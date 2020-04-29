@@ -6232,18 +6232,14 @@ static struct vkd3d_cs_op_data *d3d12_command_queue_require_space_locked(struct 
 
 static void STDMETHODCALLTYPE d3d12_command_queue_UpdateTileMappings(ID3D12CommandQueue *iface,
         ID3D12Resource *resource, UINT region_count,
-        const D3D12_TILED_RESOURCE_COORDINATE *region_start_coordinates,
-        const D3D12_TILE_REGION_SIZE *region_sizes,
-        UINT range_count,
-        const D3D12_TILE_RANGE_FLAGS *range_flags,
-        UINT *heap_range_offsets,
-        UINT *range_tile_counts,
-        D3D12_TILE_MAPPING_FLAGS flags)
+        const D3D12_TILED_RESOURCE_COORDINATE *region_start_coordinates, const D3D12_TILE_REGION_SIZE *region_sizes,
+        ID3D12Heap *heap, UINT range_count, const D3D12_TILE_RANGE_FLAGS *range_flags,
+        UINT *heap_range_offsets, UINT *range_tile_counts, D3D12_TILE_MAPPING_FLAGS flags)
 {
     FIXME("iface %p, resource %p, region_count %u, region_start_coordinates %p, "
-            "region_sizes %p, range_count %u, range_flags %p, heap_range_offsets %p, "
+            "region_sizes %p, heap %p, range_count %u, range_flags %p, heap_range_offsets %p, "
             "range_tile_counts %p, flags %#x stub!\n",
-            iface, resource, region_count, region_start_coordinates, region_sizes, range_count,
+            iface, resource, region_count, region_start_coordinates, region_sizes, heap, range_count,
             range_flags, heap_range_offsets, range_tile_counts, flags);
 }
 
