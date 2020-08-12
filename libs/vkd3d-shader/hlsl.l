@@ -109,6 +109,7 @@ sampler3D               {return KW_SAMPLER3D;           }
 samplerCUBE             {return KW_SAMPLERCUBE;         }
 sampler_state           {return KW_SAMPLER_STATE;       }
 SamplerComparisonState  {return KW_SAMPLERCOMPARISONSTATE;}
+SamplerState            {return KW_SAMPLER;             }
 shared                  {return KW_SHARED;              }
 stateblock              {return KW_STATEBLOCK;          }
 stateblock_state        {return KW_STATEBLOCK_STATE;    }
