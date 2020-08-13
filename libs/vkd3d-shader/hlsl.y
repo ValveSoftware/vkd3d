@@ -1083,6 +1083,15 @@ static struct list *append_unop(struct list *list, struct hlsl_ir_node *node)
     return list;
 }
 
+static struct list *add_unary_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {node_from_list(instrs)};
+
+    add_expr(ctx, instrs, op, args, &loc);
+    return instrs;
+}
+
 static struct list *add_binary_expr(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
         enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
 {
@@ -3018,7 +3027,7 @@ unary_expr:
             if ($1 == UNARY_OP_PLUS)
                 $$ = $2;
             else
-                $$ = append_unop($2, hlsl_new_unary_expr(ctx, ops[$1], node_from_list($2), @1));
+                $$ = add_unary_expr(ctx, $2, ops[$1], @1);
         }
 
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
