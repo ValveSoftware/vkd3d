@@ -1069,12 +1069,6 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
     return expr;
 }
 
-static struct list *append_unop(struct list *list, struct hlsl_ir_node *node)
-{
-    list_add_tail(list, &node->entry);
-    return list;
-}
-
 static struct list *add_unary_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
 {
@@ -2872,7 +2866,8 @@ postfix_expr:
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
                     YYABORT;
                 }
-                $$ = append_unop($1, &swizzle->node);
+                list_add_tail($1, &swizzle->node.entry);
+                $$ = $1;
             }
             else
             {
@@ -2986,7 +2981,8 @@ postfix_expr:
             vkd3d_free($4.args);
             if (!(load = hlsl_new_var_load(ctx, var, @2)))
                 YYABORT;
-            $$ = append_unop($4.instrs, &load->node);
+            list_add_tail($4.instrs, &load->node.entry);
+            $$ = $4.instrs;
         }
 
 unary_expr:
@@ -3030,6 +3026,7 @@ unary_expr:
         {
             struct hlsl_type *src_type = node_from_list($6)->data_type;
             struct hlsl_type *dst_type;
+            struct hlsl_ir_expr *cast;
             unsigned int i;
 
             if ($2)
@@ -3057,7 +3054,13 @@ unary_expr:
                 YYABORT;
             }
 
-            $$ = append_unop($6, &hlsl_new_cast(ctx, node_from_list($6), dst_type, &@3)->node);
+            if (!(cast = hlsl_new_cast(ctx, node_from_list($6), dst_type, &@3)))
+            {
+                hlsl_free_instr_list($6);
+                YYABORT;
+            }
+            list_add_tail($6, &cast->node.entry);
+            $$ = $6;
         }
 
 mul_expr:
