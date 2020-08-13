@@ -1555,6 +1555,14 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
     return args.decl;
 }
 
+static bool intrinsic_abs(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {params->args[0]};
+
+    return !!add_expr(ctx, params->instrs, HLSL_OP1_ABS, args, &loc);
+}
+
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1594,6 +1602,7 @@ static const struct intrinsic_function
 }
 intrinsic_functions[] =
 {
+    {"abs",                                 1, true,  intrinsic_abs},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"max",                                 2, true,  intrinsic_max},
     {"saturate",                            1, true,  intrinsic_saturate},
