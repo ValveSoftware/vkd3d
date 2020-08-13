@@ -80,14 +80,6 @@ struct parse_if_body
     struct list *else_instrs;
 };
 
-enum parse_unary_op
-{
-    UNARY_OP_PLUS,
-    UNARY_OP_MINUS,
-    UNARY_OP_LOGICNOT,
-    UNARY_OP_BITNOT,
-};
-
 enum parse_assign_op
 {
     ASSIGN_OP_ASSIGN,
@@ -1736,7 +1728,6 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
     struct parse_array_sizes arrays;
     struct parse_variable_def *variable_def;
     struct parse_if_body if_body;
-    enum parse_unary_op unary_op;
     enum parse_assign_op assign_op;
     struct hlsl_reg_reservation reg_reservation;
     struct parse_colon_attribute colon_attribute;
@@ -1924,8 +1915,6 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
 %type <type> struct_spec
 %type <type> type
 %type <type> typedef_type
-
-%type <unary_op> unary_op
 
 %type <variable_def> type_spec
 %type <variable_def> variable_def
@@ -3020,16 +3009,22 @@ unary_expr:
             }
             $$ = $2;
         }
-    | unary_op unary_expr
+    | '+' unary_expr
         {
-            static const enum hlsl_ir_expr_op ops[] = {0, HLSL_OP1_NEG, HLSL_OP1_LOGIC_NOT, HLSL_OP1_BIT_NOT};
-
-            if ($1 == UNARY_OP_PLUS)
-                $$ = $2;
-            else
-                $$ = add_unary_expr(ctx, $2, ops[$1], @1);
+            $$ = $2;
         }
-
+    | '-' unary_expr
+        {
+            $$ = add_unary_expr(ctx, $2, HLSL_OP1_NEG, @1);
+        }
+    | '~' unary_expr
+        {
+            $$ = add_unary_expr(ctx, $2, HLSL_OP1_BIT_NOT, @1);
+        }
+    | '!' unary_expr
+        {
+            $$ = add_unary_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, @1);
+        }
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | '(' var_modifiers type arrays ')' unary_expr
         {
@@ -3063,24 +3058,6 @@ unary_expr:
             }
 
             $$ = append_unop($6, &hlsl_new_cast(ctx, node_from_list($6), dst_type, &@3)->node);
-        }
-
-unary_op:
-      '+'
-        {
-            $$ = UNARY_OP_PLUS;
-        }
-    | '-'
-        {
-            $$ = UNARY_OP_MINUS;
-        }
-    | '!'
-        {
-            $$ = UNARY_OP_LOGICNOT;
-        }
-    | '~'
-        {
-            $$ = UNARY_OP_BITNOT;
         }
 
 mul_expr:
