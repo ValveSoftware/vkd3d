@@ -1585,6 +1585,28 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc);
 }
 
+static bool intrinsic_pow(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {0};
+    struct hlsl_ir_node *log, *exp;
+    struct hlsl_ir_expr *mul;
+
+    if (!(log = hlsl_new_unary_expr(ctx, HLSL_OP1_LOG2, params->args[0], loc)))
+        return false;
+    list_add_tail(params->instrs, &log->entry);
+
+    args[0] = params->args[1];
+    args[1] = log;
+    if (!(mul = add_expr(ctx, params->instrs, HLSL_OP2_MUL, args, &loc)))
+        return false;
+
+    if (!(exp = hlsl_new_unary_expr(ctx, HLSL_OP1_EXP2, &mul->node, loc)))
+        return false;
+    list_add_tail(params->instrs, &exp->entry);
+    return true;
+}
+
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1605,6 +1627,7 @@ intrinsic_functions[] =
     {"abs",                                 1, true,  intrinsic_abs},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"max",                                 2, true,  intrinsic_max},
+    {"pow",                                 2, true,  intrinsic_pow},
     {"saturate",                            1, true,  intrinsic_saturate},
 };
 

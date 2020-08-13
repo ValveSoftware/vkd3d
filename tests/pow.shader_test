@@ -1,0 +1,10 @@
+[pixel shader]
+float4 main(uniform float2 u, uniform float2 v) : sv_target
+{
+    return float4(pow(u.y, 3), pow(u, v), pow(0.5, v.y));
+}
+
+[test]
+uniform 0 float4 0.4 0.8 2.5 2.0
+draw quad
+probe all rgba (0.512, 0.101192884, 0.64, 0.25)
