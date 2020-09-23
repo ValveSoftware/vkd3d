@@ -232,3 +232,21 @@ void vkd3d_destroy_event(HANDLE event)
         ERR("Failed to destroy condition variable, error %d.\n", rc);
     vkd3d_free(impl);
 }
+
+HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob)
+{
+    HRESULT hr;
+    void *data;
+
+    TRACE("data_size %lu, blob %p.\n", data_size, blob);
+
+    if (!(data = vkd3d_calloc(data_size, 1)))
+        return E_OUTOFMEMORY;
+
+    if (FAILED(hr = vkd3d_blob_create(data, data_size, blob)))
+    {
+        WARN("Failed to create blob object, hr %#x.\n", hr);
+        vkd3d_free(data);
+    }
+    return hr;
+}

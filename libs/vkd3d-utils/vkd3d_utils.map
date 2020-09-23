@@ -8,6 +8,7 @@ global:
     D3D12GetDebugInterface;
     D3D12SerializeRootSignature;
     D3D12SerializeVersionedRootSignature;
+    D3DCreateBlob;
     vkd3d_create_event;
     vkd3d_destroy_event;
     vkd3d_signal_event;

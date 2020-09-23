@@ -54,6 +54,9 @@ HRESULT WINAPI D3D12CreateVersionedRootSignatureDeserializer(const void *data,
 HRESULT WINAPI D3D12SerializeVersionedRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *desc,
         ID3DBlob **blob, ID3DBlob **error_blob);
 
+/* 1.3 */
+HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob);
+
 #ifdef __cplusplus
 }
 #endif  /* __cplusplus */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Józef Kucia for CodeWeavers
+ * Copyright 2010 Matteo Bruni for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,26 +16,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef __VKD3D_UTILS_PRIVATE_H
-#define __VKD3D_UTILS_PRIVATE_H
+#ifndef __VKD3D_D3DCOMPILER_H
+#define __VKD3D_D3DCOMPILER_H
+#ifndef __D3DCOMPILER_H__
 
-#define COBJMACROS
-#define NONAMELESSUNION
-#define VK_NO_PROTOTYPES
+HRESULT WINAPI D3DCreateBlob(SIZE_T size, ID3D10Blob **blob);
 
-#include <pthread.h>
-#include <vkd3d.h>
-#include <vkd3d_shader.h>
-
-#include "vkd3d_blob.h"
-#include "vkd3d_memory.h"
-#include <vkd3d_utils.h>
-
-struct vkd3d_event
-{
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    BOOL is_signaled;
-};
-
-#endif  /* __VKD3D_UTILS_PRIVATE_H */
+#endif /* __D3DCOMPILER_H__ */
+#endif /* __VKD3D_D3DCOMPILER_H */
