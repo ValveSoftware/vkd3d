@@ -16,7 +16,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#define INITGUID
 #include "vkd3d_private.h"
 
 VKD3D_DEBUG_ENV_NAME("VKD3D_DEBUG");
@@ -423,126 +422,11 @@ HRESULT vkd3d_create_versioned_root_signature_deserializer(const void *data, SIZ
             &IID_ID3D12VersionedRootSignatureDeserializer, iid, deserializer);
 }
 
-/* ID3DBlob */
-struct d3d_blob
-{
-    ID3D10Blob ID3DBlob_iface;
-    LONG refcount;
-
-    void *buffer;
-    SIZE_T size;
-};
-
-static struct d3d_blob *impl_from_ID3DBlob(ID3DBlob *iface)
-{
-    return CONTAINING_RECORD(iface, struct d3d_blob, ID3DBlob_iface);
-}
-
-static HRESULT STDMETHODCALLTYPE d3d_blob_QueryInterface(ID3DBlob *iface, REFIID riid, void **object)
-{
-    TRACE("iface %p, riid %s, object %p.\n", iface, debugstr_guid(riid), object);
-
-    if (IsEqualGUID(riid, &IID_ID3DBlob)
-            || IsEqualGUID(riid, &IID_IUnknown))
-    {
-        ID3D10Blob_AddRef(iface);
-        *object = iface;
-        return S_OK;
-    }
-
-    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(riid));
-
-    *object = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG STDMETHODCALLTYPE d3d_blob_AddRef(ID3DBlob *iface)
-{
-    struct d3d_blob *blob = impl_from_ID3DBlob(iface);
-    ULONG refcount = InterlockedIncrement(&blob->refcount);
-
-    TRACE("%p increasing refcount to %u.\n", blob, refcount);
-
-    return refcount;
-}
-
-static ULONG STDMETHODCALLTYPE d3d_blob_Release(ID3DBlob *iface)
-{
-    struct d3d_blob *blob = impl_from_ID3DBlob(iface);
-    ULONG refcount = InterlockedDecrement(&blob->refcount);
-
-    TRACE("%p decreasing refcount to %u.\n", blob, refcount);
-
-    if (!refcount)
-    {
-        vkd3d_free(blob->buffer);
-
-        vkd3d_free(blob);
-    }
-
-    return refcount;
-}
-
-static void * STDMETHODCALLTYPE d3d_blob_GetBufferPointer(ID3DBlob *iface)
-{
-    struct d3d_blob *blob = impl_from_ID3DBlob(iface);
-
-    TRACE("iface %p.\n", iface);
-
-    return blob->buffer;
-}
-
-static SIZE_T STDMETHODCALLTYPE d3d_blob_GetBufferSize(ID3DBlob *iface)
-{
-    struct d3d_blob *blob = impl_from_ID3DBlob(iface);
-
-    TRACE("iface %p.\n", iface);
-
-    return blob->size;
-}
-
-static const struct ID3D10BlobVtbl d3d_blob_vtbl =
-{
-    /* IUnknown methods */
-    d3d_blob_QueryInterface,
-    d3d_blob_AddRef,
-    d3d_blob_Release,
-    /* ID3DBlob methods */
-    d3d_blob_GetBufferPointer,
-    d3d_blob_GetBufferSize
-};
-
-static void d3d_blob_init(struct d3d_blob *blob, void *buffer, SIZE_T size)
-{
-    blob->ID3DBlob_iface.lpVtbl = &d3d_blob_vtbl;
-    blob->refcount = 1;
-
-    blob->buffer = buffer;
-    blob->size = size;
-}
-
-static HRESULT d3d_blob_create(void *buffer, SIZE_T size, struct d3d_blob **blob)
-{
-    struct d3d_blob *object;
-
-    if (!(object = vkd3d_malloc(sizeof(*object))))
-        return E_OUTOFMEMORY;
-
-    d3d_blob_init(object, buffer, size);
-
-    TRACE("Created blob object %p.\n", object);
-
-    *blob = object;
-
-    return S_OK;
-}
-
 HRESULT vkd3d_serialize_root_signature(const D3D12_ROOT_SIGNATURE_DESC *desc,
         D3D_ROOT_SIGNATURE_VERSION version, ID3DBlob **blob, ID3DBlob **error_blob)
 {
     struct vkd3d_shader_versioned_root_signature_desc vkd3d_desc;
     struct vkd3d_shader_code dxbc;
-    struct d3d_blob *blob_object;
     char *messages;
     HRESULT hr;
     int ret;
@@ -571,25 +455,19 @@ HRESULT vkd3d_serialize_root_signature(const D3D12_ROOT_SIGNATURE_DESC *desc,
         WARN("Failed to serialize root signature, vkd3d result %d.\n", ret);
         if (error_blob && messages)
         {
-            if (FAILED(hr = d3d_blob_create(messages, strlen(messages), &blob_object)))
+            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), error_blob)))
                 ERR("Failed to create error blob, hr %#x.\n", hr);
-            else
-                *error_blob = &blob_object->ID3DBlob_iface;
         }
         return hresult_from_vkd3d_result(ret);
     }
     vkd3d_shader_free_messages(messages);
 
-    if (FAILED(hr = d3d_blob_create((void *)dxbc.code, dxbc.size, &blob_object)))
+    if (FAILED(hr = vkd3d_blob_create((void *)dxbc.code, dxbc.size, blob)))
     {
         WARN("Failed to create blob object, hr %#x.\n", hr);
         vkd3d_shader_free_shader_code(&dxbc);
-        return hr;
     }
-
-    *blob = &blob_object->ID3DBlob_iface;
-
-    return S_OK;
+    return hr;
 }
 
 HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *desc,
@@ -597,7 +475,6 @@ HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGN
 {
     const struct vkd3d_shader_versioned_root_signature_desc *vkd3d_desc;
     struct vkd3d_shader_code dxbc;
-    struct d3d_blob *blob_object;
     char *messages;
     HRESULT hr;
     int ret;
@@ -619,23 +496,17 @@ HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGN
         WARN("Failed to serialize root signature, vkd3d result %d.\n", ret);
         if (error_blob && messages)
         {
-            if (FAILED(hr = d3d_blob_create(messages, strlen(messages), &blob_object)))
+            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), error_blob)))
                 ERR("Failed to create error blob, hr %#x.\n", hr);
-            else
-                *error_blob = &blob_object->ID3DBlob_iface;
         }
         return hresult_from_vkd3d_result(ret);
     }
     vkd3d_shader_free_messages(messages);
 
-    if (FAILED(hr = d3d_blob_create((void *)dxbc.code, dxbc.size, &blob_object)))
+    if (FAILED(hr = vkd3d_blob_create((void *)dxbc.code, dxbc.size, blob)))
     {
         WARN("Failed to create blob object, hr %#x.\n", hr);
         vkd3d_shader_free_shader_code(&dxbc);
-        return hr;
     }
-
-    *blob = &blob_object->ID3DBlob_iface;
-
-    return S_OK;
+    return hr;
 }

@@ -24,6 +24,7 @@
 #define VK_NO_PROTOTYPES
 
 #include "vkd3d_common.h"
+#include "vkd3d_blob.h"
 #include "vkd3d_memory.h"
 #include "vkd3d_utf8.h"
 #include "list.h"
