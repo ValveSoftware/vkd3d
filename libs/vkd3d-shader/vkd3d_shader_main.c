@@ -110,7 +110,7 @@ static void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer,
 
     for (p = buffer->buffer; *p; p = q)
     {
-        if (!(q = strstr(p, "\n")))
+        if (!(q = strchr(p, '\n')))
             q = p + strlen(p);
         else
             ++q;
