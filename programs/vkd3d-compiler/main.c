@@ -72,6 +72,9 @@ target_type_info[] =
     {VKD3D_SHADER_TARGET_SPIRV_TEXT,
         "spirv-text", "A SPIR-V shader in text form.\n",
         false},
+    {VKD3D_SHADER_TARGET_D3D_ASM,
+        "d3d-asm", "A shader in Direct3D assembly form.\n",
+        false},
 };
 
 static bool read_shader(struct vkd3d_shader_code *shader, FILE *f)
