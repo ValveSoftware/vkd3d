@@ -23,6 +23,9 @@
 
 VKD3D_DEBUG_ENV_NAME("VKD3D_SHADER_DEBUG");
 
+static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context);
+
 static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 {
     buffer->buffer[0] = '\0';
@@ -318,21 +321,23 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
         return ret;
 
+    if (!vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name))
+        return VKD3D_ERROR;
+
     scan_info = *compile_info;
     scan_descriptor_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
     scan_descriptor_info.next = scan_info.next;
     scan_info.next = &scan_descriptor_info;
 
-    if ((ret = vkd3d_shader_scan(&scan_info, messages)) < 0)
-        return ret;
-    if (messages)
+    if ((ret = scan_dxbc(&scan_info, &message_context)) < 0)
     {
-        vkd3d_shader_free_messages(*messages);
-        *messages = NULL;
+        vkd3d_shader_message_context_trace_messages(&message_context);
+        if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+            ret = VKD3D_ERROR_OUT_OF_MEMORY;
+        vkd3d_shader_message_context_cleanup(&message_context);
+        return ret;
     }
 
-    if (!vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name))
-        return VKD3D_ERROR;
     if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, &message_context)) < 0)
         goto done;
 
@@ -391,7 +396,7 @@ struct vkd3d_shader_scan_context
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
     size_t descriptors_size;
 
-    struct vkd3d_shader_message_context message_context;
+    struct vkd3d_shader_message_context *message_context;
 
     struct vkd3d_shader_cf_info
     {
@@ -416,20 +421,19 @@ struct vkd3d_shader_scan_context
     size_t uav_range_count;
 };
 
-static bool vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
+static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
         struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
-        enum vkd3d_shader_log_level log_level, const char *source_name)
+        struct vkd3d_shader_message_context *message_context)
 {
     memset(context, 0, sizeof(*context));
     context->scan_descriptor_info = scan_descriptor_info;
-    return vkd3d_shader_message_context_init(&context->message_context, log_level, source_name);
+    context->message_context = message_context;
 }
 
 static void vkd3d_shader_scan_context_cleanup(struct vkd3d_shader_scan_context *context)
 {
     vkd3d_free(context->uav_ranges);
     vkd3d_free(context->cf_info);
-    vkd3d_shader_message_context_cleanup(&context->message_context);
 }
 
 static struct vkd3d_shader_cf_info *vkd3d_shader_scan_get_current_cf_info(struct vkd3d_shader_scan_context *context)
@@ -713,7 +717,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ELSE:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_IF)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘else’ instruction without corresponding ‘if’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -722,7 +726,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ENDIF:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_IF)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endif’ instruction without corresponding ‘if’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -735,7 +739,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ENDLOOP:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_LOOP)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endloop’ instruction without corresponding ‘loop’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -749,7 +753,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH || cf_info->inside_block)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endswitch’ instruction without corresponding ‘switch’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -759,7 +763,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘case’ instruction outside switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -769,13 +773,13 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘default’ instruction outside switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
             if (cf_info->has_default)
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered duplicate ‘default’ instruction inside the current switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -785,7 +789,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_BREAK:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_breakable_cf_info(context)))
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘break’ instruction outside breakable block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -794,7 +798,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_BREAKP:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘breakp’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -802,7 +806,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_CONTINUE:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘continue’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -811,7 +815,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_CONTINUEP:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘continue’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -844,22 +848,14 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     return VKD3D_OK;
 }
 
-int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char **messages)
+static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
-    struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_scan_context context;
     struct vkd3d_shader_parser parser;
     int ret;
-
-    TRACE("compile_info %p, messages %p.\n", compile_info, messages);
-
-    if (messages)
-        *messages = NULL;
-
-    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
-        return ret;
 
     if ((scan_descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO)))
     {
@@ -867,16 +863,10 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
         scan_descriptor_info->descriptor_count = 0;
     }
 
-    if (!vkd3d_shader_scan_context_init(&context, scan_descriptor_info,
-            compile_info->log_level, compile_info->source_name))
-        return VKD3D_ERROR;
-    message_context = &context.message_context;
+    vkd3d_shader_scan_context_init(&context, scan_descriptor_info, message_context);
 
     if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, message_context)) < 0)
     {
-        vkd3d_shader_message_context_trace_messages(message_context);
-        if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(message_context)))
-            ret = VKD3D_ERROR_OUT_OF_MEMORY;
         vkd3d_shader_scan_context_cleanup(&context);
         return ret;
     }
@@ -911,11 +901,33 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     ret = VKD3D_OK;
 
 done:
-    vkd3d_shader_message_context_trace_messages(message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(message_context)))
-        ret = VKD3D_ERROR_OUT_OF_MEMORY;
     vkd3d_shader_scan_context_cleanup(&context);
     vkd3d_shader_parser_destroy(&parser);
+    return ret;
+}
+
+int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char **messages)
+{
+    struct vkd3d_shader_message_context message_context;
+    int ret;
+
+    TRACE("compile_info %p, messages %p.\n", compile_info, messages);
+
+    if (messages)
+        *messages = NULL;
+
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
+        return ret;
+
+    if (!vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    ret = scan_dxbc(compile_info, &message_context);
+
+    vkd3d_shader_message_context_trace_messages(&message_context);
+    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+        ret = VKD3D_ERROR_OUT_OF_MEMORY;
+    vkd3d_shader_message_context_cleanup(&message_context);
     return ret;
 }
 
