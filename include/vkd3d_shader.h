@@ -55,6 +55,11 @@ enum vkd3d_shader_structure_type
     VKD3D_SHADER_STRUCTURE_TYPE_TRANSFORM_FEEDBACK_INFO,
 
     /**
+     * The structure is a vkd3d_shader_hlsl_source_info structure.
+     * \since 1.3
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO,
+    /**
      * The structure is a vkd3d_shader_preprocess_info structure.
      * \since 1.3
      */
@@ -737,6 +742,39 @@ struct vkd3d_shader_preprocess_info
      * \ref pfn_open_include and \ref pfn_close_include callbacks.
      */
     void *include_context;
+};
+
+/**
+ * A chained structure containing HLSL compilation parameters.
+ *
+ * This structure is optional.
+ *
+ * This structure extends vkd3d_shader_compile_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.3
+ */
+struct vkd3d_shader_hlsl_source_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /**
+     * Optional pointer to a null-terminated string containing the shader entry
+     * point.
+     *
+     * If this parameter is NULL, vkd3d-shader uses the entry point "main".
+     */
+    const char *entry_point;
+    struct vkd3d_shader_code secondary_code;
+    /**
+     * Pointer to a null-terminated string containing the target shader
+     * profile.
+     */
+    const char *profile;
 };
 
 /* root signature 1.0 */
