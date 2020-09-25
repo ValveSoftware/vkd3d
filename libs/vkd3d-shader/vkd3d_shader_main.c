@@ -338,6 +338,13 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
     vkd3d_shader_dump_shader(parser.shader_version.type, &compile_info->source);
 
+    if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
+    {
+        ret = vkd3d_dxbc_binary_to_text(parser.data, out);
+        vkd3d_shader_parser_destroy(&parser);
+        goto done;
+    }
+
     if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser.shader_version,
             &parser.shader_desc, compile_info, &scan_descriptor_info, &message_context)))
     {
@@ -1074,6 +1081,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 #ifdef HAVE_SPIRV_TOOLS
         VKD3D_SHADER_TARGET_SPIRV_TEXT,
 #endif
+        VKD3D_SHADER_TARGET_D3D_ASM,
     };
 
     TRACE("source_type %#x, count %p.\n", source_type, count);
