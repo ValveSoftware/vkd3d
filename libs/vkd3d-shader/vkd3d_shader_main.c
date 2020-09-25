@@ -1141,3 +1141,11 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
             return NULL;
     }
 }
+
+int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, char **messages)
+{
+    TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
+
+    return VKD3D_ERROR_NOT_IMPLEMENTED;
+}

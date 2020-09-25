@@ -54,6 +54,12 @@ enum vkd3d_shader_structure_type
     /** The structure is a vkd3d_shader_transform_feedback_info structure. */
     VKD3D_SHADER_STRUCTURE_TYPE_TRANSFORM_FEEDBACK_INFO,
 
+    /**
+     * The structure is a vkd3d_shader_preprocess_info structure.
+     * \since 1.3
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO,
+
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
 
@@ -609,6 +615,128 @@ struct vkd3d_shader_spirv_domain_shader_target_info
 
     enum vkd3d_shader_tessellator_output_primitive output_primitive;
     enum vkd3d_shader_tessellator_partitioning partitioning;
+};
+
+/**
+ * A single preprocessor macro, passed as part of struct
+ * vkd3d_shader_preprocess_info.
+ */
+struct vkd3d_shader_macro
+{
+    /**
+     * A null-terminated string containing the name of a macro. This macro must
+     * not be a parameterized (i.e. function-like) macro. If this field is not a
+     * valid macro identifier, it will be ignored.
+     */
+    const char *name;
+    /** A null-terminated string containing the expansion of the macro. */
+    const char *value;
+};
+
+/**
+ * Type of a callback function which will be used to open preprocessor includes.
+ *
+ * This callback function is passed as part of struct
+ * vkd3d_shader_preprocess_info.
+ *
+ * If this function fails, vkd3d-shader will emit a compilation error, and the
+ * \a pfn_close_include callback will not be called.
+ *
+ * \param filename Unquoted string used as an argument to the \#include
+ * directive.
+ *
+ * \param local Whether the \#include directive is requesting a local (i.e.
+ * double-quoted) or system (i.e. angle-bracketed) include.
+ *
+ * \param parent_data Unprocessed source code of the file in which this
+ * \#include directive is evaluated. This parameter may be NULL.
+ *
+ * \param context The user-defined pointer passed to struct
+ * vkd3d_shader_preprocess_info.
+ *
+ * \param out Output location for the full contents of the included file. The
+ * code need not be allocated using standard vkd3d functions, but must remain
+ * valid until the corresponding call to \a pfn_close_include. If this function
+ * fails, the contents of this parameter are ignored.
+ *
+ * \return A member of \ref vkd3d_result.
+ */
+typedef int (*PFN_vkd3d_shader_open_include)(const char *filename, bool local,
+        const char *parent_data, void *context, struct vkd3d_shader_code *out);
+/**
+ * Type of a callback function which will be used to close preprocessor
+ * includes.
+ *
+ * This callback function is passed as part of struct
+ * vkd3d_shader_preprocess_info.
+ *
+ * \param code Contents of the included file, which were allocated by the
+ * \ref PFN_vkd3d_shader_open_include callback. The source code was allocated by
+ * the user and thus need not be freed by vkd3d_shader_free_shader_code().
+ *
+ * \param context The user-defined pointer passed to struct
+ * vkd3d_shader_preprocess_info.
+ */
+typedef void (*PFN_vkd3d_shader_close_include)(const struct vkd3d_shader_code *code, void *context);
+
+/**
+ * A chained structure containing preprocessing parameters.
+ *
+ * This structure is optional.
+ *
+ * This structure extends vkd3d_shader_compile_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.3
+ */
+struct vkd3d_shader_preprocess_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /**
+     * Pointer to an array of predefined macros. Each macro in this array will
+     * be expanded as if a corresponding #define statement were prepended to the
+     * source code.
+     *
+     * If the same macro is specified multiple times, only the first value is
+     * used.
+     */
+    const struct vkd3d_shader_macro *macros;
+    /** Size, in elements, of \ref macros. */
+    unsigned int macro_count;
+
+    /**
+     * Optional pointer to a callback function, which will be called in order to
+     * evaluate \#include directives. The function receives parameters
+     * corresponding to the directive's arguments, and should return the
+     * complete text of the included file.
+     *
+     * If this field is set to NULL, or if this structure is omitted,
+     * vkd3d-shader will attempt to open included files using POSIX file APIs.
+     *
+     * If this field is set to NULL, the \ref pfn_close_include field must also
+     * be set to NULL.
+     */
+    PFN_vkd3d_shader_open_include pfn_open_include;
+    /**
+     * Optional pointer to a callback function, which will be called whenever an
+     * included file is closed. This function will be called exactly once for
+     * each successful call to \ref pfn_open_include, and should be used to free
+     * any resources allocated thereby.
+     *
+     * If this field is set to NULL, the \ref pfn_open_include field must also
+     * be set to NULL.
+     */
+    PFN_vkd3d_shader_close_include pfn_close_include;
+    /**
+     * User-defined pointer which will be passed unmodified to the
+     * \ref pfn_open_include and \ref pfn_close_include callbacks.
+     */
+    void *include_context;
 };
 
 /* root signature 1.0 */
@@ -1453,6 +1581,35 @@ struct vkd3d_shader_signature_element *vkd3d_shader_find_signature_element(
  * \param signature Signature description to free.
  */
 void vkd3d_shader_free_shader_signature(struct vkd3d_shader_signature *signature);
+
+/* 1.3 */
+
+/**
+ * Preprocess the given source code.
+ *
+ * This function supports the following chained structures:
+ * - vkd3d_shader_preprocess_info
+ *
+ * \param compile_info A chained structure containing compilation parameters.
+ *
+ * \param out A pointer to a vkd3d_shader_code structure in which the
+ * preprocessed code will be stored.
+ * \n
+ * The preprocessed shader is allocated by vkd3d-shader and should be freed with
+ * vkd3d_shader_free_shader_code() when no longer needed.
+ *
+ * \param messages Optional output location for error or informational messages
+ * produced by the compiler.
+ * \n
+ * This parameter behaves identically to the \a messages parameter of
+ * vkd3d_shader_compile().
+ *
+ * \return A member of \ref vkd3d_result.
+ *
+ * \since 1.3
+ */
+int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, char **messages);
 
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
