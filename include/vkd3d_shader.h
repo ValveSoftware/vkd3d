@@ -448,6 +448,8 @@ enum vkd3d_shader_source_type
      * the format used for Direct3D shader model 4 and 5 shaders.
      */
     VKD3D_SHADER_SOURCE_DXBC_TPF,
+    /** High-Level Shader Language source code. */
+    VKD3D_SHADER_SOURCE_HLSL,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SOURCE_TYPE),
 };
@@ -467,6 +469,11 @@ enum vkd3d_shader_target_type
     VKD3D_SHADER_TARGET_SPIRV_BINARY,
     VKD3D_SHADER_TARGET_SPIRV_TEXT,
     VKD3D_SHADER_TARGET_D3D_ASM,
+    /**
+     * A 'Tokenized Program Format' shader embedded in a DXBC container. This is
+     * the format used for Direct3D shader model 4 and 5 shaders.
+     */
+    VKD3D_SHADER_TARGET_DXBC_TPF,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_TARGET_TYPE),
 };

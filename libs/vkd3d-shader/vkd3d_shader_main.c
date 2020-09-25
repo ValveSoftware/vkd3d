@@ -839,65 +839,51 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, char **messages)
+static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info scan_descriptor_info;
-    struct vkd3d_shader_message_context message_context;
     struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_compile_info scan_info;
     struct vkd3d_dxbc_compiler *spirv_compiler;
     struct vkd3d_shader_parser parser;
     int ret;
 
-    TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
-
-    if (messages)
-        *messages = NULL;
-
-    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
-        return ret;
-
-    if (!vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name))
-        return VKD3D_ERROR;
-
     scan_info = *compile_info;
     scan_descriptor_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
     scan_descriptor_info.next = scan_info.next;
     scan_info.next = &scan_descriptor_info;
 
-    if ((ret = scan_dxbc(&scan_info, &message_context)) < 0)
+    if ((ret = scan_dxbc(&scan_info, message_context)) < 0)
+        return ret;
+
+    if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, message_context)) < 0)
     {
-        vkd3d_shader_message_context_trace_messages(&message_context);
-        if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
-            ret = VKD3D_ERROR_OUT_OF_MEMORY;
-        vkd3d_shader_message_context_cleanup(&message_context);
+        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
     }
-
-    if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, &message_context)) < 0)
-        goto done;
 
     vkd3d_shader_dump_shader(parser.shader_version.type, &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
+        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         ret = vkd3d_dxbc_binary_to_text(parser.data, out);
         vkd3d_shader_parser_destroy(&parser);
-        goto done;
+        return ret;
     }
 
     if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser.shader_version,
-            &parser.shader_desc, compile_info, &scan_descriptor_info, &message_context)))
+            &parser.shader_desc, compile_info, &scan_descriptor_info, message_context)))
     {
         ERR("Failed to create DXBC compiler.\n");
         vkd3d_shader_parser_destroy(&parser);
-        ret = VKD3D_ERROR;
-        goto done;
+        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+        return VKD3D_ERROR;
     }
 
-    message_context.line = 2; /* Line 1 is the version token. */
-    message_context.column = 1;
+    message_context->line = 2; /* Line 1 is the version token. */
+    message_context->column = 1;
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {
         shader_sm4_read_instruction(parser.data, &parser.ptr, &instruction);
@@ -911,7 +897,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
         if ((ret = vkd3d_dxbc_compiler_handle_instruction(spirv_compiler, &instruction)) < 0)
             break;
-        ++message_context.line;
+        ++message_context->line;
     }
 
     if (ret >= 0)
@@ -919,12 +905,51 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
     vkd3d_dxbc_compiler_destroy(spirv_compiler);
     vkd3d_shader_parser_destroy(&parser);
-done:
+    vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+    return ret;
+}
+
+static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    return VKD3D_ERROR_NOT_IMPLEMENTED;
+}
+
+int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, char **messages)
+{
+    struct vkd3d_shader_message_context message_context;
+    int ret;
+
+    TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
+
+    if (messages)
+        *messages = NULL;
+
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
+        return ret;
+
+    if (!vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name))
+        return VKD3D_ERROR;
+
+    switch (compile_info->source_type)
+    {
+        case VKD3D_SHADER_SOURCE_DXBC_TPF:
+            ret = compile_dxbc_tpf(compile_info, out, &message_context);
+            break;
+
+        case VKD3D_SHADER_SOURCE_HLSL:
+            ret = compile_hlsl(compile_info, out, &message_context);
+            break;
+
+        default:
+            assert(0);
+    }
+
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
     vkd3d_shader_message_context_cleanup(&message_context);
-    vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
     return ret;
 }
 
@@ -1073,6 +1098,7 @@ const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(uns
     static const enum vkd3d_shader_source_type types[] =
     {
         VKD3D_SHADER_SOURCE_DXBC_TPF,
+        VKD3D_SHADER_SOURCE_HLSL,
     };
 
     TRACE("count %p.\n", count);
@@ -1093,6 +1119,11 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         VKD3D_SHADER_TARGET_D3D_ASM,
     };
 
+    static const enum vkd3d_shader_target_type hlsl_types[] =
+    {
+        VKD3D_SHADER_TARGET_DXBC_TPF,
+    };
+
     TRACE("source_type %#x, count %p.\n", source_type, count);
 
     switch (source_type)
@@ -1100,6 +1131,10 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         case VKD3D_SHADER_SOURCE_DXBC_TPF:
             *count = ARRAY_SIZE(dxbc_tpf_types);
             return dxbc_tpf_types;
+
+        case VKD3D_SHADER_SOURCE_HLSL:
+            *count = ARRAY_SIZE(hlsl_types);
+            return hlsl_types;
 
         default:
             *count = 0;
