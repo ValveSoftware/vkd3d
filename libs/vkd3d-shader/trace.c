@@ -1557,17 +1557,18 @@ static void shader_dump_instruction(struct vkd3d_string_buffer *buffer,
     shader_addline(buffer, "\n");
 }
 
-void vkd3d_shader_trace(void *data)
+enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code *out)
 {
     struct vkd3d_shader_version shader_version;
-    struct vkd3d_string_buffer buffer;
-    const char *p, *q;
     const DWORD *ptr;
+    struct vkd3d_string_buffer buffer;
+    enum vkd3d_result result = VKD3D_OK;
+    void *code;
 
     if (!vkd3d_string_buffer_init(&buffer))
     {
         ERR("Failed to initialize string buffer.\n");
-        return;
+        return VKD3D_ERROR;
     }
 
     shader_sm4_read_header(data, &ptr, &shader_version);
@@ -1583,13 +1584,37 @@ void vkd3d_shader_trace(void *data)
         {
             WARN("Skipping unrecognized instruction.\n");
             shader_addline(&buffer, "<unrecognized instruction>\n");
+            result = VKD3D_ERROR;
             continue;
         }
 
         shader_dump_instruction(&buffer, &ins, &shader_version);
     }
 
-    for (p = buffer.buffer; *p; p = q)
+    code = vkd3d_malloc(buffer.content_size);
+    if (code)
+    {
+        memcpy(code, buffer.buffer, buffer.content_size);
+        out->size = buffer.content_size;
+        out->code = code;
+    }
+    else
+        result = VKD3D_ERROR_OUT_OF_MEMORY;
+
+    vkd3d_string_buffer_cleanup(&buffer);
+
+    return result;
+}
+
+void vkd3d_shader_trace(void *data)
+{
+    const char *p, *q;
+    struct vkd3d_shader_code code;
+
+    if (vkd3d_dxbc_binary_to_text(data, &code) != VKD3D_OK)
+        return;
+
+    for (p = code.code; *p; p = q)
     {
         if (!(q = strstr(p, "\n")))
             q = p + strlen(p);
@@ -1598,5 +1623,5 @@ void vkd3d_shader_trace(void *data)
         TRACE("    %.*s", (int)(q - p), p);
     }
 
-    vkd3d_string_buffer_cleanup(&buffer);
+    vkd3d_shader_free_shader_code(&code);
 }

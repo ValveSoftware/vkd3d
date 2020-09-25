@@ -830,6 +830,7 @@ struct vkd3d_string_buffer
     unsigned int content_size;
 };
 
+enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
 bool vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args) DECLSPEC_HIDDEN;
