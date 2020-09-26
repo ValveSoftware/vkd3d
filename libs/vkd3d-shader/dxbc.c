@@ -433,11 +433,15 @@ enum vkd3d_sm4_resource_type
 
 enum vkd3d_sm4_data_type
 {
-    VKD3D_SM4_DATA_UNORM  = 0x1,
-    VKD3D_SM4_DATA_SNORM  = 0x2,
-    VKD3D_SM4_DATA_INT    = 0x3,
-    VKD3D_SM4_DATA_UINT   = 0x4,
-    VKD3D_SM4_DATA_FLOAT  = 0x5,
+    VKD3D_SM4_DATA_UNORM     = 0x1,
+    VKD3D_SM4_DATA_SNORM     = 0x2,
+    VKD3D_SM4_DATA_INT       = 0x3,
+    VKD3D_SM4_DATA_UINT      = 0x4,
+    VKD3D_SM4_DATA_FLOAT     = 0x5,
+    VKD3D_SM4_DATA_MIXED     = 0x6,
+    VKD3D_SM4_DATA_DOUBLE    = 0x7,
+    VKD3D_SM4_DATA_CONTINUED = 0x8,
+    VKD3D_SM4_DATA_UNUSED    = 0x9,
 };
 
 enum vkd3d_sm4_sampler_mode
@@ -522,12 +526,16 @@ static const enum vkd3d_shader_resource_type resource_type_table[] =
 
 static const enum vkd3d_data_type data_type_table[] =
 {
-    /* 0 */                       VKD3D_DATA_FLOAT,
-    /* VKD3D_SM4_DATA_UNORM */    VKD3D_DATA_UNORM,
-    /* VKD3D_SM4_DATA_SNORM */    VKD3D_DATA_SNORM,
-    /* VKD3D_SM4_DATA_INT */      VKD3D_DATA_INT,
-    /* VKD3D_SM4_DATA_UINT */     VKD3D_DATA_UINT,
-    /* VKD3D_SM4_DATA_FLOAT */    VKD3D_DATA_FLOAT,
+    /* 0 */                         VKD3D_DATA_FLOAT,
+    /* VKD3D_SM4_DATA_UNORM */      VKD3D_DATA_UNORM,
+    /* VKD3D_SM4_DATA_SNORM */      VKD3D_DATA_SNORM,
+    /* VKD3D_SM4_DATA_INT */        VKD3D_DATA_INT,
+    /* VKD3D_SM4_DATA_UINT */       VKD3D_DATA_UINT,
+    /* VKD3D_SM4_DATA_FLOAT */      VKD3D_DATA_FLOAT,
+    /* VKD3D_SM4_DATA_MIXED */      VKD3D_DATA_MIXED,
+    /* VKD3D_SM4_DATA_DOUBLE */     VKD3D_DATA_DOUBLE,
+    /* VKD3D_SM4_DATA_CONTINUED */  VKD3D_DATA_CONTINUED,
+    /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,
 };
 
 static bool shader_is_sm_5_1(const struct vkd3d_sm4_data *priv)

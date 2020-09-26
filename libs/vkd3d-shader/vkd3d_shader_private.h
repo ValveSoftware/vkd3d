@@ -394,6 +394,10 @@ enum vkd3d_data_type
     VKD3D_DATA_UNORM,
     VKD3D_DATA_SNORM,
     VKD3D_DATA_OPAQUE,
+    VKD3D_DATA_MIXED,
+    VKD3D_DATA_DOUBLE,
+    VKD3D_DATA_CONTINUED,
+    VKD3D_DATA_UNUSED,
 };
 
 enum vkd3d_immconst_type

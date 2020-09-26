@@ -530,15 +530,19 @@ static void shader_dump_data_type(struct vkd3d_string_buffer *buffer, enum vkd3d
 {
     static const char *const data_type_names[] =
     {
-        /* VKD3D_DATA_FLOAT    */ "float",
-        /* VKD3D_DATA_INT      */ "int",
-        /* VKD3D_DATA_RESOURCE */ "resource",
-        /* VKD3D_DATA_SAMPLER  */ "sampler",
-        /* VKD3D_DATA_UAV      */ "uav",
-        /* VKD3D_DATA_UINT     */ "uint",
-        /* VKD3D_DATA_UNORM    */ "unorm",
-        /* VKD3D_DATA_SNORM    */ "snorm",
-        /* VKD3D_DATA_OPAQUE   */ "opaque",
+        /* VKD3D_DATA_FLOAT     */ "float",
+        /* VKD3D_DATA_INT       */ "int",
+        /* VKD3D_DATA_RESOURCE  */ "resource",
+        /* VKD3D_DATA_SAMPLER   */ "sampler",
+        /* VKD3D_DATA_UAV       */ "uav",
+        /* VKD3D_DATA_UINT      */ "uint",
+        /* VKD3D_DATA_UNORM     */ "unorm",
+        /* VKD3D_DATA_SNORM     */ "snorm",
+        /* VKD3D_DATA_OPAQUE    */ "opaque",
+        /* VKD3D_DATA_MIXED     */ "mixed",
+        /* VKD3D_DATA_DOUBLE    */ "double",
+        /* VKD3D_DATA_CONTINUED */ "<continued>",
+        /* VKD3D_DATA_UNUSED    */ "<unused>",
     };
     const char *name;
 
