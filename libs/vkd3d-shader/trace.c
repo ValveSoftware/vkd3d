@@ -526,7 +526,7 @@ static void shader_dump_resource_type(struct vkd3d_string_buffer *buffer, enum v
         shader_addline(buffer, "unknown");
 }
 
-static void shader_dump_data_type(struct vkd3d_string_buffer *buffer, enum vkd3d_data_type type)
+static void shader_dump_data_type(struct vkd3d_string_buffer *buffer, const enum vkd3d_data_type *type)
 {
     static const char *const data_type_names[] =
     {
@@ -545,13 +545,20 @@ static void shader_dump_data_type(struct vkd3d_string_buffer *buffer, enum vkd3d
         /* VKD3D_DATA_UNUSED    */ "<unused>",
     };
     const char *name;
+    int i;
 
-    if (type <= ARRAY_SIZE(data_type_names))
-        name = data_type_names[type];
-    else
-        name = "unknown";
+    shader_addline(buffer, "(");
 
-    shader_addline(buffer, "(%s,%s,%s,%s)", name, name, name, name);
+    for (i = 0; i < 4; i++)
+    {
+        if (type[i] < ARRAY_SIZE(data_type_names))
+            name = data_type_names[type[i]];
+        else
+            name = "unknown";
+        shader_addline(buffer, "%s%s", i == 0 ? "" : ",", name);
+    }
+
+    shader_addline(buffer, ")");
 }
 
 static void shader_dump_decl_usage(struct vkd3d_string_buffer *buffer,
@@ -1539,7 +1546,10 @@ static void shader_dump_instruction(struct vkd3d_string_buffer *buffer,
                 shader_addline(buffer, ")");
             }
 
-            if (ins->resource_data_type != VKD3D_DATA_FLOAT)
+            if (ins->resource_data_type[0] != VKD3D_DATA_FLOAT ||
+                ins->resource_data_type[1] != VKD3D_DATA_FLOAT ||
+                ins->resource_data_type[2] != VKD3D_DATA_FLOAT ||
+                ins->resource_data_type[3] != VKD3D_DATA_FLOAT)
                 shader_dump_data_type(buffer, ins->resource_data_type);
 
             for (i = 0; i < ins->dst_count; ++i)

@@ -563,7 +563,16 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
     const struct vkd3d_shader_semantic *semantic = &instruction->declaration.semantic;
     enum vkd3d_shader_resource_data_type resource_data_type;
 
-    switch (semantic->resource_data_type)
+    if (semantic->resource_data_type[0] != semantic->resource_data_type[1] ||
+        semantic->resource_data_type[0] != semantic->resource_data_type[2] ||
+        semantic->resource_data_type[0] != semantic->resource_data_type[3])
+        FIXME("Resource data types are different (%d, %d, %d, %d).\n",
+                semantic->resource_data_type[0],
+                semantic->resource_data_type[1],
+                semantic->resource_data_type[2],
+                semantic->resource_data_type[3]);
+
+    switch (semantic->resource_data_type[0])
     {
         case VKD3D_DATA_UNORM:
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_UNORM;
@@ -581,7 +590,7 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
             break;
         default:
-            ERR("Invalid resource data type %#x.\n", semantic->resource_data_type);
+            ERR("Invalid resource data type %#x.\n", semantic->resource_data_type[0]);
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
             break;
     }

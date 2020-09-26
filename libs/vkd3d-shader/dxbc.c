@@ -122,6 +122,8 @@
 
 #define VKD3D_SM4_CONDITIONAL_NZ              (0x1u << 18)
 
+#define VKD3D_SM4_TYPE_COMPONENT(com, i)      (((com) >> (4 * (i))) & 0xfu)
+
 enum vkd3d_sm4_opcode
 {
     VKD3D_SM4_OP_ADD                              = 0x00,
@@ -623,6 +625,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins,
     enum vkd3d_sm4_data_type data_type;
     enum vkd3d_data_type reg_data_type;
     DWORD components;
+    unsigned int i;
 
     resource_type = (opcode_token & VKD3D_SM4_RESOURCE_TYPE_MASK) >> VKD3D_SM4_RESOURCE_TYPE_SHIFT;
     if (!resource_type || (resource_type >= ARRAY_SIZE(resource_type_table)))
@@ -639,18 +642,19 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins,
     semantic->resource.register_index = shader_sm4_map_resource_idx(&semantic->resource.reg.reg, priv);
 
     components = *tokens++;
-    if ((components & 0xfff0) != (components & 0xf) * 0x1110)
-        FIXME("Components (%#x) have different data types.\n", components);
-    data_type = components & 0xf;
+    for (i = 0; i < VKD3D_VEC4_SIZE; i++)
+    {
+        data_type = VKD3D_SM4_TYPE_COMPONENT(components, i);
 
-    if (!data_type || (data_type >= ARRAY_SIZE(data_type_table)))
-    {
-        FIXME("Unhandled data type %#x.\n", data_type);
-        semantic->resource_data_type = VKD3D_DATA_FLOAT;
-    }
-    else
-    {
-        semantic->resource_data_type = data_type_table[data_type];
+        if (!data_type || (data_type >= ARRAY_SIZE(data_type_table)))
+        {
+            FIXME("Unhandled data type %#x.\n", data_type);
+            semantic->resource_data_type[i] = VKD3D_DATA_FLOAT;
+        }
+        else
+        {
+            semantic->resource_data_type[i] = data_type_table[data_type];
+        }
     }
 
     if (reg_data_type == VKD3D_DATA_UAV)
@@ -1791,16 +1795,21 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
         case VKD3D_SM5_MODIFIER_DATA_TYPE:
         {
             DWORD components = (modifier & VKD3D_SM5_MODIFIER_DATA_TYPE_MASK) >> VKD3D_SM5_MODIFIER_DATA_TYPE_SHIFT;
-            enum vkd3d_sm4_data_type data_type = components & 0xf;
+            unsigned int i;
 
-            if ((components & 0xfff0) != (components & 0xf) * 0x1110)
-                FIXME("Components (%#x) have different data types.\n", components);
-            if (data_type < ARRAY_SIZE(data_type_table))
-                ins->resource_data_type = data_type_table[data_type];
-            else
+            for (i = 0; i < VKD3D_VEC4_SIZE; i++)
             {
-                FIXME("Unhandled data type %#x.\n", data_type);
-                ins->resource_data_type = VKD3D_DATA_FLOAT;
+                enum vkd3d_sm4_data_type data_type = VKD3D_SM4_TYPE_COMPONENT(components, i);
+
+                if (!data_type || (data_type >= ARRAY_SIZE(data_type_table)))
+                {
+                    FIXME("Unhandled data type %#x.\n", data_type);
+                    ins->resource_data_type[i] = VKD3D_DATA_FLOAT;
+                }
+                else
+                {
+                    ins->resource_data_type[i] = data_type_table[data_type];
+                }
             }
             break;
         }
@@ -1881,7 +1890,10 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
     ins->src_count = strlen(opcode_info->src_info);
     ins->src = priv->src_param;
     ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
-    ins->resource_data_type = VKD3D_DATA_FLOAT;
+    ins->resource_data_type[0] = VKD3D_DATA_FLOAT;
+    ins->resource_data_type[1] = VKD3D_DATA_FLOAT;
+    ins->resource_data_type[2] = VKD3D_DATA_FLOAT;
+    ins->resource_data_type[3] = VKD3D_DATA_FLOAT;
     memset(&ins->texel_offset, 0, sizeof(ins->texel_offset));
 
     p = *ptr;

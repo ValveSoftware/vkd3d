@@ -5625,7 +5625,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_resource(struct vkd3d_dxbc_compiler *co
         FIXME("Unhandled UAV flags %#x.\n", instruction->flags);
 
     vkd3d_dxbc_compiler_emit_resource_declaration(compiler, &semantic->resource,
-            semantic->resource_type, semantic->resource_data_type, 0, false);
+            semantic->resource_type, semantic->resource_data_type[0], 0, false);
 }
 
 static void vkd3d_dxbc_compiler_emit_dcl_resource_raw(struct vkd3d_dxbc_compiler *compiler,
