@@ -17,9 +17,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <fcntl.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -28,6 +29,9 @@
 
 #include "vkd3d_common.h"
 #include "vkd3d_shader.h"
+#ifdef HAVE_NCURSES
+#include <term.h>
+#endif
 
 #define MAX_COMPILE_OPTIONS 3
 
@@ -180,6 +184,8 @@ struct options
     bool print_version;
     bool print_source_types;
     bool print_target_types;
+    uint32_t formatting;
+    bool explicit_colour;
 
     struct vkd3d_shader_compile_option compile_options[MAX_COMPILE_OPTIONS];
     unsigned int compile_option_count;
@@ -230,7 +236,7 @@ static bool parse_buffer_uav(enum vkd3d_shader_compile_option_buffer_uav *buffer
     return false;
 }
 
-static bool parse_formatting(uint32_t *formatting, char *arg)
+static bool parse_formatting(uint32_t *formatting, bool *colour, char *arg)
 {
     static const struct formatting_option
     {
@@ -270,6 +276,8 @@ static bool parse_formatting(uint32_t *formatting, char *arg)
                     *formatting |= opts[i].value;
                 else
                     *formatting &= ~opts[i].value;
+                if (opts[i].value == VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR)
+                    *colour = true;
                 break;
             }
         }
@@ -353,8 +361,6 @@ static bool validate_target_type(
 
 static bool parse_command_line(int argc, char **argv, struct options *options)
 {
-    enum vkd3d_shader_compile_option_formatting_flags formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
-            | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
     enum vkd3d_shader_compile_option_buffer_uav buffer_uav;
     int option;
 
@@ -374,6 +380,8 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     memset(options, 0, sizeof(*options));
     options->source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     options->target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
+    options->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
+            | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
 
     for (;;)
     {
@@ -405,7 +413,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 break;
 
             case OPTION_TEXT_FORMATTING:
-                if (!parse_formatting(&formatting, optarg))
+                if (!parse_formatting(&options->formatting, &options->explicit_colour, optarg))
                     return false;
                 break;
 
@@ -450,7 +458,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     if (options->print_target_types)
         return true;
 
-    add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, formatting);
     if (optind < argc)
         options->filename = argv[argc - 1];
 
@@ -527,6 +534,26 @@ static FILE *open_output(const char *filename, bool *close)
     return f;
 }
 
+static bool has_colour(FILE *f)
+{
+#ifdef HAVE_NCURSES
+    bool supported;
+    int ret;
+
+    if (!isatty(fileno(f)))
+        return false;
+    setupterm(NULL, fileno(f), &ret);
+    if (ret != 1)
+        return false;
+    supported = !!tigetstr("setaf");
+    del_curterm(cur_term);
+
+    return supported;
+#else
+    return false;
+#endif
+}
+
 int main(int argc, char **argv)
 {
     bool close_input = false, close_output = false;
@@ -584,6 +611,10 @@ int main(int argc, char **argv)
                 "If this is really what you intended, specify the output explicitly.\n");
         goto done;
     }
+
+    if (!options.explicit_colour && has_colour(output))
+        options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
+    add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = NULL;

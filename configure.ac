@@ -8,9 +8,10 @@ AC_CONFIG_HEADERS(include/config.h)
 AC_ARG_VAR([WIDL], [widl IDL compiler])
 AC_ARG_VAR([CROSSCC32], [32-bit Windows cross compiler])
 AC_ARG_VAR([CROSSCC64], [64-bit Windows cross compiler])
-AC_ARG_WITH([xcb], AS_HELP_STRING([--with-xcb], [Build with XCB library (default: test)]))
+AC_ARG_WITH([ncurses], AS_HELP_STRING([--with-ncurses], [Build with the ncurses library (default: test)]))
 AC_ARG_WITH([spirv-tools], AS_HELP_STRING([--with-spirv-tools],
                                           [Build with SPIRV-Tools library (default: disabled)]))
+AC_ARG_WITH([xcb], AS_HELP_STRING([--with-xcb], [Build with XCB library (default: test)]))
 AC_ARG_ENABLE([demos],
               AS_HELP_STRING([--enable-demos], [Build demo programs (default: disabled)]),,
               [enable_demos=no])
@@ -109,6 +110,10 @@ VKD3D_CHECK_SONAME([vulkan], [vkGetInstanceProcAddr],
                                                                                ["$ac_cv_lib_soname_MoltenVK"])],
                                                            [AC_MSG_ERROR([libvulkan and libMoltenVK not found.])])])])
 
+AS_IF([test "x$with_ncurses" != "xno"],
+      [PKG_CHECK_MODULES([NCURSES], [ncurses],
+                         [AC_DEFINE([HAVE_NCURSES], [1], [Define to 1 if you have ncurses.]) with_ncurses=yes],
+                         [with_ncurses=no])])
 AS_IF([test "x$with_spirv_tools" = "xyes"],
       [PKG_CHECK_MODULES([SPIRV_TOOLS], [SPIRV-Tools-shared],
       [AC_DEFINE([HAVE_SPIRV_TOOLS], [1], [Define to 1 if you have SPIRV-Tools.])])],
@@ -152,8 +157,9 @@ AS_ECHO(["
 
   widl: ${WIDL}
 
-  Have XCB: ${HAVE_XCB}
+  Have ncurses: ${with_ncurses}
   Have SPIRV-Tools: ${with_spirv_tools}
+  Have xcb: ${HAVE_XCB}
 
   Building demos: ${enable_demos}
   Building tests: ${enable_tests}
