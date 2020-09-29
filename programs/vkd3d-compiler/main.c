@@ -52,12 +52,17 @@ static const struct source_type_info
     enum vkd3d_shader_source_type type;
     const char *name;
     const char *description;
+    bool is_binary;
 }
 source_type_info[] =
 {
     {VKD3D_SHADER_SOURCE_DXBC_TPF,
         "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
-        "                This is the format used for Direct3D shader model 4 and 5 shaders.\n"},
+        "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",
+        true},
+    {VKD3D_SHADER_SOURCE_HLSL,
+        "hlsl",         "High Level Shader Language source code.\n",
+        false},
 };
 
 static const struct target_type_info
@@ -594,7 +599,7 @@ int main(int argc, char **argv)
     if (!(input = open_input(options.filename, &close_input)))
         goto done;
 
-    if (!options.filename && isatty(fileno(input)))
+    if (!options.filename && get_source_type_info(options.source_type)->is_binary && isatty(fileno(input)))
     {
         fprintf(stderr, "Input is a tty and input format is binary, exiting.\n"
                 "If this is really what you intended, specify the input explicitly.\n");
