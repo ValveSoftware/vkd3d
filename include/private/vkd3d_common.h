@@ -21,6 +21,7 @@
 
 #include "config.h"
 #include "vkd3d_windows.h"
+#include "vkd3d_types.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -182,5 +183,7 @@ static inline void vkd3d_parse_version(const char *version, int *major, int *min
 
     *minor = atoi(version);
 }
+
+HRESULT hresult_from_vkd3d_result(int vkd3d_result) DECLSPEC_HIDDEN;
 
 #endif  /* __VKD3D_COMMON_H */

@@ -67,6 +67,7 @@ libvkd3d_common_la_SOURCES = \
 	include/private/vkd3d_debug.h \
 	libs/vkd3d-common/blob.c \
 	libs/vkd3d-common/debug.c \
+	libs/vkd3d-common/error.c \
 	libs/vkd3d-common/memory.c \
 	libs/vkd3d-common/utf8.c
 
