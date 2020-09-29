@@ -125,6 +125,131 @@ HRESULT WINAPI D3D12SerializeVersionedRootSignature(const D3D12_VERSIONED_ROOT_S
     return vkd3d_serialize_versioned_root_signature(desc, blob, error_blob);
 }
 
+static int open_include(const char *filename, bool local, const char *parent_data, void *context,
+        struct vkd3d_shader_code *code)
+{
+    ID3DInclude *iface = context;
+    unsigned int size;
+
+    if (FAILED(ID3DInclude_Open(iface, local ? D3D_INCLUDE_LOCAL : D3D_INCLUDE_SYSTEM,
+            filename, parent_data, &code->code, &size)))
+        return VKD3D_ERROR;
+
+    code->size = size;
+    return VKD3D_OK;
+}
+
+static void close_include(const struct vkd3d_shader_code *code, void *context)
+{
+    ID3DInclude *iface = context;
+
+    ID3DInclude_Close(iface, code->code);
+}
+
+HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
+        const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entry_point,
+        const char *profile, UINT flags, UINT effect_flags, UINT secondary_flags,
+        const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader_blob,
+        ID3DBlob **messages_blob)
+{
+    struct vkd3d_shader_preprocess_info preprocess_info;
+    struct vkd3d_shader_hlsl_source_info hlsl_info;
+    struct vkd3d_shader_compile_option options[1];
+    struct vkd3d_shader_compile_info compile_info;
+    struct vkd3d_shader_code byte_code;
+    const D3D_SHADER_MACRO *macro;
+    char *messages;
+    HRESULT hr;
+    int ret;
+
+    TRACE("data %p, data_size %lu, filename %s, macros %p, include %p, entry_point %s, "
+            "profile %s, flags %#x, effect_flags %#x, secondary_flags %#x, secondary_data %p, "
+            "secondary_data_size %lu, shader_blob %p, messages_blob %p.\n",
+            data, data_size, debugstr_a(filename), macros, include, debugstr_a(entry_point),
+            debugstr_a(profile), flags, effect_flags, secondary_flags, secondary_data,
+            secondary_data_size, shader_blob, messages_blob);
+
+    if (flags & ~D3DCOMPILE_DEBUG)
+        FIXME("Ignoring flags %#x.\n", flags);
+    if (effect_flags)
+        FIXME("Ignoring effect flags %#x.\n", effect_flags);
+    if (secondary_flags)
+        FIXME("Ignoring secondary flags %#x.\n", secondary_flags);
+
+    compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
+    compile_info.next = &preprocess_info;
+    compile_info.source.code = data;
+    compile_info.source.size = data_size;
+    compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    compile_info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+    compile_info.options = options;
+    compile_info.option_count = 0;
+    compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+    compile_info.source_name = filename;
+
+    preprocess_info.type = VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO;
+    preprocess_info.next = &hlsl_info;
+    preprocess_info.macros = (const struct vkd3d_shader_macro *)macros;
+    preprocess_info.macro_count = 0;
+    if (macros)
+    {
+        for (macro = macros; macro->Name; ++macro)
+            ++preprocess_info.macro_count;
+    }
+    preprocess_info.pfn_open_include = open_include;
+    preprocess_info.pfn_close_include = close_include;
+    preprocess_info.include_context = include;
+
+    hlsl_info.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO;
+    hlsl_info.next = NULL;
+    hlsl_info.profile = profile;
+    hlsl_info.entry_point = entry_point;
+    hlsl_info.secondary_code.code = secondary_data;
+    hlsl_info.secondary_code.size = secondary_data_size;
+
+    if (!(flags & D3DCOMPILE_DEBUG))
+        options[compile_info.option_count++].name = VKD3D_SHADER_COMPILE_OPTION_STRIP_DEBUG;
+
+    ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);
+    if (messages)
+    {
+        if (messages_blob)
+        {
+            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
+            {
+                vkd3d_shader_free_shader_code(&byte_code);
+                return hr;
+            }
+        }
+        else
+            vkd3d_shader_free_messages(messages);
+    }
+
+    if (!ret)
+    {
+        if (FAILED(hr = vkd3d_blob_create((void *)byte_code.code, byte_code.size, shader_blob)))
+        {
+            vkd3d_shader_free_shader_code(&byte_code);
+            return hr;
+        }
+    }
+
+    return hresult_from_vkd3d_result(ret);
+}
+
+HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
+        const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entrypoint,
+        const char *profile, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages)
+{
+    TRACE("data %p, data_size %lu, filename %s, macros %p, include %p, entrypoint %s, "
+            "profile %s, flags %#x, effect_flags %#x, shader %p, error_messages %p.\n",
+            data, data_size, debugstr_a(filename), macros, include, debugstr_a(entrypoint),
+            debugstr_a(profile), flags, effect_flags, shader, error_messages);
+
+    return D3DCompile2(data, data_size, filename, macros, include, entrypoint, profile, flags,
+            effect_flags, 0, NULL, 0, shader, error_messages);
+}
+
 /* Events */
 HANDLE vkd3d_create_event(void)
 {

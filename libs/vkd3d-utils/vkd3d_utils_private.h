@@ -26,6 +26,7 @@
 #include <pthread.h>
 #include <vkd3d.h>
 #include <vkd3d_shader.h>
+#include <vkd3d_d3dcompiler.h>
 
 #include "vkd3d_blob.h"
 #include "vkd3d_memory.h"

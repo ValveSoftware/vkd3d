@@ -65,6 +65,8 @@ typedef int HRESULT;
 # define DXGI_ERROR_NOT_FOUND _HRESULT_TYPEDEF_(0x887a0002)
 # define DXGI_ERROR_MORE_DATA _HRESULT_TYPEDEF_(0x887a0003)
 
+# define D3DERR_INVALIDCALL _HRESULT_TYPEDEF_(0x8876086c)
+
 /* Basic types */
 typedef unsigned char BYTE;
 typedef unsigned int DWORD;
