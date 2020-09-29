@@ -42,6 +42,7 @@ enum
     OPTION_OUTPUT,
     OPTION_PRINT_SOURCE_TYPES,
     OPTION_PRINT_TARGET_TYPES,
+    OPTION_PROFILE,
     OPTION_STRIP_DEBUG,
     OPTION_VERSION,
     OPTION_TEXT_FORMATTING,
@@ -171,6 +172,7 @@ static void print_usage(const char *program_name)
         "  --print-source-types  Display the supported source types and exit.\n"
         "  --print-target-types  Display the supported target types for the specified\n"
         "                        source type and exit.\n"
+        "  -p, --profile=<name>  Specify the target shader profile for HLSL shaders.\n"
         "  --strip-debug         Strip debug information from the output.\n"
         "  -V, --version         Display version information and exit.\n"
         "  -x <type>             Specify the type of the source. Valid values are\n"
@@ -188,6 +190,7 @@ struct options
 {
     const char *filename;
     const char *output_filename;
+    const char *profile;
     enum vkd3d_shader_source_type source_type;
     enum vkd3d_shader_target_type target_type;
     bool print_version;
@@ -381,6 +384,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         {"formatting",         required_argument, NULL, OPTION_TEXT_FORMATTING},
         {"print-source-types", no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
         {"print-target-types", no_argument,       NULL, OPTION_PRINT_TARGET_TYPES},
+        {"profile",            required_argument, NULL, OPTION_PROFILE},
         {"strip-debug",        no_argument,       NULL, OPTION_STRIP_DEBUG},
         {"version",            no_argument,       NULL, OPTION_VERSION},
         {NULL,                 0,                 NULL, 0},
@@ -394,7 +398,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "b:ho:Vx:", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "b:ho:p:Vx:", long_options, NULL)) == -1)
             break;
 
         switch (option)
@@ -419,6 +423,11 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
             case OPTION_OUTPUT:
             case 'o':
                 options->output_filename = optarg;
+                break;
+
+            case OPTION_PROFILE:
+            case 'p':
+                options->profile = optarg;
                 break;
 
             case OPTION_TEXT_FORMATTING:
@@ -565,6 +574,7 @@ static bool has_colour(FILE *f)
 
 int main(int argc, char **argv)
 {
+    struct vkd3d_shader_hlsl_source_info hlsl_source_info = {0};
     bool close_input = false, close_output = false;
     struct vkd3d_shader_compile_info info;
     struct vkd3d_shader_code spirv;
@@ -626,13 +636,16 @@ int main(int argc, char **argv)
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
-    info.next = NULL;
+    info.next = &hlsl_source_info;
     info.source_type = options.source_type;
     info.target_type = options.target_type;
     info.options = options.compile_options;
     info.option_count = options.compile_option_count;
     info.log_level = VKD3D_SHADER_LOG_INFO;
     info.source_name = options.filename;
+
+    hlsl_source_info.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO;
+    hlsl_source_info.profile = options.profile;
 
     if (!read_shader(&info.source, input))
     {
