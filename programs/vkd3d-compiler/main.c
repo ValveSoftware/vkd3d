@@ -39,6 +39,7 @@ enum
 {
     OPTION_HELP = CHAR_MAX + 1,
     OPTION_BUFFER_UAV,
+    OPTION_ENTRY,
     OPTION_OUTPUT,
     OPTION_PRINT_SOURCE_TYPES,
     OPTION_PRINT_TARGET_TYPES,
@@ -161,6 +162,7 @@ static void print_usage(const char *program_name)
         "  --buffer-uav=<type>   Specify the buffer type to use for buffer UAV bindings.\n"
         "                        Valid values are 'buffer-texture' (default) and\n"
         "                        'storage-buffer'.\n"
+        "  -e, --entry=<name>    Use <name> as the entry point (default is \"main\").\n"
         "  -o, --output=<file>   Write the output to <file>. If <file> is '-' or no\n"
         "                        output file is specified, output will be written to\n"
         "                        standard output.\n"
@@ -190,6 +192,7 @@ struct options
 {
     const char *filename;
     const char *output_filename;
+    const char *entry_point;
     const char *profile;
     enum vkd3d_shader_source_type source_type;
     enum vkd3d_shader_target_type target_type;
@@ -380,6 +383,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     {
         {"help",               no_argument,       NULL, OPTION_HELP},
         {"buffer-uav",         required_argument, NULL, OPTION_BUFFER_UAV},
+        {"entry",              required_argument, NULL, OPTION_ENTRY},
         {"output",             required_argument, NULL, OPTION_OUTPUT},
         {"formatting",         required_argument, NULL, OPTION_TEXT_FORMATTING},
         {"print-source-types", no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
@@ -398,7 +402,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "b:ho:p:Vx:", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "b:e:ho:p:Vx:", long_options, NULL)) == -1)
             break;
 
         switch (option)
@@ -418,6 +422,11 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                     return false;
                 }
                 add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_BUFFER_UAV, buffer_uav);
+                break;
+
+            case OPTION_ENTRY:
+            case 'e':
+                options->entry_point = optarg;
                 break;
 
             case OPTION_OUTPUT:
@@ -646,6 +655,7 @@ int main(int argc, char **argv)
 
     hlsl_source_info.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO;
     hlsl_source_info.profile = options.profile;
+    hlsl_source_info.entry_point = options.entry_point;
 
     if (!read_shader(&info.source, input))
     {
