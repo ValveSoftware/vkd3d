@@ -11,6 +11,7 @@ global:
     D3DCompile;
     D3DCompile2;
     D3DCreateBlob;
+    D3DPreprocess;
     vkd3d_create_event;
     vkd3d_destroy_event;
     vkd3d_signal_event;

@@ -250,6 +250,72 @@ HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filena
             effect_flags, 0, NULL, 0, shader, error_messages);
 }
 
+HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename,
+        const D3D_SHADER_MACRO *macros, ID3DInclude *include,
+        ID3DBlob **preprocessed_blob, ID3DBlob **messages_blob)
+{
+    struct vkd3d_shader_preprocess_info preprocess_info;
+    struct vkd3d_shader_compile_info compile_info;
+    struct vkd3d_shader_code preprocessed_code;
+    const D3D_SHADER_MACRO *macro;
+    char *messages;
+    HRESULT hr;
+    int ret;
+
+    TRACE("data %p, size %lu, filename %s, macros %p, include %p, preprocessed_blob %p, messages_blob %p.\n",
+            data, size, debugstr_a(filename), macros, include, preprocessed_blob, messages_blob);
+
+    compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
+    compile_info.next = &preprocess_info;
+    compile_info.source.code = data;
+    compile_info.source.size = size;
+    compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    compile_info.target_type = VKD3D_SHADER_TARGET_NONE;
+    compile_info.options = NULL;
+    compile_info.option_count = 0;
+    compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+    compile_info.source_name = filename;
+
+    preprocess_info.type = VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO;
+    preprocess_info.next = NULL;
+    preprocess_info.macros = (const struct vkd3d_shader_macro *)macros;
+    preprocess_info.macro_count = 0;
+    if (macros)
+    {
+        for (macro = macros; macro->Name; ++macro)
+            ++preprocess_info.macro_count;
+    }
+    preprocess_info.pfn_open_include = open_include;
+    preprocess_info.pfn_close_include = close_include;
+    preprocess_info.include_context = include;
+
+    ret = vkd3d_shader_preprocess(&compile_info, &preprocessed_code, &messages);
+    if (messages)
+    {
+        if (messages_blob)
+        {
+            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
+            {
+                vkd3d_shader_free_shader_code(&preprocessed_code);
+                return hr;
+            }
+        }
+        else
+            vkd3d_shader_free_messages(messages);
+    }
+
+    if (!ret)
+    {
+        if (FAILED(hr = vkd3d_blob_create((void *)preprocessed_code.code, preprocessed_code.size, preprocessed_blob)))
+        {
+            vkd3d_shader_free_shader_code(&preprocessed_code);
+            return hr;
+        }
+    }
+
+    return hresult_from_vkd3d_result(ret);
+}
+
 /* Events */
 HANDLE vkd3d_create_event(void)
 {
