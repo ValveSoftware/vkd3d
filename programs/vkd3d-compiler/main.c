@@ -84,6 +84,10 @@ target_type_info[] =
     {VKD3D_SHADER_TARGET_D3D_ASM,
         "d3d-asm", "A shader in Direct3D assembly form.\n",
         false},
+    {VKD3D_SHADER_TARGET_DXBC_TPF,
+        "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
+        "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",
+        true},
 };
 
 static bool read_shader(struct vkd3d_shader_code *shader, FILE *f)
