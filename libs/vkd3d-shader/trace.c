@@ -520,7 +520,7 @@ static void shader_dump_resource_type(struct vkd3d_string_buffer *buffer, enum v
         /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY    */ "texturecubearray",
     };
 
-    if (type <= ARRAY_SIZE(resource_type_names))
+    if (type < ARRAY_SIZE(resource_type_names))
         shader_addline(buffer, "%s", resource_type_names[type]);
     else
         shader_addline(buffer, "unknown");
