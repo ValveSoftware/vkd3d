@@ -1,0 +1,16 @@
+# Use a uniform to prevent the compiler from optimizing.
+
+[pixel shader]
+uniform int i;
+float4 main() : SV_TARGET
+{
+    float4 color = float4(0.5, 0.4, 0.3, 0.2);
+    color.g = color[i];
+    color.b = 0.8;
+    return color;
+}
+
+[test]
+uniform 0 uint 2
+draw quad
+probe all rgba (0.5, 0.3, 0.8, 0.2)

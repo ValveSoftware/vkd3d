@@ -1,0 +1,14 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 color;
+    color[0] = 0.020;
+    color[1] = 0.245;
+    color[2] = 0.351;
+    color[3] = 1.0;
+    return color;
+}
+
+[test]
+draw quad
+probe all rgba (0.02, 0.245, 0.351, 1.0)

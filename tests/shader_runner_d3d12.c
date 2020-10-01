@@ -211,6 +211,18 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             }
             memcpy(context->uniforms + offset, &v, sizeof(v));
         }
+        else if (match_string(line, "uint", &line))
+        {
+            unsigned int u;
+
+            sscanf(line, "%u", &u);
+            if (offset + 1 > context->uniform_count)
+            {
+                context->uniform_count = offset + 1;
+                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
+            }
+            memcpy(context->uniforms + offset, &u, sizeof(u));
+        }
     }
     else
     {
@@ -271,6 +283,9 @@ START_TEST(shader_runner_d3d12)
 
     while (fgets(line, sizeof(line), f))
     {
+        if (line[0] == '\n')
+            continue;
+
         if (line[0] == '[')
         {
             switch (state)
