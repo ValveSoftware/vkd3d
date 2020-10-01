@@ -50,6 +50,7 @@ vkd3d_shader_runners = \
 	tests/shader_runner_d3d12
 
 vkd3d_shader_tests = \
+	tests/math.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
@@ -177,6 +178,7 @@ tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
 XFAIL_TESTS = \
+	tests/math.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \

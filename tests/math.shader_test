@@ -1,0 +1,15 @@
+[pixel shader]
+float4 main(uniform float u, uniform float v, uniform float w, uniform float x,
+            uniform float y, uniform float z) : SV_TARGET
+{
+    return float4(x * y - z / w + --u / -v,
+            z * x / y + w / -v,
+            u + v - w,
+            x / y / w);
+}
+
+[test]
+uniform 0 float4 2.5 0.3 0.2 0.7
+uniform 4 float4 0.1 1.5 0.0 0.0
+draw quad
+probe all rgba (-12.43, 9.833333, 1.6, 35.0) 1
