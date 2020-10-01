@@ -167,6 +167,29 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         check_sub_resource_vec4(context->c.render_target, 0, context->c.queue, context->c.list, &v, ulps);
         reset_command_list(context->c.list, context->c.allocator);
     }
+    else if (match_string(line, "probe rect rgba", &line))
+    {
+        unsigned int x, y, w, h, ulps;
+        struct resource_readback rb;
+        struct vec4 v;
+        RECT rect;
+        int ret;
+
+        ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f )", &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w);
+        if (ret < 8)
+            goto err;
+        if (ret < 9)
+            ulps = 0;
+
+        get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
+        rect.left = x;
+        rect.right = x + w;
+        rect.top = y;
+        rect.bottom = y + h;
+        check_readback_data_vec4(&rb, &rect, &v, ulps);
+        release_resource_readback(&rb);
+        reset_command_list(context->c.list, context->c.allocator);
+    }
     else if (match_string(line, "uniform", &line))
     {
         unsigned int offset;
@@ -204,6 +227,8 @@ START_TEST(shader_runner_d3d12)
 {
     static const struct test_context_desc desc =
     {
+        .rt_width = 640,
+        .rt_height = 480,
         .no_root_signature = true,
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };

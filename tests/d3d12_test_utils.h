@@ -585,6 +585,36 @@ static void check_readback_data_uint_(unsigned int line, struct resource_readbac
     ok_(line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
 }
 
+#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec4_(__LINE__, a, b, c, d)
+static void check_readback_data_vec4_(unsigned int line, struct resource_readback *rb,
+        const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
+{
+    RECT r = {0, 0, rb->width, rb->height};
+    unsigned int x = 0, y = 0;
+    struct vec4 got = {0};
+    bool all_match = true;
+
+    if (rect)
+        r = *rect;
+
+    for (y = r.top; y < r.bottom; ++y)
+    {
+        for (x = r.left; x < r.right; ++x)
+        {
+            got = *get_readback_vec4(rb, x, y);
+            if (!compare_vec4(&got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
+            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
+}
+
 #define check_sub_resource_uint(a, b, c, d, e, f) check_sub_resource_uint_(__LINE__, a, b, c, d, e, f)
 static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
@@ -603,29 +633,10 @@ static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *t
         const struct vec4 *expected, unsigned int max_diff)
 {
     struct resource_readback rb;
-    unsigned int x = 0, y;
-    bool all_match = true;
-    struct vec4 got = {0};
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
-    {
-        for (x = 0; x < rb.width; ++x)
-        {
-            got = *get_readback_vec4(&rb, x, y);
-            if (!compare_vec4(&got, expected, max_diff))
-            {
-                all_match = false;
-                break;
-            }
-        }
-        if (!all_match)
-            break;
-    }
+    check_readback_data_vec4_(line, &rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
-
-    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
-            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
 #define create_default_buffer(a, b, c, d) create_default_buffer_(__LINE__, a, b, c, d)
