@@ -19,6 +19,11 @@
 #ifndef __VKD3D_D3D12_TEST_UTILS_H
 #define __VKD3D_D3D12_TEST_UTILS_H
 
+struct vec4
+{
+    float x, y, z, w;
+};
+
 #define wait_queue_idle(a, b) wait_queue_idle_(__LINE__, a, b)
 static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12CommandQueue *queue);
 static ID3D12Device *create_device(void);
@@ -53,6 +58,31 @@ static void set_viewport(D3D12_VIEWPORT *vp, float x, float y,
     vp->MaxDepth = max_depth;
 }
 
+static bool compare_float(float f, float g, unsigned int ulps)
+{
+    int x, y;
+    union
+    {
+        float f;
+        int i;
+    } u;
+
+    u.f = f;
+    x = u.i;
+    u.f = g;
+    y = u.i;
+
+    if (x < 0)
+        x = INT_MIN - x;
+    if (y < 0)
+        y = INT_MIN - y;
+
+    if (abs(x - y) > ulps)
+        return false;
+
+    return true;
+}
+
 static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
 {
     unsigned int diff = x > y ? x - y : y - x;
@@ -66,6 +96,14 @@ static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
             && compare_uint((c1 >> 8) & 0xff, (c2 >> 8) & 0xff, max_diff)
             && compare_uint((c1 >> 16) & 0xff, (c2 >> 16) & 0xff, max_diff)
             && compare_uint((c1 >> 24) & 0xff, (c2 >> 24) & 0xff, max_diff);
+}
+
+static bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
+{
+    return compare_float(v1->x, v2->x, ulps)
+            && compare_float(v1->y, v2->y, ulps)
+            && compare_float(v1->z, v2->z, ulps)
+            && compare_float(v1->w, v2->w, ulps);
 }
 
 static D3D12_SHADER_BYTECODE shader_bytecode(const DWORD *code, size_t size)
@@ -501,6 +539,11 @@ static unsigned int get_readback_uint(struct resource_readback *rb,
     return *(unsigned int *)get_readback_data(rb, x, y, z, sizeof(unsigned int));
 }
 
+static const struct vec4 *get_readback_vec4(struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return get_readback_data(rb, x, y, 0, sizeof(struct vec4));
+}
+
 static void release_resource_readback(struct resource_readback *rb)
 {
     D3D12_RANGE range = {0, 0};
@@ -554,6 +597,37 @@ static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *t
     release_resource_readback(&rb);
 }
 
+#define check_sub_resource_vec4(a, b, c, d, e, f) check_sub_resource_vec4_(__LINE__, a, b, c, d, e, f)
+static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *texture,
+        unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+        const struct vec4 *expected, unsigned int max_diff)
+{
+    struct resource_readback rb;
+    unsigned int x = 0, y;
+    bool all_match = true;
+    struct vec4 got = {0};
+
+    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    for (y = 0; y < rb.height; ++y)
+    {
+        for (x = 0; x < rb.width; ++x)
+        {
+            got = *get_readback_vec4(&rb, x, y);
+            if (!compare_vec4(&got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    release_resource_readback(&rb);
+
+    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
+            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
+}
+
 #define create_default_buffer(a, b, c, d) create_default_buffer_(__LINE__, a, b, c, d)
 static inline ID3D12Resource *create_default_buffer_(unsigned int line, ID3D12Device *device,
         size_t size, D3D12_RESOURCE_FLAGS resource_flags, D3D12_RESOURCE_STATES initial_resource_state)
@@ -595,7 +669,7 @@ static ID3D12Resource *create_default_texture_(unsigned int line, ID3D12Device *
 
 #define create_default_texture(a, b, c, d, e, f) create_default_texture2d_(__LINE__, a, b, c, 1, 1, d, e, f)
 #define create_default_texture2d(a, b, c, d, e, f, g, h) create_default_texture2d_(__LINE__, a, b, c, d, e, f, g, h)
-static ID3D12Resource *create_default_texture2d_(unsigned int line, ID3D12Device *device,
+static inline ID3D12Resource *create_default_texture2d_(unsigned int line, ID3D12Device *device,
         unsigned int width, unsigned int height, unsigned int array_size, unsigned int miplevel_count,
         DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_RESOURCE_STATES initial_state)
 {
@@ -639,6 +713,33 @@ static ID3D12RootSignature *create_empty_root_signature_(unsigned int line,
     root_signature_desc.pParameters = NULL;
     root_signature_desc.NumStaticSamplers = 0;
     root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = flags;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+
+    return root_signature;
+}
+
+#define create_32bit_constants_root_signature(a, b, c, e) \
+        create_32bit_constants_root_signature_(__LINE__, a, b, c, e, 0)
+static inline ID3D12RootSignature *create_32bit_constants_root_signature_(unsigned int line,
+        ID3D12Device *device, unsigned int reg_idx, unsigned int element_count,
+        D3D12_SHADER_VISIBILITY shader_visibility, D3D12_ROOT_SIGNATURE_FLAGS flags)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    ID3D12RootSignature *root_signature = NULL;
+    D3D12_ROOT_PARAMETER root_parameter;
+    HRESULT hr;
+
+    root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    root_parameter.Constants.ShaderRegister = reg_idx;
+    root_parameter.Constants.RegisterSpace = 0;
+    root_parameter.Constants.Num32BitValues = element_count;
+    root_parameter.ShaderVisibility = shader_visibility;
+
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = 1;
+    root_signature_desc.pParameters = &root_parameter;
     root_signature_desc.Flags = flags;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
     ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);

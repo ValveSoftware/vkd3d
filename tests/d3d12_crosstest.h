@@ -46,6 +46,7 @@ typedef int HRESULT;
 #define WIDL_C_INLINE_WRAPPERS
 #include "vkd3d_d3d12.h"
 #include "vkd3d_d3d12sdklayers.h"
+#include "vkd3d_d3dcompiler.h"
 
 #include <inttypes.h>
 #include <limits.h>

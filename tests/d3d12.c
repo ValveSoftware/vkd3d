@@ -31,11 +31,6 @@ struct vec2
     float x, y;
 };
 
-struct vec4
-{
-    float x, y, z, w;
-};
-
 struct uvec4
 {
     unsigned int x, y, z, w;
@@ -45,39 +40,6 @@ struct ivec4
 {
     int x, y, z, w;
 };
-
-static bool compare_float(float f, float g, unsigned int ulps)
-{
-    int x, y;
-    union
-    {
-        float f;
-        int i;
-    } u;
-
-    u.f = f;
-    x = u.i;
-    u.f = g;
-    y = u.i;
-
-    if (x < 0)
-        x = INT_MIN - x;
-    if (y < 0)
-        y = INT_MIN - y;
-
-    if (abs(x - y) > ulps)
-        return false;
-
-    return true;
-}
-
-static bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
-{
-    return compare_float(v1->x, v2->x, ulps)
-            && compare_float(v1->y, v2->y, ulps)
-            && compare_float(v1->z, v2->z, ulps)
-            && compare_float(v1->w, v2->w, ulps);
-}
 
 static bool compare_uvec4(const struct uvec4* v1, const struct uvec4 *v2)
 {
@@ -408,11 +370,6 @@ static float get_readback_float(struct resource_readback *rb, unsigned int x, un
     return *(float *)get_readback_data(rb, x, y, 0, sizeof(float));
 }
 
-static const struct vec4 *get_readback_vec4(struct resource_readback *rb, unsigned int x, unsigned int y)
-{
-    return get_readback_data(rb, x, y, 0, sizeof(struct vec4));
-}
-
 static const struct uvec4 *get_readback_uvec4(struct resource_readback *rb, unsigned int x, unsigned int y)
 {
     return get_readback_data(rb, x, y, 0, sizeof(struct uvec4));
@@ -582,37 +539,6 @@ static void check_sub_resource_uint64_(unsigned int line, ID3D12Resource *textur
     release_resource_readback(&rb);
 }
 
-#define check_sub_resource_vec4(a, b, c, d, e, f) check_sub_resource_vec4_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *texture,
-        unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
-        const struct vec4 *expected, unsigned int max_diff)
-{
-    struct resource_readback rb;
-    unsigned int x = 0, y;
-    bool all_match = true;
-    struct vec4 got = {0};
-
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
-    {
-        for (x = 0; x < rb.width; ++x)
-        {
-            got = *get_readback_vec4(&rb, x, y);
-            if (!compare_vec4(&got, expected, max_diff))
-            {
-                all_match = false;
-                break;
-            }
-        }
-        if (!all_match)
-            break;
-    }
-    release_resource_readback(&rb);
-
-    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
-            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
-}
-
 #define check_sub_resource_uvec4(a, b, c, d, e) check_sub_resource_uvec4_(__LINE__, a, b, c, d, e)
 static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
@@ -738,33 +664,6 @@ static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
     root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     root_parameter.Descriptor.ShaderRegister = reg_idx;
     root_parameter.Descriptor.RegisterSpace = 0;
-    root_parameter.ShaderVisibility = shader_visibility;
-
-    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
-    root_signature_desc.NumParameters = 1;
-    root_signature_desc.pParameters = &root_parameter;
-    root_signature_desc.Flags = flags;
-    hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok_(line)(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
-
-    return root_signature;
-}
-
-#define create_32bit_constants_root_signature(a, b, c, e) \
-        create_32bit_constants_root_signature_(__LINE__, a, b, c, e, 0)
-static ID3D12RootSignature *create_32bit_constants_root_signature_(unsigned int line,
-        ID3D12Device *device, unsigned int reg_idx, unsigned int element_count,
-        D3D12_SHADER_VISIBILITY shader_visibility, D3D12_ROOT_SIGNATURE_FLAGS flags)
-{
-    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
-    ID3D12RootSignature *root_signature = NULL;
-    D3D12_ROOT_PARAMETER root_parameter;
-    HRESULT hr;
-
-    root_parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-    root_parameter.Constants.ShaderRegister = reg_idx;
-    root_parameter.Constants.RegisterSpace = 0;
-    root_parameter.Constants.Num32BitValues = element_count;
     root_parameter.ShaderVisibility = shader_visibility;
 
     memset(&root_signature_desc, 0, sizeof(root_signature_desc));
