@@ -49,6 +49,16 @@ vkd3d_cross_tests = \
 vkd3d_shader_runners = \
 	tests/shader_runner_d3d12
 
+vkd3d_shader_tests = \
+	tests/swizzle-0.shader_test \
+	tests/swizzle-1.shader_test \
+	tests/swizzle-2.shader_test \
+	tests/swizzle-3.shader_test \
+	tests/swizzle-4.shader_test \
+	tests/swizzle-5.shader_test \
+	tests/swizzle-6.shader_test \
+	tests/swizzle-7.shader_test
+
 vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
 	tests/d3d12_test_utils.h
@@ -159,13 +169,22 @@ TEST_EXTENSIONS = .shader_test
 
 if BUILD_TESTS
 check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_runners)
-TESTS = $(vkd3d_tests) $(vkd3d_cross_tests)
+TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @VULKAN_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
+XFAIL_TESTS = \
+	tests/swizzle-0.shader_test \
+	tests/swizzle-1.shader_test \
+	tests/swizzle-2.shader_test \
+	tests/swizzle-3.shader_test \
+	tests/swizzle-4.shader_test \
+	tests/swizzle-5.shader_test \
+	tests/swizzle-6.shader_test \
+	tests/swizzle-7.shader_test
 endif
 
 if BUILD_DEMOS
