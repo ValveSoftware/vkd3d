@@ -190,6 +190,29 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         release_resource_readback(&rb);
         reset_command_list(context->c.list, context->c.allocator);
     }
+    else if (match_string(line, "probe rgba", &line))
+    {
+        struct resource_readback rb;
+        unsigned int x, y, ulps;
+        struct vec4 v;
+        RECT rect;
+        int ret;
+
+        ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
+        if (ret < 6)
+            goto err;
+        if (ret < 7)
+            ulps = 0;
+
+        get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
+        rect.left = x;
+        rect.right = x + 1;
+        rect.top = y;
+        rect.bottom = y + 1;
+        check_readback_data_vec4(&rb, &rect, &v, ulps);
+        release_resource_readback(&rb);
+        reset_command_list(context->c.list, context->c.allocator);
+    }
     else if (match_string(line, "uniform", &line))
     {
         unsigned int offset;
