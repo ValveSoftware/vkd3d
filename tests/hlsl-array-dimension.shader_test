@@ -1,0 +1,16 @@
+# Test what kinds of expressions are valid array dimensions.
+[pixel shader]
+float4 main() : sv_target
+{
+    const int dim = 4;
+    float a[2 * 2] = {0.1, 0.2, 0.3, 0.4};
+    float b[4.1] = a;
+    float c[dim] = b;
+    float d[true] = {c[0]};
+    float e[65536];
+    return float4(d[0], c[0], c[1], c[3]);
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.1, 0.2, 0.4)

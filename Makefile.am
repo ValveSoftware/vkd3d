@@ -51,6 +51,7 @@ vkd3d_shader_runners = \
 
 vkd3d_shader_tests = \
 	tests/conditional.shader_test \
+	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-comma.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
@@ -186,6 +187,7 @@ tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
 XFAIL_TESTS = \
 	tests/conditional.shader_test \
+	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-comma.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
