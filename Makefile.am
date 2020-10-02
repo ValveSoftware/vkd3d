@@ -53,6 +53,8 @@ vkd3d_shader_tests = \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-comma.shader_test \
+	tests/hlsl-majority-pragma.shader_test \
+	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
@@ -189,6 +191,8 @@ XFAIL_TESTS = \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-comma.shader_test \
+	tests/hlsl-majority-pragma.shader_test \
+	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-vector-indexing.shader_test \

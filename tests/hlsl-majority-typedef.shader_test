@@ -1,0 +1,22 @@
+[pixel shader]
+typedef float2x2 matrix_t;
+typedef row_major matrix_t row_matrix_t;
+typedef column_major matrix_t col_matrix_t;
+uniform row_matrix_t r;
+uniform col_matrix_t c;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = mul(r, float2(0.5, 0.6));
+    ret.zw = mul(c, float2(0.5, 0.6));
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+uniform  8 float4 0.1 0.3 0.0 0.0
+uniform 12 float4 0.2 0.4 0.0 0.0
+draw quad
+probe all rgba (0.17, 0.39, 0.17, 0.39) 1
