@@ -1,0 +1,15 @@
+[pixel shader]
+float myfunc()
+{
+    return 0.6;
+}
+static float a = myfunc() + 0.2;
+static float b;
+float4 main() : sv_target
+{
+    return float4(a, b, 0, 0);
+}
+
+[test]
+draw quad
+probe all rgba (0.8, 0.0, 0.0, 0.0)
