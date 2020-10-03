@@ -58,6 +58,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
+	tests/hlsl-struct-varying.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
@@ -197,6 +198,7 @@ XFAIL_TESTS = \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
+	tests/hlsl-struct-varying.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
