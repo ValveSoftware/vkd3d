@@ -114,6 +114,24 @@ const char *vkd3d_dbg_sprintf(const char *fmt, ...)
     return buffer;
 }
 
+static int get_escape_char(int c)
+{
+    switch (c)
+    {
+        case '"':
+        case '\\':
+            return c;
+        case '\t':
+            return 't';
+        case '\n':
+            return 'n';
+        case '\r':
+            return 'r';
+        default:
+            return 0;
+    }
+}
+
 const char *debugstr_a(const char *str)
 {
     char *buffer, *ptr;
@@ -127,21 +145,7 @@ const char *debugstr_a(const char *str)
     *ptr++ = '"';
     while ((c = *str++) && ptr <= buffer + VKD3D_DEBUG_BUFFER_SIZE - 8)
     {
-        int escape_char;
-
-        switch (c)
-        {
-            case '"':
-            case '\\':
-            case '\n':
-            case '\r':
-            case '\t':
-                escape_char = c;
-                break;
-            default:
-                escape_char = 0;
-                break;
-        }
+        int escape_char = get_escape_char(c);
 
         if (escape_char)
         {
@@ -187,21 +191,7 @@ static const char *debugstr_w16(const uint16_t *wstr)
     *ptr++ = '"';
     while ((c = *wstr++) && ptr <= buffer + VKD3D_DEBUG_BUFFER_SIZE - 10)
     {
-        int escape_char;
-
-        switch (c)
-        {
-            case '"':
-            case '\\':
-            case '\n':
-            case '\r':
-            case '\t':
-                escape_char = c;
-                break;
-            default:
-                escape_char = 0;
-                break;
-        }
+        int escape_char = get_escape_char(c);
 
         if (escape_char)
         {
@@ -247,21 +237,7 @@ static const char *debugstr_w32(const uint32_t *wstr)
     *ptr++ = '"';
     while ((c = *wstr++) && ptr <= buffer + VKD3D_DEBUG_BUFFER_SIZE - 10)
     {
-        int escape_char;
-
-        switch (c)
-        {
-            case '"':
-            case '\\':
-            case '\n':
-            case '\r':
-            case '\t':
-                escape_char = c;
-                break;
-            default:
-                escape_char = 0;
-                break;
-        }
+        int escape_char = get_escape_char(c);
 
         if (escape_char)
         {
