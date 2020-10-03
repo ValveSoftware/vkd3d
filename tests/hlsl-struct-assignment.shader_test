@@ -1,0 +1,23 @@
+[pixel shader]
+struct apple
+{
+    struct
+    {
+        float4 a;
+    } m;
+    float4 b;
+};
+
+float4 main() : sv_target
+{
+    struct apple q, r, s;
+
+    q.m.a = float4(0.1, 0.2, 0.3, 0.4);
+    q.b = float4(0.5, 0.1, 0.4, 0.5);
+    s = r = q;
+    return s.m.a + s.b;
+}
+
+[test]
+draw quad
+probe all rgba (0.6, 0.3, 0.7, 0.9) 1
