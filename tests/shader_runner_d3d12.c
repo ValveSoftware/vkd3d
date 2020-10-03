@@ -102,6 +102,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *target)
 enum parse_state
 {
     STATE_NONE,
+    STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEST,
 };
@@ -269,10 +270,10 @@ START_TEST(shader_runner_d3d12)
     };
     size_t shader_source_size = 0, shader_source_len = 0;
     enum parse_state state = STATE_NONE;
+    unsigned int i, line_number = 0;
     struct shader_context context;
     const char *filename = NULL;
     char *shader_source = NULL;
-    unsigned int i;
     char line[256];
     FILE *f;
 
@@ -304,12 +305,13 @@ START_TEST(shader_runner_d3d12)
     memset(&context, 0, sizeof(context));
     init_test_context(&context.c, &desc);
 
-    while (fgets(line, sizeof(line), f))
+    for (;;)
     {
-        if (line[0] == '\n')
-            continue;
+        char *ret = fgets(line, sizeof(line), f);
 
-        if (line[0] == '[')
+        ++line_number;
+
+        if (!ret || line[0] == '[')
         {
             switch (state)
             {
@@ -322,14 +324,43 @@ START_TEST(shader_runner_d3d12)
                         return;
                     shader_source_len = 0;
                     break;
-            }
 
+                case STATE_SHADER_INVALID_PIXEL:
+                {
+                    ID3D10Blob *blob = NULL, *errors = NULL;
+                    HRESULT hr;
+
+                    hr = D3DCompile(shader_source, strlen(shader_source), NULL,
+                            NULL, NULL, "main", "ps_4_0", 0, 0, &blob, &errors);
+                    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+                    ok(!blob, "Expected no compiled shader blob.\n");
+                    ok(!!errors, "Expected non-NULL error blob.\n");
+
+                    if (vkd3d_test_state.debug_level)
+                        trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+                    ID3D10Blob_Release(errors);
+
+                    shader_source_len = 0;
+                    break;
+                }
+            }
+        }
+
+        if (!ret)
+            break;
+
+        if (line[0] == '[')
+        {
             if (!strcmp(line, "[pixel shader]\n"))
                 state = STATE_SHADER_PIXEL;
+            else if (!strcmp(line, "[pixel shader fail]\n"))
+                state = STATE_SHADER_INVALID_PIXEL;
             else if (!strcmp(line, "[test]\n"))
                 state = STATE_TEST;
+
+            vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
-        else
+        else if (line[0] != '\n')
         {
             switch (state)
             {
@@ -338,6 +369,7 @@ START_TEST(shader_runner_d3d12)
                         fprintf(stderr, "Ignoring line '%s' in %s.\n", line, argv[1]);
                     break;
 
+                case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_PIXEL:
                 {
                     size_t len = strlen(line);
@@ -356,7 +388,8 @@ START_TEST(shader_runner_d3d12)
         }
     }
 
-    ID3D10Blob_Release(context.ps_code);
+    if (context.ps_code)
+        ID3D10Blob_Release(context.ps_code);
     destroy_test_context(&context.c);
 
     fclose(f);

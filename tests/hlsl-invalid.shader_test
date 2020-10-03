@@ -1,0 +1,117 @@
+[pixel shader fail]
+float4 main() : sv_target
+{
+    return y;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float4 x = float4(0, 0, 0, 0);
+    x.xzzx = float4(1, 2, 3, 4);
+    return x;
+}
+
+[pixel shader fail]
+float4 main(float2 pos : TEXCOORD0) : sv_target
+{
+    float4 x = pos;
+    return x;
+}
+
+[pixel shader fail]
+float4 563r(float2 45s : TEXCOORD0) : sv_target
+{
+    float4 x = 45s;
+    return float4(x.x, x.y, 0, 0);
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    struct { int b,c; } x = {0};
+    return x;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    struct {} x = {};
+    return x;
+}
+
+[pixel shader fail]
+float4 main(float2 pos : TEXCOORD0) : sv_target
+{
+    return;
+}
+
+[pixel shader fail]
+void main(float2 pos : TEXCOORD0)
+{
+    return pos;
+}
+
+[pixel shader fail]
+float4 main(float2 pos : TEXCOORD0) : sv_target
+{
+    return pos;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float a[0];
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float a[65537];
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    int x;
+    float a[(x = 2)];
+    return 0;
+}
+
+[pixel shader fail]
+uniform float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+typedef row_major float4x4 matrix_t;
+typedef column_major matrix_t matrix2_t;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+float4 main()
+{
+    return 0;
+}
+
+[pixel shader fail]
+float4 main(out float4 o : sv_target)
+{
+    o = 1;
+    return 0;
+}
+
+[pixel shader fail]
+struct {float4 a;};
+
+float4 main() : sv_target
+{
+    return 0;
+}
