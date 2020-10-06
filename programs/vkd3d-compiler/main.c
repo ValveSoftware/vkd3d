@@ -365,7 +365,7 @@ static bool validate_target_type(
     const enum vkd3d_shader_target_type *supported_types =
         vkd3d_shader_get_supported_target_types(source_type, &count);
 
-    for (i = 0; i < ARRAY_SIZE(target_type_info); ++i)
+    for (i = 0; i < count; ++i)
     {
         if (target_type == supported_types[i])
             return true;
