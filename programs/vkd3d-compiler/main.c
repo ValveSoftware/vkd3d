@@ -474,6 +474,9 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         }
     }
 
+    if (options->print_target_types)
+        return true;
+
     if (!validate_target_type(options->source_type, options->target_type))
     {
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
@@ -481,9 +484,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 get_source_type_info(options->source_type)->name);
         return false;
     }
-
-    if (options->print_target_types)
-        return true;
 
     if (optind < argc)
         options->filename = argv[argc - 1];
