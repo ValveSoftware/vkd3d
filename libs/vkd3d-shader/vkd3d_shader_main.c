@@ -149,6 +149,9 @@ bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_cont
 
     *out = NULL;
 
+    if (!context->messages.content_size)
+        return true;
+
     if (!(messages = vkd3d_malloc(context->messages.content_size + 1)))
         return false;
     memcpy(messages, context->messages.buffer, context->messages.content_size + 1);

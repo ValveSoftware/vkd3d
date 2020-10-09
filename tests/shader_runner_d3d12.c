@@ -335,6 +335,8 @@ START_TEST(shader_runner_d3d12)
                     ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
                     ok(!blob, "Expected no compiled shader blob.\n");
                     ok(!!errors, "Expected non-NULL error blob.\n");
+                    if (!errors)
+                        return;
 
                     if (vkd3d_test_state.debug_level)
                         trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
