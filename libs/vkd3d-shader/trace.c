@@ -1579,11 +1579,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code
     enum vkd3d_result result = VKD3D_OK;
     void *code;
 
-    if (!vkd3d_string_buffer_init(&buffer))
-    {
-        ERR("Failed to initialize string buffer.\n");
-        return VKD3D_ERROR;
-    }
+    vkd3d_string_buffer_init(&buffer);
 
     shader_sm4_read_header(data, &ptr, &shader_version);
     shader_addline(&buffer, "%s_%u_%u\n",

@@ -836,7 +836,7 @@ struct vkd3d_string_buffer
 
 enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
-bool vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
+void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args) DECLSPEC_HIDDEN;
 
 struct vkd3d_shader_message_context
@@ -850,7 +850,7 @@ struct vkd3d_shader_message_context
 void vkd3d_shader_message_context_cleanup(struct vkd3d_shader_message_context *context) DECLSPEC_HIDDEN;
 bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context,
         char **out) DECLSPEC_HIDDEN;
-bool vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
+void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
         enum vkd3d_shader_log_level log_level, const char *source_name) DECLSPEC_HIDDEN;
 void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_message_context *context,
         const char *function) DECLSPEC_HIDDEN;

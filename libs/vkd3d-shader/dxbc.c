@@ -2781,8 +2781,7 @@ int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
     memset(root_signature, 0, sizeof(*root_signature));
     if (messages)
         *messages = NULL;
-    if (!vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO, NULL))
-        return VKD3D_ERROR;
+    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO, NULL);
 
     ret = parse_dxbc(dxbc->code, dxbc->size, &message_context, rts0_handler, root_signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
@@ -3346,8 +3345,7 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
         *messages = NULL;
 
     memset(&context, 0, sizeof(context));
-    if (!vkd3d_shader_message_context_init(&context.message_context, VKD3D_SHADER_LOG_INFO, NULL))
-        return VKD3D_ERROR;
+    vkd3d_shader_message_context_init(&context.message_context, VKD3D_SHADER_LOG_INFO, NULL);
 
     if (root_signature->version != VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_0
             && root_signature->version != VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_1)
