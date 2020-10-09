@@ -2786,7 +2786,7 @@ int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
 
     ret = parse_dxbc(dxbc->code, dxbc->size, &message_context, rts0_handler, root_signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
 
     vkd3d_shader_message_context_cleanup(&message_context);
@@ -3390,7 +3390,7 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
 
 done:
     vkd3d_shader_message_context_trace_messages(&context.message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&context.message_context)))
+    if (!vkd3d_shader_message_context_copy_messages(&context.message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
     vkd3d_shader_message_context_cleanup(&context.message_context);
     return ret;

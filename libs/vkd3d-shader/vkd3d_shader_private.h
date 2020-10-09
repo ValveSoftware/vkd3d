@@ -848,7 +848,8 @@ struct vkd3d_shader_message_context
 };
 
 void vkd3d_shader_message_context_cleanup(struct vkd3d_shader_message_context *context) DECLSPEC_HIDDEN;
-char *vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context) DECLSPEC_HIDDEN;
+bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context,
+        char **out) DECLSPEC_HIDDEN;
 bool vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
         enum vkd3d_shader_log_level log_level, const char *source_name) DECLSPEC_HIDDEN;
 void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_message_context *context,

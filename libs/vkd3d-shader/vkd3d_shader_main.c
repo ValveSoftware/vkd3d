@@ -140,14 +140,20 @@ void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_mess
     vkd3d_string_buffer_trace_(&context->messages, function);
 }
 
-char *vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context)
+bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context, char **out)
 {
     char *messages;
 
-    if ((messages = vkd3d_malloc(context->messages.content_size + 1)))
-        memcpy(messages, context->messages.buffer, context->messages.content_size + 1);
+    if (!out)
+        return true;
 
-    return messages;
+    *out = NULL;
+
+    if (!(messages = vkd3d_malloc(context->messages.content_size + 1)))
+        return false;
+    memcpy(messages, context->messages.buffer, context->messages.content_size + 1);
+    *out = messages;
+    return true;
 }
 
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context,
@@ -842,7 +848,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     ret = scan_dxbc(compile_info, &message_context);
 
     vkd3d_shader_message_context_trace_messages(&message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
     vkd3d_shader_message_context_cleanup(&message_context);
     return ret;
@@ -956,7 +962,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     vkd3d_shader_message_context_trace_messages(&message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
     vkd3d_shader_message_context_cleanup(&message_context);
     return ret;
@@ -1046,7 +1052,7 @@ int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
 
     ret = shader_parse_input_signature(dxbc->code, dxbc->size, &message_context, signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
-    if (messages && !(*messages = vkd3d_shader_message_context_copy_messages(&message_context)))
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
 
     vkd3d_shader_message_context_cleanup(&message_context);
