@@ -1618,16 +1618,17 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code
 
 void vkd3d_shader_trace(void *data)
 {
-    const char *p, *q;
+    const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
     if (vkd3d_dxbc_binary_to_text(data, &code) != VKD3D_OK)
         return;
 
-    for (p = code.code; *p; p = q)
+    end = (const char *)code.code + code.size;
+    for (p = code.code; p < end; p = q)
     {
-        if (!(q = strstr(p, "\n")))
-            q = p + strlen(p);
+        if (!(q = memchr(p, '\n', end - p)))
+            q = end;
         else
             ++q;
         TRACE("    %.*s", (int)(q - p), p);
