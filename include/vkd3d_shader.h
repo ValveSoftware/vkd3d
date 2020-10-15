@@ -155,7 +155,13 @@ enum vkd3d_shader_visibility
 /** A generic structure containing a GPU shader, in text or byte-code format. */
 struct vkd3d_shader_code
 {
-    /** Pointer to the code. */
+    /**
+     * Pointer to the code. Note that textual formats are not null-terminated.
+     * Therefore \a size should not include a null terminator, when this
+     * structure is passed as input to a vkd3d-shader function, and the
+     * allocated string will not include a null terminator when this structure
+     * is used as output.
+     */
     const void *code;
     /** Size of \a code, in bytes. */
     size_t size;
