@@ -93,15 +93,15 @@ static int VKD3D_PRINTF_FUNC(2, 3) vkd3d_string_buffer_printf(struct vkd3d_strin
 
 static void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
 {
-    const char *p, *q;
+    const char *p, *q, *end = buffer->buffer + buffer->content_size;
 
     if (!TRACE_ON())
         return;
 
-    for (p = buffer->buffer; *p; p = q)
+    for (p = buffer->buffer; p < end; p = q)
     {
-        if (!(q = strchr(p, '\n')))
-            q = p + strlen(p);
+        if (!(q = memchr(p, '\n', end - p)))
+            q = end;
         else
             ++q;
         vkd3d_dbg_printf(VKD3D_DBG_LEVEL_TRACE, function, "%.*s", (int)(q - p), p);
