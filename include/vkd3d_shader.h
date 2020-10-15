@@ -635,12 +635,16 @@ struct vkd3d_shader_spirv_domain_shader_target_info
 struct vkd3d_shader_macro
 {
     /**
-     * A null-terminated string containing the name of a macro. This macro must
-     * not be a parameterized (i.e. function-like) macro. If this field is not a
-     * valid macro identifier, it will be ignored.
+     * Pointer to a null-terminated string containing the name of a macro. This
+     * macro must not be a parameterized (i.e. function-like) macro. If this
+     * field is not a valid macro identifier, this macro will be ignored.
      */
     const char *name;
-    /** A null-terminated string containing the expansion of the macro. */
+    /**
+     * Optional pointer to a null-terminated string containing the expansion of
+     * the macro. This field may be set to NULL, in which case the macro has an
+     * empty expansion.
+     */
     const char *value;
 };
 
@@ -713,7 +717,7 @@ struct vkd3d_shader_preprocess_info
      * be expanded as if a corresponding #define statement were prepended to the
      * source code.
      *
-     * If the same macro is specified multiple times, only the first value is
+     * If the same macro is specified multiple times, only the last value is
      * used.
      */
     const struct vkd3d_shader_macro *macros;
