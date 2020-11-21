@@ -1152,5 +1152,8 @@ int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info
 {
     TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
 
+    if (messages)
+        *messages = NULL;
+
     return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
