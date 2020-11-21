@@ -1,0 +1,126 @@
+[preproc]
+#if 1
+pass
+#endif
+
+[preproc]
+#if 1
+pass
+
+[preproc]
+pass
+#if 0
+fail
+
+[preproc]
+#if 1
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 0
+fail
+#else
+pass
+#endif
+
+[preproc]
+#if 0
+fail
+#else
+pass
+
+[preproc]
+#if 0
+fail
+#elif 1
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 1
+pass
+#elif 1
+fail
+#else
+fail
+#endif
+
+[preproc]
+#if 0
+fail
+#elif 0
+fail
+#else
+pass
+#endif
+
+[preproc]
+#if 0
+#if 1
+fail
+#endif
+#else
+#if 0
+fail
+#else
+pass
+#endif
+#endif
+
+[preproc]
+#if 0
+fail
+#endif
+pass
+
+[preproc]
+#endif
+pass
+
+[preproc]
+/* The #elif is effectively ignored here. */
+#if 0
+fail
+#else
+pass
+#elif 0
+#endif
+
+[preproc]
+#if 0
+fail
+#else
+#elif 0
+pass
+#endif
+
+[preproc]
+/* Similarly, the second #else is effectively ignored here. */
+#if 0
+fail
+#else
+pass
+#else
+#endif
+
+[preproc]
+/* Similarly, the second #else is effectively ignored here. */
+#if 0
+fail
+#else
+#else
+pass
+#endif
+
+[preproc]
+#if 0
+#define KEY fail
+#else
+#define KEY pass
+#endif
+KEY

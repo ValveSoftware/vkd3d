@@ -102,6 +102,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *target)
 enum parse_state
 {
     STATE_NONE,
+    STATE_PREPROC,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEST,
@@ -345,6 +346,33 @@ START_TEST(shader_runner_d3d12)
                     shader_source_len = 0;
                     break;
                 }
+
+                case STATE_PREPROC:
+                {
+                    ID3D10Blob *blob = NULL, *errors = NULL;
+                    HRESULT hr;
+                    char *text;
+
+                    hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
+                    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+                    if (hr == S_OK)
+                    {
+                        if (errors)
+                        {
+                            if (vkd3d_test_state.debug_level)
+                                trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+                            ID3D10Blob_Release(errors);
+                        }
+
+                        text = ID3D10Blob_GetBufferPointer(blob);
+                        ok(strstr(text, "pass"), "'pass' not found in preprocessed shader.\n");
+                        ok(!strstr(text, "fail"), "'fail' found in preprocessed shader.\n");
+                        ID3D10Blob_Release(blob);
+                    }
+
+                    shader_source_len = 0;
+                    break;
+                }
             }
         }
 
@@ -359,6 +387,8 @@ START_TEST(shader_runner_d3d12)
                 state = STATE_SHADER_INVALID_PIXEL;
             else if (!strcmp(line, "[test]\n"))
                 state = STATE_TEST;
+            else if (!strcmp(line, "[preproc]\n"))
+                state = STATE_PREPROC;
 
             vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
@@ -371,6 +401,7 @@ START_TEST(shader_runner_d3d12)
                         fprintf(stderr, "Ignoring line '%s' in %s.\n", line, argv[1]);
                     break;
 
+                case STATE_PREPROC:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_PIXEL:
                 {
