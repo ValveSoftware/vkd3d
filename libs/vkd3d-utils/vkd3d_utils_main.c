@@ -268,6 +268,9 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
     TRACE("data %p, size %lu, filename %s, macros %p, include %p, preprocessed_blob %p, messages_blob %p.\n",
             data, size, debugstr_a(filename), macros, include, preprocessed_blob, messages_blob);
 
+    if (messages_blob)
+        *messages_blob = NULL;
+
     compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     compile_info.next = &preprocess_info;
     compile_info.source.code = data;
