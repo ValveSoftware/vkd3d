@@ -176,6 +176,9 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     if (secondary_flags)
         FIXME("Ignoring secondary flags %#x.\n", secondary_flags);
 
+    if (messages_blob)
+        *messages_blob = NULL;
+
     compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     compile_info.next = &preprocess_info;
     compile_info.source.code = data;
