@@ -1,0 +1,89 @@
+[preproc]
+#define KEY
+#ifdef KEY
+pass
+#endif
+
+[preproc]
+#define KEY
+#if defined(KEY)
+pass
+#endif
+
+[preproc]
+#define KEY
+#if defined KEY
+pass
+#endif
+
+[preproc]
+#ifndef KEY
+pass
+#endif
+
+[preproc]
+#if !defined(KEY)
+pass
+#endif
+
+[preproc]
+#define KEY
+#ifndef KEY
+fail
+#else
+pass
+#endif
+
+[preproc]
+#ifdef KEY
+fail
+#else
+pass
+#endif
+
+[preproc]
+#define KEY(a, b)
+#ifdef KEY
+pass
+#endif
+
+[preproc]
+#ifdef KEY
+fail
+#endif
+#define KEY
+pass
+
+[preproc]
+#define KEY 0
+#ifdef KEY
+pass
+#endif
+
+[preproc]
+#define KEY
+#undef KEY
+#ifndef KEY
+pass
+#endif
+
+[preproc]
+#if KEY
+fail
+#else
+pass
+#endif
+
+[preproc]
+#if KEY == 0
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if KEY == 1
+fail
+#else
+pass
+#endif

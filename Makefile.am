@@ -65,6 +65,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
 	tests/preproc-if.shader_test \
+	tests/preproc-ifdef.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
@@ -208,6 +209,7 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
 	tests/preproc-if.shader_test \
+	tests/preproc-ifdef.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
