@@ -1,0 +1,80 @@
+[preproc]
+  #  define  KEY  pass
+KEY
+
+[preproc]
+#if 0
+#error
+#endif
+pass
+
+[preproc]
+#define pass fail
+"pass"
+
+[preproc]
+#define pass fail
+" escape \" pass "
+
+[preproc]
+#define fail pass
+" escape \\" fail
+
+[preproc]
+"multiline
+string"
+pass
+
+[preproc]
+"multiline
+pass"
+
+[preproc]
+"pass
+string"
+
+[preproc]
+/*
+#error
+fail
+ * / fail*/pass
+
+[preproc]
+pass/*
+#error
+fail
+ */
+
+[preproc]
+pass//fail
+
+[preproc]
+// multiline comment \
+fail
+pass
+
+[preproc]
+fa/* */il
+pass
+
+[preproc]
+#define KEY //
+KEY pass
+
+[preproc]
+#define KEY /* fail */ pass
+KEY
+
+[preproc]
+#define KEY(a, b) /* multiline
+
+comment */ a
+KEY(pass, fail)
+
+[preproc]
+pass /* fail
+
+[preproc]
+/* The backslash must be the last character in the line. */
+#define KEY \ 
+pass
