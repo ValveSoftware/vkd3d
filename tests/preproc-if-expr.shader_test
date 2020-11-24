@@ -1,0 +1,261 @@
+[preproc]
+#if 1 == 1
+pass
+#endif
+
+[preproc]
+#if 1 == 0
+fail
+#endif
+pass
+
+[preproc]
+#if 2
+pass
+#endif
+
+[preproc]
+#if -1
+pass
+#endif
+
+[preproc]
+#if-1
+pass
+#endif
+
+[preproc]
+#if 1 + 1 == 2
+pass
+#endif
+
+[preproc]
+#if 1 + 1 == 3
+fail
+#endif
+pass
+
+[preproc]
+#if 8 - 3 == 5
+pass
+#endif
+
+[preproc]
+#if 2 * 2 == 4
+pass
+#endif
+
+[preproc]
+#if 2 * 2 == 4
+pass
+#endif
+
+[preproc]
+#if 8 / 3 == 2
+pass
+#endif
+
+[preproc]
+#if 0x12 == 18
+pass
+#endif
+
+[preproc]
+#if 012 == 10
+pass
+#endif
+
+[preproc]
+#if   -1 == 0xfffffff
+fail
+#elif -1 == 0xffffffff
+pass
+#endif
+
+[preproc]
+#if   -1 == 0xefffffffel
+fail
+#elif -1 == 0xeffffffffl
+pass
+#endif
+
+[preproc]
+#if (-1 == 4294967295l) && (-1 == 8589934591l) && (1 == 4294967297l)
+pass
+#endif
+
+[preproc]
+#if (-1ul == 4294967295ul) && (-1ul == 8589934591ul) && (1ul == 4294967297ul)
+pass
+#endif
+
+[preproc]
+#if (-1lu == 4294967295lu) && (-1lu == 8589934591lu) && (1lu == 4294967297lu)
+pass
+#endif
+
+[preproc]
+#if 36893488147419103233 == 1
+pass
+#endif
+
+[preproc]
+/* All math is done using unsigned 32-bit integers. */
+#if 8 / -3 == 2
+fail
+#elif 8 / -3 == 3
+fail
+#elif 8 / -3 == -2
+fail
+#elif 8 / -3 == -3
+fail
+#elif 8 / -3 == 0
+pass
+#endif
+
+[preproc]
+#if -8 / 3 == 2
+fail
+#elif -8 / 3 == 3
+fail
+#elif -8 / 3 == -2
+fail
+#elif -8 / 3 == -3
+fail
+#elif -8 / 3 == 1431655762
+pass
+#endif
+
+[preproc]
+#if 1 && 0
+fail
+#endif
+pass
+
+[preproc]
+#if 0 && 1
+fail
+#endif
+pass
+
+[preproc]
+#if 1 && 1
+pass
+#endif
+
+[preproc]
+#if 1 || 0
+pass
+#endif
+
+[preproc]
+#if 0 || 1
+pass
+#endif
+
+[preproc]
+#if 0 || 0
+fail
+#endif
+pass
+
+[preproc]
+#if 1 != 1
+fail
+#elif 1 != 0
+pass
+#endif
+
+[preproc]
+#if 2 < 1
+fail
+#elif 2 < 2
+fail
+#elif 1 < 2
+pass
+#endif
+
+[preproc]
+#if 2 <= 1
+fail
+#elif (1 <= 1) && (1 <= 2)
+pass
+#endif
+
+[preproc]
+#if 1 > 2
+fail
+#elif 2 > 2
+fail
+#elif 2 > 1
+pass
+#endif
+
+[preproc]
+#if 1 >= 2
+fail
+#elif (1 >= 1) && (2 >= 1)
+pass
+#endif
+
+[preproc]
+#if (2 == 2) == 1
+pass
+#endif
+
+[preproc]
+#if ((!0) == 1) && ((!1) == 0) && ((!2) == 0)
+pass
+#endif
+
+[preproc]
+#if (0 ? 2 : 3) == 3
+pass
+#endif
+
+[preproc]
+#if (1 ? 2 : 3) == 2
+pass
+#endif
+
+[preproc]
+#if (6 & 3) == 2
+pass
+#endif
+
+[preproc]
+#if (6 | 3) == 7
+pass
+#endif
+
+[preproc]
+#if (6 ^ 3) == 5
+pass
+#endif
+
+[preproc]
+#if +1 == 1
+pass
+#endif
+
+[preproc]
+#if -(-1) == 1
+pass
+#endif
+
+[preproc]
+#if 2 + 3 * 5 == 17
+pass
+#endif
+
+[preproc]
+#if (2 + 3) * 5 == 25
+pass
+#endif
+
+[preproc]
+#if 0 \
+< \
+1
+pass
+#endif
