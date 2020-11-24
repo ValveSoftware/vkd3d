@@ -67,6 +67,7 @@ vkd3d_shader_tests = \
 	tests/preproc-if.shader_test \
 	tests/preproc-ifdef.shader_test \
 	tests/preproc-if-expr.shader_test \
+	tests/preproc-macro.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
@@ -212,6 +213,7 @@ XFAIL_TESTS = \
 	tests/preproc-if.shader_test \
 	tests/preproc-ifdef.shader_test \
 	tests/preproc-if-expr.shader_test \
+	tests/preproc-macro.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \

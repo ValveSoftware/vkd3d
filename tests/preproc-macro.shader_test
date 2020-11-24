@@ -1,0 +1,303 @@
+[preproc]
+#define KEY pass
+KEY
+
+[preproc]
+#define KEY fail
+pass
+
+[preproc]
+#define KEY(a, b) a
+KEY(pass, fail)
+
+[preproc]
+/* Make sure argument expansion replaces the right tokens. */
+#define KEY(pass, fail) fail
+KEY(fail, pass)
+
+[preproc]
+#define KEY (pass)
+KEY(a,b)
+
+[preproc]
+#define FUNC(a) pass
+#define LEFT FUNC(
+LEFT fail)
+
+[preproc]
+#define KEY(a, b) a
+KEY(
+pass
+,
+fail
+)
+
+[preproc]
+/* Function-like macros which cannot be expanded (due to argument count mismatch
+ * or other parse errors) emit only the macro name and nothing else. In the case
+ * of unterminated macro lists, nothing after the macro name is emitted. */
+#define pass(a, b) a b fail
+pass(fail, fail
+fail
+
+[preproc]
+#define pass(a, b) fail
+pass(fail, fail, fail)
+
+[preproc]
+#define KEY(a, b) fail
+KEY(fail, fail, fail)
+pass
+
+[preproc]
+#define pass(a, b) fail
+pass
+(a, b)
+
+[preproc]
+#define FUNC(a) pass
+#define KEY FUNC
+KEY (fail)
+
+[preproc]
+#define KEY(a, b) a ## b
+KEY  (  pa  ,  ss  )
+
+[preproc]
+#define KEY(a, b) pa ## ss
+KEY(fail, fail)
+
+[preproc]
+#define KEY(a) a ## ss
+KEY(pa)
+
+[preproc]
+#define KEY(a) pa ## a
+KEY(ss)
+
+[preproc]
+#define KEY(x) p \
+ ## \
+ x \
+ ## \
+ ss
+KEY(
+a
+)
+
+[preproc]
+/* Concatenation is only parsed if the macro has arguments. */
+#define KEY fa ## il
+KEY pass
+
+[preproc]
+#define KEY(a) a
+KEY(pa ## ss)
+
+[preproc]
+fa ## il
+pass
+
+[preproc]
+#define KEY1 KEY2
+#define KEY2 pass
+KEY1
+
+[preproc]
+#define KEY2 pass
+#define KEY1 KEY2
+KEY1
+
+[preproc]
+#define KEY fail
+#undef KEY
+KEY pass
+
+[preproc]
+#define KEY(a,b) fail
+#undef KEY
+KEY(pass, pass)
+
+[preproc]
+#define KEY1 KEY2
+#define KEY2 fail
+#undef KEY2
+KEY1 pass
+
+[preproc]
+#define KEY2 fail
+#define KEY1 KEY2
+#undef KEY2
+KEY1 pass
+
+[preproc]
+#define KEY1(a, b) a
+#define KEY2 pass
+#define KEY3 fail
+KEY1(KEY2, KEY3)
+
+[preproc]
+#define a b
+#define KEY(a) b
+KEY(fail)
+pass
+
+[preproc]
+#define a b
+#define KEY(a) a
+KEY(pass)
+
+[preproc]
+#define OP==
+#if 2 OP 3
+fail
+#elif 2 OP 2
+pass
+#endif
+
+[preproc]
+#define KEY 1
+#if KEY == 1
+pass
+#endif
+
+[preproc]
+#define KEY(a, b) (a < b)
+#if KEY(2, 1)
+fail
+#elif KEY(1, 2)
+pass
+#endif
+
+[preproc]
+#define KEY fail
+#define KEY pass
+KEY
+
+[preproc]
+/* Identifiers are not expanded in the LHS of #define statements. */
+#define KEY pass
+#define KEY fail
+pass
+
+[preproc]
+#undef KEY
+pass
+
+[preproc]
+#define KEY(a, b) b
+KEY("fail,fail",pass)
+
+[preproc]
+#define \
+KEY( \
+a \
+, \
+b \
+) \
+a
+KEY(pass, fail)
+
+[preproc]
+#define \
+KEY \
+pass
+KEY
+
+[preproc]
+#define KEY(a, b) b
+KEY(multiline
+argument,pass)
+
+[preproc]
+#define KEY(a, b) b
+KEY(
+multiline
+#define fail pass
+argument, fail)
+
+[preproc]
+#define KEY(a, b) a
+KEY((pass,pass),(fail,fail))
+
+[preproc]
+#define KEY(a, b) b
+KEY((,,fail,,fail,,),(,,pass,,pass,,))
+
+[preproc]
+#define KEY(a, b) b
+KEY([,,fail,,fail,,],[,,pass,,pass,,])
+
+[preproc]
+#define KEY(a, b) b
+KEY({,,fail,,fail,,},{,,pass,,pass,,})
+
+[preproc]
+#define KEY(a, b) pass
+KEY((),())
+
+[preproc]
+#define KEY(a, b) pass
+KEY((,),(,))
+
+[preproc]
+/* Unbalanced parentheses result in an unterminated macro. */
+#define pass(a, b) fail
+pass((),()
+
+[preproc]
+#define KEY(a,a) a
+KEY(pass,fail)
+
+[preproc]
+/* Macro arguments suffer their own macro expansion only after the macro has
+ * been completely parsed. */
+#define KEY(a) a
+KEY(fail
+#define fail pass
+)
+
+[preproc]
+/* The same applies to #if. */
+#define KEY(a) a
+KEY(
+#define OBJ
+#ifdef OBJ
+pass
+#endif
+)
+
+[preproc]
+#define KEY(a) a
+KEY(pass
+#ifdef OBJ
+fail
+#endif
+#define OBJ
+)
+
+[preproc]
+/* Directives inside of macro arguments are always evaluated. */
+#define FUNC(a) value
+FUNC(fail
+#define KEY pass
+)
+KEY
+
+[preproc]
+#define FUNC1(a) a ## ss
+#define FUNC2(a, b) a < b
+
+FUNC1(
+#if FUNC2(3, 2)
+fail
+#elif FUNC2(2, 3)
+pa
+#else
+fail
+#endif
+)
+
+[preproc]
+#define __LINE__ pass
+__LINE__
