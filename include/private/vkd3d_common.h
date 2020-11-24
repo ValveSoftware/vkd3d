@@ -120,6 +120,20 @@ static inline unsigned int vkd3d_log2i(unsigned int x)
 #endif
 }
 
+static inline void *vkd3d_memmem( const void *haystack, size_t haystack_len, const void *needle, size_t needle_len)
+{
+    const char *str = haystack;
+
+    while (haystack_len >= needle_len)
+    {
+        if (!memcmp(str, needle, needle_len))
+            return (char *)str;
+        ++str;
+        --haystack_len;
+    }
+    return NULL;
+}
+
 static inline int ascii_isupper(int c)
 {
     return 'A' <= c && c <= 'Z';

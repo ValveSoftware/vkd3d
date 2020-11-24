@@ -1,5 +1,6 @@
 /d3d12
 /d3d12_invalid_usage
+/hlsl_d3d12
 /shader_runner_d3d12
 /vkd3d_api
 /vkd3d_common

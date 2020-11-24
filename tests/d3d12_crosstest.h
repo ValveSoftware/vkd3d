@@ -40,6 +40,7 @@ typedef int HRESULT;
 #endif
 
 #define COBJMACROS
+#define CONST_VTABLE
 #define INITGUID
 #include "vkd3d_test.h"
 #include "vkd3d_windows.h"

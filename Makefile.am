@@ -44,7 +44,8 @@ vkd3d_tests = \
 
 vkd3d_cross_tests = \
 	tests/d3d12 \
-	tests/d3d12_invalid_usage
+	tests/d3d12_invalid_usage \
+	tests/hlsl_d3d12
 
 vkd3d_shader_runners = \
 	tests/shader_runner_d3d12
@@ -193,6 +194,7 @@ check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_runners)
 TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @VULKAN_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @VULKAN_LIBS@
+tests_hlsl_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
