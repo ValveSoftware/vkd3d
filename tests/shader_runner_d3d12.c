@@ -103,6 +103,7 @@ enum parse_state
 {
     STATE_NONE,
     STATE_PREPROC,
+    STATE_PREPROC_INVALID,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEST,
@@ -347,6 +348,27 @@ START_TEST(shader_runner_d3d12)
                     break;
                 }
 
+                case STATE_PREPROC_INVALID:
+                {
+                    ID3D10Blob *blob = NULL, *errors = NULL;
+                    HRESULT hr;
+
+                    hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
+                    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+                    ok(!blob, "Expected no compiled shader blob.\n");
+                    ok(!!errors, "Expected non-NULL error blob.\n");
+
+                    if (errors)
+                    {
+                        if (vkd3d_test_state.debug_level)
+                            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+                        ID3D10Blob_Release(errors);
+                    }
+
+                    shader_source_len = 0;
+                    break;
+                }
+
                 case STATE_PREPROC:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -389,6 +411,8 @@ START_TEST(shader_runner_d3d12)
                 state = STATE_TEST;
             else if (!strcmp(line, "[preproc]\n"))
                 state = STATE_PREPROC;
+            else if (!strcmp(line, "[preproc fail]\n"))
+                state = STATE_PREPROC_INVALID;
 
             vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
@@ -402,6 +426,7 @@ START_TEST(shader_runner_d3d12)
                     break;
 
                 case STATE_PREPROC:
+                case STATE_PREPROC_INVALID:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_PIXEL:
                 {

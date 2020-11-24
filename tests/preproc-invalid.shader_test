@@ -1,0 +1,8 @@
+[preproc fail]
+#error
+
+[preproc fail]
+#include <nonexistent_file>
+
+[preproc fail]
+#include "nonexistent_file"
