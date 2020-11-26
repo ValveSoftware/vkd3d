@@ -583,6 +583,7 @@ static bool has_colour(FILE *f)
 
 int main(int argc, char **argv)
 {
+    struct vkd3d_shader_spirv_target_info spirv_target_info = {0};
     struct vkd3d_shader_hlsl_source_info hlsl_source_info = {0};
     bool close_input = false, close_output = false;
     struct vkd3d_shader_compile_info info;
@@ -654,8 +655,13 @@ int main(int argc, char **argv)
     info.source_name = options.filename;
 
     hlsl_source_info.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO;
+    hlsl_source_info.next = &spirv_target_info;
     hlsl_source_info.profile = options.profile;
     hlsl_source_info.entry_point = options.entry_point;
+
+    spirv_target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
+    spirv_target_info.entry_point = options.entry_point;
+    spirv_target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
 
     if (!read_shader(&info.source, input))
     {
