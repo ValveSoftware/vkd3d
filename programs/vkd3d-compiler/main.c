@@ -586,7 +586,7 @@ int main(int argc, char **argv)
     struct vkd3d_shader_hlsl_source_info hlsl_source_info = {0};
     bool close_input = false, close_output = false;
     struct vkd3d_shader_compile_info info;
-    struct vkd3d_shader_code spirv;
+    struct vkd3d_shader_code output_code;
     struct options options;
     FILE *input, *output;
     char *messages;
@@ -663,7 +663,7 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    ret = vkd3d_shader_compile(&info, &spirv, &messages);
+    ret = vkd3d_shader_compile(&info, &output_code, &messages);
     if (messages)
         fputs(messages, stderr);
     vkd3d_shader_free_messages(messages);
@@ -674,15 +674,15 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    if (!write_shader(&spirv, output))
+    if (!write_shader(&output_code, output))
     {
         fprintf(stderr, "Failed to write output shader.\n");
-        vkd3d_shader_free_shader_code(&spirv);
+        vkd3d_shader_free_shader_code(&output_code);
         goto done;
     }
 
     fail = 0;
-    vkd3d_shader_free_shader_code(&spirv);
+    vkd3d_shader_free_shader_code(&output_code);
 done:
     if (close_output)
         fclose(output);
