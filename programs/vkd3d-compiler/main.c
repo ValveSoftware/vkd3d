@@ -163,6 +163,7 @@ static void print_usage(const char *program_name)
         "                        Valid values are 'buffer-texture' (default) and\n"
         "                        'storage-buffer'.\n"
         "  -e, --entry=<name>    Use <name> as the entry point (default is \"main\").\n"
+        "  -E                    Preprocess the source code instead of compiling it.\n"
         "  -o, --output=<file>   Write the output to <file>. If <file> is '-' or no\n"
         "                        output file is specified, output will be written to\n"
         "                        standard output.\n"
@@ -196,6 +197,7 @@ struct options
     const char *profile;
     enum vkd3d_shader_source_type source_type;
     enum vkd3d_shader_target_type target_type;
+    bool preprocess_only;
     bool print_version;
     bool print_source_types;
     bool print_target_types;
@@ -402,7 +404,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "b:e:ho:p:Vx:", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "b:e:Eho:p:Vx:", long_options, NULL)) == -1)
             break;
 
         switch (option)
@@ -427,6 +429,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
             case OPTION_ENTRY:
             case 'e':
                 options->entry_point = optarg;
+                break;
+
+            case 'E':
+                options->preprocess_only = true;
                 break;
 
             case OPTION_OUTPUT:
@@ -669,7 +675,11 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    ret = vkd3d_shader_compile(&info, &output_code, &messages);
+    if (options.preprocess_only)
+        ret = vkd3d_shader_preprocess(&info, &output_code, &messages);
+    else
+        ret = vkd3d_shader_compile(&info, &output_code, &messages);
+
     if (messages)
         fputs(messages, stderr);
     vkd3d_shader_free_messages(messages);
