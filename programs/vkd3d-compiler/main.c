@@ -639,12 +639,21 @@ int main(int argc, char **argv)
     if (!(output = open_output(options.output_filename, &close_output)))
         goto done;
 
-    if (!options.output_filename && get_target_type_info(options.target_type)->is_binary
-            && isatty(fileno(output)))
+    if (!options.output_filename && isatty(fileno(output)))
     {
-        fprintf(stderr, "Output is a tty and output format is binary, exiting.\n"
-                "If this is really what you intended, specify the output explicitly.\n");
-        goto done;
+        bool is_binary;
+
+        if (options.preprocess_only)
+            is_binary = get_source_type_info(options.source_type)->is_binary;
+        else
+            is_binary = get_target_type_info(options.target_type)->is_binary;
+
+        if (is_binary)
+        {
+            fprintf(stderr, "Output is a tty and output format is binary, exiting.\n"
+                    "If this is really what you intended, specify the output explicitly.\n");
+            goto done;
+        }
     }
 
     if (!options.explicit_colour && has_colour(output))
