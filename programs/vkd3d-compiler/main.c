@@ -483,7 +483,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     if (options->print_target_types)
         return true;
 
-    if (!validate_target_type(options->source_type, options->target_type))
+    if (!options->preprocess_only && !validate_target_type(options->source_type, options->target_type))
     {
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
                 get_target_type_info(options->target_type)->name,
