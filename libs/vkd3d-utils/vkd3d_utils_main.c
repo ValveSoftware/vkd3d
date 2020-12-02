@@ -131,6 +131,9 @@ static int open_include(const char *filename, bool local, const char *parent_dat
     ID3DInclude *iface = context;
     unsigned int size;
 
+    if (!iface)
+        return VKD3D_ERROR;
+
     if (FAILED(ID3DInclude_Open(iface, local ? D3D_INCLUDE_LOCAL : D3D_INCLUDE_SYSTEM,
             filename, parent_data, &code->code, &size)))
         return VKD3D_ERROR;
