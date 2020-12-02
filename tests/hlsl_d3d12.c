@@ -72,6 +72,14 @@ static const char test_include_file2[] =
 static const char test_include_file3[] =
     "#undef BRONTES";
 
+static const char test_include2_top[] =
+    "#define FUNC(a, b) a ## b\n"
+    "#include \"file4\"\n"
+    ",ss)";
+
+static const char test_include2_file4[] =
+    "FUNC(pa";
+
 static unsigned int refcount_file1, refcount_file2, refcount_file3, include_count_file2;
 
 static HRESULT WINAPI test_include_Open(ID3DInclude *iface, D3D_INCLUDE_TYPE type,
@@ -105,6 +113,13 @@ static HRESULT WINAPI test_include_Open(ID3DInclude *iface, D3D_INCLUDE_TYPE typ
         *code = test_include_file3;
         *size = strlen(test_include_file3);
         ++refcount_file3;
+    }
+    else if (!strcmp(filename, "file4"))
+    {
+        ok(type == D3D_INCLUDE_LOCAL, "Got type %#x.\n", type);
+        ok(!parent_data, "Got parent data %p.\n", parent_data);
+        *code = test_include2_file4;
+        *size = strlen(test_include2_file4);
     }
     else
     {
@@ -389,6 +404,9 @@ static void test_preprocess(void)
     ok(!refcount_file2, "Got %d references to file1.\n", refcount_file2);
     ok(!refcount_file3, "Got %d references to file1.\n", refcount_file3);
     todo ok(include_count_file2 == 2, "file2 was included %u times.\n", include_count_file2);
+
+    /* Macro invocation spread across multiple files. */
+    check_preprocess(test_include2_top, NULL, &test_include, "pass", NULL);
 
     blob = errors = (ID3D10Blob *)0xdeadbeef;
     hr = D3DPreprocess(test_include_top, strlen(test_include_top), NULL, NULL, &test_include_fail, &blob, &errors);
