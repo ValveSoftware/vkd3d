@@ -372,6 +372,7 @@ START_TEST(shader_runner_d3d12)
                 case STATE_PREPROC:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
+                    SIZE_T size;
                     HRESULT hr;
                     char *text;
 
@@ -387,8 +388,11 @@ START_TEST(shader_runner_d3d12)
                         }
 
                         text = ID3D10Blob_GetBufferPointer(blob);
-                        ok(strstr(text, "pass"), "'pass' not found in preprocessed shader.\n");
-                        ok(!strstr(text, "fail"), "'fail' found in preprocessed shader.\n");
+                        size = ID3D10Blob_GetBufferSize(blob);
+                        ok(vkd3d_memmem(text, size, "pass", strlen("pass")),
+                                "'pass' not found in preprocessed shader.\n");
+                        ok(!vkd3d_memmem(text, size, "fail", strlen("fail")),
+                                "'fail' found in preprocessed shader.\n");
                         ID3D10Blob_Release(blob);
                     }
 
