@@ -129,11 +129,12 @@ static int open_include(const char *filename, bool local, const char *parent_dat
         struct vkd3d_shader_code *code)
 {
     ID3DInclude *iface = context;
-    unsigned int size;
+    unsigned int size = 0;
 
     if (!iface)
         return VKD3D_ERROR;
 
+    memset(code, 0, sizeof(*code));
     if (FAILED(ID3DInclude_Open(iface, local ? D3D_INCLUDE_LOCAL : D3D_INCLUDE_SYSTEM,
             filename, parent_data, &code->code, &size)))
         return VKD3D_ERROR;
