@@ -252,7 +252,8 @@ static void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
     free_shader_desc(&parser->shader_desc);
 }
 
-static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info)
+static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info,
+        bool validate_target_type)
 {
     const enum vkd3d_shader_source_type *source_types;
     const enum vkd3d_shader_target_type *target_types;
@@ -276,16 +277,19 @@ static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    target_types = vkd3d_shader_get_supported_target_types(compile_info->source_type, &count);
-    for (i = 0; i < count; ++i)
+    if (validate_target_type)
     {
-        if (target_types[i] == compile_info->target_type)
-            break;
-    }
-    if (i == count)
-    {
-        WARN("Invalid shader target type %#x.\n", compile_info->target_type);
-        return VKD3D_ERROR_INVALID_ARGUMENT;
+        target_types = vkd3d_shader_get_supported_target_types(compile_info->source_type, &count);
+        for (i = 0; i < count; ++i)
+        {
+            if (target_types[i] == compile_info->target_type)
+                break;
+        }
+        if (i == count)
+        {
+            WARN("Invalid shader target type %#x.\n", compile_info->target_type);
+            return VKD3D_ERROR_INVALID_ARGUMENT;
+        }
     }
 
     return VKD3D_OK;
@@ -832,7 +836,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     if (messages)
         *messages = NULL;
 
-    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
         return ret;
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
@@ -933,7 +937,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     if (messages)
         *messages = NULL;
 
-    if ((ret = vkd3d_shader_validate_compile_info(compile_info)) < 0)
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
         return ret;
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
@@ -1150,10 +1154,15 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages)
 {
+    int ret;
+
     TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
 
     if (messages)
         *messages = NULL;
+
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info, false)) < 0)
+        return ret;
 
     return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
