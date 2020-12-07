@@ -78,8 +78,7 @@ int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *
     }
 }
 
-static int VKD3D_PRINTF_FUNC(2, 3) vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer,
-        const char *format, ...)
+int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *format, ...)
 {
     va_list args;
     int ret;
@@ -91,7 +90,7 @@ static int VKD3D_PRINTF_FUNC(2, 3) vkd3d_string_buffer_printf(struct vkd3d_strin
     return ret;
 }
 
-static void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
+void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
 {
     const char *p, *q, *end = buffer->buffer + buffer->content_size;
 
@@ -1154,6 +1153,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages)
 {
+    struct vkd3d_shader_message_context message_context;
     int ret;
 
     TRACE("compile_info %p, out %p, messages %p.\n", compile_info, out, messages);
@@ -1164,5 +1164,13 @@ int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, false)) < 0)
         return ret;
 
-    return VKD3D_ERROR_NOT_IMPLEMENTED;
+    vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
+
+    ret = preproc_lexer_parse(compile_info, out, &message_context);
+
+    vkd3d_shader_message_context_trace_messages(&message_context);
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
+        ret = VKD3D_ERROR_OUT_OF_MEMORY;
+    vkd3d_shader_message_context_cleanup(&message_context);
+    return ret;
 }

@@ -19,7 +19,10 @@ vkd3d-*.tar.xz
 *.log
 *.o
 *.pc
+*.tab.c
+*.tab.h
 *.trs
+*.yy.c
 *~
 
 .deps

@@ -30,6 +30,12 @@ AC_PROG_MKDIR_P
 VKD3D_PROG_WIDL(3, 20)
 AS_IF([test "x$WIDL" = "xno"], [AC_MSG_WARN([widl is required to build header files.])])
 
+AC_CHECK_PROGS([FLEX], [flex], [none])
+AS_IF([test "$FLEX" = "none"], [AC_MSG_ERROR([no suitable flex found. Please install the 'flex' package.])])
+
+AC_CHECK_PROGS([BISON], [bison], [none])
+AS_IF([test "$BISON" = "none"], [AC_MSG_ERROR([no suitable bison found. Please install the 'bison' package.])])
+
 DX_PS_FEATURE([OFF])
 DX_INIT_DOXYGEN([vkd3d], [Doxyfile], [doc])
 AC_CONFIG_FILES([Doxyfile])

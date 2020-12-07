@@ -108,6 +108,33 @@ libvkd3d_common_la_SOURCES = \
 
 lib_LTLIBRARIES = libvkd3d-shader.la libvkd3d.la libvkd3d-utils.la
 
+VKD3D_V_FLEX = $(vkd3d_v_flex_@AM_V@)
+vkd3d_v_flex_ = $(vkd3d_v_flex_@AM_DEFAULT_V@)
+vkd3d_v_flex_0 = @echo "  FLEX    " $@;
+vkd3d_v_flex_1 =
+
+VKD3D_V_BISON = $(vkd3d_v_bison_@AM_V@)
+vkd3d_v_bison_ = $(vkd3d_v_bison_@AM_DEFAULT_V@)
+vkd3d_v_bison_0 = @echo "  BISON   " $@;
+vkd3d_v_bison_1 =
+
+libs/vkd3d-shader/preproc.yy.c: libs/vkd3d-shader/preproc.l
+	$(VKD3D_V_FLEX)$(FLEX) $(LFLAGS) -o $@ $<
+
+libs/vkd3d-shader/preproc.tab.c libs/vkd3d-shader/preproc.tab.h &: libs/vkd3d-shader/preproc.y
+	$(VKD3D_V_BISON)$(BISON) $(YFLAGS) -d -o libs/vkd3d-shader/preproc.tab.c $<
+
+BUILT_SOURCES += libs/vkd3d-shader/preproc.tab.h
+
+vkd3d_shader_yyfiles = \
+	libs/vkd3d-shader/preproc.tab.c \
+	libs/vkd3d-shader/preproc.tab.h \
+	libs/vkd3d-shader/preproc.yy.c
+
+CLEANFILES = $(vkd3d_shader_yyfiles)
+
+nodist_libvkd3d_shader_la_SOURCES = $(vkd3d_shader_yyfiles)
+
 libvkd3d_shader_la_SOURCES = \
 	include/private/list.h \
 	include/private/rbtree.h \
@@ -122,7 +149,7 @@ libvkd3d_shader_la_SOURCES = \
 	libs/vkd3d-shader/vkd3d_shader.map \
 	libs/vkd3d-shader/vkd3d_shader_main.c \
 	libs/vkd3d-shader/vkd3d_shader_private.h
-libvkd3d_shader_la_CFLAGS = $(AM_CFLAGS) @SPIRV_TOOLS_CFLAGS@
+libvkd3d_shader_la_CFLAGS = $(AM_CFLAGS) -I$(srcdir)/libs/vkd3d-shader @SPIRV_TOOLS_CFLAGS@
 libvkd3d_shader_la_LDFLAGS = $(AM_LDFLAGS) -version-info 1:0:0
 libvkd3d_shader_la_LIBADD = libvkd3d-common.la @SPIRV_TOOLS_LIBS@
 if HAVE_LD_VERSION_SCRIPT
@@ -173,7 +200,7 @@ EXTRA_DIST = ANNOUNCE LICENSE
 pkgconfigdir = $(libdir)/pkgconfig
 pkginclude_HEADERS = $(vkd3d_public_headers)
 nodist_pkgconfig_DATA = libvkd3d.pc libvkd3d-shader.pc libvkd3d-utils.pc
-CLEANFILES = libvkd3d.pc libvkd3d-shader.pc libvkd3d-utils.pc
+CLEANFILES += libvkd3d.pc libvkd3d-shader.pc libvkd3d-utils.pc
 EXTRA_DIST += \
 	libs/vkd3d/libvkd3d.pc.in \
 	libs/vkd3d-shader/libvkd3d-shader.pc.in \

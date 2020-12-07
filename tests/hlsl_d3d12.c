@@ -30,22 +30,20 @@ static void check_preprocess_(int line, const char *source, const D3D_SHADER_MAC
     HRESULT hr;
 
     hr = D3DPreprocess(source, strlen(source), NULL, macros, include, &blob, &errors);
-    todo ok_(line)(hr == S_OK, "Failed to preprocess shader, hr %#x.\n", hr);
+    assert_that_(line)(hr == S_OK, "Failed to preprocess shader, hr %#x.\n", hr);
     if (errors)
     {
         if (vkd3d_test_state.debug_level)
             trace_(line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
         ID3D10Blob_Release(errors);
     }
-    if (hr != S_OK)
-        return;
     code = ID3D10Blob_GetBufferPointer(blob);
     size = ID3D10Blob_GetBufferSize(blob);
     if (present)
         ok_(line)(vkd3d_memmem(code, size, present, strlen(present)),
                 "\"%s\" not found in preprocessed shader.\n", present);
     if (absent)
-        ok_(line)(!vkd3d_memmem(code, size, absent, strlen(absent)),
+        assert_that_(line)(!vkd3d_memmem(code, size, absent, strlen(absent)),
                 "\"%s\" found in preprocessed shader.\n", absent);
     ID3D10Blob_Release(blob);
 }
@@ -352,7 +350,8 @@ static void test_preprocess(void)
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
-        check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
+        todo_if (i != 5 && i != 8 && i != 42)
+            check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
     }
     vkd3d_test_set_context(NULL);
 
@@ -360,16 +359,16 @@ static void test_preprocess(void)
     macros[0].Definition = "value";
     macros[1].Name = NULL;
     macros[1].Definition = NULL;
-    check_preprocess("KEY", macros, NULL, "value", "KEY");
+    todo check_preprocess("KEY", macros, NULL, "value", "KEY");
 
-    check_preprocess("#undef KEY\nKEY", macros, NULL, "KEY", "value");
+    todo check_preprocess("#undef KEY\nKEY", macros, NULL, "KEY", "value");
 
     macros[0].Name = NULL;
-    check_preprocess("KEY", macros, NULL, "KEY", "value");
+    todo check_preprocess("KEY", macros, NULL, "KEY", "value");
 
     macros[0].Name = "KEY";
     macros[0].Definition = NULL;
-    check_preprocess("KEY", macros, NULL, NULL, "KEY");
+    todo check_preprocess("KEY", macros, NULL, NULL, "KEY");
 
     macros[0].Name = "0";
     macros[0].Definition = "value";
@@ -377,7 +376,7 @@ static void test_preprocess(void)
 
     macros[0].Name = "KEY(a)";
     macros[0].Definition = "value";
-    check_preprocess("KEY(a)", macros, NULL, "KEY", "value");
+    todo check_preprocess("KEY(a)", macros, NULL, "KEY", "value");
 
     macros[0].Name = "KEY";
     macros[0].Definition = "value1";
@@ -385,33 +384,33 @@ static void test_preprocess(void)
     macros[1].Definition = "value2";
     macros[2].Name = NULL;
     macros[2].Definition = NULL;
-    check_preprocess("KEY", macros, NULL, "value2", NULL);
+    todo check_preprocess("KEY", macros, NULL, "value2", NULL);
 
     macros[0].Name = "KEY";
     macros[0].Definition = "KEY2";
     macros[1].Name = "KEY2";
     macros[1].Definition = "value";
-    check_preprocess("KEY", macros, NULL, "value", NULL);
+    todo check_preprocess("KEY", macros, NULL, "value", NULL);
 
     macros[0].Name = "KEY2";
     macros[0].Definition = "value";
     macros[1].Name = "KEY";
     macros[1].Definition = "KEY2";
-    check_preprocess("KEY", macros, NULL, "value", NULL);
+    todo check_preprocess("KEY", macros, NULL, "value", NULL);
 
-    check_preprocess(test_include_top, NULL, &test_include, "pass", "fail");
+    todo check_preprocess(test_include_top, NULL, &test_include, "pass", "fail");
     ok(!refcount_file1, "Got %d references to file1.\n", refcount_file1);
     ok(!refcount_file2, "Got %d references to file1.\n", refcount_file2);
     ok(!refcount_file3, "Got %d references to file1.\n", refcount_file3);
     todo ok(include_count_file2 == 2, "file2 was included %u times.\n", include_count_file2);
 
     /* Macro invocation spread across multiple files. */
-    check_preprocess(test_include2_top, NULL, &test_include, "pass", NULL);
+    todo check_preprocess(test_include2_top, NULL, &test_include, "pass", NULL);
 
     blob = errors = (ID3D10Blob *)0xdeadbeef;
     hr = D3DPreprocess(test_include_top, strlen(test_include_top), NULL, NULL, &test_include_fail, &blob, &errors);
     todo ok(hr == E_FAIL, "Got hr %#x.\n", hr);
-    ok(blob == (ID3D10Blob *)0xdeadbeef, "Expected no compiled shader blob.\n");
+    todo ok(blob == (ID3D10Blob *)0xdeadbeef, "Expected no compiled shader blob.\n");
     todo ok(!!errors, "Expected non-NULL error blob.\n");
     if (errors)
     {

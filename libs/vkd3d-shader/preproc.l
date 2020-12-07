@@ -1,0 +1,99 @@
+/*
+ * HLSL preprocessor
+ *
+ * Copyright 2020 Zebediah Figura for CodeWeavers
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+%{
+
+#include "preproc.tab.h"
+
+#define YYSTYPE PREPROC_YYSTYPE
+#define YYLTYPE PREPROC_YYLTYPE
+
+#define YY_DECL static int preproc_lexer_lex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, yyscan_t yyscanner)
+
+%}
+
+%option 8bit
+%option bison-bridge
+%option bison-locations
+%option extra-type="struct preproc_ctx *"
+%option never-interactive
+%option noinput
+%option nounput
+%option noyywrap
+%option prefix="preproc_yy"
+%option reentrant
+
+WS              [ \t]
+
+%%
+
+{WS}+                               {}
+.                                   {return T_TEXT;}
+
+%%
+
+int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
+{
+    struct preproc_ctx *ctx = yyget_extra(scanner);
+
+    for (;;)
+    {
+        const char *text;
+        int token;
+
+        if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
+            return 0;
+        text = yyget_text(scanner);
+
+        TRACE("Parsing token %d, string %s.\n", token, debugstr_a(text));
+
+        vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
+    }
+}
+
+int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct preproc_ctx ctx = {0};
+    YY_BUFFER_STATE top_buffer;
+    void *output_code;
+
+    vkd3d_string_buffer_init(&ctx.buffer);
+
+    yylex_init_extra(&ctx, &ctx.scanner);
+    top_buffer = yy_scan_bytes(compile_info->source.code, compile_info->source.size, ctx.scanner);
+
+    preproc_yyparse(ctx.scanner, &ctx);
+
+    yy_delete_buffer(top_buffer, ctx.scanner);
+    yylex_destroy(ctx.scanner);
+
+    if (!(output_code = vkd3d_malloc(ctx.buffer.content_size)))
+    {
+        vkd3d_string_buffer_cleanup(&ctx.buffer);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    memcpy(output_code, ctx.buffer.buffer, ctx.buffer.content_size);
+    out->size = ctx.buffer.content_size;
+    out->code = output_code;
+    vkd3d_string_buffer_trace(&ctx.buffer);
+    vkd3d_string_buffer_cleanup(&ctx.buffer);
+    return VKD3D_OK;
+}
