@@ -36,16 +36,33 @@
 %option never-interactive
 %option noinput
 %option nounput
+%option noyy_top_state
 %option noyywrap
 %option prefix="preproc_yy"
 %option reentrant
+%option stack
+
+    /* Because these can both be terminated by EOF, we need states for them. */
+%s C_COMMENT
+%s CXX_COMMENT
 
 WS              [ \t]
 
 %%
 
-{WS}+                               {}
-.                                   {return T_TEXT;}
+<INITIAL>"//"                       {yy_push_state(CXX_COMMENT, yyscanner);}
+<INITIAL>"/*"                       {yy_push_state(C_COMMENT, yyscanner);}
+<CXX_COMMENT>\\\r?\n                {}
+<CXX_COMMENT>\n                     {
+        yy_pop_state(yyscanner);
+        return T_TEXT;
+    }
+<C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
+<C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
+<C_COMMENT,CXX_COMMENT>.            {}
+
+<INITIAL>{WS}+                      {}
+<INITIAL>.                          {return T_TEXT;}
 
 %%
 
