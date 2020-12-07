@@ -417,7 +417,7 @@ static void vkd3d_init_debug_report(struct vkd3d_instance *instance)
     callback_info.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
     callback_info.pfnCallback = vkd3d_debug_report_callback;
     callback_info.pUserData = NULL;
-    if ((vr = VK_CALL(vkCreateDebugReportCallbackEXT(vk_instance, &callback_info, NULL, &callback)) < 0))
+    if ((vr = VK_CALL(vkCreateDebugReportCallbackEXT(vk_instance, &callback_info, NULL, &callback))) < 0)
     {
         WARN("Failed to create debug report callback, vr %d.\n", vr);
         return;
