@@ -47,6 +47,7 @@
 %s CXX_COMMENT
 
 WS              [ \t]
+IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 %%
 
@@ -60,6 +61,27 @@ WS              [ \t]
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT>.            {}
+
+<INITIAL>{IDENTIFIER}               {return T_TEXT;}
+
+<INITIAL>[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[hHfF]?    {return T_TEXT;}
+<INITIAL>[0-9]+\.([eE][+-]?[0-9]+)?[hHfF]?          {return T_TEXT;}
+<INITIAL>[0-9]+([eE][+-]?[0-9]+)?[hHfF]             {return T_TEXT;}
+<INITIAL>[0-9]+[eE][+-]?[0-9]+                      {return T_TEXT;}
+<INITIAL>0[xX][0-9a-fA-f]+[ul]{0,2}                 {return T_TEXT;}
+<INITIAL>0[0-7]*[ul]{0,2}                           {return T_TEXT;}
+<INITIAL>[1-9][0-9]*[ul]{0,2}                       {return T_TEXT;}
+
+<INITIAL>"&&"                       {return T_TEXT;}
+<INITIAL>"||"                       {return T_TEXT;}
+<INITIAL>"++"                       {return T_TEXT;}
+<INITIAL>"--"                       {return T_TEXT;}
+<INITIAL>"<<"=?                     {return T_TEXT;}
+<INITIAL>">>"=?                     {return T_TEXT;}
+<INITIAL>[-+*/%&|^=><!]=            {return T_TEXT;}
+
+    /* C strings (including escaped quotes). */
+<INITIAL>\"([^"\\]|\\.)*\"          {return T_TEXT;}
 
 <INITIAL>{WS}+                      {}
 <INITIAL>.                          {return T_TEXT;}
