@@ -600,6 +600,16 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
             semantic->resource_type, resource_data_type);
 }
 
+static void vkd3d_shader_scan_error(struct vkd3d_shader_scan_context *context,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_verror(context->message_context, error, format, args);
+    va_end(args);
+}
+
 static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -636,7 +646,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ELSE:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_IF)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘else’ instruction without corresponding ‘if’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -645,7 +655,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ENDIF:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_IF)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endif’ instruction without corresponding ‘if’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -658,7 +668,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_ENDLOOP:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_LOOP)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endloop’ instruction without corresponding ‘loop’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -672,7 +682,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH || cf_info->inside_block)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘endswitch’ instruction without corresponding ‘switch’ block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -682,7 +692,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘case’ instruction outside switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -692,13 +702,13 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context))
                     || cf_info->type != VKD3D_SHADER_BLOCK_SWITCH)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘default’ instruction outside switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
             if (cf_info->has_default)
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered duplicate ‘default’ instruction inside the current switch block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -708,7 +718,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_BREAK:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_breakable_cf_info(context)))
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘break’ instruction outside breakable block.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -717,7 +727,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_BREAKP:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘breakp’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -725,7 +735,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_CONTINUE:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘continue’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
@@ -734,7 +744,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_CONTINUEP:
             if (!(cf_info = vkd3d_shader_scan_find_innermost_loop_cf_info(context)))
             {
-                vkd3d_shader_error(context->message_context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
+                vkd3d_shader_scan_error(context, VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF,
                         "Encountered ‘continue’ instruction outside loop.");
                 return VKD3D_ERROR_INVALID_SHADER;
             }
