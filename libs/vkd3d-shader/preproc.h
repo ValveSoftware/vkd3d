@@ -27,7 +27,11 @@ struct preproc_ctx
 {
     void *scanner;
 
+    struct vkd3d_shader_message_context *message_context;
     struct vkd3d_string_buffer buffer;
+    struct vkd3d_shader_location location;
+
+    bool error;
 };
 
 #endif

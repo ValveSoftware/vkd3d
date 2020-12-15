@@ -24,6 +24,8 @@
 #include "vkd3d_shader_private.h"
 #include "preproc.h"
 
+#define PREPROC_YYLTYPE struct vkd3d_shader_location
+
 }
 
 %code provides
@@ -36,9 +38,22 @@ int preproc_yylex(PREPROC_YYSTYPE *yylval_param, PREPROC_YYLTYPE *yylloc_param, 
 %code
 {
 
+#define YYLLOC_DEFAULT(cur, rhs, n) (cur) = YYRHSLOC(rhs, !!n)
+
+static void preproc_error(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_verror(ctx->message_context, loc, error, format, args);
+    va_end(args);
+    ctx->error = true;
+}
+
 static void yyerror(const YYLTYPE *loc, void *scanner, struct preproc_ctx *ctx, const char *string)
 {
-    FIXME("Error reporting is not implemented.\n");
+    preproc_error(ctx, loc, VKD3D_SHADER_ERROR_PP_INVALID_SYNTAX, "%s", string);
 }
 
 }

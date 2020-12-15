@@ -27,6 +27,10 @@
 
 #define YY_DECL static int preproc_lexer_lex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, yyscan_t yyscanner)
 
+static void update_location(struct preproc_ctx *ctx);
+
+#define YY_USER_ACTION update_location(yyget_extra(yyscanner));
+
 %}
 
 %option 8bit
@@ -88,6 +92,27 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 %%
 
+static void update_location(struct preproc_ctx *ctx)
+{
+    unsigned int i, leng = yyget_leng(ctx->scanner);
+    const char *text = yyget_text(ctx->scanner);
+
+    /* We want to do this here, rather than before calling yylex(), because
+     * some tokens are skipped by the lexer. */
+
+    *yyget_lloc(ctx->scanner) = ctx->location;
+
+    for (i = 0; i < leng; ++i)
+    {
+        ++ctx->location.column;
+        if (text[i] == '\n')
+        {
+            ctx->location.column = 1;
+            ++ctx->location.line;
+        }
+    }
+}
+
 int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 {
     struct preproc_ctx *ctx = yyget_extra(scanner);
@@ -101,7 +126,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
             return 0;
         text = yyget_text(scanner);
 
-        TRACE("Parsing token %d, string %s.\n", token, debugstr_a(text));
+        TRACE("Parsing token %d, line %d, string %s.\n", token, lloc->line, debugstr_a(text));
 
         vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
     }
@@ -115,6 +140,10 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     void *output_code;
 
     vkd3d_string_buffer_init(&ctx.buffer);
+    ctx.message_context = message_context;
+    ctx.location.source_name = compile_info->source_name;
+    ctx.location.line = 1;
+    ctx.location.column = 1;
 
     yylex_init_extra(&ctx, &ctx.scanner);
     top_buffer = yy_scan_bytes(compile_info->source.code, compile_info->source.size, ctx.scanner);
@@ -123,6 +152,13 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
     yy_delete_buffer(top_buffer, ctx.scanner);
     yylex_destroy(ctx.scanner);
+
+    if (ctx.error)
+    {
+        WARN("Failed to preprocess.\n");
+        vkd3d_string_buffer_cleanup(&ctx.buffer);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
 
     if (!(output_code = vkd3d_malloc(ctx.buffer.content_size)))
     {
