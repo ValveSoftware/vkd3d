@@ -119,9 +119,11 @@ vkd3d_v_bison_0 = @echo "  BISON   " $@;
 vkd3d_v_bison_1 =
 
 libs/vkd3d-shader/preproc.yy.c: libs/vkd3d-shader/preproc.l
+	@$(MKDIR_P) libs/vkd3d-shader
 	$(VKD3D_V_FLEX)$(FLEX) $(LFLAGS) -o $@ $<
 
 libs/vkd3d-shader/preproc.tab.c libs/vkd3d-shader/preproc.tab.h &: libs/vkd3d-shader/preproc.y
+	@$(MKDIR_P) libs/vkd3d-shader
 	$(VKD3D_V_BISON)$(BISON) $(YFLAGS) -d -o libs/vkd3d-shader/preproc.tab.c $<
 
 BUILT_SOURCES += libs/vkd3d-shader/preproc.tab.h
