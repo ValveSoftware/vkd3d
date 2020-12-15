@@ -2021,9 +2021,11 @@ static const char *shader_get_string(const char *data, size_t data_size, DWORD o
     return data + offset;
 }
 
-static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_message_context *message_context,
+static int parse_dxbc(const char *data, size_t data_size,
+        struct vkd3d_shader_message_context *message_context, const char *source_name,
         int (*chunk_handler)(const char *data, DWORD data_size, DWORD tag, void *ctx), void *ctx)
 {
+    const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t checksum[4], calculated_checksum[4];
     const char *ptr = data;
     int ret = VKD3D_OK;
@@ -2036,7 +2038,7 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
     if (data_size < VKD3D_DXBC_HEADER_SIZE)
     {
         WARN("Invalid data size %zu.\n", data_size);
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_SIZE,
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_SIZE,
                 "DXBC size %zu is smaller than the DXBC header size.", data_size);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
@@ -2047,7 +2049,7 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
     if (tag != TAG_DXBC)
     {
         WARN("Wrong tag.\n");
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_MAGIC, "Invalid DXBC magic.");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_MAGIC, "Invalid DXBC magic.");
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
@@ -2063,7 +2065,8 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
                 checksum[0], checksum[1], checksum[2], checksum[3],
                 calculated_checksum[0], calculated_checksum[1],
                 calculated_checksum[2], calculated_checksum[3]);
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_CHECKSUM, "Invalid DXBC checksum.");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHECKSUM,
+                "Invalid DXBC checksum.");
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
@@ -2072,7 +2075,7 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
     if (version != 0x00000001)
     {
         WARN("Got unexpected DXBC version %#x.\n", version);
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_VERSION,
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_VERSION,
                 "DXBC version %#x is not supported.", version);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
@@ -2095,7 +2098,7 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
         if (chunk_offset >= data_size || !require_space(chunk_offset, 2, sizeof(DWORD), data_size))
         {
             WARN("Invalid chunk offset %#x (data size %zu).\n", chunk_offset, data_size);
-            vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_OFFSET,
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_OFFSET,
                     "DXBC chunk %u has invalid offset %#x (data size %#zx).", i, chunk_offset, data_size);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
@@ -2109,7 +2112,7 @@ static int parse_dxbc(const char *data, size_t data_size, struct vkd3d_shader_me
         {
             WARN("Invalid chunk size %#x (data size %zu, chunk offset %#x).\n",
                     chunk_size, data_size, chunk_offset);
-            vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_SIZE,
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_SIZE,
                     "DXBC chunk %u has invalid size %#x (data size %#zx, chunk offset %#x).",
                     i, chunk_offset, data_size, chunk_offset);
             return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -2229,7 +2232,7 @@ int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
     int ret;
 
     memset(signature, 0, sizeof(*signature));
-    if ((ret = parse_dxbc(dxbc, dxbc_length, message_context, isgn_handler, signature)) < 0)
+    if ((ret = parse_dxbc(dxbc, dxbc_length, message_context, NULL, isgn_handler, signature)) < 0)
         ERR("Failed to parse input signature.\n");
 
     return ret;
@@ -2304,7 +2307,7 @@ void free_shader_desc(struct vkd3d_shader_desc *desc)
 }
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_desc *desc)
+        struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc)
 {
     int ret;
 
@@ -2314,7 +2317,7 @@ int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
     memset(&desc->output_signature, 0, sizeof(desc->output_signature));
     memset(&desc->patch_constant_signature, 0, sizeof(desc->patch_constant_signature));
 
-    ret = parse_dxbc(dxbc, dxbc_length, message_context, shdr_handler, desc);
+    ret = parse_dxbc(dxbc, dxbc_length, message_context, source_name, shdr_handler, desc);
     if (!desc->byte_code)
         ret = VKD3D_ERROR_INVALID_ARGUMENT;
 
@@ -2781,9 +2784,9 @@ int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
     memset(root_signature, 0, sizeof(*root_signature));
     if (messages)
         *messages = NULL;
-    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO, NULL);
+    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
 
-    ret = parse_dxbc(dxbc->code, dxbc->size, &message_context, rts0_handler, root_signature);
+    ret = parse_dxbc(dxbc->code, dxbc->size, &message_context, NULL, rts0_handler, root_signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
@@ -2935,7 +2938,7 @@ static int shader_write_root_signature_header(struct root_signature_writer_conte
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature header.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -2963,7 +2966,7 @@ static int shader_write_descriptor_ranges(struct root_signature_writer_context *
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature descriptor ranges.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -2993,7 +2996,7 @@ static int shader_write_descriptor_ranges1(struct root_signature_writer_context 
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature descriptor ranges.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3009,7 +3012,7 @@ static int shader_write_descriptor_table(struct root_signature_writer_context *c
     return shader_write_descriptor_ranges(context, table);
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root descriptor table.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3025,7 +3028,7 @@ static int shader_write_descriptor_table1(struct root_signature_writer_context *
     return shader_write_descriptor_ranges1(context, table);
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root descriptor table.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3043,7 +3046,7 @@ static int shader_write_root_constants(struct root_signature_writer_context *con
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root constants.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3059,7 +3062,7 @@ static int shader_write_root_descriptor(struct root_signature_writer_context *co
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root descriptor.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3077,7 +3080,7 @@ static int shader_write_root_descriptor1(struct root_signature_writer_context *c
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root descriptor.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3126,7 +3129,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
                 break;
             default:
                 FIXME("Unrecognized type %#x.\n", versioned_root_signature_get_parameter_type(desc, i));
-                vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_INVALID_ROOT_PARAMETER_TYPE,
+                vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_INVALID_ROOT_PARAMETER_TYPE,
                         "Invalid/unrecognised root signature root parameter type %#x.",
                         versioned_root_signature_get_parameter_type(desc, i));
                 return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -3139,7 +3142,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature root parameters.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3183,7 +3186,7 @@ static int shader_write_static_samplers(struct root_signature_writer_context *co
     return VKD3D_OK;
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature static samplers.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3218,7 +3221,7 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
     return shader_write_static_samplers(context, desc);
 
 fail:
-    vkd3d_shader_error(&context->message_context, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
             "Out of memory while writing root signature.");
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
@@ -3247,7 +3250,7 @@ static int validate_descriptor_table_v_1_0(const struct vkd3d_shader_root_descri
         else
         {
             WARN("Invalid descriptor range type %#x.\n", r->range_type);
-            vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_RS_INVALID_DESCRIPTOR_RANGE_TYPE,
+            vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_RS_INVALID_DESCRIPTOR_RANGE_TYPE,
                     "Invalid root signature descriptor range type %#x.", r->range_type);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
@@ -3256,7 +3259,7 @@ static int validate_descriptor_table_v_1_0(const struct vkd3d_shader_root_descri
     if (have_srv_uav_cbv && have_sampler)
     {
         WARN("Samplers cannot be mixed with CBVs/SRVs/UAVs in descriptor tables.\n");
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_RS_MIXED_DESCRIPTOR_RANGE_TYPES,
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_RS_MIXED_DESCRIPTOR_RANGE_TYPES,
                 "Encountered both CBV/SRV/UAV and sampler descriptor ranges in the same root descriptor table.");
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
@@ -3288,7 +3291,7 @@ static int validate_descriptor_table_v_1_1(const struct vkd3d_shader_root_descri
         else
         {
             WARN("Invalid descriptor range type %#x.\n", r->range_type);
-            vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_RS_INVALID_DESCRIPTOR_RANGE_TYPE,
+            vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_RS_INVALID_DESCRIPTOR_RANGE_TYPE,
                     "Invalid root signature descriptor range type %#x.", r->range_type);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
@@ -3297,7 +3300,7 @@ static int validate_descriptor_table_v_1_1(const struct vkd3d_shader_root_descri
     if (have_srv_uav_cbv && have_sampler)
     {
         WARN("Samplers cannot be mixed with CBVs/SRVs/UAVs in descriptor tables.\n");
-        vkd3d_shader_error(message_context, VKD3D_SHADER_ERROR_RS_MIXED_DESCRIPTOR_RANGE_TYPES,
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_RS_MIXED_DESCRIPTOR_RANGE_TYPES,
                 "Encountered both CBV/SRV/UAV and sampler descriptor ranges in the same root descriptor table.");
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
@@ -3345,14 +3348,14 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
         *messages = NULL;
 
     memset(&context, 0, sizeof(context));
-    vkd3d_shader_message_context_init(&context.message_context, VKD3D_SHADER_LOG_INFO, NULL);
+    vkd3d_shader_message_context_init(&context.message_context, VKD3D_SHADER_LOG_INFO);
 
     if (root_signature->version != VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_0
             && root_signature->version != VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_1)
     {
         ret = VKD3D_ERROR_INVALID_ARGUMENT;
         WARN("Root signature version %#x not supported.\n", root_signature->version);
-        vkd3d_shader_error(&context.message_context, VKD3D_SHADER_ERROR_RS_INVALID_VERSION,
+        vkd3d_shader_error(&context.message_context, NULL, VKD3D_SHADER_ERROR_RS_INVALID_VERSION,
                 "Root signature version %#x is not supported.", root_signature->version);
         goto done;
     }

@@ -108,13 +108,9 @@ void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const 
 }
 
 void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
-        enum vkd3d_shader_log_level log_level, const char *source_name)
+        enum vkd3d_shader_log_level log_level)
 {
     context->log_level = log_level;
-    context->source_name = source_name ? source_name : "<anonymous>";
-    context->line = 0;
-    context->column = 0;
-
     vkd3d_string_buffer_init(&context->messages);
 }
 
@@ -148,28 +144,37 @@ bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_cont
     return true;
 }
 
-void vkd3d_shader_verror(struct vkd3d_shader_message_context *context,
+void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args)
 {
     if (context->log_level < VKD3D_SHADER_LOG_ERROR)
         return;
 
-    if (context->line)
-        vkd3d_string_buffer_printf(&context->messages, "%s:%u:%u: E%04u: ",
-                context->source_name, context->line, context->column, error);
+    if (location)
+    {
+        const char *source_name = location->source_name ? location->source_name : "<anonymous>";
+
+        if (location->line)
+            vkd3d_string_buffer_printf(&context->messages, "%s:%u:%u: E%04u: ",
+                    source_name, location->line, location->column, error);
+        else
+            vkd3d_string_buffer_printf(&context->messages, "%s: E%04u: ", source_name, error);
+    }
     else
-        vkd3d_string_buffer_printf(&context->messages, "%s: E%04u: ", context->source_name, error);
+    {
+        vkd3d_string_buffer_printf(&context->messages, "E%04u: ", error);
+    }
     vkd3d_string_buffer_vprintf(&context->messages, format, args);
     vkd3d_string_buffer_printf(&context->messages, "\n");
 }
 
-void vkd3d_shader_error(struct vkd3d_shader_message_context *context,
+void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, ...)
 {
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(context, error, format, args);
+    vkd3d_shader_verror(context, location, error, format, args);
     va_end(args);
 }
 
@@ -222,12 +227,13 @@ struct vkd3d_shader_parser
 };
 
 static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_desc *shader_desc = &parser->shader_desc;
     int ret;
 
-    if ((ret = shader_extract_from_dxbc(dxbc->code, dxbc->size, message_context, shader_desc)) < 0)
+    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
+            message_context, compile_info->source_name, shader_desc)) < 0)
     {
         WARN("Failed to extract shader, vkd3d result %d.\n", ret);
         return ret;
@@ -307,6 +313,7 @@ struct vkd3d_shader_scan_context
     size_t descriptors_size;
 
     struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_shader_location location;
 
     struct vkd3d_shader_cf_info
     {
@@ -332,12 +339,15 @@ struct vkd3d_shader_scan_context
 };
 
 static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context)
 {
     memset(context, 0, sizeof(*context));
     context->scan_descriptor_info = scan_descriptor_info;
     context->message_context = message_context;
+    context->location.source_name = compile_info->source_name;
+    context->location.line = 2; /* Line 1 is the version token. */
 }
 
 static void vkd3d_shader_scan_context_cleanup(struct vkd3d_shader_scan_context *context)
@@ -606,7 +616,7 @@ static void vkd3d_shader_scan_error(struct vkd3d_shader_scan_context *context,
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(context->message_context, error, format, args);
+    vkd3d_shader_verror(context->message_context, &context->location, error, format, args);
     va_end(args);
 }
 
@@ -774,6 +784,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     if (vkd3d_shader_instruction_is_uav_counter(instruction))
         vkd3d_shader_scan_record_uav_counter(context, &instruction->src[0].reg);
 
+    ++context->location.line;
     return VKD3D_OK;
 }
 
@@ -792,9 +803,9 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
         scan_descriptor_info->descriptor_count = 0;
     }
 
-    vkd3d_shader_scan_context_init(&context, scan_descriptor_info, message_context);
+    vkd3d_shader_scan_context_init(&context, compile_info, scan_descriptor_info, message_context);
 
-    if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, message_context)) < 0)
+    if ((ret = vkd3d_shader_parser_init(&parser, compile_info, message_context)) < 0)
     {
         vkd3d_shader_scan_context_cleanup(&context);
         return ret;
@@ -803,8 +814,6 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     if (TRACE_ON())
         vkd3d_shader_trace(parser.data);
 
-    message_context->line = 2; /* Line 1 is the version token. */
-    message_context->column = 1;
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {
         shader_sm4_read_instruction(parser.data, &parser.ptr, &instruction);
@@ -824,7 +833,6 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
                 vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
             goto done;
         }
-        ++message_context->line;
     }
 
     ret = VKD3D_OK;
@@ -848,7 +856,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
         return ret;
 
-    vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
+    vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     ret = scan_dxbc(compile_info, &message_context);
 
@@ -877,7 +885,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     if ((ret = scan_dxbc(&scan_info, message_context)) < 0)
         return ret;
 
-    if ((ret = vkd3d_shader_parser_init(&parser, &compile_info->source, message_context)) < 0)
+    if ((ret = vkd3d_shader_parser_init(&parser, compile_info, message_context)) < 0)
     {
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
@@ -902,8 +910,6 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    message_context->line = 2; /* Line 1 is the version token. */
-    message_context->column = 1;
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {
         shader_sm4_read_instruction(parser.data, &parser.ptr, &instruction);
@@ -917,7 +923,6 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 
         if ((ret = vkd3d_dxbc_compiler_handle_instruction(spirv_compiler, &instruction)) < 0)
             break;
-        ++message_context->line;
     }
 
     if (ret >= 0)
@@ -949,7 +954,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
         return ret;
 
-    vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
+    vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     switch (compile_info->source_type)
     {
@@ -1051,7 +1056,7 @@ int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
 
     if (messages)
         *messages = NULL;
-    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO, NULL);
+    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
 
     ret = shader_parse_input_signature(dxbc->code, dxbc->size, &message_context, signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
@@ -1174,7 +1179,7 @@ int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, false)) < 0)
         return ret;
 
-    vkd3d_shader_message_context_init(&message_context, compile_info->log_level, compile_info->source_name);
+    vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     ret = preproc_lexer_parse(compile_info, out, &message_context);
 

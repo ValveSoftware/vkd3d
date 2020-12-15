@@ -2155,6 +2155,7 @@ struct vkd3d_dxbc_compiler
     struct vkd3d_spirv_builder spirv_builder;
 
     struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_shader_location location;
     bool failed;
 
     bool strip_debug;
@@ -2245,6 +2246,8 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
 
     memset(compiler, 0, sizeof(*compiler));
     compiler->message_context = message_context;
+    compiler->location.source_name = compile_info->source_name;
+    compiler->location.line = 2; /* Line 1 is the version token. */
 
     if ((target_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)))
     {
@@ -2452,7 +2455,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_dxbc_compiler_error(struct vkd3d_dxbc_
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(compiler->message_context, error, format, args);
+    vkd3d_shader_verror(compiler->message_context, &compiler->location, error, format, args);
     va_end(args);
     compiler->failed = true;
 }
@@ -9194,6 +9197,7 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
             FIXME("Unhandled instruction %#x.\n", instruction->handler_idx);
     }
 
+    ++compiler->location.line;
     return ret;
 }
 

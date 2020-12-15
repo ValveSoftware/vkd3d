@@ -844,11 +844,15 @@ int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer,
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function) DECLSPEC_HIDDEN;
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args) DECLSPEC_HIDDEN;
 
+struct vkd3d_shader_location
+{
+    const char *source_name;
+    unsigned int line, column;
+};
+
 struct vkd3d_shader_message_context
 {
     enum vkd3d_shader_log_level log_level;
-    const char *source_name;
-    unsigned int line, column;
     struct vkd3d_string_buffer messages;
 };
 
@@ -856,18 +860,19 @@ void vkd3d_shader_message_context_cleanup(struct vkd3d_shader_message_context *c
 bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context,
         char **out) DECLSPEC_HIDDEN;
 void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
-        enum vkd3d_shader_log_level log_level, const char *source_name) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_log_level log_level) DECLSPEC_HIDDEN;
 void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_message_context *context,
         const char *function) DECLSPEC_HIDDEN;
 #define vkd3d_shader_message_context_trace_messages(context) \
         vkd3d_shader_message_context_trace_messages_(context, __FUNCTION__)
-void vkd3d_shader_error(struct vkd3d_shader_message_context *context, enum vkd3d_shader_error error,
-        const char *format, ...) VKD3D_PRINTF_FUNC(3, 4) DECLSPEC_HIDDEN;
-void vkd3d_shader_verror(struct vkd3d_shader_message_context *context,
+void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
+void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_message_context *message_context, const char *source_name,
+        struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
 void free_shader_desc(struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
 
 int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
