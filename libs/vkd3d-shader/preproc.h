@@ -27,6 +27,10 @@ struct preproc_if_state
 {
     /* Are we currently in a "true" block? */
     bool current_true;
+    /* Have we seen a "true" block in this #if..#endif yet? */
+    bool seen_true;
+    /* Have we seen an #else yet? */
+    bool seen_else;
 };
 
 struct preproc_ctx

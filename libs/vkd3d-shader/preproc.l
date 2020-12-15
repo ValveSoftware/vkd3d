@@ -100,6 +100,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
 
+        if (!strcmp(p, "else"))
+            return T_ELSE;
         if (!strcmp(p, "endif"))
             return T_ENDIF;
         if (!strcmp(p, "if"))
@@ -187,6 +189,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         {
             switch (token)
             {
+                case T_ELSE:
                 case T_ENDIF:
                 case T_IF:
                     ctx->current_directive = token;

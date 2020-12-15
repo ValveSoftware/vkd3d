@@ -81,6 +81,8 @@ static bool preproc_push_if(struct preproc_ctx *ctx, bool condition)
         return false;
     state = &ctx->if_stack[ctx->if_count++];
     state->current_true = condition && preproc_was_writing(ctx);
+    state->seen_true = condition;
+    state->seen_else = false;
     return true;
 }
 
@@ -138,6 +140,7 @@ static uint32_t preproc_parse_integer(const char *s)
 
 %token T_NEWLINE
 
+%token T_ELSE "#else"
 %token T_ENDIF "#endif"
 %token T_IF "#if"
 
@@ -157,6 +160,28 @@ directive
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
+        }
+    | T_ELSE T_NEWLINE
+        {
+            if (ctx->if_count)
+            {
+                struct preproc_if_state *state = &ctx->if_stack[ctx->if_count - 1];
+
+                if (state->seen_else)
+                {
+                    preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE, "Ignoring #else after #else.");
+                }
+                else
+                {
+                    state->current_true = !state->seen_true && preproc_was_writing(ctx);
+                    state->seen_else = true;
+                }
+            }
+            else
+            {
+                preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE,
+                        "Ignoring #else without prior #if.");
+            }
         }
     | T_ENDIF T_NEWLINE
         {
