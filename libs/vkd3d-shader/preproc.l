@@ -100,6 +100,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
 
+        if (!strcmp(p, "elif"))
+            return T_ELIF;
         if (!strcmp(p, "else"))
             return T_ELSE;
         if (!strcmp(p, "endif"))
@@ -189,6 +191,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         {
             switch (token)
             {
+                case T_ELIF:
                 case T_ELSE:
                 case T_ENDIF:
                 case T_IF:

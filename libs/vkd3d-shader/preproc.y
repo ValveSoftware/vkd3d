@@ -140,6 +140,7 @@ static uint32_t preproc_parse_integer(const char *s)
 
 %token T_NEWLINE
 
+%token T_ELIF "#elif"
 %token T_ELSE "#else"
 %token T_ENDIF "#endif"
 %token T_IF "#if"
@@ -160,6 +161,28 @@ directive
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
+        }
+    | T_ELIF expr T_NEWLINE
+        {
+            if (ctx->if_count)
+            {
+                struct preproc_if_state *state = &ctx->if_stack[ctx->if_count - 1];
+
+                if (state->seen_else)
+                {
+                    preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE, "Ignoring #elif after #else.");
+                }
+                else
+                {
+                    state->current_true = $2 && !state->seen_true && preproc_was_writing(ctx);
+                    state->seen_true = $2 || state->seen_true;
+                }
+            }
+            else
+            {
+                preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE,
+                        "Ignoring #elif without prior #if.");
+            }
         }
     | T_ELSE T_NEWLINE
         {
