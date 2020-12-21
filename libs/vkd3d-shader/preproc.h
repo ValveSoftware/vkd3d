@@ -23,6 +23,12 @@
 
 #include "vkd3d_shader_private.h"
 
+struct preproc_if_state
+{
+    /* Are we currently in a "true" block? */
+    bool current_true;
+};
+
 struct preproc_ctx
 {
     void *scanner;
@@ -31,7 +37,18 @@ struct preproc_ctx
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_location location;
 
+    struct preproc_if_state *if_stack;
+    size_t if_count, if_stack_size;
+
+    int current_directive;
+
+    bool last_was_newline;
+    bool last_was_eof;
+
     bool error;
 };
+
+void preproc_warning(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
+        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 
 #endif

@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "vkd3d_debug.h"
 
@@ -52,6 +53,16 @@ static inline void *vkd3d_calloc(size_t count, size_t size)
 static inline void vkd3d_free(void *ptr)
 {
     free(ptr);
+}
+
+static inline char *vkd3d_strdup(const char *string)
+{
+    size_t len = strlen(string) + 1;
+    char *ptr;
+
+    if ((ptr = vkd3d_malloc(len)))
+        memcpy(ptr, string, len);
+    return ptr;
 }
 
 bool vkd3d_array_reserve(void **elements, size_t *capacity,

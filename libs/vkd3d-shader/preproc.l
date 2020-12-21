@@ -50,6 +50,7 @@ static void update_location(struct preproc_ctx *ctx);
 %s C_COMMENT
 %s CXX_COMMENT
 
+NEWLINE         \r?\n
 WS              [ \t]
 IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
@@ -57,10 +58,10 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 <INITIAL>"//"                       {yy_push_state(CXX_COMMENT, yyscanner);}
 <INITIAL>"/*"                       {yy_push_state(C_COMMENT, yyscanner);}
-<CXX_COMMENT>\\\r?\n                {}
+<CXX_COMMENT>\\{NEWLINE}            {}
 <CXX_COMMENT>\n                     {
         yy_pop_state(yyscanner);
-        return T_TEXT;
+        return T_NEWLINE;
     }
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
@@ -68,13 +69,15 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 <INITIAL>{IDENTIFIER}               {return T_TEXT;}
 
+    /* We have no use for floats, but shouldn't parse them as integers. */
+
 <INITIAL>[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[hHfF]?    {return T_TEXT;}
 <INITIAL>[0-9]+\.([eE][+-]?[0-9]+)?[hHfF]?          {return T_TEXT;}
 <INITIAL>[0-9]+([eE][+-]?[0-9]+)?[hHfF]             {return T_TEXT;}
 <INITIAL>[0-9]+[eE][+-]?[0-9]+                      {return T_TEXT;}
-<INITIAL>0[xX][0-9a-fA-f]+[ul]{0,2}                 {return T_TEXT;}
-<INITIAL>0[0-7]*[ul]{0,2}                           {return T_TEXT;}
-<INITIAL>[1-9][0-9]*[ul]{0,2}                       {return T_TEXT;}
+<INITIAL>0[xX][0-9a-fA-f]+[ul]{0,2}                 {return T_INTEGER;}
+<INITIAL>0[0-7]*[ul]{0,2}                           {return T_INTEGER;}
+<INITIAL>[1-9][0-9]*[ul]{0,2}                       {return T_INTEGER;}
 
 <INITIAL>"&&"                       {return T_TEXT;}
 <INITIAL>"||"                       {return T_TEXT;}
@@ -86,6 +89,29 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
     /* C strings (including escaped quotes). */
 <INITIAL>\"([^"\\]|\\.)*\"          {return T_TEXT;}
+
+<INITIAL>#{WS}*{IDENTIFIER}         {
+        struct preproc_ctx *ctx = yyget_extra(yyscanner);
+        const char *p;
+
+        if (!ctx->last_was_newline)
+            return T_TEXT;
+
+        for (p = yytext + 1; strchr(" \t", *p); ++p)
+            ;
+
+        if (!strcmp(p, "endif"))
+            return T_ENDIF;
+        if (!strcmp(p, "if"))
+            return T_IF;
+
+        preproc_warning(ctx, yyget_lloc(yyscanner), VKD3D_SHADER_WARNING_PP_UNKNOWN_DIRECTIVE,
+                "Ignoring unknown directive \"%s\".", yytext);
+        return T_TEXT;
+    }
+
+<INITIAL>\\{NEWLINE}                {}
+<INITIAL>{NEWLINE}                  {return T_NEWLINE;}
 
 <INITIAL>{WS}+                      {}
 <INITIAL>.                          {return T_TEXT;}
@@ -113,6 +139,27 @@ static void update_location(struct preproc_ctx *ctx)
     }
 }
 
+static bool preproc_is_writing(struct preproc_ctx *ctx)
+{
+    if (!ctx->if_count)
+        return true;
+    return ctx->if_stack[ctx->if_count - 1].current_true;
+}
+
+static int return_token(int token, YYSTYPE *lval, const char *text)
+{
+    switch (token)
+    {
+        case T_INTEGER:
+        case T_TEXT:
+            if (!(lval->string = vkd3d_strdup(text)))
+                return 0;
+            break;
+    }
+
+    return token;
+}
+
 int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 {
     struct preproc_ctx *ctx = yyget_extra(scanner);
@@ -122,11 +169,44 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         const char *text;
         int token;
 
-        if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
+        if (ctx->last_was_eof)
             return 0;
-        text = yyget_text(scanner);
 
-        TRACE("Parsing token %d, line %d, string %s.\n", token, lloc->line, debugstr_a(text));
+        if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
+        {
+            ctx->last_was_eof = true;
+            token = T_NEWLINE;
+            text = "\n";
+        }
+        else
+        {
+            text = yyget_text(scanner);
+        }
+
+        if (ctx->last_was_newline)
+        {
+            switch (token)
+            {
+                case T_ENDIF:
+                case T_IF:
+                    ctx->current_directive = token;
+                    break;
+
+                default:
+                    ctx->current_directive = 0;
+            }
+        }
+
+        ctx->last_was_newline = (token == T_NEWLINE);
+
+        TRACE("Parsing token %d, line %d, in directive %d, string %s.\n",
+                token, lloc->line, ctx->current_directive, debugstr_a(text));
+
+        if (!ctx->current_directive && !preproc_is_writing(ctx))
+            continue;
+
+        if (ctx->current_directive)
+            return return_token(token, lval, text);
 
         vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
     }
@@ -147,11 +227,21 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
     yylex_init_extra(&ctx, &ctx.scanner);
     top_buffer = yy_scan_bytes(compile_info->source.code, compile_info->source.size, ctx.scanner);
+    ctx.last_was_newline = true;
 
     preproc_yyparse(ctx.scanner, &ctx);
 
     yy_delete_buffer(top_buffer, ctx.scanner);
     yylex_destroy(ctx.scanner);
+
+    if (ctx.if_count)
+    {
+        const struct vkd3d_shader_location loc = {.source_name = ctx.location.source_name};
+
+        preproc_warning(&ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF, "Unterminated #if block.");
+    }
+
+    vkd3d_free(ctx.if_stack);
 
     if (ctx.error)
     {

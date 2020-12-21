@@ -81,6 +81,10 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_RS_MIXED_DESCRIPTOR_RANGE_TYPES  = 3004,
 
     VKD3D_SHADER_ERROR_PP_INVALID_SYNTAX                = 4000,
+
+    VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE           = 4301,
+    VKD3D_SHADER_WARNING_PP_UNKNOWN_DIRECTIVE           = 4303,
+    VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF             = 4305,
 };
 
 enum VKD3D_SHADER_INSTRUCTION_HANDLER
@@ -870,6 +874,8 @@ void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_mess
 void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
+void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,

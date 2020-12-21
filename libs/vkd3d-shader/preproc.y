@@ -51,9 +51,69 @@ static void preproc_error(struct preproc_ctx *ctx, const struct vkd3d_shader_loc
     ctx->error = true;
 }
 
+void preproc_warning(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(ctx->message_context, loc, error, format, args);
+    va_end(args);
+}
+
 static void yyerror(const YYLTYPE *loc, void *scanner, struct preproc_ctx *ctx, const char *string)
 {
     preproc_error(ctx, loc, VKD3D_SHADER_ERROR_PP_INVALID_SYNTAX, "%s", string);
+}
+
+static bool preproc_was_writing(struct preproc_ctx *ctx)
+{
+    if (ctx->if_count < 2)
+        return true;
+    return ctx->if_stack[ctx->if_count - 2].current_true;
+}
+
+static bool preproc_push_if(struct preproc_ctx *ctx, bool condition)
+{
+    struct preproc_if_state *state;
+
+    if (!vkd3d_array_reserve((void **)&ctx->if_stack, &ctx->if_stack_size, ctx->if_count + 1, sizeof(*ctx->if_stack)))
+        return false;
+    state = &ctx->if_stack[ctx->if_count++];
+    state->current_true = condition && preproc_was_writing(ctx);
+    return true;
+}
+
+static int char_to_int(char c)
+{
+    if ('0' <= c && c <= '9')
+        return c - '0';
+    if ('A' <= c && c <= 'F')
+        return c - 'A' + 10;
+    if ('a' <= c && c <= 'f')
+        return c - 'a' + 10;
+    return -1;
+}
+
+static uint32_t preproc_parse_integer(const char *s)
+{
+    uint32_t base = 10, ret = 0;
+    int digit;
+
+    if (*s == '0')
+    {
+        base = 8;
+        ++s;
+        if (*s == 'x' || *s == 'X')
+        {
+            base = 16;
+            ++s;
+        }
+    }
+
+    while ((digit = char_to_int(*s++)) >= 0)
+        ret = ret * base + (uint32_t)digit;
+    return ret;
 }
 
 }
@@ -67,9 +127,49 @@ static void yyerror(const YYLTYPE *loc, void *scanner, struct preproc_ctx *ctx, 
 %parse-param {void *scanner}
 %parse-param {struct preproc_ctx *ctx}
 
-%token T_TEXT
+%union
+{
+    char *string;
+    uint32_t integer;
+}
+
+%token <string> T_INTEGER
+%token <string> T_TEXT
+
+%token T_NEWLINE
+
+%token T_ENDIF "#endif"
+%token T_IF "#if"
+
+%type <integer> expr
 
 %%
 
 shader_text
     : %empty
+    | shader_text directive
+        {
+            vkd3d_string_buffer_printf(&ctx->buffer, "\n");
+        }
+
+directive
+    : T_IF expr T_NEWLINE
+        {
+            if (!preproc_push_if(ctx, !!$2))
+                YYABORT;
+        }
+    | T_ENDIF T_NEWLINE
+        {
+            if (ctx->if_count)
+                --ctx->if_count;
+            else
+                preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE,
+                        "Ignoring #endif without prior #if.");
+        }
+
+expr
+    : T_INTEGER
+        {
+            $$ = preproc_parse_integer($1);
+            vkd3d_free($1);
+        }

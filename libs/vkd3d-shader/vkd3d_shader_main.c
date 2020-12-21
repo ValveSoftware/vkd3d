@@ -144,6 +144,30 @@ bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_cont
     return true;
 }
 
+void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_error error, const char *format, va_list args)
+{
+    if (context->log_level < VKD3D_SHADER_LOG_WARNING)
+        return;
+
+    if (location)
+    {
+        const char *source_name = location->source_name ? location->source_name : "<anonymous>";
+
+        if (location->line)
+            vkd3d_string_buffer_printf(&context->messages, "%s:%u:%u: W%04u: ",
+                    source_name, location->line, location->column, error);
+        else
+            vkd3d_string_buffer_printf(&context->messages, "%s: W%04u: ", source_name, error);
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(&context->messages, "W%04u: ", error);
+    }
+    vkd3d_string_buffer_vprintf(&context->messages, format, args);
+    vkd3d_string_buffer_printf(&context->messages, "\n");
+}
+
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args)
 {

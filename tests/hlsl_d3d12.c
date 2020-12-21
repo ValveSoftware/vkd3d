@@ -414,7 +414,7 @@ static void test_preprocess(void)
     hr = D3DPreprocess(test_include_top, strlen(test_include_top), NULL, NULL, &test_include_fail, &blob, &errors);
     todo ok(hr == E_FAIL, "Got hr %#x.\n", hr);
     todo ok(blob == (ID3D10Blob *)0xdeadbeef, "Expected no compiled shader blob.\n");
-    todo ok(!!errors, "Expected non-NULL error blob.\n");
+    ok(!!errors, "Expected non-NULL error blob.\n");
     if (errors)
     {
         if (vkd3d_test_state.debug_level)
