@@ -22,6 +22,7 @@
 #define __VKD3D_SHADER_PREPROC_H
 
 #include "vkd3d_shader_private.h"
+#include "rbtree.h"
 
 struct preproc_if_state
 {
@@ -31,6 +32,12 @@ struct preproc_if_state
     bool seen_true;
     /* Have we seen an #else yet? */
     bool seen_else;
+};
+
+struct preproc_macro
+{
+    struct rb_entry entry;
+    char *name;
 };
 
 struct preproc_ctx
@@ -44,6 +51,8 @@ struct preproc_ctx
     struct preproc_if_state *if_stack;
     size_t if_count, if_stack_size;
 
+    struct rb_tree macros;
+
     int current_directive;
 
     bool last_was_newline;
@@ -52,6 +61,7 @@ struct preproc_ctx
     bool error;
 };
 
+void preproc_free_macro(struct preproc_macro *macro) DECLSPEC_HIDDEN;
 void preproc_warning(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 

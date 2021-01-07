@@ -349,7 +349,7 @@ static void test_preprocess(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        if (i == 43)
+        if (i == 6)
             continue;
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
         todo_if (i <= 4 || (i >= 9 && i <= 14))

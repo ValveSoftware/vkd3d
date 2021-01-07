@@ -67,7 +67,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT>.            {}
 
-<INITIAL>{IDENTIFIER}               {return T_TEXT;}
+<INITIAL>{IDENTIFIER}               {return T_IDENTIFIER;}
 
     /* We have no use for floats, but shouldn't parse them as integers. */
 
@@ -100,6 +100,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
 
+        if (!strcmp(p, "define"))
+            return T_DEFINE;
         if (!strcmp(p, "elif"))
             return T_ELIF;
         if (!strcmp(p, "else"))
@@ -154,6 +156,7 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
 {
     switch (token)
     {
+        case T_IDENTIFIER:
         case T_INTEGER:
         case T_TEXT:
             if (!(lval->string = vkd3d_strdup(text)))
@@ -191,6 +194,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         {
             switch (token)
             {
+                case T_DEFINE:
                 case T_ELIF:
                 case T_ELSE:
                 case T_ENDIF:
@@ -208,14 +212,37 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         TRACE("Parsing token %d, line %d, in directive %d, string %s.\n",
                 token, lloc->line, ctx->current_directive, debugstr_a(text));
 
-        if (!ctx->current_directive && !preproc_is_writing(ctx))
-            continue;
+        switch (ctx->current_directive)
+        {
+            case T_ELIF:
+            case T_ELSE:
+            case T_ENDIF:
+            case T_IF:
+                break;
+
+            default:
+                if (!preproc_is_writing(ctx))
+                    continue;
+        }
 
         if (ctx->current_directive)
             return return_token(token, lval, text);
 
         vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
     }
+}
+
+static int preproc_macro_compare(const void *key, const struct rb_entry *entry)
+{
+    const struct preproc_macro *macro = RB_ENTRY_VALUE(entry, struct preproc_macro, entry);
+    const char *name = key;
+
+    return strcmp(name, macro->name);
+}
+
+static void preproc_macro_rb_free(struct rb_entry *entry, void *ctx)
+{
+    preproc_free_macro(RB_ENTRY_VALUE(entry, struct preproc_macro, entry));
 }
 
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
@@ -226,6 +253,7 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     void *output_code;
 
     vkd3d_string_buffer_init(&ctx.buffer);
+    rb_init(&ctx.macros, preproc_macro_compare);
     ctx.message_context = message_context;
     ctx.location.source_name = compile_info->source_name;
     ctx.location.line = 1;
@@ -248,6 +276,7 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     vkd3d_free(ctx.if_stack);
+    rb_destroy(&ctx.macros, preproc_macro_rb_free, NULL);
 
     if (ctx.error)
     {

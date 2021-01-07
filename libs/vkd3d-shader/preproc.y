@@ -66,6 +66,43 @@ static void yyerror(const YYLTYPE *loc, void *scanner, struct preproc_ctx *ctx, 
     preproc_error(ctx, loc, VKD3D_SHADER_ERROR_PP_INVALID_SYNTAX, "%s", string);
 }
 
+static struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *name)
+{
+    struct rb_entry *entry;
+
+    if ((entry = rb_get(&ctx->macros, name)))
+        return RB_ENTRY_VALUE(entry, struct preproc_macro, entry);
+    return NULL;
+}
+
+static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name)
+{
+    struct preproc_macro *macro;
+    int ret;
+
+    if ((macro = preproc_find_macro(ctx, name)))
+    {
+        preproc_warning(ctx, loc, VKD3D_SHADER_WARNING_PP_ALREADY_DEFINED, "Redefinition of %s.", name);
+        rb_remove(&ctx->macros, &macro->entry);
+        preproc_free_macro(macro);
+    }
+
+    TRACE("Defining new macro %s.\n", debugstr_a(name));
+
+    if (!(macro = vkd3d_malloc(sizeof(*macro))))
+        return false;
+    macro->name = name;
+    ret = rb_put(&ctx->macros, name, &macro->entry);
+    assert(!ret);
+    return true;
+}
+
+void preproc_free_macro(struct preproc_macro *macro)
+{
+    vkd3d_free(macro->name);
+    vkd3d_free(macro);
+}
+
 static bool preproc_was_writing(struct preproc_ctx *ctx)
 {
     if (ctx->if_count < 2)
@@ -135,17 +172,20 @@ static uint32_t preproc_parse_integer(const char *s)
     uint32_t integer;
 }
 
+%token <string> T_IDENTIFIER
 %token <string> T_INTEGER
 %token <string> T_TEXT
 
 %token T_NEWLINE
 
+%token T_DEFINE "#define"
 %token T_ELIF "#elif"
 %token T_ELSE "#else"
 %token T_ENDIF "#endif"
 %token T_IF "#if"
 
 %type <integer> expr
+%type <string> body_token
 
 %%
 
@@ -156,8 +196,25 @@ shader_text
             vkd3d_string_buffer_printf(&ctx->buffer, "\n");
         }
 
+body_text
+    : %empty
+    | body_text body_token
+        {
+            vkd3d_free($2);
+        }
+
+body_token
+    : T_IDENTIFIER
+    | T_INTEGER
+    | T_TEXT
+
 directive
-    : T_IF expr T_NEWLINE
+    : T_DEFINE T_IDENTIFIER body_text T_NEWLINE
+        {
+            if (!preproc_add_macro(ctx, &@$, $2))
+                YYABORT;
+        }
+    | T_IF expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
