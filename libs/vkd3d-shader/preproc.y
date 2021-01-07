@@ -183,6 +183,7 @@ static uint32_t preproc_parse_integer(const char *s)
 %token T_ELSE "#else"
 %token T_ENDIF "#endif"
 %token T_IF "#if"
+%token T_IFDEF "#ifdef"
 
 %type <integer> expr
 %type <string> body_token
@@ -218,6 +219,11 @@ directive
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
+        }
+    | T_IFDEF T_IDENTIFIER T_NEWLINE
+        {
+            preproc_push_if(ctx, !!preproc_find_macro(ctx, $2));
+            vkd3d_free($2);
         }
     | T_ELIF expr T_NEWLINE
         {
