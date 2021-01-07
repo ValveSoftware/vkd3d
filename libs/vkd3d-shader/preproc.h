@@ -34,6 +34,22 @@ struct preproc_if_state
     bool seen_else;
 };
 
+struct preproc_buffer
+{
+    void *lexer_buffer;
+    struct vkd3d_shader_location location;
+};
+
+struct preproc_file
+{
+    struct preproc_buffer buffer;
+    struct vkd3d_shader_code code;
+    char *filename;
+
+    struct preproc_if_state *if_stack;
+    size_t if_count, if_stack_size;
+};
+
 struct preproc_macro
 {
     struct rb_entry entry;
@@ -42,14 +58,14 @@ struct preproc_macro
 
 struct preproc_ctx
 {
+    const struct vkd3d_shader_preprocess_info *preprocess_info;
     void *scanner;
 
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_string_buffer buffer;
-    struct vkd3d_shader_location location;
 
-    struct preproc_if_state *if_stack;
-    size_t if_count, if_stack_size;
+    struct preproc_file *file_stack;
+    size_t file_count, file_stack_size;
 
     struct rb_tree macros;
 
@@ -61,8 +77,16 @@ struct preproc_ctx
     bool error;
 };
 
+void preproc_close_include(struct preproc_ctx *ctx, const struct vkd3d_shader_code *code) DECLSPEC_HIDDEN;
 void preproc_free_macro(struct preproc_macro *macro) DECLSPEC_HIDDEN;
+bool preproc_push_include(struct preproc_ctx *ctx, char *filename, const struct vkd3d_shader_code *code) DECLSPEC_HIDDEN;
 void preproc_warning(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
+
+static inline struct preproc_file *preproc_get_top_file(struct preproc_ctx *ctx)
+{
+    assert(ctx->file_count);
+    return &ctx->file_stack[ctx->file_count - 1];
+}
 
 #endif

@@ -50,6 +50,8 @@ static void update_location(struct preproc_ctx *ctx);
 %s C_COMMENT
 %s CXX_COMMENT
 
+%s INCLUDE
+
 NEWLINE         \r?\n
 WS              [ \t]
 IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
@@ -61,6 +63,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <CXX_COMMENT>\\{NEWLINE}            {}
 <CXX_COMMENT>\n                     {
         yy_pop_state(yyscanner);
+        BEGIN(INITIAL);
         return T_NEWLINE;
     }
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
@@ -87,6 +90,9 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>">>"=?                     {return T_TEXT;}
 <INITIAL>[-+*/%&|^=><!]=            {return T_TEXT;}
 
+<INCLUDE>\"[^"]*\"                  {return T_STRING;}
+<INCLUDE>\<[^>]*\>                  {return T_STRING;}
+
     /* C strings (including escaped quotes). */
 <INITIAL>\"([^"\\]|\\.)*\"          {return T_TEXT;}
 
@@ -99,6 +105,12 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
+
+        if (!strcmp(p, "include"))
+        {
+            BEGIN(INCLUDE);
+            return T_INCLUDE;
+        }
 
         if (!strcmp(p, "define"))
             return T_DEFINE;
@@ -120,8 +132,11 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         return T_TEXT;
     }
 
-<INITIAL>\\{NEWLINE}                {}
-<INITIAL>{NEWLINE}                  {return T_NEWLINE;}
+<INITIAL,INCLUDE>\\{NEWLINE}        {}
+<INITIAL,INCLUDE>{NEWLINE}          {
+        BEGIN(INITIAL);
+        return T_NEWLINE;
+    }
 
 <INITIAL>{WS}+                      {}
 <INITIAL>.                          {return T_TEXT;}
@@ -130,30 +145,59 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 static void update_location(struct preproc_ctx *ctx)
 {
+    struct preproc_buffer *buffer = &preproc_get_top_file(ctx)->buffer;
     unsigned int i, leng = yyget_leng(ctx->scanner);
     const char *text = yyget_text(ctx->scanner);
 
     /* We want to do this here, rather than before calling yylex(), because
      * some tokens are skipped by the lexer. */
 
-    *yyget_lloc(ctx->scanner) = ctx->location;
+    *yyget_lloc(ctx->scanner) = buffer->location;
 
     for (i = 0; i < leng; ++i)
     {
-        ++ctx->location.column;
+        ++buffer->location.column;
         if (text[i] == '\n')
         {
-            ctx->location.column = 1;
-            ++ctx->location.line;
+            buffer->location.column = 1;
+            ++buffer->location.line;
         }
     }
 }
 
+static void preproc_pop_buffer(struct preproc_ctx *ctx)
+{
+    struct preproc_file *file = preproc_get_top_file(ctx);
+
+    if (ctx->file_count > 1)
+        preproc_close_include(ctx, &file->code);
+
+    if (file->if_count)
+    {
+        const struct vkd3d_shader_location loc = {.source_name = file->filename};
+
+        preproc_warning(ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF, "Unterminated #if block.");
+    }
+    vkd3d_free(file->if_stack);
+
+    vkd3d_free(file->filename);
+
+    yy_delete_buffer(file->buffer.lexer_buffer, ctx->scanner);
+
+    --ctx->file_count;
+    TRACE("File stack size is now %zu.\n", ctx->file_count);
+
+    if (ctx->file_count)
+        yy_switch_to_buffer(ctx->file_stack[ctx->file_count - 1].buffer.lexer_buffer, ctx->scanner);
+}
+
 static bool preproc_is_writing(struct preproc_ctx *ctx)
 {
-    if (!ctx->if_count)
+    const struct preproc_file *file = preproc_get_top_file(ctx);
+
+    if (!file->if_count)
         return true;
-    return ctx->if_stack[ctx->if_count - 1].current_true;
+    return file->if_stack[file->if_count - 1].current_true;
 }
 
 static int return_token(int token, YYSTYPE *lval, const char *text)
@@ -162,6 +206,7 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
     {
         case T_IDENTIFIER:
         case T_INTEGER:
+        case T_STRING:
         case T_TEXT:
             if (!(lval->string = vkd3d_strdup(text)))
                 return 0;
@@ -181,8 +226,14 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         int token;
 
         if (ctx->last_was_eof)
-            return 0;
+        {
+            preproc_pop_buffer(ctx);
+            if (!ctx->file_count)
+                return 0;
+        }
+        ctx->last_was_eof = false;
 
+        assert(ctx->file_count);
         if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
         {
             ctx->last_was_eof = true;
@@ -205,6 +256,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                 case T_IF:
                 case T_IFDEF:
                 case T_IFNDEF:
+                case T_INCLUDE:
                     ctx->current_directive = token;
                     break;
 
@@ -240,6 +292,26 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
     }
 }
 
+bool preproc_push_include(struct preproc_ctx *ctx, char *filename, const struct vkd3d_shader_code *code)
+{
+    struct preproc_file *file;
+
+    if (!vkd3d_array_reserve((void **)&ctx->file_stack, &ctx->file_stack_size,
+            ctx->file_count + 1, sizeof(*ctx->file_stack)))
+        return false;
+    file = &ctx->file_stack[ctx->file_count++];
+    memset(file, 0, sizeof(*file));
+    file->code = *code;
+    file->filename = filename;
+    file->buffer.lexer_buffer = yy_scan_bytes(code->code, code->size, ctx->scanner);
+    file->buffer.location.source_name = file->filename;
+    file->buffer.location.line = 1;
+    file->buffer.location.column = 1;
+    TRACE("File stack size is now %zu.\n", ctx->file_count);
+    ctx->last_was_newline = true;
+    return true;
+}
+
 static int preproc_macro_compare(const void *key, const struct rb_entry *entry)
 {
     const struct preproc_macro *macro = RB_ENTRY_VALUE(entry, struct preproc_macro, entry);
@@ -256,35 +328,40 @@ static void preproc_macro_rb_free(struct rb_entry *entry, void *ctx)
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
+    static const struct vkd3d_shader_preprocess_info default_preprocess_info = {0};
     struct preproc_ctx ctx = {0};
-    YY_BUFFER_STATE top_buffer;
+    char *source_name;
     void *output_code;
 
     vkd3d_string_buffer_init(&ctx.buffer);
     rb_init(&ctx.macros, preproc_macro_compare);
+    if (!(ctx.preprocess_info = vkd3d_find_struct(compile_info->next, PREPROCESS_INFO)))
+        ctx.preprocess_info = &default_preprocess_info;
     ctx.message_context = message_context;
-    ctx.location.source_name = compile_info->source_name;
-    ctx.location.line = 1;
-    ctx.location.column = 1;
+
+    if (!(source_name = vkd3d_strdup(compile_info->source_name ? compile_info->source_name : "<anonymous>")))
+    {
+        vkd3d_string_buffer_cleanup(&ctx.buffer);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
 
     yylex_init_extra(&ctx, &ctx.scanner);
-    top_buffer = yy_scan_bytes(compile_info->source.code, compile_info->source.size, ctx.scanner);
-    ctx.last_was_newline = true;
+    if (!preproc_push_include(&ctx, source_name, &compile_info->source))
+    {
+        yylex_destroy(ctx.scanner);
+        vkd3d_free(source_name);
+        vkd3d_string_buffer_cleanup(&ctx.buffer);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
 
     preproc_yyparse(ctx.scanner, &ctx);
 
-    yy_delete_buffer(top_buffer, ctx.scanner);
+    while (ctx.file_count)
+        preproc_pop_buffer(&ctx);
     yylex_destroy(ctx.scanner);
 
-    if (ctx.if_count)
-    {
-        const struct vkd3d_shader_location loc = {.source_name = ctx.location.source_name};
-
-        preproc_warning(&ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF, "Unterminated #if block.");
-    }
-
-    vkd3d_free(ctx.if_stack);
     rb_destroy(&ctx.macros, preproc_macro_rb_free, NULL);
+    vkd3d_free(ctx.file_stack);
 
     if (ctx.error)
     {

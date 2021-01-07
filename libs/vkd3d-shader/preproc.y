@@ -23,6 +23,8 @@
 
 #include "vkd3d_shader_private.h"
 #include "preproc.h"
+#include <stdio.h>
+#include <sys/stat.h>
 
 #define PREPROC_YYLTYPE struct vkd3d_shader_location
 
@@ -105,18 +107,24 @@ void preproc_free_macro(struct preproc_macro *macro)
 
 static bool preproc_was_writing(struct preproc_ctx *ctx)
 {
-    if (ctx->if_count < 2)
+    const struct preproc_file *file = preproc_get_top_file(ctx);
+
+    /* This applies across files, since we can't #include anyway if we weren't
+     * writing. */
+    if (file->if_count < 2)
         return true;
-    return ctx->if_stack[ctx->if_count - 2].current_true;
+    return file->if_stack[file->if_count - 2].current_true;
 }
 
 static bool preproc_push_if(struct preproc_ctx *ctx, bool condition)
 {
+    struct preproc_file *file = preproc_get_top_file(ctx);
     struct preproc_if_state *state;
 
-    if (!vkd3d_array_reserve((void **)&ctx->if_stack, &ctx->if_stack_size, ctx->if_count + 1, sizeof(*ctx->if_stack)))
+    if (!vkd3d_array_reserve((void **)&file->if_stack, &file->if_stack_size,
+            file->if_count + 1, sizeof(*file->if_stack)))
         return false;
-    state = &ctx->if_stack[ctx->if_count++];
+    state = &file->if_stack[file->if_count++];
     state->current_true = condition && preproc_was_writing(ctx);
     state->seen_true = condition;
     state->seen_else = false;
@@ -155,6 +163,93 @@ static uint32_t preproc_parse_integer(const char *s)
     return ret;
 }
 
+static int default_open_include(const char *filename, bool local,
+        const char *parent_data, void *context, struct vkd3d_shader_code *out)
+{
+    uint8_t *data, *new_data;
+    size_t size = 4096;
+    struct stat st;
+    size_t pos = 0;
+    size_t ret;
+    FILE *f;
+
+    if (!(f = fopen(filename, "rb")))
+    {
+        ERR("Unable to open %s for reading.\n", debugstr_a(filename));
+        return VKD3D_ERROR;
+    }
+
+    if (fstat(fileno(f), &st) == -1)
+    {
+        ERR("Could not stat file %s.\n", debugstr_a(filename));
+        fclose(f);
+        return VKD3D_ERROR;
+    }
+
+    if (S_ISREG(st.st_mode))
+        size = st.st_size;
+
+    if (!(data = vkd3d_malloc(size)))
+    {
+        fclose(f);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (;;)
+    {
+        if (pos >= size)
+        {
+            if (size > SIZE_MAX / 2 || !(new_data = vkd3d_realloc(data, size * 2)))
+            {
+                vkd3d_free(data);
+                fclose(f);
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+            }
+            data = new_data;
+            size *= 2;
+        }
+
+        if (!(ret = fread(&data[pos], 1, size - pos, f)))
+            break;
+        pos += ret;
+    }
+
+    if (!feof(f))
+    {
+        vkd3d_free(data);
+        return VKD3D_ERROR;
+    }
+
+    fclose(f);
+
+    out->code = data;
+    out->size = pos;
+
+    return VKD3D_OK;
+}
+
+static void default_close_include(const struct vkd3d_shader_code *code, void *context)
+{
+    vkd3d_free((void *)code->code);
+}
+
+void preproc_close_include(struct preproc_ctx *ctx, const struct vkd3d_shader_code *code)
+{
+    PFN_vkd3d_shader_close_include close_include = ctx->preprocess_info->pfn_close_include;
+
+    if (!close_include)
+        close_include = default_close_include;
+
+    close_include(code, ctx->preprocess_info->include_context);
+}
+
+static const void *get_parent_data(struct preproc_ctx *ctx)
+{
+    if (ctx->file_count == 1)
+        return NULL;
+    return preproc_get_top_file(ctx)->code.code;
+}
+
 }
 
 %define api.prefix {preproc_yy}
@@ -174,6 +269,7 @@ static uint32_t preproc_parse_integer(const char *s)
 
 %token <string> T_IDENTIFIER
 %token <string> T_INTEGER
+%token <string> T_STRING
 %token <string> T_TEXT
 
 %token T_NEWLINE
@@ -185,6 +281,7 @@ static uint32_t preproc_parse_integer(const char *s)
 %token T_IF "#if"
 %token T_IFDEF "#ifdef"
 %token T_IFNDEF "#ifndef"
+%token T_INCLUDE "#include"
 
 %type <integer> expr
 %type <string> body_token
@@ -233,9 +330,11 @@ directive
         }
     | T_ELIF expr T_NEWLINE
         {
-            if (ctx->if_count)
+            const struct preproc_file *file = preproc_get_top_file(ctx);
+
+            if (file->if_count)
             {
-                struct preproc_if_state *state = &ctx->if_stack[ctx->if_count - 1];
+                struct preproc_if_state *state = &file->if_stack[file->if_count - 1];
 
                 if (state->seen_else)
                 {
@@ -255,9 +354,11 @@ directive
         }
     | T_ELSE T_NEWLINE
         {
-            if (ctx->if_count)
+            const struct preproc_file *file = preproc_get_top_file(ctx);
+
+            if (file->if_count)
             {
-                struct preproc_if_state *state = &ctx->if_stack[ctx->if_count - 1];
+                struct preproc_if_state *state = &file->if_stack[file->if_count - 1];
 
                 if (state->seen_else)
                 {
@@ -277,11 +378,45 @@ directive
         }
     | T_ENDIF T_NEWLINE
         {
-            if (ctx->if_count)
-                --ctx->if_count;
+            struct preproc_file *file = preproc_get_top_file(ctx);
+
+            if (file->if_count)
+                --file->if_count;
             else
                 preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE,
                         "Ignoring #endif without prior #if.");
+        }
+    | T_INCLUDE T_STRING T_NEWLINE
+        {
+            PFN_vkd3d_shader_open_include open_include = ctx->preprocess_info->pfn_open_include;
+            struct vkd3d_shader_code code;
+            char *filename;
+            int result;
+
+            if (!(filename = vkd3d_malloc(strlen($2) - 1)))
+                YYABORT;
+
+            if (!open_include)
+                open_include = default_open_include;
+
+            memcpy(filename, $2 + 1, strlen($2) - 2);
+            filename[strlen($2) - 2] = 0;
+
+            if (!(result = open_include(filename, $2[0] == '"', get_parent_data(ctx),
+                    ctx->preprocess_info->include_context, &code)))
+            {
+                if (!preproc_push_include(ctx, filename, &code))
+                {
+                    preproc_close_include(ctx, &code);
+                    vkd3d_free(filename);
+                }
+            }
+            else
+            {
+                preproc_error(ctx, &@$, VKD3D_SHADER_ERROR_PP_INCLUDE_FAILED, "Failed to open %s.", $2);
+                vkd3d_free(filename);
+            }
+            vkd3d_free($2);
         }
 
 expr
