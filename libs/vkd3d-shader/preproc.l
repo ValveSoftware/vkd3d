@@ -112,6 +112,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
             return T_IF;
         if (!strcmp(p, "ifdef"))
             return T_IFDEF;
+        if (!strcmp(p, "ifndef"))
+            return T_IFNDEF;
 
         preproc_warning(ctx, yyget_lloc(yyscanner), VKD3D_SHADER_WARNING_PP_UNKNOWN_DIRECTIVE,
                 "Ignoring unknown directive \"%s\".", yytext);
@@ -202,6 +204,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                 case T_ENDIF:
                 case T_IF:
                 case T_IFDEF:
+                case T_IFNDEF:
                     ctx->current_directive = token;
                     break;
 
@@ -222,6 +225,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
             case T_ENDIF:
             case T_IF:
             case T_IFDEF:
+            case T_IFNDEF:
                 break;
 
             default:
