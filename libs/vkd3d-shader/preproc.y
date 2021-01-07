@@ -282,6 +282,7 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
 %token T_IFDEF "#ifdef"
 %token T_IFNDEF "#ifndef"
 %token T_INCLUDE "#include"
+%token T_UNDEF "#undef"
 
 %type <integer> expr
 %type <string> body_token
@@ -312,6 +313,18 @@ directive
         {
             if (!preproc_add_macro(ctx, &@$, $2))
                 YYABORT;
+        }
+    | T_UNDEF T_IDENTIFIER T_NEWLINE
+        {
+            struct preproc_macro *macro;
+
+            if ((macro = preproc_find_macro(ctx, $2)))
+            {
+                TRACE("Removing macro definition %s.\n", debugstr_a($2));
+                rb_remove(&ctx->macros, &macro->entry);
+                preproc_free_macro(macro);
+            }
+            vkd3d_free($2);
         }
     | T_IF expr T_NEWLINE
         {
