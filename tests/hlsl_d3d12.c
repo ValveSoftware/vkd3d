@@ -349,10 +349,8 @@ static void test_preprocess(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        if (i == 10 || i == 11)
-            continue;
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
-        todo_if (i <= 4 || (i >= 9 && i <= 14))
+        todo_if (i <= 4 || i == 9 || (i >= 12 && i <= 14))
             check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
     }
     vkd3d_test_set_context(NULL);
@@ -407,8 +405,7 @@ static void test_preprocess(void)
     ok(include_count_file2 == 2, "file2 was included %u times.\n", include_count_file2);
 
     /* Macro invocation spread across multiple files. */
-    if (0)
-        todo check_preprocess(test_include2_top, NULL, &test_include, "pass", NULL);
+    check_preprocess(test_include2_top, NULL, &test_include, "pass", NULL);
 
     blob = errors = (ID3D10Blob *)0xdeadbeef;
     hr = D3DPreprocess(test_include_top, strlen(test_include_top), NULL, NULL, &test_include_fail, &blob, &errors);

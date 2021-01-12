@@ -83,6 +83,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>0[0-7]*[ul]{0,2}                           {return T_INTEGER;}
 <INITIAL>[1-9][0-9]*[ul]{0,2}                       {return T_INTEGER;}
 
+<INITIAL>##                         {return T_CONCAT;}
+
 <INITIAL>"&&"                       {return T_TEXT;}
 <INITIAL>"||"                       {return T_TEXT;}
 <INITIAL>"++"                       {return T_TEXT;}
@@ -187,6 +189,18 @@ static struct preproc_macro *preproc_get_top_macro(struct preproc_ctx *ctx)
     if (!ctx->expansion_count)
         return NULL;
     return ctx->expansion_stack[ctx->expansion_count - 1].macro;
+}
+
+/* Concatenation is not done for object-like macros, but is done for both
+ * function-like macro bodies and their arguments. */
+static bool should_concat(struct preproc_ctx *ctx)
+{
+    struct preproc_macro *macro;
+
+    if (!ctx->expansion_count)
+        return false;
+    macro = ctx->expansion_stack[ctx->expansion_count - 1].macro;
+    return !macro || macro->arg_count;
 }
 
 static void preproc_pop_buffer(struct preproc_ctx *ctx)
@@ -375,6 +389,14 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         switch (func_state->state)
         {
             case STATE_NONE:
+                if (token == T_CONCAT && should_concat(ctx))
+                {
+                    while (ctx->buffer.content_size
+                            && strchr(" \t\r\n", ctx->buffer.buffer[ctx->buffer.content_size - 1]))
+                        --ctx->buffer.content_size;
+                    break;
+                }
+
                 if (token == T_IDENTIFIER || token == T_IDENTIFIER_PAREN)
                 {
                     const struct preproc_text *expansion;

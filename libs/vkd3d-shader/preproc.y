@@ -327,6 +327,8 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_INCLUDE "#include"
 %token T_UNDEF "#undef"
 
+%token T_CONCAT "##"
+
 %type <integer> expr
 %type <string> body_token
 %type <const_string> body_token_const
@@ -418,6 +420,10 @@ body_token_const
     | ','
         {
             $$ = ",";
+        }
+    | T_CONCAT
+        {
+            $$ = "##";
         }
 
 directive
