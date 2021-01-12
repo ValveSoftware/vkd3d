@@ -28,6 +28,12 @@
 
 #define PREPROC_YYLTYPE struct vkd3d_shader_location
 
+struct parse_arg_names
+{
+    char **args;
+    size_t count;
+};
+
 }
 
 %code provides
@@ -254,6 +260,15 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
     return preproc_get_top_file(ctx)->code.code;
 }
 
+static void free_parse_arg_names(struct parse_arg_names *args)
+{
+    unsigned int i;
+
+    for (i = 0; i < args->count; ++i)
+        vkd3d_free(args->args[i]);
+    vkd3d_free(args->args);
+}
+
 }
 
 %define api.prefix {preproc_yy}
@@ -268,11 +283,14 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
 %union
 {
     char *string;
+    const char *const_string;
     uint32_t integer;
     struct vkd3d_string_buffer string_buffer;
+    struct parse_arg_names arg_names;
 }
 
 %token <string> T_IDENTIFIER
+%token <string> T_IDENTIFIER_PAREN
 %token <string> T_INTEGER
 %token <string> T_STRING
 %token <string> T_TEXT
@@ -291,7 +309,9 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
 
 %type <integer> expr
 %type <string> body_token
+%type <const_string> body_token_const
 %type <string_buffer> body_text
+%type <arg_names> identifier_list
 
 %%
 
@@ -300,6 +320,28 @@ shader_text
     | shader_text directive
         {
             vkd3d_string_buffer_printf(&ctx->buffer, "\n");
+        }
+
+identifier_list
+    : T_IDENTIFIER
+        {
+            if (!($$.args = vkd3d_malloc(sizeof(*$$.args))))
+                YYABORT;
+            $$.args[0] = $1;
+            $$.count = 1;
+        }
+    | identifier_list ',' T_IDENTIFIER
+        {
+            char **new_array;
+
+            if (!(new_array = vkd3d_realloc($1.args, ($1.count + 1) * sizeof(*$$.args))))
+            {
+                free_parse_arg_names(&$1);
+                YYABORT;
+            }
+            $$.args = new_array;
+            $$.count = $1.count + 1;
+            $$.args[$1.count] = $3;
         }
 
 body_text
@@ -316,11 +358,31 @@ body_text
             }
             vkd3d_free($2);
         }
+    | body_text body_token_const
+        {
+            if (vkd3d_string_buffer_printf(&$$, "%s ", $2) < 0)
+                YYABORT;
+        }
 
 body_token
     : T_IDENTIFIER
+    | T_IDENTIFIER_PAREN
     | T_INTEGER
     | T_TEXT
+
+body_token_const
+    : '('
+        {
+            $$ = "(";
+        }
+    | ')'
+        {
+            $$ = ")";
+        }
+    | ','
+        {
+            $$ = ",";
+        }
 
 directive
     : T_DEFINE T_IDENTIFIER body_text T_NEWLINE
@@ -329,6 +391,16 @@ directive
             {
                 vkd3d_free($2);
                 vkd3d_string_buffer_cleanup(&$3);
+                YYABORT;
+            }
+        }
+    | T_DEFINE T_IDENTIFIER_PAREN '(' identifier_list ')' body_text T_NEWLINE
+        {
+            free_parse_arg_names(&$4);
+            if (!preproc_add_macro(ctx, &@6, $2, &@6, &$6))
+            {
+                vkd3d_free($2);
+                vkd3d_string_buffer_cleanup(&$6);
                 YYABORT;
             }
         }

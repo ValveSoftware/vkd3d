@@ -70,6 +70,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT>.            {}
 
+<INITIAL>{IDENTIFIER}/\(            {return T_IDENTIFIER_PAREN;}
 <INITIAL>{IDENTIFIER}               {return T_IDENTIFIER;}
 
     /* We have no use for floats, but shouldn't parse them as integers. */
@@ -141,6 +142,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
     }
 
 <INITIAL>{WS}+                      {}
+<INITIAL>[(),]                      {return yytext[0];}
 <INITIAL>.                          {return T_TEXT;}
 
 %%
@@ -221,6 +223,7 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
     switch (token)
     {
         case T_IDENTIFIER:
+        case T_IDENTIFIER_PAREN:
         case T_INTEGER:
         case T_STRING:
         case T_TEXT:
@@ -321,7 +324,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     continue;
         }
 
-        if (token == T_IDENTIFIER)
+        if (token == T_IDENTIFIER || token == T_IDENTIFIER_PAREN)
         {
             struct preproc_macro *macro;
 
