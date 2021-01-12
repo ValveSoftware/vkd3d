@@ -6368,6 +6368,8 @@ static void vkd3d_dxbc_compiler_emit_alu_instruction(struct vkd3d_dxbc_compiler 
 
     val_id = vkd3d_spirv_build_op_trv(builder, &builder->function_stream, op, type_id,
             src_ids, instruction->src_count);
+    if (instruction->flags & VKD3DSI_PRECISE_XYZW)
+        vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
 
     vkd3d_dxbc_compiler_emit_store_dst(compiler, dst, val_id);
 }
@@ -6600,6 +6602,8 @@ static void vkd3d_dxbc_compiler_emit_dot(struct vkd3d_dxbc_compiler *compiler,
         val_id = vkd3d_dxbc_compiler_emit_construct_vector(compiler,
                 component_type, component_count, val_id, 0, 1);
     }
+    if (instruction->flags & VKD3DSI_PRECISE_XYZW)
+        vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
 
     vkd3d_dxbc_compiler_emit_store_dst(compiler, dst, val_id);
 }
