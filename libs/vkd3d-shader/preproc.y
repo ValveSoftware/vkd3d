@@ -68,7 +68,7 @@ static void yyerror(const YYLTYPE *loc, void *scanner, struct preproc_ctx *ctx, 
     preproc_error(ctx, loc, VKD3D_SHADER_ERROR_PP_INVALID_SYNTAX, "%s", string);
 }
 
-static struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *name)
+struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *name)
 {
     struct rb_entry *entry;
 
@@ -77,7 +77,8 @@ static struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const c
     return NULL;
 }
 
-static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name)
+static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name,
+        const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body)
 {
     struct preproc_macro *macro;
     int ret;
@@ -94,6 +95,8 @@ static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader
     if (!(macro = vkd3d_malloc(sizeof(*macro))))
         return false;
     macro->name = name;
+    macro->body.text = *body;
+    macro->body.location = *body_loc;
     ret = rb_put(&ctx->macros, name, &macro->entry);
     assert(!ret);
     return true;
@@ -102,6 +105,7 @@ static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader
 void preproc_free_macro(struct preproc_macro *macro)
 {
     vkd3d_free(macro->name);
+    vkd3d_string_buffer_cleanup(&macro->body.text);
     vkd3d_free(macro);
 }
 
@@ -265,6 +269,7 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
 {
     char *string;
     uint32_t integer;
+    struct vkd3d_string_buffer string_buffer;
 }
 
 %token <string> T_IDENTIFIER
@@ -286,6 +291,7 @@ static const void *get_parent_data(struct preproc_ctx *ctx)
 
 %type <integer> expr
 %type <string> body_token
+%type <string_buffer> body_text
 
 %%
 
@@ -298,8 +304,16 @@ shader_text
 
 body_text
     : %empty
+        {
+            vkd3d_string_buffer_init(&$$);
+        }
     | body_text body_token
         {
+            if (vkd3d_string_buffer_printf(&$$, "%s ", $2) < 0)
+            {
+                vkd3d_free($2);
+                YYABORT;
+            }
             vkd3d_free($2);
         }
 
@@ -311,8 +325,12 @@ body_token
 directive
     : T_DEFINE T_IDENTIFIER body_text T_NEWLINE
         {
-            if (!preproc_add_macro(ctx, &@$, $2))
+            if (!preproc_add_macro(ctx, &@$, $2, &@3, &$3))
+            {
+                vkd3d_free($2);
+                vkd3d_string_buffer_cleanup(&$3);
                 YYABORT;
+            }
         }
     | T_UNDEF T_IDENTIFIER T_NEWLINE
         {

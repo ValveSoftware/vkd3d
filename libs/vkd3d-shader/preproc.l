@@ -169,27 +169,41 @@ static void update_location(struct preproc_ctx *ctx)
 
 static void preproc_pop_buffer(struct preproc_ctx *ctx)
 {
-    struct preproc_file *file = preproc_get_top_file(ctx);
-
-    if (ctx->file_count > 1)
-        preproc_close_include(ctx, &file->code);
-
-    if (file->if_count)
+    if (ctx->expansion_count)
     {
-        const struct vkd3d_shader_location loc = {.source_name = file->filename};
+        struct preproc_expansion *exp = &ctx->expansion_stack[ctx->expansion_count - 1];
 
-        preproc_warning(ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF, "Unterminated #if block.");
+        yy_delete_buffer(exp->buffer.lexer_buffer, ctx->scanner);
+
+        --ctx->expansion_count;
+        TRACE("Expansion stack size is now %zu.\n", ctx->expansion_count);
     }
-    vkd3d_free(file->if_stack);
+    else
+    {
+        struct preproc_file *file = preproc_get_top_file(ctx);
 
-    vkd3d_free(file->filename);
+        if (ctx->file_count > 1)
+            preproc_close_include(ctx, &file->code);
 
-    yy_delete_buffer(file->buffer.lexer_buffer, ctx->scanner);
+        if (file->if_count)
+        {
+            const struct vkd3d_shader_location loc = {.source_name = file->filename};
 
-    --ctx->file_count;
-    TRACE("File stack size is now %zu.\n", ctx->file_count);
+            preproc_warning(ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_IF, "Unterminated #if block.");
+        }
+        vkd3d_free(file->if_stack);
 
-    if (ctx->file_count)
+        vkd3d_free(file->filename);
+
+        yy_delete_buffer(file->buffer.lexer_buffer, ctx->scanner);
+
+        --ctx->file_count;
+        TRACE("File stack size is now %zu.\n", ctx->file_count);
+    }
+
+    if (ctx->expansion_count)
+        yy_switch_to_buffer(ctx->expansion_stack[ctx->expansion_count - 1].buffer.lexer_buffer, ctx->scanner);
+    else if (ctx->file_count)
         yy_switch_to_buffer(ctx->file_stack[ctx->file_count - 1].buffer.lexer_buffer, ctx->scanner);
 }
 
@@ -218,6 +232,21 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
     return token;
 }
 
+static bool preproc_push_expansion(struct preproc_ctx *ctx, const struct preproc_text *text)
+{
+    struct preproc_expansion *exp;
+
+    if (!vkd3d_array_reserve((void **)&ctx->expansion_stack, &ctx->expansion_stack_size,
+            ctx->expansion_count + 1, sizeof(*ctx->expansion_stack)))
+        return false;
+    exp = &ctx->expansion_stack[ctx->expansion_count++];
+    exp->text = text;
+    exp->buffer.lexer_buffer = yy_scan_bytes(text->text.buffer, text->text.content_size, ctx->scanner);
+    exp->buffer.location = text->location;
+    TRACE("Expansion stack size is now %zu.\n", ctx->expansion_count);
+    return true;
+}
+
 int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 {
     struct preproc_ctx *ctx = yyget_extra(scanner);
@@ -239,6 +268,10 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
         {
             ctx->last_was_eof = true;
+
+            /* If we have reached the end of an included file, inject a newline. */
+            if (ctx->expansion_count)
+                continue;
             token = T_NEWLINE;
             text = "\n";
         }
@@ -286,6 +319,29 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
             default:
                 if (!preproc_is_writing(ctx))
                     continue;
+        }
+
+        if (token == T_IDENTIFIER)
+        {
+            struct preproc_macro *macro;
+
+            switch (ctx->current_directive)
+            {
+                case T_DEFINE:
+                case T_IFDEF:
+                case T_IFNDEF:
+                case T_UNDEF:
+                    /* Return identifiers verbatim. */
+                    return return_token(token, lval, text);
+            }
+
+            /* Otherwise, expand a macro if there is one. */
+
+            if ((macro = preproc_find_macro(ctx, text)))
+            {
+                preproc_push_expansion(ctx, &macro->body);
+                continue;
+            }
         }
 
         if (ctx->current_directive)
@@ -365,6 +421,7 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
     rb_destroy(&ctx.macros, preproc_macro_rb_free, NULL);
     vkd3d_free(ctx.file_stack);
+    vkd3d_free(ctx.expansion_stack);
 
     if (ctx.error)
     {

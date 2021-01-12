@@ -349,10 +349,10 @@ static void test_preprocess(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        if (i == 6 || i == 10 || i == 11)
+        if (i == 10 || i == 11)
             continue;
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
-        todo_if (i <= 4 || (i >= 9 && i <= 14))
+        todo_if (i <= 4 || (i >= 9 && i <= 14) || i == 43)
             check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
     }
     vkd3d_test_set_context(NULL);
@@ -400,12 +400,11 @@ static void test_preprocess(void)
     macros[1].Definition = "KEY2";
     todo check_preprocess("KEY", macros, NULL, "value", NULL);
 
-    if (0)
-        todo check_preprocess(test_include_top, NULL, &test_include, "pass", "fail");
+    check_preprocess(test_include_top, NULL, &test_include, "pass", "fail");
     ok(!refcount_file1, "Got %d references to file1.\n", refcount_file1);
     ok(!refcount_file2, "Got %d references to file1.\n", refcount_file2);
     ok(!refcount_file3, "Got %d references to file1.\n", refcount_file3);
-    todo ok(include_count_file2 == 2, "file2 was included %u times.\n", include_count_file2);
+    ok(include_count_file2 == 2, "file2 was included %u times.\n", include_count_file2);
 
     /* Macro invocation spread across multiple files. */
     if (0)
