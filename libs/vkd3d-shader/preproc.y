@@ -309,6 +309,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
     struct parse_arg_names arg_names;
 }
 
+%token <string> T_HASHSTRING
 %token <string> T_IDENTIFIER
 %token <string> T_IDENTIFIER_PAREN
 %token <string> T_INTEGER
@@ -387,7 +388,8 @@ body_text
         }
 
 body_token
-    : T_IDENTIFIER
+    : T_HASHSTRING
+    | T_IDENTIFIER
     | T_IDENTIFIER_PAREN
     | T_INTEGER
     | T_TEXT

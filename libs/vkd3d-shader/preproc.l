@@ -104,7 +104,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         const char *p;
 
         if (!ctx->last_was_newline)
-            return T_TEXT;
+            return T_HASHSTRING;
 
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
@@ -247,6 +247,7 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
 {
     switch (token)
     {
+        case T_HASHSTRING:
         case T_IDENTIFIER:
         case T_IDENTIFIER_PAREN:
         case T_INTEGER:
@@ -389,11 +390,48 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         switch (func_state->state)
         {
             case STATE_NONE:
+            {
+                struct preproc_macro *macro;
+
                 if (token == T_CONCAT && should_concat(ctx))
                 {
                     while (ctx->buffer.content_size
                             && strchr(" \t\r\n", ctx->buffer.buffer[ctx->buffer.content_size - 1]))
                         --ctx->buffer.content_size;
+                    break;
+                }
+
+                /* Stringification, however, is only done for function-like
+                 * macro bodies. */
+                if (token == T_HASHSTRING && (macro = preproc_get_top_macro(ctx)) && macro->arg_count)
+                {
+                    const struct preproc_text *expansion;
+                    const char *p = text + 1;
+                    unsigned int i;
+
+                    if (ctx->current_directive)
+                        return return_token(token, lval, text);
+
+                    while (*p == ' ' || *p == '\t')
+                        ++p;
+
+                    vkd3d_string_buffer_printf(&ctx->buffer, "\"");
+                    if ((expansion = find_arg_expansion(ctx, p)))
+                    {
+                        for (i = 0; i < expansion->text.content_size; ++i)
+                        {
+                            char c = expansion->text.buffer[i];
+
+                            if (c == '\\' || c == '"')
+                                vkd3d_string_buffer_printf(&ctx->buffer, "\\");
+                            vkd3d_string_buffer_printf(&ctx->buffer, "%c", c);
+                        }
+                    }
+                    else
+                    {
+                        vkd3d_string_buffer_printf(&ctx->buffer, "%s", p);
+                    }
+                    vkd3d_string_buffer_printf(&ctx->buffer, "\"");
                     break;
                 }
 
@@ -440,6 +478,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 
                 vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
                 break;
+            }
 
             case STATE_IDENTIFIER:
                 if (token == '(')
