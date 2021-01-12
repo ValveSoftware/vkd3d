@@ -84,9 +84,10 @@ struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *na
 }
 
 static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name,
-        const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body)
+        char **arg_names, size_t arg_count, const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body)
 {
     struct preproc_macro *macro;
+    unsigned int i;
     int ret;
 
     if ((macro = preproc_find_macro(ctx, name)))
@@ -96,11 +97,21 @@ static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader
         preproc_free_macro(macro);
     }
 
-    TRACE("Defining new macro %s.\n", debugstr_a(name));
+    TRACE("Defining new macro %s with %zu arguments.\n", debugstr_a(name), arg_count);
 
     if (!(macro = vkd3d_malloc(sizeof(*macro))))
         return false;
     macro->name = name;
+    macro->arg_names = arg_names;
+    macro->arg_count = arg_count;
+    macro->arg_values = NULL;
+    if (arg_count && !(macro->arg_values = vkd3d_calloc(arg_count, sizeof(*macro->arg_values))))
+    {
+        vkd3d_free(macro);
+        return false;
+    }
+    for (i = 0; i < arg_count; ++i)
+        vkd3d_string_buffer_init(&macro->arg_values[i].text);
     macro->body.text = *body;
     macro->body.location = *body_loc;
     ret = rb_put(&ctx->macros, name, &macro->entry);
@@ -110,7 +121,16 @@ static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader
 
 void preproc_free_macro(struct preproc_macro *macro)
 {
+    unsigned int i;
+
     vkd3d_free(macro->name);
+    for (i = 0; i < macro->arg_count; ++i)
+    {
+        vkd3d_string_buffer_cleanup(&macro->arg_values[i].text);
+        vkd3d_free(macro->arg_names[i]);
+    }
+    vkd3d_free(macro->arg_names);
+    vkd3d_free(macro->arg_values);
     vkd3d_string_buffer_cleanup(&macro->body.text);
     vkd3d_free(macro);
 }
@@ -379,6 +399,22 @@ body_token_const
         {
             $$ = ")";
         }
+    | '['
+        {
+            $$ = "[";
+        }
+    | ']'
+        {
+            $$ = "]";
+        }
+    | '{'
+        {
+            $$ = "{";
+        }
+    | '}'
+        {
+            $$ = "}";
+        }
     | ','
         {
             $$ = ",";
@@ -387,7 +423,7 @@ body_token_const
 directive
     : T_DEFINE T_IDENTIFIER body_text T_NEWLINE
         {
-            if (!preproc_add_macro(ctx, &@$, $2, &@3, &$3))
+            if (!preproc_add_macro(ctx, &@$, $2, NULL, 0, &@3, &$3))
             {
                 vkd3d_free($2);
                 vkd3d_string_buffer_cleanup(&$3);
@@ -396,10 +432,10 @@ directive
         }
     | T_DEFINE T_IDENTIFIER_PAREN '(' identifier_list ')' body_text T_NEWLINE
         {
-            free_parse_arg_names(&$4);
-            if (!preproc_add_macro(ctx, &@6, $2, &@6, &$6))
+            if (!preproc_add_macro(ctx, &@6, $2, $4.args, $4.count, &@6, &$6))
             {
                 vkd3d_free($2);
+                free_parse_arg_names(&$4);
                 vkd3d_string_buffer_cleanup(&$6);
                 YYABORT;
             }

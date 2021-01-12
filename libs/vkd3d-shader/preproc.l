@@ -142,7 +142,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
     }
 
 <INITIAL>{WS}+                      {}
-<INITIAL>[(),]                      {return yytext[0];}
+<INITIAL>[()\[\]{},]                {return yytext[0];}
 <INITIAL>.                          {return T_TEXT;}
 
 %%
@@ -167,6 +167,26 @@ static void update_location(struct preproc_ctx *ctx)
             ++buffer->location.line;
         }
     }
+}
+
+static bool preproc_is_writing(struct preproc_ctx *ctx)
+{
+    const struct preproc_file *file;
+
+    /* This can happen while checking for unterminated macro invocation. */
+    if (!ctx->file_count)
+        return true;
+    file = preproc_get_top_file(ctx);
+    if (!file->if_count)
+        return true;
+    return file->if_stack[file->if_count - 1].current_true;
+}
+
+static struct preproc_macro *preproc_get_top_macro(struct preproc_ctx *ctx)
+{
+    if (!ctx->expansion_count)
+        return NULL;
+    return ctx->expansion_stack[ctx->expansion_count - 1].macro;
 }
 
 static void preproc_pop_buffer(struct preproc_ctx *ctx)
@@ -209,15 +229,6 @@ static void preproc_pop_buffer(struct preproc_ctx *ctx)
         yy_switch_to_buffer(ctx->file_stack[ctx->file_count - 1].buffer.lexer_buffer, ctx->scanner);
 }
 
-static bool preproc_is_writing(struct preproc_ctx *ctx)
-{
-    const struct preproc_file *file = preproc_get_top_file(ctx);
-
-    if (!file->if_count)
-        return true;
-    return file->if_stack[file->if_count - 1].current_true;
-}
-
 static int return_token(int token, YYSTYPE *lval, const char *text)
 {
     switch (token)
@@ -235,7 +246,29 @@ static int return_token(int token, YYSTYPE *lval, const char *text)
     return token;
 }
 
-static bool preproc_push_expansion(struct preproc_ctx *ctx, const struct preproc_text *text)
+static const struct preproc_text *find_arg_expansion(struct preproc_ctx *ctx, const char *s)
+{
+    struct preproc_macro *macro;
+    unsigned int i;
+
+    if ((macro = preproc_get_top_macro(ctx)))
+    {
+        for (i = 0; i < macro->arg_count; ++i)
+        {
+            if (!strcmp(s, macro->arg_names[i]))
+                return &macro->arg_values[i];
+        }
+    }
+    return NULL;
+}
+
+static void preproc_text_add(struct preproc_text *text, const char *string)
+{
+    vkd3d_string_buffer_printf(&text->text, "%s", string);
+}
+
+static bool preproc_push_expansion(struct preproc_ctx *ctx,
+        const struct preproc_text *text, struct preproc_macro *macro)
 {
     struct preproc_expansion *exp;
 
@@ -246,6 +279,7 @@ static bool preproc_push_expansion(struct preproc_ctx *ctx, const struct preproc
     exp->text = text;
     exp->buffer.lexer_buffer = yy_scan_bytes(text->text.buffer, text->text.content_size, ctx->scanner);
     exp->buffer.location = text->location;
+    exp->macro = macro;
     TRACE("Expansion stack size is now %zu.\n", ctx->expansion_count);
     return true;
 }
@@ -256,58 +290,72 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 
     for (;;)
     {
+        struct preproc_func_state *func_state;
         const char *text;
         int token;
 
-        if (ctx->last_was_eof)
+        if (ctx->lookahead_token)
         {
-            preproc_pop_buffer(ctx);
-            if (!ctx->file_count)
-                return 0;
-        }
-        ctx->last_was_eof = false;
-
-        assert(ctx->file_count);
-        if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
-        {
-            ctx->last_was_eof = true;
-
-            /* If we have reached the end of an included file, inject a newline. */
-            if (ctx->expansion_count)
-                continue;
-            token = T_NEWLINE;
-            text = "\n";
+            token = ctx->lookahead_token;
+            text = yyget_text(scanner);
         }
         else
         {
-            text = yyget_text(scanner);
-        }
-
-        if (ctx->last_was_newline)
-        {
-            switch (token)
+            if (ctx->last_was_eof)
             {
-                case T_DEFINE:
-                case T_ELIF:
-                case T_ELSE:
-                case T_ENDIF:
-                case T_IF:
-                case T_IFDEF:
-                case T_IFNDEF:
-                case T_INCLUDE:
-                case T_UNDEF:
-                    ctx->current_directive = token;
-                    break;
-
-                default:
-                    ctx->current_directive = 0;
+                preproc_pop_buffer(ctx);
+                if (!ctx->file_count)
+                    return 0;
             }
+            ctx->last_was_eof = false;
+
+            assert(ctx->file_count);
+            if (!(token = preproc_lexer_lex(lval, lloc, scanner)))
+            {
+                ctx->last_was_eof = true;
+
+                /* If we have reached the end of an included file, inject a newline. */
+                if (ctx->expansion_count)
+                    continue;
+                token = T_NEWLINE;
+                text = "\n";
+            }
+            else
+            {
+                text = yyget_text(scanner);
+            }
+
+            if (ctx->last_was_newline)
+            {
+                switch (token)
+                {
+                    case T_DEFINE:
+                    case T_ELIF:
+                    case T_ELSE:
+                    case T_ENDIF:
+                    case T_IF:
+                    case T_IFDEF:
+                    case T_IFNDEF:
+                    case T_INCLUDE:
+                    case T_UNDEF:
+                        ctx->current_directive = token;
+                        break;
+
+                    default:
+                        ctx->current_directive = 0;
+                }
+            }
+
+            ctx->last_was_newline = (token == T_NEWLINE);
         }
 
-        ctx->last_was_newline = (token == T_NEWLINE);
+        func_state = ctx->current_directive ? &ctx->directive_func : &ctx->text_func;
 
-        TRACE("Parsing token %d, line %d, in directive %d, string %s.\n",
-                token, lloc->line, ctx->current_directive, debugstr_a(text));
+        TRACE("Parsing token %d%s, line %d, in directive %d, state %#x, string %s.\n",
+                token, ctx->lookahead_token ? " (lookahead)" : "", lloc->line,
+                ctx->current_directive, func_state->state, debugstr_a(text));
+
+        ctx->lookahead_token = 0;
 
         switch (ctx->current_directive)
         {
@@ -324,33 +372,154 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     continue;
         }
 
-        if (token == T_IDENTIFIER || token == T_IDENTIFIER_PAREN)
+        switch (func_state->state)
         {
-            struct preproc_macro *macro;
+            case STATE_NONE:
+                if (token == T_IDENTIFIER || token == T_IDENTIFIER_PAREN)
+                {
+                    const struct preproc_text *expansion;
+                    struct preproc_macro *macro;
 
-            switch (ctx->current_directive)
-            {
-                case T_DEFINE:
-                case T_IFDEF:
-                case T_IFNDEF:
-                case T_UNDEF:
-                    /* Return identifiers verbatim. */
+                    switch (ctx->current_directive)
+                    {
+                        case T_DEFINE:
+                        case T_IFDEF:
+                        case T_IFNDEF:
+                        case T_UNDEF:
+                            /* Return identifiers verbatim. */
+                            return return_token(token, lval, text);
+                    }
+
+                    /* Otherwise, expand a macro if there is one. */
+
+                    if ((expansion = find_arg_expansion(ctx, text)))
+                    {
+                        preproc_push_expansion(ctx, expansion, NULL);
+                        continue;
+                    }
+
+                    if ((macro = preproc_find_macro(ctx, text)))
+                    {
+                        if (!macro->arg_count)
+                        {
+                            preproc_push_expansion(ctx, &macro->body, macro);
+                        }
+                        else
+                        {
+                            func_state->state = STATE_IDENTIFIER;
+                            func_state->macro = macro;
+                        }
+                        continue;
+                    }
+                }
+
+                if (ctx->current_directive)
                     return return_token(token, lval, text);
-            }
 
-            /* Otherwise, expand a macro if there is one. */
+                vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
+                break;
 
-            if ((macro = preproc_find_macro(ctx, text)))
+            case STATE_IDENTIFIER:
+                if (token == '(')
+                {
+                    struct preproc_text *first_arg = &func_state->macro->arg_values[0];
+                    unsigned int i;
+
+                    func_state->arg_count = 0;
+                    func_state->paren_depth = 1;
+                    func_state->state = STATE_ARGS;
+                    for (i = 0; i < func_state->macro->arg_count; ++i)
+                        func_state->macro->arg_values[i].text.content_size = 0;
+
+                    first_arg->location = *lloc;
+                }
+                else
+                {
+                    const char *name = func_state->macro->name;
+
+                    ctx->lookahead_token = token;
+                    func_state->macro = NULL;
+                    func_state->state = STATE_NONE;
+
+                    if (ctx->current_directive)
+                        return return_token(T_IDENTIFIER, lval, name);
+
+                    vkd3d_string_buffer_printf(&ctx->buffer, "%s ", name);
+                }
+                break;
+
+            case STATE_ARGS:
             {
-                preproc_push_expansion(ctx, &macro->body);
-                continue;
+                struct preproc_text *current_arg = NULL;
+
+                assert(func_state->macro->arg_count);
+
+                if (func_state->arg_count < func_state->macro->arg_count)
+                    current_arg = &func_state->macro->arg_values[func_state->arg_count];
+
+                switch (token)
+                {
+                    case T_NEWLINE:
+                        if (current_arg)
+                            preproc_text_add(current_arg, " ");
+                        break;
+
+                    case ')':
+                    case ']':
+                    case '}':
+                        if (!--func_state->paren_depth)
+                        {
+                            if (++func_state->arg_count == func_state->macro->arg_count)
+                            {
+                                preproc_push_expansion(ctx, &func_state->macro->body, func_state->macro);
+                            }
+                            else
+                            {
+                                preproc_warning(ctx, lloc, VKD3D_SHADER_WARNING_PP_ARGUMENT_COUNT_MISMATCH,
+                                        "Wrong number of arguments to macro \"%s\": expected %zu, got %zu.",
+                                        func_state->macro->name, func_state->macro->arg_count, func_state->arg_count);
+
+                                if (ctx->current_directive)
+                                    return return_token(T_IDENTIFIER, lval, func_state->macro->name);
+
+                                vkd3d_string_buffer_printf(&ctx->buffer, "%s ", func_state->macro->name);
+                            }
+                            func_state->macro = NULL;
+                            func_state->state = STATE_NONE;
+                        }
+                        else
+                        {
+                            if (current_arg)
+                                preproc_text_add(current_arg, text);
+                        }
+                        break;
+
+                    case ',':
+                        if (func_state->paren_depth == 1)
+                        {
+                            ++func_state->arg_count;
+                            if (current_arg)
+                                current_arg->location = *lloc;
+                        }
+                        else if (current_arg)
+                        {
+                            preproc_text_add(current_arg, text);
+                        }
+                        break;
+
+                    case '(':
+                    case '[':
+                    case '{':
+                        ++func_state->paren_depth;
+                        /* fall through */
+
+                    default:
+                        if (current_arg)
+                            preproc_text_add(current_arg, text);
+                }
+                break;
             }
         }
-
-        if (ctx->current_directive)
-            return return_token(token, lval, text);
-
-        vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
     }
 }
 
@@ -417,6 +586,26 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     preproc_yyparse(ctx.scanner, &ctx);
+
+    switch (ctx.text_func.state)
+    {
+        case STATE_NONE:
+            break;
+
+        case STATE_ARGS:
+        {
+            const struct vkd3d_shader_location loc = {.source_name = source_name};
+
+            preproc_warning(&ctx, &loc, VKD3D_SHADER_WARNING_PP_UNTERMINATED_MACRO,
+                    "Unterminated macro invocation.");
+        }
+        /* fall through */
+
+        case STATE_IDENTIFIER:
+            if (preproc_is_writing(&ctx))
+                vkd3d_string_buffer_printf(&ctx.buffer, "%s ", ctx.text_func.macro->name);
+            break;
+    }
 
     while (ctx.file_count)
         preproc_pop_buffer(&ctx);

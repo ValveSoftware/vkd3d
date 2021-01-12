@@ -352,7 +352,7 @@ static void test_preprocess(void)
         if (i == 10 || i == 11)
             continue;
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
-        todo_if (i <= 4 || (i >= 9 && i <= 14) || i == 43)
+        todo_if (i <= 4 || (i >= 9 && i <= 14))
             check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
     }
     vkd3d_test_set_context(NULL);

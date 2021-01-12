@@ -247,7 +247,6 @@ XFAIL_TESTS = \
 	tests/preproc-if-expr.shader_test \
 	tests/preproc-invalid.shader_test \
 	tests/preproc-macro.shader_test \
-	tests/preproc-misc.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \

@@ -60,12 +60,19 @@ struct preproc_expansion
 {
     struct preproc_buffer buffer;
     const struct preproc_text *text;
+    /* Back-pointer to the macro, if this expansion a macro body. This is
+     * necessary so that argument tokens can be correctly replaced. */
+    struct preproc_macro *macro;
 };
 
 struct preproc_macro
 {
     struct rb_entry entry;
     char *name;
+
+    char **arg_names;
+    size_t arg_count;
+    struct preproc_text *arg_values;
 
     struct preproc_text body;
 };
@@ -86,7 +93,35 @@ struct preproc_ctx
 
     struct rb_tree macros;
 
+    /* It's possible to parse as many as two function-like macros at once: one
+     * in the main text, and another inside of #if directives. E.g.
+     *
+     * func1(
+     * #if func2(...)
+     * #endif
+     * )
+     *
+     * It's not possible to parse more than two, however. In the case of nested
+     * calls like "func1(func2(...))", we store everything inside the outer
+     * parentheses as unparsed text, and then parse it once the argument is
+     * actually invoked.
+     */
+    struct preproc_func_state
+    {
+        struct preproc_macro *macro;
+        size_t arg_count;
+        enum
+        {
+            STATE_NONE = 0,
+            STATE_IDENTIFIER,
+            STATE_ARGS,
+        } state;
+        unsigned int paren_depth;
+    } text_func, directive_func;
+
     int current_directive;
+
+    int lookahead_token;
 
     bool last_was_newline;
     bool last_was_eof;
