@@ -350,7 +350,7 @@ static void test_preprocess(void)
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
         vkd3d_test_set_context("Source \"%s\"", tests[i].source);
-        todo_if (i == 9 || (i >= 12 && i <= 14))
+        todo_if (i == 9)
             check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
     }
     vkd3d_test_set_context(NULL);

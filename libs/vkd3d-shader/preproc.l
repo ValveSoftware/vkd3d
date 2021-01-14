@@ -471,6 +471,26 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                         }
                         continue;
                     }
+
+                    if (!strcmp(text, "__LINE__"))
+                    {
+                        const struct preproc_file *file = preproc_get_top_file(ctx);
+
+                        /* Not the current line number, but rather the line
+                         * number before invoking any macros. */
+
+                        if (ctx->current_directive)
+                        {
+                            char string[13];
+
+                            sprintf(string, "%d", file->buffer.location.line);
+                            return return_token(T_INTEGER, lval, string);
+                        }
+
+                        if (preproc_is_writing(ctx))
+                            vkd3d_string_buffer_printf(&ctx->buffer, "%d ", file->buffer.location.line);
+                        continue;
+                    }
                 }
 
                 if (ctx->current_directive)
