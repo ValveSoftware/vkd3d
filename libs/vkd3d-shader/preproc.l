@@ -472,6 +472,29 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                         continue;
                     }
 
+                    if (!strcmp(text, "__FILE__"))
+                    {
+                        const struct preproc_file *file = preproc_get_top_file(ctx);
+
+                        /* Not the current file name, but rather the file name
+                         * before invoking any macros. */
+
+                        if (ctx->current_directive)
+                        {
+                            char *string;
+
+                            if (!(string = vkd3d_malloc(strlen(file->filename) + 3)))
+                                return 0;
+                            sprintf(string, "\"%s\"", file->filename);
+                            lval->string = string;
+                            return T_STRING;
+                        }
+
+                        if (preproc_is_writing(ctx))
+                            vkd3d_string_buffer_printf(&ctx->buffer, "\"%s\" ", file->filename);
+                        continue;
+                    }
+
                     if (!strcmp(text, "__LINE__"))
                     {
                         const struct preproc_file *file = preproc_get_top_file(ctx);
