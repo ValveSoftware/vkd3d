@@ -129,6 +129,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
             return T_IFDEF;
         if (!strcmp(p, "ifndef"))
             return T_IFNDEF;
+        if (!strcmp(p, "pragma"))
+            return T_PRAGMA;
         if (!strcmp(p, "undef"))
             return T_UNDEF;
 
@@ -352,6 +354,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     case T_IFDEF:
                     case T_IFNDEF:
                     case T_INCLUDE:
+                    case T_PRAGMA:
                     case T_UNDEF:
                         ctx->current_directive = token;
                         break;
@@ -385,6 +388,16 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
             default:
                 if (!preproc_is_writing(ctx))
                     continue;
+        }
+
+        if (ctx->current_directive == T_PRAGMA)
+        {
+            /* Print all tokens verbatim. */
+            if (token == T_PRAGMA)
+                vkd3d_string_buffer_printf(&ctx->buffer, "#pragma ");
+            else
+                vkd3d_string_buffer_printf(&ctx->buffer, "%s", text);
+            continue;
         }
 
         switch (func_state->state)

@@ -326,6 +326,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_IFDEF "#ifdef"
 %token T_IFNDEF "#ifndef"
 %token T_INCLUDE "#include"
+%token T_PRAGMA "#pragma"
 %token T_UNDEF "#undef"
 
 %token T_CONCAT "##"
