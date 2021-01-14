@@ -125,6 +125,7 @@ struct preproc_ctx
 
     bool last_was_newline;
     bool last_was_eof;
+    bool last_was_defined;
 
     bool error;
 };

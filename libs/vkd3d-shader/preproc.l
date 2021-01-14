@@ -73,6 +73,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 <ERROR>(\\{NEWLINE}|[^\n])*         {return T_STRING;}
 
+<INITIAL>defined/\(                 {return T_DEFINED;}
+<INITIAL>defined                    {return T_DEFINED;}
 <INITIAL>{IDENTIFIER}/\(            {return T_IDENTIFIER_PAREN;}
 <INITIAL>{IDENTIFIER}               {return T_IDENTIFIER;}
 
@@ -377,6 +379,9 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
             ctx->last_was_newline = (token == T_NEWLINE);
         }
 
+        if (ctx->current_directive && token == T_DEFINED)
+            ctx->last_was_defined = true;
+
         func_state = ctx->current_directive ? &ctx->directive_func : &ctx->text_func;
 
         TRACE("Parsing token %d%s, line %d, in directive %d, state %#x, string %s.\n",
@@ -471,6 +476,17 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                         case T_UNDEF:
                             /* Return identifiers verbatim. */
                             return return_token(token, lval, text);
+
+                        case T_IF:
+                        case T_ELIF:
+                            /* Return identifiers verbatim only if they're the
+                             * argument to "defined". */
+                            if (ctx->last_was_defined)
+                            {
+                                ctx->last_was_defined = false;
+                                return return_token(token, lval, text);
+                            }
+                            break;
                     }
 
                     /* Otherwise, expand a macro if there is one. */

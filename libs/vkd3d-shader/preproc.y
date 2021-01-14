@@ -331,6 +331,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_UNDEF "#undef"
 
 %token T_CONCAT "##"
+%token T_DEFINED "defined"
 
 %type <integer> expr
 %type <string> body_token
@@ -428,6 +429,10 @@ body_token_const
     | T_CONCAT
         {
             $$ = "##";
+        }
+    | T_DEFINED
+        {
+            $$ = "defined";
         }
 
 directive
@@ -582,4 +587,14 @@ expr
         {
             $$ = preproc_parse_integer($1);
             vkd3d_free($1);
+        }
+    | T_DEFINED T_IDENTIFIER
+        {
+            $$ = !!preproc_find_macro(ctx, $2);
+            vkd3d_free($2);
+        }
+    | T_DEFINED '(' T_IDENTIFIER ')'
+        {
+            $$ = !!preproc_find_macro(ctx, $3);
+            vkd3d_free($3);
         }
