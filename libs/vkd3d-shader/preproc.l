@@ -50,6 +50,7 @@ static void update_location(struct preproc_ctx *ctx);
 %s C_COMMENT
 %s CXX_COMMENT
 
+%s ERROR
 %s INCLUDE
 
 NEWLINE         \r?\n
@@ -69,6 +70,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT>.            {}
+
+<ERROR>(\\{NEWLINE}|[^\n])*         {return T_STRING;}
 
 <INITIAL>{IDENTIFIER}/\(            {return T_IDENTIFIER_PAREN;}
 <INITIAL>{IDENTIFIER}               {return T_IDENTIFIER;}
@@ -109,6 +112,12 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
 
+        if (!strcmp(p, "error"))
+        {
+            BEGIN(ERROR);
+            return T_ERROR;
+        }
+
         if (!strcmp(p, "include"))
         {
             BEGIN(INCLUDE);
@@ -140,7 +149,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
     }
 
 <INITIAL,INCLUDE>\\{NEWLINE}        {}
-<INITIAL,INCLUDE>{NEWLINE}          {
+<INITIAL,INCLUDE,ERROR>{NEWLINE}    {
         BEGIN(INITIAL);
         return T_NEWLINE;
     }
@@ -350,6 +359,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     case T_ELIF:
                     case T_ELSE:
                     case T_ENDIF:
+                    case T_ERROR:
                     case T_IF:
                     case T_IFDEF:
                     case T_IFNDEF:

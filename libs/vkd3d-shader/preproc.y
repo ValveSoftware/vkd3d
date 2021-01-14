@@ -319,6 +319,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_NEWLINE
 
 %token T_DEFINE "#define"
+%token T_ERROR "#error"
 %token T_ELIF "#elif"
 %token T_ELSE "#else"
 %token T_ENDIF "#endif"
@@ -533,6 +534,15 @@ directive
             else
                 preproc_warning(ctx, &@$, VKD3D_SHADER_WARNING_PP_INVALID_DIRECTIVE,
                         "Ignoring #endif without prior #if.");
+        }
+    | T_ERROR T_NEWLINE
+        {
+            preproc_error(ctx, &@$, VKD3D_SHADER_ERROR_PP_ERROR_DIRECTIVE, "Error directive.");
+        }
+    | T_ERROR T_STRING T_NEWLINE
+        {
+            preproc_error(ctx, &@$, VKD3D_SHADER_ERROR_PP_ERROR_DIRECTIVE, "Error directive: %s", $2);
+            vkd3d_free($2);
         }
     | T_INCLUDE T_STRING T_NEWLINE
         {
