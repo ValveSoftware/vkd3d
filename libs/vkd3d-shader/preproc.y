@@ -336,6 +336,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %type <integer> primary_expr
 %type <integer> unary_expr
 %type <integer> mul_expr
+%type <integer> add_expr
 %type <string> body_token
 %type <const_string> body_token_const
 %type <string_buffer> body_text
@@ -489,7 +490,7 @@ directive
             }
             vkd3d_free($2);
         }
-    | T_IF mul_expr T_NEWLINE
+    | T_IF add_expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
@@ -504,7 +505,7 @@ directive
             preproc_push_if(ctx, !preproc_find_macro(ctx, $2));
             vkd3d_free($2);
         }
-    | T_ELIF mul_expr T_NEWLINE
+    | T_ELIF add_expr T_NEWLINE
         {
             const struct preproc_file *file = preproc_get_top_file(ctx);
 
@@ -655,4 +656,15 @@ mul_expr
                 $3 = 1;
             }
             $$ = $1 / $3;
+        }
+
+add_expr
+    : mul_expr
+    | add_expr '+' mul_expr
+        {
+            $$ = $1 + $3;
+        }
+    | add_expr '-' mul_expr
+        {
+            $$ = $1 - $3;
         }
