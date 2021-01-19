@@ -588,6 +588,11 @@ expr
             $$ = preproc_parse_integer($1);
             vkd3d_free($1);
         }
+    | T_IDENTIFIER
+        {
+            $$ = 0;
+            vkd3d_free($1);
+        }
     | T_DEFINED T_IDENTIFIER
         {
             $$ = !!preproc_find_macro(ctx, $2);
