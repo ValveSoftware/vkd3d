@@ -157,7 +157,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
     }
 
 <INITIAL>{WS}+                      {}
-<INITIAL>[()\[\]{},]                {return yytext[0];}
+<INITIAL>[-()\[\]{},+!]             {return yytext[0];}
 <INITIAL>.                          {return T_TEXT;}
 
 %%

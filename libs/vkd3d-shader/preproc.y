@@ -333,7 +333,8 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_CONCAT "##"
 %token T_DEFINED "defined"
 
-%type <integer> expr
+%type <integer> primary_expr
+%type <integer> unary_expr
 %type <string> body_token
 %type <const_string> body_token_const
 %type <string_buffer> body_text
@@ -426,6 +427,18 @@ body_token_const
         {
             $$ = ",";
         }
+    | '+'
+        {
+            $$ = "+";
+        }
+    | '-'
+        {
+            $$ = "-";
+        }
+    | '!'
+        {
+            $$ = "!";
+        }
     | T_CONCAT
         {
             $$ = "##";
@@ -467,7 +480,7 @@ directive
             }
             vkd3d_free($2);
         }
-    | T_IF expr T_NEWLINE
+    | T_IF unary_expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
@@ -482,7 +495,7 @@ directive
             preproc_push_if(ctx, !preproc_find_macro(ctx, $2));
             vkd3d_free($2);
         }
-    | T_ELIF expr T_NEWLINE
+    | T_ELIF unary_expr T_NEWLINE
         {
             const struct preproc_file *file = preproc_get_top_file(ctx);
 
@@ -582,7 +595,7 @@ directive
             vkd3d_free($2);
         }
 
-expr
+primary_expr
     : T_INTEGER
         {
             $$ = preproc_parse_integer($1);
@@ -602,4 +615,19 @@ expr
         {
             $$ = !!preproc_find_macro(ctx, $3);
             vkd3d_free($3);
+        }
+
+unary_expr
+    : primary_expr
+    | '+' unary_expr
+        {
+            $$ = $2;
+        }
+    | '-' unary_expr
+        {
+            $$ = -$2;
+        }
+    | '!' unary_expr
+        {
+            $$ = !$2;
         }
