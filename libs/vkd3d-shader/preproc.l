@@ -78,6 +78,9 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>{IDENTIFIER}/\(            {return T_IDENTIFIER_PAREN;}
 <INITIAL>{IDENTIFIER}               {return T_IDENTIFIER;}
 
+<INITIAL>"<="                       {return T_LE;}
+<INITIAL>">="                       {return T_GE;}
+
     /* We have no use for floats, but shouldn't parse them as integers. */
 
 <INITIAL>[0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[hHfF]?    {return T_TEXT;}
@@ -96,7 +99,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>"--"                       {return T_TEXT;}
 <INITIAL>"<<"=?                     {return T_TEXT;}
 <INITIAL>">>"=?                     {return T_TEXT;}
-<INITIAL>[-+*/%&|^=><!]=            {return T_TEXT;}
+<INITIAL>[-+*/%&|^=!]=              {return T_TEXT;}
 
 <INCLUDE>\"[^"]*\"                  {return T_STRING;}
 <INCLUDE>\<[^>]*\>                  {return T_STRING;}
@@ -157,7 +160,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
     }
 
 <INITIAL>{WS}+                      {}
-<INITIAL>[-()\[\]{},+!*/]           {return yytext[0];}
+<INITIAL>[-()\[\]{},+!*/<>]         {return yytext[0];}
 <INITIAL>.                          {return T_TEXT;}
 
 %%
