@@ -693,6 +693,10 @@ primary_expr
             $$ = !!preproc_find_macro(ctx, $3);
             vkd3d_free($3);
         }
+    | '(' expr ')'
+        {
+            $$ = $2;
+        }
 
 unary_expr
     : primary_expr

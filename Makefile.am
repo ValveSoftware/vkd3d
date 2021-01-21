@@ -243,8 +243,6 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
-	tests/preproc-if-expr.shader_test \
-	tests/preproc-macro.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
