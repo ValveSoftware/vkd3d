@@ -82,6 +82,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>">="                       {return T_GE;}
 <INITIAL>"=="                       {return T_EQ;}
 <INITIAL>"!="                       {return T_NE;}
+<INITIAL>"&&"                       {return T_AND;}
+<INITIAL>"||"                       {return T_OR;}
 
     /* We have no use for floats, but shouldn't parse them as integers. */
 
@@ -95,8 +97,6 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 
 <INITIAL>##                         {return T_CONCAT;}
 
-<INITIAL>"&&"                       {return T_TEXT;}
-<INITIAL>"||"                       {return T_TEXT;}
 <INITIAL>"++"                       {return T_TEXT;}
 <INITIAL>"--"                       {return T_TEXT;}
 <INITIAL>"<<"=?                     {return T_TEXT;}

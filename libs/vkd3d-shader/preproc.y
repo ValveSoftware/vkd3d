@@ -336,6 +336,8 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_GE ">="
 %token T_EQ "=="
 %token T_NE "!="
+%token T_AND "&&"
+%token T_OR "||"
 %token T_DEFINED "defined"
 
 %type <integer> primary_expr
@@ -347,6 +349,8 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %type <integer> bitand_expr
 %type <integer> bitxor_expr
 %type <integer> bitor_expr
+%type <integer> logicand_expr
+%type <integer> logicor_expr
 %type <string> body_token
 %type <const_string> body_token_const
 %type <string_buffer> body_text
@@ -499,6 +503,14 @@ body_token_const
         {
             $$ = "!=";
         }
+    | T_AND
+        {
+            $$ = "&&";
+        }
+    | T_OR
+        {
+            $$ = "||";
+        }
     | T_DEFINED
         {
             $$ = "defined";
@@ -536,7 +548,7 @@ directive
             }
             vkd3d_free($2);
         }
-    | T_IF bitor_expr T_NEWLINE
+    | T_IF logicor_expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
@@ -551,7 +563,7 @@ directive
             preproc_push_if(ctx, !preproc_find_macro(ctx, $2));
             vkd3d_free($2);
         }
-    | T_ELIF bitor_expr T_NEWLINE
+    | T_ELIF logicor_expr T_NEWLINE
         {
             const struct preproc_file *file = preproc_get_top_file(ctx);
 
@@ -764,4 +776,18 @@ bitor_expr
     | bitor_expr '|' bitxor_expr
         {
             $$ = $1 | $3;
+        }
+
+logicand_expr
+    : bitor_expr
+    | logicand_expr T_AND bitor_expr
+        {
+            $$ = $1 && $3;
+        }
+
+logicor_expr
+    : logicand_expr
+    | logicor_expr T_OR logicand_expr
+        {
+            $$ = $1 || $3;
         }
