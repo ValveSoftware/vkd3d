@@ -344,6 +344,9 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %type <integer> add_expr
 %type <integer> ineq_expr
 %type <integer> eq_expr
+%type <integer> bitand_expr
+%type <integer> bitxor_expr
+%type <integer> bitor_expr
 %type <string> body_token
 %type <const_string> body_token_const
 %type <string_buffer> body_text
@@ -464,6 +467,18 @@ body_token_const
         {
             $$ = ">";
         }
+    | '&'
+        {
+            $$ = "&";
+        }
+    | '|'
+        {
+            $$ = "|";
+        }
+    | '^'
+        {
+            $$ = "^";
+        }
     | T_CONCAT
         {
             $$ = "##";
@@ -521,7 +536,7 @@ directive
             }
             vkd3d_free($2);
         }
-    | T_IF eq_expr T_NEWLINE
+    | T_IF bitor_expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
@@ -536,7 +551,7 @@ directive
             preproc_push_if(ctx, !preproc_find_macro(ctx, $2));
             vkd3d_free($2);
         }
-    | T_ELIF eq_expr T_NEWLINE
+    | T_ELIF bitor_expr T_NEWLINE
         {
             const struct preproc_file *file = preproc_get_top_file(ctx);
 
@@ -728,4 +743,25 @@ eq_expr
     | eq_expr T_NE ineq_expr
         {
             $$ = $1 != $3;
+        }
+
+bitand_expr
+    : eq_expr
+    | bitand_expr '&' eq_expr
+        {
+            $$ = $1 & $3;
+        }
+
+bitxor_expr
+    : bitand_expr
+    | bitxor_expr '^' bitand_expr
+        {
+            $$ = $1 ^ $3;
+        }
+
+bitor_expr
+    : bitxor_expr
+    | bitor_expr '|' bitxor_expr
+        {
+            $$ = $1 | $3;
         }
