@@ -334,6 +334,8 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 
 %token T_LE "<="
 %token T_GE ">="
+%token T_EQ "=="
+%token T_NE "!="
 %token T_DEFINED "defined"
 
 %type <integer> primary_expr
@@ -341,6 +343,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %type <integer> mul_expr
 %type <integer> add_expr
 %type <integer> ineq_expr
+%type <integer> eq_expr
 %type <string> body_token
 %type <const_string> body_token_const
 %type <string_buffer> body_text
@@ -473,6 +476,14 @@ body_token_const
         {
             $$ = ">=";
         }
+    | T_EQ
+        {
+            $$ = "==";
+        }
+    | T_NE
+        {
+            $$ = "!=";
+        }
     | T_DEFINED
         {
             $$ = "defined";
@@ -510,7 +521,7 @@ directive
             }
             vkd3d_free($2);
         }
-    | T_IF ineq_expr T_NEWLINE
+    | T_IF eq_expr T_NEWLINE
         {
             if (!preproc_push_if(ctx, !!$2))
                 YYABORT;
@@ -525,7 +536,7 @@ directive
             preproc_push_if(ctx, !preproc_find_macro(ctx, $2));
             vkd3d_free($2);
         }
-    | T_ELIF ineq_expr T_NEWLINE
+    | T_ELIF eq_expr T_NEWLINE
         {
             const struct preproc_file *file = preproc_get_top_file(ctx);
 
@@ -706,4 +717,15 @@ ineq_expr
     | ineq_expr T_GE add_expr
         {
             $$ = $1 >= $3;
+        }
+
+eq_expr
+    : ineq_expr
+    | eq_expr T_EQ ineq_expr
+        {
+            $$ = $1 == $3;
+        }
+    | eq_expr T_NE ineq_expr
+        {
+            $$ = $1 != $3;
         }
