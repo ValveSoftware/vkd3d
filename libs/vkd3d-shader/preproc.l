@@ -104,6 +104,10 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>">>"=?                     {return T_TEXT;}
 <INITIAL>[-+*/%&|^]=                {return T_TEXT;}
 
+    /* Native doesn't preserve these tokens when running the preprocessor on its
+     * own, but there's no good reason to emulate that difference yet. */
+<INITIAL>[pv]s\.[123]\.[0-4x]       {return T_TEXT;}
+
 <INCLUDE,LINE>\"[^"]*\"             {return T_STRING;}
 <INCLUDE>\<[^>]*\>                  {return T_STRING;}
 
