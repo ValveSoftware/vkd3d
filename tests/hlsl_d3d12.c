@@ -358,7 +358,7 @@ static void test_preprocess(void)
     macros[0].Definition = "value";
     macros[1].Name = NULL;
     macros[1].Definition = NULL;
-    todo check_preprocess("KEY", macros, NULL, "value", "KEY");
+    check_preprocess("KEY", macros, NULL, "value", "KEY");
 
     check_preprocess("#undef KEY\nKEY", macros, NULL, "KEY", "value");
 
@@ -367,7 +367,7 @@ static void test_preprocess(void)
 
     macros[0].Name = "KEY";
     macros[0].Definition = NULL;
-    todo check_preprocess("KEY", macros, NULL, NULL, "KEY");
+    check_preprocess("KEY", macros, NULL, NULL, "KEY");
 
     macros[0].Name = "0";
     macros[0].Definition = "value";
@@ -383,19 +383,19 @@ static void test_preprocess(void)
     macros[1].Definition = "value2";
     macros[2].Name = NULL;
     macros[2].Definition = NULL;
-    todo check_preprocess("KEY", macros, NULL, "value2", NULL);
+    check_preprocess("KEY", macros, NULL, "value2", NULL);
 
     macros[0].Name = "KEY";
     macros[0].Definition = "KEY2";
     macros[1].Name = "KEY2";
     macros[1].Definition = "value";
-    todo check_preprocess("KEY", macros, NULL, "value", NULL);
+    check_preprocess("KEY", macros, NULL, "value", NULL);
 
     macros[0].Name = "KEY2";
     macros[0].Definition = "value";
     macros[1].Name = "KEY";
     macros[1].Definition = "KEY2";
-    todo check_preprocess("KEY", macros, NULL, "value", NULL);
+    check_preprocess("KEY", macros, NULL, "value", NULL);
 
     check_preprocess(test_include_top, NULL, &test_include, "pass", "fail");
     ok(!refcount_file1, "Got %d references to file1.\n", refcount_file1);

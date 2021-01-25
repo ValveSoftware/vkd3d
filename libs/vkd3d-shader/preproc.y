@@ -83,8 +83,8 @@ struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *na
     return NULL;
 }
 
-static bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name,
-        char **arg_names, size_t arg_count, const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body)
+bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name, char **arg_names,
+        size_t arg_count, const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body)
 {
     struct preproc_macro *macro;
     unsigned int i;

@@ -130,6 +130,8 @@ struct preproc_ctx
     bool error;
 };
 
+bool preproc_add_macro(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc, char *name, char **arg_names,
+        size_t arg_count, const struct vkd3d_shader_location *body_loc, struct vkd3d_string_buffer *body) DECLSPEC_HIDDEN;
 void preproc_close_include(struct preproc_ctx *ctx, const struct vkd3d_shader_code *code) DECLSPEC_HIDDEN;
 struct preproc_macro *preproc_find_macro(struct preproc_ctx *ctx, const char *name) DECLSPEC_HIDDEN;
 void preproc_free_macro(struct preproc_macro *macro) DECLSPEC_HIDDEN;

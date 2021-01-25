@@ -717,8 +717,9 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 {
     static const struct vkd3d_shader_preprocess_info default_preprocess_info = {0};
     struct preproc_ctx ctx = {0};
-    char *source_name;
+    char *source_name = NULL;
     void *output_code;
+    unsigned int i;
 
     vkd3d_string_buffer_init(&ctx.buffer);
     rb_init(&ctx.macros, preproc_macro_compare);
@@ -727,18 +728,30 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     ctx.message_context = message_context;
 
     if (!(source_name = vkd3d_strdup(compile_info->source_name ? compile_info->source_name : "<anonymous>")))
+        goto fail;
+
+    for (i = 0; i < ctx.preprocess_info->macro_count; ++i)
     {
-        vkd3d_string_buffer_cleanup(&ctx.buffer);
-        return VKD3D_ERROR_OUT_OF_MEMORY;
+        const struct vkd3d_shader_location loc = {.source_name = source_name};
+        struct vkd3d_string_buffer body;
+        char *name;
+
+        vkd3d_string_buffer_init(&body);
+        vkd3d_string_buffer_printf(&body, "%s", ctx.preprocess_info->macros[i].value);
+        if (!(name = vkd3d_strdup(ctx.preprocess_info->macros[i].name)))
+            goto fail;
+        if (!preproc_add_macro(&ctx, &loc, name, NULL, 0, &loc, &body))
+        {
+            vkd3d_free(name);
+            goto fail;
+        }
     }
 
     yylex_init_extra(&ctx, &ctx.scanner);
     if (!preproc_push_include(&ctx, source_name, &compile_info->source))
     {
         yylex_destroy(ctx.scanner);
-        vkd3d_free(source_name);
-        vkd3d_string_buffer_cleanup(&ctx.buffer);
-        return VKD3D_ERROR_OUT_OF_MEMORY;
+        goto fail;
     }
 
     preproc_yyparse(ctx.scanner, &ctx);
@@ -789,4 +802,10 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
     vkd3d_string_buffer_trace(&ctx.buffer);
     vkd3d_string_buffer_cleanup(&ctx.buffer);
     return VKD3D_OK;
+
+fail:
+    rb_destroy(&ctx.macros, preproc_macro_rb_free, NULL);
+    vkd3d_free(source_name);
+    vkd3d_string_buffer_cleanup(&ctx.buffer);
+    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
