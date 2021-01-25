@@ -52,6 +52,7 @@ static void update_location(struct preproc_ctx *ctx);
 
 %s ERROR
 %s INCLUDE
+%s LINE
 
 NEWLINE         \r?\n
 WS              [ \t]
@@ -91,9 +92,9 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>[0-9]+\.([eE][+-]?[0-9]+)?[hHfF]?          {return T_TEXT;}
 <INITIAL>[0-9]+([eE][+-]?[0-9]+)?[hHfF]             {return T_TEXT;}
 <INITIAL>[0-9]+[eE][+-]?[0-9]+                      {return T_TEXT;}
-<INITIAL>0[xX][0-9a-fA-f]+[ul]{0,2}                 {return T_INTEGER;}
-<INITIAL>0[0-7]*[ul]{0,2}                           {return T_INTEGER;}
-<INITIAL>[1-9][0-9]*[ul]{0,2}                       {return T_INTEGER;}
+<INITIAL,LINE>0[xX][0-9a-fA-f]+[ul]{0,2}            {return T_INTEGER;}
+<INITIAL,LINE>0[0-7]*[ul]{0,2}                      {return T_INTEGER;}
+<INITIAL,LINE>[1-9][0-9]*[ul]{0,2}                  {return T_INTEGER;}
 
 <INITIAL>##                         {return T_CONCAT;}
 
@@ -103,7 +104,7 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>">>"=?                     {return T_TEXT;}
 <INITIAL>[-+*/%&|^]=                {return T_TEXT;}
 
-<INCLUDE>\"[^"]*\"                  {return T_STRING;}
+<INCLUDE,LINE>\"[^"]*\"             {return T_STRING;}
 <INCLUDE>\<[^>]*\>                  {return T_STRING;}
 
     /* C strings (including escaped quotes). */
@@ -131,6 +132,12 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
             return T_INCLUDE;
         }
 
+        if (!strcmp(p, "line"))
+        {
+            BEGIN(LINE);
+            return T_LINE;
+        }
+
         if (!strcmp(p, "define"))
             return T_DEFINE;
         if (!strcmp(p, "elif"))
@@ -155,8 +162,8 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
         return T_TEXT;
     }
 
-<INITIAL,INCLUDE>\\{NEWLINE}        {}
-<INITIAL,INCLUDE,ERROR>{NEWLINE}    {
+<INITIAL,INCLUDE,LINE>\\{NEWLINE}       {}
+<INITIAL,INCLUDE,ERROR,LINE>{NEWLINE}   {
         BEGIN(INITIAL);
         return T_NEWLINE;
     }
@@ -371,6 +378,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     case T_IFDEF:
                     case T_IFNDEF:
                     case T_INCLUDE:
+                    case T_LINE:
                     case T_PRAGMA:
                     case T_UNDEF:
                         ctx->current_directive = token;

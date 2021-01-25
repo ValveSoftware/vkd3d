@@ -327,6 +327,7 @@ static void free_parse_arg_names(struct parse_arg_names *args)
 %token T_IFDEF "#ifdef"
 %token T_IFNDEF "#ifndef"
 %token T_INCLUDE "#include"
+%token T_LINE "#line"
 %token T_PRAGMA "#pragma"
 %token T_UNDEF "#undef"
 
@@ -670,6 +671,17 @@ directive
                 vkd3d_free(filename);
             }
             vkd3d_free($2);
+        }
+    | T_LINE T_INTEGER T_NEWLINE
+        {
+            FIXME("#line directive.\n");
+            vkd3d_free($2);
+        }
+    | T_LINE T_INTEGER T_STRING T_NEWLINE
+        {
+            FIXME("#line directive.\n");
+            vkd3d_free($2);
+            vkd3d_free($3);
         }
 
 primary_expr
