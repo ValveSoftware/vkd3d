@@ -743,10 +743,14 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
         vkd3d_string_buffer_init(&body);
         vkd3d_string_buffer_printf(&body, "%s", ctx.preprocess_info->macros[i].value);
         if (!(name = vkd3d_strdup(ctx.preprocess_info->macros[i].name)))
+        {
+            vkd3d_string_buffer_cleanup(&body);
             goto fail;
+        }
         if (!preproc_add_macro(&ctx, &loc, name, NULL, 0, &loc, &body))
         {
             vkd3d_free(name);
+            vkd3d_string_buffer_cleanup(&body);
             goto fail;
         }
     }
