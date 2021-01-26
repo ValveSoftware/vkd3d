@@ -496,6 +496,12 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         return false;
     }
 
+    if (!options->preprocess_only && options->source_type == VKD3D_SHADER_SOURCE_HLSL && !options->profile)
+    {
+        fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
+        return false;
+    }
+
     if (optind < argc)
         options->filename = argv[argc - 1];
 
