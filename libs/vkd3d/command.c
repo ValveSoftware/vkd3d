@@ -195,7 +195,7 @@ static uint64_t vkd3d_queue_reset_sequence_number_locked(struct vkd3d_queue *que
 {
     unsigned int i;
 
-    WARN("Ressetting sequence number for queue %p.\n", queue);
+    WARN("Resetting sequence number for queue %p.\n", queue);
 
     queue->completed_sequence_number = 0;
     queue->submitted_sequence_number = 1;
