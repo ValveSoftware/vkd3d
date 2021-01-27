@@ -548,6 +548,10 @@ enum vkd3d_shader_type
     VKD3D_SHADER_TYPE_GRAPHICS_COUNT,
 
     VKD3D_SHADER_TYPE_COMPUTE = VKD3D_SHADER_TYPE_GRAPHICS_COUNT,
+
+    VKD3D_SHADER_TYPE_EFFECT,
+    VKD3D_SHADER_TYPE_TEXTURE,
+    VKD3D_SHADER_TYPE_LIBRARY,
     VKD3D_SHADER_TYPE_COUNT,
 };
 
@@ -884,6 +888,8 @@ void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const str
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
 
+void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader) DECLSPEC_HIDDEN;
+
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
         struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
@@ -908,6 +914,9 @@ void vkd3d_compute_dxbc_checksum(const void *dxbc, size_t size, uint32_t checksu
 
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+
+int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type(
         enum vkd3d_data_type data_type)

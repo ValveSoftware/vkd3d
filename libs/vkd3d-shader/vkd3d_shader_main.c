@@ -225,7 +225,7 @@ static void vkd3d_shader_dump_blob(const char *path, const char *prefix, const v
     }
 }
 
-static void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader)
+void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader)
 {
     static bool enabled = true;
     const char *path;
@@ -961,7 +961,16 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
-    return VKD3D_ERROR_NOT_IMPLEMENTED;
+    struct vkd3d_shader_code preprocessed;
+    int ret;
+
+    if ((ret = preproc_lexer_parse(compile_info, &preprocessed, message_context)))
+        return ret;
+
+    ret = hlsl_compile_shader(preprocessed.code, compile_info, out, message_context);
+
+    vkd3d_shader_free_shader_code(&preprocessed);
+    return ret;
 }
 
 int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,

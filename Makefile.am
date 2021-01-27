@@ -126,9 +126,22 @@ libs/vkd3d-shader/preproc.tab.c libs/vkd3d-shader/preproc.tab.h &: libs/vkd3d-sh
 	@$(MKDIR_P) libs/vkd3d-shader
 	$(VKD3D_V_BISON)$(BISON) $(YFLAGS) -d -o libs/vkd3d-shader/preproc.tab.c $<
 
-BUILT_SOURCES += libs/vkd3d-shader/preproc.tab.h
+libs/vkd3d-shader/hlsl.yy.c: $(srcdir)/libs/vkd3d-shader/hlsl.l
+	@$(MKDIR_P) libs/vkd3d-shader
+	$(VKD3D_V_FLEX)$(FLEX) $(LFLAGS) -o $@ $<
+
+libs/vkd3d-shader/hlsl.tab.c libs/vkd3d-shader/hlsl.tab.h &: libs/vkd3d-shader/hlsl.y
+	@$(MKDIR_P) libs/vkd3d-shader
+	$(VKD3D_V_BISON)$(BISON) $(YFLAGS) -d -o libs/vkd3d-shader/hlsl.tab.c $<
+
+BUILT_SOURCES += \
+	libs/vkd3d-shader/hlsl.tab.h \
+	libs/vkd3d-shader/preproc.tab.h
 
 vkd3d_shader_yyfiles = \
+	libs/vkd3d-shader/hlsl.tab.c \
+	libs/vkd3d-shader/hlsl.tab.h \
+	libs/vkd3d-shader/hlsl.yy.c \
 	libs/vkd3d-shader/preproc.tab.c \
 	libs/vkd3d-shader/preproc.tab.h \
 	libs/vkd3d-shader/preproc.yy.c
@@ -146,6 +159,7 @@ libvkd3d_shader_la_SOURCES = \
 	include/vkd3d_shader.h \
 	libs/vkd3d-shader/checksum.c \
 	libs/vkd3d-shader/dxbc.c \
+	libs/vkd3d-shader/hlsl.c \
 	libs/vkd3d-shader/spirv.c \
 	libs/vkd3d-shader/trace.c \
 	libs/vkd3d-shader/vkd3d_shader.map \

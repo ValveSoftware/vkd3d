@@ -1220,6 +1220,15 @@ const char *shader_get_type_prefix(enum vkd3d_shader_type type)
         case VKD3D_SHADER_TYPE_COMPUTE:
             return "cs";
 
+        case VKD3D_SHADER_TYPE_EFFECT:
+            return "fx";
+
+        case VKD3D_SHADER_TYPE_TEXTURE:
+            return "tx";
+
+        case VKD3D_SHADER_TYPE_LIBRARY:
+            return "lib";
+
         default:
             FIXME("Unhandled shader type %#x.\n", type);
             return "unknown";
