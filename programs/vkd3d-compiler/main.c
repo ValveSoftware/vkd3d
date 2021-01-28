@@ -480,13 +480,13 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         }
     }
 
-    if (options->print_target_types)
-        return true;
-
     if (options->source_type == VKD3D_SHADER_SOURCE_NONE)
         options->source_type = options->preprocess_only ? VKD3D_SHADER_SOURCE_HLSL : VKD3D_SHADER_SOURCE_DXBC_TPF;
     if (options->target_type == VKD3D_SHADER_TARGET_NONE && !options->preprocess_only)
         options->target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
+
+    if (options->print_target_types)
+        return true;
 
     if (!options->preprocess_only && !validate_target_type(options->source_type, options->target_type))
     {
