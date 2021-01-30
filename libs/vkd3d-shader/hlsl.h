@@ -592,9 +592,6 @@ static inline void set_parse_status(enum parse_status *current, enum parse_statu
         *current = PARSE_WARN;
 }
 
-struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[3],
-        struct source_location *loc) DECLSPEC_HIDDEN;
-
 struct hlsl_type *new_array_type(struct hlsl_type *basic_type, unsigned int array_size) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct source_location loc) DECLSPEC_HIDDEN;

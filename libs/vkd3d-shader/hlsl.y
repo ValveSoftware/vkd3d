@@ -914,6 +914,215 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
     }
 }
 
+static BOOL expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
+{
+    if (t1->base_type > HLSL_TYPE_LAST_SCALAR || t2->base_type > HLSL_TYPE_LAST_SCALAR)
+        return FALSE;
+
+    /* Scalar vars can be converted to pretty much everything */
+    if ((t1->dimx == 1 && t1->dimy == 1) || (t2->dimx == 1 && t2->dimy == 1))
+        return TRUE;
+
+    if (t1->type == HLSL_CLASS_VECTOR && t2->type == HLSL_CLASS_VECTOR)
+        return TRUE;
+
+    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
+    {
+        /* Matrix-vector conversion is apparently allowed if either they have the same components
+           count or the matrix is nx1 or 1xn */
+        if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
+        {
+            if (components_count_type(t1) == components_count_type(t2))
+                return TRUE;
+
+            return (t1->type == HLSL_CLASS_MATRIX && (t1->dimx == 1 || t1->dimy == 1))
+                    || (t2->type == HLSL_CLASS_MATRIX && (t2->dimx == 1 || t2->dimy == 1));
+        }
+
+        /* Both matrices */
+        if ((t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
+                || (t1->dimx <= t2->dimx && t1->dimy <= t2->dimy))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hlsl_base_type t2)
+{
+    static const enum hlsl_base_type types[] =
+    {
+        HLSL_TYPE_BOOL,
+        HLSL_TYPE_INT,
+        HLSL_TYPE_UINT,
+        HLSL_TYPE_HALF,
+        HLSL_TYPE_FLOAT,
+        HLSL_TYPE_DOUBLE,
+    };
+    int t1_idx = -1, t2_idx = -1, i;
+
+    for (i = 0; i < ARRAY_SIZE(types); ++i)
+    {
+        /* Always convert away from HLSL_TYPE_HALF */
+        if (t1 == types[i])
+            t1_idx = t1 == HLSL_TYPE_HALF ? i + 1 : i;
+        if (t2 == types[i])
+            t2_idx = t2 == HLSL_TYPE_HALF ? i + 1 : i;
+
+        if (t1_idx != -1 && t2_idx != -1)
+            break;
+    }
+    if (t1_idx == -1 || t2_idx == -1)
+    {
+        FIXME("Unexpected base type.\n");
+        return HLSL_TYPE_FLOAT;
+    }
+    return t1_idx >= t2_idx ? t1 : t2;
+}
+
+static struct hlsl_type *expr_common_type(struct hlsl_type *t1, struct hlsl_type *t2,
+        struct source_location *loc)
+{
+    enum hlsl_type_class type;
+    enum hlsl_base_type base;
+    unsigned int dimx, dimy;
+
+    if (t1->type > HLSL_CLASS_LAST_NUMERIC || t2->type > HLSL_CLASS_LAST_NUMERIC)
+    {
+        hlsl_report_message(*loc, HLSL_LEVEL_ERROR, "non scalar/vector/matrix data type in expression");
+        return NULL;
+    }
+
+    if (compare_hlsl_types(t1, t2))
+        return t1;
+
+    if (!expr_compatible_data_types(t1, t2))
+    {
+        hlsl_report_message(*loc, HLSL_LEVEL_ERROR, "expression data types are incompatible");
+        return NULL;
+    }
+
+    if (t1->base_type == t2->base_type)
+        base = t1->base_type;
+    else
+        base = expr_common_base_type(t1->base_type, t2->base_type);
+
+    if (t1->dimx == 1 && t1->dimy == 1)
+    {
+        type = t2->type;
+        dimx = t2->dimx;
+        dimy = t2->dimy;
+    }
+    else if (t2->dimx == 1 && t2->dimy == 1)
+    {
+        type = t1->type;
+        dimx = t1->dimx;
+        dimy = t1->dimy;
+    }
+    else if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX)
+    {
+        type = HLSL_CLASS_MATRIX;
+        dimx = min(t1->dimx, t2->dimx);
+        dimy = min(t1->dimy, t2->dimy);
+    }
+    else
+    {
+        /* Two vectors or a vector and a matrix (matrix must be 1xn or nx1) */
+        unsigned int max_dim_1, max_dim_2;
+
+        max_dim_1 = max(t1->dimx, t1->dimy);
+        max_dim_2 = max(t2->dimx, t2->dimy);
+        if (t1->dimx * t1->dimy == t2->dimx * t2->dimy)
+        {
+            type = HLSL_CLASS_VECTOR;
+            dimx = max(t1->dimx, t2->dimx);
+            dimy = 1;
+        }
+        else if (max_dim_1 <= max_dim_2)
+        {
+            type = t1->type;
+            if (type == HLSL_CLASS_VECTOR)
+            {
+                dimx = max_dim_1;
+                dimy = 1;
+            }
+            else
+            {
+                dimx = t1->dimx;
+                dimy = t1->dimy;
+            }
+        }
+        else
+        {
+            type = t2->type;
+            if (type == HLSL_CLASS_VECTOR)
+            {
+                dimx = max_dim_2;
+                dimy = 1;
+            }
+            else
+            {
+                dimx = t2->dimx;
+                dimy = t2->dimy;
+            }
+        }
+    }
+
+    if (type == HLSL_CLASS_SCALAR)
+        return hlsl_ctx.builtin_types.scalar[base];
+    if (type == HLSL_CLASS_VECTOR)
+        return hlsl_ctx.builtin_types.vector[base][dimx - 1];
+    return new_hlsl_type(NULL, type, base, dimx, dimy);
+}
+
+static struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *operands[3], struct source_location *loc)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_type *type;
+    unsigned int i;
+
+    type = operands[0]->data_type;
+    for (i = 1; i <= 2; ++i)
+    {
+        if (!operands[i])
+            break;
+        type = expr_common_type(type, operands[i]->data_type, loc);
+        if (!type)
+            return NULL;
+    }
+    for (i = 0; i <= 2; ++i)
+    {
+        struct hlsl_ir_expr *cast;
+
+        if (!operands[i])
+            break;
+        if (compare_hlsl_types(operands[i]->data_type, type))
+            continue;
+        TRACE("Implicitly converting %s into %s in an expression.\n", debug_hlsl_type(operands[i]->data_type), debug_hlsl_type(type));
+        if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
+                && operands[i]->data_type->dimx * operands[i]->data_type->dimy != type->dimx * type->dimy)
+        {
+            hlsl_report_message(operands[i]->loc, HLSL_LEVEL_WARNING, "implicit truncation of vector/matrix type");
+        }
+
+        if (!(cast = new_cast(operands[i], type, &operands[i]->loc)))
+            return NULL;
+        list_add_after(&operands[i]->entry, &cast->node.entry);
+        operands[i] = &cast->node;
+    }
+
+    if (!(expr = vkd3d_calloc(1, sizeof(*expr))))
+        return NULL;
+    init_node(&expr->node, HLSL_IR_EXPR, type, *loc);
+    expr->op = op;
+    for (i = 0; i <= 2; ++i)
+        hlsl_src_from_node(&expr->operands[i], operands[i]);
+    list_add_tail(instrs, &expr->node.entry);
+
+    return expr;
+}
+
 static struct list *append_unop(struct list *list, struct hlsl_ir_node *node)
 {
     list_add_tail(list, &node->entry);
