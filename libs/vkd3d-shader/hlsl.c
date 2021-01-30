@@ -371,63 +371,6 @@ BOOL compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
     return FALSE;
 }
 
-static BOOL implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
-{
-    if (!convertible_data_type(t1) || !convertible_data_type(t2))
-        return FALSE;
-
-    if (t1->type <= HLSL_CLASS_LAST_NUMERIC)
-    {
-        /* Scalar vars can be converted to any other numeric data type */
-        if (t1->dimx == 1 && t1->dimy == 1 && t2->type <= HLSL_CLASS_LAST_NUMERIC)
-            return TRUE;
-        /* The other way around is true too */
-        if (t2->dimx == 1 && t2->dimy == 1 && t2->type <= HLSL_CLASS_LAST_NUMERIC)
-            return TRUE;
-    }
-
-    if (t1->type == HLSL_CLASS_ARRAY && t2->type == HLSL_CLASS_ARRAY)
-    {
-        return components_count_type(t1) == components_count_type(t2);
-    }
-
-    if ((t1->type == HLSL_CLASS_ARRAY && t2->type <= HLSL_CLASS_LAST_NUMERIC)
-            || (t1->type <= HLSL_CLASS_LAST_NUMERIC && t2->type == HLSL_CLASS_ARRAY))
-    {
-        /* e.g. float4[3] to float4 is allowed */
-        if (t1->type == HLSL_CLASS_ARRAY && compare_hlsl_types(t1->e.array.type, t2))
-            return TRUE;
-        if (components_count_type(t1) == components_count_type(t2))
-            return TRUE;
-        return FALSE;
-    }
-
-    if (t1->type <= HLSL_CLASS_VECTOR && t2->type <= HLSL_CLASS_VECTOR)
-    {
-        if (t1->dimx >= t2->dimx)
-            return TRUE;
-        return FALSE;
-    }
-
-    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
-    {
-        if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX
-                && t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
-            return TRUE;
-
-        /* Matrix-vector conversion is apparently allowed if they have the same components count */
-        if ((t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
-                && components_count_type(t1) == components_count_type(t2))
-            return TRUE;
-        return FALSE;
-    }
-
-    if (t1->type == HLSL_CLASS_STRUCT && t2->type == HLSL_CLASS_STRUCT)
-        return compare_hlsl_types(t1, t2);
-
-    return FALSE;
-}
-
 static BOOL expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 {
     if (t1->base_type > HLSL_TYPE_LAST_SCALAR || t2->base_type > HLSL_TYPE_LAST_SCALAR)
@@ -587,33 +530,6 @@ static struct hlsl_type *expr_common_type(struct hlsl_type *t1, struct hlsl_type
     if (type == HLSL_CLASS_VECTOR)
         return hlsl_ctx.builtin_types.vector[base][dimx - 1];
     return new_hlsl_type(NULL, type, base, dimx, dimy);
-}
-
-struct hlsl_ir_node *add_implicit_conversion(struct list *instrs, struct hlsl_ir_node *node,
-        struct hlsl_type *dst_type, struct source_location *loc)
-{
-    struct hlsl_type *src_type = node->data_type;
-    struct hlsl_ir_expr *cast;
-
-    if (compare_hlsl_types(src_type, dst_type))
-        return node;
-
-    if (!implicit_compatible_data_types(src_type, dst_type))
-    {
-        hlsl_report_message(*loc, HLSL_LEVEL_ERROR, "can't implicitly convert %s to %s",
-                debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
-        return NULL;
-    }
-
-    if (dst_type->dimx * dst_type->dimy < src_type->dimx * src_type->dimy)
-        hlsl_report_message(*loc, HLSL_LEVEL_WARNING, "implicit truncation of vector type");
-
-    TRACE("Implicit conversion from %s to %s.\n", debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
-
-    if (!(cast = new_cast(node, dst_type, loc)))
-        return NULL;
-    list_add_tail(instrs, &cast->node.entry);
-    return &cast->node;
 }
 
 struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[3],
