@@ -599,19 +599,34 @@ struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op op, stru
 struct hlsl_ir_node *add_implicit_conversion(struct list *instrs, struct hlsl_ir_node *node, struct hlsl_type *type,
         struct source_location *loc) DECLSPEC_HIDDEN;
 
-struct hlsl_ir_expr *new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
-        struct source_location *loc) DECLSPEC_HIDDEN;
+struct hlsl_type *new_array_type(struct hlsl_type *basic_type, unsigned int array_size) DECLSPEC_HIDDEN;
+struct hlsl_ir_assignment *new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
+        struct hlsl_ir_node *rhs, unsigned int writemask, struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
+struct hlsl_ir_expr *new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
+        struct source_location *loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_function_decl *new_func_decl(struct hlsl_type *return_type,
+        struct list *parameters, const char *semantic, struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_if *new_if(struct hlsl_ir_node *condition, struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_assignment *new_simple_assignment(struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs) DECLSPEC_HIDDEN;
+struct hlsl_type *new_struct_type(const char *name, struct list *fields) DECLSPEC_HIDDEN;
+struct hlsl_ir_swizzle *new_swizzle(DWORD s, unsigned int components,
+        struct hlsl_ir_node *val, struct source_location *loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_var *new_synthetic_var(const char *name, struct hlsl_type *type,
+        const struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_constant *new_uint_constant(unsigned int n, const struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *new_unary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_var *new_var(const char *name, struct hlsl_type *type, const struct source_location loc,
+        const char *semantic, unsigned int modifiers, const struct reg_reservation *reg_reservation) DECLSPEC_HIDDEN;
+struct hlsl_ir_load *new_var_load(struct hlsl_ir_var *var, const struct source_location loc) DECLSPEC_HIDDEN;
 
 BOOL add_declaration(struct hlsl_scope *scope, struct hlsl_ir_var *decl, BOOL local_var) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *get_variable(struct hlsl_scope *scope, const char *name) DECLSPEC_HIDDEN;
 void free_declaration(struct hlsl_ir_var *decl) DECLSPEC_HIDDEN;
 struct hlsl_type *new_hlsl_type(const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy) DECLSPEC_HIDDEN;
-struct hlsl_type *new_array_type(struct hlsl_type *basic_type, unsigned int array_size) DECLSPEC_HIDDEN;
 struct hlsl_type *clone_hlsl_type(struct hlsl_type *old, unsigned int default_majority) DECLSPEC_HIDDEN;
 struct hlsl_type *get_type(struct hlsl_scope *scope, const char *name, BOOL recursive) DECLSPEC_HIDDEN;
 BOOL is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
@@ -624,6 +639,7 @@ BOOL pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 void init_functions_tree(struct rb_tree *funcs) DECLSPEC_HIDDEN;
 void add_function_decl(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl,
         BOOL intrinsic) DECLSPEC_HIDDEN;
+BOOL type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
 int hlsl_lexer_compile(const char *text, enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
