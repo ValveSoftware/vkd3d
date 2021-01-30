@@ -626,7 +626,6 @@ BOOL is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 BOOL find_function(const char *name) DECLSPEC_HIDDEN;
 unsigned int components_count_type(struct hlsl_type *type) DECLSPEC_HIDDEN;
 BOOL compare_hlsl_types(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
-BOOL compatible_data_types(struct hlsl_type *s1, struct hlsl_type *s2) DECLSPEC_HIDDEN;
 void push_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 BOOL pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 void init_functions_tree(struct rb_tree *funcs) DECLSPEC_HIDDEN;
