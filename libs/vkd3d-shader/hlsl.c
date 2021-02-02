@@ -20,6 +20,22 @@
 #include "hlsl.h"
 #include <stdio.h>
 
+void hlsl_message(const char *fmt, ...)
+{
+    /* FIXME */
+}
+
+void hlsl_report_message(const struct source_location loc,
+        enum hlsl_error_level level, const char *fmt, ...)
+{
+    /* FIXME */
+
+    if (level == HLSL_LEVEL_ERROR)
+        set_parse_status(&hlsl_ctx.status, PARSE_ERR);
+    else if (level == HLSL_LEVEL_WARNING)
+        set_parse_status(&hlsl_ctx.status, PARSE_WARN);
+}
+
 BOOL add_declaration(struct hlsl_scope *scope, struct hlsl_ir_var *decl, BOOL local_var)
 {
     struct hlsl_ir_var *var;

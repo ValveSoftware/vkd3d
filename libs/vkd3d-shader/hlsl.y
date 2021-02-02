@@ -30,22 +30,6 @@ struct hlsl_parse_ctx hlsl_ctx;
 struct YYLTYPE;
 static struct source_location get_location(const struct YYLTYPE *l);
 
-void hlsl_message(const char *fmt, ...)
-{
-    /* FIXME */
-}
-
-void hlsl_report_message(const struct source_location loc,
-        enum hlsl_error_level level, const char *fmt, ...)
-{
-    /* FIXME */
-
-    if (level == HLSL_LEVEL_ERROR)
-        set_parse_status(&hlsl_ctx.status, PARSE_ERR);
-    else if (level == HLSL_LEVEL_WARNING)
-        set_parse_status(&hlsl_ctx.status, PARSE_WARN);
-}
-
 static void hlsl_error(const char *s)
 {
     const struct source_location loc =
