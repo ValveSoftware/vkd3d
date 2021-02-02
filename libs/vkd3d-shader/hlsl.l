@@ -172,10 +172,9 @@ row_major               {return KW_ROW_MAJOR;           }
 
 {IDENTIFIER}            {
                             hlsl_lval.name = vkd3d_strdup(yytext);
-                            if (get_variable(hlsl_ctx.cur_scope, yytext)
-                                    || find_function(yytext))
+                            if (hlsl_get_var(hlsl_ctx.cur_scope, yytext) || hlsl_get_function(yytext))
                                 return VAR_IDENTIFIER;
-                            else if (get_type(hlsl_ctx.cur_scope, yytext, TRUE))
+                            else if (hlsl_get_type(hlsl_ctx.cur_scope, yytext, TRUE))
                                 return TYPE_IDENTIFIER;
                             else
                                 return NEW_IDENTIFIER;

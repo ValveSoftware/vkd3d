@@ -50,7 +50,7 @@ static void debug_dump_decl(struct hlsl_type *type, DWORD modifiers, const char 
 {
     TRACE("Line %u: ", line_no);
     if (modifiers)
-        TRACE("%s ", debug_modifiers(modifiers));
+        TRACE("%s ", hlsl_debug_modifiers(modifiers));
     TRACE("%s %s;\n", debug_hlsl_type(type), declname);
 }
 
@@ -87,21 +87,21 @@ static BOOL compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 
     if (t1->type == HLSL_CLASS_ARRAY)
     {
-        if (compare_hlsl_types(t1->e.array.type, t2))
+        if (hlsl_type_compare(t1->e.array.type, t2))
             /* e.g. float4[3] to float4 is allowed */
             return TRUE;
 
         if (t2->type == HLSL_CLASS_ARRAY || t2->type == HLSL_CLASS_STRUCT)
-            return components_count_type(t1) >= components_count_type(t2);
+            return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
         else
-            return components_count_type(t1) == components_count_type(t2);
+            return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
     }
 
     if (t1->type == HLSL_CLASS_STRUCT)
-        return components_count_type(t1) >= components_count_type(t2);
+        return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
 
     if (t2->type == HLSL_CLASS_ARRAY || t2->type == HLSL_CLASS_STRUCT)
-        return components_count_type(t1) == components_count_type(t2);
+        return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
 
     if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
     {
@@ -110,12 +110,12 @@ static BOOL compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 
         /* Matrix-vector conversion is apparently allowed if they have the same components count */
         if ((t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
-                && components_count_type(t1) == components_count_type(t2))
+                && hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
             return TRUE;
         return FALSE;
     }
 
-    if (components_count_type(t1) >= components_count_type(t2))
+    if (hlsl_type_component_count(t1) >= hlsl_type_component_count(t2))
         return TRUE;
     return FALSE;
 }
@@ -137,16 +137,16 @@ static BOOL implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
 
     if (t1->type == HLSL_CLASS_ARRAY && t2->type == HLSL_CLASS_ARRAY)
     {
-        return components_count_type(t1) == components_count_type(t2);
+        return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
     }
 
     if ((t1->type == HLSL_CLASS_ARRAY && t2->type <= HLSL_CLASS_LAST_NUMERIC)
             || (t1->type <= HLSL_CLASS_LAST_NUMERIC && t2->type == HLSL_CLASS_ARRAY))
     {
         /* e.g. float4[3] to float4 is allowed */
-        if (t1->type == HLSL_CLASS_ARRAY && compare_hlsl_types(t1->e.array.type, t2))
+        if (t1->type == HLSL_CLASS_ARRAY && hlsl_type_compare(t1->e.array.type, t2))
             return TRUE;
-        if (components_count_type(t1) == components_count_type(t2))
+        if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
             return TRUE;
         return FALSE;
     }
@@ -166,13 +166,13 @@ static BOOL implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
 
         /* Matrix-vector conversion is apparently allowed if they have the same components count */
         if ((t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
-                && components_count_type(t1) == components_count_type(t2))
+                && hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
             return TRUE;
         return FALSE;
     }
 
     if (t1->type == HLSL_CLASS_STRUCT && t2->type == HLSL_CLASS_STRUCT)
-        return compare_hlsl_types(t1, t2);
+        return hlsl_type_compare(t1, t2);
 
     return FALSE;
 }
@@ -183,7 +183,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct list *instrs, struct 
     struct hlsl_type *src_type = node->data_type;
     struct hlsl_ir_expr *cast;
 
-    if (compare_hlsl_types(src_type, dst_type))
+    if (hlsl_type_compare(src_type, dst_type))
         return node;
 
     if (!implicit_compatible_data_types(src_type, dst_type))
@@ -198,7 +198,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct list *instrs, struct 
 
     TRACE("Implicit conversion from %s to %s.\n", debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
 
-    if (!(cast = new_cast(node, dst_type, loc)))
+    if (!(cast = hlsl_new_cast(node, dst_type, loc)))
         return NULL;
     list_add_tail(instrs, &cast->node.entry);
     return &cast->node;
@@ -220,7 +220,7 @@ static BOOL declare_variable(struct hlsl_ir_var *decl, BOOL local)
         if (invalid)
         {
             hlsl_report_message(decl->loc, HLSL_LEVEL_ERROR,
-                    "modifier '%s' invalid for local variables", debug_modifiers(invalid));
+                    "modifier '%s' invalid for local variables", hlsl_debug_modifiers(invalid));
         }
         if (decl->semantic)
         {
@@ -231,16 +231,16 @@ static BOOL declare_variable(struct hlsl_ir_var *decl, BOOL local)
     }
     else
     {
-        if (find_function(decl->name))
+        if (hlsl_get_function(decl->name))
         {
             hlsl_report_message(decl->loc, HLSL_LEVEL_ERROR, "redefinition of '%s'", decl->name);
             return FALSE;
         }
     }
-    ret = add_declaration(hlsl_ctx.cur_scope, decl, local);
+    ret = hlsl_add_var(hlsl_ctx.cur_scope, decl, local);
     if (!ret)
     {
-        struct hlsl_ir_var *old = get_variable(hlsl_ctx.cur_scope, decl->name);
+        struct hlsl_ir_var *old = hlsl_get_var(hlsl_ctx.cur_scope, decl->name);
 
         hlsl_report_message(decl->loc, HLSL_LEVEL_ERROR, "\"%s\" already declared", decl->name);
         hlsl_report_message(old->loc, HLSL_LEVEL_NOTE, "\"%s\" was previously declared here", old->name);
@@ -253,7 +253,7 @@ static DWORD add_modifiers(DWORD modifiers, DWORD mod, const struct source_locat
 {
     if (modifiers & mod)
     {
-        hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifier '%s' already specified", debug_modifiers(mod));
+        hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifier '%s' already specified", hlsl_debug_modifiers(mod));
         return modifiers;
     }
     if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
@@ -266,7 +266,7 @@ static DWORD add_modifiers(DWORD modifiers, DWORD mod, const struct source_locat
 
 static BOOL add_type_to_scope(struct hlsl_scope *scope, struct hlsl_type *def)
 {
-    if (get_type(scope, def->name, FALSE))
+    if (hlsl_get_type(scope, def->name, FALSE))
         return FALSE;
 
     rb_put(&scope->types, def->name, &def->scope_entry);
@@ -304,20 +304,20 @@ static void declare_predefined_types(struct hlsl_scope *scope)
             for (x = 1; x <= 4; ++x)
             {
                 sprintf(name, "%s%ux%u", names[bt], y, x);
-                type = new_hlsl_type(vkd3d_strdup(name), HLSL_CLASS_MATRIX, bt, x, y);
+                type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_MATRIX, bt, x, y);
                 add_type_to_scope(scope, type);
 
                 if (y == 1)
                 {
                     sprintf(name, "%s%u", names[bt], x);
-                    type = new_hlsl_type(vkd3d_strdup(name), HLSL_CLASS_VECTOR, bt, x, y);
+                    type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_VECTOR, bt, x, y);
                     add_type_to_scope(scope, type);
                     hlsl_ctx.builtin_types.vector[bt][x - 1] = type;
 
                     if (x == 1)
                     {
                         sprintf(name, "%s", names[bt]);
-                        type = new_hlsl_type(vkd3d_strdup(name), HLSL_CLASS_SCALAR, bt, x, y);
+                        type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_SCALAR, bt, x, y);
                         add_type_to_scope(scope, type);
                         hlsl_ctx.builtin_types.scalar[bt] = type;
                     }
@@ -328,29 +328,29 @@ static void declare_predefined_types(struct hlsl_scope *scope)
 
     for (bt = 0; bt <= HLSL_SAMPLER_DIM_MAX; ++bt)
     {
-        type = new_hlsl_type(vkd3d_strdup(sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
+        type = hlsl_new_type(vkd3d_strdup(sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
         type->sampler_dim = bt;
         hlsl_ctx.builtin_types.sampler[bt] = type;
     }
 
-    hlsl_ctx.builtin_types.Void = new_hlsl_type(vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
+    hlsl_ctx.builtin_types.Void = hlsl_new_type(vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
 
     /* DX8 effects predefined types */
-    type = new_hlsl_type(vkd3d_strdup("DWORD"), HLSL_CLASS_SCALAR, HLSL_TYPE_INT, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("DWORD"), HLSL_CLASS_SCALAR, HLSL_TYPE_INT, 1, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("FLOAT"), HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("FLOAT"), HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT, 1, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("VECTOR"), HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT, 4, 1);
+    type = hlsl_new_type(vkd3d_strdup("VECTOR"), HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT, 4, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("MATRIX"), HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT, 4, 4);
+    type = hlsl_new_type(vkd3d_strdup("MATRIX"), HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT, 4, 4);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("STRING"), HLSL_CLASS_OBJECT, HLSL_TYPE_STRING, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("STRING"), HLSL_CLASS_OBJECT, HLSL_TYPE_STRING, 1, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("TEXTURE"), HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("TEXTURE"), HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE, 1, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("PIXELSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("PIXELSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER, 1, 1);
     add_type_to_scope(scope, type);
-    type = new_hlsl_type(vkd3d_strdup("VERTEXSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER, 1, 1);
+    type = hlsl_new_type(vkd3d_strdup("VERTEXSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER, 1, 1);
     add_type_to_scope(scope, type);
 }
 
@@ -365,11 +365,11 @@ static BOOL append_conditional_break(struct list *cond_list)
         return TRUE;
 
     condition = node_from_list(cond_list);
-    if (!(not = new_unary_expr(HLSL_IR_UNOP_LOGIC_NOT, condition, condition->loc)))
+    if (!(not = hlsl_new_unary_expr(HLSL_IR_UNOP_LOGIC_NOT, condition, condition->loc)))
         return FALSE;
     list_add_tail(cond_list, &not->entry);
 
-    if (!(iff = new_if(not, condition->loc)))
+    if (!(iff = hlsl_new_if(not, condition->loc)))
         return FALSE;
     list_add_tail(cond_list, &iff->node.entry);
 
@@ -431,10 +431,10 @@ oom:
     vkd3d_free(loop);
     vkd3d_free(cond_jump);
     vkd3d_free(list);
-    free_instr_list(init);
-    free_instr_list(cond);
-    free_instr_list(iter);
-    free_instr_list(body);
+    hlsl_free_instr_list(init);
+    hlsl_free_instr_list(cond);
+    hlsl_free_instr_list(iter);
+    hlsl_free_instr_list(body);
     return NULL;
 }
 
@@ -444,7 +444,7 @@ static unsigned int initializer_size(const struct parse_initializer *initializer
 
     for (i = 0; i < initializer->args_count; ++i)
     {
-        count += components_count_type(initializer->args[i]->data_type);
+        count += hlsl_type_component_count(initializer->args[i]->data_type);
     }
     TRACE("Initializer size = %u.\n", count);
     return count;
@@ -452,7 +452,7 @@ static unsigned int initializer_size(const struct parse_initializer *initializer
 
 static void free_parse_initializer(struct parse_initializer *initializer)
 {
-    free_instr_list(initializer->instrs);
+    hlsl_free_instr_list(initializer->instrs);
     vkd3d_free(initializer->args);
 }
 
@@ -499,7 +499,7 @@ static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ir_node *value, const cha
             swiz |= (y << 4 | x) << component * 8;
             component++;
         }
-        return new_swizzle(swiz, component, value, loc);
+        return hlsl_new_swizzle(swiz, component, value, loc);
     }
 
     /* Vector swizzle */
@@ -532,7 +532,7 @@ static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ir_node *value, const cha
             component++;
         }
         if (valid)
-            return new_swizzle(swiz, component, value, loc);
+            return hlsl_new_swizzle(swiz, component, value, loc);
     }
 
     return NULL;
@@ -551,11 +551,11 @@ static struct hlsl_ir_jump *add_return(struct list *instrs,
         if (!(return_value = add_implicit_conversion(instrs, return_value, return_type, &loc)))
             return NULL;
 
-        if (!(assignment = new_simple_assignment(hlsl_ctx.cur_function->return_var, return_value)))
+        if (!(assignment = hlsl_new_simple_assignment(hlsl_ctx.cur_function->return_var, return_value)))
             return NULL;
         list_add_after(&return_value->entry, &assignment->node.entry);
     }
-    else if (!type_is_void(return_type))
+    else if (!hlsl_type_is_void(return_type))
     {
         hlsl_report_message(loc, HLSL_LEVEL_ERROR, "non-void function must return a value");
         return NULL;
@@ -579,12 +579,12 @@ static struct hlsl_ir_load *add_load(struct list *instrs, struct hlsl_ir_node *v
 
     if (var_node->type == HLSL_IR_LOAD)
     {
-        const struct hlsl_deref *src = &load_from_node(var_node)->src;
+        const struct hlsl_deref *src = &hlsl_ir_load(var_node)->src;
 
         var = src->var;
         if (src->offset.node)
         {
-            if (!(add = new_binary_expr(HLSL_IR_BINOP_ADD, src->offset.node, offset)))
+            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, src->offset.node, offset)))
                 return NULL;
             list_add_tail(instrs, &add->entry);
             offset = add;
@@ -596,12 +596,12 @@ static struct hlsl_ir_load *add_load(struct list *instrs, struct hlsl_ir_node *v
         char name[27];
 
         sprintf(name, "<deref-%p>", var_node);
-        if (!(var = new_synthetic_var(name, var_node->data_type, var_node->loc)))
+        if (!(var = hlsl_new_synthetic_var(name, var_node->data_type, var_node->loc)))
             return NULL;
 
-        TRACE("Synthesized variable %p for %s node.\n", var, debug_node_type(var_node->type));
+        TRACE("Synthesized variable %p for %s node.\n", var, hlsl_node_type_to_string(var_node->type));
 
-        if (!(assign = new_simple_assignment(var, var_node)))
+        if (!(assign = hlsl_new_simple_assignment(var, var_node)))
             return NULL;
 
         list_add_tail(instrs, &assign->node.entry);
@@ -621,7 +621,7 @@ static struct hlsl_ir_load *add_record_load(struct list *instrs, struct hlsl_ir_
 {
     struct hlsl_ir_constant *c;
 
-    if (!(c = new_uint_constant(field->reg_offset * 4, loc)))
+    if (!(c = hlsl_new_uint_constant(field->reg_offset * 4, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
 
@@ -657,10 +657,10 @@ static struct hlsl_ir_load *add_array_load(struct list *instrs, struct hlsl_ir_n
         return NULL;
     }
 
-    if (!(c = new_uint_constant(data_type->reg_size * 4, loc)))
+    if (!(c = hlsl_new_uint_constant(data_type->reg_size * 4, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
-    if (!(mul = new_binary_expr(HLSL_IR_BINOP_MUL, index, &c->node)))
+    if (!(mul = hlsl_new_binary_expr(HLSL_IR_BINOP_MUL, index, &c->node)))
         return NULL;
     list_add_tail(instrs, &mul->entry);
     index = mul;
@@ -681,7 +681,7 @@ static BOOL add_struct_field(struct list *fields, struct hlsl_struct_field *fiel
     return TRUE;
 }
 
-BOOL is_row_major(const struct hlsl_type *type)
+BOOL hlsl_type_is_row_major(const struct hlsl_type *type)
 {
     /* Default to column-major if the majority isn't explicitly set, which can
      * happen for anonymous nodes. */
@@ -713,14 +713,14 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_type *type,
     if (!default_majority && !(*modifiers & HLSL_TYPE_MODIFIERS_MASK))
         return type;
 
-    if (!(new_type = clone_hlsl_type(type, default_majority)))
+    if (!(new_type = hlsl_type_clone(type, default_majority)))
         return NULL;
 
     new_type->modifiers = add_modifiers(new_type->modifiers, *modifiers, loc);
     *modifiers &= ~HLSL_TYPE_MODIFIERS_MASK;
 
     if (new_type->type == HLSL_CLASS_MATRIX)
-        new_type->reg_size = is_row_major(new_type) ? new_type->dimy : new_type->dimx;
+        new_type->reg_size = hlsl_type_is_row_major(new_type) ? new_type->dimy : new_type->dimx;
     return new_type;
 }
 
@@ -745,7 +745,7 @@ static struct list *gen_struct_fields(struct hlsl_type *type, DWORD modifiers, s
             return list;
         }
         if (v->array_size)
-            field->type = new_array_type(type, v->array_size);
+            field->type = hlsl_new_array_type(type, v->array_size);
         else
             field->type = type;
         field->name = v->name;
@@ -772,9 +772,9 @@ static BOOL add_typedef(DWORD modifiers, struct hlsl_type *orig_type, struct lis
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, list, struct parse_variable_def, entry)
     {
         if (v->array_size)
-            type = new_array_type(orig_type, v->array_size);
+            type = hlsl_new_array_type(orig_type, v->array_size);
         else
-            type = clone_hlsl_type(orig_type, 0);
+            type = hlsl_type_clone(orig_type, 0);
         if (!type)
             return FALSE;
         vkd3d_free((void *)type->name);
@@ -784,7 +784,7 @@ static BOOL add_typedef(DWORD modifiers, struct hlsl_type *orig_type, struct lis
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(type->modifiers, v->loc);
         else
-            type->reg_size = is_row_major(type) ? type->dimy : type->dimx;
+            type->reg_size = hlsl_type_is_row_major(type) ? type->dimy : type->dimx;
 
         if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
@@ -807,22 +807,22 @@ static BOOL add_func_parameter(struct list *list, struct parse_parameter *param,
     if (param->type->type == HLSL_CLASS_MATRIX)
         assert(param->type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(var = new_var(param->name, param->type, loc, param->semantic, param->modifiers, param->reg_reservation)))
+    if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->modifiers, param->reg_reservation)))
         return FALSE;
 
-    if (!add_declaration(hlsl_ctx.cur_scope, var, FALSE))
+    if (!hlsl_add_var(hlsl_ctx.cur_scope, var, FALSE))
     {
-        free_declaration(var);
+        hlsl_free_var(var);
         return FALSE;
     }
     list_add_tail(list, &var->param_entry);
     return TRUE;
 }
 
-static struct reg_reservation *parse_reg_reservation(const char *reg_string)
+static struct hlsl_reg_reservation *parse_reg_reservation(const char *reg_string)
 {
     enum vkd3d_shader_register_type type;
-    struct reg_reservation *reg_res;
+    struct hlsl_reg_reservation *reg_res;
     DWORD regnum = 0;
 
     switch (reg_string[0])
@@ -902,7 +902,7 @@ static struct list *make_list(struct hlsl_ir_node *node)
 
     if (!(list = vkd3d_malloc(sizeof(*list))))
     {
-        free_instr(node);
+        hlsl_free_instr(node);
         return NULL;
     }
     list_init(list);
@@ -919,7 +919,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
     {
         case HLSL_IR_CONSTANT:
         {
-            struct hlsl_ir_constant *constant = constant_from_node(node);
+            struct hlsl_ir_constant *constant = hlsl_ir_constant(node);
 
             switch (constant->node.data_type->base_type)
             {
@@ -934,7 +934,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
                 case HLSL_TYPE_BOOL:
                     return constant->value.b[0];
                 default:
-                    WARN("Invalid type %s.\n", debug_base_type(constant->node.data_type));
+                    WARN("Invalid type %s.\n", hlsl_base_type_to_string(constant->node.data_type));
                     return 0;
             }
         }
@@ -942,12 +942,12 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
         case HLSL_IR_EXPR:
         case HLSL_IR_LOAD:
         case HLSL_IR_SWIZZLE:
-            FIXME("Unhandled type %s.\n", debug_node_type(node->type));
+            FIXME("Unhandled type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
 
         case HLSL_IR_ASSIGNMENT:
         default:
-            WARN("Invalid node type %s.\n", debug_node_type(node->type));
+            WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
     }
 }
@@ -970,7 +970,7 @@ static BOOL expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t
            count or the matrix is nx1 or 1xn */
         if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
         {
-            if (components_count_type(t1) == components_count_type(t2))
+            if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
                 return TRUE;
 
             return (t1->type == HLSL_CLASS_MATRIX && (t1->dimx == 1 || t1->dimy == 1))
@@ -1031,7 +1031,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_type *t1, struct hlsl_type
         return NULL;
     }
 
-    if (compare_hlsl_types(t1, t2))
+    if (hlsl_type_compare(t1, t2))
         return t1;
 
     if (!expr_compatible_data_types(t1, t2))
@@ -1110,7 +1110,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_type *t1, struct hlsl_type
         return hlsl_ctx.builtin_types.scalar[base];
     if (type == HLSL_CLASS_VECTOR)
         return hlsl_ctx.builtin_types.vector[base][dimx - 1];
-    return new_hlsl_type(NULL, type, base, dimx, dimy);
+    return hlsl_new_type(NULL, type, base, dimx, dimy);
 }
 
 static struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op op,
@@ -1135,7 +1135,7 @@ static struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op o
 
         if (!operands[i])
             break;
-        if (compare_hlsl_types(operands[i]->data_type, type))
+        if (hlsl_type_compare(operands[i]->data_type, type))
             continue;
         TRACE("Implicitly converting %s into %s in an expression.\n", debug_hlsl_type(operands[i]->data_type), debug_hlsl_type(type));
         if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
@@ -1144,7 +1144,7 @@ static struct hlsl_ir_expr *add_expr(struct list *instrs, enum hlsl_ir_expr_op o
             hlsl_report_message(operands[i]->loc, HLSL_LEVEL_WARNING, "implicit truncation of vector/matrix type");
         }
 
-        if (!(cast = new_cast(operands[i], type, &operands[i]->loc)))
+        if (!(cast = hlsl_new_cast(operands[i], type, &operands[i]->loc)))
             return NULL;
         list_add_after(&operands[i]->entry, &cast->node.entry);
         operands[i] = &cast->node;
@@ -1257,7 +1257,7 @@ static struct hlsl_ir_node *add_assignment(struct list *instrs, struct hlsl_ir_n
     {
         struct hlsl_ir_node *lhs_inner;
 
-        if (lhs->type == HLSL_IR_EXPR && expr_from_node(lhs)->op == HLSL_IR_UNOP_CAST)
+        if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_IR_UNOP_CAST)
         {
             FIXME("Cast on the lhs.\n");
             vkd3d_free(assign);
@@ -1265,7 +1265,7 @@ static struct hlsl_ir_node *add_assignment(struct list *instrs, struct hlsl_ir_n
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
-            struct hlsl_ir_swizzle *swizzle = swizzle_from_node(lhs);
+            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
             const struct hlsl_type *swizzle_type = swizzle->node.data_type;
             unsigned int width;
 
@@ -1301,15 +1301,15 @@ static struct hlsl_ir_node *add_assignment(struct list *instrs, struct hlsl_ir_n
 
     init_node(&assign->node, HLSL_IR_ASSIGNMENT, lhs_type, lhs->loc);
     assign->writemask = writemask;
-    assign->lhs.var = load_from_node(lhs)->src.var;
-    hlsl_src_from_node(&assign->lhs.offset, load_from_node(lhs)->src.offset.node);
+    assign->lhs.var = hlsl_ir_load(lhs)->src.var;
+    hlsl_src_from_node(&assign->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
     if (assign_op != ASSIGN_OP_ASSIGN)
     {
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
         struct hlsl_ir_node *expr;
 
         TRACE("Adding an expression for the compound assignment.\n");
-        expr = new_binary_expr(op, lhs, rhs);
+        expr = hlsl_new_binary_expr(op, lhs, rhs);
         list_add_after(&rhs->entry, &expr->entry);
         rhs = expr;
     }
@@ -1326,7 +1326,7 @@ static void struct_var_initializer(struct list *list, struct hlsl_ir_var *var,
     struct hlsl_struct_field *field;
     unsigned int i = 0;
 
-    if (initializer_size(initializer) != components_count_type(type))
+    if (initializer_size(initializer) != hlsl_type_component_count(type))
     {
         hlsl_report_message(var->loc, HLSL_LEVEL_ERROR, "structure initializer mismatch");
         free_parse_initializer(initializer);
@@ -1345,13 +1345,13 @@ static void struct_var_initializer(struct list *list, struct hlsl_ir_var *var,
         if (i++ >= initializer->args_count)
             break;
 
-        if (components_count_type(field->type) == components_count_type(node->data_type))
+        if (hlsl_type_component_count(field->type) == hlsl_type_component_count(node->data_type))
         {
-            if (!(c = new_uint_constant(field->reg_offset * 4, node->loc)))
+            if (!(c = hlsl_new_uint_constant(field->reg_offset * 4, node->loc)))
                 break;
             list_add_tail(list, &c->node.entry);
 
-            if (!(assign = new_assignment(var, &c->node, node, 0, node->loc)))
+            if (!(assign = hlsl_new_assignment(var, &c->node, node, 0, node->loc)))
                 break;
             list_add_tail(list, &assign->node.entry);
         }
@@ -1397,11 +1397,11 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
     {
         if (v->array_size)
-            type = new_array_type(basic_type, v->array_size);
+            type = hlsl_new_array_type(basic_type, v->array_size);
         else
             type = basic_type;
 
-        if (!(var = new_var(v->name, type, v->loc, v->semantic, modifiers, v->reg_reservation)))
+        if (!(var = hlsl_new_var(v->name, type, v->loc, v->semantic, modifiers, v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
@@ -1417,7 +1417,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
         if (type->modifiers & HLSL_MODIFIER_CONST && !(var->modifiers & HLSL_STORAGE_UNIFORM) && !v->initializer.args_count)
         {
             hlsl_report_message(v->loc, HLSL_LEVEL_ERROR, "const variable without initializer");
-            free_declaration(var);
+            hlsl_free_var(var);
             vkd3d_free(v);
             continue;
         }
@@ -1425,7 +1425,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
         ret = declare_variable(var, local);
         if (!ret)
         {
-            free_declaration(var);
+            hlsl_free_var(var);
             vkd3d_free(v);
             continue;
         }
@@ -1450,7 +1450,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
                 }
             }
             if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
-                    && components_count_type(type) != size)
+                    && hlsl_type_component_count(type) != size)
             {
                 hlsl_report_message(v->loc, HLSL_LEVEL_ERROR,
                         "'%s' initializer does not match", v->name);
@@ -1487,7 +1487,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
                 continue;
             }
 
-            load = new_var_load(var, var->loc);
+            load = hlsl_new_var_load(var, var->loc);
             list_add_tail(v->initializer.instrs, &load->node.entry);
             add_assignment(v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
             vkd3d_free(v->initializer.args);
@@ -1528,7 +1528,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
     struct parse_if_body if_body;
     enum parse_unary_op unary_op;
     enum parse_assign_op assign_op;
-    struct reg_reservation *reg_reservation;
+    struct hlsl_reg_reservation *reg_reservation;
     struct parse_colon_attribute colon_attribute;
 }
 
@@ -1732,7 +1732,7 @@ hlsl_prog:
                             "redefinition of function %s", debugstr_a($2.name));
                     YYABORT;
                 }
-                else if (!compare_hlsl_types(decl->return_type, $2.decl->return_type))
+                else if (!hlsl_type_compare(decl->return_type, $2.decl->return_type))
                 {
                     hlsl_report_message($2.decl->loc, HLSL_LEVEL_ERROR,
                             "redefining function %s with a different return type",
@@ -1744,14 +1744,14 @@ hlsl_prog:
                 }
             }
 
-            if (type_is_void($2.decl->return_type) && $2.decl->semantic)
+            if (hlsl_type_is_void($2.decl->return_type) && $2.decl->semantic)
             {
                 hlsl_report_message($2.decl->loc, HLSL_LEVEL_ERROR,
                         "void function with a semantic");
             }
 
             TRACE("Adding function '%s' to the function list.\n", $2.name);
-            add_function_decl(&hlsl_ctx.functions, $2.name, $2.decl, FALSE);
+            hlsl_add_function(&hlsl_ctx.functions, $2.name, $2.decl, FALSE);
         }
     | hlsl_prog declaration_statement
         {
@@ -1759,7 +1759,7 @@ hlsl_prog:
 
             if (!list_empty($2))
                 FIXME("Uniform initializer.\n");
-            free_instr_list($2);
+            hlsl_free_instr_list($2);
         }
     | hlsl_prog preproc_directive
     | hlsl_prog ';'
@@ -1825,9 +1825,9 @@ named_struct_spec:
             BOOL ret;
 
             TRACE("Structure %s declaration.\n", debugstr_a($2));
-            $$ = new_struct_type($2, $4);
+            $$ = hlsl_new_struct_type($2, $4);
 
-            if (get_variable(hlsl_ctx.cur_scope, $2))
+            if (hlsl_get_var(hlsl_ctx.cur_scope, $2))
             {
                 hlsl_report_message(get_location(&@2), HLSL_LEVEL_ERROR, "redefinition of '%s'", $2);
                 YYABORT;
@@ -1845,7 +1845,7 @@ unnamed_struct_spec:
       KW_STRUCT '{' fields_list '}'
         {
             TRACE("Anonymous structure declaration.\n");
-            $$ = new_struct_type(NULL, $3);
+            $$ = hlsl_new_struct_type(NULL, $3);
         }
 
 any_identifier:
@@ -1899,13 +1899,13 @@ func_declaration:
             TRACE("Function %s parsed.\n", $1.name);
             $$ = $1;
             $$.decl->body = $2;
-            pop_scope(&hlsl_ctx);
+            hlsl_pop_scope(&hlsl_ctx);
         }
     | func_prototype ';'
         {
             TRACE("Function prototype for %s.\n", $1.name);
             $$ = $1;
-            pop_scope(&hlsl_ctx);
+            hlsl_pop_scope(&hlsl_ctx);
         }
 
 func_prototype:
@@ -1918,12 +1918,12 @@ func_prototype:
                         "unexpected modifiers on a function");
                 YYABORT;
             }
-            if (get_variable(hlsl_ctx.globals, $3))
+            if (hlsl_get_var(hlsl_ctx.globals, $3))
             {
                 hlsl_report_message(get_location(&@3), HLSL_LEVEL_ERROR, "redefinition of '%s'\n", $3);
                 YYABORT;
             }
-            if (type_is_void($2) && $7.semantic)
+            if (hlsl_type_is_void($2) && $7.semantic)
             {
                 hlsl_report_message(get_location(&@7), HLSL_LEVEL_ERROR, "void function with a semantic");
             }
@@ -1933,7 +1933,7 @@ func_prototype:
                 FIXME("Unexpected register reservation for a function.\n");
                 vkd3d_free($7.reg_reservation);
             }
-            if (!($$.decl = new_func_decl($2, $5, $7.semantic, get_location(&@3))))
+            if (!($$.decl = hlsl_new_func_decl($2, $5, $7.semantic, get_location(&@3))))
                 YYABORT;
             $$.name = $3;
             hlsl_ctx.cur_function = $$.decl;
@@ -1947,14 +1947,14 @@ compound_statement:
         }
     | '{' scope_start statement_list '}'
         {
-            pop_scope(&hlsl_ctx);
+            hlsl_pop_scope(&hlsl_ctx);
             $$ = $3;
         }
 
 scope_start:
       /* empty */
         {
-            push_scope(&hlsl_ctx);
+            hlsl_push_scope(&hlsl_ctx);
         }
 
 var_identifier:
@@ -2100,7 +2100,7 @@ type:
                 YYABORT;
             }
 
-            $$ = new_hlsl_type(NULL, HLSL_CLASS_VECTOR, $3->base_type, $5, 1);
+            $$ = hlsl_new_type(NULL, HLSL_CLASS_VECTOR, $3->base_type, $5, 1);
         }
     | KW_MATRIX '<' base_type ',' C_INTEGER ',' C_INTEGER '>'
         {
@@ -2123,7 +2123,7 @@ type:
                 YYABORT;
             }
 
-            $$ = new_hlsl_type(NULL, HLSL_CLASS_MATRIX, $3->base_type, $7, $5);
+            $$ = hlsl_new_type(NULL, HLSL_CLASS_MATRIX, $3->base_type, $7, $5);
         }
 
 base_type:
@@ -2153,12 +2153,12 @@ base_type:
         }
     | TYPE_IDENTIFIER
         {
-            $$ = get_type(hlsl_ctx.cur_scope, $1, TRUE);
+            $$ = hlsl_get_type(hlsl_ctx.cur_scope, $1, TRUE);
             vkd3d_free($1);
         }
     | KW_STRUCT TYPE_IDENTIFIER
         {
-            $$ = get_type(hlsl_ctx.cur_scope, $2, TRUE);
+            $$ = hlsl_get_type(hlsl_ctx.cur_scope, $2, TRUE);
             if ($$->type != HLSL_CLASS_STRUCT)
                 hlsl_report_message(get_location(&@1), HLSL_LEVEL_ERROR, "'%s' redefined as a structure\n", $2);
             vkd3d_free($2);
@@ -2278,7 +2278,7 @@ array:
         {
             unsigned int size = evaluate_array_dimension(node_from_list($2));
 
-            free_instr_list($2);
+            hlsl_free_instr_list($2);
 
             if (!size)
             {
@@ -2436,7 +2436,7 @@ selection_statement:
             struct hlsl_ir_node *condition = node_from_list($3);
             struct hlsl_ir_if *instr;
 
-            if (!(instr = new_if(condition, get_location(&@1))))
+            if (!(instr = hlsl_new_if(condition, get_location(&@1))))
                 YYABORT;
             list_move_tail(&instr->then_instrs, $5.then_instrs);
             list_move_tail(&instr->else_instrs, $5.else_instrs);
@@ -2473,7 +2473,7 @@ loop_statement:
     | KW_FOR '(' scope_start expr_statement expr_statement expr ')' statement
         {
             $$ = create_loop(LOOP_FOR, $4, $5, $6, $8, get_location(&@1));
-            pop_scope(&hlsl_ctx);
+            hlsl_pop_scope(&hlsl_ctx);
         }
     | KW_FOR '(' scope_start declaration expr_statement expr ')' statement
         {
@@ -2481,7 +2481,7 @@ loop_statement:
                 hlsl_report_message(get_location(&@4), HLSL_LEVEL_WARNING,
                         "no expressions in for loop initializer");
             $$ = create_loop(LOOP_FOR, $4, $5, $6, $8, get_location(&@1));
-            pop_scope(&hlsl_ctx);
+            hlsl_pop_scope(&hlsl_ctx);
         }
 
 expr_statement:
@@ -2534,12 +2534,12 @@ primary_expr:
             struct hlsl_ir_load *load;
             struct hlsl_ir_var *var;
 
-            if (!(var = get_variable(hlsl_ctx.cur_scope, $1)))
+            if (!(var = hlsl_get_var(hlsl_ctx.cur_scope, $1)))
             {
                 hlsl_report_message(get_location(&@1), HLSL_LEVEL_ERROR, "variable '%s' is not declared\n", $1);
                 YYABORT;
             }
-            if ((load = new_var_load(var, get_location(&@1))))
+            if ((load = hlsl_new_var_load(var, get_location(&@1))))
             {
                 if (!($$ = make_list(&load->node)))
                     YYABORT;
@@ -2565,9 +2565,9 @@ postfix_expr:
                 hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifying a const expression");
                 YYABORT;
             }
-            inc = new_unary_expr(HLSL_IR_UNOP_POSTINC, node_from_list($1), loc);
+            inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTINC, node_from_list($1), loc);
             /* Post increment/decrement expressions are considered const */
-            inc->data_type = clone_hlsl_type(inc->data_type, 0);
+            inc->data_type = hlsl_type_clone(inc->data_type, 0);
             inc->data_type->modifiers |= HLSL_MODIFIER_CONST;
             $$ = append_unop($1, inc);
         }
@@ -2582,9 +2582,9 @@ postfix_expr:
                 hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifying a const expression");
                 YYABORT;
             }
-            inc = new_unary_expr(HLSL_IR_UNOP_POSTDEC, node_from_list($1), loc);
+            inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTDEC, node_from_list($1), loc);
             /* Post increment/decrement expressions are considered const */
-            inc->data_type = clone_hlsl_type(inc->data_type, 0);
+            inc->data_type = hlsl_type_clone(inc->data_type, 0);
             inc->data_type->modifiers |= HLSL_MODIFIER_CONST;
             $$ = append_unop($1, inc);
         }
@@ -2644,13 +2644,13 @@ postfix_expr:
             if (index->data_type->type != HLSL_CLASS_SCALAR)
             {
                 hlsl_report_message(get_location(&@3), HLSL_LEVEL_ERROR, "array index is not scalar");
-                free_instr_list($1);
+                hlsl_free_instr_list($1);
                 YYABORT;
             }
 
             if (!add_array_load($1, array, index, get_location(&@2)))
             {
-                free_instr_list($1);
+                hlsl_free_instr_list($1);
                 YYABORT;
             }
             $$ = $1;
@@ -2690,7 +2690,7 @@ postfix_expr:
                 FIXME("Matrix constructors are not supported yet.\n");
 
             sprintf(name, "<constructor-%x>", counter++);
-            if (!(var = new_synthetic_var(name, $2, get_location(&@2))))
+            if (!(var = hlsl_new_synthetic_var(name, $2, get_location(&@2))))
                 YYABORT;
             for (i = 0; i < $4.args_count; ++i)
             {
@@ -2702,7 +2702,7 @@ postfix_expr:
                     hlsl_report_message(arg->loc, HLSL_LEVEL_ERROR, "invalid constructor argument");
                     continue;
                 }
-                width = components_count_type(arg->data_type);
+                width = hlsl_type_component_count(arg->data_type);
 
                 if (width > 4)
                 {
@@ -2714,14 +2714,14 @@ postfix_expr:
                         hlsl_ctx.builtin_types.vector[$2->base_type][width - 1], &arg->loc)))
                     continue;
 
-                if (!(assignment = new_assignment(var, NULL, arg,
+                if (!(assignment = hlsl_new_assignment(var, NULL, arg,
                         ((1 << width) - 1) << writemask_offset, arg->loc)))
                     YYABORT;
                 writemask_offset += width;
                 list_add_tail($4.instrs, &assignment->node.entry);
             }
             vkd3d_free($4.args);
-            if (!(load = new_var_load(var, get_location(&@2))))
+            if (!(load = hlsl_new_var_load(var, get_location(&@2))))
                 YYABORT;
             $$ = append_unop($4.instrs, &load->node);
         }
@@ -2738,7 +2738,7 @@ unary_expr:
                 hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifying a const expression");
                 YYABORT;
             }
-            $$ = append_unop($2, new_unary_expr(HLSL_IR_UNOP_PREINC, node_from_list($2), loc));
+            $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREINC, node_from_list($2), loc));
         }
     | OP_DEC unary_expr
         {
@@ -2750,7 +2750,7 @@ unary_expr:
                 hlsl_report_message(loc, HLSL_LEVEL_ERROR, "modifying a const expression");
                 YYABORT;
             }
-            $$ = append_unop($2, new_unary_expr(HLSL_IR_UNOP_PREDEC, node_from_list($2), loc));
+            $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREDEC, node_from_list($2), loc));
         }
     | unary_op unary_expr
         {
@@ -2760,7 +2760,7 @@ unary_expr:
             if ($1 == UNARY_OP_PLUS)
                 $$ = $2;
             else
-                $$ = append_unop($2, new_unary_expr(ops[$1], node_from_list($2), get_location(&@1)));
+                $$ = append_unop($2, hlsl_new_unary_expr(ops[$1], node_from_list($2), get_location(&@1)));
         }
 
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
@@ -2778,7 +2778,7 @@ unary_expr:
             }
 
             if ($4)
-                dst_type = new_array_type($3, $4);
+                dst_type = hlsl_new_array_type($3, $4);
             else
                 dst_type = $3;
 
@@ -2789,7 +2789,7 @@ unary_expr:
                 YYABORT;
             }
 
-            $$ = append_unop($6, &new_cast(node_from_list($6), dst_type, &loc)->node);
+            $$ = append_unop($6, &hlsl_new_cast(node_from_list($6), dst_type, &loc)->node);
         }
 
 unary_op:
@@ -3011,7 +3011,7 @@ static void dump_function_decl(struct rb_entry *entry, void *context)
     struct hlsl_ir_function_decl *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
 
     if (func->body)
-        debug_dump_ir_function_decl(func);
+        hlsl_dump_function(func);
 }
 
 static void dump_function(struct rb_entry *entry, void *context)
@@ -3032,14 +3032,14 @@ static unsigned int index_instructions(struct list *instrs, unsigned int index)
 
         if (instr->type == HLSL_IR_IF)
         {
-            struct hlsl_ir_if *iff = if_from_node(instr);
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
             index = index_instructions(&iff->then_instrs, index);
             index = index_instructions(&iff->else_instrs, index);
         }
         else if (instr->type == HLSL_IR_LOOP)
         {
-            index = index_instructions(&loop_from_node(instr)->body, index);
-            loop_from_node(instr)->next_index = index;
+            index = index_instructions(&hlsl_ir_loop(instr)->body, index);
+            hlsl_ir_loop(instr)->next_index = index;
         }
     }
 
@@ -3062,7 +3062,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         {
         case HLSL_IR_ASSIGNMENT:
         {
-            struct hlsl_ir_assignment *assignment = assignment_from_node(instr);
+            struct hlsl_ir_assignment *assignment = hlsl_ir_assignment(instr);
 
             var = assignment->lhs.var;
             if (!var->first_write)
@@ -3074,7 +3074,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         }
         case HLSL_IR_EXPR:
         {
-            struct hlsl_ir_expr *expr = expr_from_node(instr);
+            struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
             unsigned int i;
 
             for (i = 0; i < ARRAY_SIZE(expr->operands) && expr->operands[i].node; ++i)
@@ -3083,7 +3083,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         }
         case HLSL_IR_IF:
         {
-            struct hlsl_ir_if *iff = if_from_node(instr);
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
             compute_liveness_recurse(&iff->then_instrs, loop_first, loop_last);
             compute_liveness_recurse(&iff->else_instrs, loop_first, loop_last);
@@ -3092,7 +3092,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         }
         case HLSL_IR_LOAD:
         {
-            struct hlsl_ir_load *load = load_from_node(instr);
+            struct hlsl_ir_load *load = hlsl_ir_load(instr);
 
             var = load->src.var;
             var->last_read = loop_last ? max(instr->index, loop_last) : instr->index;
@@ -3102,7 +3102,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         }
         case HLSL_IR_LOOP:
         {
-            struct hlsl_ir_loop *loop = loop_from_node(instr);
+            struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
 
             compute_liveness_recurse(&loop->body, loop_first ? loop_first : instr->index,
                     loop_last ? loop_last : loop->next_index);
@@ -3110,7 +3110,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         }
         case HLSL_IR_SWIZZLE:
         {
-            struct hlsl_ir_swizzle *swizzle = swizzle_from_node(instr);
+            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
 
             swizzle->val.node->last_read = instr->index;
             break;
@@ -3170,7 +3170,7 @@ int hlsl_parser_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, c
     init_functions_tree(&hlsl_ctx.functions);
     list_init(&hlsl_ctx.static_initializers);
 
-    push_scope(&hlsl_ctx);
+    hlsl_push_scope(&hlsl_ctx);
     hlsl_ctx.globals = hlsl_ctx.cur_scope;
     declare_predefined_types(hlsl_ctx.globals);
 
@@ -3185,7 +3185,7 @@ int hlsl_parser_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, c
         goto out;
     }
 
-    if (!type_is_void(entry_func->return_type)
+    if (!hlsl_type_is_void(entry_func->return_type)
             && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->semantic)
     {
         hlsl_report_message(entry_func->loc, HLSL_LEVEL_ERROR,
@@ -3214,20 +3214,20 @@ out:
     vkd3d_free(hlsl_ctx.source_files);
 
     TRACE("Freeing functions IR.\n");
-    rb_destroy(&hlsl_ctx.functions, free_function_rb, NULL);
+    rb_destroy(&hlsl_ctx.functions, hlsl_free_function_rb, NULL);
 
     TRACE("Freeing variables.\n");
     LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &hlsl_ctx.scopes, struct hlsl_scope, entry)
     {
         LIST_FOR_EACH_ENTRY_SAFE(var, next_var, &scope->vars, struct hlsl_ir_var, scope_entry)
-            free_declaration(var);
+            hlsl_free_var(var);
         rb_destroy(&scope->types, NULL, NULL);
         vkd3d_free(scope);
     }
 
     TRACE("Freeing types.\n");
     LIST_FOR_EACH_ENTRY_SAFE(hlsl_type, next_type, &hlsl_ctx.types, struct hlsl_type, entry)
-        free_hlsl_type(hlsl_type);
+        hlsl_free_type(hlsl_type);
 
     return ret;
 }
