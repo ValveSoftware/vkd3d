@@ -537,15 +537,13 @@ void hlsl_push_scope(struct hlsl_parse_ctx *ctx)
     list_add_tail(&ctx->scopes, &new_scope->entry);
 }
 
-BOOL hlsl_pop_scope(struct hlsl_parse_ctx *ctx)
+void hlsl_pop_scope(struct hlsl_parse_ctx *ctx)
 {
     struct hlsl_scope *prev_scope = ctx->cur_scope->upper;
 
-    if (!prev_scope)
-        return FALSE;
+    assert(prev_scope);
     TRACE("Popping current scope.\n");
     ctx->cur_scope = prev_scope;
-    return TRUE;
 }
 
 static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hlsl_type *t2)

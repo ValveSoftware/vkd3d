@@ -646,7 +646,7 @@ void hlsl_report_message(const struct source_location loc,
         enum hlsl_error_level level, const char *fmt, ...) VKD3D_PRINTF_FUNC(3,4) DECLSPEC_HIDDEN;
 
 void hlsl_push_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
-BOOL hlsl_pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
+void hlsl_pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority) DECLSPEC_HIDDEN;
 BOOL hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
