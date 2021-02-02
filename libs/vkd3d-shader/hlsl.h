@@ -230,7 +230,7 @@ struct hlsl_ir_function
     struct rb_entry entry;
     const char *name;
     struct rb_tree overloads;
-    BOOL intrinsic;
+    bool intrinsic;
 };
 
 struct hlsl_ir_function_decl
@@ -386,7 +386,7 @@ struct hlsl_ir_constant
         int i[4];
         float f[4];
         double d[4];
-        BOOL b[4];
+        bool b[4];
     } value;
 };
 
@@ -596,8 +596,8 @@ const char *hlsl_debug_modifiers(DWORD modifiers) DECLSPEC_HIDDEN;
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDEN;
 
 void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl,
-        BOOL intrinsic) DECLSPEC_HIDDEN;
-BOOL hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, BOOL local_var) DECLSPEC_HIDDEN;
+        bool intrinsic) DECLSPEC_HIDDEN;
+bool hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, bool local_var) DECLSPEC_HIDDEN;
 
 int hlsl_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
@@ -610,8 +610,8 @@ void hlsl_free_function_rb(struct rb_entry *entry, void *context) DECLSPEC_HIDDE
 void hlsl_free_type(struct hlsl_type *type) DECLSPEC_HIDDEN;
 void hlsl_free_var(struct hlsl_ir_var *decl) DECLSPEC_HIDDEN;
 
-BOOL hlsl_get_function(const char *name) DECLSPEC_HIDDEN;
-struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, BOOL recursive) DECLSPEC_HIDDEN;
+bool hlsl_get_function(const char *name) DECLSPEC_HIDDEN;
+struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name) DECLSPEC_HIDDEN;
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_type *basic_type, unsigned int array_size) DECLSPEC_HIDDEN;
@@ -649,10 +649,10 @@ void hlsl_push_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 void hlsl_pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority) DECLSPEC_HIDDEN;
-BOOL hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
+bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
 unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
-BOOL hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
-BOOL hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
+bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
+bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
 int hlsl_lexer_compile(const char *text, enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;

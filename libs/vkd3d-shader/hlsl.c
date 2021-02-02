@@ -36,14 +36,14 @@ void hlsl_report_message(const struct source_location loc,
         set_parse_status(&hlsl_ctx.status, PARSE_WARN);
 }
 
-BOOL hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, BOOL local_var)
+bool hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, bool local_var)
 {
     struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
     {
         if (!strcmp(decl->name, var->name))
-            return FALSE;
+            return false;
     }
     if (local_var && scope->upper->upper == hlsl_ctx.globals)
     {
@@ -51,12 +51,12 @@ BOOL hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, BOOL local
         LIST_FOR_EACH_ENTRY(var, &scope->upper->vars, struct hlsl_ir_var, scope_entry)
         {
             if (!strcmp(decl->name, var->name))
-                return FALSE;
+                return false;
         }
     }
 
     list_add_tail(&scope->vars, &decl->scope_entry);
-    return TRUE;
+    return true;
 }
 
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
@@ -154,7 +154,7 @@ struct hlsl_type *hlsl_new_struct_type(const char *name, struct list *fields)
     return type;
 }
 
-struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, BOOL recursive)
+struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive)
 {
     struct rb_entry *entry = rb_get(&scope->types, name);
 
@@ -166,7 +166,7 @@ struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, BOOL
     return NULL;
 }
 
-BOOL hlsl_get_function(const char *name)
+bool hlsl_get_function(const char *name)
 {
     return rb_get(&hlsl_ctx.functions, name) != NULL;
 }
@@ -197,24 +197,24 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type)
     return count;
 }
 
-BOOL hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
+bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
 {
     if (t1 == t2)
-        return TRUE;
+        return true;
 
     if (t1->type != t2->type)
-        return FALSE;
+        return false;
     if (t1->base_type != t2->base_type)
-        return FALSE;
+        return false;
     if (t1->base_type == HLSL_TYPE_SAMPLER && t1->sampler_dim != t2->sampler_dim)
-        return FALSE;
+        return false;
     if ((t1->modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
             != (t2->modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
-        return FALSE;
+        return false;
     if (t1->dimx != t2->dimx)
-        return FALSE;
+        return false;
     if (t1->dimy != t2->dimy)
-        return FALSE;
+        return false;
     if (t1->type == HLSL_CLASS_STRUCT)
     {
         struct list *t1cur, *t2cur;
@@ -227,20 +227,20 @@ BOOL hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
             t1field = LIST_ENTRY(t1cur, struct hlsl_struct_field, entry);
             t2field = LIST_ENTRY(t2cur, struct hlsl_struct_field, entry);
             if (!hlsl_type_compare(t1field->type, t2field->type))
-                return FALSE;
+                return false;
             if (strcmp(t1field->name, t2field->name))
-                return FALSE;
+                return false;
             t1cur = list_next(t1->e.elements, t1cur);
             t2cur = list_next(t2->e.elements, t2cur);
         }
         if (t1cur != t2cur)
-            return FALSE;
+            return false;
     }
     if (t1->type == HLSL_CLASS_ARRAY)
         return t1->e.array.elements_count == t2->e.array.elements_count
                 && hlsl_type_compare(t1->e.array.type, t2->e.array.type);
 
-    return TRUE;
+    return true;
 }
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority)
@@ -368,7 +368,7 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(const char *name, struct hlsl_type *t
     return var;
 }
 
-static BOOL type_is_single_reg(const struct hlsl_type *type)
+static bool type_is_single_reg(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
@@ -473,7 +473,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(DWORD s, unsigned int components,
     return swizzle;
 }
 
-BOOL hlsl_type_is_void(const struct hlsl_type *type)
+bool hlsl_type_is_void(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;
 }
@@ -1235,7 +1235,7 @@ void hlsl_free_function_rb(struct rb_entry *entry, void *context)
     free_function(RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry));
 }
 
-void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl, BOOL intrinsic)
+void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl, bool intrinsic)
 {
     struct hlsl_ir_function *func;
     struct rb_entry *func_entry, *old_entry;
@@ -1292,7 +1292,7 @@ struct hlsl_profile_info
     DWORD sm_minor;
     DWORD level_major;
     DWORD level_minor;
-    BOOL sw;
+    bool sw;
 };
 
 static const struct hlsl_profile_info *get_target_info(const char *target)
@@ -1301,66 +1301,66 @@ static const struct hlsl_profile_info *get_target_info(const char *target)
 
     static const struct hlsl_profile_info profiles[] =
     {
-        {"cs_4_0",              VKD3D_SHADER_TYPE_COMPUTE,  4, 0, 0, 0, FALSE},
-        {"cs_4_1",              VKD3D_SHADER_TYPE_COMPUTE,  4, 1, 0, 0, FALSE},
-        {"cs_5_0",              VKD3D_SHADER_TYPE_COMPUTE,  5, 0, 0, 0, FALSE},
-        {"ds_5_0",              VKD3D_SHADER_TYPE_DOMAIN,   5, 0, 0, 0, FALSE},
-        {"fx_2_0",              VKD3D_SHADER_TYPE_EFFECT,   2, 0, 0, 0, FALSE},
-        {"fx_4_0",              VKD3D_SHADER_TYPE_EFFECT,   4, 0, 0, 0, FALSE},
-        {"fx_4_1",              VKD3D_SHADER_TYPE_EFFECT,   4, 1, 0, 0, FALSE},
-        {"fx_5_0",              VKD3D_SHADER_TYPE_EFFECT,   5, 0, 0, 0, FALSE},
-        {"gs_4_0",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 0, 0, 0, FALSE},
-        {"gs_4_1",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 1, 0, 0, FALSE},
-        {"gs_5_0",              VKD3D_SHADER_TYPE_GEOMETRY, 5, 0, 0, 0, FALSE},
-        {"hs_5_0",              VKD3D_SHADER_TYPE_HULL,     5, 0, 0, 0, FALSE},
-        {"ps.1.0",              VKD3D_SHADER_TYPE_PIXEL,    1, 0, 0, 0, FALSE},
-        {"ps.1.1",              VKD3D_SHADER_TYPE_PIXEL,    1, 1, 0, 0, FALSE},
-        {"ps.1.2",              VKD3D_SHADER_TYPE_PIXEL,    1, 2, 0, 0, FALSE},
-        {"ps.1.3",              VKD3D_SHADER_TYPE_PIXEL,    1, 3, 0, 0, FALSE},
-        {"ps.1.4",              VKD3D_SHADER_TYPE_PIXEL,    1, 4, 0, 0, FALSE},
-        {"ps.2.0",              VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, FALSE},
-        {"ps.2.a",              VKD3D_SHADER_TYPE_PIXEL,    2, 1, 0, 0, FALSE},
-        {"ps.2.b",              VKD3D_SHADER_TYPE_PIXEL,    2, 2, 0, 0, FALSE},
-        {"ps.2.sw",             VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, TRUE},
-        {"ps.3.0",              VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, FALSE},
-        {"ps_1_0",              VKD3D_SHADER_TYPE_PIXEL,    1, 0, 0, 0, FALSE},
-        {"ps_1_1",              VKD3D_SHADER_TYPE_PIXEL,    1, 1, 0, 0, FALSE},
-        {"ps_1_2",              VKD3D_SHADER_TYPE_PIXEL,    1, 2, 0, 0, FALSE},
-        {"ps_1_3",              VKD3D_SHADER_TYPE_PIXEL,    1, 3, 0, 0, FALSE},
-        {"ps_1_4",              VKD3D_SHADER_TYPE_PIXEL,    1, 4, 0, 0, FALSE},
-        {"ps_2_0",              VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, FALSE},
-        {"ps_2_a",              VKD3D_SHADER_TYPE_PIXEL,    2, 1, 0, 0, FALSE},
-        {"ps_2_b",              VKD3D_SHADER_TYPE_PIXEL,    2, 2, 0, 0, FALSE},
-        {"ps_2_sw",             VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, TRUE},
-        {"ps_3_0",              VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, FALSE},
-        {"ps_3_sw",             VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, TRUE},
-        {"ps_4_0",              VKD3D_SHADER_TYPE_PIXEL,    4, 0, 0, 0, FALSE},
-        {"ps_4_0_level_9_0",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 0, FALSE},
-        {"ps_4_0_level_9_1",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 1, FALSE},
-        {"ps_4_0_level_9_3",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 3, FALSE},
-        {"ps_4_1",              VKD3D_SHADER_TYPE_PIXEL,    4, 1, 0, 0, FALSE},
-        {"ps_5_0",              VKD3D_SHADER_TYPE_PIXEL,    5, 0, 0, 0, FALSE},
-        {"tx_1_0",              VKD3D_SHADER_TYPE_TEXTURE,  1, 0, 0, 0, FALSE},
-        {"vs.1.0",              VKD3D_SHADER_TYPE_VERTEX,   1, 0, 0, 0, FALSE},
-        {"vs.1.1",              VKD3D_SHADER_TYPE_VERTEX,   1, 1, 0, 0, FALSE},
-        {"vs.2.0",              VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, FALSE},
-        {"vs.2.a",              VKD3D_SHADER_TYPE_VERTEX,   2, 1, 0, 0, FALSE},
-        {"vs.2.sw",             VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, TRUE},
-        {"vs.3.0",              VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, FALSE},
-        {"vs.3.sw",             VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, TRUE},
-        {"vs_1_0",              VKD3D_SHADER_TYPE_VERTEX,   1, 0, 0, 0, FALSE},
-        {"vs_1_1",              VKD3D_SHADER_TYPE_VERTEX,   1, 1, 0, 0, FALSE},
-        {"vs_2_0",              VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, FALSE},
-        {"vs_2_a",              VKD3D_SHADER_TYPE_VERTEX,   2, 1, 0, 0, FALSE},
-        {"vs_2_sw",             VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, TRUE},
-        {"vs_3_0",              VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, FALSE},
-        {"vs_3_sw",             VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, TRUE},
-        {"vs_4_0",              VKD3D_SHADER_TYPE_VERTEX,   4, 0, 0, 0, FALSE},
-        {"vs_4_0_level_9_0",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 0, FALSE},
-        {"vs_4_0_level_9_1",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 1, FALSE},
-        {"vs_4_0_level_9_3",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 3, FALSE},
-        {"vs_4_1",              VKD3D_SHADER_TYPE_VERTEX,   4, 1, 0, 0, FALSE},
-        {"vs_5_0",              VKD3D_SHADER_TYPE_VERTEX,   5, 0, 0, 0, FALSE},
+        {"cs_4_0",              VKD3D_SHADER_TYPE_COMPUTE,  4, 0, 0, 0, false},
+        {"cs_4_1",              VKD3D_SHADER_TYPE_COMPUTE,  4, 1, 0, 0, false},
+        {"cs_5_0",              VKD3D_SHADER_TYPE_COMPUTE,  5, 0, 0, 0, false},
+        {"ds_5_0",              VKD3D_SHADER_TYPE_DOMAIN,   5, 0, 0, 0, false},
+        {"fx_2_0",              VKD3D_SHADER_TYPE_EFFECT,   2, 0, 0, 0, false},
+        {"fx_4_0",              VKD3D_SHADER_TYPE_EFFECT,   4, 0, 0, 0, false},
+        {"fx_4_1",              VKD3D_SHADER_TYPE_EFFECT,   4, 1, 0, 0, false},
+        {"fx_5_0",              VKD3D_SHADER_TYPE_EFFECT,   5, 0, 0, 0, false},
+        {"gs_4_0",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 0, 0, 0, false},
+        {"gs_4_1",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 1, 0, 0, false},
+        {"gs_5_0",              VKD3D_SHADER_TYPE_GEOMETRY, 5, 0, 0, 0, false},
+        {"hs_5_0",              VKD3D_SHADER_TYPE_HULL,     5, 0, 0, 0, false},
+        {"ps.1.0",              VKD3D_SHADER_TYPE_PIXEL,    1, 0, 0, 0, false},
+        {"ps.1.1",              VKD3D_SHADER_TYPE_PIXEL,    1, 1, 0, 0, false},
+        {"ps.1.2",              VKD3D_SHADER_TYPE_PIXEL,    1, 2, 0, 0, false},
+        {"ps.1.3",              VKD3D_SHADER_TYPE_PIXEL,    1, 3, 0, 0, false},
+        {"ps.1.4",              VKD3D_SHADER_TYPE_PIXEL,    1, 4, 0, 0, false},
+        {"ps.2.0",              VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, false},
+        {"ps.2.a",              VKD3D_SHADER_TYPE_PIXEL,    2, 1, 0, 0, false},
+        {"ps.2.b",              VKD3D_SHADER_TYPE_PIXEL,    2, 2, 0, 0, false},
+        {"ps.2.sw",             VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, true},
+        {"ps.3.0",              VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, false},
+        {"ps_1_0",              VKD3D_SHADER_TYPE_PIXEL,    1, 0, 0, 0, false},
+        {"ps_1_1",              VKD3D_SHADER_TYPE_PIXEL,    1, 1, 0, 0, false},
+        {"ps_1_2",              VKD3D_SHADER_TYPE_PIXEL,    1, 2, 0, 0, false},
+        {"ps_1_3",              VKD3D_SHADER_TYPE_PIXEL,    1, 3, 0, 0, false},
+        {"ps_1_4",              VKD3D_SHADER_TYPE_PIXEL,    1, 4, 0, 0, false},
+        {"ps_2_0",              VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, false},
+        {"ps_2_a",              VKD3D_SHADER_TYPE_PIXEL,    2, 1, 0, 0, false},
+        {"ps_2_b",              VKD3D_SHADER_TYPE_PIXEL,    2, 2, 0, 0, false},
+        {"ps_2_sw",             VKD3D_SHADER_TYPE_PIXEL,    2, 0, 0, 0, true},
+        {"ps_3_0",              VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, false},
+        {"ps_3_sw",             VKD3D_SHADER_TYPE_PIXEL,    3, 0, 0, 0, true},
+        {"ps_4_0",              VKD3D_SHADER_TYPE_PIXEL,    4, 0, 0, 0, false},
+        {"ps_4_0_level_9_0",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 0, false},
+        {"ps_4_0_level_9_1",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 1, false},
+        {"ps_4_0_level_9_3",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 3, false},
+        {"ps_4_1",              VKD3D_SHADER_TYPE_PIXEL,    4, 1, 0, 0, false},
+        {"ps_5_0",              VKD3D_SHADER_TYPE_PIXEL,    5, 0, 0, 0, false},
+        {"tx_1_0",              VKD3D_SHADER_TYPE_TEXTURE,  1, 0, 0, 0, false},
+        {"vs.1.0",              VKD3D_SHADER_TYPE_VERTEX,   1, 0, 0, 0, false},
+        {"vs.1.1",              VKD3D_SHADER_TYPE_VERTEX,   1, 1, 0, 0, false},
+        {"vs.2.0",              VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, false},
+        {"vs.2.a",              VKD3D_SHADER_TYPE_VERTEX,   2, 1, 0, 0, false},
+        {"vs.2.sw",             VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, true},
+        {"vs.3.0",              VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, false},
+        {"vs.3.sw",             VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, true},
+        {"vs_1_0",              VKD3D_SHADER_TYPE_VERTEX,   1, 0, 0, 0, false},
+        {"vs_1_1",              VKD3D_SHADER_TYPE_VERTEX,   1, 1, 0, 0, false},
+        {"vs_2_0",              VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, false},
+        {"vs_2_a",              VKD3D_SHADER_TYPE_VERTEX,   2, 1, 0, 0, false},
+        {"vs_2_sw",             VKD3D_SHADER_TYPE_VERTEX,   2, 0, 0, 0, true},
+        {"vs_3_0",              VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, false},
+        {"vs_3_sw",             VKD3D_SHADER_TYPE_VERTEX,   3, 0, 0, 0, true},
+        {"vs_4_0",              VKD3D_SHADER_TYPE_VERTEX,   4, 0, 0, 0, false},
+        {"vs_4_0_level_9_0",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 0, false},
+        {"vs_4_0_level_9_1",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 1, false},
+        {"vs_4_0_level_9_3",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 3, false},
+        {"vs_4_1",              VKD3D_SHADER_TYPE_VERTEX,   4, 1, 0, 0, false},
+        {"vs_5_0",              VKD3D_SHADER_TYPE_VERTEX,   5, 0, 0, 0, false},
     };
 
     for (i = 0; i < ARRAY_SIZE(profiles); ++i)
