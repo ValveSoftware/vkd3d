@@ -748,20 +748,20 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
     return names[type];
 }
 
-static void debug_dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr);
+static void dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr);
 
-static void debug_dump_instr_list(struct vkd3d_string_buffer *buffer, const struct list *list)
+static void dump_instr_list(struct vkd3d_string_buffer *buffer, const struct list *list)
 {
     struct hlsl_ir_node *instr;
 
     LIST_FOR_EACH_ENTRY(instr, list, struct hlsl_ir_node, entry)
     {
-        debug_dump_instr(buffer, instr);
+        dump_instr(buffer, instr);
         vkd3d_string_buffer_printf(buffer, "\n");
     }
 }
 
-static void debug_dump_src(struct vkd3d_string_buffer *buffer, const struct hlsl_src *src)
+static void dump_src(struct vkd3d_string_buffer *buffer, const struct hlsl_src *src)
 {
     if (src->node->index)
         vkd3d_string_buffer_printf(buffer, "@%u", src->node->index);
@@ -769,7 +769,7 @@ static void debug_dump_src(struct vkd3d_string_buffer *buffer, const struct hlsl
         vkd3d_string_buffer_printf(buffer, "%p", src->node);
 }
 
-static void debug_dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_var *var)
+static void dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_var *var)
 {
     if (var->modifiers)
         vkd3d_string_buffer_printf(buffer, "%s ", hlsl_debug_modifiers(var->modifiers));
@@ -778,7 +778,7 @@ static void debug_dump_ir_var(struct vkd3d_string_buffer *buffer, const struct h
         vkd3d_string_buffer_printf(buffer, " : %s", var->semantic);
 }
 
-static void debug_dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
+static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
 {
     if (deref->offset.node)
         /* Print the variable's type for convenience. */
@@ -788,7 +788,7 @@ static void debug_dump_deref(struct vkd3d_string_buffer *buffer, const struct hl
     if (deref->offset.node)
     {
         vkd3d_string_buffer_printf(buffer, "[");
-        debug_dump_src(buffer, &deref->offset);
+        dump_src(buffer, &deref->offset);
         vkd3d_string_buffer_printf(buffer, "]");
     }
 }
@@ -812,18 +812,18 @@ static const char *debug_writemask(DWORD writemask)
     return vkd3d_dbg_sprintf(".%s", string);
 }
 
-static void debug_dump_ir_assignment(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_assignment *assign)
+static void dump_ir_assignment(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_assignment *assign)
 {
     vkd3d_string_buffer_printf(buffer, "= (");
-    debug_dump_deref(buffer, &assign->lhs);
+    dump_deref(buffer, &assign->lhs);
     if (assign->writemask != VKD3DSP_WRITEMASK_ALL)
         vkd3d_string_buffer_printf(buffer, "%s", debug_writemask(assign->writemask));
     vkd3d_string_buffer_printf(buffer, " ");
-    debug_dump_src(buffer, &assign->rhs);
+    dump_src(buffer, &assign->rhs);
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
-static void debug_dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_constant *constant)
+static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_constant *constant)
 {
     struct hlsl_type *type = constant->node.data_type;
     unsigned int x;
@@ -939,32 +939,31 @@ static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
     return op_names[expr->op];
 }
 
-/* Dumps the expression in a prefix "operator (operands)" form */
-static void debug_dump_ir_expr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_expr *expr)
+static void dump_ir_expr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
     unsigned int i;
 
     vkd3d_string_buffer_printf(buffer, "%s (", debug_expr_op(expr));
     for (i = 0; i < 3 && expr->operands[i].node; ++i)
     {
-        debug_dump_src(buffer, &expr->operands[i]);
+        dump_src(buffer, &expr->operands[i]);
         vkd3d_string_buffer_printf(buffer, " ");
     }
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
-static void debug_dump_ir_if(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_if *if_node)
+static void dump_ir_if(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_if *if_node)
 {
     vkd3d_string_buffer_printf(buffer, "if (");
-    debug_dump_src(buffer, &if_node->condition);
+    dump_src(buffer, &if_node->condition);
     vkd3d_string_buffer_printf(buffer, ")\n{\n");
-    debug_dump_instr_list(buffer, &if_node->then_instrs);
+    dump_instr_list(buffer, &if_node->then_instrs);
     vkd3d_string_buffer_printf(buffer, "}\nelse\n{\n");
-    debug_dump_instr_list(buffer, &if_node->else_instrs);
+    dump_instr_list(buffer, &if_node->else_instrs);
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
-static void debug_dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_jump *jump)
+static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_jump *jump)
 {
     switch (jump->type)
     {
@@ -986,18 +985,18 @@ static void debug_dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct 
     }
 }
 
-static void debug_dump_ir_loop(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_loop *loop)
+static void dump_ir_loop(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_loop *loop)
 {
     vkd3d_string_buffer_printf(buffer, "for (;;)\n{\n");
-    debug_dump_instr_list(buffer, &loop->body);
+    dump_instr_list(buffer, &loop->body);
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
-static void debug_dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_swizzle *swizzle)
+static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_swizzle *swizzle)
 {
     unsigned int i;
 
-    debug_dump_src(buffer, &swizzle->val);
+    dump_src(buffer, &swizzle->val);
     vkd3d_string_buffer_printf(buffer, ".");
     if (swizzle->val.node->data_type->dimy > 1)
     {
@@ -1013,7 +1012,7 @@ static void debug_dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const stru
     }
 }
 
-static void debug_dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr)
+static void dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     if (instr->index)
         vkd3d_string_buffer_printf(buffer, "%4u: ", instr->index);
@@ -1025,35 +1024,35 @@ static void debug_dump_instr(struct vkd3d_string_buffer *buffer, const struct hl
     switch (instr->type)
     {
         case HLSL_IR_ASSIGNMENT:
-            debug_dump_ir_assignment(buffer, hlsl_ir_assignment(instr));
+            dump_ir_assignment(buffer, hlsl_ir_assignment(instr));
             break;
 
         case HLSL_IR_CONSTANT:
-            debug_dump_ir_constant(buffer, hlsl_ir_constant(instr));
+            dump_ir_constant(buffer, hlsl_ir_constant(instr));
             break;
 
         case HLSL_IR_EXPR:
-            debug_dump_ir_expr(buffer, hlsl_ir_expr(instr));
+            dump_ir_expr(buffer, hlsl_ir_expr(instr));
             break;
 
         case HLSL_IR_IF:
-            debug_dump_ir_if(buffer, hlsl_ir_if(instr));
+            dump_ir_if(buffer, hlsl_ir_if(instr));
             break;
 
         case HLSL_IR_JUMP:
-            debug_dump_ir_jump(buffer, hlsl_ir_jump(instr));
+            dump_ir_jump(buffer, hlsl_ir_jump(instr));
             break;
 
         case HLSL_IR_LOAD:
-            debug_dump_deref(buffer, &hlsl_ir_load(instr)->src);
+            dump_deref(buffer, &hlsl_ir_load(instr)->src);
             break;
 
         case HLSL_IR_LOOP:
-            debug_dump_ir_loop(buffer, hlsl_ir_loop(instr));
+            dump_ir_loop(buffer, hlsl_ir_loop(instr));
             break;
 
         case HLSL_IR_SWIZZLE:
-            debug_dump_ir_swizzle(buffer, hlsl_ir_swizzle(instr));
+            dump_ir_swizzle(buffer, hlsl_ir_swizzle(instr));
             break;
 
         default:
@@ -1071,13 +1070,13 @@ void hlsl_dump_function(const struct hlsl_ir_function_decl *func)
     vkd3d_string_buffer_printf(&buffer, "Function parameters:\n");
     LIST_FOR_EACH_ENTRY(param, func->parameters, struct hlsl_ir_var, param_entry)
     {
-        debug_dump_ir_var(&buffer, param);
+        dump_ir_var(&buffer, param);
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
     if (func->semantic)
         vkd3d_string_buffer_printf(&buffer, "Function semantic: %s\n", func->semantic);
     if (func->body)
-        debug_dump_instr_list(&buffer, func->body);
+        dump_instr_list(&buffer, func->body);
 
     vkd3d_string_buffer_trace(&buffer);
     vkd3d_string_buffer_cleanup(&buffer);
