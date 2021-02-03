@@ -33308,7 +33308,7 @@ static void test_hull_shader_relative_addressing(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    todo check_triangles(&rb, &expected_triangle, 1);
+    check_triangles(&rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
