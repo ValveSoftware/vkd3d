@@ -26605,21 +26605,17 @@ struct triangle
     struct vec4 v[3];
 };
 
-#define check_triangles(a, b, c, d, e) check_triangles_(__LINE__, a, b, c, d, e)
-static void check_triangles_(unsigned int line, ID3D12Resource *buffer,
-        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+#define check_triangles(a, b, c) check_triangles_(__LINE__, a, b, c)
+static void check_triangles_(unsigned int line, struct resource_readback *rb,
         const struct triangle *triangles, unsigned int triangle_count)
 {
     const struct triangle *current, *expected;
-    struct resource_readback rb;
     unsigned int i, j, offset;
     bool all_match = true;
 
-    get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-
     for (i = 0; i < triangle_count; ++i)
     {
-        current = get_readback_data(&rb, i, 0, 0, sizeof(*current));
+        current = get_readback_data(rb, i, 0, 0, sizeof(*current));
         expected = &triangles[i];
 
         offset = ~0u;
@@ -26660,8 +26656,6 @@ static void check_triangles_(unsigned int line, ID3D12Resource *buffer,
             expected->v[0].x, expected->v[0].y, expected->v[0].z, expected->v[0].w,
             expected->v[1].x, expected->v[1].y, expected->v[1].z, expected->v[1].w,
             expected->v[2].x, expected->v[2].y, expected->v[2].z, expected->v[2].w);
-
-    release_resource_readback(&rb);
 }
 
 static void test_quad_tessellation(void)
@@ -26978,7 +26972,9 @@ static void test_quad_tessellation(void)
 
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    check_triangles(so_buffer, queue, command_list, expected_quad_ccw, ARRAY_SIZE(expected_quad_ccw));
+    get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
+    check_triangles(&rb, expected_quad_ccw, ARRAY_SIZE(expected_quad_ccw));
+    release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
     transition_resource_state(command_list, so_buffer,
@@ -27017,7 +27013,9 @@ static void test_quad_tessellation(void)
 
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    check_triangles(so_buffer, queue, command_list, expected_quad_cw, ARRAY_SIZE(expected_quad_cw));
+    get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
+    check_triangles(&rb, expected_quad_cw, ARRAY_SIZE(expected_quad_cw));
+    release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
     transition_resource_state(command_list, so_buffer,
@@ -33078,6 +33076,246 @@ static void test_sampler_register_space(void)
     destroy_test_context(&context);
 }
 
+static void test_hull_shader_relative_addressing(void)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
+    ID3D12GraphicsCommandList *command_list;
+    D3D12_ROOT_PARAMETER root_parameters[1];
+    D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
+    D3D12_INPUT_LAYOUT_DESC input_layout;
+    ID3D12Resource *vb, *so_buffer;
+    struct test_context_desc desc;
+    D3D12_VERTEX_BUFFER_VIEW vbv;
+    struct resource_readback rb;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    HRESULT hr;
+
+#if 0
+    int2 index[4];
+
+    struct patch_in_data
+    {
+        float4 position[2] : P;
+    };
+
+    struct patch_out_data
+    {
+        float4 position : SV_Position;
+    };
+
+    struct patch_constant_data
+    {
+        float edges[3] : SV_TessFactor;
+        float inside : SV_InsideTessFactor;
+    };
+
+    void patch_constant(out patch_constant_data output)
+    {
+        output.edges[0] = 1.0f;
+        output.edges[1] = 1.0f;
+        output.edges[2] = 1.0f;
+        output.inside = 1.0f;
+    }
+
+    patch_in_data vs_main(patch_in_data input)
+    {
+        return input;
+    }
+
+    [domain("tri")]
+    [outputcontrolpoints(4)]
+    [partitioning("integer")]
+    [outputtopology("triangle_cw")]
+    [patchconstantfunc("patch_constant")]
+    patch_out_data hs_main(InputPatch<patch_in_data, 3> input, uint i : SV_OutputControlPointID)
+    {
+        patch_out_data output;
+
+        output.position = input[index[i].x].position[index[i].y];
+
+        return output;
+    }
+
+    [domain("tri")]
+    float4 ds_main(patch_constant_data input, float3 tess_coord : SV_DomainLocation,
+            const OutputPatch<patch_out_data, 4> patch) : SV_Position
+    {
+        float4 position;
+
+        position = patch[3].position;
+        position += patch[0].position * tess_coord.x;
+        position += patch[1].position * tess_coord.y;
+        position += patch[2].position * tess_coord.z;
+
+        return position / 2;
+    }
+#endif
+    static const DWORD vs_code[] =
+    {
+        0x43425844, 0x7ba6d35f, 0x9640af75, 0x43fbed3a, 0x564c554f, 0x00000001, 0x00000124, 0x00000003,
+        0x0000002c, 0x00000070, 0x000000b4, 0x4e475349, 0x0000003c, 0x00000002, 0x00000008, 0x00000038,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000038, 0x00000001, 0x00000000,
+        0x00000003, 0x00000001, 0x00000f0f, 0xabab0050, 0x4e47534f, 0x0000003c, 0x00000002, 0x00000008,
+        0x00000038, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x0000000f, 0x00000038, 0x00000001,
+        0x00000000, 0x00000003, 0x00000001, 0x0000000f, 0xabab0050, 0x58454853, 0x00000068, 0x00010050,
+        0x0000001a, 0x0100086a, 0x0300005f, 0x001010f2, 0x00000000, 0x0300005f, 0x001010f2, 0x00000001,
+        0x03000065, 0x001020f2, 0x00000000, 0x03000065, 0x001020f2, 0x00000001, 0x05000036, 0x001020f2,
+        0x00000000, 0x00101e46, 0x00000000, 0x05000036, 0x001020f2, 0x00000001, 0x00101e46, 0x00000001,
+        0x0100003e,
+    };
+    static const DWORD hs_code[] =
+    {
+        0x43425844, 0xe1d76e8a, 0x5e615b9a, 0xac2b4cf5, 0xbd8708f0, 0x00000001, 0x000002ec, 0x00000004,
+        0x00000030, 0x00000074, 0x000000a8, 0x0000013c, 0x4e475349, 0x0000003c, 0x00000002, 0x00000008,
+        0x00000038, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000038, 0x00000001,
+        0x00000000, 0x00000003, 0x00000001, 0x00000f0f, 0xabab0050, 0x4e47534f, 0x0000002c, 0x00000001,
+        0x00000008, 0x00000020, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x505f5653,
+        0x7469736f, 0x006e6f69, 0x47534350, 0x0000008c, 0x00000004, 0x00000008, 0x00000068, 0x00000000,
+        0x0000000d, 0x00000003, 0x00000000, 0x00000e01, 0x00000068, 0x00000001, 0x0000000d, 0x00000003,
+        0x00000001, 0x00000e01, 0x00000068, 0x00000002, 0x0000000d, 0x00000003, 0x00000002, 0x00000e01,
+        0x00000076, 0x00000000, 0x0000000e, 0x00000003, 0x00000003, 0x00000e01, 0x545f5653, 0x46737365,
+        0x6f746361, 0x56530072, 0x736e495f, 0x54656469, 0x46737365, 0x6f746361, 0xabab0072, 0x58454853,
+        0x000001a8, 0x00030050, 0x0000006a, 0x01000071, 0x01001893, 0x01002094, 0x01001095, 0x01000896,
+        0x01001897, 0x0100086a, 0x04000859, 0x00208e46, 0x00000000, 0x00000004, 0x01000072, 0x0200005f,
+        0x00016000, 0x0400005f, 0x002010f2, 0x00000003, 0x00000000, 0x0400005f, 0x002010f2, 0x00000003,
+        0x00000001, 0x03000065, 0x001020f2, 0x00000000, 0x02000068, 0x00000001, 0x0500005b, 0x002010f2,
+        0x00000003, 0x00000000, 0x00000002, 0x04000036, 0x00100012, 0x00000000, 0x00016001, 0x07000036,
+        0x00100022, 0x00000000, 0x0420801a, 0x00000000, 0x0010000a, 0x00000000, 0x07000036, 0x00100012,
+        0x00000000, 0x0420800a, 0x00000000, 0x0010000a, 0x00000000, 0x08000036, 0x001020f2, 0x00000000,
+        0x04a01e46, 0x0010000a, 0x00000000, 0x0010001a, 0x00000000, 0x0100003e, 0x01000073, 0x02000099,
+        0x00000003, 0x0200005f, 0x00017000, 0x04000067, 0x00102012, 0x00000000, 0x00000011, 0x04000067,
+        0x00102012, 0x00000001, 0x00000012, 0x04000067, 0x00102012, 0x00000002, 0x00000013, 0x02000068,
+        0x00000001, 0x0400005b, 0x00102012, 0x00000000, 0x00000003, 0x04000036, 0x00100012, 0x00000000,
+        0x0001700a, 0x06000036, 0x00902012, 0x0010000a, 0x00000000, 0x00004001, 0x3f800000, 0x0100003e,
+        0x01000073, 0x04000067, 0x00102012, 0x00000003, 0x00000014, 0x05000036, 0x00102012, 0x00000003,
+        0x00004001, 0x3f800000, 0x0100003e,
+    };
+    static const DWORD ds_code[] =
+    {
+        0x43425844, 0x95673c05, 0xbf512405, 0x69311baa, 0x46d18077, 0x00000001, 0x00000214, 0x00000004,
+        0x00000030, 0x00000064, 0x000000f8, 0x0000012c, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x00000f0f, 0x505f5653, 0x7469736f,
+        0x006e6f69, 0x47534350, 0x0000008c, 0x00000004, 0x00000008, 0x00000068, 0x00000000, 0x0000000d,
+        0x00000003, 0x00000000, 0x00000001, 0x00000068, 0x00000001, 0x0000000d, 0x00000003, 0x00000001,
+        0x00000001, 0x00000068, 0x00000002, 0x0000000d, 0x00000003, 0x00000002, 0x00000001, 0x00000076,
+        0x00000000, 0x0000000e, 0x00000003, 0x00000003, 0x00000001, 0x545f5653, 0x46737365, 0x6f746361,
+        0x56530072, 0x736e495f, 0x54656469, 0x46737365, 0x6f746361, 0xabab0072, 0x4e47534f, 0x0000002c,
+        0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f,
+        0x505f5653, 0x7469736f, 0x006e6f69, 0x58454853, 0x000000e0, 0x00040050, 0x00000038, 0x01002093,
+        0x01001095, 0x0100086a, 0x0200005f, 0x0001c072, 0x0400005f, 0x002190f2, 0x00000004, 0x00000000,
+        0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x02000068, 0x00000001, 0x0a000032, 0x001000f2,
+        0x00000000, 0x00219e46, 0x00000000, 0x00000000, 0x0001c006, 0x00219e46, 0x00000003, 0x00000000,
+        0x09000032, 0x001000f2, 0x00000000, 0x00219e46, 0x00000001, 0x00000000, 0x0001c556, 0x00100e46,
+        0x00000000, 0x09000032, 0x001000f2, 0x00000000, 0x00219e46, 0x00000002, 0x00000000, 0x0001caa6,
+        0x00100e46, 0x00000000, 0x0a000038, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x00004002,
+        0x3f000000, 0x3f000000, 0x3f000000, 0x3f000000, 0x0100003e,
+    };
+    static const D3D12_INPUT_ELEMENT_DESC layout_desc[] =
+    {
+        {"P", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"P", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    };
+    static const D3D12_SO_DECLARATION_ENTRY so_declaration[] =
+    {
+        {0, "SV_POSITION",  0, 0, 4, 0},
+    };
+    static const struct
+    {
+        struct vec4 texcoord[2];
+    }
+    vertices[] =
+    {
+        {{{1.0f, 1.0f, 1.0f, 1.0f}, { 8.0f,  8.0f,  8.0f, 1.0f}}},
+        {{{2.0f, 2.0f, 2.0f, 1.0f}, {16.0f, 16.0f, 16.0f, 1.0f}}},
+        {{{4.0f, 4.0f, 4.0f, 1.0f}, {32.0f, 32.0f, 32.0f, 1.0f}}},
+    };
+    static const struct uvec4 indices[] =
+    {
+        {0, 0},
+        {1, 1},
+        {2, 1},
+        {2, 0},
+    };
+    static const struct triangle expected_triangle =
+    {{
+        {10.0f, 10.0f, 10.0f, 1.0f},
+        {18.0f, 18.0f, 18.0f, 1.0f},
+        { 2.5f,  2.5f,  2.5f, 1.0f},
+    }};
+    unsigned int strides[] = {sizeof(struct vec4)};
+
+    memset(&desc, 0, sizeof(desc));
+    desc.no_root_signature = true;
+    desc.no_pipeline = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    command_list = context.list;
+    queue = context.queue;
+
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    root_parameters[0].Constants.ShaderRegister = 0;
+    root_parameters[0].Constants.RegisterSpace = 0;
+    root_parameters[0].Constants.Num32BitValues = 16;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_HULL;
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+            | D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT;
+    hr = create_root_signature(context.device, &root_signature_desc, &context.root_signature);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    input_layout.pInputElementDescs = layout_desc;
+    input_layout.NumElements = ARRAY_SIZE(layout_desc);
+    init_pipeline_state_desc(&pso_desc, context.root_signature, DXGI_FORMAT_UNKNOWN, NULL, NULL, &input_layout);
+    pso_desc.VS = shader_bytecode(vs_code, sizeof(vs_code));
+    pso_desc.HS = shader_bytecode(hs_code, sizeof(hs_code));
+    pso_desc.DS = shader_bytecode(ds_code, sizeof(ds_code));
+    memset(&pso_desc.PS, 0, sizeof(pso_desc.PS));
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    pso_desc.StreamOutput.NumEntries = ARRAY_SIZE(so_declaration);
+    pso_desc.StreamOutput.pSODeclaration = so_declaration;
+    pso_desc.StreamOutput.pBufferStrides = strides;
+    pso_desc.StreamOutput.NumStrides = ARRAY_SIZE(strides);
+    pso_desc.StreamOutput.RasterizedStream = D3D12_SO_NO_RASTERIZED_STREAM;
+    hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    vb = create_upload_buffer(context.device, sizeof(vertices), vertices);
+    vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(vb);
+    vbv.StrideInBytes = sizeof(*vertices);
+    vbv.SizeInBytes = sizeof(vertices);
+
+    so_buffer = create_default_buffer(context.device, 4096,
+            D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_STREAM_OUT);
+    sobv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(so_buffer);
+    sobv.SizeInBytes = 1024;
+    sobv.BufferFilledSizeLocation = sobv.BufferLocation + sobv.SizeInBytes;
+
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 0, 16, indices, 0);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_3_CONTROL_POINT_PATCHLIST);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, &vbv);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_SOSetTargets(command_list, 0, 1, &sobv);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+
+    transition_resource_state(command_list, so_buffer,
+            D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
+    todo check_triangles(&rb, &expected_triangle, 1);
+    release_resource_readback(&rb);
+
+    ID3D12Resource_Release(so_buffer);
+    ID3D12Resource_Release(vb);
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -33244,4 +33482,5 @@ START_TEST(d3d12)
     run_test(test_write_buffer_immediate);
     run_test(test_register_space);
     run_test(test_sampler_register_space);
+    run_test(test_hull_shader_relative_addressing);
 }
