@@ -19,9 +19,86 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
-%{
+
+%code requires
+{
+
 #include "hlsl.h"
 #include <stdio.h>
+
+struct parse_parameter
+{
+    struct hlsl_type *type;
+    const char *name;
+    const char *semantic;
+    const struct hlsl_reg_reservation *reg_reservation;
+    unsigned int modifiers;
+};
+
+struct parse_colon_attribute
+{
+    const char *semantic;
+    struct hlsl_reg_reservation *reg_reservation;
+};
+
+struct parse_initializer
+{
+    struct hlsl_ir_node **args;
+    unsigned int args_count;
+    struct list *instrs;
+};
+
+struct parse_variable_def
+{
+    struct list entry;
+    struct source_location loc;
+
+    char *name;
+    uint32_t array_size;
+    const char *semantic;
+    struct hlsl_reg_reservation *reg_reservation;
+    struct parse_initializer initializer;
+};
+
+struct parse_function
+{
+    char *name;
+    struct hlsl_ir_function_decl *decl;
+};
+
+struct parse_if_body
+{
+    struct list *then_instrs;
+    struct list *else_instrs;
+};
+
+enum parse_unary_op
+{
+    UNARY_OP_PLUS,
+    UNARY_OP_MINUS,
+    UNARY_OP_LOGICNOT,
+    UNARY_OP_BITNOT,
+};
+
+enum parse_assign_op
+{
+    ASSIGN_OP_ASSIGN,
+    ASSIGN_OP_ADD,
+    ASSIGN_OP_SUB,
+    ASSIGN_OP_MUL,
+    ASSIGN_OP_DIV,
+    ASSIGN_OP_MOD,
+    ASSIGN_OP_LSHIFT,
+    ASSIGN_OP_RSHIFT,
+    ASSIGN_OP_AND,
+    ASSIGN_OP_OR,
+    ASSIGN_OP_XOR,
+};
+
+}
+
+%code
+{
 
 int hlsl_lex(void);
 
@@ -1504,7 +1581,7 @@ static struct list *declare_vars(struct hlsl_type *basic_type, DWORD modifiers, 
     return statements_list;
 }
 
-%}
+}
 
 %locations
 %define parse.error verbose
