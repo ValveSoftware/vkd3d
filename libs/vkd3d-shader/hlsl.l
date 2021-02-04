@@ -271,8 +271,7 @@ row_major               {return KW_ROW_MAJOR;           }
 
 %%
 
-int hlsl_lexer_compile(const char *text, enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
+int hlsl_lexer_compile(const char *text, const char *entrypoint)
 {
     YY_BUFFER_STATE buffer;
     int ret;
@@ -280,7 +279,7 @@ int hlsl_lexer_compile(const char *text, enum vkd3d_shader_type type, DWORD majo
     buffer = hlsl__scan_string(text);
     hlsl__switch_to_buffer(buffer);
 
-    ret = hlsl_parser_compile(type, major, minor, entrypoint, dxbc, message_context);
+    ret = hlsl_parser_compile(entrypoint);
 
     hlsl__delete_buffer(buffer);
     return ret;

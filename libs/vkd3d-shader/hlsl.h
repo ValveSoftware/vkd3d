@@ -518,8 +518,6 @@ static inline void set_parse_status(enum parse_status *current, enum parse_statu
         *current = PARSE_WARN;
 }
 
-void init_functions_tree(struct rb_tree *funcs) DECLSPEC_HIDDEN;
-
 const char *hlsl_base_type_to_string(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 const char *hlsl_debug_modifiers(DWORD modifiers) DECLSPEC_HIDDEN;
@@ -536,7 +534,6 @@ void hlsl_dump_function(const struct hlsl_ir_function_decl *func) DECLSPEC_HIDDE
 
 void hlsl_free_instr(struct hlsl_ir_node *node) DECLSPEC_HIDDEN;
 void hlsl_free_instr_list(struct list *list) DECLSPEC_HIDDEN;
-void hlsl_free_function_rb(struct rb_entry *entry, void *context) DECLSPEC_HIDDEN;
 void hlsl_free_type(struct hlsl_type *type) DECLSPEC_HIDDEN;
 void hlsl_free_var(struct hlsl_ir_var *decl) DECLSPEC_HIDDEN;
 
@@ -578,15 +575,15 @@ void hlsl_report_message(const struct source_location loc,
 void hlsl_push_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 void hlsl_pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
 
+bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type) DECLSPEC_HIDDEN;
+
 struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority) DECLSPEC_HIDDEN;
 bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
 unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-int hlsl_lexer_compile(const char *text, enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
-int hlsl_parser_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+int hlsl_lexer_compile(const char *text, const char *entrypoint) DECLSPEC_HIDDEN;
+int hlsl_parser_compile(const char *entrypoint) DECLSPEC_HIDDEN;
 
 #endif

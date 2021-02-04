@@ -341,96 +341,6 @@ static DWORD add_modifiers(DWORD modifiers, DWORD mod, const struct source_locat
     return modifiers | mod;
 }
 
-static bool add_type_to_scope(struct hlsl_scope *scope, struct hlsl_type *def)
-{
-    if (hlsl_get_type(scope, def->name, false))
-        return false;
-
-    rb_put(&scope->types, def->name, &def->scope_entry);
-    return true;
-}
-
-static void declare_predefined_types(struct hlsl_scope *scope)
-{
-    struct hlsl_type *type;
-    unsigned int x, y, bt;
-    static const char * const names[] =
-    {
-        "float",
-        "half",
-        "double",
-        "int",
-        "uint",
-        "bool",
-    };
-    char name[10];
-
-    static const char *const sampler_names[] =
-    {
-        "sampler",
-        "sampler1D",
-        "sampler2D",
-        "sampler3D",
-        "samplerCUBE"
-    };
-
-    for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
-    {
-        for (y = 1; y <= 4; ++y)
-        {
-            for (x = 1; x <= 4; ++x)
-            {
-                sprintf(name, "%s%ux%u", names[bt], y, x);
-                type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_MATRIX, bt, x, y);
-                add_type_to_scope(scope, type);
-
-                if (y == 1)
-                {
-                    sprintf(name, "%s%u", names[bt], x);
-                    type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_VECTOR, bt, x, y);
-                    add_type_to_scope(scope, type);
-                    hlsl_ctx.builtin_types.vector[bt][x - 1] = type;
-
-                    if (x == 1)
-                    {
-                        sprintf(name, "%s", names[bt]);
-                        type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_SCALAR, bt, x, y);
-                        add_type_to_scope(scope, type);
-                        hlsl_ctx.builtin_types.scalar[bt] = type;
-                    }
-                }
-            }
-        }
-    }
-
-    for (bt = 0; bt <= HLSL_SAMPLER_DIM_MAX; ++bt)
-    {
-        type = hlsl_new_type(vkd3d_strdup(sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
-        type->sampler_dim = bt;
-        hlsl_ctx.builtin_types.sampler[bt] = type;
-    }
-
-    hlsl_ctx.builtin_types.Void = hlsl_new_type(vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
-
-    /* DX8 effects predefined types */
-    type = hlsl_new_type(vkd3d_strdup("DWORD"), HLSL_CLASS_SCALAR, HLSL_TYPE_INT, 1, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("FLOAT"), HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT, 1, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("VECTOR"), HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT, 4, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("MATRIX"), HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT, 4, 4);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("STRING"), HLSL_CLASS_OBJECT, HLSL_TYPE_STRING, 1, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("TEXTURE"), HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE, 1, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("PIXELSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER, 1, 1);
-    add_type_to_scope(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("VERTEXSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER, 1, 1);
-    add_type_to_scope(scope, type);
-}
-
 static bool append_conditional_break(struct list *cond_list)
 {
     struct hlsl_ir_node *condition, *not;
@@ -867,7 +777,7 @@ static bool add_typedef(DWORD modifiers, struct hlsl_type *orig_type, struct lis
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
             hlsl_report_message(v->loc, HLSL_LEVEL_ERROR, "more than one matrix majority keyword");
 
-        ret = add_type_to_scope(hlsl_ctx.cur_scope, type);
+        ret = hlsl_scope_add_type(hlsl_ctx.cur_scope, type);
         if (!ret)
             hlsl_report_message(v->loc, HLSL_LEVEL_ERROR,
                     "redefinition of custom type '%s'", v->name);
@@ -1910,7 +1820,7 @@ named_struct_spec:
                 YYABORT;
             }
 
-            ret = add_type_to_scope(hlsl_ctx.cur_scope, $$);
+            ret = hlsl_scope_add_type(hlsl_ctx.cur_scope, $$);
             if (!ret)
             {
                 hlsl_report_message(get_location(&@2), HLSL_LEVEL_ERROR, "redefinition of struct '%s'", $2);
@@ -3222,44 +3132,19 @@ static void compute_liveness(struct hlsl_ir_function_decl *entry_func)
     compute_liveness_recurse(entry_func->body, 0, 0);
 }
 
-int hlsl_parser_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
+int hlsl_parser_compile(const char *entrypoint)
 {
     struct hlsl_ir_function_decl *entry_func;
-    struct hlsl_scope *scope, *next_scope;
-    struct hlsl_type *hlsl_type, *next_type;
-    struct hlsl_ir_var *var, *next_var;
-    int ret = VKD3D_ERROR;
-    unsigned int i;
-
-    hlsl_ctx.status = PARSE_SUCCESS;
-    hlsl_ctx.message_context = message_context;
-    hlsl_ctx.line_no = hlsl_ctx.column = 1;
-    hlsl_ctx.source_file = vkd3d_strdup("");
-    hlsl_ctx.source_files = vkd3d_malloc(sizeof(*hlsl_ctx.source_files));
-    if (hlsl_ctx.source_files)
-        hlsl_ctx.source_files[0] = hlsl_ctx.source_file;
-    hlsl_ctx.source_files_count = 1;
-    hlsl_ctx.cur_scope = NULL;
-    hlsl_ctx.matrix_majority = HLSL_COLUMN_MAJOR;
-    list_init(&hlsl_ctx.scopes);
-    list_init(&hlsl_ctx.types);
-    init_functions_tree(&hlsl_ctx.functions);
-    list_init(&hlsl_ctx.static_initializers);
-
-    hlsl_push_scope(&hlsl_ctx);
-    hlsl_ctx.globals = hlsl_ctx.cur_scope;
-    declare_predefined_types(hlsl_ctx.globals);
 
     hlsl_parse();
 
     if (hlsl_ctx.status == PARSE_ERR)
-        goto out;
+        return VKD3D_ERROR_INVALID_SHADER;
 
     if (!(entry_func = get_func_entry(entrypoint)))
     {
         hlsl_message("error: entry point %s is not defined\n", debugstr_a(entrypoint));
-        goto out;
+        return VKD3D_ERROR_INVALID_SHADER;
     }
 
     if (!hlsl_type_is_void(entry_func->return_type)
@@ -3282,29 +3167,7 @@ int hlsl_parser_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, c
 
     compute_liveness(entry_func);
 
-    if (hlsl_ctx.status != PARSE_ERR)
-        ret = VKD3D_ERROR_NOT_IMPLEMENTED;
-
-out:
-    for (i = 0; i < hlsl_ctx.source_files_count; ++i)
-        vkd3d_free((void *)hlsl_ctx.source_files[i]);
-    vkd3d_free(hlsl_ctx.source_files);
-
-    TRACE("Freeing functions IR.\n");
-    rb_destroy(&hlsl_ctx.functions, hlsl_free_function_rb, NULL);
-
-    TRACE("Freeing variables.\n");
-    LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &hlsl_ctx.scopes, struct hlsl_scope, entry)
-    {
-        LIST_FOR_EACH_ENTRY_SAFE(var, next_var, &scope->vars, struct hlsl_ir_var, scope_entry)
-            hlsl_free_var(var);
-        rb_destroy(&scope->types, NULL, NULL);
-        vkd3d_free(scope);
-    }
-
-    TRACE("Freeing types.\n");
-    LIST_FOR_EACH_ENTRY_SAFE(hlsl_type, next_type, &hlsl_ctx.types, struct hlsl_type, entry)
-        hlsl_free_type(hlsl_type);
-
-    return ret;
+    if (hlsl_ctx.status == PARSE_ERR)
+        return VKD3D_ERROR_INVALID_SHADER;
+    return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
