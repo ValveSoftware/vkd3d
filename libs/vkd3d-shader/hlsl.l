@@ -24,12 +24,9 @@
 #include "hlsl.h"
 #include "hlsl.tab.h"
 
-#define YY_USER_ACTION                               \
-   do {                                              \
-      hlsl_lloc.first_column = hlsl_ctx.column;      \
-      hlsl_lloc.first_line = hlsl_ctx.line_no;       \
-      hlsl_ctx.column += yyleng;                     \
-   } while(0);
+static void update_location(HLSL_LTYPE *lloc);
+
+#define YY_USER_ACTION update_location(&hlsl_lloc);
 
 %}
 
@@ -270,6 +267,14 @@ row_major               {return KW_ROW_MAJOR;           }
                         }
 
 %%
+
+static void update_location(HLSL_LTYPE *lloc)
+{
+    lloc->file = hlsl_ctx.source_file;
+    lloc->col = hlsl_ctx.column;
+    lloc->line = hlsl_ctx.line_no;
+    hlsl_ctx.column += yyleng;
+}
 
 int hlsl_lexer_compile(const char *text, const char *entrypoint)
 {
