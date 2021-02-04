@@ -8866,6 +8866,13 @@ static void vkd3d_dxbc_compiler_emit_sync(struct vkd3d_dxbc_compiler *compiler,
         flags &= ~VKD3DSSF_THREAD_GROUP;
     }
 
+    if (flags & VKD3DSSF_GLOBAL_UAV)
+    {
+        memory_scope = SpvScopeDevice;
+        memory_semantics |= SpvMemorySemanticsImageMemoryMask;
+        flags &= ~VKD3DSSF_GLOBAL_UAV;
+    }
+
     if (flags)
     {
         FIXME("Unhandled sync flags %#x.\n", flags);

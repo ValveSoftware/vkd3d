@@ -368,6 +368,11 @@ static void shader_dump_global_flags(struct vkd3d_string_buffer *buffer, DWORD g
 
 static void shader_dump_sync_flags(struct vkd3d_string_buffer *buffer, DWORD sync_flags)
 {
+    if (sync_flags & VKD3DSSF_GLOBAL_UAV)
+    {
+        shader_addline(buffer, "_uglobal");
+        sync_flags &= ~VKD3DSSF_GLOBAL_UAV;
+    }
     if (sync_flags & VKD3DSSF_GROUP_SHARED_MEMORY)
     {
         shader_addline(buffer, "_g");
