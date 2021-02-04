@@ -1378,8 +1378,9 @@ static int compare_function_rb(const void *key, const struct rb_entry *entry)
 
 static void declare_predefined_types(struct hlsl_scope *scope)
 {
+    unsigned int x, y, bt, i;
     struct hlsl_type *type;
-    unsigned int x, y, bt;
+
     static const char * const names[] =
     {
         "float",
@@ -1398,6 +1399,25 @@ static void declare_predefined_types(struct hlsl_scope *scope)
         "sampler2D",
         "sampler3D",
         "samplerCUBE"
+    };
+
+    static const struct
+    {
+        char name[13];
+        enum hlsl_type_class class;
+        enum hlsl_base_type base_type;
+        unsigned int dimx, dimy;
+    }
+    effect_types[] =
+    {
+        {"DWORD",           HLSL_CLASS_SCALAR, HLSL_TYPE_INT,           1, 1},
+        {"FLOAT",           HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT,         1, 1},
+        {"VECTOR",          HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT,         4, 1},
+        {"MATRIX",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},
+        {"STRING",          HLSL_CLASS_OBJECT, HLSL_TYPE_STRING,        1, 1},
+        {"TEXTURE",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
+        {"PIXELSHADER",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
+        {"VERTEXSHADER",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
     };
 
     for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
@@ -1438,23 +1458,12 @@ static void declare_predefined_types(struct hlsl_scope *scope)
 
     hlsl_ctx.builtin_types.Void = hlsl_new_type(vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
 
-    /* DX8 effects predefined types */
-    type = hlsl_new_type(vkd3d_strdup("DWORD"), HLSL_CLASS_SCALAR, HLSL_TYPE_INT, 1, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("FLOAT"), HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT, 1, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("VECTOR"), HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT, 4, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("MATRIX"), HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT, 4, 4);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("STRING"), HLSL_CLASS_OBJECT, HLSL_TYPE_STRING, 1, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("TEXTURE"), HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE, 1, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("PIXELSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER, 1, 1);
-    hlsl_scope_add_type(scope, type);
-    type = hlsl_new_type(vkd3d_strdup("VERTEXSHADER"), HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER, 1, 1);
-    hlsl_scope_add_type(scope, type);
+    for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
+    {
+        type = hlsl_new_type(vkd3d_strdup(effect_types[i].name), effect_types[i].class,
+                effect_types[i].base_type, effect_types[i].dimx, effect_types[i].dimy);
+        hlsl_scope_add_type(scope, type);
+    }
 }
 
 static bool hlsl_ctx_init(struct hlsl_parse_ctx *ctx, struct vkd3d_shader_message_context *message_context)
