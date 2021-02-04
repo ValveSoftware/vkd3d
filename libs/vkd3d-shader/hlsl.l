@@ -24,17 +24,24 @@
 #include "hlsl.h"
 #include "hlsl.tab.h"
 
-static void update_location(HLSL_LTYPE *lloc);
+#define YYSTYPE HLSL_STYPE
+#define YYLTYPE HLSL_LTYPE
 
-#define YY_USER_ACTION update_location(&hlsl_lloc);
+static void update_location(struct hlsl_ctx *ctx, HLSL_LTYPE *loc);
+
+#define YY_USER_ACTION update_location(yyget_extra(yyscanner), yyget_lloc(yyscanner));
 
 %}
 
-%option prefix="hlsl_"
+%option bison-bridge
+%option bison-locations
+%option extra-type="struct hlsl_ctx *"
 %option never-interactive
 %option noinput
 %option nounput
 %option noyywrap
+%option prefix="hlsl_"
+%option reentrant
 
 %x pp pp_line pp_pragma pp_ignore
 
@@ -52,21 +59,14 @@ IDENTIFIER              [A-Za-z_][A-Za-z0-9_]*
 ANY                     (.)
 
 %%
-{RESERVED1}             {
-                            hlsl_message("Line %u: Reserved keyword \"%s\" used.\n", hlsl_ctx.line_no, yytext);
-                            set_parse_status(&hlsl_ctx.status, PARSE_ERR);
-                        }
-{RESERVED2}             {
-                            hlsl_message("Line %u: Reserved keyword \"%s\" used.\n", hlsl_ctx.line_no, yytext);
-                            set_parse_status(&hlsl_ctx.status, PARSE_ERR);
-                        }
-{RESERVED3}             {
-                            hlsl_message("Line %u: Reserved keyword \"%s\" used.\n", hlsl_ctx.line_no, yytext);
-                            set_parse_status(&hlsl_ctx.status, PARSE_ERR);
-                        }
+{RESERVED1}             |
+{RESERVED2}             |
+{RESERVED3}             |
 {RESERVED4}             {
-                            hlsl_message("Line %u: Reserved keyword \"%s\" used.\n", hlsl_ctx.line_no, yytext);
-                            set_parse_status(&hlsl_ctx.status, PARSE_ERR);
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
+                            hlsl_message("Line %u: Reserved keyword \"%s\" used.\n", ctx->line_no, yytext);
+                            set_parse_status(&ctx->status, PARSE_ERR);
                         }
 
 BlendState              {return KW_BLENDSTATE;          }
@@ -168,37 +168,39 @@ column_major            {return KW_COLUMN_MAJOR;        }
 row_major               {return KW_ROW_MAJOR;           }
 
 {IDENTIFIER}            {
-                            hlsl_lval.name = vkd3d_strdup(yytext);
-                            if (hlsl_get_var(hlsl_ctx.cur_scope, yytext) || hlsl_get_function(yytext))
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
+                            yylval->name = vkd3d_strdup(yytext);
+                            if (hlsl_get_var(ctx->cur_scope, yytext) || hlsl_get_function(ctx, yytext))
                                 return VAR_IDENTIFIER;
-                            else if (hlsl_get_type(hlsl_ctx.cur_scope, yytext, true))
+                            else if (hlsl_get_type(ctx->cur_scope, yytext, true))
                                 return TYPE_IDENTIFIER;
                             else
                                 return NEW_IDENTIFIER;
                         }
 
 [0-9]*\.[0-9]+([eE][+-]?[0-9]+)?[h|H|f|F]? {
-                            hlsl_lval.floatval = atof(yytext);
+                            yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
 [0-9]+\.([eE][+-]?[0-9]+)?[h|H|f|F]? {
-                            hlsl_lval.floatval = atof(yytext);
+                            yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
 [0-9]+([eE][+-]?[0-9]+)?[h|H|f|F] {
-                            hlsl_lval.floatval = atof(yytext);
+                            yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
 0x[0-9a-fA-F]+          {
-                            sscanf(yytext, "0x%x", &hlsl_lval.intval);
+                            sscanf(yytext, "0x%x", &yylval->intval);
                             return C_INTEGER;
                         }
 0[0-7]+                 {
-                            sscanf(yytext, "0%o", &hlsl_lval.intval);
+                            sscanf(yytext, "0%o", &yylval->intval);
                             return C_INTEGER;
                         }
 [0-9]+                  {
-                            hlsl_lval.intval = (atoi(yytext));
+                            yylval->intval = (atoi(yytext));
                             return C_INTEGER;
                         }
 
@@ -206,8 +208,10 @@ row_major               {return KW_ROW_MAJOR;           }
 
 {WS}+                   {}
 {NEWLINE}               {
-                            hlsl_ctx.line_no++;
-                            hlsl_ctx.column = 1;
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
+                            ctx->line_no++;
+                            ctx->column = 1;
                         }
 
 ^#                      {
@@ -219,24 +223,30 @@ row_major               {return KW_ROW_MAJOR;           }
                             BEGIN(pp_pragma);
                         }
 <pp_pragma>pack_matrix{WS}*\({WS}*row_major{WS}*\) {
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
                             TRACE("#pragma setting row_major mode.\n");
-                            hlsl_ctx.matrix_majority = HLSL_ROW_MAJOR;
+                            ctx->matrix_majority = HLSL_ROW_MAJOR;
                             BEGIN(pp_ignore);
                         }
 <pp_pragma>pack_matrix{WS}*\({WS}*column_major{WS}*\) {
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
                             TRACE("#pragma setting column_major mode.\n");
-                            hlsl_ctx.matrix_majority = HLSL_COLUMN_MAJOR;
+                            ctx->matrix_majority = HLSL_COLUMN_MAJOR;
                             BEGIN(pp_ignore);
                         }
 <pp_pragma>{NEWLINE}    {
-                            FIXME("Unsupported preprocessor #pragma directive at line %u.\n", hlsl_ctx.line_no);
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+
+                            FIXME("Unsupported preprocessor #pragma directive at line %u.\n", ctx->line_no);
                             BEGIN(INITIAL);
                         }
 <pp_pragma>{ANY}        {}
 <pp>[0-9]+              {
                             TRACE("Preprocessor line info.\n");
                             BEGIN(pp_line);
-                            hlsl_lval.intval = (atoi(yytext));
+                            yylval->intval = (atoi(yytext));
                             return PRE_LINE;
                         }
 <pp_line>{STRING}       {
@@ -244,7 +254,7 @@ row_major               {return KW_ROW_MAJOR;           }
 
                             BEGIN(pp_ignore);
                             string[strlen(string) - 1] = 0;
-                            hlsl_lval.name = string;
+                            yylval->name = string;
                             return STRING;
                         }
 <pp_line>{WS}+          {}
@@ -268,24 +278,26 @@ row_major               {return KW_ROW_MAJOR;           }
 
 %%
 
-static void update_location(HLSL_LTYPE *lloc)
+static void update_location(struct hlsl_ctx *ctx, HLSL_LTYPE *lloc)
 {
-    lloc->file = hlsl_ctx.source_file;
-    lloc->col = hlsl_ctx.column;
-    lloc->line = hlsl_ctx.line_no;
-    hlsl_ctx.column += yyleng;
+    lloc->file = ctx->source_file;
+    lloc->col = ctx->column;
+    lloc->line = ctx->line_no;
+    ctx->column += yyget_leng(ctx->scanner);
 }
 
-int hlsl_lexer_compile(const char *text, const char *entrypoint)
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entrypoint)
 {
     YY_BUFFER_STATE buffer;
     int ret;
 
-    buffer = hlsl__scan_string(text);
-    hlsl__switch_to_buffer(buffer);
+    yylex_init_extra(ctx, &ctx->scanner);
+    buffer = hlsl__scan_string(text, ctx->scanner);
+    hlsl__switch_to_buffer(buffer, ctx->scanner);
 
-    ret = hlsl_parser_compile(entrypoint);
+    ret = hlsl_parser_compile(ctx, entrypoint);
 
-    hlsl__delete_buffer(buffer);
+    hlsl__delete_buffer(buffer, ctx->scanner);
+    yylex_destroy(ctx->scanner);
     return ret;
 }

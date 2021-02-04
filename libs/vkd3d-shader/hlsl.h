@@ -398,7 +398,7 @@ struct hlsl_scope
     struct hlsl_scope *upper;
 };
 
-struct hlsl_parse_ctx
+struct hlsl_ctx
 {
     const char **source_files;
     unsigned int source_files_count;
@@ -407,6 +407,8 @@ struct hlsl_parse_ctx
     unsigned int column;
     enum parse_status status;
     struct vkd3d_shader_message_context *message_context;
+
+    void *scanner;
 
     struct hlsl_scope *cur_scope;
     struct hlsl_scope *globals;
@@ -428,8 +430,6 @@ struct hlsl_parse_ctx
 
     struct list static_initializers;
 };
-
-extern struct hlsl_parse_ctx hlsl_ctx DECLSPEC_HIDDEN;
 
 enum hlsl_error_level
 {
@@ -525,10 +525,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDE
 
 void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl,
         bool intrinsic) DECLSPEC_HIDDEN;
-bool hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, bool local_var) DECLSPEC_HIDDEN;
-
-int hlsl_compile(enum vkd3d_shader_type type, DWORD major, DWORD minor, const char *entrypoint,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var) DECLSPEC_HIDDEN;
 
 void hlsl_dump_function(const struct hlsl_ir_function_decl *func) DECLSPEC_HIDDEN;
 
@@ -537,30 +534,32 @@ void hlsl_free_instr_list(struct list *list) DECLSPEC_HIDDEN;
 void hlsl_free_type(struct hlsl_type *type) DECLSPEC_HIDDEN;
 void hlsl_free_var(struct hlsl_ir_var *decl) DECLSPEC_HIDDEN;
 
-bool hlsl_get_function(const char *name) DECLSPEC_HIDDEN;
+bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name) DECLSPEC_HIDDEN;
 
-struct hlsl_type *hlsl_new_array_type(struct hlsl_type *basic_type, unsigned int array_size) DECLSPEC_HIDDEN;
+struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
+        unsigned int array_size) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *hlsl_new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
         struct source_location *loc) DECLSPEC_HIDDEN;
-struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_type *return_type,
+struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const char *semantic, struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs,
         struct hlsl_ir_node *rhs) DECLSPEC_HIDDEN;
-struct hlsl_type *hlsl_new_struct_type(const char *name, struct list *fields) DECLSPEC_HIDDEN;
-struct hlsl_ir_swizzle *hlsl_new_swizzle(DWORD s, unsigned int components,
+struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields) DECLSPEC_HIDDEN;
+struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, struct source_location *loc) DECLSPEC_HIDDEN;
-struct hlsl_ir_var *hlsl_new_synthetic_var(const char *name, struct hlsl_type *type,
+struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
         const struct source_location loc) DECLSPEC_HIDDEN;
-struct hlsl_type *hlsl_new_type(const char *name, enum hlsl_type_class type_class,
+struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy) DECLSPEC_HIDDEN;
-struct hlsl_ir_constant *hlsl_new_uint_constant(unsigned int n, const struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
+        const struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_unary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         struct source_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct source_location loc,
@@ -569,21 +568,22 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct source_location loc) DECLSPEC_HIDDEN;
 
 void hlsl_message(const char *fmt, ...) VKD3D_PRINTF_FUNC(1,2) DECLSPEC_HIDDEN;
-void hlsl_report_message(const struct source_location loc,
-        enum hlsl_error_level level, const char *fmt, ...) VKD3D_PRINTF_FUNC(3,4) DECLSPEC_HIDDEN;
+void hlsl_report_message(struct hlsl_ctx *ctx, const struct source_location loc,
+        enum hlsl_error_level level, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 
-void hlsl_push_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
-void hlsl_pop_scope(struct hlsl_parse_ctx *ctx) DECLSPEC_HIDDEN;
+void hlsl_push_scope(struct hlsl_ctx *ctx) DECLSPEC_HIDDEN;
+void hlsl_pop_scope(struct hlsl_ctx *ctx) DECLSPEC_HIDDEN;
 
 bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority) DECLSPEC_HIDDEN;
+struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
+        unsigned int default_majority) DECLSPEC_HIDDEN;
 bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
 unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-int hlsl_lexer_compile(const char *text, const char *entrypoint) DECLSPEC_HIDDEN;
-int hlsl_parser_compile(const char *entrypoint) DECLSPEC_HIDDEN;
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entrypoint) DECLSPEC_HIDDEN;
+int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint) DECLSPEC_HIDDEN;
 
 #endif

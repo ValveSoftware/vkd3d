@@ -25,19 +25,20 @@ void hlsl_message(const char *fmt, ...)
     /* FIXME */
 }
 
-void hlsl_report_message(const struct source_location loc,
+void hlsl_report_message(struct hlsl_ctx *ctx, const struct source_location loc,
         enum hlsl_error_level level, const char *fmt, ...)
 {
     /* FIXME */
 
     if (level == HLSL_LEVEL_ERROR)
-        set_parse_status(&hlsl_ctx.status, PARSE_ERR);
+        set_parse_status(&ctx->status, PARSE_ERR);
     else if (level == HLSL_LEVEL_WARNING)
-        set_parse_status(&hlsl_ctx.status, PARSE_WARN);
+        set_parse_status(&ctx->status, PARSE_WARN);
 }
 
-bool hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, bool local_var)
+bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)
 {
+    struct hlsl_scope *scope = ctx->cur_scope;
     struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
@@ -45,7 +46,7 @@ bool hlsl_add_var(struct hlsl_scope *scope, struct hlsl_ir_var *decl, bool local
         if (!strcmp(decl->name, var->name))
             return false;
     }
-    if (local_var && scope->upper->upper == hlsl_ctx.globals)
+    if (local_var && scope->upper->upper == ctx->globals)
     {
         /* Check whether the variable redefines a function parameter. */
         LIST_FOR_EACH_ENTRY(var, &scope->upper->vars, struct hlsl_ir_var, scope_entry)
@@ -81,7 +82,7 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     vkd3d_free(decl);
 }
 
-struct hlsl_type *hlsl_new_type(const char *name, enum hlsl_type_class type_class,
+struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
     struct hlsl_type *type;
@@ -98,14 +99,14 @@ struct hlsl_type *hlsl_new_type(const char *name, enum hlsl_type_class type_clas
     else
         type->reg_size = 1;
 
-    list_add_tail(&hlsl_ctx.types, &type->entry);
+    list_add_tail(&ctx->types, &type->entry);
 
     return type;
 }
 
-struct hlsl_type *hlsl_new_array_type(struct hlsl_type *basic_type, unsigned int array_size)
+struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size)
 {
-    struct hlsl_type *type = hlsl_new_type(NULL, HLSL_CLASS_ARRAY, HLSL_TYPE_FLOAT, 1, 1);
+    struct hlsl_type *type = hlsl_new_type(ctx, NULL, HLSL_CLASS_ARRAY, HLSL_TYPE_FLOAT, 1, 1);
 
     if (!type)
         return NULL;
@@ -126,7 +127,7 @@ static DWORD get_array_size(const struct hlsl_type *type)
     return 1;
 }
 
-struct hlsl_type *hlsl_new_struct_type(const char *name, struct list *fields)
+struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields)
 {
     struct hlsl_struct_field *field;
     unsigned int reg_size = 0;
@@ -149,7 +150,7 @@ struct hlsl_type *hlsl_new_struct_type(const char *name, struct list *fields)
     }
     type->reg_size = reg_size;
 
-    list_add_tail(&hlsl_ctx.types, &type->entry);
+    list_add_tail(&ctx->types, &type->entry);
 
     return type;
 }
@@ -166,9 +167,9 @@ struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool
     return NULL;
 }
 
-bool hlsl_get_function(const char *name)
+bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name)
 {
-    return rb_get(&hlsl_ctx.functions, name) != NULL;
+    return rb_get(&ctx->functions, name) != NULL;
 }
 
 unsigned int hlsl_type_component_count(struct hlsl_type *type)
@@ -243,7 +244,7 @@ bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
     return true;
 }
 
-struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_majority)
+struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, unsigned int default_majority)
 {
     struct hlsl_struct_field *old_field, *field;
     struct hlsl_type *type;
@@ -271,7 +272,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_ma
     switch (old->type)
     {
         case HLSL_CLASS_ARRAY:
-            type->e.array.type = hlsl_type_clone(old->e.array.type, default_majority);
+            type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority);
             type->e.array.elements_count = old->e.array.elements_count;
             type->reg_size = type->e.array.elements_count * type->e.array.type->reg_size;
             break;
@@ -302,7 +303,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_ma
                     vkd3d_free(type);
                     return NULL;
                 }
-                field->type = hlsl_type_clone(old_field->type, default_majority);
+                field->type = hlsl_type_clone(ctx, old_field->type, default_majority);
                 field->name = vkd3d_strdup(old_field->name);
                 if (old_field->semantic)
                     field->semantic = vkd3d_strdup(old_field->semantic);
@@ -324,7 +325,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_type *old, unsigned int default_ma
             break;
     }
 
-    list_add_tail(&hlsl_ctx.types, &type->entry);
+    list_add_tail(&ctx->types, &type->entry);
     return type;
 }
 
@@ -354,10 +355,7 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
     struct hlsl_ir_var *var;
 
     if (!(var = vkd3d_calloc(1, sizeof(*var))))
-    {
-        hlsl_ctx.status = PARSE_ERR;
         return NULL;
-    }
 
     var->name = name;
     var->data_type = type;
@@ -368,12 +366,13 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
     return var;
 }
 
-struct hlsl_ir_var *hlsl_new_synthetic_var(const char *name, struct hlsl_type *type, const struct source_location loc)
+struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
+        const struct source_location loc)
 {
     struct hlsl_ir_var *var = hlsl_new_var(vkd3d_strdup(name), type, loc, NULL, 0, NULL);
 
     if (var)
-        list_add_tail(&hlsl_ctx.globals->vars, &var->scope_entry);
+        list_add_tail(&ctx->globals->vars, &var->scope_entry);
     return var;
 }
 
@@ -406,13 +405,13 @@ struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs, s
     return hlsl_new_assignment(lhs, NULL, rhs, 0, rhs->loc);
 }
 
-struct hlsl_ir_constant *hlsl_new_uint_constant(unsigned int n, const struct source_location loc)
+struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n, const struct source_location loc)
 {
     struct hlsl_ir_constant *c;
 
     if (!(c = vkd3d_malloc(sizeof(*c))))
         return NULL;
-    init_node(&c->node, HLSL_IR_CONSTANT, hlsl_ctx.builtin_types.scalar[HLSL_TYPE_UINT], loc);
+    init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_UINT], loc);
     c->value.u[0] = n;
     return c;
 }
@@ -468,7 +467,7 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct sou
     return load;
 }
 
-struct hlsl_ir_swizzle *hlsl_new_swizzle(DWORD s, unsigned int components,
+struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, struct source_location *loc)
 {
     struct hlsl_ir_swizzle *swizzle;
@@ -476,7 +475,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(DWORD s, unsigned int components,
     if (!(swizzle = vkd3d_malloc(sizeof(*swizzle))))
         return NULL;
     init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            hlsl_new_type(NULL, HLSL_CLASS_VECTOR, val->data_type->base_type, components, 1), *loc);
+            hlsl_new_type(ctx, NULL, HLSL_CLASS_VECTOR, val->data_type->base_type, components, 1), *loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;
@@ -487,7 +486,7 @@ bool hlsl_type_is_void(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;
 }
 
-struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_type *return_type,
+struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const char *semantic, struct source_location loc)
 {
     struct hlsl_ir_function_decl *decl;
@@ -505,7 +504,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_type *return_type,
         char name[28];
 
         sprintf(name, "<retval-%p>", decl);
-        if (!(return_var = hlsl_new_synthetic_var(name, return_type, loc)))
+        if (!(return_var = hlsl_new_synthetic_var(ctx, name, return_type, loc)))
         {
             vkd3d_free(decl);
             return NULL;
@@ -532,7 +531,7 @@ static int compare_hlsl_types_rb(const void *key, const struct rb_entry *entry)
     return strcmp(name, type->name);
 }
 
-void hlsl_push_scope(struct hlsl_parse_ctx *ctx)
+void hlsl_push_scope(struct hlsl_ctx *ctx)
 {
     struct hlsl_scope *new_scope;
 
@@ -546,7 +545,7 @@ void hlsl_push_scope(struct hlsl_parse_ctx *ctx)
     list_add_tail(&ctx->scopes, &new_scope->entry);
 }
 
-void hlsl_pop_scope(struct hlsl_parse_ctx *ctx)
+void hlsl_pop_scope(struct hlsl_ctx *ctx)
 {
     struct hlsl_scope *prev_scope = ctx->cur_scope->upper;
 
@@ -1376,7 +1375,7 @@ static int compare_function_rb(const void *key, const struct rb_entry *entry)
     return strcmp(name, func->name);
 }
 
-static void declare_predefined_types(struct hlsl_scope *scope)
+static void declare_predefined_types(struct hlsl_ctx *ctx)
 {
     unsigned int x, y, bt, i;
     struct hlsl_type *type;
@@ -1427,22 +1426,22 @@ static void declare_predefined_types(struct hlsl_scope *scope)
             for (x = 1; x <= 4; ++x)
             {
                 sprintf(name, "%s%ux%u", names[bt], y, x);
-                type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_MATRIX, bt, x, y);
-                hlsl_scope_add_type(scope, type);
+                type = hlsl_new_type(ctx, vkd3d_strdup(name), HLSL_CLASS_MATRIX, bt, x, y);
+                hlsl_scope_add_type(ctx->globals, type);
 
                 if (y == 1)
                 {
                     sprintf(name, "%s%u", names[bt], x);
-                    type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_VECTOR, bt, x, y);
-                    hlsl_scope_add_type(scope, type);
-                    hlsl_ctx.builtin_types.vector[bt][x - 1] = type;
+                    type = hlsl_new_type(ctx, vkd3d_strdup(name), HLSL_CLASS_VECTOR, bt, x, y);
+                    hlsl_scope_add_type(ctx->globals, type);
+                    ctx->builtin_types.vector[bt][x - 1] = type;
 
                     if (x == 1)
                     {
                         sprintf(name, "%s", names[bt]);
-                        type = hlsl_new_type(vkd3d_strdup(name), HLSL_CLASS_SCALAR, bt, x, y);
-                        hlsl_scope_add_type(scope, type);
-                        hlsl_ctx.builtin_types.scalar[bt] = type;
+                        type = hlsl_new_type(ctx, vkd3d_strdup(name), HLSL_CLASS_SCALAR, bt, x, y);
+                        hlsl_scope_add_type(ctx->globals, type);
+                        ctx->builtin_types.scalar[bt] = type;
                     }
                 }
             }
@@ -1451,22 +1450,22 @@ static void declare_predefined_types(struct hlsl_scope *scope)
 
     for (bt = 0; bt <= HLSL_SAMPLER_DIM_MAX; ++bt)
     {
-        type = hlsl_new_type(vkd3d_strdup(sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
+        type = hlsl_new_type(ctx, vkd3d_strdup(sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
         type->sampler_dim = bt;
-        hlsl_ctx.builtin_types.sampler[bt] = type;
+        ctx->builtin_types.sampler[bt] = type;
     }
 
-    hlsl_ctx.builtin_types.Void = hlsl_new_type(vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
+    ctx->builtin_types.Void = hlsl_new_type(ctx, vkd3d_strdup("void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {
-        type = hlsl_new_type(vkd3d_strdup(effect_types[i].name), effect_types[i].class,
+        type = hlsl_new_type(ctx, vkd3d_strdup(effect_types[i].name), effect_types[i].class,
                 effect_types[i].base_type, effect_types[i].dimx, effect_types[i].dimy);
-        hlsl_scope_add_type(scope, type);
+        hlsl_scope_add_type(ctx->globals, type);
     }
 }
 
-static bool hlsl_ctx_init(struct hlsl_parse_ctx *ctx, struct vkd3d_shader_message_context *message_context)
+static bool hlsl_ctx_init(struct hlsl_ctx *ctx, struct vkd3d_shader_message_context *message_context)
 {
     memset(ctx, 0, sizeof(*ctx));
 
@@ -1490,7 +1489,7 @@ static bool hlsl_ctx_init(struct hlsl_parse_ctx *ctx, struct vkd3d_shader_messag
     ctx->globals = ctx->cur_scope;
 
     list_init(&ctx->types);
-    declare_predefined_types(ctx->globals);
+    declare_predefined_types(ctx);
 
     rb_init(&ctx->functions, compare_function_rb);
 
@@ -1499,7 +1498,7 @@ static bool hlsl_ctx_init(struct hlsl_parse_ctx *ctx, struct vkd3d_shader_messag
     return true;
 }
 
-static void hlsl_ctx_cleanup(struct hlsl_parse_ctx *ctx)
+static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 {
     struct hlsl_scope *scope, *next_scope;
     struct hlsl_ir_var *var, *next_var;
@@ -1529,6 +1528,7 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
 {
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
     const struct hlsl_profile_info *profile;
+    struct hlsl_ctx ctx;
     int ret;
 
     if (!(hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO)))
@@ -1545,12 +1545,12 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
 
     vkd3d_shader_dump_shader(profile->type, &compile_info->source);
 
-    if (!hlsl_ctx_init(&hlsl_ctx, message_context))
+    if (!hlsl_ctx_init(&ctx, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    ret = hlsl_lexer_compile(text, hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main");
+    ret = hlsl_lexer_compile(&ctx, text, hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main");
 
-    hlsl_ctx_cleanup(&hlsl_ctx);
+    hlsl_ctx_cleanup(&ctx);
 
     return ret;
 }
