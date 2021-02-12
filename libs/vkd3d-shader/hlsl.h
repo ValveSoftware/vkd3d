@@ -496,7 +496,7 @@ static inline void hlsl_src_remove(struct hlsl_src *src)
 
 const char *hlsl_base_type_to_string(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
-const char *hlsl_debug_modifiers(DWORD modifiers) DECLSPEC_HIDDEN;
+char *hlsl_modifiers_to_string(unsigned int modifiers) DECLSPEC_HIDDEN;
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDEN;
 
 void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl,

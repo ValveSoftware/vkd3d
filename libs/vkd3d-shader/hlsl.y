@@ -282,8 +282,14 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
 
         if (invalid)
         {
-            hlsl_error(ctx, decl->loc, "modifier '%s' invalid for local variables", hlsl_debug_modifiers(invalid));
+            char *string;
+
+            if ((string = hlsl_modifiers_to_string(invalid)))
+                hlsl_error(ctx, decl->loc,
+                        "Modifiers '%s' are not allowed on local variables.", string);
+            vkd3d_free(string);
         }
+
         if (decl->semantic)
         {
             hlsl_error(ctx, decl->loc, "semantics are not allowed on local variables");
@@ -314,7 +320,11 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
 {
     if (modifiers & mod)
     {
-        hlsl_error(ctx, loc, "modifier '%s' already specified", hlsl_debug_modifiers(mod));
+        char *string;
+
+        if ((string = hlsl_modifiers_to_string(mod)))
+            hlsl_error(ctx, loc, "Modifier '%s' was already specified.", string);
+        vkd3d_free(string);
         return modifiers;
     }
     if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
