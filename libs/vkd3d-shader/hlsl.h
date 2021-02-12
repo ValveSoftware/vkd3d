@@ -23,13 +23,6 @@
 #include "vkd3d_shader_private.h"
 #include "rbtree.h"
 
-enum parse_status
-{
-    PARSE_SUCCESS = 0,
-    PARSE_WARN = 1,
-    PARSE_ERR = 2
-};
-
 /* The general IR structure is inspired by Mesa GLSL hir, even though the code
  * ends up being quite different in practice. Anyway, here comes the relevant
  * licensing information.
@@ -396,8 +389,8 @@ struct hlsl_ctx
     const char **source_files;
     unsigned int source_files_count;
     struct vkd3d_shader_location location;
-    enum parse_status status;
     struct vkd3d_shader_message_context *message_context;
+    bool failed;
 
     void *scanner;
 
@@ -499,14 +492,6 @@ static inline void hlsl_src_remove(struct hlsl_src *src)
     if (src->node)
         list_remove(&src->entry);
     src->node = NULL;
-}
-
-static inline void set_parse_status(enum parse_status *current, enum parse_status update)
-{
-    if (update == PARSE_ERR)
-        *current = PARSE_ERR;
-    else if (update == PARSE_WARN && *current == PARSE_SUCCESS)
-        *current = PARSE_WARN;
 }
 
 const char *hlsl_base_type_to_string(const struct hlsl_type *type) DECLSPEC_HIDDEN;

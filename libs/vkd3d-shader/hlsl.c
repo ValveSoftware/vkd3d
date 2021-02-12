@@ -35,14 +35,12 @@ void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, co
 {
     /* FIXME */
 
-    set_parse_status(&ctx->status, PARSE_ERR);
+    ctx->failed = true;
 }
 
 void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, const char *fmt, ...)
 {
     /* FIXME */
-
-    set_parse_status(&ctx->status, PARSE_WARN);
 }
 
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)

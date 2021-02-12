@@ -2006,7 +2006,7 @@ param_list:
             if (!add_func_parameter(ctx, $$, &$1, @1))
             {
                 ERR("Error adding function parameter %s.\n", $1.name);
-                set_parse_status(&ctx->status, PARSE_ERR);
+                ctx->failed = true;
                 YYABORT;
             }
         }
@@ -3111,7 +3111,7 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
 
     yyparse(ctx->scanner, ctx);
 
-    if (ctx->status == PARSE_ERR)
+    if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
 
     if (!(entry_func = get_func_entry(ctx, entrypoint)))
@@ -3140,7 +3140,7 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
 
     compute_liveness(ctx, entry_func);
 
-    if (ctx->status == PARSE_ERR)
+    if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
     return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
