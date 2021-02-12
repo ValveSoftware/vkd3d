@@ -28486,9 +28486,9 @@ static void test_cpu_descriptors_lifetime(void)
     destroy_test_context(&context);
 }
 
-static void check_clip_distance(struct test_context *context,
-        ID3D12PipelineState *pso, D3D12_VERTEX_BUFFER_VIEW vbv[2], ID3D12Resource *vb,
-        ID3D12Resource *vs_cb, ID3D12Resource *gs_cb)
+static void check_clip_distance(struct test_context *context, ID3D12PipelineState *pso,
+        D3D12_PRIMITIVE_TOPOLOGY topology, D3D12_VERTEX_BUFFER_VIEW vbv[2], ID3D12Resource *vb,
+        ID3D12Resource *vs_cb, ID3D12Resource *tess_cb, ID3D12Resource *gs_cb)
 {
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     struct vertex
@@ -28511,10 +28511,14 @@ static void check_clip_distance(struct test_context *context,
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, topology);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, vbv);
@@ -28535,10 +28539,14 @@ static void check_clip_distance(struct test_context *context,
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, topology);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, vbv);
@@ -28559,10 +28567,14 @@ static void check_clip_distance(struct test_context *context,
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, topology);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, vbv);
@@ -28583,10 +28595,14 @@ static void check_clip_distance(struct test_context *context,
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, topology);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, vbv);
@@ -28612,10 +28628,14 @@ static void check_clip_distance(struct test_context *context,
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, topology);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 2, vbv);
@@ -28637,11 +28657,11 @@ static void check_clip_distance(struct test_context *context,
 
 static void test_clip_distance(void)
 {
+    ID3D12Resource *vs_cb, *tess_cb, *gs_cb, *vb[2];
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
-    D3D12_ROOT_PARAMETER root_parameters[3];
+    D3D12_ROOT_PARAMETER root_parameters[4];
     ID3D12GraphicsCommandList *command_list;
-    ID3D12Resource *vs_cb, *gs_cb, *vb[2];
     D3D12_INPUT_LAYOUT_DESC input_layout;
     D3D12_VERTEX_BUFFER_VIEW vbv[2];
     struct test_context_desc desc;
@@ -28752,6 +28772,171 @@ static void test_clip_distance(void)
         0x00000000, 0x00000000, 0x0010100a, 0x00000002, 0x0100003e,
     };
     static const D3D12_SHADER_BYTECODE vs_multiple = {vs_multiple_code, sizeof(vs_multiple_code)};
+#if 0
+    bool use_constant;
+    float clip_distance0;
+    float clip_distance1;
+    float tessellation_factor;
+
+    struct vertex
+    {
+        float4 position : SV_POSITION;
+        float user_clip : CLIP_DISTANCE;
+        float clip : SV_ClipDistance;
+    };
+
+    struct patch_constant_data
+    {
+        float edges[4] : SV_TessFactor;
+        float inside[2] : SV_InsideTessFactor;
+    };
+
+    patch_constant_data patch_constant()
+    {
+        patch_constant_data output;
+
+        output.edges[0] = tessellation_factor;
+        output.edges[1] = tessellation_factor;
+        output.edges[2] = tessellation_factor;
+        output.edges[3] = tessellation_factor;
+        output.inside[0] = tessellation_factor;
+        output.inside[1] = tessellation_factor;
+
+        return output;
+    }
+
+    [domain("quad")]
+    [outputcontrolpoints(4)]
+    [outputtopology("triangle_cw")]
+    [partitioning("pow2")]
+    [patchconstantfunc("patch_constant")]
+    vertex hs_main(InputPatch<vertex, 4> input,
+            uint i : SV_OutputControlPointID)
+    {
+        vertex o;
+        o.position = input[i].position;
+        o.user_clip = input[i].user_clip;
+        o.clip = input[i].user_clip;
+        return o;
+    }
+
+    float4 interpolate_vec(float4 a, float4 b, float4 c, float4 d, float2 tess_coord)
+    {
+        float4 e = lerp(a, b, tess_coord.x);
+        float4 f = lerp(c, d, tess_coord.x);
+        return lerp(e, f, tess_coord.y);
+    }
+
+    float interpolate(float a, float b, float c, float d, float2 tess_coord)
+    {
+        float e = lerp(a, b, tess_coord.x);
+        float f = lerp(c, d, tess_coord.x);
+        return lerp(e, f, tess_coord.y);
+    }
+
+    [domain("quad")]
+    vertex ds_main(patch_constant_data input,
+            float2 tess_coord : SV_DomainLocation,
+            const OutputPatch<vertex, 4> patch)
+    {
+        vertex output;
+
+        output.position = interpolate_vec(patch[0].position, patch[1].position,
+                patch[2].position, patch[3].position, tess_coord);
+        output.user_clip = interpolate(patch[0].user_clip, patch[1].user_clip,
+                patch[2].user_clip, patch[3].user_clip, tess_coord);
+        output.clip = interpolate(patch[0].clip, patch[1].clip,
+                patch[2].clip, patch[3].clip, tess_coord);
+        if (use_constant)
+            output.clip = clip_distance0;
+
+        return output;
+    }
+#endif
+    static const DWORD hs_code[] =
+    {
+        0x43425844, 0x5a6d7564, 0x5f30a6c9, 0x2cf3b848, 0x5b4c6dca, 0x00000001, 0x00000414, 0x00000004,
+        0x00000030, 0x000000b4, 0x00000138, 0x000001fc, 0x4e475349, 0x0000007c, 0x00000003, 0x00000008,
+        0x00000050, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x00000f0f, 0x0000005c, 0x00000000,
+        0x00000000, 0x00000003, 0x00000001, 0x00000101, 0x0000006a, 0x00000000, 0x00000002, 0x00000003,
+        0x00000002, 0x00000001, 0x505f5653, 0x5449534f, 0x004e4f49, 0x50494c43, 0x5349445f, 0x434e4154,
+        0x56530045, 0x696c435f, 0x73694470, 0x636e6174, 0xabab0065, 0x4e47534f, 0x0000007c, 0x00000003,
+        0x00000008, 0x00000050, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x0000005c,
+        0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x00000e01, 0x0000006a, 0x00000000, 0x00000002,
+        0x00000003, 0x00000002, 0x00000e01, 0x505f5653, 0x5449534f, 0x004e4f49, 0x50494c43, 0x5349445f,
+        0x434e4154, 0x56530045, 0x696c435f, 0x73694470, 0x636e6174, 0xabab0065, 0x47534350, 0x000000bc,
+        0x00000006, 0x00000008, 0x00000098, 0x00000000, 0x0000000b, 0x00000003, 0x00000000, 0x00000e01,
+        0x00000098, 0x00000001, 0x0000000b, 0x00000003, 0x00000001, 0x00000e01, 0x00000098, 0x00000002,
+        0x0000000b, 0x00000003, 0x00000002, 0x00000e01, 0x00000098, 0x00000003, 0x0000000b, 0x00000003,
+        0x00000003, 0x00000e01, 0x000000a6, 0x00000000, 0x0000000c, 0x00000003, 0x00000004, 0x00000e01,
+        0x000000a6, 0x00000001, 0x0000000c, 0x00000003, 0x00000005, 0x00000e01, 0x545f5653, 0x46737365,
+        0x6f746361, 0x56530072, 0x736e495f, 0x54656469, 0x46737365, 0x6f746361, 0xabab0072, 0x58454853,
+        0x00000210, 0x00030050, 0x00000084, 0x01000071, 0x01002093, 0x01002094, 0x01001895, 0x01001096,
+        0x01001897, 0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x01000072, 0x0200005f,
+        0x00016000, 0x0400005f, 0x002010f2, 0x00000004, 0x00000000, 0x0400005f, 0x00201012, 0x00000004,
+        0x00000001, 0x03000065, 0x001020f2, 0x00000000, 0x03000065, 0x00102012, 0x00000001, 0x03000065,
+        0x00102012, 0x00000002, 0x02000068, 0x00000001, 0x04000036, 0x00100012, 0x00000000, 0x00016001,
+        0x07000036, 0x001020f2, 0x00000000, 0x00a01e46, 0x0010000a, 0x00000000, 0x00000000, 0x07000036,
+        0x00102012, 0x00000001, 0x00a0100a, 0x0010000a, 0x00000000, 0x00000001, 0x07000036, 0x00102012,
+        0x00000002, 0x00a0100a, 0x0010000a, 0x00000000, 0x00000001, 0x0100003e, 0x01000073, 0x02000099,
+        0x00000004, 0x0200005f, 0x00017000, 0x04000067, 0x00102012, 0x00000000, 0x0000000b, 0x04000067,
+        0x00102012, 0x00000001, 0x0000000c, 0x04000067, 0x00102012, 0x00000002, 0x0000000d, 0x04000067,
+        0x00102012, 0x00000003, 0x0000000e, 0x02000068, 0x00000001, 0x0400005b, 0x00102012, 0x00000000,
+        0x00000004, 0x04000036, 0x00100012, 0x00000000, 0x0001700a, 0x07000036, 0x00902012, 0x0010000a,
+        0x00000000, 0x0020803a, 0x00000000, 0x00000000, 0x0100003e, 0x01000073, 0x02000099, 0x00000002,
+        0x0200005f, 0x00017000, 0x04000067, 0x00102012, 0x00000004, 0x0000000f, 0x04000067, 0x00102012,
+        0x00000005, 0x00000010, 0x02000068, 0x00000001, 0x0400005b, 0x00102012, 0x00000004, 0x00000002,
+        0x04000036, 0x00100012, 0x00000000, 0x0001700a, 0x08000036, 0x00d02012, 0x00000004, 0x0010000a,
+        0x00000000, 0x0020803a, 0x00000000, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE hs = {hs_code, sizeof(hs_code)};
+    static const DWORD ds_code[] =
+    {
+        0x43425844, 0xc54dc020, 0x063a9622, 0x6f649eb9, 0xceb1dd36, 0x00000001, 0x0000054c, 0x00000004,
+        0x00000030, 0x000000b4, 0x00000178, 0x000001fc, 0x4e475349, 0x0000007c, 0x00000003, 0x00000008,
+        0x00000050, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x00000f0f, 0x0000005c, 0x00000000,
+        0x00000000, 0x00000003, 0x00000001, 0x00000101, 0x0000006a, 0x00000000, 0x00000002, 0x00000003,
+        0x00000002, 0x00000101, 0x505f5653, 0x5449534f, 0x004e4f49, 0x50494c43, 0x5349445f, 0x434e4154,
+        0x56530045, 0x696c435f, 0x73694470, 0x636e6174, 0xabab0065, 0x47534350, 0x000000bc, 0x00000006,
+        0x00000008, 0x00000098, 0x00000000, 0x0000000b, 0x00000003, 0x00000000, 0x00000001, 0x00000098,
+        0x00000001, 0x0000000b, 0x00000003, 0x00000001, 0x00000001, 0x00000098, 0x00000002, 0x0000000b,
+        0x00000003, 0x00000002, 0x00000001, 0x00000098, 0x00000003, 0x0000000b, 0x00000003, 0x00000003,
+        0x00000001, 0x000000a6, 0x00000000, 0x0000000c, 0x00000003, 0x00000004, 0x00000001, 0x000000a6,
+        0x00000001, 0x0000000c, 0x00000003, 0x00000005, 0x00000001, 0x545f5653, 0x46737365, 0x6f746361,
+        0x56530072, 0x736e495f, 0x54656469, 0x46737365, 0x6f746361, 0xabab0072, 0x4e47534f, 0x0000007c,
+        0x00000003, 0x00000008, 0x00000050, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f,
+        0x0000005c, 0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x00000e01, 0x0000006a, 0x00000000,
+        0x00000002, 0x00000003, 0x00000002, 0x00000e01, 0x505f5653, 0x5449534f, 0x004e4f49, 0x50494c43,
+        0x5349445f, 0x434e4154, 0x56530045, 0x696c435f, 0x73694470, 0x636e6174, 0xabab0065, 0x58454853,
+        0x00000348, 0x00040050, 0x000000d2, 0x01002093, 0x01001895, 0x0100086a, 0x04000059, 0x00208e46,
+        0x00000000, 0x00000001, 0x0200005f, 0x0001c032, 0x0400005f, 0x002190f2, 0x00000004, 0x00000000,
+        0x0400005f, 0x00219012, 0x00000004, 0x00000001, 0x0400005f, 0x00219012, 0x00000004, 0x00000002,
+        0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x03000065, 0x00102012, 0x00000001, 0x04000067,
+        0x00102012, 0x00000002, 0x00000002, 0x02000068, 0x00000002, 0x0a000000, 0x001000f2, 0x00000000,
+        0x80219e46, 0x00000041, 0x00000002, 0x00000000, 0x00219e46, 0x00000003, 0x00000000, 0x09000032,
+        0x001000f2, 0x00000000, 0x0001c006, 0x00100e46, 0x00000000, 0x00219e46, 0x00000002, 0x00000000,
+        0x0a000000, 0x001000f2, 0x00000001, 0x80219e46, 0x00000041, 0x00000000, 0x00000000, 0x00219e46,
+        0x00000001, 0x00000000, 0x09000032, 0x001000f2, 0x00000001, 0x0001c006, 0x00100e46, 0x00000001,
+        0x00219e46, 0x00000000, 0x00000000, 0x08000000, 0x001000f2, 0x00000000, 0x00100e46, 0x00000000,
+        0x80100e46, 0x00000041, 0x00000001, 0x08000032, 0x001020f2, 0x00000000, 0x0001c556, 0x00100e46,
+        0x00000000, 0x00100e46, 0x00000001, 0x0a000000, 0x00100012, 0x00000000, 0x8021900a, 0x00000041,
+        0x00000002, 0x00000001, 0x0021900a, 0x00000003, 0x00000001, 0x09000032, 0x00100012, 0x00000000,
+        0x0001c00a, 0x0010000a, 0x00000000, 0x0021900a, 0x00000002, 0x00000001, 0x0a000000, 0x00100022,
+        0x00000000, 0x8021900a, 0x00000041, 0x00000000, 0x00000001, 0x0021900a, 0x00000001, 0x00000001,
+        0x09000032, 0x00100022, 0x00000000, 0x0001c00a, 0x0010001a, 0x00000000, 0x0021900a, 0x00000000,
+        0x00000001, 0x08000000, 0x00100012, 0x00000000, 0x8010001a, 0x00000041, 0x00000000, 0x0010000a,
+        0x00000000, 0x08000032, 0x00102012, 0x00000001, 0x0001c01a, 0x0010000a, 0x00000000, 0x0010001a,
+        0x00000000, 0x0a000000, 0x00100012, 0x00000000, 0x8021900a, 0x00000041, 0x00000002, 0x00000002,
+        0x0021900a, 0x00000003, 0x00000002, 0x09000032, 0x00100012, 0x00000000, 0x0001c00a, 0x0010000a,
+        0x00000000, 0x0021900a, 0x00000002, 0x00000002, 0x0a000000, 0x00100022, 0x00000000, 0x8021900a,
+        0x00000041, 0x00000000, 0x00000002, 0x0021900a, 0x00000001, 0x00000002, 0x09000032, 0x00100022,
+        0x00000000, 0x0001c00a, 0x0010001a, 0x00000000, 0x0021900a, 0x00000000, 0x00000002, 0x08000000,
+        0x00100012, 0x00000000, 0x8010001a, 0x00000041, 0x00000000, 0x0010000a, 0x00000000, 0x08000032,
+        0x00100012, 0x00000000, 0x0001c01a, 0x0010000a, 0x00000000, 0x0010001a, 0x00000000, 0x0b000037,
+        0x00102012, 0x00000002, 0x0020800a, 0x00000000, 0x00000000, 0x0020801a, 0x00000000, 0x00000000,
+        0x0010000a, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ds = {ds_code, sizeof(ds_code)};
     static const DWORD gs_code[] =
     {
 #if 0
@@ -28845,7 +29030,7 @@ static void test_clip_distance(void)
         bool use_constant;
         float clip_distance0;
         float clip_distance1;
-        float padding;
+        float tessellation_factor;
     } cb_data;
 
     memset(&desc, 0, sizeof(desc));
@@ -28862,14 +29047,22 @@ static void test_clip_distance(void)
     root_parameters[0].Descriptor.ShaderRegister = 0;
     root_parameters[0].Descriptor.RegisterSpace = 0;
     root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
     root_parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-    root_parameters[1].Descriptor.ShaderRegister = 1;
+    root_parameters[1].Descriptor.ShaderRegister = 0;
     root_parameters[1].Descriptor.RegisterSpace = 0;
-    root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_HULL;
+
     root_parameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     root_parameters[2].Descriptor.ShaderRegister = 0;
     root_parameters[2].Descriptor.RegisterSpace = 0;
-    root_parameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
+    root_parameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_DOMAIN;
+
+    root_parameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+    root_parameters[3].Descriptor.ShaderRegister = 0;
+    root_parameters[3].Descriptor.RegisterSpace = 0;
+    root_parameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_GEOMETRY;
+
     root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
     root_signature_desc.pParameters = root_parameters;
     root_signature_desc.NumStaticSamplers = 0;
@@ -28898,14 +29091,20 @@ static void test_clip_distance(void)
     vbv[1].SizeInBytes = sizeof(vertices);
 
     memset(&cb_data, 0, sizeof(cb_data));
+    cb_data.tessellation_factor = 1.0f;
     vs_cb = create_upload_buffer(device, sizeof(cb_data), &cb_data);
+    tess_cb = create_upload_buffer(device, sizeof(cb_data), &cb_data);
     gs_cb = create_upload_buffer(device, sizeof(cb_data), &cb_data);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -28923,7 +29122,7 @@ static void test_clip_distance(void)
     reset_command_list(command_list, context.allocator);
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    check_clip_distance(&context, pso, vbv, vb[1], vs_cb, gs_cb);
+    check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, vbv, vb[1], vs_cb, tess_cb, gs_cb);
 
     cb_data.use_constant = true;
     cb_data.clip_distance0 = -1.0f;
@@ -28931,13 +29130,63 @@ static void test_clip_distance(void)
 
     ID3D12PipelineState_Release(pso);
 
+    /* tessellation shaders */
+    pso_desc.HS = hs;
+    pso_desc.DS = ds;
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pso);
+    ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
+
+    check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
+            vbv, vb[1], vs_cb, tess_cb, gs_cb);
+
+    cb_data.use_constant = false;
+    cb_data.tessellation_factor = 2.0f;
+    update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
+
+    for (i = 0; i < ARRAY_SIZE(vertices); ++i)
+        vertices[i].clip_distance0 = 1.0f;
+    update_buffer_data(vb[1], 0, sizeof(vertices), &vertices);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
+            ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
+            ID3D12Resource_GetGPUVirtualAddress(gs_cb));
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
+
+    ID3D12PipelineState_Release(pso);
+    reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    cb_data.use_constant = true;
+    cb_data.clip_distance0 = -1.0f;
+    update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
+
     /* geometry shader */
     pso_desc.GS = gs;
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pso);
     ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
 
-    check_clip_distance(&context, pso, vbv, vb[1], vs_cb, gs_cb);
+    check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
+            vbv, vb[1], vs_cb, tess_cb, gs_cb);
 
     cb_data.use_constant = true;
     cb_data.clip_distance0 = 1.0f;
@@ -28946,10 +29195,14 @@ static void test_clip_distance(void)
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
     ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
@@ -28966,7 +29219,10 @@ static void test_clip_distance(void)
 
     /* multiple clip distances */
     pso_desc.VS = vs_multiple;
+    memset(&pso_desc.HS, 0, sizeof(pso_desc.HS));
+    memset(&pso_desc.DS, 0, sizeof(pso_desc.DS));
     memset(&pso_desc.GS, 0, sizeof(pso_desc.GS));
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pso);
     ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
@@ -28981,7 +29237,11 @@ static void test_clip_distance(void)
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -29008,7 +29268,11 @@ static void test_clip_distance(void)
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -29041,7 +29305,11 @@ static void test_clip_distance(void)
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
             ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
     ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
             ID3D12Resource_GetGPUVirtualAddress(gs_cb));
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -29058,6 +29326,7 @@ static void test_clip_distance(void)
     for (i = 0; i < ARRAY_SIZE(vb); ++i)
         ID3D12Resource_Release(vb[i]);
     ID3D12Resource_Release(vs_cb);
+    ID3D12Resource_Release(tess_cb);
     ID3D12Resource_Release(gs_cb);
     destroy_test_context(&context);
 }
