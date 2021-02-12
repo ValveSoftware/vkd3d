@@ -6268,16 +6268,18 @@ static void vkd3d_dxbc_compiler_emit_hull_shader_barrier(struct vkd3d_dxbc_compi
 
 static void vkd3d_dxbc_compiler_emit_hull_shader_input_initialisation(struct vkd3d_dxbc_compiler *compiler)
 {
+    uint32_t type_id, length_id, register_index_id, src_array_id, dst_array_id, vicp_id, tmp_id;
     const struct vkd3d_shader_signature *signature = compiler->input_signature;
+    uint32_t src_type_id, dst_type_id, src_id, dst_id, point_index_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t type_id, length_id, index_id, src_id, dst_id, vicp_id;
     const struct vkd3d_shader_signature_element *element;
     enum vkd3d_shader_input_sysval_semantic sysval;
     const struct vkd3d_spirv_builtin *builtin;
-    unsigned int register_count, i;
+    unsigned int register_count, i, j;
     struct vkd3d_shader_register r;
     struct vkd3d_symbol symbol;
     struct rb_entry *entry;
+    uint32_t indices[2];
 
     for (i = 0, register_count = 0; i < signature->element_count; ++i)
     {
@@ -6303,26 +6305,51 @@ static void vkd3d_dxbc_compiler_emit_hull_shader_input_initialisation(struct vkd
         entry = rb_get(&compiler->symbol_table, &symbol);
         vicp_id = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry)->id;
 
-        index_id = vkd3d_dxbc_compiler_get_constant_uint(compiler, element->register_index);
-        dst_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, type_id, vicp_id, index_id);
+        register_index_id = vkd3d_dxbc_compiler_get_constant_uint(compiler, element->register_index);
+        dst_array_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, type_id, vicp_id, register_index_id);
 
         if (element->sysval_semantic)
         {
             sysval = vkd3d_siv_from_sysval(element->sysval_semantic);
             builtin = get_spirv_builtin_for_sysval(compiler, sysval);
-            src_id = vkd3d_dxbc_compiler_emit_builtin_variable(compiler, builtin,
+            src_array_id = vkd3d_dxbc_compiler_emit_builtin_variable(compiler, builtin,
                     SpvStorageClassInput, compiler->input_control_point_count);
+
+            if (builtin->component_count == 4)
+            {
+                vkd3d_spirv_build_op_copy_memory(builder, dst_array_id, src_array_id, SpvMemoryAccessMaskNone);
+            }
+            else
+            {
+                tmp_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, builtin->component_count);
+                src_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassInput, tmp_id);
+                dst_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassPrivate, tmp_id);
+
+                for (j = 0; j < compiler->input_control_point_count; ++j)
+                {
+                    point_index_id = vkd3d_dxbc_compiler_get_constant_uint(compiler, j);
+                    src_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder,
+                            src_type_id, src_array_id, point_index_id);
+
+                    indices[0] = point_index_id;
+                    indices[1] = vkd3d_dxbc_compiler_get_constant_uint(compiler, 0);
+                    dst_id = vkd3d_spirv_build_op_in_bounds_access_chain(builder,
+                            dst_type_id, dst_array_id, indices, 2);
+
+                    vkd3d_spirv_build_op_copy_memory(builder, dst_id, src_id, SpvMemoryAccessMaskNone);
+                }
+            }
         }
         else
         {
-            src_id = vkd3d_dxbc_compiler_emit_array_variable(compiler, &builder->global_stream,
+            src_array_id = vkd3d_dxbc_compiler_emit_array_variable(compiler, &builder->global_stream,
                     SpvStorageClassInput, VKD3D_SHADER_COMPONENT_FLOAT, 4, compiler->input_control_point_count);
-            vkd3d_spirv_add_iface_variable(builder, src_id);
-            vkd3d_spirv_build_op_decorate1(builder, src_id, SpvDecorationLocation, element->register_index);
-            vkd3d_spirv_build_op_name(builder, src_id, "v%u", element->register_index);
-        }
+            vkd3d_spirv_add_iface_variable(builder, src_array_id);
+            vkd3d_spirv_build_op_decorate1(builder, src_array_id, SpvDecorationLocation, element->register_index);
+            vkd3d_spirv_build_op_name(builder, src_array_id, "v%u", element->register_index);
 
-        vkd3d_spirv_build_op_copy_memory(builder, dst_id, src_id, SpvMemoryAccessMaskNone);
+            vkd3d_spirv_build_op_copy_memory(builder, dst_array_id, src_array_id, SpvMemoryAccessMaskNone);
+        }
     }
 }
 
