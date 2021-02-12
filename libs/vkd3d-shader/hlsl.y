@@ -121,14 +121,6 @@ static struct hlsl_ir_node *node_from_list(struct list *list)
     return LIST_ENTRY(list_tail(list), struct hlsl_ir_node, entry);
 }
 
-static void debug_dump_decl(struct hlsl_type *type, DWORD modifiers, const char *declname, unsigned int line_no)
-{
-    TRACE("Line %u: ", line_no);
-    if (modifiers)
-        TRACE("%s ", hlsl_debug_modifiers(modifiers));
-    TRACE("%s %s;\n", debug_hlsl_type(type), declname);
-}
-
 static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
 {
     if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
@@ -270,8 +262,6 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     if (dst_type->dimx * dst_type->dimy < src_type->dimx * src_type->dimy)
         hlsl_warning(ctx, *loc, "implicit truncation of vector type");
 
-    TRACE("Implicit conversion from %s to %s.\n", debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
-
     if (!(cast = hlsl_new_cast(node, dst_type, loc)))
         return NULL;
     list_add_tail(instrs, &cast->node.entry);
@@ -282,7 +272,6 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
 {
     bool ret;
 
-    TRACE("Declaring variable %s.\n", decl->name);
     if (decl->data_type->type != HLSL_CLASS_MATRIX)
         check_invalid_matrix_modifiers(ctx, decl->modifiers, decl->loc);
 
@@ -428,7 +417,6 @@ static unsigned int initializer_size(const struct parse_initializer *initializer
     {
         count += hlsl_type_component_count(initializer->args[i]->data_type);
     }
-    TRACE("Initializer size = %u.\n", count);
     return count;
 }
 
@@ -581,8 +569,6 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
         if (!(var = hlsl_new_synthetic_var(ctx, name, var_node->data_type, var_node->loc)))
             return NULL;
 
-        TRACE("Synthesized variable %p for %s node.\n", var, hlsl_node_type_to_string(var_node->type));
-
         if (!(assign = hlsl_new_simple_assignment(var, var_node)))
             return NULL;
 
@@ -617,8 +603,6 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     struct hlsl_type *data_type;
     struct hlsl_ir_constant *c;
     struct hlsl_ir_node *mul;
-
-    TRACE("Array load from type %s.\n", debug_hlsl_type(expr_type));
 
     if (expr_type->type == HLSL_CLASS_ARRAY)
     {
@@ -721,7 +705,6 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
     list_init(list);
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, fields, struct parse_variable_def, entry)
     {
-        debug_dump_decl(type, 0, v->name, v->loc.line);
         if (!(field = vkd3d_calloc(1, sizeof(*field))))
         {
             vkd3d_free(v);
@@ -1121,7 +1104,6 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             break;
         if (hlsl_type_compare(operands[i]->data_type, type))
             continue;
-        TRACE("Implicitly converting %s into %s in an expression.\n", debug_hlsl_type(operands[i]->data_type), debug_hlsl_type(type));
         if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
                 && operands[i]->data_type->dimx * operands[i]->data_type->dimy != type->dimx * type->dimy)
         {
@@ -1292,7 +1274,6 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
         struct hlsl_ir_node *expr;
 
-        TRACE("Adding an expression for the compound assignment.\n");
         expr = hlsl_new_binary_expr(op, lhs, rhs);
         list_add_after(&rhs->entry, &expr->entry);
         rhs = expr;
@@ -1391,7 +1372,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             free_parse_variable_def(v);
             continue;
         }
-        debug_dump_decl(type, modifiers, v->name, v->loc.line);
 
         if (ctx->cur_scope == ctx->globals)
         {
@@ -1414,14 +1394,12 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             vkd3d_free(v);
             continue;
         }
-        TRACE("Declared variable %s.\n", var->name);
 
         if (v->initializer.args_count)
         {
             unsigned int size = initializer_size(&v->initializer);
             struct hlsl_ir_load *load;
 
-            TRACE("Variable with initializer.\n");
             if (type->type <= HLSL_CLASS_LAST_NUMERIC
                     && type->dimx * type->dimy != size && size != 1)
             {
@@ -1739,29 +1717,22 @@ hlsl_prog:
                         "void function with a semantic");
             }
 
-            TRACE("Adding function '%s' to the function list.\n", $2.name);
             hlsl_add_function(&ctx->functions, $2.name, $2.decl, false);
         }
     | hlsl_prog declaration_statement
         {
-            TRACE("Declaration statement parsed.\n");
-
             if (!list_empty($2))
                 FIXME("Uniform initializer.\n");
             hlsl_free_instr_list($2);
         }
     | hlsl_prog preproc_directive
     | hlsl_prog ';'
-        {
-            TRACE("Skipping stray semicolon.\n");
-        }
 
 preproc_directive:
       PRE_LINE STRING
         {
             const char **new_array = NULL;
 
-            TRACE("Updating line information to file %s, line %u.\n", debugstr_a($2), $1);
             ctx->location.line = $1;
             if (strcmp($2, ctx->location.source_name))
                 new_array = vkd3d_realloc(ctx->source_files,
@@ -1813,7 +1784,6 @@ named_struct_spec:
         {
             bool ret;
 
-            TRACE("Structure %s declaration.\n", debugstr_a($2));
             $$ = hlsl_new_struct_type(ctx, $2, $4);
 
             if (hlsl_get_var(ctx->cur_scope, $2))
@@ -1833,7 +1803,6 @@ named_struct_spec:
 unnamed_struct_spec:
       KW_STRUCT '{' fields_list '}'
         {
-            TRACE("Anonymous structure declaration.\n");
             $$ = hlsl_new_struct_type(ctx, NULL, $3);
         }
 
@@ -1884,14 +1853,12 @@ field:
 func_declaration:
       func_prototype compound_statement
         {
-            TRACE("Function %s parsed.\n", $1.name);
             $$ = $1;
             $$.decl->body = $2;
             hlsl_pop_scope(ctx);
         }
     | func_prototype ';'
         {
-            TRACE("Function prototype for %s.\n", $1.name);
             $$ = $1;
             hlsl_pop_scope(ctx);
         }
@@ -2246,7 +2213,6 @@ variable_def:
         }
     | any_identifier array colon_attribute '=' complex_initializer
         {
-            TRACE("Declaration with initializer.\n");
             $$ = vkd3d_calloc(1, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
@@ -2273,7 +2239,6 @@ array:
                         "array size is not a positive integer constant\n");
                 YYABORT;
             }
-            TRACE("Array size %u.\n", size);
 
             if (size > 65536)
             {
@@ -3131,10 +3096,7 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
     index_instructions(entry_func->body, 2);
 
     if (TRACE_ON())
-    {
-        TRACE("IR dump.\n");
         rb_for_each_entry(&ctx->functions, dump_function, NULL);
-    }
 
     compute_liveness(ctx, entry_func);
 

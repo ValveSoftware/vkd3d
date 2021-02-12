@@ -218,7 +218,6 @@ row_major               {return KW_ROW_MAJOR;           }
                         }
 
 <pp>pragma{WS}+         {
-                            TRACE("Got a #pragma.\n");
                             BEGIN(pp_pragma);
                         }
 <pp_pragma>pack_matrix{WS}*\({WS}*row_major{WS}*\) {
@@ -243,7 +242,6 @@ row_major               {return KW_ROW_MAJOR;           }
                         }
 <pp_pragma>{ANY}        {}
 <pp>[0-9]+              {
-                            TRACE("Preprocessor line info.\n");
                             BEGIN(pp_line);
                             yylval->intval = (atoi(yytext));
                             return PRE_LINE;

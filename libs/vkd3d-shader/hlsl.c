@@ -1255,7 +1255,6 @@ void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_functio
                 ERR("Redeclaring a user defined function as an intrinsic.\n");
                 return;
             }
-            TRACE("Function %s redeclared as a user defined function.\n", debugstr_a(name));
             func->intrinsic = intrinsic;
             rb_destroy(&func->overloads, free_function_decl_rb, NULL);
             rb_init(&func->overloads, compare_function_decl_rb);
