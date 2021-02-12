@@ -26,7 +26,7 @@
 #include "hlsl.h"
 #include <stdio.h>
 
-#define HLSL_LTYPE struct source_location
+#define HLSL_YYLTYPE struct source_location
 
 struct parse_parameter
 {
@@ -102,7 +102,7 @@ enum parse_assign_op
 %code provides
 {
 
-int hlsl_lex(HLSL_STYPE *yylval_param, HLSL_LTYPE *yylloc_param, void *yyscanner);
+int yylex(HLSL_YYSTYPE *yylval_param, HLSL_YYLTYPE *yylloc_param, void *yyscanner);
 
 }
 
@@ -1496,7 +1496,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
 %locations
 %define parse.error verbose
-%define api.prefix {hlsl_}
+%define api.prefix {hlsl_yy}
 %define api.pure full
 %expect 1
 %lex-param {yyscan_t scanner}

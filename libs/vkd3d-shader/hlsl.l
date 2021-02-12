@@ -24,10 +24,10 @@
 #include "hlsl.h"
 #include "hlsl.tab.h"
 
-#define YYSTYPE HLSL_STYPE
-#define YYLTYPE HLSL_LTYPE
+#define YYSTYPE HLSL_YYSTYPE
+#define YYLTYPE HLSL_YYLTYPE
 
-static void update_location(struct hlsl_ctx *ctx, HLSL_LTYPE *loc);
+static void update_location(struct hlsl_ctx *ctx, YYLTYPE *loc);
 
 #define YY_USER_ACTION update_location(yyget_extra(yyscanner), yyget_lloc(yyscanner));
 
@@ -40,7 +40,7 @@ static void update_location(struct hlsl_ctx *ctx, HLSL_LTYPE *loc);
 %option noinput
 %option nounput
 %option noyywrap
-%option prefix="hlsl_"
+%option prefix="hlsl_yy"
 %option reentrant
 
 %x pp pp_line pp_pragma pp_ignore
@@ -278,7 +278,7 @@ row_major               {return KW_ROW_MAJOR;           }
 
 %%
 
-static void update_location(struct hlsl_ctx *ctx, HLSL_LTYPE *lloc)
+static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
 {
     lloc->file = ctx->source_file;
     lloc->col = ctx->column;
@@ -292,12 +292,12 @@ int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entry
     int ret;
 
     yylex_init_extra(ctx, &ctx->scanner);
-    buffer = hlsl__scan_string(text, ctx->scanner);
-    hlsl__switch_to_buffer(buffer, ctx->scanner);
+    buffer = yy_scan_string(text, ctx->scanner);
+    yy_switch_to_buffer(buffer, ctx->scanner);
 
     ret = hlsl_parser_compile(ctx, entrypoint);
 
-    hlsl__delete_buffer(buffer, ctx->scanner);
+    yy_delete_buffer(buffer, ctx->scanner);
     yylex_destroy(ctx->scanner);
     return ret;
 }
