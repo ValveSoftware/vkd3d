@@ -25,15 +25,24 @@ void hlsl_message(const char *fmt, ...)
     /* FIXME */
 }
 
-void hlsl_report_message(struct hlsl_ctx *ctx, const struct source_location loc,
-        enum hlsl_error_level level, const char *fmt, ...)
+void hlsl_note(struct hlsl_ctx *ctx, const struct source_location loc,
+        enum vkd3d_shader_log_level level, const char *fmt, ...)
+{
+    /* FIXME */
+}
+
+void hlsl_error(struct hlsl_ctx *ctx, const struct source_location loc, const char *fmt, ...)
 {
     /* FIXME */
 
-    if (level == HLSL_LEVEL_ERROR)
-        set_parse_status(&ctx->status, PARSE_ERR);
-    else if (level == HLSL_LEVEL_WARNING)
-        set_parse_status(&ctx->status, PARSE_WARN);
+    set_parse_status(&ctx->status, PARSE_ERR);
+}
+
+void hlsl_warning(struct hlsl_ctx *ctx, const struct source_location loc, const char *fmt, ...)
+{
+    /* FIXME */
+
+    set_parse_status(&ctx->status, PARSE_WARN);
 }
 
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)

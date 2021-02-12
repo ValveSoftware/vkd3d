@@ -65,8 +65,7 @@ ANY                     (.)
 {RESERVED4}             {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
-                            hlsl_report_message(ctx, *yylloc, HLSL_LEVEL_ERROR,
-                                    "Reserved keyword \"%s\" used.\n", yytext);
+                            hlsl_error(ctx, *yylloc, "Reserved keyword \"%s\" used.\n", yytext);
                         }
 
 BlendState              {return KW_BLENDSTATE;          }
