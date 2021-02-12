@@ -667,31 +667,55 @@ const char *hlsl_base_type_to_string(const struct hlsl_type *type)
     return name;
 }
 
-const char *debug_hlsl_type(const struct hlsl_type *type)
+char *hlsl_type_to_string(const struct hlsl_type *type)
 {
     const char *name;
+    char *string;
 
     if (type->name)
-        return debugstr_a(type->name);
+        return vkd3d_strdup(type->name);
 
-    if (type->type == HLSL_CLASS_STRUCT)
-        return "<anonymous struct>";
-
-    if (type->type == HLSL_CLASS_ARRAY)
+    switch (type->type)
     {
-        return vkd3d_dbg_sprintf("%s[%u]", hlsl_base_type_to_string(type->e.array.type),
-                type->e.array.elements_count);
+        case HLSL_CLASS_SCALAR:
+            return vkd3d_strdup(hlsl_base_type_to_string(type));
+
+        case HLSL_CLASS_VECTOR:
+            name = hlsl_base_type_to_string(type);
+            if ((string = malloc(strlen(name) + 2)))
+                sprintf(string, "%s%u", name, type->dimx);
+            return string;
+
+        case HLSL_CLASS_MATRIX:
+            name = hlsl_base_type_to_string(type);
+            if ((string = malloc(strlen(name) + 4)))
+                sprintf(string, "%s%ux%u", name, type->dimx, type->dimy);
+            return string;
+
+        case HLSL_CLASS_ARRAY:
+            name = hlsl_base_type_to_string(type->e.array.type);
+            if ((string = malloc(strlen(name) + 15)))
+                sprintf(string, "%s[%u]", name, type->e.array.elements_count);
+            return string;
+
+        case HLSL_CLASS_STRUCT:
+            return vkd3d_strdup("<anonymous struct>");
+
+        default:
+            return vkd3d_strdup("<unexpected type>");
     }
+}
 
-    name = hlsl_base_type_to_string(type);
+const char *debug_hlsl_type(const struct hlsl_type *type)
+{
+    const char *ret;
+    char *string;
 
-    if (type->type == HLSL_CLASS_SCALAR)
-        return vkd3d_dbg_sprintf("%s", name);
-    if (type->type == HLSL_CLASS_VECTOR)
-        return vkd3d_dbg_sprintf("%s%u", name, type->dimx);
-    if (type->type == HLSL_CLASS_MATRIX)
-        return vkd3d_dbg_sprintf("%s%ux%u", name, type->dimx, type->dimy);
-    return "unexpected_type";
+    if (!(string = hlsl_type_to_string(type)))
+        return NULL;
+    ret = vkd3d_dbg_sprintf("%s", string);
+    vkd3d_free(string);
+    return ret;
 }
 
 char *hlsl_modifiers_to_string(unsigned int modifiers)
@@ -795,11 +819,7 @@ static void dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir
 
 static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
 {
-    if (deref->offset.node)
-        /* Print the variable's type for convenience. */
-        vkd3d_string_buffer_printf(buffer, "(%s %s)", debug_hlsl_type(deref->var->data_type), deref->var->name);
-    else
-        vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
+    vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
     if (deref->offset.node)
     {
         vkd3d_string_buffer_printf(buffer, "[");
@@ -947,9 +967,6 @@ static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
 
         ",",
     };
-
-    if (expr->op == HLSL_IR_UNOP_CAST)
-        return debug_hlsl_type(expr->node.data_type);
 
     return op_names[expr->op];
 }

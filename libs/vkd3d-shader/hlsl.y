@@ -254,8 +254,12 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
 
     if (!implicit_compatible_data_types(src_type, dst_type))
     {
-        hlsl_error(ctx, *loc, "can't implicitly convert %s to %s",
-                debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
+        char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
+
+        if (src_string && dst_string)
+            hlsl_error(ctx, *loc, "Can't implicitly convert from %s to %s.", src_string, dst_string);
+        vkd3d_free(src_string);
+        vkd3d_free(dst_string);
         return NULL;
     }
 
@@ -2728,8 +2732,12 @@ unary_expr:
 
             if (!compatible_data_types(src_type, dst_type))
             {
-                hlsl_error(ctx, @3, "can't cast from %s to %s",
-                        debug_hlsl_type(src_type), debug_hlsl_type(dst_type));
+                char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
+
+                if (src_string && dst_string)
+                    hlsl_error(ctx, @3, "Can't cast from %s to %s.", src_string, dst_string);
+                vkd3d_free(src_string);
+                vkd3d_free(dst_string);
                 YYABORT;
             }
 
