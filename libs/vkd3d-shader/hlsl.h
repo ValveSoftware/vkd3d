@@ -144,13 +144,6 @@ struct hlsl_struct_field
     unsigned int reg_offset;
 };
 
-struct source_location
-{
-    const char *file;
-    unsigned int line;
-    unsigned int col;
-};
-
 enum hlsl_ir_node_type
 {
     HLSL_IR_ASSIGNMENT = 0,
@@ -171,7 +164,7 @@ struct hlsl_ir_node
 
     struct list uses;
 
-    struct source_location loc;
+    struct vkd3d_shader_location loc;
 
     /* Liveness ranges. "index" is the index of this instruction. Since this is
      * essentially an SSA value, the earliest live point is the index. This is
@@ -215,7 +208,7 @@ struct hlsl_reg_reservation
 struct hlsl_ir_var
 {
     struct hlsl_type *data_type;
-    struct source_location loc;
+    struct vkd3d_shader_location loc;
     const char *name;
     const char *semantic;
     unsigned int modifiers;
@@ -237,7 +230,7 @@ struct hlsl_ir_function_decl
 {
     struct hlsl_type *return_type;
     struct hlsl_ir_var *return_var;
-    struct source_location loc;
+    struct vkd3d_shader_location loc;
     struct rb_entry entry;
     struct hlsl_ir_function *func;
     const char *semantic;
@@ -487,7 +480,7 @@ static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node 
 }
 
 static inline void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
-        struct hlsl_type *data_type, struct source_location loc)
+        struct hlsl_type *data_type, struct vkd3d_shader_location loc)
 {
     memset(node, 0, sizeof(*node));
     node->type = type;
@@ -541,39 +534,39 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name) DEC
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         unsigned int array_size) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *hlsl_new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
-        struct hlsl_ir_node *rhs, unsigned int writemask, struct source_location loc) DECLSPEC_HIDDEN;
+        struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
-        struct source_location *loc) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const char *semantic, struct source_location loc) DECLSPEC_HIDDEN;
-struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct source_location loc) DECLSPEC_HIDDEN;
+        struct list *parameters, const char *semantic, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs,
         struct hlsl_ir_node *rhs) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields) DECLSPEC_HIDDEN;
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
-        struct hlsl_ir_node *val, struct source_location *loc) DECLSPEC_HIDDEN;
+        struct hlsl_ir_node *val, struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
-        const struct source_location loc) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy) DECLSPEC_HIDDEN;
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
-        const struct source_location loc) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_unary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
-        struct source_location loc) DECLSPEC_HIDDEN;
-struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct source_location loc,
+        struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct vkd3d_shader_location loc,
         const char *semantic, unsigned int modifiers,
         const struct hlsl_reg_reservation *reg_reservation) DECLSPEC_HIDDEN;
-struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct source_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 
 void hlsl_message(const char *fmt, ...) VKD3D_PRINTF_FUNC(1,2) DECLSPEC_HIDDEN;
 
-void hlsl_error(struct hlsl_ctx *ctx, const struct source_location loc,
+void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4) DECLSPEC_HIDDEN;
-void hlsl_warning(struct hlsl_ctx *ctx, const struct source_location loc,
+void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4) DECLSPEC_HIDDEN;
-void hlsl_note(struct hlsl_ctx *ctx, const struct source_location loc, enum vkd3d_shader_log_level level,
+void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, enum vkd3d_shader_log_level level,
         const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 
 void hlsl_push_scope(struct hlsl_ctx *ctx) DECLSPEC_HIDDEN;

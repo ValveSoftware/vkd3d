@@ -279,9 +279,9 @@ row_major               {return KW_ROW_MAJOR;           }
 
 static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
 {
-    lloc->file = ctx->source_file;
-    lloc->col = ctx->column;
+    lloc->source_name = ctx->source_file;
     lloc->line = ctx->line_no;
+    lloc->column = ctx->column;
     ctx->column += yyget_leng(ctx->scanner);
 }
 

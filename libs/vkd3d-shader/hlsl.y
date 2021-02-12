@@ -26,7 +26,7 @@
 #include "hlsl.h"
 #include <stdio.h>
 
-#define HLSL_YYLTYPE struct source_location
+#define HLSL_YYLTYPE struct vkd3d_shader_location
 
 struct parse_parameter
 {
@@ -53,7 +53,7 @@ struct parse_initializer
 struct parse_variable_def
 {
     struct list entry;
-    struct source_location loc;
+    struct vkd3d_shader_location loc;
 
     char *name;
     uint32_t array_size;
@@ -129,7 +129,7 @@ static void debug_dump_decl(struct hlsl_type *type, DWORD modifiers, const char 
     TRACE("%s %s;\n", debug_hlsl_type(type), declname);
 }
 
-static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct source_location loc)
+static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
 {
     if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
         hlsl_error(ctx, loc, "'row_major' or 'column_major' modifiers are only allowed for matrices.");
@@ -252,7 +252,7 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
 }
 
 static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *node, struct hlsl_type *dst_type, struct source_location *loc)
+        struct hlsl_ir_node *node, struct hlsl_type *dst_type, struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
     struct hlsl_ir_expr *cast;
@@ -321,7 +321,7 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
     return true;
 }
 
-static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, const struct source_location loc)
+static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, const struct vkd3d_shader_location loc)
 {
     if (modifiers & mod)
     {
@@ -371,7 +371,7 @@ enum loop_type
 };
 
 static struct list *create_loop(enum loop_type type, struct list *init, struct list *cond,
-        struct list *iter, struct list *body, struct source_location loc)
+        struct list *iter, struct list *body, struct vkd3d_shader_location loc)
 {
     struct list *list = NULL;
     struct hlsl_ir_loop *loop = NULL;
@@ -439,7 +439,7 @@ static void free_parse_initializer(struct parse_initializer *initializer)
 }
 
 static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_node *value, const char *swizzle,
-        struct source_location *loc)
+        struct vkd3d_shader_location *loc)
 {
     unsigned int len = strlen(swizzle), component = 0;
     unsigned int i, set, swiz = 0;
@@ -521,7 +521,7 @@ static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_
 }
 
 static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *return_value, struct source_location loc)
+        struct hlsl_ir_node *return_value, struct vkd3d_shader_location loc)
 {
     struct hlsl_type *return_type = ctx->cur_function->return_type;
     struct hlsl_ir_jump *jump;
@@ -553,7 +553,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
 }
 
 static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
-        struct hlsl_ir_node *offset, struct hlsl_type *data_type, const struct source_location loc)
+        struct hlsl_ir_node *offset, struct hlsl_type *data_type, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *add = NULL;
     struct hlsl_ir_load *load;
@@ -599,7 +599,7 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
 }
 
 static struct hlsl_ir_load *add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
-        const struct hlsl_struct_field *field, const struct source_location loc)
+        const struct hlsl_struct_field *field, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_constant *c;
 
@@ -611,7 +611,7 @@ static struct hlsl_ir_load *add_record_load(struct hlsl_ctx *ctx, struct list *i
 }
 
 static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
-        struct hlsl_ir_node *index, const struct source_location loc)
+        struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
 {
     const struct hlsl_type *expr_type = array->data_type;
     struct hlsl_type *data_type;
@@ -671,7 +671,7 @@ bool hlsl_type_is_row_major(const struct hlsl_type *type)
 }
 
 static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        unsigned int *modifiers, struct source_location loc)
+        unsigned int *modifiers, struct vkd3d_shader_location loc)
 {
     unsigned int default_majority = 0;
     struct hlsl_type *new_type;
@@ -784,7 +784,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 }
 
 static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
-        struct parse_parameter *param, const struct source_location loc)
+        struct parse_parameter *param, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_var *var;
 
@@ -1003,7 +1003,7 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
 }
 
 static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
-        struct source_location *loc)
+        struct vkd3d_shader_location *loc)
 {
     enum hlsl_type_class type;
     enum hlsl_base_type base;
@@ -1098,7 +1098,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
 }
 
 static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
-        enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[3], struct source_location *loc)
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[3], struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_expr *expr;
     struct hlsl_type *type;
@@ -1152,7 +1152,7 @@ static struct list *append_unop(struct list *list, struct hlsl_ir_node *node)
 }
 
 static struct list *add_binary_expr(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, struct source_location loc)
+        enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *args[3] = {node_from_list(list1), node_from_list(list2)};
 
