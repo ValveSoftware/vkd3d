@@ -2464,8 +2464,6 @@ loop_statement:
         }
     | KW_FOR '(' scope_start declaration expr_statement expr ')' statement
         {
-            if (!$4)
-                hlsl_warning(ctx, @4, "no expressions in for loop initializer");
             $$ = create_loop(LOOP_FOR, $4, $5, $6, $8, @1);
             hlsl_pop_scope(ctx);
         }
