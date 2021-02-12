@@ -395,9 +395,7 @@ struct hlsl_ctx
 {
     const char **source_files;
     unsigned int source_files_count;
-    const char *source_file;
-    unsigned int line_no;
-    unsigned int column;
+    struct vkd3d_shader_location location;
     enum parse_status status;
     struct vkd3d_shader_message_context *message_context;
 

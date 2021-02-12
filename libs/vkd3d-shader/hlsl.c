@@ -1482,16 +1482,16 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, struct vkd3d_shader_message_cont
 
     ctx->message_context = message_context;
 
-    ctx->line_no = ctx->column = 1;
-    if (!(ctx->source_file = vkd3d_strdup("")))
-        return false;
     if (!(ctx->source_files = vkd3d_malloc(sizeof(*ctx->source_files))))
+        return false;
+    if (!(ctx->source_files[0] = vkd3d_strdup("")))
     {
-        vkd3d_free((void *)ctx->source_file);
+        vkd3d_free(ctx->source_files);
         return false;
     }
-    ctx->source_files[0] = ctx->source_file;
     ctx->source_files_count = 1;
+    ctx->location.source_name = ctx->source_files[0];
+    ctx->location.line = ctx->location.column = 1;
 
     ctx->matrix_majority = HLSL_COLUMN_MAJOR;
 

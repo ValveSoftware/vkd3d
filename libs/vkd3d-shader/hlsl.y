@@ -1762,8 +1762,8 @@ preproc_directive:
             const char **new_array = NULL;
 
             TRACE("Updating line information to file %s, line %u.\n", debugstr_a($2), $1);
-            ctx->line_no = $1;
-            if (strcmp($2, ctx->source_file))
+            ctx->location.line = $1;
+            if (strcmp($2, ctx->location.source_name))
                 new_array = vkd3d_realloc(ctx->source_files,
                         sizeof(*ctx->source_files) * (ctx->source_files_count + 1));
 
@@ -1771,7 +1771,7 @@ preproc_directive:
             {
                 ctx->source_files = new_array;
                 ctx->source_files[ctx->source_files_count++] = $2;
-                ctx->source_file = $2;
+                ctx->location.source_name = $2;
             }
             else
             {

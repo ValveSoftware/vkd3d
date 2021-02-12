@@ -209,8 +209,8 @@ row_major               {return KW_ROW_MAJOR;           }
 {NEWLINE}               {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
-                            ctx->line_no++;
-                            ctx->column = 1;
+                            ++ctx->location.line;
+                            ctx->location.column = 1;
                         }
 
 ^#                      {
@@ -238,7 +238,7 @@ row_major               {return KW_ROW_MAJOR;           }
 <pp_pragma>{NEWLINE}    {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
-                            FIXME("Unsupported preprocessor #pragma directive at line %u.\n", ctx->line_no);
+                            FIXME("Unsupported preprocessor #pragma directive at line %u.\n", ctx->location.line);
                             BEGIN(INITIAL);
                         }
 <pp_pragma>{ANY}        {}
@@ -279,10 +279,8 @@ row_major               {return KW_ROW_MAJOR;           }
 
 static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
 {
-    lloc->source_name = ctx->source_file;
-    lloc->line = ctx->line_no;
-    lloc->column = ctx->column;
-    ctx->column += yyget_leng(ctx->scanner);
+    *lloc = ctx->location;
+    ctx->location.column += yyget_leng(ctx->scanner);
 }
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entrypoint)
