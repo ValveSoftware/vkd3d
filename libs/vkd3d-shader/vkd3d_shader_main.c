@@ -460,7 +460,7 @@ static struct vkd3d_shader_descriptor_info *vkd3d_shader_scan_get_uav_descriptor
 
 static bool vkd3d_shader_instruction_is_uav_read(const struct vkd3d_shader_instruction *instruction)
 {
-    enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx = instruction->handler_idx;
+    enum vkd3d_shader_opcode handler_idx = instruction->handler_idx;
     return (VKD3DSIH_ATOMIC_AND <= handler_idx && handler_idx <= VKD3DSIH_ATOMIC_XOR)
             || (VKD3DSIH_IMM_ATOMIC_ALLOC <= handler_idx && handler_idx <= VKD3DSIH_IMM_ATOMIC_XOR)
             || handler_idx == VKD3DSIH_LD_UAV_TYPED
@@ -482,7 +482,7 @@ static void vkd3d_shader_scan_record_uav_read(struct vkd3d_shader_scan_context *
 
 static bool vkd3d_shader_instruction_is_uav_counter(const struct vkd3d_shader_instruction *instruction)
 {
-    enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx = instruction->handler_idx;
+    enum vkd3d_shader_opcode handler_idx = instruction->handler_idx;
     return handler_idx == VKD3DSIH_IMM_ATOMIC_ALLOC
             || handler_idx == VKD3DSIH_IMM_ATOMIC_CONSUME;
 }

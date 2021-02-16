@@ -93,7 +93,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_WARNING_PP_DIV_BY_ZERO                 = 4306,
 };
 
-enum VKD3D_SHADER_INSTRUCTION_HANDLER
+enum vkd3d_shader_opcode
 {
     VKD3DSIH_ABS,
     VKD3DSIH_ADD,
@@ -779,7 +779,7 @@ struct vkd3d_shader_primitive_type
 
 struct vkd3d_shader_instruction
 {
-    enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+    enum vkd3d_shader_opcode handler_idx;
     DWORD flags;
     unsigned int dst_count;
     unsigned int src_count;

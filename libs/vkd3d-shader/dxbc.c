@@ -481,7 +481,7 @@ struct vkd3d_sm4_data
 struct vkd3d_sm4_opcode_info
 {
     enum vkd3d_sm4_opcode opcode;
-    enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+    enum vkd3d_shader_opcode handler_idx;
     const char *dst_info;
     const char *src_info;
     void (*read_opcode_func)(struct vkd3d_shader_instruction *ins,

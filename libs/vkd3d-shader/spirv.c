@@ -2131,7 +2131,7 @@ struct vkd3d_push_constant_buffer_binding
 
 struct vkd3d_shader_phase
 {
-    enum VKD3D_SHADER_INSTRUCTION_HANDLER type;
+    enum vkd3d_shader_opcode type;
     unsigned int idx;
     unsigned int instance_count;
     uint32_t function_id;
@@ -6417,7 +6417,7 @@ static SpvOp vkd3d_dxbc_compiler_map_alu_instruction(const struct vkd3d_shader_i
 {
     static const struct
     {
-        enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+        enum vkd3d_shader_opcode handler_idx;
         SpvOp spirv_op;
     }
     alu_ops[] =
@@ -6491,7 +6491,7 @@ static enum GLSLstd450 vkd3d_dxbc_compiler_map_ext_glsl_instruction(
 {
     static const struct
     {
-        enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+        enum vkd3d_shader_opcode handler_idx;
         enum GLSLstd450 glsl_inst;
     }
     glsl_insts[] =
@@ -7514,7 +7514,7 @@ static void vkd3d_dxbc_compiler_emit_deriv_instruction(struct vkd3d_dxbc_compile
 
     static const struct instruction_info
     {
-        enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+        enum vkd3d_shader_opcode handler_idx;
         SpvOp op;
         bool needs_derivative_control;
     }
@@ -8402,7 +8402,7 @@ static SpvOp vkd3d_dxbc_compiler_map_atomic_instruction(const struct vkd3d_shade
 {
     static const struct
     {
-        enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx;
+        enum vkd3d_shader_opcode handler_idx;
         SpvOp spirv_op;
     }
     atomic_ops[] =
@@ -8438,7 +8438,7 @@ static SpvOp vkd3d_dxbc_compiler_map_atomic_instruction(const struct vkd3d_shade
     return SpvOpMax;
 }
 
-static bool is_imm_atomic_instruction(enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx)
+static bool is_imm_atomic_instruction(enum vkd3d_shader_opcode handler_idx)
 {
     return VKD3DSIH_IMM_ATOMIC_ALLOC <= handler_idx && handler_idx <= VKD3DSIH_IMM_ATOMIC_XOR;
 }
@@ -9029,7 +9029,7 @@ static void vkd3d_dxbc_compiler_emit_main_prolog(struct vkd3d_dxbc_compiler *com
         vkd3d_dxbc_compiler_emit_hull_shader_inputs(compiler);
 }
 
-static bool is_dcl_instruction(enum VKD3D_SHADER_INSTRUCTION_HANDLER handler_idx)
+static bool is_dcl_instruction(enum vkd3d_shader_opcode handler_idx)
 {
     return (VKD3DSIH_DCL <= handler_idx && handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
             || handler_idx == VKD3DSIH_HS_DECLS;
