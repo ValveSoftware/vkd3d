@@ -300,10 +300,17 @@ shader_input_sysval_semantic_names[] =
     {VKD3D_SIV_LINE_DENSITY_TESS_FACTOR,   "finalLineDensityTessFactor"},
 };
 
+struct vkd3d_d3d_asm_colours
+{
+    const char *reset;
+    const char *opcode;
+};
+
 struct vkd3d_d3d_asm_compiler
 {
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_version shader_version;
+    struct vkd3d_d3d_asm_colours colours;
 };
 
 static int shader_ver_ge(const struct vkd3d_shader_version *v, int major, int minor)
@@ -1334,7 +1341,8 @@ static void shader_dump_register_space(struct vkd3d_d3d_asm_compiler *compiler, 
 
 static void shader_print_opcode(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_shader_opcode opcode)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s", shader_opcode_names[opcode]);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s", compiler->colours.opcode,
+            shader_opcode_names[opcode], compiler->colours.reset);
 }
 
 static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1360,9 +1368,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     {
         case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_UAV_TYPED:
+            vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.opcode);
             shader_dump_decl_usage(compiler, &ins->declaration.semantic, ins->flags);
             shader_dump_ins_modifiers(compiler, &ins->declaration.semantic.resource.reg);
-            shader_addline(buffer, " ");
+            vkd3d_string_buffer_printf(buffer, "%s ", compiler->colours.reset);
             shader_dump_register(compiler, &ins->declaration.semantic.resource.reg.reg);
             shader_dump_register_space(compiler, ins->declaration.semantic.resource.register_space);
             break;
@@ -1602,21 +1611,53 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     shader_addline(buffer, "\n");
 }
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data, struct vkd3d_shader_code *out)
+enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out)
 {
+    enum vkd3d_shader_compile_option_formatting_flags formatting;
     struct vkd3d_shader_version *shader_version;
     struct vkd3d_d3d_asm_compiler compiler;
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
     const DWORD *ptr;
+    unsigned int i;
     void *code;
+
+    static const struct vkd3d_d3d_asm_colours no_colours =
+    {
+        .reset = "",
+        .opcode = "",
+    };
+    static const struct vkd3d_d3d_asm_colours colours =
+    {
+        .reset = "\x1b[m",
+        .opcode = "\x1b[96;1m",
+    };
+
+    formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
+            | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
+    if (compile_info)
+    {
+        for (i = 0; i < compile_info->option_count; ++i)
+        {
+            const struct vkd3d_shader_compile_option *option = &compile_info->options[i];
+
+            if (option->name == VKD3D_SHADER_COMPILE_OPTION_FORMATTING)
+                formatting = option->value;
+        }
+    }
+
+    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR)
+        compiler.colours = colours;
+    else
+        compiler.colours = no_colours;
 
     buffer = &compiler.buffer;
     vkd3d_string_buffer_init(buffer);
 
     shader_version = &compiler.shader_version;
     shader_sm4_read_header(data, &ptr, shader_version);
-    vkd3d_string_buffer_printf(buffer, "%s_%u_%u\n",
+    vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u\n", compiler.colours.reset,
             shader_get_type_prefix(shader_version->type), shader_version->major, shader_version->minor);
 
     while (!shader_sm4_is_end(data, &ptr))
@@ -1656,7 +1697,7 @@ void vkd3d_shader_trace(void *data)
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(data, &code) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(data, NULL, &code) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;

@@ -920,7 +920,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        ret = vkd3d_dxbc_binary_to_text(parser.data, out);
+        ret = vkd3d_dxbc_binary_to_text(parser.data, compile_info, out);
         vkd3d_shader_parser_destroy(&parser);
         return ret;
     }
