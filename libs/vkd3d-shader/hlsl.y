@@ -1711,17 +1711,15 @@ hlsl_prog:
                 if (decl->body && $2.decl->body)
                 {
                     hlsl_error(ctx, $2.decl->loc,
-                            "redefinition of function %s", debugstr_a($2.name));
+                            "redefinition of function \"%s\"", $2.name);
                     YYABORT;
                 }
                 else if (!hlsl_type_compare(decl->return_type, $2.decl->return_type))
                 {
                     hlsl_error(ctx, $2.decl->loc,
-                            "redefining function %s with a different return type",
-                            debugstr_a($2.name));
+                            "redefining function \"%s\" with a different return type", $2.name);
                     hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR,
-                            "%s previously declared here",
-                            debugstr_a($2.name));
+                            "\"%s\" previously declared here", $2.name);
                     YYABORT;
                 }
             }
@@ -2570,7 +2568,7 @@ postfix_expr:
                 }
                 if (!$$)
                 {
-                    hlsl_error(ctx, @3, "invalid subscript %s", debugstr_a($3));
+                    hlsl_error(ctx, @3, "invalid subscript \"%s\"", $3);
                     YYABORT;
                 }
             }
@@ -2580,14 +2578,14 @@ postfix_expr:
 
                 if (!(swizzle = get_swizzle(ctx, node, $3, &@3)))
                 {
-                    hlsl_error(ctx, @3, "invalid swizzle %s", debugstr_a($3));
+                    hlsl_error(ctx, @3, "invalid swizzle \"%s\"", $3);
                     YYABORT;
                 }
                 $$ = append_unop($1, &swizzle->node);
             }
             else
             {
-                hlsl_error(ctx, @3, "invalid subscript %s", debugstr_a($3));
+                hlsl_error(ctx, @3, "invalid subscript \"%s\"", $3);
                 YYABORT;
             }
         }
@@ -3098,7 +3096,7 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
 
     if (!(entry_func = get_func_entry(ctx, entrypoint)))
     {
-        hlsl_message("error: entry point %s is not defined\n", debugstr_a(entrypoint));
+        hlsl_message("error: entry point \"%s\" is not defined\n", entrypoint);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
