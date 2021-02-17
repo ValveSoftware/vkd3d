@@ -714,6 +714,12 @@ static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(&compiler->buffer, "%s%d%s", prefix, i, suffix);
 }
 
+static void shader_print_uint_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, unsigned int i, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%u%s", prefix, i, suffix);
+}
+
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
 {
@@ -723,7 +729,7 @@ static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         shader_dump_src_param(compiler, rel_addr);
         vkd3d_string_buffer_printf(&compiler->buffer, " + ");
     }
-    vkd3d_string_buffer_printf(&compiler->buffer, "%u]", offset);
+    shader_print_uint_literal(compiler, "", offset, "]");
 }
 
 static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg)
@@ -959,7 +965,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
                     case VKD3D_DATA_UINT:
-                        shader_addline(buffer, "%u", reg->u.immconst_uint[0]);
+                        shader_print_uint_literal(compiler, "", reg->u.immconst_uint[0], "");
                         break;
                     default:
                         shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
@@ -985,9 +991,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
                     case VKD3D_DATA_UINT:
-                        shader_addline(buffer, "%u, %u, %u, %u",
-                                reg->u.immconst_uint[0], reg->u.immconst_uint[1],
-                                reg->u.immconst_uint[2], reg->u.immconst_uint[3]);
+                        shader_print_uint_literal(compiler, "", reg->u.immconst_uint[0], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[1], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[2], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[3], "");
                         break;
                     default:
                         shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
@@ -1351,7 +1358,7 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
 static void shader_dump_register_space(struct vkd3d_d3d_asm_compiler *compiler, unsigned int register_space)
 {
     if (shader_ver_ge(&compiler->shader_version, 5, 1))
-        vkd3d_string_buffer_printf(&compiler->buffer, ", space=%u", register_space);
+        shader_print_uint_literal(compiler, ", space=", register_space, "");
 }
 
 static void shader_print_opcode(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_shader_opcode opcode)
@@ -1434,14 +1441,14 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_INDEX_RANGE:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.index_range.dst);
-            shader_addline(buffer, " %u", ins->declaration.index_range.register_count);
+            shader_print_uint_literal(compiler, " ", ins->declaration.index_range.register_count, "");
             break;
 
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             vkd3d_string_buffer_printf(buffer, " %sx%u%s", compiler->colours.reg,
                     ins->declaration.indexable_temp.register_idx, compiler->colours.reset);
             shader_print_subscript(compiler, ins->declaration.indexable_temp.register_size, NULL);
-            vkd3d_string_buffer_printf(buffer, ", %u", ins->declaration.indexable_temp.component_count);
+            shader_print_uint_literal(compiler, ", ", ins->declaration.indexable_temp.component_count, "");
             break;
 
         case VKD3DSIH_DCL_INPUT_PS:
@@ -1498,7 +1505,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.structured_resource.resource.reg);
-            shader_addline(buffer, ", %u", ins->declaration.structured_resource.byte_stride);
+            shader_print_uint_literal(compiler, ", ", ins->declaration.structured_resource.byte_stride, "");
             shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.register_space);
             break;
 
@@ -1517,7 +1524,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_INPUT_CONTROL_POINT_COUNT:
         case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
         case VKD3DSIH_DCL_VERTICES_OUT:
-            vkd3d_string_buffer_printf(buffer, " %u", ins->declaration.count);
+            shader_print_uint_literal(compiler, " ", ins->declaration.count, "");
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
@@ -1538,21 +1545,20 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_TGSM_RAW:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.tgsm_raw.reg);
-            shader_addline(buffer, ", %u", ins->declaration.tgsm_raw.byte_count);
+            shader_print_uint_literal(compiler, ", ", ins->declaration.tgsm_raw.byte_count, "");
             break;
 
         case VKD3DSIH_DCL_TGSM_STRUCTURED:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.tgsm_structured.reg);
-            shader_addline(buffer, ", %u, %u", ins->declaration.tgsm_structured.byte_stride,
-                    ins->declaration.tgsm_structured.structure_count);
+            shader_print_uint_literal(compiler, ", ", ins->declaration.tgsm_structured.byte_stride, "");
+            shader_print_uint_literal(compiler, ", ", ins->declaration.tgsm_structured.structure_count, "");
             break;
 
         case VKD3DSIH_DCL_THREAD_GROUP:
-            vkd3d_string_buffer_printf(buffer, " %u, %u, %u",
-                    ins->declaration.thread_group_size.x,
-                    ins->declaration.thread_group_size.y,
-                    ins->declaration.thread_group_size.z);
+            shader_print_uint_literal(compiler, " ", ins->declaration.thread_group_size.x, "");
+            shader_print_uint_literal(compiler, ", ", ins->declaration.thread_group_size.y, "");
+            shader_print_uint_literal(compiler, ", ", ins->declaration.thread_group_size.z, "");
             break;
 
         case VKD3DSIH_DCL_UAV_RAW:
@@ -1566,7 +1572,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_uav_flags(compiler, ins->flags);
             shader_addline(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.structured_resource.resource.reg);
-            shader_addline(buffer, ", %u", ins->declaration.structured_resource.byte_stride);
+            shader_print_uint_literal(compiler, ", ", ins->declaration.structured_resource.byte_stride, "");
             shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.register_space);
             break;
 
