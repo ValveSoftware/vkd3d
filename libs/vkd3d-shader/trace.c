@@ -702,6 +702,18 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
 static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_src_param *param);
 
+static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
+        unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "[");
+    if (rel_addr)
+    {
+        shader_dump_src_param(compiler, rel_addr);
+        vkd3d_string_buffer_printf(&compiler->buffer, " + ");
+    }
+    vkd3d_string_buffer_printf(&compiler->buffer, "%u]", offset);
+}
+
 static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
@@ -981,51 +993,28 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     {
         if (offset != ~0u)
         {
-            bool printbrackets = reg->idx[0].rel_addr
-                || reg->type == VKD3DSPR_INCONTROLPOINT
-                || reg->type == VKD3DSPR_IMMCONSTBUFFER
-                || ((compiler->shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY
-                            || compiler->shader_version.type == VKD3D_SHADER_TYPE_HULL)
-                        && reg->type == VKD3DSPR_INPUT);
-
-            if (printbrackets)
-                shader_addline(buffer, "%s[", compiler->colours.reset);
-            if (reg->idx[0].rel_addr)
+            if (reg->idx[0].rel_addr || reg->type == VKD3DSPR_IMMCONSTBUFFER
+                    || reg->type == VKD3DSPR_INCONTROLPOINT || (reg->type == VKD3DSPR_INPUT
+                    && (compiler->shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY
+                    || compiler->shader_version.type == VKD3D_SHADER_TYPE_HULL)))
             {
-                shader_dump_src_param(compiler, reg->idx[0].rel_addr);
-                shader_addline(buffer, " + ");
+                vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
+                shader_print_subscript(compiler, offset, reg->idx[0].rel_addr);
             }
-            shader_addline(buffer, "%u", offset);
-            if (printbrackets)
-                shader_addline(buffer, "]");
             else
-                shader_addline(buffer, "%s", compiler->colours.reset);
+            {
+                vkd3d_string_buffer_printf(buffer, "%u%s", offset, compiler->colours.reset);
+            }
 
             /* For CBs in sm < 5.1 we move the buffer offset from idx[1] to idx[2]
              * to normalise it with 5.1.
              * Here we should ignore it if it's a CB in sm < 5.1. */
             if (reg->idx[1].offset != ~0u &&
                     (reg->type != VKD3DSPR_CONSTBUFFER || shader_ver_ge(&compiler->shader_version, 5, 1)))
-            {
-                shader_addline(buffer, "[");
-                if (reg->idx[1].rel_addr)
-                {
-                    shader_dump_src_param(compiler, reg->idx[1].rel_addr);
-                    shader_addline(buffer, " + ");
-                }
-                shader_addline(buffer, "%u]", reg->idx[1].offset);
-            }
+                shader_print_subscript(compiler, reg->idx[1].offset, reg->idx[1].rel_addr);
 
             if (reg->idx[2].offset != ~0u)
-            {
-                shader_addline(buffer, "[");
-                if (reg->idx[2].rel_addr)
-                {
-                    shader_dump_src_param(compiler, reg->idx[2].rel_addr);
-                    shader_addline(buffer, " + ");
-                }
-                shader_addline(buffer, "%u]", reg->idx[2].offset);
-            }
+                shader_print_subscript(compiler, reg->idx[2].offset, reg->idx[2].rel_addr);
         }
         else
         {
@@ -1033,7 +1022,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
         }
 
         if (reg->type == VKD3DSPR_FUNCTIONPOINTER)
-            shader_addline(buffer, "[%u]", reg->u.fp_body_idx);
+            shader_print_subscript(compiler, reg->u.fp_body_idx, NULL);
     }
     else
     {
@@ -1392,7 +1381,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_register(compiler, &ins->declaration.cb.src.reg);
             if (shader_ver_ge(&compiler->shader_version, 5, 1))
-                shader_addline(buffer, "[%u]", ins->declaration.cb.size);
+                shader_print_subscript(compiler, ins->declaration.cb.size, NULL);
             shader_addline(buffer, ", %s",
                     ins->flags & VKD3DSI_INDEXED_DYNAMIC ? "dynamicIndexed" : "immediateIndexed");
             shader_dump_register_space(compiler, ins->declaration.cb.register_space);
@@ -1435,10 +1424,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
-            vkd3d_string_buffer_printf(buffer, " %sx%u%s[%u], %u", compiler->colours.reg,
-                    ins->declaration.indexable_temp.register_idx, compiler->colours.reset,
-                    ins->declaration.indexable_temp.register_size,
-                    ins->declaration.indexable_temp.component_count);
+            vkd3d_string_buffer_printf(buffer, " %sx%u%s", compiler->colours.reg,
+                    ins->declaration.indexable_temp.register_idx, compiler->colours.reset);
+            shader_print_subscript(compiler, ins->declaration.indexable_temp.register_size, NULL);
+            vkd3d_string_buffer_printf(buffer, ", %u", ins->declaration.indexable_temp.component_count);
             break;
 
         case VKD3DSIH_DCL_INPUT_PS:
@@ -1480,8 +1469,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_INTERFACE:
-            vkd3d_string_buffer_printf(buffer, " fp%u[%u][%u] = {...}", ins->declaration.fp.index,
-                    ins->declaration.fp.array_size, ins->declaration.fp.body_count);
+            vkd3d_string_buffer_printf(buffer, " fp%u", ins->declaration.fp.index);
+            shader_print_subscript(compiler, ins->declaration.fp.array_size, NULL);
+            shader_print_subscript(compiler, ins->declaration.fp.body_count, NULL);
+            vkd3d_string_buffer_printf(buffer, " = {...}");
             break;
 
         case VKD3DSIH_DCL_RESOURCE_RAW:
