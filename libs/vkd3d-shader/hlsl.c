@@ -639,38 +639,20 @@ static int compare_function_decl_rb(const void *key, const struct rb_entry *entr
     return 0;
 }
 
-const char *hlsl_base_type_to_string(const struct hlsl_type *type)
-{
-    const char *name = "(unknown)";
-
-    switch (type->base_type)
-    {
-        case HLSL_TYPE_FLOAT:        name = "float";         break;
-        case HLSL_TYPE_HALF:         name = "half";          break;
-        case HLSL_TYPE_DOUBLE:       name = "double";        break;
-        case HLSL_TYPE_INT:          name = "int";           break;
-        case HLSL_TYPE_UINT:         name = "uint";          break;
-        case HLSL_TYPE_BOOL:         name = "bool";          break;
-        case HLSL_TYPE_SAMPLER:
-            switch (type->sampler_dim)
-            {
-                case HLSL_SAMPLER_DIM_GENERIC: name = "sampler";       break;
-                case HLSL_SAMPLER_DIM_1D:      name = "sampler1D";     break;
-                case HLSL_SAMPLER_DIM_2D:      name = "sampler2D";     break;
-                case HLSL_SAMPLER_DIM_3D:      name = "sampler3D";     break;
-                case HLSL_SAMPLER_DIM_CUBE:    name = "samplerCUBE";   break;
-            }
-            break;
-        default:
-            FIXME("Unhandled case %u.\n", type->base_type);
-    }
-    return name;
-}
-
 char *hlsl_type_to_string(const struct hlsl_type *type)
 {
     const char *name;
     char *string;
+
+    static const char base_types[HLSL_TYPE_LAST_SCALAR + 1][7] =
+    {
+        "float",
+        "half",
+        "double",
+        "int",
+        "uint",
+        "bool",
+    };
 
     if (type->name)
         return vkd3d_strdup(type->name);
@@ -678,16 +660,16 @@ char *hlsl_type_to_string(const struct hlsl_type *type)
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
-            return vkd3d_strdup(hlsl_base_type_to_string(type));
+            return vkd3d_strdup(base_types[type->base_type]);
 
         case HLSL_CLASS_VECTOR:
-            name = hlsl_base_type_to_string(type);
+            name = base_types[type->base_type];
             if ((string = malloc(strlen(name) + 2)))
                 sprintf(string, "%s%u", name, type->dimx);
             return string;
 
         case HLSL_CLASS_MATRIX:
-            name = hlsl_base_type_to_string(type);
+            name = base_types[type->base_type];
             if ((string = malloc(strlen(name) + 4)))
                 sprintf(string, "%s%ux%u", name, type->dimx, type->dimy);
             return string;
@@ -907,8 +889,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
                 break;
 
             default:
-                vkd3d_string_buffer_printf(buffer, "Constants of type %s not supported\n",
-                        hlsl_base_type_to_string(type));
+                assert(0);
         }
     }
     if (type->dimx != 1)

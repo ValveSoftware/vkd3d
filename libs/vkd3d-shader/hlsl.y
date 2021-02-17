@@ -909,13 +909,14 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
                 case HLSL_TYPE_INT:
                     return constant->value.i[0];
                 case HLSL_TYPE_FLOAT:
+                case HLSL_TYPE_HALF:
                     return constant->value.f[0];
                 case HLSL_TYPE_DOUBLE:
                     return constant->value.d[0];
                 case HLSL_TYPE_BOOL:
                     return constant->value.b[0];
                 default:
-                    WARN("Invalid type %s.\n", hlsl_base_type_to_string(constant->node.data_type));
+                    assert(0);
                     return 0;
             }
         }
