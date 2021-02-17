@@ -708,6 +708,12 @@ static void shader_print_float_literal(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(&compiler->buffer, "%s%.8e%s", prefix, f, suffix);
 }
 
+static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, int i, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%d%s", prefix, i, suffix);
+}
+
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
 {
@@ -948,7 +954,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
                         break;
                     case VKD3D_DATA_INT:
-                        shader_addline(buffer, "%d", reg->u.immconst_uint[0]);
+                        shader_print_int_literal(compiler, "", reg->u.immconst_uint[0], "");
                         break;
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
@@ -971,9 +977,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_float_literal(compiler, ", ", reg->u.immconst_float[3], "");
                         break;
                     case VKD3D_DATA_INT:
-                        shader_addline(buffer, "%d, %d, %d, %d",
-                                reg->u.immconst_uint[0], reg->u.immconst_uint[1],
-                                reg->u.immconst_uint[2], reg->u.immconst_uint[3]);
+                        shader_print_int_literal(compiler, "", reg->u.immconst_uint[0], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[1], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[2], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[3], "");
                         break;
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
@@ -1574,10 +1581,12 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DEFI:
-            vkd3d_string_buffer_printf(buffer, " %si%u%s = %d, %d, %d, %d",
-                    compiler->colours.reg, ins->dst[0].reg.idx[0].offset, compiler->colours.reset,
-                    ins->src[0].reg.u.immconst_uint[0], ins->src[0].reg.u.immconst_uint[1],
-                    ins->src[0].reg.u.immconst_uint[2], ins->src[0].reg.u.immconst_uint[3]);
+            vkd3d_string_buffer_printf(buffer, " %si%u%s", compiler->colours.reg,
+                    ins->dst[0].reg.idx[0].offset, compiler->colours.reset);
+            shader_print_int_literal(compiler, " = ", ins->src[0].reg.u.immconst_uint[0], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[1], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[2], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[3], "");
             break;
 
         case VKD3DSIH_DEFB:
@@ -1590,8 +1599,9 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_instruction_flags(compiler, ins);
             if (vkd3d_shader_instruction_has_texel_offset(ins))
             {
-                shader_addline(buffer, "(%d,%d,%d)",
-                        ins->texel_offset.u, ins->texel_offset.v, ins->texel_offset.w);
+                shader_print_int_literal(compiler, "(", ins->texel_offset.u, "");
+                shader_print_int_literal(compiler, ",", ins->texel_offset.v, "");
+                shader_print_int_literal(compiler, ",", ins->texel_offset.w, ")");
             }
 
             if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
