@@ -702,6 +702,12 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
 static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_src_param *param);
 
+static void shader_print_float_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, float f, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%.8e%s", prefix, f, suffix);
+}
+
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
 {
@@ -939,7 +945,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
-                        shader_addline(buffer, "%.8e", reg->u.immconst_float[0]);
+                        shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
                         break;
                     case VKD3D_DATA_INT:
                         shader_addline(buffer, "%d", reg->u.immconst_uint[0]);
@@ -959,9 +965,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
-                        shader_addline(buffer, "%.8e, %.8e, %.8e, %.8e",
-                                reg->u.immconst_float[0], reg->u.immconst_float[1],
-                                reg->u.immconst_float[2], reg->u.immconst_float[3]);
+                        shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[1], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[2], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[3], "");
                         break;
                     case VKD3D_DATA_INT:
                         shader_addline(buffer, "%d, %d, %d, %d",
@@ -1401,7 +1408,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
-            vkd3d_string_buffer_printf(buffer, " %.8e", ins->declaration.max_tessellation_factor);
+            shader_print_float_literal(compiler, " ", ins->declaration.max_tessellation_factor, "");
             break;
 
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
@@ -1557,11 +1564,13 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DEF:
-            vkd3d_string_buffer_printf(buffer, " %sc%u%s = %.8e, %.8e, %.8e, %.8e",
-                    compiler->colours.reg, shader_get_float_offset(ins->dst[0].reg.type,
-                    ins->dst[0].reg.idx[0].offset), compiler->colours.reset,
-                    ins->src[0].reg.u.immconst_float[0], ins->src[0].reg.u.immconst_float[1],
-                    ins->src[0].reg.u.immconst_float[2], ins->src[0].reg.u.immconst_float[3]);
+            vkd3d_string_buffer_printf(buffer, " %sc%u%s", compiler->colours.reg,
+                    shader_get_float_offset(ins->dst[0].reg.type, ins->dst[0].reg.idx[0].offset),
+                    compiler->colours.reset);
+            shader_print_float_literal(compiler, " = ", ins->src[0].reg.u.immconst_float[0], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[1], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[2], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[3], "");
             break;
 
         case VKD3DSIH_DEFI:
