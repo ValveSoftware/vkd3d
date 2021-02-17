@@ -304,6 +304,7 @@ struct vkd3d_d3d_asm_colours
 {
     const char *reset;
     const char *opcode;
+    const char *reg;
 };
 
 struct vkd3d_d3d_asm_compiler
@@ -709,6 +710,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     static const char * const rastout_reg_names[] = {"oPos", "oFog", "oPts"};
     static const char * const misctype_reg_names[] = {"vPos", "vFace"};
 
+    shader_addline(buffer, "%s", compiler->colours.reg);
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
@@ -918,7 +920,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 
     if (reg->type == VKD3DSPR_IMMCONST)
     {
-        shader_addline(buffer, "(");
+        shader_addline(buffer, "%s(", compiler->colours.reset);
         switch (reg->immconst_type)
         {
             case VKD3D_IMMCONST_SCALAR:
@@ -987,7 +989,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         && reg->type == VKD3DSPR_INPUT);
 
             if (printbrackets)
-                shader_addline(buffer, "[");
+                shader_addline(buffer, "%s[", compiler->colours.reset);
             if (reg->idx[0].rel_addr)
             {
                 shader_dump_src_param(compiler, reg->idx[0].rel_addr);
@@ -996,6 +998,8 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
             shader_addline(buffer, "%u", offset);
             if (printbrackets)
                 shader_addline(buffer, "]");
+            else
+                shader_addline(buffer, "%s", compiler->colours.reset);
 
             /* For CBs in sm < 5.1 we move the buffer offset from idx[1] to idx[2]
              * to normalise it with 5.1.
@@ -1023,9 +1027,17 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 shader_addline(buffer, "%u]", reg->idx[2].offset);
             }
         }
+        else
+        {
+            shader_addline(buffer, "%s", compiler->colours.reset);
+        }
 
         if (reg->type == VKD3DSPR_FUNCTIONPOINTER)
             shader_addline(buffer, "[%u]", reg->u.fp_body_idx);
+    }
+    else
+    {
+        shader_addline(buffer, "%s", compiler->colours.reset);
     }
 }
 
@@ -1423,8 +1435,8 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
-            vkd3d_string_buffer_printf(buffer, " x%u[%u], %u",
-                    ins->declaration.indexable_temp.register_idx,
+            vkd3d_string_buffer_printf(buffer, " %sx%u%s[%u], %u", compiler->colours.reg,
+                    ins->declaration.indexable_temp.register_idx, compiler->colours.reset,
                     ins->declaration.indexable_temp.register_size,
                     ins->declaration.indexable_temp.component_count);
             break;
@@ -1554,20 +1566,23 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DEF:
-            vkd3d_string_buffer_printf(buffer, " c%u = %.8e, %.8e, %.8e, %.8e",
-                    shader_get_float_offset(ins->dst[0].reg.type, ins->dst[0].reg.idx[0].offset),
+            vkd3d_string_buffer_printf(buffer, " %sc%u%s = %.8e, %.8e, %.8e, %.8e",
+                    compiler->colours.reg, shader_get_float_offset(ins->dst[0].reg.type,
+                    ins->dst[0].reg.idx[0].offset), compiler->colours.reset,
                     ins->src[0].reg.u.immconst_float[0], ins->src[0].reg.u.immconst_float[1],
                     ins->src[0].reg.u.immconst_float[2], ins->src[0].reg.u.immconst_float[3]);
             break;
 
         case VKD3DSIH_DEFI:
-            vkd3d_string_buffer_printf(buffer, " i%u = %d, %d, %d, %d", ins->dst[0].reg.idx[0].offset,
+            vkd3d_string_buffer_printf(buffer, " %si%u%s = %d, %d, %d, %d",
+                    compiler->colours.reg, ins->dst[0].reg.idx[0].offset, compiler->colours.reset,
                     ins->src[0].reg.u.immconst_uint[0], ins->src[0].reg.u.immconst_uint[1],
                     ins->src[0].reg.u.immconst_uint[2], ins->src[0].reg.u.immconst_uint[3]);
             break;
 
         case VKD3DSIH_DEFB:
-            vkd3d_string_buffer_printf(buffer, " b%u = %s", ins->dst[0].reg.idx[0].offset,
+            vkd3d_string_buffer_printf(buffer, " %sb%u%s = %s", compiler->colours.reg,
+                    ins->dst[0].reg.idx[0].offset, compiler->colours.reset,
                     ins->src[0].reg.u.immconst_uint[0] ? "true" : "false");
             break;
 
@@ -1627,11 +1642,13 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
     {
         .reset = "",
         .opcode = "",
+        .reg = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
     {
         .reset = "\x1b[m",
         .opcode = "\x1b[96;1m",
+        .reg = "\x1b[96m",
     };
 
     formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
