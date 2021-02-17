@@ -693,10 +693,27 @@ char *hlsl_type_to_string(const struct hlsl_type *type)
             return string;
 
         case HLSL_CLASS_ARRAY:
-            name = hlsl_base_type_to_string(type->e.array.type);
-            if ((string = malloc(strlen(name) + 15)))
-                sprintf(string, "%s[%u]", name, type->e.array.elements_count);
+        {
+            const struct hlsl_type *t;
+            char *inner_string;
+            size_t len = 1;
+
+            for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
+                len += 14;
+            if (!(inner_string = hlsl_type_to_string(t)))
+                return NULL;
+            len += strlen(inner_string);
+
+            if ((string = malloc(len)))
+            {
+                strcpy(string, inner_string);
+                for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
+                    sprintf(string + strlen(string), "[%u]", t->e.array.elements_count);
+            }
+
+            vkd3d_free(inner_string);
             return string;
+        }
 
         case HLSL_CLASS_STRUCT:
             return vkd3d_strdup("<anonymous struct>");
