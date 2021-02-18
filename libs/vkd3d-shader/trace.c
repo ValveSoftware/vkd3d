@@ -307,6 +307,7 @@ struct vkd3d_d3d_asm_colours
     const char *literal;
     const char *opcode;
     const char *reg;
+    const char *write_mask;
 };
 
 struct vkd3d_d3d_asm_compiler
@@ -1090,7 +1091,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
     {
         static const char write_mask_chars[] = "xyzw";
 
-        shader_addline(buffer, ".");
+        shader_addline(buffer, ".%s", compiler->colours.write_mask);
         if (write_mask & VKD3DSP_WRITEMASK_0)
             shader_addline(buffer, "%c", write_mask_chars[0]);
         if (write_mask & VKD3DSP_WRITEMASK_1)
@@ -1099,6 +1100,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
             shader_addline(buffer, "%c", write_mask_chars[2]);
         if (write_mask & VKD3DSP_WRITEMASK_3)
             shader_addline(buffer, "%c", write_mask_chars[3]);
+        shader_addline(buffer, "%s", compiler->colours.reset);
     }
 }
 
@@ -1686,6 +1688,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .literal = "",
         .opcode = "",
         .reg = "",
+        .write_mask = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
     {
@@ -1693,6 +1696,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .literal = "\x1b[95m",
         .opcode = "\x1b[96;1m",
         .reg = "\x1b[96m",
+        .write_mask = "\x1b[93m",
     };
 
     formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
