@@ -726,6 +726,12 @@ static void shader_print_hex_literal(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(&compiler->buffer, "%s0x%08x%s", prefix, i, suffix);
 }
 
+static void shader_print_bool_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, unsigned int b, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s", prefix, b ? "true" : "false", suffix);
+}
+
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
 {
@@ -1601,9 +1607,9 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DEFB:
-            vkd3d_string_buffer_printf(buffer, " %sb%u%s = %s", compiler->colours.reg,
-                    ins->dst[0].reg.idx[0].offset, compiler->colours.reset,
-                    ins->src[0].reg.u.immconst_uint[0] ? "true" : "false");
+            vkd3d_string_buffer_printf(buffer, " %sb%u%s", compiler->colours.reg,
+                    ins->dst[0].reg.idx[0].offset, compiler->colours.reset);
+            shader_print_bool_literal(compiler, " = ", ins->src[0].reg.u.immconst_uint[0], "");
             break;
 
         default:
