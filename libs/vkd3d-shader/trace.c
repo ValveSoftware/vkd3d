@@ -307,6 +307,7 @@ struct vkd3d_d3d_asm_colours
     const char *literal;
     const char *opcode;
     const char *reg;
+    const char *swizzle;
     const char *write_mask;
 };
 
@@ -1158,12 +1159,14 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
                 && swizzle_x == swizzle_z
                 && swizzle_x == swizzle_w)
         {
-            shader_addline(buffer, ".%c", swizzle_chars[swizzle_x]);
+            shader_addline(buffer, ".%s%c%s", compiler->colours.swizzle,
+                    swizzle_chars[swizzle_x], compiler->colours.reset);
         }
         else
         {
-            shader_addline(buffer, ".%c%c%c%c", swizzle_chars[swizzle_x], swizzle_chars[swizzle_y],
-                    swizzle_chars[swizzle_z], swizzle_chars[swizzle_w]);
+            shader_addline(buffer, ".%s%c%c%c%c%s", compiler->colours.swizzle,
+                    swizzle_chars[swizzle_x], swizzle_chars[swizzle_y],
+                    swizzle_chars[swizzle_z], swizzle_chars[swizzle_w], compiler->colours.reset);
         }
     }
     if (src_modifier == VKD3DSPSM_ABS || src_modifier == VKD3DSPSM_ABSNEG)
@@ -1688,6 +1691,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .literal = "",
         .opcode = "",
         .reg = "",
+        .swizzle = "",
         .write_mask = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
@@ -1696,6 +1700,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .literal = "\x1b[95m",
         .opcode = "\x1b[96;1m",
         .reg = "\x1b[96m",
+        .swizzle = "\x1b[93m",
         .write_mask = "\x1b[93m",
     };
 
