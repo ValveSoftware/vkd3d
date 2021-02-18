@@ -720,6 +720,12 @@ static void shader_print_uint_literal(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(&compiler->buffer, "%s%u%s", prefix, i, suffix);
 }
 
+static void shader_print_hex_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, unsigned int i, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s0x%08x%s", prefix, i, suffix);
+}
+
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
         unsigned int offset, const struct vkd3d_shader_src_param *rel_addr)
 {
@@ -1429,11 +1435,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             vkd3d_string_buffer_printf(buffer, " {\n");
             for (i = 0; i < ins->declaration.icb->vec4_count; ++i)
             {
-                shader_addline(buffer, "    {0x%08x, 0x%08x, 0x%08x, 0x%08x},\n",
-                        ins->declaration.icb->data[4 * i + 0],
-                        ins->declaration.icb->data[4 * i + 1],
-                        ins->declaration.icb->data[4 * i + 2],
-                        ins->declaration.icb->data[4 * i + 3]);
+                shader_print_hex_literal(compiler, "    {", ins->declaration.icb->data[4 * i + 0], "");
+                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 1], "");
+                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 2], "");
+                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 3], "},\n");
             }
             shader_addline(buffer, "}");
             break;
