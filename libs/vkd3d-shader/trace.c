@@ -25,6 +25,7 @@
 #include "vkd3d_shader_private.h"
 
 #include <stdio.h>
+#include <math.h>
 
 static const char * const shader_opcode_names[] =
 {
@@ -303,6 +304,7 @@ shader_input_sysval_semantic_names[] =
 struct vkd3d_d3d_asm_colours
 {
     const char *reset;
+    const char *literal;
     const char *opcode;
     const char *reg;
 };
@@ -705,31 +707,44 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
 static void shader_print_float_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, float f, const char *suffix)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s%.8e%s", prefix, f, suffix);
+    if (isfinite(f) && signbit(f))
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%.8e%s%s",
+                prefix, compiler->colours.literal, -f, compiler->colours.reset, suffix);
+    else
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%.8e%s%s",
+                prefix, compiler->colours.literal, f, compiler->colours.reset, suffix);
 }
 
 static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, int i, const char *suffix)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s%d%s", prefix, i, suffix);
+    if (i < 0)
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%d%s%s",
+                prefix, compiler->colours.literal, -i, compiler->colours.reset, suffix);
+    else
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%d%s%s",
+                prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
 }
 
 static void shader_print_uint_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, unsigned int i, const char *suffix)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s%u%s", prefix, i, suffix);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%u%s%s",
+            prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
 }
 
 static void shader_print_hex_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, unsigned int i, const char *suffix)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s0x%08x%s", prefix, i, suffix);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s0x%08x%s%s",
+            prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
 }
 
 static void shader_print_bool_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, unsigned int b, const char *suffix)
 {
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s", prefix, b ? "true" : "false", suffix);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s%s%s", prefix,
+            compiler->colours.literal, b ? "true" : "false", compiler->colours.reset, suffix);
 }
 
 static void shader_print_subscript(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1668,12 +1683,14 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
     static const struct vkd3d_d3d_asm_colours no_colours =
     {
         .reset = "",
+        .literal = "",
         .opcode = "",
         .reg = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
     {
         .reset = "\x1b[m",
+        .literal = "\x1b[95m",
         .opcode = "\x1b[96;1m",
         .reg = "\x1b[96m",
     };
