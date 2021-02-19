@@ -29,6 +29,9 @@
 #define VKD3D_SM5_MODIFIER_RESOURCE_TYPE_SHIFT 6
 #define VKD3D_SM5_MODIFIER_RESOURCE_TYPE_MASK (0xfu << VKD3D_SM5_MODIFIER_RESOURCE_TYPE_SHIFT)
 
+#define VKD3D_SM5_MODIFIER_RESOURCE_STRIDE_SHIFT 11
+#define VKD3D_SM5_MODIFIER_RESOURCE_STRIDE_MASK  (0xfffu << VKD3D_SM5_MODIFIER_RESOURCE_STRIDE_SHIFT)
+
 #define VKD3D_SM4_AOFFIMMI_U_SHIFT            9
 #define VKD3D_SM4_AOFFIMMI_U_MASK             (0xfu << VKD3D_SM4_AOFFIMMI_U_SHIFT)
 #define VKD3D_SM4_AOFFIMMI_V_SHIFT            13
@@ -1835,6 +1838,9 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
                 FIXME("Unhandled resource type %#x.\n", resource_type);
                 ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
             }
+
+            ins->resource_stride
+                    = (modifier & VKD3D_SM5_MODIFIER_RESOURCE_STRIDE_MASK) >> VKD3D_SM5_MODIFIER_RESOURCE_STRIDE_SHIFT;
             break;
         }
 
@@ -1899,6 +1905,7 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
     ins->src_count = strlen(opcode_info->src_info);
     ins->src = priv->src_param;
     ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
+    ins->resource_stride = 0;
     ins->resource_data_type[0] = VKD3D_DATA_FLOAT;
     ins->resource_data_type[1] = VKD3D_DATA_FLOAT;
     ins->resource_data_type[2] = VKD3D_DATA_FLOAT;

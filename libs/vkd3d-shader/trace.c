@@ -1635,18 +1635,21 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
         default:
             shader_dump_instruction_flags(compiler, ins);
+
+            if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
+            {
+                shader_addline(buffer, "_indexable(");
+                shader_dump_resource_type(compiler, ins->resource_type);
+                if (ins->resource_stride)
+                    shader_print_uint_literal(compiler, ", stride=", ins->resource_stride, "");
+                shader_addline(buffer, ")");
+            }
+
             if (vkd3d_shader_instruction_has_texel_offset(ins))
             {
                 shader_print_int_literal(compiler, "(", ins->texel_offset.u, "");
                 shader_print_int_literal(compiler, ",", ins->texel_offset.v, "");
                 shader_print_int_literal(compiler, ",", ins->texel_offset.w, ")");
-            }
-
-            if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
-            {
-                shader_addline(buffer, "(");
-                shader_dump_resource_type(compiler, ins->resource_type);
-                shader_addline(buffer, ")");
             }
 
             if (ins->resource_data_type[0] != VKD3D_DATA_FLOAT
