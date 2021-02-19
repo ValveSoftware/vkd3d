@@ -5644,9 +5644,12 @@ static void vkd3d_dxbc_compiler_emit_dcl_resource(struct vkd3d_dxbc_compiler *co
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_semantic *semantic = &instruction->declaration.semantic;
+    uint32_t flags = instruction->flags;
 
-    if (instruction->flags)
-        FIXME("Unhandled UAV flags %#x.\n", instruction->flags);
+    /* We don't distinguish between APPEND and COUNTER UAVs. */
+    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
+    if (flags)
+        FIXME("Unhandled UAV flags %#x.\n", flags);
 
     vkd3d_dxbc_compiler_emit_resource_declaration(compiler, &semantic->resource,
             semantic->resource_type, semantic->resource_data_type[0], 0, false);
@@ -5656,9 +5659,12 @@ static void vkd3d_dxbc_compiler_emit_dcl_resource_raw(struct vkd3d_dxbc_compiler
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_raw_resource *resource = &instruction->declaration.raw_resource;
+    uint32_t flags = instruction->flags;
 
-    if (instruction->flags)
-        FIXME("Unhandled UAV flags %#x.\n", instruction->flags);
+    /* We don't distinguish between APPEND and COUNTER UAVs. */
+    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
+    if (flags)
+        FIXME("Unhandled UAV flags %#x.\n", flags);
 
     vkd3d_dxbc_compiler_emit_resource_declaration(compiler, &resource->resource,
             VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, 0, true);
@@ -5669,9 +5675,12 @@ static void vkd3d_dxbc_compiler_emit_dcl_resource_structured(struct vkd3d_dxbc_c
 {
     const struct vkd3d_shader_structured_resource *resource = &instruction->declaration.structured_resource;
     unsigned int stride = resource->byte_stride;
+    uint32_t flags = instruction->flags;
 
-    if (instruction->flags)
-        FIXME("Unhandled UAV flags %#x.\n", instruction->flags);
+    /* We don't distinguish between APPEND and COUNTER UAVs. */
+    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
+    if (flags)
+        FIXME("Unhandled UAV flags %#x.\n", flags);
 
     vkd3d_dxbc_compiler_emit_resource_declaration(compiler, &resource->resource,
             VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, stride / 4, false);
