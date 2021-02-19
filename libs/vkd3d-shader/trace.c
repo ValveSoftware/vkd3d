@@ -308,6 +308,7 @@ struct vkd3d_d3d_asm_colours
     const char *opcode;
     const char *reg;
     const char *swizzle;
+    const char *version;
     const char *write_mask;
 };
 
@@ -1692,6 +1693,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .opcode = "",
         .reg = "",
         .swizzle = "",
+        .version = "",
         .write_mask = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
@@ -1701,6 +1703,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         .opcode = "\x1b[96;1m",
         .reg = "\x1b[96m",
         .swizzle = "\x1b[93m",
+        .version = "\x1b[36m",
         .write_mask = "\x1b[93m",
     };
 
@@ -1727,8 +1730,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
 
     shader_version = &compiler.shader_version;
     shader_sm4_read_header(data, &ptr, shader_version);
-    vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u\n", compiler.colours.reset,
-            shader_get_type_prefix(shader_version->type), shader_version->major, shader_version->minor);
+    vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
+            shader_get_type_prefix(shader_version->type), shader_version->major,
+            shader_version->minor, compiler.colours.reset);
 
     while (!shader_sm4_is_end(data, &ptr))
     {
