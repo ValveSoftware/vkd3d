@@ -357,6 +357,14 @@ enum vkd3d_sm4_register_type
     VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL     = 0x27,
 };
 
+enum vkd3d_sm4_register_modifier
+{
+    VKD3D_SM4_REGISTER_MODIFIER_NONE       = 0x01,
+    VKD3D_SM4_REGISTER_MODIFIER_NEGATE     = 0x41,
+    VKD3D_SM4_REGISTER_MODIFIER_ABS        = 0x81,
+    VKD3D_SM4_REGISTER_MODIFIER_ABS_NEGATE = 0xc1,
+};
+
 enum vkd3d_sm4_output_primitive_type
 {
     VKD3D_SM4_OUTPUT_PT_POINTLIST     = 0x1,
@@ -1522,20 +1530,21 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
 
         switch (m)
         {
-            case 0x41:
+            case VKD3D_SM4_REGISTER_MODIFIER_NEGATE:
                 *modifier = VKD3DSPSM_NEG;
                 break;
 
-            case 0x81:
+            case VKD3D_SM4_REGISTER_MODIFIER_ABS:
                 *modifier = VKD3DSPSM_ABS;
                 break;
 
-            case 0xc1:
+            case VKD3D_SM4_REGISTER_MODIFIER_ABS_NEGATE:
                 *modifier = VKD3DSPSM_ABSNEG;
                 break;
 
             default:
                 FIXME("Skipping modifier 0x%08x.\n", m);
+            case VKD3D_SM4_REGISTER_MODIFIER_NONE:
                 *modifier = VKD3DSPSM_NONE;
                 break;
         }
