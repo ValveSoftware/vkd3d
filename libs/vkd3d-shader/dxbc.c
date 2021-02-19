@@ -442,6 +442,8 @@ enum vkd3d_sm4_resource_type
     VKD3D_SM4_RESOURCE_TEXTURE_2DARRAY    = 0x8,
     VKD3D_SM4_RESOURCE_TEXTURE_2DMSARRAY  = 0x9,
     VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY  = 0xa,
+    VKD3D_SM4_RESOURCE_RAW_BUFFER         = 0xb,
+    VKD3D_SM4_RESOURCE_STRUCTURED_BUFFER  = 0xc,
 };
 
 enum vkd3d_sm4_data_type
@@ -535,6 +537,8 @@ static const enum vkd3d_shader_resource_type resource_type_table[] =
     /* VKD3D_SM4_RESOURCE_TEXTURE_2DARRAY */      VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY,
     /* VKD3D_SM4_RESOURCE_TEXTURE_2DMSARRAY */    VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY,
     /* VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY */    VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY,
+    /* VKD3D_SM4_RESOURCE_RAW_BUFFER */           VKD3D_SHADER_RESOURCE_BUFFER,
+    /* VKD3D_SM4_RESOURCE_STRUCTURED_BUFFER */    VKD3D_SHADER_RESOURCE_BUFFER,
 };
 
 static const enum vkd3d_data_type data_type_table[] =
@@ -1831,6 +1835,11 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
             enum vkd3d_sm4_resource_type resource_type
                     = (modifier & VKD3D_SM5_MODIFIER_RESOURCE_TYPE_MASK) >> VKD3D_SM5_MODIFIER_RESOURCE_TYPE_SHIFT;
 
+            if (resource_type == VKD3D_SM4_RESOURCE_RAW_BUFFER)
+                ins->raw = true;
+            else if (resource_type == VKD3D_SM4_RESOURCE_STRUCTURED_BUFFER)
+                ins->structured = true;
+
             if (resource_type < ARRAY_SIZE(resource_type_table))
                 ins->resource_type = resource_type_table[resource_type];
             else
@@ -1899,6 +1908,8 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
     ins->handler_idx = opcode_info->handler_idx;
     ins->flags = 0;
     ins->coissue = false;
+    ins->raw = false;
+    ins->structured = false;
     ins->predicate = NULL;
     ins->dst_count = strlen(opcode_info->dst_info);
     ins->dst = priv->dst_param;

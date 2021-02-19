@@ -789,7 +789,7 @@ struct vkd3d_shader_instruction
     enum vkd3d_shader_resource_type resource_type;
     unsigned int resource_stride;
     enum vkd3d_data_type resource_data_type[VKD3D_VEC4_SIZE];
-    bool coissue;
+    bool coissue, structured, raw;
     const struct vkd3d_shader_src_param *predicate;
     union
     {

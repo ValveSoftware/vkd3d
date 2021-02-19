@@ -1639,6 +1639,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             if (ins->resource_type != VKD3D_SHADER_RESOURCE_NONE)
             {
                 shader_addline(buffer, "_indexable(");
+                if (ins->raw)
+                    vkd3d_string_buffer_printf(buffer, "raw_");
+                if (ins->structured)
+                    vkd3d_string_buffer_printf(buffer, "structured_");
                 shader_dump_resource_type(compiler, ins->resource_type);
                 if (ins->resource_stride)
                     shader_print_uint_literal(compiler, ", stride=", ins->resource_stride, "");
