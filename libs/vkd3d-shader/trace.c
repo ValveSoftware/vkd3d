@@ -1682,8 +1682,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
     struct vkd3d_d3d_asm_compiler compiler;
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
+    unsigned int indent, i;
+    const char *indent_str;
     const DWORD *ptr;
-    unsigned int i;
     void *code;
 
     static const struct vkd3d_d3d_asm_colours no_colours =
@@ -1724,6 +1725,10 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         compiler.colours = colours;
     else
         compiler.colours = no_colours;
+    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT)
+        indent_str = "    ";
+    else
+        indent_str = "";
 
     buffer = &compiler.buffer;
     vkd3d_string_buffer_init(buffer);
@@ -1734,6 +1739,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
+    indent = 0;
     while (!shader_sm4_is_end(data, &ptr))
     {
         struct vkd3d_shader_instruction ins;
@@ -1747,7 +1753,38 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
             continue;
         }
 
+        switch (ins.handler_idx)
+        {
+            case VKD3DSIH_ELSE:
+            case VKD3DSIH_ENDIF:
+            case VKD3DSIH_ENDLOOP:
+            case VKD3DSIH_ENDSWITCH:
+                --indent;
+                break;
+
+            default:
+                break;
+        }
+
+        for (i = 0; i < indent; ++i)
+        {
+            vkd3d_string_buffer_printf(buffer, "%s", indent_str);
+        }
+
         shader_dump_instruction(&compiler, &ins);
+
+        switch (ins.handler_idx)
+        {
+            case VKD3DSIH_ELSE:
+            case VKD3DSIH_IF:
+            case VKD3DSIH_LOOP:
+            case VKD3DSIH_SWITCH:
+                ++indent;
+                break;
+
+            default:
+                break;
+        }
     }
 
     if ((code = vkd3d_malloc(buffer->content_size)))
