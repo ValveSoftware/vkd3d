@@ -1551,6 +1551,7 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
 
             default:
                 FIXME("Skipping modifier 0x%08x.\n", m);
+                /* fall-through */
             case VKD3D_SM4_REGISTER_MODIFIER_NONE:
                 *modifier = VKD3DSPSM_NONE;
                 break;
