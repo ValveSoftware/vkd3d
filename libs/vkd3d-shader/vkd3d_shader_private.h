@@ -906,6 +906,8 @@ void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const stru
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
+void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_log_level level, const char *format, va_list args) DECLSPEC_HIDDEN;
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
 

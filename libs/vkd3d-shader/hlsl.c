@@ -23,7 +23,11 @@
 void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         enum vkd3d_shader_log_level level, const char *fmt, ...)
 {
-    /* FIXME */
+    va_list args;
+
+    va_start(args, fmt);
+    vkd3d_shader_vnote(ctx->message_context, &loc, level, fmt, args);
+    va_end(args);
 }
 
 void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
