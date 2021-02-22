@@ -546,10 +546,10 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd
 
 void hlsl_message(const char *fmt, ...) VKD3D_PRINTF_FUNC(1,2) DECLSPEC_HIDDEN;
 
-void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
-        const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4) DECLSPEC_HIDDEN;
-void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
-        const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4) DECLSPEC_HIDDEN;
+void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, enum vkd3d_shader_error error,
+        const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
+void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, enum vkd3d_shader_error error,
+        const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, enum vkd3d_shader_log_level level,
         const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
 

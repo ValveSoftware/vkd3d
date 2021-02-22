@@ -31,16 +31,26 @@ void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
     /* FIXME */
 }
 
-void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, const char *fmt, ...)
+void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+        enum vkd3d_shader_error error, const char *fmt, ...)
 {
-    /* FIXME */
+    va_list args;
+
+    va_start(args, fmt);
+    vkd3d_shader_verror(ctx->message_context, &loc, error, fmt, args);
+    va_end(args);
 
     ctx->failed = true;
 }
 
-void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, const char *fmt, ...)
+void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+        enum vkd3d_shader_error error, const char *fmt, ...)
 {
-    /* FIXME */
+    va_list args;
+
+    va_start(args, fmt);
+    vkd3d_shader_vwarning(ctx->message_context, &loc, error, fmt, args);
+    va_end(args);
 }
 
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)

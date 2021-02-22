@@ -113,7 +113,7 @@ int yylex(HLSL_YYSTYPE *yylval_param, HLSL_YYLTYPE *yylloc_param, void *yyscanne
 
 static void yyerror(YYLTYPE *loc, void *scanner, struct hlsl_ctx *ctx, const char *s)
 {
-    hlsl_error(ctx, *loc, "%s", s);
+    hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "%s", s);
 }
 
 static struct hlsl_ir_node *node_from_list(struct list *list)
@@ -124,7 +124,8 @@ static struct hlsl_ir_node *node_from_list(struct list *list)
 static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
 {
     if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
-        hlsl_error(ctx, loc, "'row_major' or 'column_major' modifiers are only allowed for matrices.");
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "'row_major' and 'column_major' modifiers are only allowed for matrices.");
 }
 
 static bool convertible_data_type(struct hlsl_type *type)
@@ -257,14 +258,16 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
         char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
 
         if (src_string && dst_string)
-            hlsl_error(ctx, *loc, "Can't implicitly convert from %s to %s.", src_string, dst_string);
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Can't implicitly convert from %s to %s.", src_string, dst_string);
         vkd3d_free(src_string);
         vkd3d_free(dst_string);
         return NULL;
     }
 
     if (dst_type->dimx * dst_type->dimy < src_type->dimx * src_type->dimy)
-        hlsl_warning(ctx, *loc, "implicit truncation of vector type");
+        hlsl_warning(ctx, *loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
+                src_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
     if (!(cast = hlsl_new_cast(node, dst_type, loc)))
         return NULL;
@@ -289,14 +292,15 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
             char *string;
 
             if ((string = hlsl_modifiers_to_string(invalid)))
-                hlsl_error(ctx, decl->loc,
+                hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers '%s' are not allowed on local variables.", string);
             vkd3d_free(string);
         }
 
         if (decl->semantic)
         {
-            hlsl_error(ctx, decl->loc, "semantics are not allowed on local variables");
+            hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                    "Semantics are not allowed on local variables.");
             return false;
         }
     }
@@ -304,7 +308,8 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
     {
         if (hlsl_get_function(ctx, decl->name))
         {
-            hlsl_error(ctx, decl->loc, "redefinition of '%s'", decl->name);
+            hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                    "Variable '%s' is already defined as a function.", decl->name);
             return false;
         }
     }
@@ -313,8 +318,9 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
     {
         struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, decl->name);
 
-        hlsl_error(ctx, decl->loc, "\"%s\" already declared", decl->name);
-        hlsl_note(ctx, old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here", old->name);
+        hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                "Variable \"%s\" was already declared in this scope.", decl->name);
+        hlsl_note(ctx, old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
         return false;
     }
     return true;
@@ -327,13 +333,15 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
         char *string;
 
         if ((string = hlsl_modifiers_to_string(mod)))
-            hlsl_error(ctx, loc, "Modifier '%s' was already specified.", string);
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                    "Modifier '%s' was already specified.", string);
         vkd3d_free(string);
         return modifiers;
     }
     if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
     {
-        hlsl_error(ctx, loc, "more than one matrix majority keyword");
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "'row_major' and 'column_major' modifiers are mutually exclusive.");
         return modifiers;
     }
     return modifiers | mod;
@@ -541,7 +549,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     }
     else if (!hlsl_type_is_void(return_type))
     {
-        hlsl_error(ctx, loc, "non-void function must return a value");
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void function must return a value.");
         return NULL;
     }
 
@@ -631,9 +639,9 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     else
     {
         if (expr_type->type == HLSL_CLASS_SCALAR)
-            hlsl_error(ctx, loc, "array-indexed expression is scalar");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Scalar expressions cannot be array-indexed.");
         else
-            hlsl_error(ctx, loc, "expression is not array-indexable");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Expression cannot be array-indexed.");
         return NULL;
     }
 
@@ -733,7 +741,7 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
         field->semantic = v->semantic;
         if (v->initializer.args_count)
         {
-            hlsl_error(ctx, v->loc, "struct field with an initializer.\n");
+            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.\n");
             free_parse_initializer(&v->initializer);
         }
         list_add_tail(list, &field->entry);
@@ -768,12 +776,13 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 
         if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
-            hlsl_error(ctx, v->loc, "more than one matrix majority keyword");
+            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                    "'row_major' and 'column_major' modifiers are mutually exclusive.");
 
         ret = hlsl_scope_add_type(ctx->cur_scope, type);
         if (!ret)
-            hlsl_error(ctx, v->loc,
-                    "redefinition of custom type '%s'", v->name);
+            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                    "Type '%s' is already defined.", v->name);
         vkd3d_free(v);
     }
     vkd3d_free(list);
@@ -1009,7 +1018,8 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
 
     if (t1->type > HLSL_CLASS_LAST_NUMERIC || t2->type > HLSL_CLASS_LAST_NUMERIC)
     {
-        hlsl_error(ctx, *loc, "non scalar/vector/matrix data type in expression");
+        hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Non-numeric types cannot be used in expressions.");
         return NULL;
     }
 
@@ -1018,7 +1028,8 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
 
     if (!expr_compatible_data_types(t1, t2))
     {
-        hlsl_error(ctx, *loc, "expression data types are incompatible");
+        hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Expression data types are incompatible.");
         return NULL;
     }
 
@@ -1121,9 +1132,9 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             continue;
         if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
                 && operands[i]->data_type->dimx * operands[i]->data_type->dimy != type->dimx * type->dimy)
-        {
-            hlsl_warning(ctx, operands[i]->loc, "implicit truncation of vector/matrix type");
-        }
+            hlsl_warning(ctx, operands[i]->loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION,
+                    "Implicit truncation of %s type.",
+                    operands[i]->data_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
         if (!(cast = hlsl_new_cast(operands[i], type, &operands[i]->loc)))
             return NULL;
@@ -1261,7 +1272,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             hlsl_src_from_node(&swizzle->val, rhs);
             if (!invert_swizzle(&swizzle->swizzle, &writemask, &width))
             {
-                hlsl_error(ctx, lhs->loc, "invalid writemask");
+                hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
                 vkd3d_free(assign);
                 return NULL;
             }
@@ -1272,7 +1283,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
         else
         {
-            hlsl_error(ctx, lhs->loc, "invalid lvalue");
+            hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid lvalue.");
             vkd3d_free(assign);
             return NULL;
         }
@@ -1308,7 +1319,8 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
 
     if (initializer_size(initializer) != hlsl_type_component_count(type))
     {
-        hlsl_error(ctx, var->loc, "structure initializer mismatch");
+        hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of parameters in struct initializer.");
         free_parse_initializer(initializer);
         return;
     }
@@ -1396,7 +1408,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
         if (type->modifiers & HLSL_MODIFIER_CONST && !(var->modifiers & HLSL_STORAGE_UNIFORM) && !v->initializer.args_count)
         {
-            hlsl_error(ctx, v->loc, "const variable without initializer");
+            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
+                    "Const variable \"%s\" is missing an initializer.", var->name);
             hlsl_free_var(var);
             vkd3d_free(v);
             continue;
@@ -1420,8 +1433,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             {
                 if (size < type->dimx * type->dimy)
                 {
-                    hlsl_error(ctx, v->loc,
-                            "'%s' initializer does not match", v->name);
+                    hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                            "Wrong number of parameters in numeric initializer.");
                     free_parse_initializer(&v->initializer);
                     vkd3d_free(v);
                     continue;
@@ -1430,8 +1443,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
                     && hlsl_type_component_count(type) != size)
             {
-                hlsl_error(ctx, v->loc,
-                        "'%s' initializer does not match", v->name);
+                hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Wrong number of parameters in initializer.");
                 free_parse_initializer(&v->initializer);
                 vkd3d_free(v);
                 continue;
@@ -1710,14 +1723,14 @@ hlsl_prog:
             {
                 if (decl->body && $2.decl->body)
                 {
-                    hlsl_error(ctx, $2.decl->loc,
-                            "redefinition of function \"%s\"", $2.name);
+                    hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                            "Function \"%s\" is already defined.", $2.name);
                     YYABORT;
                 }
                 else if (!hlsl_type_compare(decl->return_type, $2.decl->return_type))
                 {
-                    hlsl_error(ctx, $2.decl->loc,
-                            "redefining function \"%s\" with a different return type", $2.name);
+                    hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                            "Function \"%s\" was already declared with a different return type.", $2.name);
                     hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR,
                             "\"%s\" previously declared here", $2.name);
                     YYABORT;
@@ -1725,10 +1738,8 @@ hlsl_prog:
             }
 
             if (hlsl_type_is_void($2.decl->return_type) && $2.decl->semantic)
-            {
-                hlsl_error(ctx, $2.decl->loc,
-                        "void function with a semantic");
-            }
+                hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                        "Semantics are not allowed on void functions.");
 
             hlsl_add_function(&ctx->functions, $2.name, $2.decl, false);
         }
@@ -1772,15 +1783,11 @@ struct_declaration:
             if (!$3)
             {
                 if (!$2->name)
-                {
-                    hlsl_error(ctx, @2,
-                            "anonymous struct declaration with no variables");
-                }
+                    hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                            "Anonymous struct type must declare a variable.");
                 if (modifiers)
-                {
-                    hlsl_error(ctx, @1,
-                            "modifier not allowed on struct type declaration");
-                }
+                    hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifiers are not allowed on struct type declataions.");
             }
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
@@ -1801,14 +1808,14 @@ named_struct_spec:
 
             if (hlsl_get_var(ctx->cur_scope, $2))
             {
-                hlsl_error(ctx, @2, "redefinition of '%s'", $2);
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" is already declared as a variable.", $2);
                 YYABORT;
             }
 
             ret = hlsl_scope_add_type(ctx->cur_scope, $$);
             if (!ret)
             {
-                hlsl_error(ctx, @2, "redefinition of struct '%s'", $2);
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "Struct \"%s\" is already defined.", $2);
                 YYABORT;
             }
         }
@@ -1841,7 +1848,8 @@ fields_list:
                 ret = add_struct_field($$, field);
                 if (ret == false)
                 {
-                    hlsl_error(ctx, @2, "redefinition of '%s'", field->name);
+                    hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                            "Field \"%s\" is already defined.", field->name);
                     vkd3d_free(field);
                 }
             }
@@ -1882,17 +1890,19 @@ func_prototype:
         {
             if ($1)
             {
-                hlsl_error(ctx, @1, "unexpected modifiers on a function");
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers are not allowed on functions.");
                 YYABORT;
             }
             if (hlsl_get_var(ctx->globals, $3))
             {
-                hlsl_error(ctx, @3, "redefinition of '%s'\n", $3);
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "Function \"%s\" is already defined.", $3);
                 YYABORT;
             }
             if (hlsl_type_is_void($2) && $7.semantic)
             {
-                hlsl_error(ctx, @7, "void function with a semantic");
+                hlsl_error(ctx, @7, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                        "Semantics are not allowed on void functions.");
             }
 
             if ($7.reg_reservation)
@@ -1995,7 +2005,8 @@ param_list:
             $$ = $1;
             if (!add_func_parameter(ctx, $$, &$3, @3))
             {
-                hlsl_error(ctx, @3, "duplicate parameter %s", $3.name);
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                        "Parameter \"%s\" is already declared.", $3.name);
                 YYABORT;
             }
         }
@@ -2026,8 +2037,7 @@ input_mods:
         {
             if ($1 & $2)
             {
-                hlsl_error(ctx, @2,
-                        "duplicate input-output modifiers");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER, "Duplicate modifiers specified.");
                 YYABORT;
             }
             $$ = $1 | $2;
@@ -2056,14 +2066,14 @@ type:
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
-                hlsl_error(ctx, @3,
-                        "vectors of non-scalar types are not allowed\n");
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Vectors of non-scalar types are not allowed.");
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
             {
-                hlsl_error(ctx, @5,
-                        "vector size must be between 1 and 4\n");
+                hlsl_error(ctx, @5, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Vector size must be between 1 and 4.");
                 YYABORT;
             }
 
@@ -2073,20 +2083,20 @@ type:
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
-                hlsl_error(ctx, @3,
-                        "matrices of non-scalar types are not allowed\n");
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Matrices of non-scalar types are not allowed.");
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
             {
-                hlsl_error(ctx, @5,
-                        "matrix row count must be between 1 and 4\n");
+                hlsl_error(ctx, @5, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Matrix row count must be between 1 and 4.");
                 YYABORT;
             }
             if ($7 < 1 || $7 > 4)
             {
-                hlsl_error(ctx, @7,
-                        "matrix column count must be between 1 and 4\n");
+                hlsl_error(ctx, @7, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Matrix column count must be between 1 and 4.");
                 YYABORT;
             }
 
@@ -2127,7 +2137,7 @@ base_type:
         {
             $$ = hlsl_get_type(ctx->cur_scope, $2, true);
             if ($$->type != HLSL_CLASS_STRUCT)
-                hlsl_error(ctx, @1, "'%s' redefined as a structure\n", $2);
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" redefined as a structure.", $2);
             vkd3d_free($2);
         }
 
@@ -2151,7 +2161,8 @@ typedef:
             if ($2 & ~HLSL_TYPE_MODIFIERS_MASK)
             {
                 struct parse_variable_def *v, *v_next;
-                hlsl_error(ctx, @1, "modifier not allowed on typedefs");
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Storage modifiers are not allowed on typedefs.");
                 LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $4, struct parse_variable_def, entry)
                     vkd3d_free(v);
                 vkd3d_free($4);
@@ -2248,15 +2259,15 @@ array:
 
             if (!size)
             {
-                hlsl_error(ctx, @2,
-                        "array size is not a positive integer constant\n");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Array size is not a positive integer constant.");
                 YYABORT;
             }
 
             if (size > 65536)
             {
-                hlsl_error(ctx, @2,
-                        "array size must be between 1 and 65536");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Array size must be between 1 and 65536.");
                 YYABORT;
             }
             $$ = size;
@@ -2408,8 +2419,8 @@ selection_statement:
             vkd3d_free($5.then_instrs);
             vkd3d_free($5.else_instrs);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
-                hlsl_error(ctx, instr->node.loc,
-                        "if condition requires a scalar");
+                hlsl_error(ctx, instr->node.loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "if condition requires a scalar.");
             $$ = $3;
             list_add_tail($$, &instr->node.entry);
         }
@@ -2498,7 +2509,7 @@ primary_expr:
 
             if (!(var = hlsl_get_var(ctx->cur_scope, $1)))
             {
-                hlsl_error(ctx, @1, "variable '%s' is not declared\n", $1);
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Variable \"%s\" is not defined.", $1);
                 YYABORT;
             }
             if ((load = hlsl_new_var_load(var, @1)))
@@ -2522,7 +2533,7 @@ postfix_expr:
 
             if (node_from_list($1)->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
-                hlsl_error(ctx, @2, "modifying a const expression");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
             inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTINC, node_from_list($1), @2);
@@ -2537,7 +2548,7 @@ postfix_expr:
 
             if (node_from_list($1)->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
-                hlsl_error(ctx, @2, "modifying a const expression");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
             inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTDEC, node_from_list($1), @2);
@@ -2568,7 +2579,7 @@ postfix_expr:
                 }
                 if (!$$)
                 {
-                    hlsl_error(ctx, @3, "invalid subscript \"%s\"", $3);
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", $3);
                     YYABORT;
                 }
             }
@@ -2578,14 +2589,14 @@ postfix_expr:
 
                 if (!(swizzle = get_swizzle(ctx, node, $3, &@3)))
                 {
-                    hlsl_error(ctx, @3, "invalid swizzle \"%s\"", $3);
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
                     YYABORT;
                 }
                 $$ = append_unop($1, &swizzle->node);
             }
             else
             {
-                hlsl_error(ctx, @3, "invalid subscript \"%s\"", $3);
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid subscript \"%s\".", $3);
                 YYABORT;
             }
         }
@@ -2598,7 +2609,7 @@ postfix_expr:
 
             if (index->data_type->type != HLSL_CLASS_SCALAR)
             {
-                hlsl_error(ctx, @3, "array index is not scalar");
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Array index is not scalar.");
                 hlsl_free_instr_list($1);
                 YYABORT;
             }
@@ -2623,20 +2634,20 @@ postfix_expr:
 
             if ($1)
             {
-                hlsl_error(ctx, @1,
-                        "unexpected modifier on a constructor\n");
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers are not allowed on constructors.");
                 YYABORT;
             }
             if ($2->type > HLSL_CLASS_LAST_NUMERIC)
             {
-                hlsl_error(ctx, @2,
-                        "constructors may only be used with numeric data types\n");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Constructors may only be used with numeric data types.");
                 YYABORT;
             }
             if ($2->dimx * $2->dimy != initializer_size(&$4))
             {
-                hlsl_error(ctx, @4,
-                        "expected %u components in constructor, but got %u\n",
+                hlsl_error(ctx, @4, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Expected %u components in constructor, but got %u.",
                         $2->dimx * $2->dimy, initializer_size(&$4));
                 YYABORT;
             }
@@ -2654,7 +2665,8 @@ postfix_expr:
 
                 if (arg->data_type->type == HLSL_CLASS_OBJECT)
                 {
-                    hlsl_error(ctx, arg->loc, "invalid constructor argument");
+                    hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Invalid type for constructor argument.");
                     continue;
                 }
                 width = hlsl_type_component_count(arg->data_type);
@@ -2687,7 +2699,7 @@ unary_expr:
         {
             if (node_from_list($2)->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
-                hlsl_error(ctx, @1, "modifying a const expression");
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
             $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREINC, node_from_list($2), @1));
@@ -2696,7 +2708,7 @@ unary_expr:
         {
             if (node_from_list($2)->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
-                hlsl_error(ctx, @1, "modifying a const expression");
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
             $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREDEC, node_from_list($2), @1));
@@ -2720,7 +2732,8 @@ unary_expr:
 
             if ($2)
             {
-                hlsl_error(ctx, @3, "unexpected modifier in a cast");
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers are not allowed on casts.");
                 YYABORT;
             }
 
@@ -2734,7 +2747,8 @@ unary_expr:
                 char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
 
                 if (src_string && dst_string)
-                    hlsl_error(ctx, @3, "Can't cast from %s to %s.", src_string, dst_string);
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Can't cast from %s to %s.",
+                            src_string, dst_string);
                 vkd3d_free(src_string);
                 vkd3d_free(dst_string);
                 YYABORT;
@@ -2879,7 +2893,7 @@ assignment_expr:
 
             if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
-                hlsl_error(ctx, @2, "l-value is const");
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
             list_move_tail($3, $1);
@@ -3103,8 +3117,8 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
     if (!hlsl_type_is_void(entry_func->return_type)
             && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->semantic)
     {
-        hlsl_error(ctx, entry_func->loc,
-                "entry point \"%s\" is missing a return value semantic", entry_func->func->name);
+        hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
     }
 
     list_move_head(entry_func->body, &ctx->static_initializers);

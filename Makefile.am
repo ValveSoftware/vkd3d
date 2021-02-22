@@ -246,7 +246,6 @@ XFAIL_TESTS = \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-comma.shader_test \
-	tests/hlsl-invalid.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
