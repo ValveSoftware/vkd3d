@@ -3110,7 +3110,9 @@ int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
 
     if (!(entry_func = get_func_entry(ctx, entrypoint)))
     {
-        hlsl_message("error: entry point \"%s\" is not defined\n", entrypoint);
+        const struct vkd3d_shader_location loc = {.source_name = ctx->location.source_name};
+
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Entry point \"%s\" is not defined.", entrypoint);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 

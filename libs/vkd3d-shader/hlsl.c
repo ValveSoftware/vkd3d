@@ -20,11 +20,6 @@
 #include "hlsl.h"
 #include <stdio.h>
 
-void hlsl_message(const char *fmt, ...)
-{
-    /* FIXME */
-}
-
 void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         enum vkd3d_shader_log_level level, const char *fmt, ...)
 {
