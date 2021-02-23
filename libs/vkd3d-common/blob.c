@@ -17,6 +17,7 @@
  */
 
 #define COBJMACROS
+#define CONST_VTABLE
 #define INITGUID
 #include "vkd3d.h"
 #include "vkd3d_blob.h"
