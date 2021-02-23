@@ -20,6 +20,7 @@
 #define __VKD3D_PRIVATE_H
 
 #define COBJMACROS
+#define CONST_VTABLE
 #define NONAMELESSUNION
 #define VK_NO_PROTOTYPES
 
