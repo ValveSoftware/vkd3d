@@ -54,7 +54,11 @@ static inline size_t align(size_t addr, size_t alignment)
 
 #ifdef __GNUC__
 # define VKD3D_NORETURN __attribute__((noreturn))
-# define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
+# ifdef __MINGW_PRINTF_FORMAT
+#  define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(__MINGW_PRINTF_FORMAT, fmt, args)))
+# else
+#  define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
+# endif
 # define VKD3D_UNUSED __attribute__((unused))
 # define VKD3D_UNREACHABLE __builtin_unreachable()
 #else
