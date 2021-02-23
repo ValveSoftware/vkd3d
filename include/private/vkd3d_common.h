@@ -48,7 +48,11 @@ static inline size_t align(size_t addr, size_t alignment)
 }
 
 #ifdef __GNUC__
-# define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
+# if defined(__MINGW32__) && (defined(_UCRT) || __USE_MINGW_ANSI_STDIO)
+#  define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(gnu_printf, fmt, args)))
+# else
+#  define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
+# endif
 # define VKD3D_UNUSED __attribute__((unused))
 #else
 # define VKD3D_PRINTF_FUNC(fmt, args)
