@@ -121,6 +121,15 @@ static struct hlsl_ir_node *node_from_list(struct list *list)
     return LIST_ENTRY(list_tail(list), struct hlsl_ir_node, entry);
 }
 
+static struct list *make_empty_list(void)
+{
+    struct list *list;
+
+    if ((list = vkd3d_malloc(sizeof(*list))))
+        list_init(list);
+    return list;
+}
+
 static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
 {
     if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
@@ -390,9 +399,8 @@ static struct list *create_loop(enum loop_type type, struct list *init, struct l
     struct hlsl_ir_loop *loop = NULL;
     struct hlsl_ir_if *cond_jump = NULL;
 
-    if (!(list = vkd3d_malloc(sizeof(*list))))
+    if (!(list = make_empty_list()))
         goto oom;
-    list_init(list);
 
     if (init)
         list_move_head(list, init);
@@ -724,9 +732,8 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
     if (type->type == HLSL_CLASS_MATRIX)
         assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(list = vkd3d_malloc(sizeof(*list))))
+    if (!(list = make_empty_list()))
         return NULL;
-    list_init(list);
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, fields, struct parse_variable_def, entry)
     {
         if (!(field = vkd3d_calloc(1, sizeof(*field))))
@@ -892,12 +899,11 @@ static struct list *make_list(struct hlsl_ir_node *node)
 {
     struct list *list;
 
-    if (!(list = vkd3d_malloc(sizeof(*list))))
+    if (!(list = make_empty_list()))
     {
         hlsl_free_instr(node);
         return NULL;
     }
-    list_init(list);
     list_add_tail(list, &node->entry);
     return list;
 }
@@ -1377,14 +1383,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     if (basic_type->type == HLSL_CLASS_MATRIX)
         assert(basic_type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(statements_list = vkd3d_malloc(sizeof(*statements_list))))
+    if (!(statements_list = make_empty_list()))
     {
         LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
             free_parse_variable_def(v);
         vkd3d_free(var_list);
         return NULL;
     }
-    list_init(statements_list);
 
     if (!var_list)
         return statements_list;
@@ -1836,8 +1841,8 @@ any_identifier:
 fields_list:
       /* empty */
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
         }
     | fields_list field
         {
@@ -1921,8 +1926,8 @@ func_prototype:
 compound_statement:
       '{' '}'
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
         }
     | '{' scope_start statement_list '}'
         {
@@ -1982,8 +1987,8 @@ register_opt:
 parameters:
       scope_start
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
         }
     | scope_start param_list
         {
@@ -1993,8 +1998,8 @@ parameters:
 param_list:
       parameter
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
             if (!add_func_parameter(ctx, $$, &$1, @1))
             {
                 ERR("Error adding function parameter %s.\n", $1.name);
@@ -2148,9 +2153,8 @@ declaration_statement:
     | struct_declaration
     | typedef
         {
-            if (!($$ = vkd3d_malloc(sizeof(*$$))))
+            if (!($$ = make_empty_list()))
                 YYABORT;
-            list_init($$);
         }
 
 typedef_type:
@@ -2177,8 +2181,8 @@ typedef:
 type_specs:
       type_spec
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
             list_add_head($$, &$1->entry);
         }
     | type_specs ',' type_spec
@@ -2217,8 +2221,8 @@ variables_def_optional:
 variables_def:
       variable_def
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
             list_add_head($$, &$1->entry);
         }
     | variables_def ',' variable_def
@@ -2401,9 +2405,8 @@ jump_statement:
         }
     | KW_RETURN ';'
         {
-            if (!($$ = vkd3d_malloc(sizeof(*$$))))
+            if (!($$ = make_empty_list()))
                 YYABORT;
-            list_init($$);
             if (!add_return(ctx, $$, NULL, @1))
                 YYABORT;
         }
@@ -2462,8 +2465,8 @@ loop_statement:
 expr_statement:
       ';'
         {
-            $$ = vkd3d_malloc(sizeof(*$$));
-            list_init($$);
+            if (!($$ = make_empty_list()))
+                YYABORT;
         }
     | expr ';'
         {
