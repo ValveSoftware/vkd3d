@@ -675,14 +675,17 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
+            assert(type->base_type < ARRAY_SIZE(base_types));
             vkd3d_string_buffer_printf(string, "%s", base_types[type->base_type]);
             return string;
 
         case HLSL_CLASS_VECTOR:
+            assert(type->base_type < ARRAY_SIZE(base_types));
             vkd3d_string_buffer_printf(string, "%s%u", base_types[type->base_type], type->dimx);
             return string;
 
         case HLSL_CLASS_MATRIX:
+            assert(type->base_type < ARRAY_SIZE(base_types));
             vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->base_type], type->dimx, type->dimy);
             return string;
 
