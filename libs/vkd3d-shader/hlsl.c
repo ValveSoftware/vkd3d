@@ -499,6 +499,17 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     return swizzle;
 }
 
+struct hlsl_ir_jump *hlsl_new_jump(enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_jump *jump;
+
+    if (!(jump = vkd3d_malloc(sizeof(*jump))))
+        return NULL;
+    init_node(&jump->node, HLSL_IR_JUMP, NULL, loc);
+    jump->type = type;
+    return jump;
+}
+
 bool hlsl_type_is_void(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;

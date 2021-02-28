@@ -377,10 +377,8 @@ static bool append_conditional_break(struct list *cond_list)
         return false;
     list_add_tail(cond_list, &iff->node.entry);
 
-    if (!(jump = vkd3d_malloc(sizeof(*jump))))
+    if (!(jump = hlsl_new_jump(HLSL_IR_JUMP_BREAK, condition->loc)))
         return false;
-    init_node(&jump->node, HLSL_IR_JUMP, NULL, condition->loc);
-    jump->type = HLSL_IR_JUMP_BREAK;
     list_add_head(&iff->then_instrs, &jump->node.entry);
     return true;
 }
@@ -563,10 +561,8 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
         return NULL;
     }
 
-    if (!(jump = vkd3d_malloc(sizeof(*jump))))
+    if (!(jump = hlsl_new_jump(HLSL_IR_JUMP_RETURN, loc)))
         return NULL;
-    init_node(&jump->node, HLSL_IR_JUMP, NULL, loc);
-    jump->type = HLSL_IR_JUMP_RETURN;
     list_add_tail(instrs, &jump->node.entry);
 
     return jump;

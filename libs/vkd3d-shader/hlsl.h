@@ -529,6 +529,7 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const char *semantic, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_jump *hlsl_new_jump(enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs,
         struct hlsl_ir_node *rhs) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields) DECLSPEC_HIDDEN;
