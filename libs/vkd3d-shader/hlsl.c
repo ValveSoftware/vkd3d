@@ -648,10 +648,10 @@ static int compare_function_decl_rb(const void *key, const struct rb_entry *entr
     return 0;
 }
 
-char *hlsl_type_to_string(const struct hlsl_type *type)
+struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache *string_buffers,
+        const struct hlsl_type *type)
 {
-    const char *name;
-    char *string;
+    struct vkd3d_string_buffer *string;
 
     static const char base_types[HLSL_TYPE_LAST_SCALAR + 1][7] =
     {
@@ -663,66 +663,70 @@ char *hlsl_type_to_string(const struct hlsl_type *type)
         "bool",
     };
 
+    if (!(string = vkd3d_string_buffer_get(string_buffers)))
+        return NULL;
+
     if (type->name)
-        return vkd3d_strdup(type->name);
+    {
+        vkd3d_string_buffer_printf(string, "%s", type->name);
+        return string;
+    }
 
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
-            return vkd3d_strdup(base_types[type->base_type]);
+            vkd3d_string_buffer_printf(string, "%s", base_types[type->base_type]);
+            return string;
 
         case HLSL_CLASS_VECTOR:
-            name = base_types[type->base_type];
-            if ((string = malloc(strlen(name) + 2)))
-                sprintf(string, "%s%u", name, type->dimx);
+            vkd3d_string_buffer_printf(string, "%s%u", base_types[type->base_type], type->dimx);
             return string;
 
         case HLSL_CLASS_MATRIX:
-            name = base_types[type->base_type];
-            if ((string = malloc(strlen(name) + 4)))
-                sprintf(string, "%s%ux%u", name, type->dimx, type->dimy);
+            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->base_type], type->dimx, type->dimy);
             return string;
 
         case HLSL_CLASS_ARRAY:
         {
+            struct vkd3d_string_buffer *inner_string;
             const struct hlsl_type *t;
-            char *inner_string;
-            size_t len = 1;
 
             for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
-                len += 14;
-            if (!(inner_string = hlsl_type_to_string(t)))
-                return NULL;
-            len += strlen(inner_string);
+                ;
 
-            if ((string = malloc(len)))
+            if ((inner_string = hlsl_type_to_string(string_buffers, t)))
             {
-                strcpy(string, inner_string);
-                for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
-                    sprintf(string + strlen(string), "[%u]", t->e.array.elements_count);
+                vkd3d_string_buffer_printf(string, "%s", inner_string->buffer);
+                vkd3d_string_buffer_release(string_buffers, inner_string);
             }
 
-            vkd3d_free(inner_string);
+            for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
+                vkd3d_string_buffer_printf(string, "[%u]", t->e.array.elements_count);
             return string;
         }
 
         case HLSL_CLASS_STRUCT:
-            return vkd3d_strdup("<anonymous struct>");
+            vkd3d_string_buffer_printf(string, "<anonymous struct>");
+            return string;
 
         default:
-            return vkd3d_strdup("<unexpected type>");
+            vkd3d_string_buffer_printf(string, "<unexpected type>");
+            return string;
     }
 }
 
 const char *debug_hlsl_type(const struct hlsl_type *type)
 {
+    struct vkd3d_string_buffer_cache string_buffers;
+    struct vkd3d_string_buffer *string;
     const char *ret;
-    char *string;
 
-    if (!(string = hlsl_type_to_string(type)))
+    vkd3d_string_buffer_cache_init(&string_buffers);
+    if (!(string = hlsl_type_to_string(&string_buffers, type)))
         return NULL;
-    ret = vkd3d_dbg_sprintf("%s", string);
-    vkd3d_free(string);
+    ret = vkd3d_dbg_sprintf("%s", string->buffer);
+    vkd3d_string_buffer_release(&string_buffers, string);
+    vkd3d_string_buffer_cache_cleanup(&string_buffers);
     return ret;
 }
 
@@ -1526,6 +1530,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, struct vkd3d_shader_message_cont
     ctx->source_files_count = 1;
     ctx->location.source_name = ctx->source_files[0];
     ctx->location.line = ctx->location.column = 1;
+    vkd3d_string_buffer_cache_init(&ctx->string_buffers);
 
     ctx->matrix_majority = HLSL_COLUMN_MAJOR;
 
@@ -1553,6 +1558,7 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     for (i = 0; i < ctx->source_files_count; ++i)
         vkd3d_free((void *)ctx->source_files[i]);
     vkd3d_free(ctx->source_files);
+    vkd3d_string_buffer_cache_cleanup(&ctx->string_buffers);
 
     rb_destroy(&ctx->functions, free_function_rb, NULL);
 

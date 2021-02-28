@@ -390,6 +390,7 @@ struct hlsl_ctx
     unsigned int source_files_count;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_string_buffer_cache string_buffers;
     bool failed;
 
     void *scanner;
@@ -496,7 +497,8 @@ static inline void hlsl_src_remove(struct hlsl_src *src)
 
 const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-char *hlsl_type_to_string(const struct hlsl_type *type) DECLSPEC_HIDDEN;
+struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache *string_buffers,
+        const struct hlsl_type *type) DECLSPEC_HIDDEN;
 char *hlsl_modifiers_to_string(unsigned int modifiers) DECLSPEC_HIDDEN;
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDEN;
 

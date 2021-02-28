@@ -870,12 +870,23 @@ struct vkd3d_string_buffer
     unsigned int content_size;
 };
 
+struct vkd3d_string_buffer_cache
+{
+    struct vkd3d_string_buffer **buffers;
+    size_t count, max_count, capacity;
+};
+
 enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
+struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
 void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
+void vkd3d_string_buffer_cache_cleanup(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
+void vkd3d_string_buffer_cache_init(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
 int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer,
         const char *format, ...) VKD3D_PRINTF_FUNC(2, 3) DECLSPEC_HIDDEN;
+void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list,
+        struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
 #define vkd3d_string_buffer_trace(buffer) \
         vkd3d_string_buffer_trace_(buffer, __FUNCTION__)
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function) DECLSPEC_HIDDEN;

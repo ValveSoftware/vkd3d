@@ -33,6 +33,12 @@ void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer)
     vkd3d_free(buffer->buffer);
 }
 
+static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
+{
+    buffer->buffer[0] = '\0';
+    buffer->content_size = 0;
+}
+
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
 {
     unsigned int new_buffer_size = buffer->buffer_size * 2;
@@ -105,6 +111,60 @@ void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const 
             ++q;
         vkd3d_dbg_printf(VKD3D_DBG_LEVEL_TRACE, function, "%.*s", (int)(q - p), p);
     }
+}
+
+void vkd3d_string_buffer_cache_init(struct vkd3d_string_buffer_cache *cache)
+{
+    memset(cache, 0, sizeof(*cache));
+}
+
+void vkd3d_string_buffer_cache_cleanup(struct vkd3d_string_buffer_cache *cache)
+{
+    unsigned int i;
+
+    for (i = 0; i < cache->count; ++i)
+    {
+        vkd3d_string_buffer_cleanup(cache->buffers[i]);
+        vkd3d_free(cache->buffers[i]);
+    }
+    vkd3d_free(cache->buffers);
+    vkd3d_string_buffer_cache_init(cache);
+}
+
+struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *cache)
+{
+    struct vkd3d_string_buffer *buffer;
+
+    if (!cache->count)
+    {
+        if (!vkd3d_array_reserve((void **)&cache->buffers, &cache->capacity,
+                cache->max_count + 1, sizeof(*cache->buffers)))
+            return NULL;
+        ++cache->max_count;
+
+        if (!(buffer = vkd3d_malloc(sizeof(*buffer))))
+            return NULL;
+        vkd3d_string_buffer_init(buffer);
+        if (!vkd3d_string_buffer_resize(buffer, 1))
+        {
+            vkd3d_free(buffer);
+            return NULL;
+        }
+    }
+    else
+    {
+        buffer = cache->buffers[--cache->count];
+    }
+    vkd3d_string_buffer_clear(buffer);
+    return buffer;
+}
+
+void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *cache, struct vkd3d_string_buffer *buffer)
+{
+    if (!buffer)
+        return;
+    assert(cache->count + 1 <= cache->max_count);
+    cache->buffers[cache->count++] = buffer;
 }
 
 void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,

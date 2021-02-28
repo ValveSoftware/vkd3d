@@ -255,13 +255,15 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
 
     if (!implicit_compatible_data_types(src_type, dst_type))
     {
-        char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
+        struct vkd3d_string_buffer *src_string, *dst_string;
 
+        src_string = hlsl_type_to_string(&ctx->string_buffers, src_type);
+        dst_string = hlsl_type_to_string(&ctx->string_buffers, dst_type);
         if (src_string && dst_string)
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Can't implicitly convert from %s to %s.", src_string, dst_string);
-        vkd3d_free(src_string);
-        vkd3d_free(dst_string);
+                    "Can't implicitly convert from %s to %s.", src_string->buffer, dst_string->buffer);
+        vkd3d_string_buffer_release(&ctx->string_buffers, src_string);
+        vkd3d_string_buffer_release(&ctx->string_buffers, dst_string);
         return NULL;
     }
 
@@ -2744,13 +2746,15 @@ unary_expr:
 
             if (!compatible_data_types(src_type, dst_type))
             {
-                char *src_string = hlsl_type_to_string(src_type), *dst_string = hlsl_type_to_string(dst_type);
+                struct vkd3d_string_buffer *src_string, *dst_string;
 
+                src_string = hlsl_type_to_string(&ctx->string_buffers, src_type);
+                dst_string = hlsl_type_to_string(&ctx->string_buffers, dst_type);
                 if (src_string && dst_string)
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Can't cast from %s to %s.",
-                            src_string, dst_string);
-                vkd3d_free(src_string);
-                vkd3d_free(dst_string);
+                            src_string->buffer, dst_string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, src_string);
+                vkd3d_string_buffer_release(&ctx->string_buffers, dst_string);
                 YYABORT;
             }
 
