@@ -510,6 +510,17 @@ struct hlsl_ir_jump *hlsl_new_jump(enum hlsl_ir_jump_type type, struct vkd3d_sha
     return jump;
 }
 
+struct hlsl_ir_loop *hlsl_new_loop(struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_loop *loop;
+
+    if (!(loop = vkd3d_calloc(1, sizeof(*loop))))
+        return NULL;
+    init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
+    list_init(&loop->body);
+    return loop;
+}
+
 bool hlsl_type_is_void(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;

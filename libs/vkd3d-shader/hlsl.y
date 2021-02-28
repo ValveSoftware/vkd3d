@@ -403,11 +403,9 @@ static struct list *create_loop(enum loop_type type, struct list *init, struct l
     if (init)
         list_move_head(list, init);
 
-    if (!(loop = vkd3d_calloc(1, sizeof(*loop))))
+    if (!(loop = hlsl_new_loop(loc)))
         goto oom;
-    init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
     list_add_tail(list, &loop->node.entry);
-    list_init(&loop->body);
 
     if (!append_conditional_break(cond))
         goto oom;
