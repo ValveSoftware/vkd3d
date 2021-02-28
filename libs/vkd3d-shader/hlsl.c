@@ -730,46 +730,45 @@ const char *debug_hlsl_type(const struct hlsl_type *type)
     return ret;
 }
 
-char *hlsl_modifiers_to_string(unsigned int modifiers)
+struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct vkd3d_string_buffer_cache *string_buffers,
+        unsigned int modifiers)
 {
-    char *string;
-    size_t len;
+    struct vkd3d_string_buffer *string;
 
-    if (!(string = vkd3d_malloc(110)))
+    if (!(string = vkd3d_string_buffer_get(string_buffers)))
         return NULL;
 
-    string[0] = 0;
     if (modifiers & HLSL_STORAGE_EXTERN)
-        strcat(string, "extern ");                       /* 7 */
+        vkd3d_string_buffer_printf(string, "extern ");
     if (modifiers & HLSL_STORAGE_NOINTERPOLATION)
-        strcat(string, "nointerpolation ");              /* 16 */
+        vkd3d_string_buffer_printf(string, "nointerpolation ");
     if (modifiers & HLSL_MODIFIER_PRECISE)
-        strcat(string, "precise ");                      /* 8 */
+        vkd3d_string_buffer_printf(string, "precise ");
     if (modifiers & HLSL_STORAGE_SHARED)
-        strcat(string, "shared ");                       /* 7 */
+        vkd3d_string_buffer_printf(string, "shared ");
     if (modifiers & HLSL_STORAGE_GROUPSHARED)
-        strcat(string, "groupshared ");                  /* 12 */
+        vkd3d_string_buffer_printf(string, "groupshared ");
     if (modifiers & HLSL_STORAGE_STATIC)
-        strcat(string, "static ");                       /* 7 */
+        vkd3d_string_buffer_printf(string, "static ");
     if (modifiers & HLSL_STORAGE_UNIFORM)
-        strcat(string, "uniform ");                      /* 8 */
+        vkd3d_string_buffer_printf(string, "uniform ");
     if (modifiers & HLSL_STORAGE_VOLATILE)
-        strcat(string, "volatile ");                     /* 9 */
+        vkd3d_string_buffer_printf(string, "volatile ");
     if (modifiers & HLSL_MODIFIER_CONST)
-        strcat(string, "const ");                        /* 6 */
+        vkd3d_string_buffer_printf(string, "const ");
     if (modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        strcat(string, "row_major ");                    /* 10 */
+        vkd3d_string_buffer_printf(string, "row_major ");
     if (modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
-        strcat(string, "column_major ");                 /* 13 */
+        vkd3d_string_buffer_printf(string, "column_major ");
     if ((modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT)) == (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
-        strcat(string, "inout ");                        /* 6 */
+        vkd3d_string_buffer_printf(string, "inout ");
     else if (modifiers & HLSL_STORAGE_IN)
-        strcat(string, "in ");                           /* 3 */
+        vkd3d_string_buffer_printf(string, "in ");
     else if (modifiers & HLSL_STORAGE_OUT)
-        strcat(string, "out ");                          /* 4 */
+        vkd3d_string_buffer_printf(string, "out ");
 
-    if ((len = strlen(string)))
-        string[len - 1] = 0;
+    if (string->content_size)
+        string->buffer[--string->content_size] = 0;
 
     return string;
 }
@@ -818,11 +817,14 @@ static void dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir
 {
     if (var->modifiers)
     {
-        char *string;
+        struct vkd3d_string_buffer_cache string_buffers;
+        struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_modifiers_to_string(var->modifiers)))
-            vkd3d_string_buffer_printf(buffer, "%s ", string);
-        vkd3d_free(string);
+        vkd3d_string_buffer_cache_init(&string_buffers);
+        if ((string = hlsl_modifiers_to_string(&string_buffers, var->modifiers)))
+            vkd3d_string_buffer_printf(buffer, "%s ", string->buffer);
+        vkd3d_string_buffer_release(&string_buffers, string);
+        vkd3d_string_buffer_cache_cleanup(&string_buffers);
     }
     vkd3d_string_buffer_printf(buffer, "%s %s", debug_hlsl_type(var->data_type), var->name);
     if (var->semantic)

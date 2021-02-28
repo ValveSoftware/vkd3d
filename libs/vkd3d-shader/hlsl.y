@@ -291,12 +291,12 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
 
         if (invalid)
         {
-            char *string;
+            struct vkd3d_string_buffer *string;
 
-            if ((string = hlsl_modifiers_to_string(invalid)))
+            if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, invalid)))
                 hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers '%s' are not allowed on local variables.", string);
-            vkd3d_free(string);
+                        "Modifiers '%s' are not allowed on local variables.", string->buffer);
+            vkd3d_string_buffer_release(&ctx->string_buffers, string);
         }
 
         if (decl->semantic)
@@ -332,12 +332,12 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
 {
     if (modifiers & mod)
     {
-        char *string;
+        struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_modifiers_to_string(mod)))
+        if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, mod)))
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                    "Modifier '%s' was already specified.", string);
-        vkd3d_free(string);
+                    "Modifier '%s' was already specified.", string->buffer);
+        vkd3d_string_buffer_release(&ctx->string_buffers, string);
         return modifiers;
     }
     if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))

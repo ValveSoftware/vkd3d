@@ -499,7 +499,8 @@ const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache *string_buffers,
         const struct hlsl_type *type) DECLSPEC_HIDDEN;
-char *hlsl_modifiers_to_string(unsigned int modifiers) DECLSPEC_HIDDEN;
+struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct vkd3d_string_buffer_cache *string_buffers,
+        unsigned int modifiers) DECLSPEC_HIDDEN;
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDEN;
 
 void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_function_decl *decl,
