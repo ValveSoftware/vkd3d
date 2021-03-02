@@ -130,6 +130,7 @@ struct hlsl_type
 struct hlsl_struct_field
 {
     struct list entry;
+    struct vkd3d_shader_location loc;
     struct hlsl_type *type;
     const char *name;
     const char *semantic;

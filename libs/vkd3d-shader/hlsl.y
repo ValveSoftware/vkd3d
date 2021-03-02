@@ -286,8 +286,25 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return &cast->node;
 }
 
+static struct hlsl_ir_function_decl *get_func_entry(struct hlsl_ctx *ctx, const char *name)
+{
+    struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function *func;
+    struct rb_entry *entry;
+
+    if ((entry = rb_get(&ctx->functions, name)))
+    {
+        func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
+        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+            return decl;
+    }
+
+    return NULL;
+}
+
 static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local)
 {
+    struct hlsl_ir_function_decl *func;
     bool ret;
 
     if (decl->data_type->type != HLSL_CLASS_MATRIX)
@@ -317,10 +334,12 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
     }
     else
     {
-        if (hlsl_get_function(ctx, decl->name))
+        if ((func = get_func_entry(ctx, decl->name)))
         {
             hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                     "Variable '%s' is already defined as a function.", decl->name);
+            hlsl_note(ctx, func->loc, VKD3D_SHADER_LOG_ERROR,
+                    "\"%s\" was previously defined here.", decl->name);
             return false;
         }
     }
@@ -660,17 +679,16 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     return add_load(ctx, instrs, array, index, data_type, loc);
 }
 
-static bool add_struct_field(struct list *fields, struct hlsl_struct_field *field)
+static struct hlsl_struct_field *get_struct_field(struct list *fields, const char *name)
 {
     struct hlsl_struct_field *f;
 
     LIST_FOR_EACH_ENTRY(f, fields, struct hlsl_struct_field, entry)
     {
-        if (!strcmp(f->name, field->name))
-            return false;
+        if (!strcmp(f->name, name))
+            return f;
     }
-    list_add_tail(fields, &field->entry);
-    return true;
+    return NULL;
 }
 
 bool hlsl_type_is_row_major(const struct hlsl_type *type)
@@ -739,6 +757,7 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
             field->type = hlsl_new_array_type(ctx, type, v->array_size);
         else
             field->type = type;
+        field->loc = v->loc;
         field->name = v->name;
         field->modifiers = modifiers;
         field->semantic = v->semantic;
@@ -870,22 +889,6 @@ static const struct hlsl_ir_function_decl *get_overloaded_func(struct rb_tree *f
         }
         return RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     }
-    return NULL;
-}
-
-static struct hlsl_ir_function_decl *get_func_entry(struct hlsl_ctx *ctx, const char *name)
-{
-    struct hlsl_ir_function_decl *decl;
-    struct hlsl_ir_function *func;
-    struct rb_entry *entry;
-
-    if ((entry = rb_get(&ctx->functions, name)))
-    {
-        func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
-        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
-            return decl;
-    }
-
     return NULL;
 }
 
@@ -1726,14 +1729,14 @@ hlsl_prog:
                 {
                     hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Function \"%s\" is already defined.", $2.name);
+                    hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously defined here.", $2.name);
                     YYABORT;
                 }
                 else if (!hlsl_type_compare(decl->return_type, $2.decl->return_type))
                 {
                     hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Function \"%s\" was already declared with a different return type.", $2.name);
-                    hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR,
-                            "\"%s\" previously declared here", $2.name);
+                    hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", $2.name);
                     YYABORT;
                 }
             }
@@ -1840,18 +1843,22 @@ fields_list:
         }
     | fields_list field
         {
-            bool ret;
-            struct hlsl_struct_field *field, *next;
+            struct hlsl_struct_field *field, *next, *existing;
 
             $$ = $1;
             LIST_FOR_EACH_ENTRY_SAFE(field, next, $2, struct hlsl_struct_field, entry)
             {
-                ret = add_struct_field($$, field);
-                if (ret == false)
+                if ((existing = get_struct_field($$, field->name)))
                 {
                     hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Field \"%s\" is already defined.", field->name);
+                    hlsl_note(ctx, existing->loc, VKD3D_SHADER_LOG_ERROR,
+                            "'%s' was previously defined here.", field->name);
                     vkd3d_free(field);
+                }
+                else
+                {
+                    list_add_tail($$, &field->entry);
                 }
             }
             vkd3d_free($2);
@@ -1889,15 +1896,20 @@ func_prototype:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
       var_modifiers type var_identifier '(' parameters ')' colon_attribute
         {
+            struct hlsl_ir_var *var;
+
             if ($1)
             {
                 hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on functions.");
                 YYABORT;
             }
-            if (hlsl_get_var(ctx->globals, $3))
+            if ((var = hlsl_get_var(ctx->globals, $3)))
             {
-                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "Function \"%s\" is already defined.", $3);
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                        "\"%s\" is already declared as a variable.", $3);
+                hlsl_note(ctx, var->loc, VKD3D_SHADER_LOG_ERROR,
+                        "\"%s\" was previously declared here.", $3);
                 YYABORT;
             }
             if (hlsl_type_is_void($2) && $7.semantic)
@@ -2565,22 +2577,15 @@ postfix_expr:
                 struct hlsl_type *type = node->data_type;
                 struct hlsl_struct_field *field;
 
-                $$ = NULL;
-                LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
-                {
-                    if (!strcmp($3, field->name))
-                    {
-                        if (!add_record_load(ctx, $1, node, field, @2))
-                            YYABORT;
-                        $$ = $1;
-                        break;
-                    }
-                }
-                if (!$$)
+                if (!(field = get_struct_field(type->e.elements, $3)))
                 {
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", $3);
                     YYABORT;
                 }
+
+                if (!add_record_load(ctx, $1, node, field, @2))
+                    YYABORT;
+                $$ = $1;
             }
             else if (node->data_type->type <= HLSL_CLASS_LAST_NUMERIC)
             {

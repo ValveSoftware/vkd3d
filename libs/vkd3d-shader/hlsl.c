@@ -319,6 +319,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
                     vkd3d_free(type);
                     return NULL;
                 }
+                field->loc = old_field->loc;
                 field->type = hlsl_type_clone(ctx, old_field->type, default_majority);
                 field->name = vkd3d_strdup(old_field->name);
                 if (old_field->semantic)
