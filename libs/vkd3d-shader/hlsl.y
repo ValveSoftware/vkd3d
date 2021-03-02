@@ -1714,7 +1714,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 %%
 
 hlsl_prog:
-      /* empty */
+      %empty
     | hlsl_prog func_declaration
         {
             const struct hlsl_ir_function_decl *decl;
@@ -1833,7 +1833,7 @@ any_identifier:
     | NEW_IDENTIFIER
 
 fields_list:
-      /* empty */
+      %empty
         {
             if (!($$ = make_empty_list()))
                 YYABORT;
@@ -1930,7 +1930,7 @@ compound_statement:
         }
 
 scope_start:
-      /* empty */
+      %empty
         {
             hlsl_push_scope(ctx);
         }
@@ -1940,7 +1940,7 @@ var_identifier:
     | NEW_IDENTIFIER
 
 colon_attribute:
-      /* empty */
+      %empty
         {
             $$.semantic = NULL;
             $$.reg_reservation = NULL;
@@ -2030,7 +2030,7 @@ parameter:
         }
 
 input_mods:
-      /* empty */
+      %empty
         {
             $$ = 0;
         }
@@ -2206,7 +2206,7 @@ declaration:
         }
 
 variables_def_optional:
-      /* empty */
+      %empty
         {
             $$ = NULL;
         }
@@ -2247,7 +2247,7 @@ variable_def:
         }
 
 array:
-      /* empty */
+      %empty
         {
             $$ = 0;
         }
@@ -2274,7 +2274,7 @@ array:
         }
 
 var_modifiers:
-      /* empty */
+      %empty
         {
             $$ = 0;
         }
