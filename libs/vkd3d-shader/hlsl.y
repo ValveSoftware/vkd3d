@@ -1765,10 +1765,6 @@ hlsl_prog:
                 }
             }
 
-            if (hlsl_type_is_void($2.decl->return_type) && $2.decl->semantic)
-                hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
-                        "Semantics are not allowed on void functions.");
-
             hlsl_add_function(&ctx->functions, $2.name, $2.decl, false);
         }
     | hlsl_prog declaration_statement
