@@ -50,13 +50,19 @@ struct parse_initializer
     struct list *instrs;
 };
 
+struct parse_array_sizes
+{
+    uint32_t *sizes; /* innermost first */
+    unsigned int count;
+};
+
 struct parse_variable_def
 {
     struct list entry;
     struct vkd3d_shader_location loc;
 
     char *name;
-    uint32_t array_size;
+    struct parse_array_sizes arrays;
     const char *semantic;
     struct hlsl_reg_reservation *reg_reservation;
     struct parse_initializer initializer;
@@ -732,15 +738,17 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
         return NULL;
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, fields, struct parse_variable_def, entry)
     {
+        unsigned int i;
+
         if (!(field = vkd3d_calloc(1, sizeof(*field))))
         {
             vkd3d_free(v);
             return list;
         }
-        if (v->array_size)
-            field->type = hlsl_new_array_type(ctx, type, v->array_size);
-        else
-            field->type = type;
+
+        field->type = type;
+        for (i = 0; i < v->arrays.count; ++i)
+            field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[i]);
         field->loc = v->loc;
         field->name = v->name;
         field->modifiers = modifiers;
@@ -761,16 +769,27 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_type *type;
+    unsigned int i;
     bool ret;
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, list, struct parse_variable_def, entry)
     {
-        if (v->array_size)
-            type = hlsl_new_array_type(ctx, orig_type, v->array_size);
+        if (!v->arrays.count)
+        {
+            if (!(type = hlsl_type_clone(ctx, orig_type, 0)))
+                return false;
+        }
         else
-            type = hlsl_type_clone(ctx, orig_type, 0);
-        if (!type)
-            return false;
+        {
+            type = orig_type;
+        }
+
+        for (i = 0; i < v->arrays.count; ++i)
+        {
+            if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i])))
+                return false;
+        }
+
         vkd3d_free((void *)type->name);
         type->name = v->name;
         type->modifiers |= modifiers;
@@ -1369,6 +1388,7 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
 static void free_parse_variable_def(struct parse_variable_def *v)
 {
     free_parse_initializer(&v->initializer);
+    vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
     vkd3d_free((void *)v->semantic);
     vkd3d_free(v->reg_reservation);
@@ -1400,10 +1420,11 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
     {
-        if (v->array_size)
-            type = hlsl_new_array_type(ctx, basic_type, v->array_size);
-        else
-            type = basic_type;
+        unsigned int i;
+
+        type = basic_type;
+        for (i = 0; i < v->arrays.count; ++i)
+            type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
 
         if (!(var = hlsl_new_var(v->name, type, v->loc, v->semantic, modifiers, v->reg_reservation)))
         {
@@ -1475,7 +1496,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 vkd3d_free(v);
                 continue;
             }
-            if (v->array_size > 0)
+            if (v->arrays.count)
             {
                 FIXME("Initializing arrays is not supported yet.\n");
                 free_parse_initializer(&v->initializer);
@@ -1531,6 +1552,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     struct parse_function function;
     struct parse_parameter parameter;
     struct parse_initializer initializer;
+    struct parse_array_sizes arrays;
     struct parse_variable_def *variable_def;
     struct parse_if_body if_body;
     enum parse_unary_op unary_op;
@@ -1681,6 +1703,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 %token <name> STRING
 %token <name> TYPE_IDENTIFIER
 
+%type <arrays> arrays
+
 %type <assign_op> assign_op
 
 %type <boolval> boolean
@@ -1694,8 +1718,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 %type <initializer> initializer_expr_list
 
 %type <if_body> if_body
-
-%type <intval> array
 
 %type <modifiers> input_mod
 %type <modifiers> input_mods
@@ -2217,12 +2239,12 @@ type_specs:
         }
 
 type_spec:
-      any_identifier array
+      any_identifier arrays
         {
             $$ = vkd3d_calloc(1, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
-            $$->array_size = $2;
+            $$->arrays = $2;
         }
 
 declaration:
@@ -2257,41 +2279,46 @@ variables_def:
         }
 
 variable_def:
-      any_identifier array colon_attribute
+      any_identifier arrays colon_attribute
         {
             $$ = vkd3d_calloc(1, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
-            $$->array_size = $2;
+            $$->arrays = $2;
             $$->semantic = $3.semantic;
             $$->reg_reservation = $3.reg_reservation;
         }
-    | any_identifier array colon_attribute '=' complex_initializer
+    | any_identifier arrays colon_attribute '=' complex_initializer
         {
             $$ = vkd3d_calloc(1, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
-            $$->array_size = $2;
+            $$->arrays = $2;
             $$->semantic = $3.semantic;
             $$->reg_reservation = $3.reg_reservation;
             $$->initializer = $5;
         }
 
-array:
+arrays:
       %empty
         {
-            $$ = 0;
+            $$.sizes = NULL;
+            $$.count = 0;
         }
-    | '[' expr ']'
+    | '[' expr ']' arrays
         {
             unsigned int size = evaluate_array_dimension(node_from_list($2));
+            uint32_t *new_array;
 
             hlsl_free_instr_list($2);
+
+            $$ = $4;
 
             if (!size)
             {
                 hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
                         "Array size is not a positive integer constant.");
+                vkd3d_free($$.sizes);
                 YYABORT;
             }
 
@@ -2299,9 +2326,17 @@ array:
             {
                 hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
                         "Array size %u is not between 1 and 65536.", size);
+                vkd3d_free($$.sizes);
                 YYABORT;
             }
-            $$ = size;
+
+            if (!(new_array = vkd3d_realloc($$.sizes, ($$.count + 1) * sizeof(*new_array))))
+            {
+                vkd3d_free($$.sizes);
+                YYABORT;
+            }
+            $$.sizes = new_array;
+            $$.sizes[$$.count++] = size;
         }
 
 var_modifiers:
@@ -2632,6 +2667,7 @@ postfix_expr:
     | postfix_expr '[' expr ']'
         {
             struct hlsl_ir_node *array = node_from_list($1), *index = node_from_list($3);
+            struct hlsl_ir_expr *cast;
 
             list_move_tail($1, $3);
             vkd3d_free($3);
@@ -2643,7 +2679,14 @@ postfix_expr:
                 YYABORT;
             }
 
-            if (!add_array_load(ctx, $1, array, index, @2))
+            if (!(cast = hlsl_new_cast(index, ctx->builtin_types.scalar[HLSL_TYPE_UINT], &index->loc)))
+            {
+                hlsl_free_instr_list($1);
+                YYABORT;
+            }
+            list_add_tail($1, &cast->node.entry);
+
+            if (!add_array_load(ctx, $1, array, &cast->node, @2))
             {
                 hlsl_free_instr_list($1);
                 YYABORT;
@@ -2762,10 +2805,11 @@ unary_expr:
         }
 
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
-    | '(' var_modifiers type array ')' unary_expr
+    | '(' var_modifiers type arrays ')' unary_expr
         {
             struct hlsl_type *src_type = node_from_list($6)->data_type;
             struct hlsl_type *dst_type;
+            unsigned int i;
 
             if ($2)
             {
@@ -2774,10 +2818,9 @@ unary_expr:
                 YYABORT;
             }
 
-            if ($4)
-                dst_type = hlsl_new_array_type(ctx, $3, $4);
-            else
-                dst_type = $3;
+            dst_type = $3;
+            for (i = 0; i < $4.count; ++i)
+                dst_type = hlsl_new_array_type(ctx, dst_type, $4.sizes[i]);
 
             if (!compatible_data_types(src_type, dst_type))
             {
