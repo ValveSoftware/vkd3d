@@ -1,0 +1,25 @@
+[pixel shader fail]
+uniform float4 color[2][3];
+
+float4 main() : sv_target
+{
+    return color[2][1];
+}
+
+[pixel shader]
+uniform float color[2][3];
+
+float4 main() : sv_target
+{
+    return float4(color[1][0], color[0][0], color[1][2], color[0][2]);
+}
+
+[test]
+uniform  0 float4 0.1 0.0 0.0 0.0
+uniform  4 float4 0.2 0.0 0.0 0.0
+uniform  8 float4 0.3 0.0 0.0 0.0
+uniform 12 float4 0.4 0.0 0.0 0.0
+uniform 16 float4 0.5 0.0 0.0 0.0
+uniform 20 float4 0.6 0.0 0.0 0.0
+draw quad
+probe all rgba (0.4, 0.1, 0.6, 0.3)
