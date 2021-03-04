@@ -1646,7 +1646,11 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
     if (!hlsl_ctx_init(&ctx, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    hlsl_lexer_compile(&ctx, text);
+    if (hlsl_lexer_compile(&ctx, text) == 2)
+    {
+        hlsl_ctx_cleanup(&ctx);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
 
     if (ctx.failed)
     {
