@@ -1618,7 +1618,7 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
         hlsl_free_type(type);
 }
 
-int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info *compile_info,
+int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
@@ -1646,7 +1646,7 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
     if (!hlsl_ctx_init(&ctx, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    if (hlsl_lexer_compile(&ctx, text) == 2)
+    if (hlsl_lexer_compile(&ctx, hlsl) == 2)
     {
         hlsl_ctx_cleanup(&ctx);
         return VKD3D_ERROR_OUT_OF_MEMORY;

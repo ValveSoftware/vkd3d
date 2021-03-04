@@ -572,6 +572,6 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text) DECLSPEC_HIDDEN;
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl) DECLSPEC_HIDDEN;
 
 #endif

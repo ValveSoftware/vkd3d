@@ -949,7 +949,7 @@ void vkd3d_compute_dxbc_checksum(const void *dxbc, size_t size, uint32_t checksu
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
 
-int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info *compile_info,
+int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type(

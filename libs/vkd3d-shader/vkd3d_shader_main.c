@@ -1047,7 +1047,7 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
     if ((ret = preproc_lexer_parse(compile_info, &preprocessed, message_context)))
         return ret;
 
-    ret = hlsl_compile_shader(preprocessed.code, compile_info, out, message_context);
+    ret = hlsl_compile_shader(&preprocessed, compile_info, out, message_context);
 
     vkd3d_shader_free_shader_code(&preprocessed);
     return ret;

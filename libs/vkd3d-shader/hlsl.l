@@ -282,13 +282,13 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
     ctx->location.column += yyget_leng(ctx->scanner);
 }
 
-int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text)
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl)
 {
     YY_BUFFER_STATE buffer;
     int ret;
 
     yylex_init_extra(ctx, &ctx->scanner);
-    buffer = yy_scan_string(text, ctx->scanner);
+    buffer = yy_scan_bytes(hlsl->code, hlsl->size, ctx->scanner);
     yy_switch_to_buffer(buffer, ctx->scanner);
 
     ret = hlsl_yyparse(ctx->scanner, ctx);
