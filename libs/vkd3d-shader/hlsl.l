@@ -282,7 +282,7 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
     ctx->location.column += yyget_leng(ctx->scanner);
 }
 
-int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entrypoint)
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text)
 {
     YY_BUFFER_STATE buffer;
     int ret;
@@ -291,7 +291,7 @@ int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entry
     buffer = yy_scan_string(text, ctx->scanner);
     yy_switch_to_buffer(buffer, ctx->scanner);
 
-    ret = hlsl_parser_compile(ctx, entrypoint);
+    ret = hlsl_yyparse(ctx->scanner, ctx);
 
     yy_delete_buffer(buffer, ctx->scanner);
     yylex_destroy(ctx->scanner);

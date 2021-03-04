@@ -286,22 +286,6 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return &cast->node;
 }
 
-static struct hlsl_ir_function_decl *get_func_entry(struct hlsl_ctx *ctx, const char *name)
-{
-    struct hlsl_ir_function_decl *decl;
-    struct hlsl_ir_function *func;
-    struct rb_entry *entry;
-
-    if ((entry = rb_get(&ctx->functions, name)))
-    {
-        func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
-        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
-            return decl;
-    }
-
-    return NULL;
-}
-
 static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local)
 {
     struct hlsl_ir_function_decl *func;
@@ -334,7 +318,7 @@ static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, boo
     }
     else
     {
-        if ((func = get_func_entry(ctx, decl->name)))
+        if ((func = hlsl_get_func_decl(ctx, decl->name)))
         {
             hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                     "Variable '%s' is already defined as a function.", decl->name);
@@ -3012,32 +2996,3 @@ expr:
             list_move_tail($$, $3);
             vkd3d_free($3);
         }
-
-%%
-
-int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint)
-{
-    struct hlsl_ir_function_decl *entry_func;
-
-    yyparse(ctx->scanner, ctx);
-
-    if (ctx->failed)
-        return VKD3D_ERROR_INVALID_SHADER;
-
-    if (!(entry_func = get_func_entry(ctx, entrypoint)))
-    {
-        const struct vkd3d_shader_location loc = {.source_name = ctx->location.source_name};
-
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Entry point \"%s\" is not defined.", entrypoint);
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
-
-    if (!hlsl_type_is_void(entry_func->return_type)
-            && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->semantic)
-    {
-        hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
-                "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
-    }
-
-    return hlsl_emit_dxbc(ctx, entry_func);
-}

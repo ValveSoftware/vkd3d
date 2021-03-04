@@ -188,6 +188,22 @@ bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name)
     return rb_get(&ctx->functions, name) != NULL;
 }
 
+struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name)
+{
+    struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function *func;
+    struct rb_entry *entry;
+
+    if ((entry = rb_get(&ctx->functions, name)))
+    {
+        func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
+        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+            return decl;
+    }
+
+    return NULL;
+}
+
 unsigned int hlsl_type_component_count(struct hlsl_type *type)
 {
     struct hlsl_struct_field *field;
@@ -1606,7 +1622,9 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
+    struct hlsl_ir_function_decl *entry_func;
     const struct hlsl_profile_info *profile;
+    const char *entry_point;
     struct hlsl_ctx ctx;
     int ret;
 
@@ -1615,6 +1633,7 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
         ERR("No HLSL source info given.\n");
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
+    entry_point = hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main";
 
     if (!(profile = get_target_info(hlsl_source_info->profile)))
     {
@@ -1627,9 +1646,30 @@ int hlsl_compile_shader(const char *text, const struct vkd3d_shader_compile_info
     if (!hlsl_ctx_init(&ctx, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    ret = hlsl_lexer_compile(&ctx, text, hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main");
+    hlsl_lexer_compile(&ctx, text);
+
+    if (ctx.failed)
+    {
+        hlsl_ctx_cleanup(&ctx);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!(entry_func = hlsl_get_func_decl(&ctx, entry_point)))
+    {
+        const struct vkd3d_shader_location loc = {.source_name = compile_info->source_name};
+
+        hlsl_error(&ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+                "Entry point \"%s\" is not defined.", entry_point);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!hlsl_type_is_void(entry_func->return_type)
+            && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->semantic)
+        hlsl_error(&ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                "Entry point \"%s\" is missing a return value semantic.", entry_point);
+
+    ret = hlsl_emit_dxbc(&ctx, entry_func);
 
     hlsl_ctx_cleanup(&ctx);
-
     return ret;
 }

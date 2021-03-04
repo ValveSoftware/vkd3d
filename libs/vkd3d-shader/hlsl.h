@@ -518,6 +518,7 @@ void hlsl_free_type(struct hlsl_type *type) DECLSPEC_HIDDEN;
 void hlsl_free_var(struct hlsl_ir_var *decl) DECLSPEC_HIDDEN;
 
 bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name) DECLSPEC_HIDDEN;
+struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name) DECLSPEC_HIDDEN;
 
@@ -571,7 +572,6 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 
-int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text, const char *entrypoint) DECLSPEC_HIDDEN;
-int hlsl_parser_compile(struct hlsl_ctx *ctx, const char *entrypoint) DECLSPEC_HIDDEN;
+int hlsl_lexer_compile(struct hlsl_ctx *ctx, const char *text) DECLSPEC_HIDDEN;
 
 #endif
