@@ -1021,10 +1021,25 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
     enum hlsl_base_type base;
     unsigned int dimx, dimy;
 
-    if (t1->type > HLSL_CLASS_LAST_NUMERIC || t2->type > HLSL_CLASS_LAST_NUMERIC)
+    if (t1->type > HLSL_CLASS_LAST_NUMERIC)
     {
-        hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                "Non-numeric types cannot be used in expressions.");
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(&ctx->string_buffers, t1)))
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
+        vkd3d_string_buffer_release(&ctx->string_buffers, string);
+        return NULL;
+    }
+
+    if (t2->type > HLSL_CLASS_LAST_NUMERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(&ctx->string_buffers, t2)))
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
+        vkd3d_string_buffer_release(&ctx->string_buffers, string);
         return NULL;
     }
 
@@ -1033,8 +1048,15 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
 
     if (!expr_compatible_data_types(t1, t2))
     {
-        hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                "Expression data types are incompatible.");
+        struct vkd3d_string_buffer *t1_string = hlsl_type_to_string(&ctx->string_buffers, t1);
+        struct vkd3d_string_buffer *t2_string = hlsl_type_to_string(&ctx->string_buffers, t2);
+
+        if (t1_string && t2_string)
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Expression data types \"%s\" and \"%s\" are incompatible.",
+                    t1_string->buffer, t2_string->buffer);
+        vkd3d_string_buffer_release(&ctx->string_buffers, t1_string);
+        vkd3d_string_buffer_release(&ctx->string_buffers, t2_string);
         return NULL;
     }
 
@@ -1325,7 +1347,8 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
     if (initializer_size(initializer) != hlsl_type_component_count(type))
     {
         hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                "Wrong number of parameters in struct initializer.");
+                "Expected %u components in initializer, but got %u.",
+                hlsl_type_component_count(type), initializer_size(initializer));
         free_parse_initializer(initializer);
         return;
     }
@@ -1438,7 +1461,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 if (size < type->dimx * type->dimy)
                 {
                     hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Wrong number of parameters in numeric initializer.");
+                            "Expected %u components in numeric initializer, but got %u.",
+                            type->dimx * type->dimy, size);
                     free_parse_initializer(&v->initializer);
                     vkd3d_free(v);
                     continue;
@@ -1448,7 +1472,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                     && hlsl_type_component_count(type) != size)
             {
                 hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Wrong number of parameters in initializer.");
+                        "Expected %u components in initializer, but got %u.", hlsl_type_component_count(type), size);
                 free_parse_initializer(&v->initializer);
                 vkd3d_free(v);
                 continue;
@@ -2050,7 +2074,12 @@ input_mods:
         {
             if ($1 & $2)
             {
-                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER, "Duplicate modifiers specified.");
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, $2)))
+                    hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifier \"%s\" was already specified.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
                 YYABORT;
             }
             $$ = $1 | $2;
@@ -2079,14 +2108,19 @@ type:
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
-                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Vectors of non-scalar types are not allowed.");
+                struct vkd3d_string_buffer *string;
+
+                string = hlsl_type_to_string(&ctx->string_buffers, $3);
+                if (string)
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Vector base type %s is not scalar.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
             {
                 hlsl_error(ctx, @5, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Vector size must be between 1 and 4.");
+                        "Vector size %d is not between 1 and 4.", $5);
                 YYABORT;
             }
 
@@ -2096,20 +2130,25 @@ type:
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
-                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Matrices of non-scalar types are not allowed.");
+                struct vkd3d_string_buffer *string;
+
+                string = hlsl_type_to_string(&ctx->string_buffers, $3);
+                if (string)
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Matrix base type %s is not scalar.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
             {
                 hlsl_error(ctx, @5, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Matrix row count must be between 1 and 4.");
+                        "Matrix row count %d is not between 1 and 4.", $5);
                 YYABORT;
             }
             if ($7 < 1 || $7 > 4)
             {
                 hlsl_error(ctx, @7, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Matrix column count must be between 1 and 4.");
+                        "Matrix column count %d is not between 1 and 4.", $7);
                 YYABORT;
             }
 
@@ -2279,7 +2318,7 @@ array:
             if (size > 65536)
             {
                 hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Array size must be between 1 and 65536.");
+                        "Array size %u is not between 1 and 65536.", size);
                 YYABORT;
             }
             $$ = size;
@@ -2430,8 +2469,14 @@ selection_statement:
             vkd3d_free($5.then_instrs);
             vkd3d_free($5.else_instrs);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
-                hlsl_error(ctx, instr->node.loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "if condition requires a scalar.");
+            {
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_type_to_string(&ctx->string_buffers, condition->data_type)))
+                    hlsl_error(ctx, instr->node.loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "if condition type %s is not scalar.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+            }
             $$ = $3;
             list_add_tail($$, &instr->node.entry);
         }
@@ -2644,8 +2689,12 @@ postfix_expr:
             }
             if ($2->type > HLSL_CLASS_LAST_NUMERIC)
             {
-                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Constructors may only be used with numeric data types.");
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_type_to_string(&ctx->string_buffers, $2)))
+                    hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Constructor data type %s is not numeric.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
                 YYABORT;
             }
             if ($2->dimx * $2->dimy != initializer_size(&$4))
@@ -2669,8 +2718,12 @@ postfix_expr:
 
                 if (arg->data_type->type == HLSL_CLASS_OBJECT)
                 {
-                    hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "Invalid type for constructor argument.");
+                    struct vkd3d_string_buffer *string;
+
+                    if ((string = hlsl_type_to_string(&ctx->string_buffers, arg->data_type)))
+                        hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Invalid type %s for constructor argument.", string->buffer);
+                    vkd3d_string_buffer_release(&ctx->string_buffers, string);
                     continue;
                 }
                 width = hlsl_type_component_count(arg->data_type);
