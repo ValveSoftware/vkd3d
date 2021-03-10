@@ -1259,12 +1259,22 @@ static bool invert_swizzle(unsigned int *swizzle, unsigned int *writemask, unsig
 static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *lhs,
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
+    struct hlsl_type *lhs_type = lhs->data_type;
     struct hlsl_ir_assignment *assign;
-    struct hlsl_type *lhs_type;
     struct hlsl_ir_expr *copy;
     DWORD writemask = 0;
 
-    lhs_type = lhs->data_type;
+    if (assign_op != ASSIGN_OP_ASSIGN)
+    {
+        enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
+        struct hlsl_ir_node *args[3] = {lhs, rhs};
+        struct hlsl_ir_expr *expr;
+
+        if (!(expr = add_expr(ctx, instrs, op, args, &rhs->loc)))
+            return NULL;
+        rhs = &expr->node;
+    }
+
     if (lhs_type->type <= HLSL_CLASS_LAST_NUMERIC)
     {
         writemask = (1 << lhs_type->dimx) - 1;
@@ -1278,8 +1288,6 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     while (lhs->type != HLSL_IR_LOAD)
     {
-        struct hlsl_ir_node *lhs_inner;
-
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_IR_UNOP_CAST)
         {
             FIXME("Cast on the lhs.\n");
@@ -1288,29 +1296,28 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
-            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
-            const struct hlsl_type *swizzle_type = swizzle->node.data_type;
-            unsigned int width;
+            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs), *new_swizzle;
+            unsigned int width, s = swizzle->swizzle;
 
             if (lhs->data_type->type == HLSL_CLASS_MATRIX)
                 FIXME("Assignments with writemasks and matrices on lhs are not supported yet.\n");
 
-            lhs_inner = swizzle->val.node;
-            hlsl_src_remove(&swizzle->val);
-            list_remove(&lhs->entry);
-
-            list_add_after(&rhs->entry, &lhs->entry);
-            hlsl_src_from_node(&swizzle->val, rhs);
-            if (!invert_swizzle(&swizzle->swizzle, &writemask, &width))
+            if (!invert_swizzle(&s, &writemask, &width))
             {
                 hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
                 vkd3d_free(assign);
                 return NULL;
             }
-            assert(swizzle_type->type == HLSL_CLASS_VECTOR);
-            if (swizzle_type->dimx != width)
-                swizzle->node.data_type = ctx->builtin_types.vector[swizzle_type->base_type][width - 1];
-            rhs = &swizzle->node;
+
+            if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
+            {
+                vkd3d_free(assign);
+                return NULL;
+            }
+            list_add_tail(instrs, &new_swizzle->node.entry);
+
+            lhs = swizzle->val.node;
+            rhs = &new_swizzle->node;
         }
         else
         {
@@ -1318,23 +1325,12 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             vkd3d_free(assign);
             return NULL;
         }
-
-        lhs = lhs_inner;
     }
 
     init_node(&assign->node, HLSL_IR_ASSIGNMENT, NULL, lhs->loc);
     assign->writemask = writemask;
     assign->lhs.var = hlsl_ir_load(lhs)->src.var;
     hlsl_src_from_node(&assign->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
-    if (assign_op != ASSIGN_OP_ASSIGN)
-    {
-        enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
-        struct hlsl_ir_node *expr;
-
-        expr = hlsl_new_binary_expr(op, lhs, rhs);
-        list_add_after(&rhs->entry, &expr->entry);
-        rhs = expr;
-    }
     hlsl_src_from_node(&assign->rhs, rhs);
     list_add_tail(instrs, &assign->node.entry);
 
