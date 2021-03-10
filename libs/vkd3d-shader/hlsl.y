@@ -1348,20 +1348,39 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     return &copy->node;
 }
 
-static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, struct vkd3d_shader_location loc)
+static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, bool post,
+        struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *lhs = node_from_list(instrs);
     struct hlsl_ir_constant *one;
 
     if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
-                "Argument to pre%screment operator is const.", decrement ? "de" : "in");
+                "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
 
     if (!(one = hlsl_new_uint_constant(ctx, 1, loc)))
         return false;
     list_add_tail(instrs, &one->node.entry);
 
-    return !!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, &one->node);
+    if (!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, &one->node))
+        return false;
+
+    if (post)
+    {
+        struct hlsl_ir_expr *copy;
+
+        /* Use a cast to the same type as a makeshift identity expression. */
+        if (!(copy = hlsl_new_cast(lhs, lhs->data_type, &lhs->loc)))
+            return false;
+        list_add_tail(instrs, &copy->node.entry);
+
+        /* Post increment/decrement expressions are considered const. */
+        if (!(copy->node.data_type = hlsl_type_clone(ctx, copy->node.data_type, 0)))
+            return false;
+        copy->node.data_type->modifiers |= HLSL_MODIFIER_CONST;
+    }
+
+    return true;
 }
 
 static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, struct hlsl_ir_var *var,
@@ -2624,33 +2643,21 @@ postfix_expr:
       primary_expr
     | postfix_expr OP_INC
         {
-            struct hlsl_ir_node *inc;
-
-            if (node_from_list($1)->data_type->modifiers & HLSL_MODIFIER_CONST)
+            if (!add_increment(ctx, $1, false, true, @2))
             {
-                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
+                hlsl_free_instr_list($1);
                 YYABORT;
             }
-            inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTINC, node_from_list($1), @2);
-            /* Post increment/decrement expressions are considered const */
-            inc->data_type = hlsl_type_clone(ctx, inc->data_type, 0);
-            inc->data_type->modifiers |= HLSL_MODIFIER_CONST;
-            $$ = append_unop($1, inc);
+            $$ = $1;
         }
     | postfix_expr OP_DEC
         {
-            struct hlsl_ir_node *inc;
-
-            if (node_from_list($1)->data_type->modifiers & HLSL_MODIFIER_CONST)
+            if (!add_increment(ctx, $1, true, true, @2))
             {
-                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
+                hlsl_free_instr_list($1);
                 YYABORT;
             }
-            inc = hlsl_new_unary_expr(HLSL_IR_UNOP_POSTDEC, node_from_list($1), @2);
-            /* Post increment/decrement expressions are considered const */
-            inc->data_type = hlsl_type_clone(ctx, inc->data_type, 0);
-            inc->data_type->modifiers |= HLSL_MODIFIER_CONST;
-            $$ = append_unop($1, inc);
+            $$ = $1;
         }
     | postfix_expr '.' any_identifier
         {
@@ -2801,7 +2808,7 @@ unary_expr:
       postfix_expr
     | OP_INC unary_expr
         {
-            if (!add_increment(ctx, $2, false, @1))
+            if (!add_increment(ctx, $2, false, false, @1))
             {
                 hlsl_free_instr_list($2);
                 YYABORT;
@@ -2810,7 +2817,7 @@ unary_expr:
         }
     | OP_DEC unary_expr
         {
-            if (!add_increment(ctx, $2, true, @1))
+            if (!add_increment(ctx, $2, true, false, @1))
             {
                 hlsl_free_instr_list($2);
                 YYABORT;

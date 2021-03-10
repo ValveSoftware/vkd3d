@@ -983,9 +983,6 @@ static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
 
         "sat",
 
-        "post++",
-        "post--",
-
         "+",
         "-",
         "*",
