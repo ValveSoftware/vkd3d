@@ -1,0 +1,15 @@
+[pixel shader]
+uniform float4 color;
+
+float4 main() : SV_target
+{
+    float4 ret = color;
+    ret.zw += float2(0.5, 0.3);
+    ret.yx -= float2(0.1, 0.5);
+    return ret;
+}
+
+[test]
+uniform 0 float4 0.0303 0.08 0.07 0.0202
+draw quad
+probe all rgba (-0.4697, -0.02, 0.57, 0.3202) 2

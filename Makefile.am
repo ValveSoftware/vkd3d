@@ -80,7 +80,11 @@ vkd3d_shader_tests = \
 	tests/swizzle-5.shader_test \
 	tests/swizzle-6.shader_test \
 	tests/swizzle-7.shader_test \
-	tests/trigonometry.shader_test
+	tests/trigonometry.shader_test \
+	tests/writemask-assignop-0.shader_test \
+	tests/writemask-assignop-1.shader_test \
+	tests/writemask-assignop-2.shader_test \
+	tests/writemask-assignop-3.shader_test
 
 vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
@@ -267,7 +271,11 @@ XFAIL_TESTS = \
 	tests/swizzle-5.shader_test \
 	tests/swizzle-6.shader_test \
 	tests/swizzle-7.shader_test \
-	tests/trigonometry.shader_test
+	tests/trigonometry.shader_test \
+	tests/writemask-assignop-0.shader_test \
+	tests/writemask-assignop-1.shader_test \
+	tests/writemask-assignop-2.shader_test \
+	tests/writemask-assignop-3.shader_test
 endif
 
 if BUILD_DEMOS
