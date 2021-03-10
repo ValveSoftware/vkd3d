@@ -1348,6 +1348,22 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     return &copy->node;
 }
 
+static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *lhs = node_from_list(instrs);
+    struct hlsl_ir_constant *one;
+
+    if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
+                "Argument to pre%screment operator is const.", decrement ? "de" : "in");
+
+    if (!(one = hlsl_new_uint_constant(ctx, 1, loc)))
+        return false;
+    list_add_tail(instrs, &one->node.entry);
+
+    return !!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, &one->node);
+}
+
 static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, struct hlsl_ir_var *var,
         struct parse_initializer *initializer)
 {
@@ -2785,21 +2801,21 @@ unary_expr:
       postfix_expr
     | OP_INC unary_expr
         {
-            if (node_from_list($2)->data_type->modifiers & HLSL_MODIFIER_CONST)
+            if (!add_increment(ctx, $2, false, @1))
             {
-                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
+                hlsl_free_instr_list($2);
                 YYABORT;
             }
-            $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREINC, node_from_list($2), @1));
+            $$ = $2;
         }
     | OP_DEC unary_expr
         {
-            if (node_from_list($2)->data_type->modifiers & HLSL_MODIFIER_CONST)
+            if (!add_increment(ctx, $2, true, @1))
             {
-                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
+                hlsl_free_instr_list($2);
                 YYABORT;
             }
-            $$ = append_unop($2, hlsl_new_unary_expr(HLSL_IR_UNOP_PREDEC, node_from_list($2), @1));
+            $$ = $2;
         }
     | unary_op unary_expr
         {

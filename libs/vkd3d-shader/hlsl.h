@@ -276,8 +276,6 @@ enum hlsl_ir_expr_op
 
     HLSL_IR_UNOP_SAT,
 
-    HLSL_IR_UNOP_PREINC,
-    HLSL_IR_UNOP_PREDEC,
     HLSL_IR_UNOP_POSTINC,
     HLSL_IR_UNOP_POSTDEC,
 
