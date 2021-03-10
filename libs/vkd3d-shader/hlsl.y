@@ -1261,6 +1261,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 {
     struct hlsl_ir_assignment *assign;
     struct hlsl_type *lhs_type;
+    struct hlsl_ir_expr *copy;
     DWORD writemask = 0;
 
     lhs_type = lhs->data_type;
@@ -1321,7 +1322,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         lhs = lhs_inner;
     }
 
-    init_node(&assign->node, HLSL_IR_ASSIGNMENT, lhs_type, lhs->loc);
+    init_node(&assign->node, HLSL_IR_ASSIGNMENT, NULL, lhs->loc);
     assign->writemask = writemask;
     assign->lhs.var = hlsl_ir_load(lhs)->src.var;
     hlsl_src_from_node(&assign->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
@@ -1337,7 +1338,14 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     hlsl_src_from_node(&assign->rhs, rhs);
     list_add_tail(instrs, &assign->node.entry);
 
-    return &assign->node;
+    /* Don't use the instruction itself as a source, as this makes structure
+     * splitting easier. Instead copy it here. Since we retrieve sources from
+     * the last instruction in the list, we do need to copy. Use a cast
+     * instruction to the same type as a makeshift identity expression. */
+    if (!(copy = hlsl_new_cast(rhs, rhs->data_type, &lhs->loc)))
+        return NULL;
+    list_add_tail(instrs, &copy->node.entry);
+    return &copy->node;
 }
 
 static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, struct hlsl_ir_var *var,
