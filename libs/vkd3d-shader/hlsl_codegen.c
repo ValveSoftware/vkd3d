@@ -53,9 +53,24 @@ static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
         hlsl_src_remove(src);
         hlsl_src_from_node(src, new);
     }
-    list_add_before(&old->entry, &new->entry);
     list_remove(&old->entry);
     hlsl_free_instr(old);
+}
+
+static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    if (instr->type == HLSL_IR_EXPR)
+    {
+        struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
+
+        if (expr->op == HLSL_IR_UNOP_CAST && hlsl_type_compare(expr->node.data_type, expr->operands[0].node->data_type))
+        {
+            replace_node(&expr->node, expr->operands[0].node);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -116,6 +131,7 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
             return false;
     }
 
+    list_add_before(&expr->node.entry, &res->node.entry);
     replace_node(&expr->node, &res->node);
     return true;
 }
@@ -289,6 +305,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 {
     list_move_head(entry_func->body, &ctx->static_initializers);
 
+    while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
     while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
     while (transform_ir(ctx, dce, entry_func->body, NULL));
 
