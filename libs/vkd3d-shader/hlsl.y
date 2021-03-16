@@ -1336,9 +1336,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     /* Don't use the instruction itself as a source, as this makes structure
      * splitting easier. Instead copy it here. Since we retrieve sources from
-     * the last instruction in the list, we do need to copy. Use a cast
-     * instruction to the same type as a makeshift identity expression. */
-    if (!(copy = hlsl_new_cast(rhs, rhs->data_type, &lhs->loc)))
+     * the last instruction in the list, we do need to copy. */
+    if (!(copy = hlsl_new_copy(rhs)))
         return NULL;
     list_add_tail(instrs, &copy->node.entry);
     return &copy->node;
@@ -1365,8 +1364,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     {
         struct hlsl_ir_expr *copy;
 
-        /* Use a cast to the same type as a makeshift identity expression. */
-        if (!(copy = hlsl_new_cast(lhs, lhs->data_type, &lhs->loc)))
+        if (!(copy = hlsl_new_copy(lhs)))
             return false;
         list_add_tail(instrs, &copy->node.entry);
 

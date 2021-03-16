@@ -525,6 +525,7 @@ struct hlsl_ir_node *hlsl_new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_i
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
         struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
+struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ir_node *node) DECLSPEC_HIDDEN;
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const char *semantic, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;

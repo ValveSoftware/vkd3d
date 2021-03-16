@@ -382,6 +382,12 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *
     return hlsl_ir_expr(cast);
 }
 
+struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ir_node *node)
+{
+    /* Use a cast to the same type as a makeshift identity expression. */
+    return hlsl_new_cast(node, node->data_type, &node->loc);
+}
+
 struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct vkd3d_shader_location loc,
         const char *semantic, unsigned int modifiers, const struct hlsl_reg_reservation *reg_reservation)
 {
