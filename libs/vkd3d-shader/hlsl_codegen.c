@@ -20,6 +20,106 @@
 
 #include "hlsl.h"
 
+static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
+        struct list *instrs, void *context)
+{
+    struct hlsl_ir_node *instr, *next;
+    bool progress = 0;
+
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            progress |= transform_ir(ctx, func, &iff->then_instrs, context);
+            progress |= transform_ir(ctx, func, &iff->else_instrs, context);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+            progress |= transform_ir(ctx, func, &hlsl_ir_loop(instr)->body, context);
+
+        progress |= func(ctx, instr, context);
+    }
+
+    return progress;
+}
+
+static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
+{
+    struct hlsl_src *src, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(src, next, &old->uses, struct hlsl_src, entry)
+    {
+        hlsl_src_remove(src);
+        hlsl_src_from_node(src, new);
+    }
+    list_add_before(&old->entry, &new->entry);
+    list_remove(&old->entry);
+    hlsl_free_instr(old);
+}
+
+static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
+    struct hlsl_ir_expr *expr;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+
+    for (i = 0; i < ARRAY_SIZE(expr->operands); ++i)
+    {
+        if (expr->operands[i].node && expr->operands[i].node->type != HLSL_IR_CONSTANT)
+            return false;
+    }
+    arg1 = hlsl_ir_constant(expr->operands[0].node);
+    if (expr->operands[1].node)
+        arg2 = hlsl_ir_constant(expr->operands[1].node);
+
+    if (!(res = vkd3d_calloc(1, sizeof(*res))))
+    {
+        ctx->failed = true;
+        return false;
+    }
+    init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
+
+    switch (instr->data_type->base_type)
+    {
+        case HLSL_TYPE_UINT:
+        {
+            unsigned int i;
+
+            switch (expr->op)
+            {
+                case HLSL_IR_BINOP_ADD:
+                    for (i = 0; i < instr->data_type->dimx; ++i)
+                        res->value.u[i] = arg1->value.u[i] + arg2->value.u[i];
+                    break;
+
+                case HLSL_IR_BINOP_MUL:
+                    for (i = 0; i < instr->data_type->dimx; ++i)
+                        res->value.u[i] = arg1->value.u[i] * arg2->value.u[i];
+                    break;
+
+                default:
+                    FIXME("Fold uint op %#x.\n", expr->op);
+                    vkd3d_free(res);
+                    return false;
+            }
+            break;
+        }
+
+        default:
+            FIXME("Fold type %#x op %#x.\n", instr->data_type->base_type, expr->op);
+            vkd3d_free(res);
+            return false;
+    }
+
+    replace_node(&expr->node, &res->node);
+    return true;
+}
+
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * computing liveness ranges. */
 static unsigned int index_instructions(struct list *instrs, unsigned int index)
@@ -162,6 +262,8 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     list_move_head(entry_func->body, &ctx->static_initializers);
+
+    while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
 
     /* Index 0 means unused; index 1 means function entry, so start at 2. */
     index_instructions(entry_func->body, 2);
