@@ -120,6 +120,32 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     return true;
 }
 
+static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    switch (instr->type)
+    {
+        case HLSL_IR_CONSTANT:
+        case HLSL_IR_EXPR:
+        case HLSL_IR_LOAD:
+        case HLSL_IR_SWIZZLE:
+            if (list_empty(&instr->uses))
+            {
+                list_remove(&instr->entry);
+                hlsl_free_instr(instr);
+                return true;
+            }
+            break;
+
+        case HLSL_IR_ASSIGNMENT:
+        case HLSL_IR_IF:
+        case HLSL_IR_JUMP:
+        case HLSL_IR_LOOP:
+            break;
+    }
+
+    return false;
+}
+
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * computing liveness ranges. */
 static unsigned int index_instructions(struct list *instrs, unsigned int index)
@@ -264,6 +290,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     list_move_head(entry_func->body, &ctx->static_initializers);
 
     while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
+    while (transform_ir(ctx, dce, entry_func->body, NULL));
 
     /* Index 0 means unused; index 1 means function entry, so start at 2. */
     index_instructions(entry_func->body, 2);
