@@ -755,7 +755,7 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
         field->semantic = v->semantic;
         if (v->initializer.args_count)
         {
-            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.\n");
+            hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.");
             free_parse_initializer(&v->initializer);
         }
         list_add_tail(list, &field->entry);
