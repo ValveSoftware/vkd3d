@@ -497,15 +497,22 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct vkd3d_shad
     return iff;
 }
 
-struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd3d_shader_location loc)
+struct hlsl_ir_load *hlsl_new_load(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
+        struct hlsl_type *type, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_load *load;
 
     if (!(load = vkd3d_calloc(1, sizeof(*load))))
         return NULL;
-    init_node(&load->node, HLSL_IR_LOAD, var->data_type, loc);
+    init_node(&load->node, HLSL_IR_LOAD, type, loc);
     load->src.var = var;
+    hlsl_src_from_node(&load->src.offset, offset);
     return load;
+}
+
+struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd3d_shader_location loc)
+{
+    return hlsl_new_load(var, NULL, var->data_type, loc);
 }
 
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,

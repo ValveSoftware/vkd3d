@@ -610,11 +610,8 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
         list_add_tail(instrs, &assign->node.entry);
     }
 
-    if (!(load = vkd3d_malloc(sizeof(*load))))
+    if (!(load = hlsl_new_load(var, offset, data_type, loc)))
         return NULL;
-    init_node(&load->node, HLSL_IR_LOAD, data_type, loc);
-    load->src.var = var;
-    hlsl_src_from_node(&load->src.offset, offset);
     list_add_tail(instrs, &load->node.entry);
     return load;
 }
