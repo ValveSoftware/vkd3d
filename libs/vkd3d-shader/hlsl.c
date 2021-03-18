@@ -230,7 +230,7 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type)
     return count;
 }
 
-bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
+bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2)
 {
     if (t1 == t2)
         return true;
@@ -259,7 +259,7 @@ bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
         {
             t1field = LIST_ENTRY(t1cur, struct hlsl_struct_field, entry);
             t2field = LIST_ENTRY(t2cur, struct hlsl_struct_field, entry);
-            if (!hlsl_type_compare(t1field->type, t2field->type))
+            if (!hlsl_types_are_equal(t1field->type, t2field->type))
                 return false;
             if (strcmp(t1field->name, t2field->name))
                 return false;
@@ -271,7 +271,7 @@ bool hlsl_type_compare(const struct hlsl_type *t1, const struct hlsl_type *t2)
     }
     if (t1->type == HLSL_CLASS_ARRAY)
         return t1->e.array.elements_count == t2->e.array.elements_count
-                && hlsl_type_compare(t1->e.array.type, t2->e.array.type);
+                && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
 
     return true;
 }
@@ -473,7 +473,7 @@ struct hlsl_ir_node *hlsl_new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_i
 {
     struct hlsl_ir_expr *expr;
 
-    assert(hlsl_type_compare(arg1->data_type, arg2->data_type));
+    assert(hlsl_types_are_equal(arg1->data_type, arg2->data_type));
 
     if (!(expr = vkd3d_calloc(1, sizeof(*expr))))
         return NULL;

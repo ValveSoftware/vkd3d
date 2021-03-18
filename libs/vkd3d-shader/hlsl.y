@@ -169,7 +169,7 @@ static bool compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 
     if (t1->type == HLSL_CLASS_ARRAY)
     {
-        if (hlsl_type_compare(t1->e.array.type, t2))
+        if (hlsl_types_are_equal(t1->e.array.type, t2))
             /* e.g. float4[3] to float4 is allowed */
             return true;
 
@@ -226,7 +226,7 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
             || (t1->type <= HLSL_CLASS_LAST_NUMERIC && t2->type == HLSL_CLASS_ARRAY))
     {
         /* e.g. float4[3] to float4 is allowed */
-        if (t1->type == HLSL_CLASS_ARRAY && hlsl_type_compare(t1->e.array.type, t2))
+        if (t1->type == HLSL_CLASS_ARRAY && hlsl_types_are_equal(t1->e.array.type, t2))
             return true;
         if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
             return true;
@@ -254,7 +254,7 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
     }
 
     if (t1->type == HLSL_CLASS_STRUCT && t2->type == HLSL_CLASS_STRUCT)
-        return hlsl_type_compare(t1, t2);
+        return hlsl_types_are_equal(t1, t2);
 
     return false;
 }
@@ -265,7 +265,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     struct hlsl_type *src_type = node->data_type;
     struct hlsl_ir_expr *cast;
 
-    if (hlsl_type_compare(src_type, dst_type))
+    if (hlsl_types_are_equal(src_type, dst_type))
         return node;
 
     if (!implicit_compatible_data_types(src_type, dst_type))
@@ -1046,7 +1046,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
         return NULL;
     }
 
-    if (hlsl_type_compare(t1, t2))
+    if (hlsl_types_are_equal(t1, t2))
         return t1;
 
     if (!expr_compatible_data_types(t1, t2))
@@ -1158,7 +1158,7 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
 
         if (!operands[i])
             break;
-        if (hlsl_type_compare(operands[i]->data_type, type))
+        if (hlsl_types_are_equal(operands[i]->data_type, type))
             continue;
         if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
                 && operands[i]->data_type->dimx * operands[i]->data_type->dimy != type->dimx * type->dimy)
@@ -1799,7 +1799,7 @@ hlsl_prog:
                     hlsl_note(ctx, decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously defined here.", $2.name);
                     YYABORT;
                 }
-                else if (!hlsl_type_compare(decl->return_type, $2.decl->return_type))
+                else if (!hlsl_types_are_equal(decl->return_type, $2.decl->return_type))
                 {
                     hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Function \"%s\" was already declared with a different return type.", $2.name);

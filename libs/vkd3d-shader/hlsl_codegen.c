@@ -73,7 +73,7 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         if (expr->op != HLSL_IR_UNOP_CAST)
             return false;
 
-        if (hlsl_type_compare(src_type, dst_type)
+        if (hlsl_types_are_equal(src_type, dst_type)
                 || (src_type->base_type == dst_type->base_type && is_vec1(src_type) && is_vec1(dst_type)))
         {
             replace_node(&expr->node, expr->operands[0].node);
