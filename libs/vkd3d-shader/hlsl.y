@@ -1472,7 +1472,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             local = false;
         }
 
-        if (type->modifiers & HLSL_MODIFIER_CONST && !(var->modifiers & HLSL_STORAGE_UNIFORM) && !v->initializer.args_count)
+        if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
+                && !(var->modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
         {
             hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
                     "Const variable \"%s\" is missing an initializer.", var->name);

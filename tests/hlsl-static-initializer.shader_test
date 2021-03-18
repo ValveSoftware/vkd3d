@@ -5,9 +5,10 @@ float myfunc()
 }
 static float a = myfunc() + 0.2;
 static float b;
+static const float c;
 float4 main() : sv_target
 {
-    return float4(a, b, 0, 0);
+    return float4(a, b, c, 0);
 }
 
 [test]

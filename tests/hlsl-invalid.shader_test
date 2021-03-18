@@ -115,3 +115,10 @@ float4 main() : sv_target
 {
     return 0;
 }
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    const float4 x;
+    return x;
+}
