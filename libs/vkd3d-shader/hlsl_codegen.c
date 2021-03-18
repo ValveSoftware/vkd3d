@@ -244,6 +244,19 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
             break;
 
         case HLSL_IR_ASSIGNMENT:
+        {
+            struct hlsl_ir_assignment *assignment = hlsl_ir_assignment(instr);
+            struct hlsl_ir_var *var = assignment->lhs.var;
+
+            if (var->last_read < instr->index)
+            {
+                list_remove(&instr->entry);
+                hlsl_free_instr(instr);
+                return true;
+            }
+            break;
+        }
+
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
@@ -371,7 +384,17 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
 
 static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
+
+    /* Index 0 means unused; index 1 means function entry, so start at 2. */
+    index_instructions(entry_func->body, 2);
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+            var->first_write = var->last_read = 0;
+    }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
@@ -399,15 +422,15 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
     while (transform_ir(ctx, split_struct_copies, entry_func->body, NULL));
     while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
+
+    do
+        compute_liveness(ctx, entry_func);
     while (transform_ir(ctx, dce, entry_func->body, NULL));
 
-    /* Index 0 means unused; index 1 means function entry, so start at 2. */
-    index_instructions(entry_func->body, 2);
+    compute_liveness(ctx, entry_func);
 
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, NULL);
-
-    compute_liveness(ctx, entry_func);
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
