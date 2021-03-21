@@ -342,7 +342,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
             struct hlsl_ir_load *load = hlsl_ir_load(instr);
 
             var = load->src.var;
-            var->last_read = loop_last ? max(instr->index, loop_last) : instr->index;
+            var->last_read = max(var->last_read, loop_last ? max(instr->index, loop_last) : instr->index);
             if (load->src.offset.node)
                 load->src.offset.node->last_read = instr->index;
             break;
