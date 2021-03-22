@@ -763,8 +763,20 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     if (param->type->type == HLSL_CLASS_MATRIX)
         assert(param->type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->modifiers, param->reg_reservation)))
+    if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->reg_reservation)))
         return false;
+
+    if (param->modifiers & HLSL_STORAGE_UNIFORM)
+    {
+        var->is_uniform = 1;
+    }
+    else
+    {
+        if (param->modifiers & HLSL_STORAGE_IN)
+            var->is_input_varying = 1;
+        if (param->modifiers & HLSL_STORAGE_OUT)
+            var->is_output_varying = 1;
+    }
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -1405,18 +1417,20 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         for (i = 0; i < v->arrays.count; ++i)
             type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
 
-        if (!(var = hlsl_new_var(v->name, type, v->loc, v->semantic, modifiers, v->reg_reservation)))
+        if (type->type != HLSL_CLASS_MATRIX)
+            check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
+
+        if (!(var = hlsl_new_var(v->name, type, v->loc, v->semantic, v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
         }
 
-        if (var->data_type->type != HLSL_CLASS_MATRIX)
-            check_invalid_matrix_modifiers(ctx, var->modifiers, var->loc);
-
         if (ctx->cur_scope == ctx->globals)
         {
-            var->modifiers |= HLSL_STORAGE_UNIFORM;
+            if (!(modifiers & HLSL_STORAGE_STATIC))
+                var->is_uniform = 1;
+
             local = false;
 
             if ((func = hlsl_get_func_decl(ctx, var->name)))
@@ -1432,11 +1446,11 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             static const unsigned int invalid = HLSL_STORAGE_EXTERN | HLSL_STORAGE_SHARED
                     | HLSL_STORAGE_GROUPSHARED | HLSL_STORAGE_UNIFORM;
 
-            if (var->modifiers & invalid)
+            if (modifiers & invalid)
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, var->modifiers & invalid)))
+                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, modifiers & invalid)))
                     hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Modifiers '%s' are not allowed on local variables.", string->buffer);
                 vkd3d_string_buffer_release(&ctx->string_buffers, string);
@@ -1447,7 +1461,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         }
 
         if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
-                && !(var->modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
+                && !(modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
         {
             hlsl_error(ctx, v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
                     "Const variable \"%s\" is missing an initializer.", var->name);

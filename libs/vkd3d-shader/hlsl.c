@@ -388,7 +388,7 @@ struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ir_node *node)
 }
 
 struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct vkd3d_shader_location loc,
-        const char *semantic, unsigned int modifiers, const struct hlsl_reg_reservation *reg_reservation)
+        const char *semantic, const struct hlsl_reg_reservation *reg_reservation)
 {
     struct hlsl_ir_var *var;
 
@@ -399,7 +399,6 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
     var->data_type = type;
     var->loc = loc;
     var->semantic = semantic;
-    var->modifiers = modifiers;
     var->reg_reservation = reg_reservation;
     return var;
 }
@@ -407,7 +406,7 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
         const struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_var *var = hlsl_new_var(vkd3d_strdup(name), type, loc, NULL, 0, NULL);
+    struct hlsl_ir_var *var = hlsl_new_var(vkd3d_strdup(name), type, loc, NULL, NULL);
 
     if (var)
         list_add_tail(&ctx->globals->vars, &var->scope_entry);
@@ -869,17 +868,12 @@ static void dump_src(struct vkd3d_string_buffer *buffer, const struct hlsl_src *
 
 static void dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_var *var)
 {
-    if (var->modifiers)
-    {
-        struct vkd3d_string_buffer_cache string_buffers;
-        struct vkd3d_string_buffer *string;
-
-        vkd3d_string_buffer_cache_init(&string_buffers);
-        if ((string = hlsl_modifiers_to_string(&string_buffers, var->modifiers)))
-            vkd3d_string_buffer_printf(buffer, "%s ", string->buffer);
-        vkd3d_string_buffer_release(&string_buffers, string);
-        vkd3d_string_buffer_cache_cleanup(&string_buffers);
-    }
+    if (var->is_input_varying)
+        vkd3d_string_buffer_printf(buffer, "in ");
+    if (var->is_output_varying)
+        vkd3d_string_buffer_printf(buffer, "out ");
+    if (var->is_uniform)
+        vkd3d_string_buffer_printf(buffer, "uniform ");
     vkd3d_string_buffer_printf(buffer, "%s %s", debug_hlsl_type(var->data_type), var->name);
     if (var->semantic)
         vkd3d_string_buffer_printf(buffer, " : %s", var->semantic);

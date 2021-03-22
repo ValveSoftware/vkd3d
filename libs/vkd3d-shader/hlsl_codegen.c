@@ -403,9 +403,9 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
-        if (var->modifiers & HLSL_STORAGE_IN)
+        if (var->is_input_varying)
             var->first_write = 1;
-        if (var->modifiers & HLSL_STORAGE_OUT)
+        if (var->is_output_varying)
             var->last_read = UINT_MAX;
     }
 

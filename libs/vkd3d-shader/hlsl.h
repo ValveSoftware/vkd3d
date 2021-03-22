@@ -204,11 +204,14 @@ struct hlsl_ir_var
     struct vkd3d_shader_location loc;
     const char *name;
     const char *semantic;
-    unsigned int modifiers;
     const struct hlsl_reg_reservation *reg_reservation;
     struct list scope_entry, param_entry;
 
     unsigned int first_write, last_read;
+
+    uint32_t is_input_varying : 1;
+    uint32_t is_output_varying : 1;
+    uint32_t is_uniform : 1;
 };
 
 struct hlsl_ir_function
@@ -546,8 +549,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
 struct hlsl_ir_node *hlsl_new_unary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct vkd3d_shader_location loc,
-        const char *semantic, unsigned int modifiers,
-        const struct hlsl_reg_reservation *reg_reservation) DECLSPEC_HIDDEN;
+        const char *semantic, const struct hlsl_reg_reservation *reg_reservation) DECLSPEC_HIDDEN;
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 
 void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, enum vkd3d_shader_error error,
