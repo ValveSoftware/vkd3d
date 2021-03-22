@@ -9023,10 +9023,15 @@ static void vkd3d_dxbc_compiler_emit_hull_shader_inputs(struct vkd3d_dxbc_compil
 
         symbol.key.reg.idx = register_idx;
         if ((entry = rb_get(&compiler->symbol_table, &symbol)))
+        {
+            struct vkd3d_symbol *s = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
+            s->info.reg.dcl_mask |= signature->elements[i].mask;
             continue;
+        }
 
         vkd3d_symbol_set_register_info(&symbol, vicp_id, SpvStorageClassPrivate,
                 VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
+        symbol.info.reg.dcl_mask = signature->elements[i].mask;
         symbol.info.reg.is_aggregate = true;
         vkd3d_dxbc_compiler_put_symbol(compiler, &symbol);
     }
