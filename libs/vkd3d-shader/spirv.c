@@ -4252,7 +4252,9 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
     }
 
     if (!(use_private_var = builtin && builtin->fixup_pfn)
-            && needs_private_io_variable(shader_signature, reg_idx, builtin, &input_component_count, &write_mask))
+            && needs_private_io_variable(shader_signature, reg_idx, builtin, &input_component_count, &write_mask)
+            && (compiler->shader_type != VKD3D_SHADER_TYPE_HULL
+            || (reg->type != VKD3DSPR_INCONTROLPOINT && reg->type != VKD3DSPR_PATCHCONST)))
         use_private_var = true;
     else
         component_idx = vkd3d_write_mask_get_component_idx(write_mask);
@@ -4266,19 +4268,44 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
         symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
         input_id = symbol->id;
     }
-    else if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && reg->type == VKD3DSPR_INCONTROLPOINT)
+    else if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL
+            && (reg->type == VKD3DSPR_INCONTROLPOINT || reg->type == VKD3DSPR_PATCHCONST))
     {
+        /* Input/output registers from one phase can be used as inputs in
+         * subsequent phases. Specifically:
+         *
+         *   - Control phase inputs are available as "vicp" in fork and join
+         *     phases.
+         *   - Control phase outputs are available as "vocp" in fork and join
+         *     phases.
+         *   - Fork phase patch constants are available as "vpc" in join
+         *     phases.
+         *
+         * We handle "vicp" and "vpc" here by creating aliases to the shader's
+         * global inputs and outputs. We handle "vocp" in
+         * vkd3d_dxbc_compiler_leave_shader_phase(). */
+
         tmp_symbol = reg_symbol;
-        tmp_symbol.key.reg.type = VKD3DSPR_INPUT;
+        if (reg->type == VKD3DSPR_PATCHCONST)
+            tmp_symbol.key.reg.type = VKD3DSPR_OUTPUT;
+        else
+            tmp_symbol.key.reg.type = VKD3DSPR_INPUT;
 
         if ((entry = rb_get(&compiler->symbol_table, &tmp_symbol)))
         {
             symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
             tmp_symbol = *symbol;
-            tmp_symbol.key.reg.type = VKD3DSPR_INCONTROLPOINT;
+            tmp_symbol.key.reg.type = reg->type;
             vkd3d_dxbc_compiler_put_symbol(compiler, &tmp_symbol);
 
             input_id = symbol->id;
+        }
+        else
+        {
+            if (reg->type == VKD3DSPR_PATCHCONST)
+                ERR("Patch constant register %u was not declared in a previous phase.\n", reg_idx);
+            else
+                ERR("Input control point register %u was not declared in a previous phase.\n", reg_idx);
         }
     }
 
@@ -4418,6 +4445,7 @@ static void vkd3d_dxbc_compiler_emit_shader_phase_input(struct vkd3d_dxbc_compil
     {
         case VKD3DSPR_INPUT:
         case VKD3DSPR_INCONTROLPOINT:
+        case VKD3DSPR_PATCHCONST:
             vkd3d_dxbc_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE, VKD3DSIM_NONE);
             return;
         case VKD3DSPR_PRIMID:
