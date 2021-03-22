@@ -340,7 +340,6 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
                 field->name = vkd3d_strdup(old_field->name);
                 if (old_field->semantic)
                     field->semantic = vkd3d_strdup(old_field->semantic);
-                field->modifiers = old_field->modifiers;
                 field->reg_offset = reg_size;
                 reg_size += field->type->reg_size;
                 list_add_tail(type->e.elements, &field->entry);

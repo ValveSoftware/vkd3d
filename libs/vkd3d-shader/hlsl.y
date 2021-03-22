@@ -721,8 +721,7 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     return new_type;
 }
 
-static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        DWORD modifiers, struct list *fields)
+static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *type, struct list *fields)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_struct_field *field;
@@ -748,7 +747,6 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
             field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[i]);
         field->loc = v->loc;
         field->name = v->name;
-        field->modifiers = modifiers;
         field->semantic = v->semantic;
         if (v->initializer.args_count)
         {
@@ -1937,7 +1935,16 @@ field:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
-            $$ = gen_struct_fields(ctx, type, modifiers, $3);
+            if (modifiers)
+            {
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, modifiers)))
+                    hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifiers '%s' are not allowed on struct fields.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+            }
+            $$ = gen_struct_fields(ctx, type, $3);
         }
 
 func_declaration:

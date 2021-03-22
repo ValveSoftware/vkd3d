@@ -134,7 +134,6 @@ struct hlsl_struct_field
     struct hlsl_type *type;
     const char *name;
     const char *semantic;
-    DWORD modifiers;
     unsigned int reg_offset;
 };
 
