@@ -766,16 +766,19 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->reg_reservation)))
         return false;
 
-    if (param->modifiers & HLSL_STORAGE_UNIFORM)
+    if (param->type->type != HLSL_CLASS_OBJECT)
     {
-        var->is_uniform = 1;
-    }
-    else
-    {
-        if (param->modifiers & HLSL_STORAGE_IN)
-            var->is_input_varying = 1;
-        if (param->modifiers & HLSL_STORAGE_OUT)
-            var->is_output_varying = 1;
+        if (param->modifiers & HLSL_STORAGE_UNIFORM)
+        {
+            var->is_uniform = 1;
+        }
+        else
+        {
+            if (param->modifiers & HLSL_STORAGE_IN)
+                var->is_input_varying = 1;
+            if (param->modifiers & HLSL_STORAGE_OUT)
+                var->is_output_varying = 1;
+        }
     }
 
     if (!hlsl_add_var(ctx, var, false))
@@ -1428,7 +1431,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
         if (ctx->cur_scope == ctx->globals)
         {
-            if (!(modifiers & HLSL_STORAGE_STATIC))
+            if (type->type != HLSL_CLASS_OBJECT && !(modifiers & HLSL_STORAGE_STATIC))
                 var->is_uniform = 1;
 
             local = false;
