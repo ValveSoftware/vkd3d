@@ -4702,20 +4702,14 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
 
     storage_class = SpvStorageClassOutput;
 
-    if ((use_private_variable = builtin && builtin->spirv_array_size))
-        write_mask = VKD3DSP_WRITEMASK_ALL;
-    else if (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
+    if (!(use_private_variable = builtin && builtin->spirv_array_size)
+            && (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
             || needs_private_io_variable(shader_signature, signature_element->register_index,
                     builtin, &output_component_count, &write_mask)
-            || is_patch_constant)
-    {
+            || is_patch_constant))
         use_private_variable = true;
-        write_mask = VKD3DSP_WRITEMASK_ALL;
-    }
     else
-    {
         component_idx = vkd3d_write_mask_get_component_idx(write_mask);
-    }
 
     vkd3d_symbol_make_register(&reg_symbol, reg);
 
@@ -4725,16 +4719,13 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
         id = symbol->id;
     }
 
-    if (!symbol || ~symbol->info.reg.dcl_mask & signature_element->mask)
+    if (!symbol || ~symbol->info.reg.dcl_mask & write_mask)
     {
         if (compiler->output_info[signature_idx].id)
         {
             id = compiler->output_info[signature_idx].id;
             if (compiler->output_info[signature_idx].array_element_mask)
-            {
                 use_private_variable = true;
-                write_mask = VKD3DSP_WRITEMASK_ALL;
-            }
         }
         else if (builtin)
         {
@@ -4795,7 +4786,8 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
                     storage_class, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
 
         vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
-                use_private_variable ? VKD3D_SHADER_COMPONENT_FLOAT : component_type, write_mask);
+                use_private_variable ? VKD3D_SHADER_COMPONENT_FLOAT : component_type,
+                use_private_variable ? VKD3DSP_WRITEMASK_ALL : write_mask);
         reg_symbol.info.reg.is_aggregate = use_private_variable ? is_patch_constant : array_size;
         if (!use_private_variable && is_control_point_phase(phase))
         {
@@ -4806,7 +4798,7 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
         {
             reg_symbol.info.reg.member_idx = reg->idx[0].offset;
         }
-        reg_symbol.info.reg.dcl_mask = signature_element->mask;
+        reg_symbol.info.reg.dcl_mask = write_mask;
 
         vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 
@@ -4815,7 +4807,7 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
     }
     else
     {
-        symbol->info.reg.dcl_mask |= signature_element->mask;
+        symbol->info.reg.dcl_mask |= write_mask;
         var_id = symbol->id;
     }
 
