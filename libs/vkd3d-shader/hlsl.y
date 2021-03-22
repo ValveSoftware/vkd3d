@@ -292,60 +292,6 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return &cast->node;
 }
 
-static bool declare_variable(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local)
-{
-    struct hlsl_ir_function_decl *func;
-    bool ret;
-
-    if (decl->data_type->type != HLSL_CLASS_MATRIX)
-        check_invalid_matrix_modifiers(ctx, decl->modifiers, decl->loc);
-
-    if (local)
-    {
-        DWORD invalid = decl->modifiers & (HLSL_STORAGE_EXTERN | HLSL_STORAGE_SHARED
-                | HLSL_STORAGE_GROUPSHARED | HLSL_STORAGE_UNIFORM);
-
-        if (invalid)
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, invalid)))
-                hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers '%s' are not allowed on local variables.", string->buffer);
-            vkd3d_string_buffer_release(&ctx->string_buffers, string);
-        }
-
-        if (decl->semantic)
-        {
-            hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
-                    "Semantics are not allowed on local variables.");
-            return false;
-        }
-    }
-    else
-    {
-        if ((func = hlsl_get_func_decl(ctx, decl->name)))
-        {
-            hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                    "Variable '%s' is already defined as a function.", decl->name);
-            hlsl_note(ctx, func->loc, VKD3D_SHADER_LOG_ERROR,
-                    "\"%s\" was previously defined here.", decl->name);
-            return false;
-        }
-    }
-    ret = hlsl_add_var(ctx, decl, local);
-    if (!ret)
-    {
-        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, decl->name);
-
-        hlsl_error(ctx, decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                "Variable \"%s\" was already declared in this scope.", decl->name);
-        hlsl_note(ctx, old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-        return false;
-    }
-    return true;
-}
-
 static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, const struct vkd3d_shader_location loc)
 {
     if (modifiers & mod)
@@ -1431,10 +1377,11 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         DWORD modifiers, struct list *var_list)
 {
     struct parse_variable_def *v, *v_next;
+    struct hlsl_ir_function_decl *func;
     struct list *statements_list;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
-    bool ret, local = true;
+    bool local = true;
 
     if (basic_type->type == HLSL_CLASS_MATRIX)
         assert(basic_type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
@@ -1464,10 +1411,39 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             continue;
         }
 
+        if (var->data_type->type != HLSL_CLASS_MATRIX)
+            check_invalid_matrix_modifiers(ctx, var->modifiers, var->loc);
+
         if (ctx->cur_scope == ctx->globals)
         {
             var->modifiers |= HLSL_STORAGE_UNIFORM;
             local = false;
+
+            if ((func = hlsl_get_func_decl(ctx, var->name)))
+            {
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                        "'%s' is already defined as a function.", var->name);
+                hlsl_note(ctx, func->loc, VKD3D_SHADER_LOG_ERROR,
+                        "'%s' was previously defined here.", var->name);
+            }
+        }
+        else
+        {
+            static const unsigned int invalid = HLSL_STORAGE_EXTERN | HLSL_STORAGE_SHARED
+                    | HLSL_STORAGE_GROUPSHARED | HLSL_STORAGE_UNIFORM;
+
+            if (var->modifiers & invalid)
+            {
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, var->modifiers & invalid)))
+                    hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifiers '%s' are not allowed on local variables.", string->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+            }
+            if (var->semantic)
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                        "Semantics are not allowed on local variables.");
         }
 
         if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
@@ -1480,9 +1456,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             continue;
         }
 
-        ret = declare_variable(ctx, var, local);
-        if (!ret)
+        if (!hlsl_add_var(ctx, var, local))
         {
+            struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
+
+            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                    "Variable \"%s\" was already declared in this scope.", var->name);
+            hlsl_note(ctx, old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
             hlsl_free_var(var);
             vkd3d_free(v);
             continue;
