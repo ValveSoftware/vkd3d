@@ -398,7 +398,8 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
-        var->first_write = 1;
+        if (var->is_uniform)
+            var->first_write = 1;
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
