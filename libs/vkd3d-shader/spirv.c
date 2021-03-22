@@ -4852,19 +4852,33 @@ static uint32_t vkd3d_dxbc_compiler_get_output_array_index(struct vkd3d_dxbc_com
 }
 
 static void vkd3d_dxbc_compiler_emit_store_shader_output(struct vkd3d_dxbc_compiler *compiler,
-        const struct vkd3d_shader_signature_element *output,
+        const struct vkd3d_shader_signature *signature, const struct vkd3d_shader_signature_element *output,
         const struct vkd3d_shader_output_info *output_info,
         uint32_t output_index_id, uint32_t val_id, unsigned int write_mask)
 {
     unsigned int dst_write_mask, use_mask, uninit_mask, swizzle, mask;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, zero_id, ptr_type_id, chain_id, object_id;
+    const struct vkd3d_shader_signature_element *element;
     unsigned int i, index, array_idx;
     uint32_t output_id;
 
     dst_write_mask = output->mask;
-    write_mask &= dst_write_mask;
     use_mask = output->used_mask;
+    if (!output->sysval_semantic)
+    {
+        for (i = 0; i < signature->element_count; ++i)
+        {
+            element = &signature->elements[i];
+            if (element->register_index != output->register_index)
+                continue;
+            if (element->sysval_semantic)
+                continue;
+            dst_write_mask |= element->mask;
+            use_mask |= element->used_mask;
+        }
+    }
+    write_mask &= dst_write_mask;
 
     if (!write_mask)
         return;
@@ -4985,13 +4999,15 @@ static void vkd3d_dxbc_compiler_emit_shader_epilogue_function(struct vkd3d_dxbc_
 
     for (i = 0; i < signature->element_count; ++i)
     {
+        if (!compiler->output_info[i].id)
+            continue;
+
         variable_idx = vkd3d_dxbc_compiler_get_output_variable_index(compiler,
                 signature->elements[i].register_index);
-
         if (!param_id[variable_idx])
             continue;
 
-        vkd3d_dxbc_compiler_emit_store_shader_output(compiler,
+        vkd3d_dxbc_compiler_emit_store_shader_output(compiler, signature,
                 &signature->elements[i], &compiler->output_info[i], output_index_id,
                 param_id[variable_idx], compiler->private_output_variable_write_mask[variable_idx]);
     }
