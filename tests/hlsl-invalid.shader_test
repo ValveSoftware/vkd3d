@@ -146,3 +146,16 @@ float4 main(struct input i) : sv_target
 {
     return i.a;
 }
+
+[pixel shader fail]
+struct output
+{
+    float4 t : sv_target;
+    int a;
+};
+
+void main(out struct output o)
+{
+    o.t = float4(0, 0, 0, 0);
+    o.a = 0;
+}

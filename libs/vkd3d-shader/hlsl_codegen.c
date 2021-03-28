@@ -140,6 +140,83 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     var->is_input_varying = 0;
 }
 
+static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
+        struct hlsl_type *type, unsigned int field_offset, const char *semantic)
+{
+    struct vkd3d_string_buffer *name;
+    struct hlsl_ir_assignment *store;
+    struct hlsl_ir_constant *offset;
+    struct hlsl_ir_var *varying;
+    struct hlsl_ir_load *load;
+
+    if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    vkd3d_string_buffer_printf(name, "<output-%s>", semantic);
+    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, vkd3d_strdup(semantic), NULL)))
+    {
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        ctx->failed = true;
+        return;
+    }
+    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    varying->is_output_varying = 1;
+    list_add_head(&ctx->globals->vars, &varying->scope_entry);
+
+    if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_tail(instrs, &offset->node.entry);
+
+    if (!(load = hlsl_new_load(var, &offset->node, type, var->loc)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_after(&offset->node.entry, &load->node.entry);
+
+    if (!(store = hlsl_new_assignment(varying, NULL, &load->node, 0, var->loc)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_after(&load->node.entry, &store->node.entry);
+}
+
+static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
+        struct hlsl_type *type, unsigned int field_offset)
+{
+    struct hlsl_struct_field *field;
+
+    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+    {
+        if (field->type->type == HLSL_CLASS_STRUCT)
+            append_output_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
+        else if (field->semantic)
+            append_output_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, field->semantic);
+        else
+            hlsl_error(ctx, field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                    "Field '%s' is missing a semantic.", field->name);
+    }
+}
+
+/* Split output varyings into two variables representing the temp and varying
+ * registers, and copy the former to the latter, so that reads from output
+ * varyings work. */
+static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
+{
+    if (var->data_type->type == HLSL_CLASS_STRUCT)
+        append_output_struct_copy(ctx, instrs, var, var->data_type, 0);
+    else if (var->semantic)
+        append_output_copy(ctx, instrs, var, var->data_type, 0, var->semantic);
+
+    var->is_output_varying = 0;
+}
+
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
         struct list *instrs, void *context)
 {
@@ -520,12 +597,13 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     {
         if (var->is_uniform || var->is_input_varying)
             var->first_write = 1;
+        else if (var->is_output_varying)
+            var->last_read = UINT_MAX;
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
-        if (var->is_output_varying)
-            var->last_read = UINT_MAX;
+        var->first_write = 1;
     }
 
     if (entry_func->return_var)
@@ -552,7 +630,11 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
             prepend_uniform_copy(ctx, entry_func->body, var);
         if (var->is_input_varying)
             prepend_input_var_copy(ctx, entry_func->body, var);
+        if (var->is_output_varying)
+            append_output_var_copy(ctx, entry_func->body, var);
     }
+    if (entry_func->return_var)
+        append_output_var_copy(ctx, entry_func->body, entry_func->return_var);
 
     while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
     while (transform_ir(ctx, split_struct_copies, entry_func->body, NULL));
