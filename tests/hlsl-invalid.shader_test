@@ -135,3 +135,14 @@ float4 main() : sv_target
     const float4 x;
     return x;
 }
+
+[pixel shader fail]
+struct input
+{
+    float4 a;
+};
+
+float4 main(struct input i) : sv_target
+{
+    return i.a;
+}
