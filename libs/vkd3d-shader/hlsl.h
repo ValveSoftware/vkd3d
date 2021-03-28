@@ -229,7 +229,6 @@ struct hlsl_ir_function_decl
     struct vkd3d_shader_location loc;
     struct rb_entry entry;
     struct hlsl_ir_function *func;
-    const char *semantic;
     struct list *parameters;
     struct list *body;
 };

@@ -563,7 +563,6 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
         return NULL;
     decl->return_type = return_type;
     decl->parameters = parameters;
-    decl->semantic = semantic;
     decl->loc = loc;
 
     if (!hlsl_type_is_void(return_type))
@@ -572,11 +571,12 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
         char name[28];
 
         sprintf(name, "<retval-%p>", decl);
-        if (!(return_var = hlsl_new_synthetic_var(ctx, name, return_type, loc)))
+        if (!(return_var = hlsl_new_var(vkd3d_strdup(name), return_type, loc, semantic, NULL)))
         {
             vkd3d_free(decl);
             return NULL;
         }
+        list_add_tail(&ctx->globals->vars, &return_var->scope_entry);
         decl->return_var = return_var;
     }
 
@@ -1161,8 +1161,6 @@ void hlsl_dump_function(const struct hlsl_ir_function_decl *func)
         dump_ir_var(&buffer, param);
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
-    if (func->semantic)
-        vkd3d_string_buffer_printf(&buffer, "Function semantic: %s\n", func->semantic);
     if (func->body)
         dump_instr_list(&buffer, func->body);
 
@@ -1302,7 +1300,6 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
 static void free_function_decl(struct hlsl_ir_function_decl *decl)
 {
-    vkd3d_free((void *)decl->semantic);
     vkd3d_free(decl->parameters);
     hlsl_free_instr_list(decl->body);
     vkd3d_free(decl);
@@ -1678,7 +1675,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     }
 
     if (!hlsl_type_is_void(entry_func->return_type)
-            && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->semantic)
+            && entry_func->return_type->type != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic)
         hlsl_error(&ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                 "Entry point \"%s\" is missing a return value semantic.", entry_point);
 
