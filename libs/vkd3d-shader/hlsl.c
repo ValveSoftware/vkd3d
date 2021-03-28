@@ -1626,6 +1626,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     struct hlsl_ir_function_decl *entry_func;
     const struct hlsl_profile_info *profile;
     const char *entry_point;
+    struct hlsl_ir_var *var;
     struct hlsl_ctx ctx;
     int ret;
 
@@ -1666,6 +1667,14 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         hlsl_error(&ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
                 "Entry point \"%s\" is not defined.", entry_point);
         return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
+    {
+        if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic
+                && (var->is_input_varying || var->is_output_varying))
+            hlsl_error(&ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                    "Parameter \"%s\" is missing a semantic.", var->name);
     }
 
     if (!hlsl_type_is_void(entry_func->return_type)
