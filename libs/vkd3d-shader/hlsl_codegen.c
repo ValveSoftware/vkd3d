@@ -19,6 +19,49 @@
  */
 
 #include "hlsl.h"
+#include <stdio.h>
+
+/* Split uniforms into two variables representing the constant and temp
+ * registers, and copy the former to the latter, so that writes to uniforms
+ * work. */
+static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
+{
+    struct vkd3d_string_buffer *name;
+    struct hlsl_ir_assignment *store;
+    struct hlsl_ir_var *const_var;
+    struct hlsl_ir_load *load;
+
+    if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    vkd3d_string_buffer_printf(name, "<uniform-%s>", var->name);
+    if (!(const_var = hlsl_new_var(vkd3d_strdup(name->buffer), var->data_type, var->loc, NULL, var->reg_reservation)))
+    {
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        ctx->failed = true;
+        return;
+    }
+    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    list_add_head(&ctx->globals->vars, &const_var->scope_entry);
+    var->is_uniform = 0;
+    const_var->is_uniform = 1;
+
+    if (!(load = hlsl_new_var_load(const_var, var->loc)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_head(instrs, &load->node.entry);
+
+    if (!(store = hlsl_new_simple_assignment(var, &load->node)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_after(&load->node.entry, &store->node.entry);
+}
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
         struct list *instrs, void *context)
@@ -404,7 +447,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
-        if (var->is_input_varying || var->is_uniform)
+        if (var->is_input_varying)
             var->first_write = 1;
         if (var->is_output_varying)
             var->last_read = UINT_MAX;
@@ -418,7 +461,21 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
+    struct hlsl_ir_var *var;
+
     list_move_head(entry_func->body, &ctx->static_initializers);
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (var->is_uniform)
+            prepend_uniform_copy(ctx, entry_func->body, var);
+    }
+
+    LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
+    {
+        if (var->is_uniform)
+            prepend_uniform_copy(ctx, entry_func->body, var);
+    }
 
     while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
     while (transform_ir(ctx, split_struct_copies, entry_func->body, NULL));
