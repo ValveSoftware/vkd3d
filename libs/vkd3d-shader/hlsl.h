@@ -171,6 +171,7 @@ struct hlsl_ir_node
      * true even for loops, since currently we can't have a reference to a
      * value generated in an earlier iteration of the loop. */
     unsigned int index, last_read;
+    struct hlsl_reg reg;
 };
 
 struct hlsl_src
