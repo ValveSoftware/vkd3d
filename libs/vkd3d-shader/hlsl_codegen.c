@@ -840,9 +840,25 @@ static void allocate_const_registers_recurse(struct list *instrs, struct livenes
     }
 }
 
-static void allocate_const_registers(struct hlsl_ir_function_decl *entry_func)
+static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct liveness liveness = {0};
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (var->is_uniform && var->last_read)
+        {
+            if (var->data_type->reg_size > 1)
+                var->reg = allocate_range(&liveness, 1, UINT_MAX, var->data_type->reg_size);
+            else
+            {
+                var->reg = allocate_register(&liveness, 1, UINT_MAX, 4);
+                var->reg.writemask = (1u << var->data_type->dimx) - 1;
+            }
+            TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
+        }
+    }
 
     allocate_const_registers_recurse(entry_func->body, &liveness);
 }
@@ -896,7 +912,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     allocate_temp_registers(entry_func);
     if (ctx->profile->major_version < 4)
-        allocate_const_registers(entry_func);
+        allocate_const_registers(ctx, entry_func);
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
