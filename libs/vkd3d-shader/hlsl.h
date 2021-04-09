@@ -137,6 +137,13 @@ struct hlsl_struct_field
     unsigned int reg_offset;
 };
 
+struct hlsl_reg
+{
+    uint32_t id;
+    unsigned int writemask;
+    bool allocated;
+};
+
 enum hlsl_ir_node_type
 {
     HLSL_IR_CONSTANT,
@@ -208,6 +215,7 @@ struct hlsl_ir_var
     struct list scope_entry, param_entry;
 
     unsigned int first_write, last_read;
+    struct hlsl_reg reg;
 
     uint32_t is_input_varying : 1;
     uint32_t is_output_varying : 1;
@@ -493,6 +501,7 @@ static inline void hlsl_src_remove(struct hlsl_src *src)
 }
 
 const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
+const char *debug_hlsl_writemask(unsigned int writemask) DECLSPEC_HIDDEN;
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache *string_buffers,
         const struct hlsl_type *type) DECLSPEC_HIDDEN;

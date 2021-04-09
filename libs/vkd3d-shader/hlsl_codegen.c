@@ -611,6 +611,191 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     compute_liveness_recurse(entry_func->body, 0, 0);
 }
 
+struct liveness
+{
+    size_t size;
+    struct
+    {
+        /* 0 if not live yet. */
+        unsigned int last_read;
+    } *regs;
+};
+
+static unsigned int get_available_writemask(struct liveness *liveness,
+        unsigned int first_write, unsigned int component_idx, unsigned int component_count)
+{
+    unsigned int i, writemask = 0, count = 0;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (liveness->regs[component_idx + i].last_read <= first_write)
+        {
+            writemask |= 1u << i;
+            if (++count == component_count)
+                return writemask;
+        }
+    }
+
+    return 0;
+}
+
+static bool resize_liveness(struct liveness *liveness, size_t new_count)
+{
+    size_t old_capacity = liveness->size;
+
+    if (!vkd3d_array_reserve((void **)&liveness->regs, &liveness->size, new_count, sizeof(*liveness->regs)))
+        return false;
+
+    if (liveness->size > old_capacity)
+        memset(liveness->regs + old_capacity, 0, (liveness->size - old_capacity) * sizeof(*liveness->regs));
+    return true;
+}
+
+static struct hlsl_reg allocate_register(struct liveness *liveness,
+        unsigned int first_write, unsigned int last_read, unsigned int component_count)
+{
+    unsigned int component_idx, writemask, i;
+    struct hlsl_reg ret = {0};
+
+    for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
+    {
+        if ((writemask = get_available_writemask(liveness, first_write, component_idx, component_count)))
+            break;
+    }
+    if (component_idx == liveness->size)
+    {
+        if (!resize_liveness(liveness, component_idx + 4))
+            return ret;
+        writemask = (1u << component_count) - 1;
+    }
+    for (i = 0; i < 4; ++i)
+    {
+        if (writemask & (1u << i))
+            liveness->regs[component_idx + i].last_read = last_read;
+    }
+    ret.id = component_idx / 4;
+    ret.writemask = writemask;
+    ret.allocated = true;
+    return ret;
+}
+
+static bool is_range_available(struct liveness *liveness, unsigned int first_write,
+        unsigned int component_idx, unsigned int component_count)
+{
+    unsigned int i;
+
+    for (i = 0; i < component_count; i += 4)
+    {
+        if (!get_available_writemask(liveness, first_write, component_idx + i, 4))
+            return false;
+    }
+    return true;
+}
+
+static struct hlsl_reg allocate_range(struct liveness *liveness,
+        unsigned int first_write, unsigned int last_read, unsigned int reg_count)
+{
+    const unsigned int component_count = reg_count * 4;
+    unsigned int i, component_idx;
+    struct hlsl_reg ret = {0};
+
+    for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
+    {
+        if (is_range_available(liveness, first_write, component_idx,
+                min(component_count, liveness->size - component_idx)))
+            break;
+    }
+    if (!resize_liveness(liveness, component_idx + component_count))
+        return ret;
+
+    for (i = 0; i < component_count; ++i)
+        liveness->regs[component_idx + i].last_read = last_read;
+    ret.id = component_idx / 4;
+    ret.allocated = true;
+    return ret;
+}
+
+static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
+{
+    if (type->reg_size > 4)
+        return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class,
+                reg.id + type->reg_size - 1);
+    return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
+}
+
+static void allocate_variable_temp_register(struct hlsl_ir_var *var, struct liveness *liveness)
+{
+    if (var->is_input_varying || var->is_output_varying || var->is_uniform)
+        return;
+
+    if (!var->reg.allocated && var->last_read)
+    {
+        if (var->data_type->reg_size > 1)
+            var->reg = allocate_range(liveness, var->first_write,
+                    var->last_read, var->data_type->reg_size);
+        else
+            var->reg = allocate_register(liveness, var->first_write,
+                    var->last_read, var->data_type->dimx);
+        TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
+                debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
+    }
+}
+
+static void allocate_temp_registers_recurse(struct list *instrs, struct liveness *liveness)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    {
+        switch (instr->type)
+        {
+            case HLSL_IR_IF:
+            {
+                struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+                allocate_temp_registers_recurse(&iff->then_instrs, liveness);
+                allocate_temp_registers_recurse(&iff->else_instrs, liveness);
+                break;
+            }
+
+            case HLSL_IR_LOAD:
+            {
+                struct hlsl_ir_load *load = hlsl_ir_load(instr);
+                /* We need to at least allocate a variable for undefs.
+                 * FIXME: We should probably find a way to remove them instead. */
+                allocate_variable_temp_register(load->src.var, liveness);
+                break;
+            }
+
+            case HLSL_IR_LOOP:
+            {
+                struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+                allocate_temp_registers_recurse(&loop->body, liveness);
+                break;
+            }
+
+            case HLSL_IR_STORE:
+            {
+                struct hlsl_ir_store *store = hlsl_ir_store(instr);
+                allocate_variable_temp_register(store->lhs.var, liveness);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+}
+
+/* Simple greedy temporary register allocation pass that just assigns a unique
+ * index to all (simultaneously live) variables or intermediate values. Agnostic
+ * as to how many registers are actually available for the current backend, and
+ * does not handle constants. */
+static void allocate_temp_registers(struct hlsl_ir_function_decl *entry_func)
+{
+    struct liveness liveness = {0};
+    allocate_temp_registers_recurse(entry_func->body, &liveness);
+}
+
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct hlsl_ir_var *var;
@@ -647,6 +832,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, NULL);
+
+    allocate_temp_registers(entry_func);
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;

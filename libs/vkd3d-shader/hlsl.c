@@ -890,7 +890,7 @@ static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_der
     }
 }
 
-static const char *debug_writemask(DWORD writemask)
+const char *debug_hlsl_writemask(unsigned int writemask)
 {
     static const char components[] = {'x', 'y', 'z', 'w'};
     char string[5];
@@ -1074,7 +1074,7 @@ static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_
     vkd3d_string_buffer_printf(buffer, "= (");
     dump_deref(buffer, &store->lhs);
     if (store->writemask != VKD3DSP_WRITEMASK_ALL)
-        vkd3d_string_buffer_printf(buffer, "%s", debug_writemask(store->writemask));
+        vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_writemask(store->writemask));
     vkd3d_string_buffer_printf(buffer, " ");
     dump_src(buffer, &store->rhs);
     vkd3d_string_buffer_printf(buffer, ")");
