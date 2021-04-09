@@ -380,6 +380,7 @@ struct hlsl_ir_constant
         double d[4];
         bool b[4];
     } value;
+    struct hlsl_reg reg;
 };
 
 struct hlsl_scope

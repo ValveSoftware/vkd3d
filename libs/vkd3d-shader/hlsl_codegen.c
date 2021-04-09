@@ -798,6 +798,55 @@ static void allocate_temp_registers_recurse(struct list *instrs, struct liveness
     }
 }
 
+static void allocate_const_registers_recurse(struct list *instrs, struct liveness *liveness)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    {
+        switch (instr->type)
+        {
+            case HLSL_IR_CONSTANT:
+            {
+                struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
+
+                if (instr->data_type->reg_size > 1)
+                    constant->reg = allocate_range(liveness, 1, UINT_MAX, instr->data_type->reg_size);
+                else
+                    constant->reg = allocate_register(liveness, 1, UINT_MAX, instr->data_type->dimx);
+                TRACE("Allocated constant @%u to %s.\n", instr->index,
+                        debug_register('c', constant->reg, instr->data_type));
+                break;
+            }
+
+            case HLSL_IR_IF:
+            {
+                struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+                allocate_const_registers_recurse(&iff->then_instrs, liveness);
+                allocate_const_registers_recurse(&iff->else_instrs, liveness);
+                break;
+            }
+
+            case HLSL_IR_LOOP:
+            {
+                struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+                allocate_const_registers_recurse(&loop->body, liveness);
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+}
+
+static void allocate_const_registers(struct hlsl_ir_function_decl *entry_func)
+{
+    struct liveness liveness = {0};
+
+    allocate_const_registers_recurse(entry_func->body, &liveness);
+}
+
 /* Simple greedy temporary register allocation pass that just assigns a unique
  * index to all (simultaneously live) variables or intermediate values. Agnostic
  * as to how many registers are actually available for the current backend, and
@@ -846,6 +895,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         rb_for_each_entry(&ctx->functions, dump_function, NULL);
 
     allocate_temp_registers(entry_func);
+    if (ctx->profile->major_version < 4)
+        allocate_const_registers(entry_func);
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
