@@ -390,8 +390,21 @@ struct hlsl_scope
     struct hlsl_scope *upper;
 };
 
+struct hlsl_profile_info
+{
+    const char *name;
+    enum vkd3d_shader_type type;
+    unsigned int major_version;
+    unsigned int minor_version;
+    unsigned int major_level;
+    unsigned int minor_level;
+    bool software;
+};
+
 struct hlsl_ctx
 {
+    const struct hlsl_profile_info *profile;
+
     const char **source_files;
     unsigned int source_files_count;
     struct vkd3d_shader_location location;

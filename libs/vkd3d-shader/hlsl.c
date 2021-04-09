@@ -1370,17 +1370,6 @@ void hlsl_add_function(struct rb_tree *funcs, char *name, struct hlsl_ir_functio
     rb_put(funcs, func->name, &func->entry);
 }
 
-struct hlsl_profile_info
-{
-    const char *name;
-    enum vkd3d_shader_type type;
-    DWORD sm_major;
-    DWORD sm_minor;
-    DWORD level_major;
-    DWORD level_minor;
-    bool sw;
-};
-
 static const struct hlsl_profile_info *get_target_info(const char *target)
 {
     unsigned int i;
@@ -1556,9 +1545,12 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 }
 
-static bool hlsl_ctx_init(struct hlsl_ctx *ctx, struct vkd3d_shader_message_context *message_context)
+static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *profile,
+        struct vkd3d_shader_message_context *message_context)
 {
     memset(ctx, 0, sizeof(*ctx));
+
+    ctx->profile = profile;
 
     ctx->message_context = message_context;
 
@@ -1642,7 +1634,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
 
     vkd3d_shader_dump_shader(profile->type, &compile_info->source);
 
-    if (!hlsl_ctx_init(&ctx, message_context))
+    if (!hlsl_ctx_init(&ctx, profile, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     if (hlsl_lexer_compile(&ctx, hlsl) == 2)
