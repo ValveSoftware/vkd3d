@@ -27,8 +27,8 @@
 static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
 {
     struct vkd3d_string_buffer *name;
-    struct hlsl_ir_assignment *store;
     struct hlsl_ir_var *const_var;
+    struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
 
     if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
@@ -55,7 +55,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     }
     list_add_head(instrs, &load->node.entry);
 
-    if (!(store = hlsl_new_simple_assignment(var, &load->node)))
+    if (!(store = hlsl_new_simple_store(var, &load->node)))
     {
         ctx->failed = true;
         return;
@@ -67,8 +67,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         struct hlsl_type *type, unsigned int field_offset, const char *semantic)
 {
     struct vkd3d_string_buffer *name;
-    struct hlsl_ir_assignment *store;
     struct hlsl_ir_constant *offset;
+    struct hlsl_ir_store *store;
     struct hlsl_ir_var *varying;
     struct hlsl_ir_load *load;
 
@@ -102,7 +102,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     list_add_after(&load->node.entry, &offset->node.entry);
 
-    if (!(store = hlsl_new_assignment(var, &offset->node, &load->node, 0, var->loc)))
+    if (!(store = hlsl_new_store(var, &offset->node, &load->node, 0, var->loc)))
     {
         ctx->failed = true;
         return;
@@ -144,8 +144,8 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         struct hlsl_type *type, unsigned int field_offset, const char *semantic)
 {
     struct vkd3d_string_buffer *name;
-    struct hlsl_ir_assignment *store;
     struct hlsl_ir_constant *offset;
+    struct hlsl_ir_store *store;
     struct hlsl_ir_var *varying;
     struct hlsl_ir_load *load;
 
@@ -179,7 +179,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     list_add_after(&offset->node.entry, &load->node.entry);
 
-    if (!(store = hlsl_new_assignment(varying, NULL, &load->node, 0, var->loc)))
+    if (!(store = hlsl_new_store(varying, NULL, &load->node, 0, var->loc)))
     {
         ctx->failed = true;
         return;
@@ -285,15 +285,15 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 {
     const struct hlsl_struct_field *field;
     const struct hlsl_ir_load *rhs_load;
-    struct hlsl_ir_assignment *assign;
     const struct hlsl_ir_node *rhs;
     const struct hlsl_type *type;
+    struct hlsl_ir_store *store;
 
-    if (instr->type != HLSL_IR_ASSIGNMENT)
+    if (instr->type != HLSL_IR_STORE)
         return false;
 
-    assign = hlsl_ir_assignment(instr);
-    rhs = assign->rhs.node;
+    store = hlsl_ir_store(instr);
+    rhs = store->rhs.node;
     type = rhs->data_type;
     if (type->type != HLSL_CLASS_STRUCT)
         return false;
@@ -302,8 +302,8 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
     LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
     {
+        struct hlsl_ir_store *field_store;
         struct hlsl_ir_node *offset, *add;
-        struct hlsl_ir_assignment *store;
         struct hlsl_ir_load *field_load;
         struct hlsl_ir_constant *c;
 
@@ -333,9 +333,9 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         list_add_before(&instr->entry, &field_load->node.entry);
 
         offset = &c->node;
-        if (assign->lhs.offset.node)
+        if (store->lhs.offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, assign->lhs.offset.node, &c->node)))
+            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, store->lhs.offset.node, &c->node)))
             {
                 ctx->failed = true;
                 return false;
@@ -344,20 +344,19 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
             offset = add;
         }
 
-        if (!(store = hlsl_new_assignment(assign->lhs.var, offset, &field_load->node, 0, instr->loc)))
+        if (!(field_store = hlsl_new_store(store->lhs.var, offset, &field_load->node, 0, instr->loc)))
         {
             ctx->failed = true;
             return false;
         }
-        list_add_before(&instr->entry, &store->node.entry);
+        list_add_before(&instr->entry, &field_store->node.entry);
     }
 
-    /* Remove the assignment instruction, so that we can split structs
-     * which contain other structs. Although assignment instructions
-     * produce a value, we don't allow HLSL_IR_ASSIGNMENT to be used as
-     * a source. */
-    list_remove(&assign->node.entry);
-    hlsl_free_instr(&assign->node);
+    /* Remove the store instruction, so that we can split structs which contain
+     * other structs. Although assignments produce a value, we don't allow
+     * HLSL_IR_STORE to be used as a source. */
+    list_remove(&store->node.entry);
+    hlsl_free_instr(&store->node);
     return true;
 }
 
@@ -440,10 +439,10 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
             }
             break;
 
-        case HLSL_IR_ASSIGNMENT:
+        case HLSL_IR_STORE:
         {
-            struct hlsl_ir_assignment *assignment = hlsl_ir_assignment(instr);
-            struct hlsl_ir_var *var = assignment->lhs.var;
+            struct hlsl_ir_store *store = hlsl_ir_store(instr);
+            struct hlsl_ir_var *var = store->lhs.var;
 
             if (var->last_read < instr->index)
             {
@@ -517,16 +516,16 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
     {
         switch (instr->type)
         {
-        case HLSL_IR_ASSIGNMENT:
+        case HLSL_IR_STORE:
         {
-            struct hlsl_ir_assignment *assignment = hlsl_ir_assignment(instr);
+            struct hlsl_ir_store *store = hlsl_ir_store(instr);
 
-            var = assignment->lhs.var;
+            var = store->lhs.var;
             if (!var->first_write)
                 var->first_write = loop_first ? min(instr->index, loop_first) : instr->index;
-            assignment->rhs.node->last_read = instr->index;
-            if (assignment->lhs.offset.node)
-                assignment->lhs.offset.node->last_read = instr->index;
+            store->rhs.node->last_read = instr->index;
+            if (store->lhs.offset.node)
+                store->lhs.offset.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_EXPR:

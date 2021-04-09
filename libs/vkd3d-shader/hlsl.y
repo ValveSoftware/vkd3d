@@ -499,14 +499,14 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
 
     if (return_value)
     {
-        struct hlsl_ir_assignment *assignment;
+        struct hlsl_ir_store *store;
 
         if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, &loc)))
             return NULL;
 
-        if (!(assignment = hlsl_new_simple_assignment(ctx->cur_function->return_var, return_value)))
+        if (!(store = hlsl_new_simple_store(ctx->cur_function->return_var, return_value)))
             return NULL;
-        list_add_after(&return_value->entry, &assignment->node.entry);
+        list_add_after(&return_value->entry, &store->node.entry);
     }
     else if (!hlsl_type_is_void(return_type))
     {
@@ -543,17 +543,17 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
     }
     else
     {
-        struct hlsl_ir_assignment *assign;
+        struct hlsl_ir_store *store;
         char name[27];
 
         sprintf(name, "<deref-%p>", var_node);
         if (!(var = hlsl_new_synthetic_var(ctx, name, var_node->data_type, var_node->loc)))
             return NULL;
 
-        if (!(assign = hlsl_new_simple_assignment(var, var_node)))
+        if (!(store = hlsl_new_simple_store(var, var_node)))
             return NULL;
 
-        list_add_tail(instrs, &assign->node.entry);
+        list_add_tail(instrs, &store->node.entry);
     }
 
     if (!(load = hlsl_new_load(var, offset, data_type, loc)))
@@ -900,7 +900,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
             FIXME("Unhandled type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
 
-        case HLSL_IR_ASSIGNMENT:
+        case HLSL_IR_STORE:
         default:
             WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
@@ -1216,7 +1216,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
-    struct hlsl_ir_assignment *assign;
+    struct hlsl_ir_store *store;
     struct hlsl_ir_expr *copy;
     DWORD writemask = 0;
 
@@ -1239,7 +1239,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             return NULL;
     }
 
-    if (!(assign = vkd3d_malloc(sizeof(*assign))))
+    if (!(store = vkd3d_malloc(sizeof(*store))))
         return NULL;
 
     while (lhs->type != HLSL_IR_LOAD)
@@ -1247,7 +1247,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_IR_UNOP_CAST)
         {
             FIXME("Cast on the lhs.\n");
-            vkd3d_free(assign);
+            vkd3d_free(store);
             return NULL;
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
@@ -1261,13 +1261,13 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             if (!invert_swizzle(&s, &writemask, &width))
             {
                 hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
-                vkd3d_free(assign);
+                vkd3d_free(store);
                 return NULL;
             }
 
             if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
             {
-                vkd3d_free(assign);
+                vkd3d_free(store);
                 return NULL;
             }
             list_add_tail(instrs, &new_swizzle->node.entry);
@@ -1278,17 +1278,17 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         else
         {
             hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid lvalue.");
-            vkd3d_free(assign);
+            vkd3d_free(store);
             return NULL;
         }
     }
 
-    init_node(&assign->node, HLSL_IR_ASSIGNMENT, NULL, lhs->loc);
-    assign->writemask = writemask;
-    assign->lhs.var = hlsl_ir_load(lhs)->src.var;
-    hlsl_src_from_node(&assign->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
-    hlsl_src_from_node(&assign->rhs, rhs);
-    list_add_tail(instrs, &assign->node.entry);
+    init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
+    store->writemask = writemask;
+    store->lhs.var = hlsl_ir_load(lhs)->src.var;
+    hlsl_src_from_node(&store->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
+    hlsl_src_from_node(&store->rhs, rhs);
+    list_add_tail(instrs, &store->node.entry);
 
     /* Don't use the instruction itself as a source, as this makes structure
      * splitting easier. Instead copy it here. Since we retrieve sources from
@@ -1355,7 +1355,7 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
     LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
     {
         struct hlsl_ir_node *node = initializer->args[i];
-        struct hlsl_ir_assignment *assign;
+        struct hlsl_ir_store *store;
         struct hlsl_ir_constant *c;
 
         if (i++ >= initializer->args_count)
@@ -1367,9 +1367,9 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
                 break;
             list_add_tail(list, &c->node.entry);
 
-            if (!(assign = hlsl_new_assignment(var, &c->node, node, 0, node->loc)))
+            if (!(store = hlsl_new_store(var, &c->node, node, 0, node->loc)))
                 break;
-            list_add_tail(list, &assign->node.entry);
+            list_add_tail(list, &store->node.entry);
         }
         else
             FIXME("Initializing with \"mismatched\" fields is not supported yet.\n");
@@ -2724,8 +2724,8 @@ postfix_expr:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | var_modifiers type '(' initializer_expr_list ')'
         {
-            struct hlsl_ir_assignment *assignment;
             unsigned int i, writemask_offset = 0;
+            struct hlsl_ir_store *store;
             static unsigned int counter;
             struct hlsl_ir_load *load;
             struct hlsl_ir_var *var;
@@ -2788,11 +2788,11 @@ postfix_expr:
                         ctx->builtin_types.vector[$2->base_type][width - 1], &arg->loc)))
                     continue;
 
-                if (!(assignment = hlsl_new_assignment(var, NULL, arg,
+                if (!(store = hlsl_new_store(var, NULL, arg,
                         ((1 << width) - 1) << writemask_offset, arg->loc)))
                     YYABORT;
                 writemask_offset += width;
-                list_add_tail($4.instrs, &assignment->node.entry);
+                list_add_tail($4.instrs, &store->node.entry);
             }
             vkd3d_free($4.args);
             if (!(load = hlsl_new_var_load(var, @2)))

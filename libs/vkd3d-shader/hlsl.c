@@ -418,28 +418,28 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-struct hlsl_ir_assignment *hlsl_new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
+struct hlsl_ir_store *hlsl_new_store(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_assignment *assign;
+    struct hlsl_ir_store *store;
 
     if (!writemask && type_is_single_reg(rhs->data_type))
         writemask = (1 << rhs->data_type->dimx) - 1;
 
-    if (!(assign = vkd3d_malloc(sizeof(*assign))))
+    if (!(store = vkd3d_malloc(sizeof(*store))))
         return NULL;
 
-    init_node(&assign->node, HLSL_IR_ASSIGNMENT, NULL, loc);
-    assign->lhs.var = var;
-    hlsl_src_from_node(&assign->lhs.offset, offset);
-    hlsl_src_from_node(&assign->rhs, rhs);
-    assign->writemask = writemask;
-    return assign;
+    init_node(&store->node, HLSL_IR_STORE, NULL, loc);
+    store->lhs.var = var;
+    hlsl_src_from_node(&store->lhs.offset, offset);
+    hlsl_src_from_node(&store->rhs, rhs);
+    store->writemask = writemask;
+    return store;
 }
 
-struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
+struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
 {
-    return hlsl_new_assignment(lhs, NULL, rhs, 0, rhs->loc);
+    return hlsl_new_store(lhs, NULL, rhs, 0, rhs->loc);
 }
 
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
@@ -830,13 +830,13 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
 {
     static const char * const names[] =
     {
-        "HLSL_IR_ASSIGNMENT",
         "HLSL_IR_CONSTANT",
         "HLSL_IR_EXPR",
         "HLSL_IR_IF",
         "HLSL_IR_LOAD",
         "HLSL_IR_LOOP",
         "HLSL_IR_JUMP",
+        "HLSL_IR_STORE",
         "HLSL_IR_SWIZZLE",
     };
 
@@ -907,17 +907,6 @@ static const char *debug_writemask(DWORD writemask)
     }
     string[pos] = '\0';
     return vkd3d_dbg_sprintf(".%s", string);
-}
-
-static void dump_ir_assignment(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_assignment *assign)
-{
-    vkd3d_string_buffer_printf(buffer, "= (");
-    dump_deref(buffer, &assign->lhs);
-    if (assign->writemask != VKD3DSP_WRITEMASK_ALL)
-        vkd3d_string_buffer_printf(buffer, "%s", debug_writemask(assign->writemask));
-    vkd3d_string_buffer_printf(buffer, " ");
-    dump_src(buffer, &assign->rhs);
-    vkd3d_string_buffer_printf(buffer, ")");
 }
 
 static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_constant *constant)
@@ -1080,6 +1069,17 @@ static void dump_ir_loop(struct vkd3d_string_buffer *buffer, const struct hlsl_i
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
+static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
+{
+    vkd3d_string_buffer_printf(buffer, "= (");
+    dump_deref(buffer, &store->lhs);
+    if (store->writemask != VKD3DSP_WRITEMASK_ALL)
+        vkd3d_string_buffer_printf(buffer, "%s", debug_writemask(store->writemask));
+    vkd3d_string_buffer_printf(buffer, " ");
+    dump_src(buffer, &store->rhs);
+    vkd3d_string_buffer_printf(buffer, ")");
+}
+
 static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_swizzle *swizzle)
 {
     unsigned int i;
@@ -1111,10 +1111,6 @@ static void dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_
 
     switch (instr->type)
     {
-        case HLSL_IR_ASSIGNMENT:
-            dump_ir_assignment(buffer, hlsl_ir_assignment(instr));
-            break;
-
         case HLSL_IR_CONSTANT:
             dump_ir_constant(buffer, hlsl_ir_constant(instr));
             break;
@@ -1137,6 +1133,10 @@ static void dump_instr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_
 
         case HLSL_IR_LOOP:
             dump_ir_loop(buffer, hlsl_ir_loop(instr));
+            break;
+
+        case HLSL_IR_STORE:
+            dump_ir_store(buffer, hlsl_ir_store(instr));
             break;
 
         case HLSL_IR_SWIZZLE:
@@ -1198,13 +1198,6 @@ void hlsl_free_instr_list(struct list *list)
     vkd3d_free(list);
 }
 
-static void free_ir_assignment(struct hlsl_ir_assignment *assignment)
-{
-    hlsl_src_remove(&assignment->rhs);
-    hlsl_src_remove(&assignment->lhs.offset);
-    vkd3d_free(assignment);
-}
-
 static void free_ir_constant(struct hlsl_ir_constant *constant)
 {
     vkd3d_free(constant);
@@ -1251,6 +1244,13 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
     vkd3d_free(loop);
 }
 
+static void free_ir_store(struct hlsl_ir_store *store)
+{
+    hlsl_src_remove(&store->rhs);
+    hlsl_src_remove(&store->lhs.offset);
+    vkd3d_free(store);
+}
+
 static void free_ir_swizzle(struct hlsl_ir_swizzle *swizzle)
 {
     hlsl_src_remove(&swizzle->val);
@@ -1261,10 +1261,6 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 {
     switch (node->type)
     {
-        case HLSL_IR_ASSIGNMENT:
-            free_ir_assignment(hlsl_ir_assignment(node));
-            break;
-
         case HLSL_IR_CONSTANT:
             free_ir_constant(hlsl_ir_constant(node));
             break;
@@ -1287,6 +1283,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_LOOP:
             free_ir_loop(hlsl_ir_loop(node));
+            break;
+
+        case HLSL_IR_STORE:
+            free_ir_store(hlsl_ir_store(node));
             break;
 
         case HLSL_IR_SWIZZLE:

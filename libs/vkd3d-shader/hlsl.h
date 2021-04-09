@@ -139,13 +139,13 @@ struct hlsl_struct_field
 
 enum hlsl_ir_node_type
 {
-    HLSL_IR_ASSIGNMENT = 0,
     HLSL_IR_CONSTANT,
     HLSL_IR_EXPR,
     HLSL_IR_IF,
     HLSL_IR_LOAD,
     HLSL_IR_LOOP,
     HLSL_IR_JUMP,
+    HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
 };
 
@@ -352,7 +352,7 @@ struct hlsl_ir_load
     struct hlsl_deref src;
 };
 
-struct hlsl_ir_assignment
+struct hlsl_ir_store
 {
     struct hlsl_ir_node node;
     struct hlsl_deref lhs;
@@ -420,12 +420,6 @@ enum hlsl_error_level
     HLSL_LEVEL_NOTE,
 };
 
-static inline struct hlsl_ir_assignment *hlsl_ir_assignment(const struct hlsl_ir_node *node)
-{
-    assert(node->type == HLSL_IR_ASSIGNMENT);
-    return CONTAINING_RECORD(node, struct hlsl_ir_assignment, node);
-}
-
 static inline struct hlsl_ir_constant *hlsl_ir_constant(const struct hlsl_ir_node *node)
 {
     assert(node->type == HLSL_IR_CONSTANT);
@@ -460,6 +454,12 @@ static inline struct hlsl_ir_loop *hlsl_ir_loop(const struct hlsl_ir_node *node)
 {
     assert(node->type == HLSL_IR_LOOP);
     return CONTAINING_RECORD(node, struct hlsl_ir_loop, node);
+}
+
+static inline struct hlsl_ir_store *hlsl_ir_store(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_STORE);
+    return CONTAINING_RECORD(node, struct hlsl_ir_store, node);
 }
 
 static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node *node)
@@ -520,8 +520,6 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name) DEC
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         unsigned int array_size) DECLSPEC_HIDDEN;
-struct hlsl_ir_assignment *hlsl_new_assignment(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
-        struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_binary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *type,
@@ -534,8 +532,10 @@ struct hlsl_ir_jump *hlsl_new_jump(enum hlsl_ir_jump_type type, struct vkd3d_sha
 struct hlsl_ir_load *hlsl_new_load(struct hlsl_ir_var *var, struct hlsl_ir_node *offset, struct hlsl_type *type,
         struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_loop *hlsl_new_loop(struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
-struct hlsl_ir_assignment *hlsl_new_simple_assignment(struct hlsl_ir_var *lhs,
+struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ir_var *lhs,
         struct hlsl_ir_node *rhs) DECLSPEC_HIDDEN;
+struct hlsl_ir_store *hlsl_new_store(struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
+        struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields) DECLSPEC_HIDDEN;
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
