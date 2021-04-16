@@ -530,7 +530,8 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var
 
 void hlsl_dump_function(const struct hlsl_ir_function_decl *func) DECLSPEC_HIDDEN;
 
-int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func) DECLSPEC_HIDDEN;
+int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;
 
 void hlsl_free_instr(struct hlsl_ir_node *node) DECLSPEC_HIDDEN;
 void hlsl_free_instr_list(struct list *list) DECLSPEC_HIDDEN;

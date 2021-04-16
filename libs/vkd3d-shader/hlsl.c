@@ -1671,7 +1671,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         hlsl_error(&ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                 "Entry point \"%s\" is missing a return value semantic.", entry_point);
 
-    ret = hlsl_emit_dxbc(&ctx, entry_func);
+    ret = hlsl_emit_dxbc(&ctx, entry_func, dxbc);
 
     hlsl_ctx_cleanup(&ctx);
     return ret;

@@ -19,6 +19,7 @@ vkd3d_public_headers = \
 	include/vkd3d.h \
 	include/vkd3d_d3d12.h \
 	include/vkd3d_d3d12sdklayers.h \
+	include/vkd3d_d3d9types.h \
 	include/vkd3d_d3dcommon.h \
 	include/vkd3d_d3dcompiler.h \
 	include/vkd3d_dxgibase.h \

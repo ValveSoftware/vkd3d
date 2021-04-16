@@ -20,6 +20,7 @@
 
 #include "hlsl.h"
 #include <stdio.h>
+#include "vkd3d_d3d9types.h"
 
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
@@ -873,7 +874,53 @@ static void allocate_temp_registers(struct hlsl_ir_function_decl *entry_func)
     allocate_temp_registers_recurse(entry_func->body, &liveness);
 }
 
-int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
+struct bytecode_buffer
+{
+    uint32_t *data;
+    size_t count, size;
+    int status;
+};
+
+static void put_dword(struct bytecode_buffer *buffer, uint32_t value)
+{
+    if (buffer->status)
+        return;
+
+    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + 1, sizeof(*buffer->data)))
+    {
+        buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
+        return;
+    }
+    buffer->data[buffer->count++] = value;
+}
+
+static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, unsigned int minor)
+{
+    if (type == VKD3D_SHADER_TYPE_VERTEX)
+        return D3DVS_VERSION(major, minor);
+    else
+        return D3DPS_VERSION(major, minor);
+}
+
+static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        struct vkd3d_shader_code *out)
+{
+    struct bytecode_buffer buffer = {0};
+    int ret;
+
+    put_dword(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
+
+    put_dword(&buffer, D3DSIO_END);
+
+    if (!(ret = buffer.status))
+    {
+        out->code = buffer.data;
+        out->size = buffer.count * sizeof(uint32_t);
+    }
+    return ret;
+}
+
+int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
     struct hlsl_ir_var *var;
 
@@ -916,5 +963,9 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
-    return VKD3D_ERROR_NOT_IMPLEMENTED;
+
+    if (ctx->profile->major_version < 4)
+        return write_sm1_shader(ctx, entry_func, out);
+    else
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
 }
