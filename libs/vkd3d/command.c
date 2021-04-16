@@ -2582,7 +2582,7 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
      *   and when the command completes executing on the queue."
      */
     bindings->descriptor_set = d3d12_command_allocator_allocate_descriptor_set(list->allocator,
-            root_signature->vk_set_layout);
+            root_signature->vk_set_layouts[root_signature->main_set]);
     bindings->in_use = false;
 
     bindings->descriptor_table_dirty_mask |= bindings->descriptor_table_active_mask & root_signature->descriptor_table_mask;
@@ -2895,7 +2895,7 @@ static void d3d12_command_list_update_descriptors(struct d3d12_command_list *lis
     struct d3d12_desc *base_descriptor;
     unsigned int i;
 
-    if (!rs || !rs->vk_set_layout)
+    if (!rs || !rs->vk_set_count)
         return;
 
     if (bindings->descriptor_table_dirty_mask || bindings->push_descriptor_dirty_mask)

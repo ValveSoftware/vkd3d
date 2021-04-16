@@ -65,10 +65,8 @@ static void d3d12_root_signature_cleanup(struct d3d12_root_signature *root_signa
 
     if (root_signature->vk_pipeline_layout)
         VK_CALL(vkDestroyPipelineLayout(device->vk_device, root_signature->vk_pipeline_layout, NULL));
-    if (root_signature->vk_set_layout)
-        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, root_signature->vk_set_layout, NULL));
-    if (root_signature->vk_push_set_layout)
-        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, root_signature->vk_push_set_layout, NULL));
+    for (i = 0; i < root_signature->vk_set_count; ++i)
+        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, root_signature->vk_set_layouts[i], NULL));
 
     if (root_signature->parameters)
     {
@@ -514,7 +512,6 @@ struct vkd3d_descriptor_set_context
 {
     VkDescriptorSetLayoutBinding *current_binding;
     unsigned int descriptor_index;
-    uint32_t set_index;
     uint32_t descriptor_binding;
 };
 
@@ -531,7 +528,7 @@ static void d3d12_root_signature_append_vk_binding(struct d3d12_root_signature *
     mapping->register_index = register_idx;
     mapping->shader_visibility = shader_visibility;
     mapping->flags = buffer_descriptor ? VKD3D_SHADER_BINDING_FLAG_BUFFER : VKD3D_SHADER_BINDING_FLAG_IMAGE;
-    mapping->binding.set = context->set_index;
+    mapping->binding.set = root_signature->vk_set_count;
     mapping->binding.binding = context->descriptor_binding++;
     mapping->binding.count = 1;
 }
@@ -777,7 +774,6 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     struct vkd3d_descriptor_set_context context;
     VkDescriptorSetLayoutBinding *binding_desc;
     struct d3d12_root_signature_info info;
-    VkDescriptorSetLayout set_layouts[2];
     HRESULT hr;
 
     memset(&context, 0, sizeof(context));
@@ -787,8 +783,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     root_signature->refcount = 1;
 
     root_signature->vk_pipeline_layout = VK_NULL_HANDLE;
-    root_signature->vk_push_set_layout = VK_NULL_HANDLE;
-    root_signature->vk_set_layout = VK_NULL_HANDLE;
+    root_signature->vk_set_count = 0;
     root_signature->parameters = NULL;
     root_signature->flags = desc->Flags;
     root_signature->descriptor_mapping = NULL;
@@ -839,10 +834,10 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     {
         if (FAILED(hr = vkd3d_create_descriptor_set_layout(device,
                 VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
-                context.descriptor_binding, binding_desc, &root_signature->vk_push_set_layout)))
+                context.descriptor_binding, binding_desc, &root_signature->vk_set_layouts[0])))
             goto fail;
+        ++root_signature->vk_set_count;
 
-        set_layouts[context.set_index++] = root_signature->vk_push_set_layout;
         context.current_binding = binding_desc;
         context.descriptor_binding = 0;
     }
@@ -855,21 +850,21 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     if (FAILED(hr = d3d12_root_signature_init_static_samplers(root_signature, device, desc, &context)))
         goto fail;
 
-    root_signature->main_set = context.set_index;
+    root_signature->main_set = root_signature->vk_set_count;
     if (context.descriptor_binding)
     {
         if (FAILED(hr = vkd3d_create_descriptor_set_layout(device,
-                0, context.descriptor_binding, binding_desc, &root_signature->vk_set_layout)))
+                0, context.descriptor_binding, binding_desc,
+                &root_signature->vk_set_layouts[root_signature->vk_set_count])))
             goto fail;
-
-        set_layouts[context.set_index++] = root_signature->vk_set_layout;
+        ++root_signature->vk_set_count;
     }
     vkd3d_free(binding_desc);
     binding_desc = NULL;
 
-    if (FAILED(hr = vkd3d_create_pipeline_layout(device, context.set_index, set_layouts,
-            root_signature->push_constant_range_count, root_signature->push_constant_ranges,
-            &root_signature->vk_pipeline_layout)))
+    if (FAILED(hr = vkd3d_create_pipeline_layout(device, root_signature->vk_set_count,
+            root_signature->vk_set_layouts, root_signature->push_constant_range_count,
+            root_signature->push_constant_ranges, &root_signature->vk_pipeline_layout)))
         goto fail;
 
     if (FAILED(hr = vkd3d_private_store_init(&root_signature->private_store)))
@@ -1424,9 +1419,9 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
         const struct vkd3d_shader_scan_descriptor_info *shader_info)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    struct vkd3d_descriptor_set_context context;
+    VkDescriptorSetLayout set_layouts[VKD3D_MAX_DESCRIPTOR_SETS + 1];
     VkDescriptorSetLayoutBinding *binding_desc;
-    VkDescriptorSetLayout set_layouts[3];
+    uint32_t set_index, descriptor_binding;
     unsigned int uav_counter_count = 0;
     unsigned int i, j;
     HRESULT hr;
@@ -1452,11 +1447,9 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
     }
     state->uav_counter_count = uav_counter_count;
 
-    memset(&context, 0, sizeof(context));
-    if (root_signature->vk_push_set_layout)
-        set_layouts[context.set_index++] = root_signature->vk_push_set_layout;
-    if (root_signature->vk_set_layout)
-        set_layouts[context.set_index++] = root_signature->vk_set_layout;
+    descriptor_binding = 0;
+    for (set_index = 0; set_index < root_signature->vk_set_count; ++set_index)
+        set_layouts[set_index] = root_signature->vk_set_layouts[set_index];
 
     for (i = 0, j = 0; i < shader_info->descriptor_count; ++i)
     {
@@ -1469,25 +1462,25 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
         state->uav_counters[j].register_space = d->register_space;
         state->uav_counters[j].register_index = d->register_index;
         state->uav_counters[j].shader_visibility = VKD3D_SHADER_VISIBILITY_COMPUTE;
-        state->uav_counters[j].binding.set = context.set_index;
-        state->uav_counters[j].binding.binding = context.descriptor_binding;
+        state->uav_counters[j].binding.set = set_index;
+        state->uav_counters[j].binding.binding = descriptor_binding;
         state->uav_counters[j].binding.count = 1;
 
         /* FIXME: For the graphics pipeline we have to take the shader
          * visibility into account. */
-        binding_desc[j].binding = context.descriptor_binding;
+        binding_desc[j].binding = descriptor_binding;
         binding_desc[j].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
         binding_desc[j].descriptorCount = 1;
         binding_desc[j].stageFlags = VK_SHADER_STAGE_ALL;
         binding_desc[j].pImmutableSamplers = NULL;
 
-        ++context.descriptor_binding;
+        ++descriptor_binding;
         ++j;
     }
 
     /* Create a descriptor set layout for UAV counters. */
     hr = vkd3d_create_descriptor_set_layout(device,
-            0, context.descriptor_binding, binding_desc, &state->vk_set_layout);
+            0, descriptor_binding, binding_desc, &state->vk_set_layout);
     vkd3d_free(binding_desc);
     if (FAILED(hr))
     {
@@ -1498,9 +1491,9 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
     /* Create a pipeline layout which is compatible for all other descriptor
      * sets with the root signature's pipeline layout.
      */
-    state->set_index = context.set_index;
-    set_layouts[context.set_index++] = state->vk_set_layout;
-    if (FAILED(hr = vkd3d_create_pipeline_layout(device, context.set_index, set_layouts,
+    state->set_index = set_index;
+    set_layouts[set_index++] = state->vk_set_layout;
+    if (FAILED(hr = vkd3d_create_pipeline_layout(device, set_index, set_layouts,
             root_signature->push_constant_range_count, root_signature->push_constant_ranges,
             &state->vk_pipeline_layout)))
     {

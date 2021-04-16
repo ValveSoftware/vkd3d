@@ -54,6 +54,7 @@
 #define VKD3D_MAX_SHADER_EXTENSIONS       1u
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
+#define VKD3D_MAX_DESCRIPTOR_SETS         2u
 
 struct d3d12_command_list;
 struct d3d12_device;
@@ -699,8 +700,8 @@ struct d3d12_root_signature
     LONG refcount;
 
     VkPipelineLayout vk_pipeline_layout;
-    VkDescriptorSetLayout vk_push_set_layout;
-    VkDescriptorSetLayout vk_set_layout;
+    uint32_t vk_set_count;
+    VkDescriptorSetLayout vk_set_layouts[VKD3D_MAX_DESCRIPTOR_SETS];
 
     struct d3d12_root_parameter *parameters;
     unsigned int parameter_count;
