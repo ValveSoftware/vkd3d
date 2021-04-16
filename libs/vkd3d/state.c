@@ -325,37 +325,44 @@ struct d3d12_root_signature_info
 };
 
 static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_signature_info *info,
-        const D3D12_DESCRIPTOR_RANGE *range)
+        const D3D12_ROOT_DESCRIPTOR_TABLE *table)
 {
-    if (range->NumDescriptors == 0xffffffff)
-    {
-        FIXME("Unhandled unbound descriptor range.\n");
-        return E_NOTIMPL;
-    }
+    unsigned int i;
 
-    switch (range->RangeType)
+    for (i = 0; i < table->NumDescriptorRanges; ++i)
     {
-        case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-            /* XXX: Vulkan buffer and image descriptors have different types. In order
-            * to preserve compatibility between Vulkan resource bindings for the same
-            * root signature, we create descriptor set layouts with two bindings for
-            * each SRV and UAV. */
-            info->binding_count += range->NumDescriptors;
-            break;
-        case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-            /* As above. */
-            info->binding_count += range->NumDescriptors;
-            break;
-        case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-            break;
-        case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
-            break;
-        default:
-            FIXME("Unhandled descriptor type %#x.\n", range->RangeType);
+        const D3D12_DESCRIPTOR_RANGE *range = &table->pDescriptorRanges[i];
+
+        if (range->NumDescriptors == 0xffffffff)
+        {
+            FIXME("Unhandled unbound descriptor range.\n");
             return E_NOTIMPL;
-    }
+        }
 
-    info->binding_count += range->NumDescriptors;
+        switch (range->RangeType)
+        {
+            case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+                /* XXX: Vulkan buffer and image descriptors have different types. In order
+                * to preserve compatibility between Vulkan resource bindings for the same
+                * root signature, we create descriptor set layouts with two bindings for
+                * each SRV and UAV. */
+                info->binding_count += range->NumDescriptors;
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+                /* As above. */
+                info->binding_count += range->NumDescriptors;
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+                break;
+            case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
+                break;
+            default:
+                FIXME("Unhandled descriptor type %#x.\n", range->RangeType);
+                return E_NOTIMPL;
+        }
+
+        info->binding_count += range->NumDescriptors;
+    }
 
     return S_OK;
 }
@@ -363,7 +370,7 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
 static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_info *info,
         const D3D12_ROOT_SIGNATURE_DESC *desc)
 {
-    unsigned int i, j;
+    unsigned int i;
     HRESULT hr;
 
     memset(info, 0, sizeof(*info));
@@ -375,10 +382,9 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
         switch (p->ParameterType)
         {
             case D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE:
-                for (j = 0; j < p->u.DescriptorTable.NumDescriptorRanges; ++j)
-                    if (FAILED(hr = d3d12_root_signature_info_count_descriptors(info,
-                            &p->u.DescriptorTable.pDescriptorRanges[j])))
-                        return hr;
+                if (FAILED(hr = d3d12_root_signature_info_count_descriptors(info,
+                        &p->u.DescriptorTable)))
+                    return hr;
                 ++info->cost;
                 break;
 
