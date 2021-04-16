@@ -421,7 +421,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
 }
 
 static HRESULT d3d12_root_signature_init_push_constants(struct d3d12_root_signature *root_signature,
-        const D3D12_ROOT_SIGNATURE_DESC *desc, const struct d3d12_root_signature_info *info,
+        const D3D12_ROOT_SIGNATURE_DESC *desc,
         struct VkPushConstantRange push_constants[D3D12_SHADER_VISIBILITY_PIXEL + 1],
         uint32_t *push_constant_range_count)
 {
@@ -847,7 +847,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
         context.descriptor_binding = 0;
     }
 
-    if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc, &info,
+    if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc,
             root_signature->push_constant_ranges, &root_signature->push_constant_range_count)))
         goto fail;
     if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &context)))
