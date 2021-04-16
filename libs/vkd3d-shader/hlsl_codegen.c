@@ -25,39 +25,43 @@
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
-static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
+static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *temp)
 {
     struct vkd3d_string_buffer *name;
-    struct hlsl_ir_var *const_var;
+    struct hlsl_ir_var *uniform;
     struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
+
+    /* Use the synthetic name for the temp, rather than the uniform, so that we
+     * can write the uniform name into the shader reflection data. */
+
+    if (!(uniform = hlsl_new_var(temp->name, temp->data_type, temp->loc, NULL, temp->reg_reservation)))
+    {
+        ctx->failed = true;
+        return;
+    }
+    list_add_before(&temp->scope_entry, &uniform->scope_entry);
+    list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
+    temp->is_uniform = 0;
+    uniform->is_uniform = 1;
 
     if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
     {
         ctx->failed = true;
         return;
     }
-    vkd3d_string_buffer_printf(name, "<uniform-%s>", var->name);
-    if (!(const_var = hlsl_new_var(vkd3d_strdup(name->buffer), var->data_type, var->loc, NULL, var->reg_reservation)))
-    {
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        ctx->failed = true;
-        return;
-    }
+    vkd3d_string_buffer_printf(name, "<temp-%s>", temp->name);
+    temp->name = vkd3d_strdup(name->buffer);
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    list_add_before(&var->scope_entry, &const_var->scope_entry);
-    list_add_tail(&ctx->extern_vars, &const_var->extern_entry);
-    var->is_uniform = 0;
-    const_var->is_uniform = 1;
 
-    if (!(load = hlsl_new_var_load(const_var, var->loc)))
+    if (!(load = hlsl_new_var_load(uniform, temp->loc)))
     {
         ctx->failed = true;
         return;
     }
     list_add_head(instrs, &load->node.entry);
 
-    if (!(store = hlsl_new_simple_store(var, &load->node)))
+    if (!(store = hlsl_new_simple_store(temp, &load->node)))
     {
         ctx->failed = true;
         return;
