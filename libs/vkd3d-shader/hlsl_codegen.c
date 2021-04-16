@@ -717,7 +717,7 @@ static struct hlsl_reg allocate_range(struct liveness *liveness,
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
 {
-    if (type->reg_size > 4)
+    if (type->reg_size > 1)
         return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class,
                 reg.id + type->reg_size - 1);
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
