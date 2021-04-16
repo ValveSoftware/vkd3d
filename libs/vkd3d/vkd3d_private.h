@@ -711,7 +711,7 @@ struct d3d12_root_signature
 
     D3D12_ROOT_SIGNATURE_FLAGS flags;
 
-    unsigned int descriptor_count;
+    unsigned int binding_count;
     struct vkd3d_shader_resource_binding *descriptor_mapping;
 
     unsigned int root_constant_count;
