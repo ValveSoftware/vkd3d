@@ -45,7 +45,8 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
         return;
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    list_add_head(&ctx->globals->vars, &const_var->scope_entry);
+    list_add_before(&var->scope_entry, &const_var->scope_entry);
+    list_add_tail(&ctx->extern_vars, &const_var->extern_entry);
     var->is_uniform = 0;
     const_var->is_uniform = 1;
 
@@ -87,7 +88,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
     varying->is_input_varying = 1;
-    list_add_head(&ctx->globals->vars, &varying->scope_entry);
+    list_add_before(&var->scope_entry, &varying->scope_entry);
+    list_add_tail(&ctx->extern_vars, &varying->extern_entry);
 
     if (!(load = hlsl_new_var_load(varying, var->loc)))
     {
@@ -164,7 +166,8 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
     varying->is_output_varying = 1;
-    list_add_head(&ctx->globals->vars, &varying->scope_entry);
+    list_add_before(&var->scope_entry, &varying->scope_entry);
+    list_add_tail(&ctx->extern_vars, &varying->extern_entry);
 
     if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
     {
@@ -593,17 +596,12 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
             var->first_write = var->last_read = 0;
     }
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_uniform || var->is_input_varying)
             var->first_write = 1;
         else if (var->is_output_varying)
             var->last_read = UINT_MAX;
-    }
-
-    LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
-    {
-        var->first_write = 1;
     }
 
     if (entry_func->return_var)
@@ -846,7 +844,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     struct liveness liveness = {0};
     struct hlsl_ir_var *var;
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_uniform && var->last_read)
         {
@@ -928,12 +926,16 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
+        if (var->data_type->type == HLSL_CLASS_OBJECT)
+            list_add_tail(&ctx->extern_vars, &var->extern_entry);
         if (var->is_uniform)
             prepend_uniform_copy(ctx, entry_func->body, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
+        if (var->data_type->type == HLSL_CLASS_OBJECT)
+            list_add_tail(&ctx->extern_vars, &var->extern_entry);
         if (var->is_uniform)
             prepend_uniform_copy(ctx, entry_func->body, var);
         if (var->is_input_varying)

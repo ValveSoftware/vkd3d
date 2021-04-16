@@ -1578,6 +1578,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *
     rb_init(&ctx->functions, compare_function_rb);
 
     list_init(&ctx->static_initializers);
+    list_init(&ctx->extern_vars);
 
     return true;
 }

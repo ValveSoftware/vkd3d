@@ -213,7 +213,7 @@ struct hlsl_ir_var
     const char *name;
     const char *semantic;
     const struct hlsl_reg_reservation *reg_reservation;
-    struct list scope_entry, param_entry;
+    struct list scope_entry, param_entry, extern_entry;
 
     unsigned int first_write, last_read;
     struct hlsl_reg reg;
@@ -418,6 +418,7 @@ struct hlsl_ctx
     struct hlsl_scope *cur_scope;
     struct hlsl_scope *globals;
     struct list scopes;
+    struct list extern_vars;
 
     struct list types;
     struct rb_tree functions;
