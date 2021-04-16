@@ -1073,6 +1073,34 @@ static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *typ
     put_dword(buffer, fields_offset);
 }
 
+static void sm1_sort_extern(struct list *sorted, struct hlsl_ir_var *to_sort)
+{
+    struct hlsl_ir_var *var;
+
+    list_remove(&to_sort->extern_entry);
+
+    LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
+    {
+        if (strcmp(to_sort->name, var->name) < 0)
+        {
+            list_add_before(&var->extern_entry, &to_sort->extern_entry);
+            return;
+        }
+    }
+
+    list_add_tail(sorted, &to_sort->extern_entry);
+}
+
+static void sm1_sort_externs(struct hlsl_ctx *ctx)
+{
+    struct list sorted = LIST_INIT(sorted);
+    struct hlsl_ir_var *var, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        sm1_sort_extern(&sorted, var);
+    list_move_tail(&ctx->extern_vars, &sorted);
+}
+
 static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
         struct hlsl_ir_function_decl *entry_func)
 {
@@ -1102,6 +1130,8 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
             }
         }
     }
+
+    sm1_sort_externs(ctx);
 
     put_dword(buffer, 0); /* COMMENT tag + size */
     put_dword(buffer, MAKEFOURCC('C','T','A','B'));
