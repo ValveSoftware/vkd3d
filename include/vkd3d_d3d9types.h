@@ -21,6 +21,12 @@
 #define __VKD3D_D3D9TYPES_H
 #ifndef _d3d9TYPES_H_
 
+#ifndef MAKEFOURCC
+#define MAKEFOURCC(ch0, ch1, ch2, ch3)  \
+    ((DWORD)(BYTE)(ch0) | ((DWORD)(BYTE)(ch1) << 8) |  \
+    ((DWORD)(BYTE)(ch2) << 16) | ((DWORD)(BYTE)(ch3) << 24 ))
+#endif
+
 #define D3DPS_VERSION(major, minor) (0xffff0000 | ((major) << 8) | (minor))
 #define D3DVS_VERSION(major, minor) (0xfffe0000 | ((major) << 8) | (minor))
 

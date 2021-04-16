@@ -765,6 +765,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
 
     if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->reg_reservation)))
         return false;
+    var->is_param = 1;
 
     if (param->type->type != HLSL_CLASS_OBJECT)
     {

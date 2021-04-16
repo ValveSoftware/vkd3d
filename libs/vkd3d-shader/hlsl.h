@@ -115,7 +115,6 @@ struct hlsl_type
     unsigned int modifiers;
     unsigned int dimx;
     unsigned int dimy;
-    unsigned int reg_size;
     union
     {
         struct list *elements;
@@ -125,6 +124,9 @@ struct hlsl_type
             unsigned int elements_count;
         } array;
     } e;
+
+    unsigned int reg_size;
+    unsigned int bytecode_offset;
 };
 
 struct hlsl_struct_field
@@ -134,7 +136,9 @@ struct hlsl_struct_field
     struct hlsl_type *type;
     const char *name;
     const char *semantic;
+
     unsigned int reg_offset;
+    unsigned int name_offset;
 };
 
 struct hlsl_reg
@@ -221,6 +225,7 @@ struct hlsl_ir_var
     uint32_t is_input_varying : 1;
     uint32_t is_output_varying : 1;
     uint32_t is_uniform : 1;
+    uint32_t is_param : 1;
 };
 
 struct hlsl_ir_function

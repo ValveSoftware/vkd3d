@@ -7,6 +7,7 @@ widl_headers = \
 	include/vkd3d_d3d12.h \
 	include/vkd3d_d3d12sdklayers.h \
 	include/vkd3d_d3dcommon.h \
+	include/vkd3d_d3dx9shader.h \
 	include/vkd3d_dxgi.h \
 	include/vkd3d_dxgi1_2.h \
 	include/vkd3d_dxgi1_3.h \
@@ -22,6 +23,7 @@ vkd3d_public_headers = \
 	include/vkd3d_d3d9types.h \
 	include/vkd3d_d3dcommon.h \
 	include/vkd3d_d3dcompiler.h \
+	include/vkd3d_d3dx9shader.h \
 	include/vkd3d_dxgibase.h \
 	include/vkd3d_dxgiformat.h \
 	include/vkd3d_shader.h \

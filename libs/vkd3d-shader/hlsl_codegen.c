@@ -20,7 +20,7 @@
 
 #include "hlsl.h"
 #include <stdio.h>
-#include "vkd3d_d3d9types.h"
+#include "vkd3d_d3dx9shader.h"
 
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
@@ -44,6 +44,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
     temp->is_uniform = 0;
     uniform->is_uniform = 1;
+    uniform->is_param = temp->is_param;
 
     if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
     {
@@ -92,6 +93,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
     varying->is_input_varying = 1;
+    varying->is_param = var->is_param;
     list_add_before(&var->scope_entry, &varying->scope_entry);
     list_add_tail(&ctx->extern_vars, &varying->extern_entry);
 
@@ -170,6 +172,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
     varying->is_output_varying = 1;
+    varying->is_param = var->is_param;
     list_add_before(&var->scope_entry, &varying->scope_entry);
     list_add_tail(&ctx->extern_vars, &varying->extern_entry);
 
@@ -896,12 +899,257 @@ static void put_dword(struct bytecode_buffer *buffer, uint32_t value)
     buffer->data[buffer->count++] = value;
 }
 
+static void set_dword(struct bytecode_buffer *buffer, unsigned int index, uint32_t value)
+{
+    if (buffer->status)
+        return;
+
+    assert(index < buffer->count);
+    buffer->data[index] = value;
+}
+
+static void put_string(struct bytecode_buffer *buffer, const char *str)
+{
+    size_t len = strlen(str) + 1;
+    unsigned int token_count = (len + 3) / sizeof(*buffer->data);
+
+    if (buffer->status)
+        return;
+
+    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + token_count, sizeof(*buffer->data)))
+    {
+        buffer->status = E_OUTOFMEMORY;
+        return;
+    }
+
+    buffer->data[buffer->count + token_count - 1] = 0xabababab;
+    memcpy(buffer->data + buffer->count, str, len);
+    buffer->count += token_count;
+}
+
 static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, unsigned int minor)
 {
     if (type == VKD3D_SHADER_TYPE_VERTEX)
         return D3DVS_VERSION(major, minor);
     else
         return D3DPS_VERSION(major, minor);
+}
+
+static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
+{
+    switch (type->type)
+    {
+        case HLSL_CLASS_ARRAY:
+            return sm1_class(type->e.array.type);
+        case HLSL_CLASS_MATRIX:
+            assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
+            if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
+                return D3DXPC_MATRIX_COLUMNS;
+            else
+                return D3DXPC_MATRIX_ROWS;
+        case HLSL_CLASS_OBJECT:
+            return D3DXPC_OBJECT;
+        case HLSL_CLASS_SCALAR:
+            return D3DXPC_SCALAR;
+        case HLSL_CLASS_STRUCT:
+            return D3DXPC_STRUCT;
+        case HLSL_CLASS_VECTOR:
+            return D3DXPC_VECTOR;
+        default:
+            ERR("Invalid class %#x.\n", type->type);
+            assert(0);
+            return 0;
+    }
+}
+
+static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
+{
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_BOOL:
+            return D3DXPT_BOOL;
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            return D3DXPT_FLOAT;
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return D3DXPT_INT;
+        case HLSL_TYPE_PIXELSHADER:
+            return D3DXPT_PIXELSHADER;
+        case HLSL_TYPE_SAMPLER:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3DXPT_SAMPLER1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3DXPT_SAMPLER2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3DXPT_SAMPLER3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3DXPT_SAMPLERCUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3DXPT_SAMPLER;
+                default:
+                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
+            }
+            break;
+        case HLSL_TYPE_STRING:
+            return D3DXPT_STRING;
+        case HLSL_TYPE_TEXTURE:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3DXPT_TEXTURE1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3DXPT_TEXTURE2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3DXPT_TEXTURE3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3DXPT_TEXTURECUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3DXPT_TEXTURE;
+                default:
+                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
+            }
+            break;
+        case HLSL_TYPE_VERTEXSHADER:
+            return D3DXPT_VERTEXSHADER;
+        case HLSL_TYPE_VOID:
+            return D3DXPT_VOID;
+        default:
+            assert(0);
+    }
+    assert(0);
+    return 0;
+}
+
+static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_ARRAY)
+        return get_array_type(type->e.array.type);
+    return type;
+}
+
+static unsigned int get_array_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_ARRAY)
+        return get_array_size(type->e.array.type) * type->e.array.elements_count;
+    return 1;
+}
+
+static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *type, unsigned int ctab_start)
+{
+    const struct hlsl_type *array_type = get_array_type(type);
+    unsigned int fields_offset = 0, field_count = 0;
+    unsigned int array_size = get_array_size(type);
+    struct hlsl_struct_field *field;
+
+    if (type->bytecode_offset)
+        return;
+
+    if (array_type->type == HLSL_CLASS_STRUCT)
+    {
+        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        {
+            field->name_offset = buffer->count;
+            put_string(buffer, field->name);
+            write_sm1_type(buffer, field->type, ctab_start);
+        }
+
+        fields_offset = (buffer->count - ctab_start) * sizeof(*buffer->data);
+
+        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        {
+            put_dword(buffer, (field->name_offset - ctab_start) * sizeof(*buffer->data));
+            put_dword(buffer, (field->type->bytecode_offset - ctab_start) * sizeof(*buffer->data));
+            ++field_count;
+        }
+    }
+
+    type->bytecode_offset = buffer->count;
+    put_dword(buffer, sm1_class(type) | (sm1_base_type(type) << 16));
+    put_dword(buffer, type->dimy | (type->dimx << 16));
+    put_dword(buffer, array_size | (field_count << 16));
+    put_dword(buffer, fields_offset);
+}
+
+static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        struct hlsl_ir_function_decl *entry_func)
+{
+    unsigned int ctab_start, vars_start;
+    unsigned int uniform_count = 0;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->semantic && var->reg.allocated)
+        {
+            ++uniform_count;
+
+            if (var->is_param && var->is_uniform)
+            {
+                struct vkd3d_string_buffer *name;
+
+                if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
+                {
+                    buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
+                    return;
+                }
+                vkd3d_string_buffer_printf(name, "$%s", var->name);
+                vkd3d_free((char *)var->name);
+                var->name = vkd3d_strdup(name->buffer);
+                vkd3d_string_buffer_release(&ctx->string_buffers, name);
+            }
+        }
+    }
+
+    put_dword(buffer, 0); /* COMMENT tag + size */
+    put_dword(buffer, MAKEFOURCC('C','T','A','B'));
+
+    ctab_start = buffer->count;
+
+    put_dword(buffer, sizeof(D3DXSHADER_CONSTANTTABLE)); /* size of this header */
+    put_dword(buffer, 0); /* creator */
+    put_dword(buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
+    put_dword(buffer, uniform_count);
+    put_dword(buffer, sizeof(D3DXSHADER_CONSTANTTABLE)); /* offset of constants */
+    put_dword(buffer, 0); /* FIXME: flags */
+    put_dword(buffer, 0); /* FIXME: target string */
+
+    vars_start = buffer->count;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->semantic && var->reg.allocated)
+        {
+            put_dword(buffer, 0); /* name */
+            put_dword(buffer, D3DXRS_FLOAT4 | (var->reg.id << 16));
+            put_dword(buffer, var->data_type->reg_size);
+            put_dword(buffer, 0); /* type */
+            put_dword(buffer, 0); /* FIXME: default value */
+        }
+    }
+
+    uniform_count = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->semantic && var->reg.allocated)
+        {
+            set_dword(buffer, vars_start + (uniform_count * 5), (buffer->count - ctab_start) * sizeof(*buffer->data));
+            put_string(buffer, var->name);
+
+            write_sm1_type(buffer, var->data_type, ctab_start);
+            set_dword(buffer, vars_start + (uniform_count * 5) + 3,
+                    (var->data_type->bytecode_offset - ctab_start) * sizeof(*buffer->data));
+            ++uniform_count;
+        }
+    }
+
+    set_dword(buffer, ctab_start + 1, (buffer->count - ctab_start) * sizeof(*buffer->data));
+    put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
+
+    set_dword(buffer, ctab_start - 2, D3DSIO_COMMENT | ((buffer->count - (ctab_start - 1)) << 16));
 }
 
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
@@ -912,12 +1160,14 @@ static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *
 
     put_dword(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
 
+    write_sm1_uniforms(ctx, &buffer, entry_func);
+
     put_dword(&buffer, D3DSIO_END);
 
     if (!(ret = buffer.status))
     {
         out->code = buffer.data;
-        out->size = buffer.count * sizeof(uint32_t);
+        out->size = buffer.count * sizeof(*buffer.data);
     }
     return ret;
 }
