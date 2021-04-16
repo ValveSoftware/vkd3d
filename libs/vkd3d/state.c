@@ -316,13 +316,6 @@ static bool vk_binding_from_d3d12_descriptor_range(struct VkDescriptorSetLayoutB
 
 struct d3d12_root_signature_info
 {
-    size_t cbv_count;
-    size_t buffer_uav_count;
-    size_t uav_count;
-    size_t buffer_srv_count;
-    size_t srv_count;
-    size_t sampler_count;
-
     size_t binding_count;
 
     size_t root_constant_count;
@@ -343,16 +336,19 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
     switch (range->RangeType)
     {
         case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
-            info->srv_count += range->NumDescriptors;
+            /* XXX: Vulkan buffer and image descriptors have different types. In order
+            * to preserve compatibility between Vulkan resource bindings for the same
+            * root signature, we create descriptor set layouts with two bindings for
+            * each SRV and UAV. */
+            info->binding_count += range->NumDescriptors;
             break;
         case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
-            info->uav_count += range->NumDescriptors;
+            /* As above. */
+            info->binding_count += range->NumDescriptors;
             break;
         case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
-            info->cbv_count += range->NumDescriptors;
             break;
         case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
-            info->sampler_count += range->NumDescriptors;
             break;
         default:
             FIXME("Unhandled descriptor type %#x.\n", range->RangeType);
@@ -388,19 +384,16 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
 
             case D3D12_ROOT_PARAMETER_TYPE_CBV:
                 ++info->root_descriptor_count;
-                ++info->cbv_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
             case D3D12_ROOT_PARAMETER_TYPE_SRV:
                 ++info->root_descriptor_count;
-                ++info->buffer_srv_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
             case D3D12_ROOT_PARAMETER_TYPE_UAV:
                 ++info->root_descriptor_count;
-                ++info->buffer_uav_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
@@ -416,7 +409,6 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
         }
     }
 
-    info->sampler_count += desc->NumStaticSamplers;
     info->binding_count += desc->NumStaticSamplers;
 
     return S_OK;
@@ -808,12 +800,6 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
         WARN("Root signature cost %zu exceeds maximum allowed cost.\n", info.cost);
         return E_INVALIDARG;
     }
-
-    /* XXX: Vulkan buffer and image descriptors have different types. In order
-     * to preserve compatibility between Vulkan resource bindings for the same
-     * root signature, we create descriptor set layouts with two bindings for
-     * each SRV and UAV. */
-    info.binding_count += info.srv_count + info.uav_count;
 
     root_signature->binding_count = info.binding_count;
     root_signature->static_sampler_count = desc->NumStaticSamplers;
