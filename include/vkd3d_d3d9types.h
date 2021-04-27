@@ -27,6 +27,19 @@
     ((DWORD)(BYTE)(ch2) << 16) | ((DWORD)(BYTE)(ch3) << 24 ))
 #endif
 
+#define D3DSI_INSTLENGTH_SHIFT  24
+
+#define D3DSP_REGTYPE_SHIFT     28
+#define D3DSP_REGTYPE_SHIFT2    8
+#define D3DSP_REGTYPE_MASK      (0x7 << D3DSP_REGTYPE_SHIFT)
+#define D3DSP_REGTYPE_MASK2     0x00001800
+
+#define D3DSP_WRITEMASK_0       0x00010000
+#define D3DSP_WRITEMASK_1       0x00020000
+#define D3DSP_WRITEMASK_2       0x00040000
+#define D3DSP_WRITEMASK_3       0x00080000
+#define D3DSP_WRITEMASK_ALL     0x000f0000
+
 #define D3DPS_VERSION(major, minor) (0xffff0000 | ((major) << 8) | (minor))
 #define D3DVS_VERSION(major, minor) (0xfffe0000 | ((major) << 8) | (minor))
 
@@ -122,6 +135,34 @@ typedef enum _D3DSHADER_INSTRUCTION_OPCODE_TYPE
 
     D3DSIO_FORCE_DWORD  = 0x7fffffff,
 } D3DSHADER_INSTRUCTION_OPCODE_TYPE;
+
+typedef enum _D3DSHADER_PARAM_REGISTER_TYPE
+{
+    D3DSPR_TEMP         = 0x00,
+    D3DSPR_INPUT        = 0x01,
+    D3DSPR_CONST        = 0x02,
+    D3DSPR_ADDR         = 0x03,
+    D3DSPR_TEXTURE      = 0x03,
+    D3DSPR_RASTOUT      = 0x04,
+    D3DSPR_ATTROUT      = 0x05,
+    D3DSPR_TEXCRDOUT    = 0x06,
+    D3DSPR_OUTPUT       = 0x06,
+    D3DSPR_CONSTINT     = 0x07,
+    D3DSPR_COLOROUT     = 0x08,
+    D3DSPR_DEPTHOUT     = 0x09,
+    D3DSPR_SAMPLER      = 0x0a,
+    D3DSPR_CONST2       = 0x0b,
+    D3DSPR_CONST3       = 0x0c,
+    D3DSPR_CONST4       = 0x0d,
+    D3DSPR_CONSTBOOL    = 0x0e,
+    D3DSPR_LOOP         = 0x0f,
+    D3DSPR_TEMPFLOAT16  = 0x10,
+    D3DSPR_MISCTYPE     = 0x11,
+    D3DSPR_LABEL        = 0x12,
+    D3DSPR_PREDICATE    = 0x13,
+
+    D3DSPR_FORCE_DWORD  = 0x7fffffff,
+} D3DSHADER_PARAM_REGISTER_TYPE;
 
 #endif  /* _d3d9TYPES_H_ */
 #endif  /* __VKD3D_D3D9TYPES_H */

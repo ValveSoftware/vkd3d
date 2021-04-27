@@ -804,8 +804,9 @@ static void allocate_temp_registers_recurse(struct list *instrs, struct liveness
     }
 }
 
-static void allocate_const_registers_recurse(struct list *instrs, struct liveness *liveness)
+static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct liveness *liveness)
 {
+    struct hlsl_constant_defs *defs = &ctx->constant_defs;
     struct hlsl_ir_node *instr;
 
     LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
@@ -815,28 +816,84 @@ static void allocate_const_registers_recurse(struct list *instrs, struct livenes
             case HLSL_IR_CONSTANT:
             {
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
+                const struct hlsl_type *type = instr->data_type;
+                unsigned int reg_size = type->reg_size;
+                unsigned int x, y, i, writemask;
 
-                if (instr->data_type->reg_size > 1)
-                    constant->reg = allocate_range(liveness, 1, UINT_MAX, instr->data_type->reg_size);
+                if (reg_size > 1)
+                    constant->reg = allocate_range(liveness, 1, UINT_MAX, reg_size);
                 else
-                    constant->reg = allocate_register(liveness, 1, UINT_MAX, instr->data_type->dimx);
-                TRACE("Allocated constant @%u to %s.\n", instr->index,
-                        debug_register('c', constant->reg, instr->data_type));
+                    constant->reg = allocate_register(liveness, 1, UINT_MAX, type->dimx);
+                TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
+
+                if (!vkd3d_array_reserve((void **)&defs->values, &defs->size,
+                        constant->reg.id + reg_size, sizeof(*defs->values)))
+                {
+                    ctx->failed = true;
+                    return;
+                }
+                defs->count = max(defs->count, constant->reg.id + reg_size);
+
+                assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
+
+                if (!(writemask = constant->reg.writemask))
+                    writemask = (1u << type->dimx) - 1;
+
+                for (y = 0; y < type->dimy; ++y)
+                {
+                    for (x = 0, i = 0; x < 4; ++x)
+                    {
+                        float f;
+
+                        if (!(writemask & (1u << x)))
+                            continue;
+
+                        switch (type->base_type)
+                        {
+                            case HLSL_TYPE_BOOL:
+                                f = constant->value.b[i++];
+                                break;
+
+                            case HLSL_TYPE_FLOAT:
+                            case HLSL_TYPE_HALF:
+                                f = constant->value.f[i++];
+                                break;
+
+                            case HLSL_TYPE_INT:
+                                f = constant->value.i[i++];
+                                break;
+
+                            case HLSL_TYPE_UINT:
+                                f = constant->value.u[i++];
+                                break;
+
+                            case HLSL_TYPE_DOUBLE:
+                                FIXME("Double constant.\n");
+                                return;
+
+                            default:
+                                assert(0);
+                                return;
+                        }
+                        defs->values[constant->reg.id + y].f[x] = f;
+                    }
+                }
+
                 break;
             }
 
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_const_registers_recurse(&iff->then_instrs, liveness);
-                allocate_const_registers_recurse(&iff->else_instrs, liveness);
+                allocate_const_registers_recurse(ctx, &iff->then_instrs, liveness);
+                allocate_const_registers_recurse(ctx, &iff->else_instrs, liveness);
                 break;
             }
 
             case HLSL_IR_LOOP:
             {
                 struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
-                allocate_const_registers_recurse(&loop->body, liveness);
+                allocate_const_registers_recurse(ctx, &loop->body, liveness);
                 break;
             }
 
@@ -850,6 +907,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 {
     struct liveness liveness = {0};
     struct hlsl_ir_var *var;
+
+    allocate_const_registers_recurse(ctx, entry_func->body, &liveness);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -865,8 +924,6 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
         }
     }
-
-    allocate_const_registers_recurse(entry_func->body, &liveness);
 }
 
 /* Simple greedy temporary register allocation pass that just assigns a unique
@@ -902,6 +959,18 @@ static unsigned int put_dword(struct bytecode_buffer *buffer, uint32_t value)
     buffer->data[buffer->count++] = value;
 
     return index;
+}
+
+/* Returns the token index. */
+static unsigned int put_float(struct bytecode_buffer *buffer, float value)
+{
+    union
+    {
+        float f;
+        uint32_t u;
+    } u;
+    u.f = value;
+    return put_dword(buffer, u.u);
 }
 
 static void set_dword(struct bytecode_buffer *buffer, unsigned int index, uint32_t value)
@@ -1186,6 +1255,34 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
     set_dword(buffer, size_offset, D3DSIO_COMMENT | ((buffer->count - (ctab_start - 1)) << 16));
 }
 
+static uint32_t sm1_encode_register_type(D3DSHADER_PARAM_REGISTER_TYPE type)
+{
+    return ((type << D3DSP_REGTYPE_SHIFT) & D3DSP_REGTYPE_MASK)
+            | ((type << D3DSP_REGTYPE_SHIFT2) & D3DSP_REGTYPE_MASK2);
+}
+
+static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
+{
+    unsigned int i, x;
+
+    for (i = 0; i < ctx->constant_defs.count; ++i)
+    {
+        uint32_t token = D3DSIO_DEF;
+
+        if (ctx->profile->major_version > 1)
+            token |= 5 << D3DSI_INSTLENGTH_SHIFT;
+        put_dword(buffer, token);
+
+        token = (1u << 31);
+        token |= sm1_encode_register_type(D3DSPR_CONST);
+        token |= D3DSP_WRITEMASK_ALL;
+        token |= i;
+        put_dword(buffer, token);
+        for (x = 0; x < 4; ++x)
+            put_float(buffer, ctx->constant_defs.values[i].f[x]);
+    }
+}
+
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct vkd3d_shader_code *out)
 {
@@ -1195,6 +1292,8 @@ static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *
     put_dword(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
 
     write_sm1_uniforms(ctx, &buffer, entry_func);
+
+    write_sm1_constant_defs(ctx, &buffer);
 
     put_dword(&buffer, D3DSIO_END);
 

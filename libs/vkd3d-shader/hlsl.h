@@ -407,6 +407,11 @@ struct hlsl_profile_info
     bool software;
 };
 
+struct hlsl_vec4
+{
+    float f[4];
+};
+
 struct hlsl_ctx
 {
     const struct hlsl_profile_info *profile;
@@ -440,6 +445,12 @@ struct hlsl_ctx
     } builtin_types;
 
     struct list static_initializers;
+
+    struct hlsl_constant_defs
+    {
+        struct hlsl_vec4 *values;
+        size_t count, size;
+    } constant_defs;
 };
 
 enum hlsl_error_level
