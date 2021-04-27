@@ -32,14 +32,14 @@ struct parse_parameter
 {
     struct hlsl_type *type;
     const char *name;
-    const char *semantic;
+    struct hlsl_semantic semantic;
     const struct hlsl_reg_reservation *reg_reservation;
     unsigned int modifiers;
 };
 
 struct parse_colon_attribute
 {
-    const char *semantic;
+    struct hlsl_semantic semantic;
     struct hlsl_reg_reservation *reg_reservation;
 };
 
@@ -63,7 +63,7 @@ struct parse_variable_def
 
     char *name;
     struct parse_array_sizes arrays;
-    const char *semantic;
+    struct hlsl_semantic semantic;
     struct hlsl_reg_reservation *reg_reservation;
     struct parse_initializer initializer;
 };
@@ -763,7 +763,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     if (param->type->type == HLSL_CLASS_MATRIX)
         assert(param->type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(var = hlsl_new_var(param->name, param->type, loc, param->semantic, param->modifiers, param->reg_reservation)))
+    if (!(var = hlsl_new_var(param->name, param->type, loc, &param->semantic, param->modifiers, param->reg_reservation)))
         return false;
     var->is_param = 1;
 
@@ -1369,7 +1369,7 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     free_parse_initializer(&v->initializer);
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
-    vkd3d_free((void *)v->semantic);
+    vkd3d_free((void *)v->semantic.name);
     vkd3d_free(v->reg_reservation);
     vkd3d_free(v);
 }
@@ -1409,7 +1409,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
 
-        if (!(var = hlsl_new_var(v->name, type, v->loc, v->semantic, modifiers, v->reg_reservation)))
+        if (!(var = hlsl_new_var(v->name, type, v->loc, &v->semantic, modifiers, v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
@@ -1441,7 +1441,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                             "Modifiers '%s' are not allowed on local variables.", string->buffer);
                 vkd3d_string_buffer_release(&ctx->string_buffers, string);
             }
-            if (var->semantic)
+            if (var->semantic.name)
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                         "Semantics are not allowed on local variables.");
         }
@@ -1572,6 +1572,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     enum parse_assign_op assign_op;
     struct hlsl_reg_reservation *reg_reservation;
     struct parse_colon_attribute colon_attribute;
+    struct hlsl_semantic semantic;
 }
 
 %token KW_BLENDSTATE
@@ -1737,12 +1738,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 %type <modifiers> var_modifiers
 
 %type <name> any_identifier
-%type <name> semantic
 %type <name> var_identifier
 
 %type <parameter> parameter
 
 %type <reg_reservation> register_opt
+
+%type <semantic> semantic
 
 %type <type> base_type
 %type <type> field_type
@@ -1960,7 +1962,7 @@ func_prototype:
                         "\"%s\" was previously declared here.", $3);
                 YYABORT;
             }
-            if (hlsl_type_is_void($2) && $7.semantic)
+            if (hlsl_type_is_void($2) && $7.semantic.name)
             {
                 hlsl_error(ctx, @7, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                         "Semantics are not allowed on void functions.");
@@ -1971,7 +1973,7 @@ func_prototype:
                 FIXME("Unexpected register reservation for a function.\n");
                 vkd3d_free($7.reg_reservation);
             }
-            if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, $7.semantic, @3)))
+            if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, &$7.semantic, @3)))
                 YYABORT;
             $$.name = $3;
             ctx->cur_function = $$.decl;
@@ -2002,7 +2004,7 @@ var_identifier:
 colon_attribute:
       %empty
         {
-            $$.semantic = NULL;
+            $$.semantic.name = NULL;
             $$.reg_reservation = NULL;
         }
     | semantic
@@ -2012,14 +2014,20 @@ colon_attribute:
         }
     | register_opt
         {
-            $$.semantic = NULL;
+            $$.semantic.name = NULL;
             $$.reg_reservation = $1;
         }
 
 semantic:
       ':' any_identifier
         {
-            $$ = $2;
+            char *p;
+
+            for (p = $2 + strlen($2); p > $2 && isdigit(p[-1]); --p)
+                ;
+            $$.name = $2;
+            $$.index = atoi(p);
+            *p = 0;
         }
 
 /* FIXME: Writemasks */

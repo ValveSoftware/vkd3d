@@ -129,13 +129,19 @@ struct hlsl_type
     unsigned int bytecode_offset;
 };
 
+struct hlsl_semantic
+{
+    const char *name;
+    uint32_t index;
+};
+
 struct hlsl_struct_field
 {
     struct list entry;
     struct vkd3d_shader_location loc;
     struct hlsl_type *type;
     const char *name;
-    const char *semantic;
+    struct hlsl_semantic semantic;
     unsigned int reg_offset;
 
     unsigned int name_bytecode_offset;
@@ -215,7 +221,7 @@ struct hlsl_ir_var
     struct hlsl_type *data_type;
     struct vkd3d_shader_location loc;
     const char *name;
-    const char *semantic;
+    struct hlsl_semantic semantic;
     unsigned int modifiers;
     const struct hlsl_reg_reservation *reg_reservation;
     struct list scope_entry, param_entry, extern_entry;
@@ -569,7 +575,8 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ir_node *node, struct hlsl_type *
         struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ir_node *node) DECLSPEC_HIDDEN;
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const char *semantic, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
+        struct list *parameters, const struct hlsl_semantic *semantic,
+        struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ir_node *condition, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_jump *hlsl_new_jump(enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_load *hlsl_new_load(struct hlsl_ir_var *var, struct hlsl_ir_node *offset, struct hlsl_type *type,
@@ -591,7 +598,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
 struct hlsl_ir_node *hlsl_new_unary_expr(enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type,
-        const struct vkd3d_shader_location loc, const char *semantic, unsigned int modifiers,
+        const struct vkd3d_shader_location loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
         const struct hlsl_reg_reservation *reg_reservation) DECLSPEC_HIDDEN;
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ir_var *var, const struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 

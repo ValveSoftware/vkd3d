@@ -93,7 +93,7 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
 void hlsl_free_var(struct hlsl_ir_var *decl)
 {
     vkd3d_free((void *)decl->name);
-    vkd3d_free((void *)decl->semantic);
+    vkd3d_free((void *)decl->semantic.name);
     vkd3d_free((void *)decl->reg_reservation);
     vkd3d_free(decl);
 }
@@ -326,7 +326,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
                 {
                     LIST_FOR_EACH_ENTRY_SAFE(field, old_field, type->e.elements, struct hlsl_struct_field, entry)
                     {
-                        vkd3d_free((void *)field->semantic);
+                        vkd3d_free((void *)field->semantic.name);
                         vkd3d_free((void *)field->name);
                         vkd3d_free(field);
                     }
@@ -338,8 +338,11 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
                 field->loc = old_field->loc;
                 field->type = hlsl_type_clone(ctx, old_field->type, default_majority);
                 field->name = vkd3d_strdup(old_field->name);
-                if (old_field->semantic)
-                    field->semantic = vkd3d_strdup(old_field->semantic);
+                if (old_field->semantic.name)
+                {
+                    field->semantic.name = vkd3d_strdup(old_field->semantic.name);
+                    field->semantic.index = old_field->semantic.index;
+                }
                 field->reg_offset = reg_size;
                 reg_size += field->type->reg_size;
                 list_add_tail(type->e.elements, &field->entry);
@@ -387,8 +390,9 @@ struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ir_node *node)
     return hlsl_new_cast(node, node->data_type, &node->loc);
 }
 
-struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const struct vkd3d_shader_location loc,
-        const char *semantic, unsigned int modifiers, const struct hlsl_reg_reservation *reg_reservation)
+struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type,
+        const struct vkd3d_shader_location loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
+        const struct hlsl_reg_reservation *reg_reservation)
 {
     struct hlsl_ir_var *var;
 
@@ -398,7 +402,8 @@ struct hlsl_ir_var *hlsl_new_var(const char *name, struct hlsl_type *type, const
     var->name = name;
     var->data_type = type;
     var->loc = loc;
-    var->semantic = semantic;
+    if (semantic)
+        var->semantic = *semantic;
     var->modifiers = modifiers;
     var->reg_reservation = reg_reservation;
     return var;
@@ -556,7 +561,7 @@ bool hlsl_type_is_void(const struct hlsl_type *type)
 }
 
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const char *semantic, struct vkd3d_shader_location loc)
+        struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_function_decl *decl;
 
@@ -881,8 +886,8 @@ static void dump_ir_var(struct vkd3d_string_buffer *buffer, const struct hlsl_ir
         vkd3d_string_buffer_cache_cleanup(&string_buffers);
     }
     vkd3d_string_buffer_printf(buffer, "%s %s", debug_hlsl_type(var->data_type), var->name);
-    if (var->semantic)
-        vkd3d_string_buffer_printf(buffer, " : %s", var->semantic);
+    if (var->semantic.name)
+        vkd3d_string_buffer_printf(buffer, " : %s%u", var->semantic.name, var->semantic.index);
 }
 
 static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
@@ -1184,7 +1189,7 @@ void hlsl_free_type(struct hlsl_type *type)
         LIST_FOR_EACH_ENTRY_SAFE(field, next_field, type->e.elements, struct hlsl_struct_field, entry)
         {
             vkd3d_free((void *)field->name);
-            vkd3d_free((void *)field->semantic);
+            vkd3d_free((void *)field->semantic.name);
             vkd3d_free(field);
         }
     }

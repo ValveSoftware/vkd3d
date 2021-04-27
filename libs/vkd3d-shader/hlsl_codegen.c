@@ -70,9 +70,10 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int field_offset, const char *semantic)
+        struct hlsl_type *type, unsigned int field_offset, const struct hlsl_semantic *semantic)
 {
     struct vkd3d_string_buffer *name;
+    struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
     struct hlsl_ir_var *varying;
@@ -83,10 +84,18 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         ctx->failed = true;
         return;
     }
-    vkd3d_string_buffer_printf(name, "<input-%s>", semantic);
-    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, vkd3d_strdup(semantic), 0, NULL)))
+    vkd3d_string_buffer_printf(name, "<input-%s%u>", semantic->name, semantic->index);
+    if (!(new_semantic.name = vkd3d_strdup(semantic->name)))
     {
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        ctx->failed = true;
+        return;
+    }
+    new_semantic.index = semantic->index;
+    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    {
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        vkd3d_free((void *)new_semantic.name);
         ctx->failed = true;
         return;
     }
@@ -127,8 +136,8 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
     {
         if (field->type->type == HLSL_CLASS_STRUCT)
             prepend_input_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
-        else if (field->semantic)
-            prepend_input_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, field->semantic);
+        else if (field->semantic.name)
+            prepend_input_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
         else
             hlsl_error(ctx, field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
@@ -142,14 +151,15 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 {
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         prepend_input_struct_copy(ctx, instrs, var, var->data_type, 0);
-    else if (var->semantic)
-        prepend_input_copy(ctx, instrs, var, var->data_type, 0, var->semantic);
+    else if (var->semantic.name)
+        prepend_input_copy(ctx, instrs, var, var->data_type, 0, &var->semantic);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int field_offset, const char *semantic)
+        struct hlsl_type *type, unsigned int field_offset, const struct hlsl_semantic *semantic)
 {
     struct vkd3d_string_buffer *name;
+    struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
     struct hlsl_ir_var *varying;
@@ -160,9 +170,17 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         ctx->failed = true;
         return;
     }
-    vkd3d_string_buffer_printf(name, "<output-%s>", semantic);
-    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, vkd3d_strdup(semantic), 0, NULL)))
+    vkd3d_string_buffer_printf(name, "<output-%s%u>", semantic->name, semantic->index);
+    if (!(new_semantic.name = vkd3d_strdup(semantic->name)))
     {
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        ctx->failed = true;
+        return;
+    }
+    new_semantic.index = semantic->index;
+    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    {
+        vkd3d_free((void *)new_semantic.name);
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
         ctx->failed = true;
         return;
@@ -204,8 +222,8 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
     {
         if (field->type->type == HLSL_CLASS_STRUCT)
             append_output_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
-        else if (field->semantic)
-            append_output_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, field->semantic);
+        else if (field->semantic.name)
+            append_output_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
         else
             hlsl_error(ctx, field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
@@ -219,8 +237,8 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 {
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         append_output_struct_copy(ctx, instrs, var, var->data_type, 0);
-    else if (var->semantic)
-        append_output_copy(ctx, instrs, var, var->data_type, 0, var->semantic);
+    else if (var->semantic.name)
+        append_output_copy(ctx, instrs, var, var->data_type, 0, &var->semantic);
 }
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -1180,7 +1198,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic && var->reg.allocated)
+        if (!var->semantic.name && var->reg.allocated)
         {
             ++uniform_count;
 
@@ -1218,7 +1236,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic && var->reg.allocated)
+        if (!var->semantic.name && var->reg.allocated)
         {
             put_dword(buffer, 0); /* name */
             put_dword(buffer, D3DXRS_FLOAT4 | (var->reg.id << 16));
@@ -1232,7 +1250,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic && var->reg.allocated)
+        if (!var->semantic.name && var->reg.allocated)
         {
             set_dword(buffer, vars_start + (uniform_count * 5), (buffer->count - ctab_start) * sizeof(*buffer->data));
             put_string(buffer, var->name);
@@ -1328,7 +1346,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
             }
             else
             {
-                if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic)
+                if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic.name)
                     hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                             "Parameter \"%s\" is missing a semantic.", var->name);
 
@@ -1341,7 +1359,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     }
     if (entry_func->return_var)
     {
-        if (entry_func->return_var->data_type->type != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic)
+        if (entry_func->return_var->data_type->type != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic.name)
             hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
