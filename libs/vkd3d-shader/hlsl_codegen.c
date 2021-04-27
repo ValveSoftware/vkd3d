@@ -948,6 +948,104 @@ static void allocate_temp_registers(struct hlsl_ir_function_decl *entry_func)
     allocate_temp_registers_recurse(entry_func->body, &liveness);
 }
 
+static bool sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic, bool output,
+        D3DSHADER_PARAM_REGISTER_TYPE *type, unsigned int *reg)
+{
+    unsigned int i;
+
+    static const struct
+    {
+        const char *semantic;
+        bool output;
+        enum vkd3d_shader_type shader_type;
+        unsigned int major_version;
+        D3DSHADER_PARAM_REGISTER_TYPE type;
+        DWORD offset;
+    }
+    register_table[] =
+    {
+        {"color",       true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_COLOROUT},
+        {"depth",       true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_DEPTHOUT},
+        {"sv_depth",    true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_DEPTHOUT},
+        {"sv_target",   true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_COLOROUT},
+        {"color",       false, VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_INPUT},
+        {"texcoord",    false, VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_TEXTURE},
+
+        {"color",       true,  VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_COLOROUT},
+        {"depth",       true,  VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_DEPTHOUT},
+        {"sv_depth",    true,  VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_DEPTHOUT},
+        {"sv_target",   true,  VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_COLOROUT},
+        {"sv_position", false, VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_MISCTYPE,    D3DSMO_POSITION},
+        {"vface",       false, VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_MISCTYPE,    D3DSMO_FACE},
+        {"vpos",        false, VKD3D_SHADER_TYPE_PIXEL, 3, D3DSPR_MISCTYPE,    D3DSMO_POSITION},
+
+        {"color",       true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_ATTROUT},
+        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_RASTOUT,     D3DSRO_FOG},
+        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_RASTOUT,     D3DSRO_POINT_SIZE},
+        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"texcoord",    true,  VKD3D_SHADER_TYPE_VERTEX, 1, D3DSPR_TEXCRDOUT},
+
+        {"color",       true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_ATTROUT},
+        {"fog",         true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_RASTOUT,     D3DSRO_FOG},
+        {"position",    true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"psize",       true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_RASTOUT,     D3DSRO_POINT_SIZE},
+        {"sv_position", true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_RASTOUT,     D3DSRO_POSITION},
+        {"texcoord",    true,  VKD3D_SHADER_TYPE_VERTEX, 2, D3DSPR_TEXCRDOUT},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(register_table); ++i)
+    {
+        if (!ascii_strcasecmp(semantic->name, register_table[i].semantic)
+                && output == register_table[i].output
+                && ctx->profile->type == register_table[i].shader_type
+                && ctx->profile->major_version == register_table[i].major_version)
+        {
+            *type = register_table[i].type;
+            if (register_table[i].type == D3DSPR_MISCTYPE || register_table[i].type == D3DSPR_RASTOUT)
+                *reg = register_table[i].offset;
+            else
+                *reg = semantic->index;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
+{
+    assert(var->semantic.name);
+
+    if (ctx->profile->major_version < 4)
+    {
+        D3DSHADER_PARAM_REGISTER_TYPE type;
+        unsigned int reg;
+
+        if (!sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg))
+        {
+            var->reg.allocated = true;
+            var->reg.id = (*counter)++;
+            var->reg.writemask = (1 << var->data_type->dimx) - 1;
+            TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v', var->reg, var->data_type));
+        }
+    }
+}
+
+static void allocate_semantic_registers(struct hlsl_ctx *ctx)
+{
+    unsigned int input_counter = 0, output_counter = 0;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_input_semantic && var->last_read)
+            allocate_semantic_register(ctx, var, &input_counter, false);
+        if (var->is_output_semantic && var->first_write)
+            allocate_semantic_register(ctx, var, &output_counter, true);
+    }
+}
+
 struct bytecode_buffer
 {
     uint32_t *data;
@@ -1381,6 +1479,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     allocate_temp_registers(entry_func);
     if (ctx->profile->major_version < 4)
         allocate_const_registers(ctx, entry_func);
+    allocate_semantic_registers(ctx);
 
     if (ctx->failed)
         return VKD3D_ERROR_INVALID_SHADER;
