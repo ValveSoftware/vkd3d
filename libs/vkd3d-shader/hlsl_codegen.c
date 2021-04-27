@@ -1051,7 +1051,7 @@ static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *typ
     {
         LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
         {
-            field->name_offset = buffer->count;
+            field->name_bytecode_offset = buffer->count;
             put_string(buffer, field->name);
             write_sm1_type(buffer, field->type, ctab_start);
         }
@@ -1060,7 +1060,7 @@ static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *typ
 
         LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
         {
-            put_dword(buffer, (field->name_offset - ctab_start) * sizeof(*buffer->data));
+            put_dword(buffer, (field->name_bytecode_offset - ctab_start) * sizeof(*buffer->data));
             put_dword(buffer, (field->type->bytecode_offset - ctab_start) * sizeof(*buffer->data));
             ++field_count;
         }

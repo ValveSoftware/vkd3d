@@ -136,9 +136,9 @@ struct hlsl_struct_field
     struct hlsl_type *type;
     const char *name;
     const char *semantic;
-
     unsigned int reg_offset;
-    unsigned int name_offset;
+
+    unsigned int name_bytecode_offset;
 };
 
 struct hlsl_reg
