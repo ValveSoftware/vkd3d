@@ -886,17 +886,22 @@ struct bytecode_buffer
     int status;
 };
 
-static void put_dword(struct bytecode_buffer *buffer, uint32_t value)
+/* Returns the token index. */
+static unsigned int put_dword(struct bytecode_buffer *buffer, uint32_t value)
 {
+    unsigned int index = buffer->count;
+
     if (buffer->status)
-        return;
+        return index;
 
     if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + 1, sizeof(*buffer->data)))
     {
         buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
-        return;
+        return index;
     }
     buffer->data[buffer->count++] = value;
+
+    return index;
 }
 
 static void set_dword(struct bytecode_buffer *buffer, unsigned int index, uint32_t value)
@@ -908,23 +913,26 @@ static void set_dword(struct bytecode_buffer *buffer, unsigned int index, uint32
     buffer->data[index] = value;
 }
 
-static void put_string(struct bytecode_buffer *buffer, const char *str)
+/* Returns the token index. */
+static unsigned int put_string(struct bytecode_buffer *buffer, const char *str)
 {
+    unsigned int index = buffer->count;
     size_t len = strlen(str) + 1;
     unsigned int token_count = (len + 3) / sizeof(*buffer->data);
 
     if (buffer->status)
-        return;
+        return index;
 
     if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + token_count, sizeof(*buffer->data)))
     {
         buffer->status = E_OUTOFMEMORY;
-        return;
+        return index;
     }
 
     buffer->data[buffer->count + token_count - 1] = 0xabababab;
     memcpy(buffer->data + buffer->count, str, len);
     buffer->count += token_count;
+    return index;
 }
 
 static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, unsigned int minor)
@@ -1051,8 +1059,7 @@ static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *typ
     {
         LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
         {
-            field->name_bytecode_offset = buffer->count;
-            put_string(buffer, field->name);
+            field->name_bytecode_offset = put_string(buffer, field->name);
             write_sm1_type(buffer, field->type, ctab_start);
         }
 
@@ -1066,8 +1073,7 @@ static void write_sm1_type(struct bytecode_buffer *buffer, struct hlsl_type *typ
         }
     }
 
-    type->bytecode_offset = buffer->count;
-    put_dword(buffer, sm1_class(type) | (sm1_base_type(type) << 16));
+    type->bytecode_offset = put_dword(buffer, sm1_class(type) | (sm1_base_type(type) << 16));
     put_dword(buffer, type->dimy | (type->dimx << 16));
     put_dword(buffer, array_size | (field_count << 16));
     put_dword(buffer, fields_offset);
@@ -1104,7 +1110,7 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
 static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
         struct hlsl_ir_function_decl *entry_func)
 {
-    unsigned int ctab_start, vars_start;
+    unsigned int ctab_start, vars_start, size_offset, creator_offset, offset;
     unsigned int uniform_count = 0;
     struct hlsl_ir_var *var;
 
@@ -1133,13 +1139,11 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
 
     sm1_sort_externs(ctx);
 
-    put_dword(buffer, 0); /* COMMENT tag + size */
+    size_offset = put_dword(buffer, 0);
     put_dword(buffer, MAKEFOURCC('C','T','A','B'));
 
-    ctab_start = buffer->count;
-
-    put_dword(buffer, sizeof(D3DXSHADER_CONSTANTTABLE)); /* size of this header */
-    put_dword(buffer, 0); /* creator */
+    ctab_start = put_dword(buffer, sizeof(D3DXSHADER_CONSTANTTABLE));
+    creator_offset = put_dword(buffer, 0);
     put_dword(buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
     put_dword(buffer, uniform_count);
     put_dword(buffer, sizeof(D3DXSHADER_CONSTANTTABLE)); /* offset of constants */
@@ -1176,10 +1180,10 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
         }
     }
 
-    set_dword(buffer, ctab_start + 1, (buffer->count - ctab_start) * sizeof(*buffer->data));
-    put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
+    offset = put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
+    set_dword(buffer, creator_offset, (offset - ctab_start) * sizeof(*buffer->data));
 
-    set_dword(buffer, ctab_start - 2, D3DSIO_COMMENT | ((buffer->count - (ctab_start - 1)) << 16));
+    set_dword(buffer, size_offset, D3DSIO_COMMENT | ((buffer->count - (ctab_start - 1)) << 16));
 }
 
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
