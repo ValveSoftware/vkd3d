@@ -229,8 +229,8 @@ struct hlsl_ir_var
     unsigned int first_write, last_read;
     struct hlsl_reg reg;
 
-    uint32_t is_input_varying : 1;
-    uint32_t is_output_varying : 1;
+    uint32_t is_input_semantic : 1;
+    uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
 };

@@ -76,8 +76,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
-    struct hlsl_ir_var *varying;
     struct hlsl_ir_load *load;
+    struct hlsl_ir_var *input;
 
     if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
     {
@@ -92,7 +92,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(input = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
         vkd3d_free((void *)new_semantic.name);
@@ -100,12 +100,12 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    varying->is_input_varying = 1;
-    varying->is_param = var->is_param;
-    list_add_before(&var->scope_entry, &varying->scope_entry);
-    list_add_tail(&ctx->extern_vars, &varying->extern_entry);
+    input->is_input_semantic = 1;
+    input->is_param = var->is_param;
+    list_add_before(&var->scope_entry, &input->scope_entry);
+    list_add_tail(&ctx->extern_vars, &input->extern_entry);
 
-    if (!(load = hlsl_new_var_load(varying, var->loc)))
+    if (!(load = hlsl_new_var_load(input, var->loc)))
     {
         ctx->failed = true;
         return;
@@ -144,9 +144,8 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
     }
 }
 
-/* Split input varyings into two variables representing the varying and temp
- * registers, and copy the former to the latter, so that writes to input
- * varyings work. */
+/* Split inputs into two variables representing the semantic and temp registers,
+ * and copy the former to the latter, so that writes to input variables work. */
 static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
 {
     if (var->data_type->type == HLSL_CLASS_STRUCT)
@@ -162,7 +161,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
-    struct hlsl_ir_var *varying;
+    struct hlsl_ir_var *output;
     struct hlsl_ir_load *load;
 
     if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
@@ -178,7 +177,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(varying = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(output = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
         vkd3d_free((void *)new_semantic.name);
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
@@ -186,10 +185,10 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    varying->is_output_varying = 1;
-    varying->is_param = var->is_param;
-    list_add_before(&var->scope_entry, &varying->scope_entry);
-    list_add_tail(&ctx->extern_vars, &varying->extern_entry);
+    output->is_output_semantic = 1;
+    output->is_param = var->is_param;
+    list_add_before(&var->scope_entry, &output->scope_entry);
+    list_add_tail(&ctx->extern_vars, &output->extern_entry);
 
     if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
     {
@@ -205,7 +204,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     list_add_after(&offset->node.entry, &load->node.entry);
 
-    if (!(store = hlsl_new_store(varying, NULL, &load->node, 0, var->loc)))
+    if (!(store = hlsl_new_store(output, NULL, &load->node, 0, var->loc)))
     {
         ctx->failed = true;
         return;
@@ -230,9 +229,9 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
     }
 }
 
-/* Split output varyings into two variables representing the temp and varying
+/* Split outputs into two variables representing the temp and semantic
  * registers, and copy the former to the latter, so that reads from output
- * varyings work. */
+ * variables work. */
 static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
 {
     if (var->data_type->type == HLSL_CLASS_STRUCT)
@@ -618,9 +617,9 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_uniform || var->is_input_varying)
+        if (var->is_uniform || var->is_input_semantic)
             var->first_write = 1;
-        else if (var->is_output_varying)
+        else if (var->is_output_semantic)
             var->last_read = UINT_MAX;
     }
 
@@ -744,7 +743,7 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
 
 static void allocate_variable_temp_register(struct hlsl_ir_var *var, struct liveness *liveness)
 {
-    if (var->is_input_varying || var->is_output_varying || var->is_uniform)
+    if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
         return;
 
     if (!var->reg.allocated && var->last_read)
