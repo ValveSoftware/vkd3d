@@ -64,6 +64,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-static-initializer.shader_test \
+	tests/hlsl-storage-qualifiers.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
 	tests/hlsl-struct-semantics.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
@@ -261,6 +262,7 @@ XFAIL_TESTS = \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-static-initializer.shader_test \
+	tests/hlsl-storage-qualifiers.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
 	tests/hlsl-struct-semantics.shader_test \
 	tests/hlsl-vector-indexing.shader_test \

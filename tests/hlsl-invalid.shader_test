@@ -122,6 +122,12 @@ float4 main(in float4 i) : sv_target
 }
 
 [pixel shader fail]
+float4 main(float4 i) : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
 struct {float4 a;};
 
 float4 main() : sv_target
@@ -158,4 +164,58 @@ void main(out struct output o)
 {
     o.t = float4(0, 0, 0, 0);
     o.a = 0;
+}
+
+[pixel shader fail]
+uniform in float4 f;
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+in float4 f;
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+static uniform float4 f;
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+void main(out uniform float4 o : sv_target)
+{
+    o = 0;
+}
+
+[pixel shader fail]
+void sub(out uniform float4 o)
+{
+    o = 0;
+}
+
+void main(out float4 o : sv_target)
+{
+    sub(o);
+}
+
+[pixel shader fail]
+void sub(in out uniform float4 o)
+{
+}
+
+void main(out float4 o : sv_target)
+{
+    o = 0;
+    sub(o);
+}
+
+[pixel shader fail]
+float4 main(void) : sv_target
+{
+    uniform float f;
+    return 0;
+}
+
+[pixel shader fail]
+float4 main(void) : sv_target
+{
+    in float f;
+    return 0;
 }
