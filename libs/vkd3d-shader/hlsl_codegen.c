@@ -1097,6 +1097,101 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
     }
 }
 
+static unsigned int map_swizzle(unsigned int swizzle, unsigned int writemask)
+{
+    unsigned int i, ret = 0;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (writemask & (1 << i))
+        {
+            ret |= (swizzle & 3) << (i * 2);
+            swizzle >>= 2;
+        }
+    }
+    return ret;
+}
+
+static unsigned int swizzle_from_writemask(unsigned int writemask)
+{
+    static const unsigned int swizzles[16] =
+    {
+        0,
+        HLSL_SWIZZLE(X, X, X, X),
+        HLSL_SWIZZLE(Y, Y, Y, Y),
+        HLSL_SWIZZLE(X, Y, X, X),
+        HLSL_SWIZZLE(Z, Z, Z, Z),
+        HLSL_SWIZZLE(X, Z, X, X),
+        HLSL_SWIZZLE(Y, Z, X, X),
+        HLSL_SWIZZLE(X, Y, Z, X),
+        HLSL_SWIZZLE(W, W, W, W),
+        HLSL_SWIZZLE(X, W, X, X),
+        HLSL_SWIZZLE(Y, W, X, X),
+        HLSL_SWIZZLE(X, Y, W, X),
+        HLSL_SWIZZLE(Z, W, X, X),
+        HLSL_SWIZZLE(X, Z, W, X),
+        HLSL_SWIZZLE(Y, Z, W, X),
+        HLSL_SWIZZLE(X, Y, Z, W),
+    };
+
+    return swizzles[writemask & 0xf];
+}
+
+static unsigned int combine_writemasks(unsigned int first, unsigned int second)
+{
+    unsigned int ret = 0, i, j = 0;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (first & (1 << i))
+        {
+            if (second & (1 << j++))
+                ret |= (1 << i);
+        }
+    }
+
+    return ret;
+}
+
+static bool type_is_single_reg(const struct hlsl_type *type)
+{
+    return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
+}
+
+static struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+{
+    struct hlsl_ir_node *offset_node = deref->offset.node;
+    const struct hlsl_ir_var *var = deref->var;
+    struct hlsl_reg ret = {0};
+    unsigned int offset = 0;
+
+    if (offset_node && offset_node->type != HLSL_IR_CONSTANT)
+    {
+        FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
+        return ret;
+    }
+
+    ret = var->reg;
+
+    ret.allocated = var->reg.allocated;
+    ret.id = var->reg.id;
+    if (offset_node)
+        offset = hlsl_ir_constant(offset_node)->value.u[0];
+    ret.id += offset / 4;
+
+    if (type_is_single_reg(var->data_type))
+    {
+        assert(!offset);
+        ret.writemask = var->reg.writemask;
+    }
+    else
+    {
+        assert(type_is_single_reg(type));
+        ret.writemask = ((1 << type->dimx) - 1) << (offset & 3);
+    }
+    return ret;
+}
+
 struct bytecode_buffer
 {
     uint32_t *data;
@@ -1428,6 +1523,57 @@ static uint32_t sm1_encode_dst(D3DSHADER_PARAM_REGISTER_TYPE type,
     return (1u << 31) | sm1_encode_register_type(type) | modifier | (writemask << 16) | reg;
 }
 
+static uint32_t sm1_encode_src(D3DSHADER_PARAM_REGISTER_TYPE type,
+        D3DSHADER_PARAM_SRCMOD_TYPE modifier, unsigned int swizzle, uint32_t reg)
+{
+    return (1u << 31) | sm1_encode_register_type(type) | modifier | (swizzle << 16) | reg;
+}
+
+struct sm1_instruction
+{
+    D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode;
+
+    struct
+    {
+        D3DSHADER_PARAM_REGISTER_TYPE type;
+        D3DSHADER_PARAM_DSTMOD_TYPE mod;
+        unsigned int writemask;
+        uint32_t reg;
+    } dst;
+
+    struct
+    {
+        D3DSHADER_PARAM_REGISTER_TYPE type;
+        D3DSHADER_PARAM_SRCMOD_TYPE mod;
+        unsigned int swizzle;
+        uint32_t reg;
+    } srcs[2];
+    unsigned int src_count;
+
+    unsigned int has_dst;
+};
+
+static void write_sm1_instruction(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        const struct sm1_instruction *instr)
+{
+    uint32_t token = instr->opcode;
+    unsigned int i;
+
+    if (ctx->profile->major_version > 1)
+        token |= (instr->has_dst + instr->src_count) << D3DSI_INSTLENGTH_SHIFT;
+    put_dword(buffer, token);
+
+    if (instr->has_dst)
+    {
+        assert(instr->dst.writemask);
+        put_dword(buffer, sm1_encode_dst(instr->dst.type, instr->dst.mod, instr->dst.writemask, instr->dst.reg));
+    }
+
+    for (i = 0; i < instr->src_count; ++i)
+        put_dword(buffer, sm1_encode_src(instr->srcs[i].type, instr->srcs[i].mod,
+                map_swizzle(instr->srcs[i].swizzle, instr->dst.writemask), instr->srcs[i].reg));
+};
+
 static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
 {
     unsigned int i, x;
@@ -1504,6 +1650,79 @@ static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct bytecode_buffer
     }
 }
 
+static void write_sm1_store(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_store *store = hlsl_ir_store(instr);
+    const struct hlsl_ir_node *rhs = store->rhs.node;
+    const struct hlsl_reg reg = hlsl_reg_from_deref(&store->lhs, rhs->data_type);
+    struct sm1_instruction sm1_instr =
+    {
+        .opcode = D3DSIO_MOV,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.reg = reg.id,
+        .dst.writemask = combine_writemasks(reg.writemask, store->writemask),
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].reg = rhs->reg.id,
+        .srcs[0].swizzle = swizzle_from_writemask(rhs->reg.writemask),
+        .src_count = 1,
+    };
+
+    if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
+    {
+        FIXME("Matrix writemasks need to be lowered.\n");
+        return;
+    }
+
+    if (store->lhs.var->is_output_semantic)
+    {
+        if (!sm1_register_from_semantic(ctx, &store->lhs.var->semantic, true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
+        {
+            assert(reg.allocated);
+            sm1_instr.dst.type = D3DSPR_OUTPUT;
+            sm1_instr.dst.reg = reg.id;
+        }
+        else
+            sm1_instr.dst.writemask = (1u << store->lhs.var->data_type->dimx) - 1;
+    }
+    else
+        assert(reg.allocated);
+
+    write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
+static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        const struct hlsl_ir_function_decl *entry_func)
+{
+    const struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, entry_func->body, struct hlsl_ir_node, entry)
+    {
+        if (instr->data_type)
+        {
+            if (instr->data_type->type == HLSL_CLASS_MATRIX)
+            {
+                FIXME("Matrix operations need to be lowered.\n");
+                break;
+            }
+
+            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
+        }
+
+        switch (instr->type)
+        {
+            case HLSL_IR_STORE:
+                write_sm1_store(ctx, buffer, instr);
+                break;
+
+            default:
+                FIXME("Unhandled instruction type %s.\n", hlsl_node_type_to_string(instr->type));
+        }
+    }
+}
+
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct vkd3d_shader_code *out)
 {
@@ -1516,6 +1735,7 @@ static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *
 
     write_sm1_constant_defs(ctx, &buffer);
     write_sm1_semantic_dcls(ctx, &buffer);
+    write_sm1_instructions(ctx, &buffer, entry_func);
 
     put_dword(&buffer, D3DSIO_END);
 
