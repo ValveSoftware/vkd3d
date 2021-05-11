@@ -1013,6 +1013,49 @@ static bool sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_s
     return false;
 }
 
+static bool sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx)
+{
+    static const struct
+    {
+        const char *name;
+        D3DDECLUSAGE usage;
+    }
+    semantics[] =
+    {
+        {"binormal",        D3DDECLUSAGE_BINORMAL},
+        {"blendindices",    D3DDECLUSAGE_BLENDINDICES},
+        {"blendweight",     D3DDECLUSAGE_BLENDWEIGHT},
+        {"color",           D3DDECLUSAGE_COLOR},
+        {"depth",           D3DDECLUSAGE_DEPTH},
+        {"fog",             D3DDECLUSAGE_FOG},
+        {"normal",          D3DDECLUSAGE_NORMAL},
+        {"position",        D3DDECLUSAGE_POSITION},
+        {"positiont",       D3DDECLUSAGE_POSITIONT},
+        {"psize",           D3DDECLUSAGE_PSIZE},
+        {"sample",          D3DDECLUSAGE_SAMPLE},
+        {"sv_depth",        D3DDECLUSAGE_DEPTH},
+        {"sv_position",     D3DDECLUSAGE_POSITION},
+        {"sv_target",       D3DDECLUSAGE_COLOR},
+        {"tangent",         D3DDECLUSAGE_TANGENT},
+        {"tessfactor",      D3DDECLUSAGE_TESSFACTOR},
+        {"texcoord",        D3DDECLUSAGE_TEXCOORD},
+    };
+
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(semantics); ++i)
+    {
+        if (!ascii_strcasecmp(semantic->name, semantics[i].name))
+        {
+            *usage = semantics[i].usage;
+            *usage_idx = semantic->index;
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
 {
     assert(var->semantic.name);
@@ -1020,7 +1063,15 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     if (ctx->profile->major_version < 4)
     {
         D3DSHADER_PARAM_REGISTER_TYPE type;
-        unsigned int reg;
+        uint32_t reg, usage_idx;
+        D3DDECLUSAGE usage;
+
+        if (!sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
+        {
+            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                    "Invalid semantic '%s'.", var->semantic.name);
+            return;
+        }
 
         if (!sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg))
         {
@@ -1371,6 +1422,12 @@ static uint32_t sm1_encode_register_type(D3DSHADER_PARAM_REGISTER_TYPE type)
             | ((type << D3DSP_REGTYPE_SHIFT2) & D3DSP_REGTYPE_MASK2);
 }
 
+static uint32_t sm1_encode_dst(D3DSHADER_PARAM_REGISTER_TYPE type,
+        D3DSHADER_PARAM_DSTMOD_TYPE modifier, unsigned int writemask, unsigned int reg)
+{
+    return (1u << 31) | sm1_encode_register_type(type) | modifier | (writemask << 16) | reg;
+}
+
 static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
 {
     unsigned int i, x;
@@ -1393,6 +1450,60 @@ static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer
     }
 }
 
+static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        const struct hlsl_ir_var *var, bool output)
+{
+    D3DSHADER_PARAM_REGISTER_TYPE type;
+    uint32_t token, usage_idx, reg_idx;
+    D3DDECLUSAGE usage;
+    bool ret;
+
+    if (sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg_idx))
+    {
+        usage = 0;
+        usage_idx = 0;
+    }
+    else
+    {
+        ret = sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx);
+        assert(ret);
+        type = output ? D3DSPR_OUTPUT : D3DSPR_INPUT;
+        reg_idx = var->reg.id;
+    }
+
+    token = D3DSIO_DCL;
+    if (ctx->profile->major_version > 1)
+        token |= 2 << D3DSI_INSTLENGTH_SHIFT;
+    put_dword(buffer, token);
+
+    token = (1u << 31);
+    token |= usage << D3DSP_DCL_USAGE_SHIFT;
+    token |= usage_idx << D3DSP_DCL_USAGEINDEX_SHIFT;
+    put_dword(buffer, token);
+    put_dword(buffer, sm1_encode_dst(type, D3DSPDM_NONE, (1 << var->data_type->dimx) - 1, reg_idx));
+}
+
+static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
+{
+    bool write_in = false, write_out = false;
+    struct hlsl_ir_var *var;
+
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+        write_in = true;
+    else if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && ctx->profile->major_version == 3)
+        write_in = write_out = true;
+    else if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && ctx->profile->major_version < 3)
+        write_in = true;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (write_in && var->is_input_semantic)
+            write_sm1_semantic_dcl(ctx, buffer, var, false);
+        if (write_out && var->is_output_semantic)
+            write_sm1_semantic_dcl(ctx, buffer, var, true);
+    }
+}
+
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct vkd3d_shader_code *out)
 {
@@ -1404,6 +1515,7 @@ static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *
     write_sm1_uniforms(ctx, &buffer, entry_func);
 
     write_sm1_constant_defs(ctx, &buffer);
+    write_sm1_semantic_dcls(ctx, &buffer);
 
     put_dword(&buffer, D3DSIO_END);
 
