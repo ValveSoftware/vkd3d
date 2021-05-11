@@ -1423,6 +1423,10 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         {
             local = false;
 
+            if ((modifiers & HLSL_STORAGE_UNIFORM) && (modifiers & HLSL_STORAGE_STATIC))
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
+
             if ((func = hlsl_get_func_decl(ctx, var->name)))
             {
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
