@@ -763,6 +763,10 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     if (param->type->type == HLSL_CLASS_MATRIX)
         assert(param->type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
+    if ((param->modifiers & HLSL_STORAGE_OUT) && (param->modifiers & HLSL_STORAGE_UNIFORM))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
+
     if (!(var = hlsl_new_var(param->name, param->type, loc, &param->semantic, param->modifiers, param->reg_reservation)))
         return false;
     var->is_param = 1;
