@@ -1171,6 +1171,11 @@ static struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const
     struct hlsl_reg ret = {0};
     unsigned int offset = 0;
 
+    /* We should always have generated a cast to UINT. */
+    if (offset_node)
+        assert(offset_node->data_type->type == HLSL_CLASS_SCALAR
+                && offset_node->data_type->base_type == HLSL_TYPE_UINT);
+
     if (offset_node && offset_node->type != HLSL_IR_CONSTANT)
     {
         FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
