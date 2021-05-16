@@ -1073,7 +1073,13 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
             return;
         }
 
-        if (!sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg))
+        if (sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg))
+        {
+            TRACE("%s %s semantic %s[%u] matches predefined register %#x[%u].\n",
+                    ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL ? "Pixel" : "Vertex", output ? "output" : "input",
+                    var->semantic.name, var->semantic.index, type, reg);
+        }
+        else
         {
             var->reg.allocated = true;
             var->reg.id = (*counter)++;
