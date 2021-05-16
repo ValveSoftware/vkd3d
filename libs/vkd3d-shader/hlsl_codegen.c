@@ -1663,6 +1663,48 @@ static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct bytecode_buffer
     }
 }
 
+static void write_sm1_load(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_load *load = hlsl_ir_load(instr);
+    const struct hlsl_reg reg = hlsl_reg_from_deref(&load->src, instr->data_type);
+    struct sm1_instruction sm1_instr =
+    {
+        .opcode = D3DSIO_MOV,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.reg = instr->reg.id,
+        .dst.writemask = instr->reg.writemask,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].reg = reg.id,
+        .srcs[0].swizzle = swizzle_from_writemask(reg.writemask),
+        .src_count = 1,
+    };
+
+    assert(instr->reg.allocated);
+
+    if (load->src.var->is_uniform)
+    {
+        assert(reg.allocated);
+        sm1_instr.srcs[0].type = D3DSPR_CONST;
+    }
+    else if (load->src.var->is_input_semantic)
+    {
+        if (!sm1_register_from_semantic(ctx, &load->src.var->semantic,
+                false, &sm1_instr.srcs[0].type, &sm1_instr.srcs[0].reg))
+        {
+            assert(reg.allocated);
+            sm1_instr.srcs[0].type = D3DSPR_INPUT;
+            sm1_instr.srcs[0].reg = reg.id;
+        }
+        else
+            sm1_instr.srcs[0].swizzle = swizzle_from_writemask((1 << load->src.var->data_type->dimx) - 1);
+    }
+
+    write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
 static void write_sm1_store(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_store *store = hlsl_ir_store(instr);
@@ -1726,6 +1768,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer 
 
         switch (instr->type)
         {
+            case HLSL_IR_LOAD:
+                write_sm1_load(ctx, buffer, instr);
+                break;
+
             case HLSL_IR_STORE:
                 write_sm1_store(ctx, buffer, instr);
                 break;
