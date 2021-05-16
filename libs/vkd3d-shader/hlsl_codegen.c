@@ -1757,7 +1757,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     {
         if (var->data_type->type == HLSL_CLASS_OBJECT)
             list_add_tail(&ctx->extern_vars, &var->extern_entry);
-        else if (!(var->modifiers & HLSL_STORAGE_STATIC))
+        else if (var->modifiers & HLSL_STORAGE_UNIFORM)
             prepend_uniform_copy(ctx, entry_func->body, var);
     }
 

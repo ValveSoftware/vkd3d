@@ -1427,6 +1427,12 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
 
+            /* Mark it as uniform. We need to do this here since synthetic
+             * variables also get put in the global scope, but shouldn't be
+             * considered uniforms, and we have no way of telling otherwise. */
+            if (!(modifiers & HLSL_STORAGE_STATIC))
+                var->modifiers |= HLSL_STORAGE_UNIFORM;
+
             if ((func = hlsl_get_func_decl(ctx, var->name)))
             {
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
