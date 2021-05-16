@@ -1523,23 +1523,11 @@ static uint32_t sm1_encode_register_type(D3DSHADER_PARAM_REGISTER_TYPE type)
             | ((type << D3DSP_REGTYPE_SHIFT2) & D3DSP_REGTYPE_MASK2);
 }
 
-static uint32_t sm1_encode_dst(D3DSHADER_PARAM_REGISTER_TYPE type,
-        D3DSHADER_PARAM_DSTMOD_TYPE modifier, unsigned int writemask, unsigned int reg)
-{
-    return (1u << 31) | sm1_encode_register_type(type) | modifier | (writemask << 16) | reg;
-}
-
-static uint32_t sm1_encode_src(D3DSHADER_PARAM_REGISTER_TYPE type,
-        D3DSHADER_PARAM_SRCMOD_TYPE modifier, unsigned int swizzle, uint32_t reg)
-{
-    return (1u << 31) | sm1_encode_register_type(type) | modifier | (swizzle << 16) | reg;
-}
-
 struct sm1_instruction
 {
     D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode;
 
-    struct
+    struct sm1_dst_register
     {
         D3DSHADER_PARAM_REGISTER_TYPE type;
         D3DSHADER_PARAM_DSTMOD_TYPE mod;
@@ -1547,7 +1535,7 @@ struct sm1_instruction
         uint32_t reg;
     } dst;
 
-    struct
+    struct sm1_src_register
     {
         D3DSHADER_PARAM_REGISTER_TYPE type;
         D3DSHADER_PARAM_SRCMOD_TYPE mod;
@@ -1558,6 +1546,20 @@ struct sm1_instruction
 
     unsigned int has_dst;
 };
+
+static void write_sm1_dst_register(struct bytecode_buffer *buffer, const struct sm1_dst_register *reg)
+{
+    assert(reg->writemask);
+    put_dword(buffer, (1u << 31) | sm1_encode_register_type(reg->type) | reg->mod | (reg->writemask << 16) | reg->reg);
+}
+
+static void write_sm1_src_register(struct bytecode_buffer *buffer,
+        const struct sm1_src_register *reg, unsigned int dst_writemask)
+{
+    unsigned int swizzle = map_swizzle(reg->swizzle, dst_writemask);
+
+    put_dword(buffer, (1u << 31) | sm1_encode_register_type(reg->type) | reg->mod | (swizzle << 16) | reg->reg);
+}
 
 static void write_sm1_instruction(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
         const struct sm1_instruction *instr)
@@ -1570,14 +1572,10 @@ static void write_sm1_instruction(struct hlsl_ctx *ctx, struct bytecode_buffer *
     put_dword(buffer, token);
 
     if (instr->has_dst)
-    {
-        assert(instr->dst.writemask);
-        put_dword(buffer, sm1_encode_dst(instr->dst.type, instr->dst.mod, instr->dst.writemask, instr->dst.reg));
-    }
+        write_sm1_dst_register(buffer, &instr->dst);
 
     for (i = 0; i < instr->src_count; ++i)
-        put_dword(buffer, sm1_encode_src(instr->srcs[i].type, instr->srcs[i].mod,
-                map_swizzle(instr->srcs[i].swizzle, instr->dst.writemask), instr->srcs[i].reg));
+        write_sm1_src_register(buffer, &instr->srcs[i], instr->dst.writemask);
 };
 
 static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
@@ -1587,16 +1585,18 @@ static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer
     for (i = 0; i < ctx->constant_defs.count; ++i)
     {
         uint32_t token = D3DSIO_DEF;
+        const struct sm1_dst_register reg =
+        {
+            .type = D3DSPR_CONST,
+            .writemask = VKD3DSP_WRITEMASK_ALL,
+            .reg = i,
+        };
 
         if (ctx->profile->major_version > 1)
             token |= 5 << D3DSI_INSTLENGTH_SHIFT;
         put_dword(buffer, token);
 
-        token = (1u << 31);
-        token |= sm1_encode_register_type(D3DSPR_CONST);
-        token |= D3DSP_WRITEMASK_ALL;
-        token |= i;
-        put_dword(buffer, token);
+        write_sm1_dst_register(buffer, &reg);
         for (x = 0; x < 4; ++x)
             put_float(buffer, ctx->constant_defs.values[i].f[x]);
     }
@@ -1605,12 +1605,12 @@ static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer
 static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
         const struct hlsl_ir_var *var, bool output)
 {
-    D3DSHADER_PARAM_REGISTER_TYPE type;
-    uint32_t token, usage_idx, reg_idx;
+    struct sm1_dst_register reg = {0};
+    uint32_t token, usage_idx;
     D3DDECLUSAGE usage;
     bool ret;
 
-    if (sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg_idx))
+    if (sm1_register_from_semantic(ctx, &var->semantic, output, &reg.type, &reg.reg))
     {
         usage = 0;
         usage_idx = 0;
@@ -1619,8 +1619,8 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct bytecode_buffer 
     {
         ret = sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx);
         assert(ret);
-        type = output ? D3DSPR_OUTPUT : D3DSPR_INPUT;
-        reg_idx = var->reg.id;
+        reg.type = output ? D3DSPR_OUTPUT : D3DSPR_INPUT;
+        reg.reg = var->reg.id;
     }
 
     token = D3DSIO_DCL;
@@ -1632,7 +1632,9 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct bytecode_buffer 
     token |= usage << D3DSP_DCL_USAGE_SHIFT;
     token |= usage_idx << D3DSP_DCL_USAGEINDEX_SHIFT;
     put_dword(buffer, token);
-    put_dword(buffer, sm1_encode_dst(type, D3DSPDM_NONE, (1 << var->data_type->dimx) - 1, reg_idx));
+
+    reg.writemask = (1 << var->data_type->dimx) - 1;
+    write_sm1_dst_register(buffer, &reg);
 }
 
 static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
