@@ -1663,6 +1663,29 @@ static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct bytecode_buffer
     }
 }
 
+static void write_sm1_constant(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
+    struct sm1_instruction sm1_instr =
+    {
+        .opcode = D3DSIO_MOV,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.reg = instr->reg.id,
+        .dst.writemask = instr->reg.writemask,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_CONST,
+        .srcs[0].reg = constant->reg.id,
+        .srcs[0].swizzle = swizzle_from_writemask(constant->reg.writemask),
+        .src_count = 1,
+    };
+
+    assert(instr->reg.allocated);
+    assert(constant->reg.allocated);
+    write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
 static void write_sm1_load(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_load *load = hlsl_ir_load(instr);
@@ -1768,6 +1791,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer 
 
         switch (instr->type)
         {
+            case HLSL_IR_CONSTANT:
+                write_sm1_constant(ctx, buffer, instr);
+                break;
+
             case HLSL_IR_LOAD:
                 write_sm1_load(ctx, buffer, instr);
                 break;
