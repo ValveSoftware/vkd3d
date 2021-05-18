@@ -1594,6 +1594,30 @@ static void write_sm1_instruction(struct hlsl_ctx *ctx, struct bytecode_buffer *
         write_sm1_src_register(buffer, &instr->srcs[i], instr->dst.writemask);
 };
 
+static void write_sm1_binary_op(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
+        const struct hlsl_reg *src1, const struct hlsl_reg *src2)
+{
+    const struct sm1_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.writemask = dst->writemask,
+        .dst.reg = dst->id,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].swizzle = swizzle_from_writemask(src1->writemask),
+        .srcs[0].reg = src1->id,
+        .srcs[1].type = D3DSPR_TEMP,
+        .srcs[1].swizzle = swizzle_from_writemask(src2->writemask),
+        .srcs[1].reg = src2->id,
+        .src_count = 2,
+    };
+    write_sm1_instruction(ctx, buffer, &instr);
+}
+
 static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
 {
     unsigned int i, x;
@@ -1695,6 +1719,32 @@ static void write_sm1_constant(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
     assert(instr->reg.allocated);
     assert(constant->reg.allocated);
     write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
+static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
+    struct hlsl_ir_node *arg1 = expr->operands[0].node;
+    struct hlsl_ir_node *arg2 = expr->operands[1].node;
+
+    assert(instr->reg.allocated);
+
+    if (instr->data_type->base_type != HLSL_TYPE_FLOAT)
+    {
+        FIXME("Non-float operations need to be lowered.\n");
+        return;
+    }
+
+    switch (expr->op)
+    {
+        case HLSL_IR_BINOP_ADD:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_ADD, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
+        default:
+            FIXME("Unhandled op %u.\n", expr->op);
+            break;
+    }
 }
 
 static void write_sm1_load(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
@@ -1829,6 +1879,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer 
         {
             case HLSL_IR_CONSTANT:
                 write_sm1_constant(ctx, buffer, instr);
+                break;
+
+            case HLSL_IR_EXPR:
+                write_sm1_expr(ctx, buffer, instr);
                 break;
 
             case HLSL_IR_LOAD:
