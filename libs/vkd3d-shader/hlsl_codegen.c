@@ -1741,6 +1741,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
             write_sm1_binary_op(ctx, buffer, D3DSIO_ADD, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
+        case HLSL_IR_BINOP_MUL:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
         default:
             FIXME("Unhandled op %u.\n", expr->op);
             break;
