@@ -1159,6 +1159,17 @@ static unsigned int combine_writemasks(unsigned int first, unsigned int second)
     return ret;
 }
 
+static unsigned int combine_swizzles(unsigned int first, unsigned int second, unsigned int dim)
+{
+    unsigned int ret = 0, i;
+    for (i = 0; i < dim; ++i)
+    {
+        unsigned int s = (second >> (i * 2)) & 3;
+        ret |= ((first >> (s * 2)) & 3) << (i * 2);
+    }
+    return ret;
+}
+
 static bool type_is_single_reg(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
@@ -1771,6 +1782,31 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer
     write_sm1_instruction(ctx, buffer, &sm1_instr);
 }
 
+static void write_sm1_swizzle(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
+    const struct hlsl_ir_node *val = swizzle->val.node;
+    struct sm1_instruction sm1_instr =
+    {
+        .opcode = D3DSIO_MOV,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.reg = instr->reg.id,
+        .dst.writemask = instr->reg.writemask,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].reg = val->reg.id,
+        .srcs[0].swizzle = combine_swizzles(swizzle_from_writemask(val->reg.writemask),
+                swizzle->swizzle, instr->data_type->dimx),
+        .src_count = 1,
+    };
+
+    assert(instr->reg.allocated);
+    assert(val->reg.allocated);
+    write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
 static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
         const struct hlsl_ir_function_decl *entry_func)
 {
@@ -1801,6 +1837,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer 
 
             case HLSL_IR_STORE:
                 write_sm1_store(ctx, buffer, instr);
+                break;
+
+            case HLSL_IR_SWIZZLE:
+                write_sm1_swizzle(ctx, buffer, instr);
                 break;
 
             default:
