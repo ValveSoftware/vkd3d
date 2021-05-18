@@ -1618,6 +1618,28 @@ static void write_sm1_binary_op(struct hlsl_ctx *ctx, struct bytecode_buffer *bu
     write_sm1_instruction(ctx, buffer, &instr);
 }
 
+static void write_sm1_unary_op(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
+        D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
+        const struct hlsl_reg *src, D3DSHADER_PARAM_SRCMOD_TYPE src_mod)
+{
+    const struct sm1_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.writemask = dst->writemask,
+        .dst.reg = dst->id,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].swizzle = swizzle_from_writemask(src->writemask),
+        .srcs[0].reg = src->id,
+        .srcs[0].mod = src_mod,
+        .src_count = 1,
+    };
+    write_sm1_instruction(ctx, buffer, &instr);
+}
+
 static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer)
 {
     unsigned int i, x;
@@ -1743,6 +1765,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
 
         case HLSL_IR_BINOP_MUL:
             write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
+        case HLSL_IR_UNOP_NEG:
+            write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG);
             break;
 
         default:
