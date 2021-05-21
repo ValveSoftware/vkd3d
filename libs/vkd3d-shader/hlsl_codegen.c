@@ -42,14 +42,11 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     uniform->is_uniform = 1;
     uniform->is_param = temp->is_param;
 
-    if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
-    {
-        ctx->failed = true;
+    if (!(name = hlsl_get_string_buffer(ctx)))
         return;
-    }
     vkd3d_string_buffer_printf(name, "<temp-%s>", temp->name);
     temp->name = hlsl_strdup(ctx, name->buffer);
-    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    hlsl_release_string_buffer(ctx, name);
 
     if (!(load = hlsl_new_var_load(ctx, uniform, temp->loc)))
         return;
@@ -70,25 +67,22 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *input;
 
-    if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
-    {
-        ctx->failed = true;
+    if (!(name = hlsl_get_string_buffer(ctx)))
         return;
-    }
     vkd3d_string_buffer_printf(name, "<input-%s%u>", semantic->name, semantic->index);
     if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        hlsl_release_string_buffer(ctx, name);
         return;
     }
     new_semantic.index = semantic->index;
     if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        hlsl_release_string_buffer(ctx, name);
         vkd3d_free((void *)new_semantic.name);
         return;
     }
-    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    hlsl_release_string_buffer(ctx, name);
     input->is_input_semantic = 1;
     input->is_param = var->is_param;
     list_add_before(&var->scope_entry, &input->scope_entry);
@@ -144,25 +138,22 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_var *output;
     struct hlsl_ir_load *load;
 
-    if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
-    {
-        ctx->failed = true;
+    if (!(name = hlsl_get_string_buffer(ctx)))
         return;
-    }
     vkd3d_string_buffer_printf(name, "<output-%s%u>", semantic->name, semantic->index);
     if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        hlsl_release_string_buffer(ctx, name);
         return;
     }
     new_semantic.index = semantic->index;
     if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
         vkd3d_free((void *)new_semantic.name);
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        hlsl_release_string_buffer(ctx, name);
         return;
     }
-    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    hlsl_release_string_buffer(ctx, name);
     output->is_output_semantic = 1;
     output->is_param = var->is_param;
     list_add_before(&var->scope_entry, &output->scope_entry);
@@ -1422,7 +1413,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
             {
                 struct vkd3d_string_buffer *name;
 
-                if (!(name = vkd3d_string_buffer_get(&ctx->string_buffers)))
+                if (!(name = hlsl_get_string_buffer(ctx)))
                 {
                     buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
                     return;
@@ -1430,7 +1421,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
                 vkd3d_string_buffer_printf(name, "$%s", var->name);
                 vkd3d_free((char *)var->name);
                 var->name = hlsl_strdup(ctx, name->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, name);
+                hlsl_release_string_buffer(ctx, name);
             }
         }
     }

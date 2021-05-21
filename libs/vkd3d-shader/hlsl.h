@@ -567,6 +567,20 @@ static inline bool hlsl_array_reserve(struct hlsl_ctx *ctx, void **elements,
     return ret;
 }
 
+static inline struct vkd3d_string_buffer *hlsl_get_string_buffer(struct hlsl_ctx *ctx)
+{
+    struct vkd3d_string_buffer *ret = vkd3d_string_buffer_get(&ctx->string_buffers);
+
+    if (!ret)
+        ctx->failed = true;
+    return ret;
+}
+
+static inline void hlsl_release_string_buffer(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer)
+{
+    vkd3d_string_buffer_release(&ctx->string_buffers, buffer);
+}
+
 const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 const char *debug_hlsl_writemask(unsigned int writemask) DECLSPEC_HIDDEN;
 
