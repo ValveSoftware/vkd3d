@@ -388,6 +388,27 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     return true;
 }
 
+/* Lower DIV to RCP + MUL. */
+static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *rcp;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_IR_BINOP_DIV)
+        return false;
+
+    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_IR_UNOP_RCP, expr->operands[1].node, instr->loc)))
+        return false;
+    list_add_before(&expr->node.entry, &rcp->entry);
+    expr->op = HLSL_IR_BINOP_MUL;
+    hlsl_src_remove(&expr->operands[1]);
+    hlsl_src_from_node(&expr->operands[1], rcp);
+    return true;
+}
+
 static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
@@ -1953,6 +1974,9 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
     while (transform_ir(ctx, split_struct_copies, entry_func->body, NULL));
     while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
+
+    if (ctx->profile->major_version < 4)
+        transform_ir(ctx, lower_division, entry_func->body, NULL);
 
     do
         compute_liveness(ctx, entry_func);
