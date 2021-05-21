@@ -170,7 +170,7 @@ row_major               {return KW_ROW_MAJOR;           }
 {IDENTIFIER}            {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
-                            yylval->name = vkd3d_strdup(yytext);
+                            yylval->name = hlsl_strdup(ctx, yytext);
                             if (hlsl_get_var(ctx->cur_scope, yytext) || hlsl_get_function(ctx, yytext))
                                 return VAR_IDENTIFIER;
                             else if (hlsl_get_type(ctx->cur_scope, yytext, true))
@@ -248,7 +248,8 @@ row_major               {return KW_ROW_MAJOR;           }
                             return PRE_LINE;
                         }
 <pp_line>{STRING}       {
-                            char *string = vkd3d_strdup(yytext + 1);
+                            struct hlsl_ctx *ctx = yyget_extra(yyscanner);
+                            char *string = hlsl_strdup(ctx, yytext + 1);
 
                             BEGIN(pp_ignore);
                             string[strlen(string) - 1] = 0;

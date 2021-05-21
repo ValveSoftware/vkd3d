@@ -35,11 +35,8 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     /* Use the synthetic name for the temp, rather than the uniform, so that we
      * can write the uniform name into the shader reflection data. */
 
-    if (!(uniform = hlsl_new_var(temp->name, temp->data_type, temp->loc, NULL, 0, temp->reg_reservation)))
-    {
-        ctx->failed = true;
+    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type, temp->loc, NULL, 0, temp->reg_reservation)))
         return;
-    }
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
     uniform->is_uniform = 1;
@@ -51,21 +48,15 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
         return;
     }
     vkd3d_string_buffer_printf(name, "<temp-%s>", temp->name);
-    temp->name = vkd3d_strdup(name->buffer);
+    temp->name = hlsl_strdup(ctx, name->buffer);
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
 
-    if (!(load = hlsl_new_var_load(uniform, temp->loc)))
-    {
-        ctx->failed = true;
+    if (!(load = hlsl_new_var_load(ctx, uniform, temp->loc)))
         return;
-    }
     list_add_head(instrs, &load->node.entry);
 
-    if (!(store = hlsl_new_simple_store(temp, &load->node)))
-    {
-        ctx->failed = true;
+    if (!(store = hlsl_new_simple_store(ctx, temp, &load->node)))
         return;
-    }
     list_add_after(&load->node.entry, &store->node.entry);
 }
 
@@ -85,18 +76,16 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     vkd3d_string_buffer_printf(name, "<input-%s%u>", semantic->name, semantic->index);
-    if (!(new_semantic.name = vkd3d_strdup(semantic->name)))
+    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        ctx->failed = true;
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(input = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
         vkd3d_free((void *)new_semantic.name);
-        ctx->failed = true;
         return;
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
@@ -105,25 +94,16 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     list_add_before(&var->scope_entry, &input->scope_entry);
     list_add_tail(&ctx->extern_vars, &input->extern_entry);
 
-    if (!(load = hlsl_new_var_load(input, var->loc)))
-    {
-        ctx->failed = true;
+    if (!(load = hlsl_new_var_load(ctx, input, var->loc)))
         return;
-    }
     list_add_head(instrs, &load->node.entry);
 
     if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
-    {
-        ctx->failed = true;
         return;
-    }
     list_add_after(&load->node.entry, &offset->node.entry);
 
-    if (!(store = hlsl_new_store(var, &offset->node, &load->node, 0, var->loc)))
-    {
-        ctx->failed = true;
+    if (!(store = hlsl_new_store(ctx, var, &offset->node, &load->node, 0, var->loc)))
         return;
-    }
     list_add_after(&offset->node.entry, &store->node.entry);
 }
 
@@ -170,18 +150,16 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     vkd3d_string_buffer_printf(name, "<output-%s%u>", semantic->name, semantic->index);
-    if (!(new_semantic.name = vkd3d_strdup(semantic->name)))
+    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        ctx->failed = true;
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(output = hlsl_new_var(vkd3d_strdup(name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
     {
         vkd3d_free((void *)new_semantic.name);
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        ctx->failed = true;
         return;
     }
     vkd3d_string_buffer_release(&ctx->string_buffers, name);
@@ -191,24 +169,15 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     list_add_tail(&ctx->extern_vars, &output->extern_entry);
 
     if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
-    {
-        ctx->failed = true;
         return;
-    }
     list_add_tail(instrs, &offset->node.entry);
 
-    if (!(load = hlsl_new_load(var, &offset->node, type, var->loc)))
-    {
-        ctx->failed = true;
+    if (!(load = hlsl_new_load(ctx, var, &offset->node, type, var->loc)))
         return;
-    }
     list_add_after(&offset->node.entry, &load->node.entry);
 
-    if (!(store = hlsl_new_store(output, NULL, &load->node, 0, var->loc)))
-    {
-        ctx->failed = true;
+    if (!(store = hlsl_new_store(ctx, output, NULL, &load->node, 0, var->loc)))
         return;
-    }
     list_add_after(&load->node.entry, &store->node.entry);
 }
 
@@ -331,47 +300,32 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         struct hlsl_ir_constant *c;
 
         if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset * 4, instr->loc)))
-        {
-            ctx->failed = true;
             return false;
-        }
         list_add_before(&instr->entry, &c->node.entry);
 
         offset = &c->node;
         if (rhs_load->src.offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, rhs_load->src.offset.node, &c->node)))
-            {
-                ctx->failed = true;
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, rhs_load->src.offset.node, &c->node)))
                 return false;
-            }
             list_add_before(&instr->entry, &add->entry);
             offset = add;
         }
-        if (!(field_load = hlsl_new_load(rhs_load->src.var, offset, field->type, instr->loc)))
-        {
-            ctx->failed = true;
+        if (!(field_load = hlsl_new_load(ctx, rhs_load->src.var, offset, field->type, instr->loc)))
             return false;
-        }
         list_add_before(&instr->entry, &field_load->node.entry);
 
         offset = &c->node;
         if (store->lhs.offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, store->lhs.offset.node, &c->node)))
-            {
-                ctx->failed = true;
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, store->lhs.offset.node, &c->node)))
                 return false;
-            }
             list_add_before(&instr->entry, &add->entry);
             offset = add;
         }
 
-        if (!(field_store = hlsl_new_store(store->lhs.var, offset, &field_load->node, 0, instr->loc)))
-        {
-            ctx->failed = true;
+        if (!(field_store = hlsl_new_store(ctx, store->lhs.var, offset, &field_load->node, 0, instr->loc)))
             return false;
-        }
         list_add_before(&instr->entry, &field_store->node.entry);
     }
 
@@ -402,11 +356,8 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     if (expr->operands[1].node)
         arg2 = hlsl_ir_constant(expr->operands[1].node);
 
-    if (!(res = vkd3d_calloc(1, sizeof(*res))))
-    {
-        ctx->failed = true;
+    if (!(res = hlsl_alloc(ctx, sizeof(*res))))
         return false;
-    }
     init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
 
     switch (instr->data_type->base_type)
@@ -657,11 +608,11 @@ static unsigned int get_available_writemask(struct liveness *liveness,
     return 0;
 }
 
-static bool resize_liveness(struct liveness *liveness, size_t new_count)
+static bool resize_liveness(struct hlsl_ctx *ctx, struct liveness *liveness, size_t new_count)
 {
     size_t old_capacity = liveness->size;
 
-    if (!vkd3d_array_reserve((void **)&liveness->regs, &liveness->size, new_count, sizeof(*liveness->regs)))
+    if (!hlsl_array_reserve(ctx, (void **)&liveness->regs, &liveness->size, new_count, sizeof(*liveness->regs)))
         return false;
 
     if (liveness->size > old_capacity)
@@ -669,7 +620,7 @@ static bool resize_liveness(struct liveness *liveness, size_t new_count)
     return true;
 }
 
-static struct hlsl_reg allocate_register(struct liveness *liveness,
+static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *liveness,
         unsigned int first_write, unsigned int last_read, unsigned int component_count)
 {
     unsigned int component_idx, writemask, i;
@@ -682,7 +633,7 @@ static struct hlsl_reg allocate_register(struct liveness *liveness,
     }
     if (component_idx == liveness->size)
     {
-        if (!resize_liveness(liveness, component_idx + 4))
+        if (!resize_liveness(ctx, liveness, component_idx + 4))
             return ret;
         writemask = (1u << component_count) - 1;
     }
@@ -710,7 +661,7 @@ static bool is_range_available(struct liveness *liveness, unsigned int first_wri
     return true;
 }
 
-static struct hlsl_reg allocate_range(struct liveness *liveness,
+static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liveness,
         unsigned int first_write, unsigned int last_read, unsigned int reg_count)
 {
     const unsigned int component_count = reg_count * 4;
@@ -723,7 +674,7 @@ static struct hlsl_reg allocate_range(struct liveness *liveness,
                 min(component_count, liveness->size - component_idx)))
             break;
     }
-    if (!resize_liveness(liveness, component_idx + component_count))
+    if (!resize_liveness(ctx, liveness, component_idx + component_count))
         return ret;
 
     for (i = 0; i < component_count; ++i)
@@ -741,7 +692,7 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 
-static void allocate_variable_temp_register(struct hlsl_ir_var *var, struct liveness *liveness)
+static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct liveness *liveness)
 {
     if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
         return;
@@ -749,17 +700,17 @@ static void allocate_variable_temp_register(struct hlsl_ir_var *var, struct live
     if (!var->reg.allocated && var->last_read)
     {
         if (var->data_type->reg_size > 1)
-            var->reg = allocate_range(liveness, var->first_write,
+            var->reg = allocate_range(ctx, liveness, var->first_write,
                     var->last_read, var->data_type->reg_size);
         else
-            var->reg = allocate_register(liveness, var->first_write,
+            var->reg = allocate_register(ctx, liveness, var->first_write,
                     var->last_read, var->data_type->dimx);
         TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
                 debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
     }
 }
 
-static void allocate_temp_registers_recurse(struct list *instrs, struct liveness *liveness)
+static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct liveness *liveness)
 {
     struct hlsl_ir_node *instr;
 
@@ -768,10 +719,10 @@ static void allocate_temp_registers_recurse(struct list *instrs, struct liveness
         if (!instr->reg.allocated && instr->last_read)
         {
             if (instr->data_type->reg_size > 1)
-                instr->reg = allocate_range(liveness, instr->index,
+                instr->reg = allocate_range(ctx, liveness, instr->index,
                         instr->last_read, instr->data_type->reg_size);
             else
-                instr->reg = allocate_register(liveness, instr->index,
+                instr->reg = allocate_register(ctx, liveness, instr->index,
                         instr->last_read, instr->data_type->dimx);
             TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
                     debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
@@ -782,8 +733,8 @@ static void allocate_temp_registers_recurse(struct list *instrs, struct liveness
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_temp_registers_recurse(&iff->then_instrs, liveness);
-                allocate_temp_registers_recurse(&iff->else_instrs, liveness);
+                allocate_temp_registers_recurse(ctx, &iff->then_instrs, liveness);
+                allocate_temp_registers_recurse(ctx, &iff->else_instrs, liveness);
                 break;
             }
 
@@ -792,21 +743,21 @@ static void allocate_temp_registers_recurse(struct list *instrs, struct liveness
                 struct hlsl_ir_load *load = hlsl_ir_load(instr);
                 /* We need to at least allocate a variable for undefs.
                  * FIXME: We should probably find a way to remove them instead. */
-                allocate_variable_temp_register(load->src.var, liveness);
+                allocate_variable_temp_register(ctx, load->src.var, liveness);
                 break;
             }
 
             case HLSL_IR_LOOP:
             {
                 struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
-                allocate_temp_registers_recurse(&loop->body, liveness);
+                allocate_temp_registers_recurse(ctx, &loop->body, liveness);
                 break;
             }
 
             case HLSL_IR_STORE:
             {
                 struct hlsl_ir_store *store = hlsl_ir_store(instr);
-                allocate_variable_temp_register(store->lhs.var, liveness);
+                allocate_variable_temp_register(ctx, store->lhs.var, liveness);
                 break;
             }
 
@@ -833,17 +784,14 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *
                 unsigned int x, y, i, writemask;
 
                 if (reg_size > 1)
-                    constant->reg = allocate_range(liveness, 1, UINT_MAX, reg_size);
+                    constant->reg = allocate_range(ctx, liveness, 1, UINT_MAX, reg_size);
                 else
-                    constant->reg = allocate_register(liveness, 1, UINT_MAX, type->dimx);
+                    constant->reg = allocate_register(ctx, liveness, 1, UINT_MAX, type->dimx);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
-                if (!vkd3d_array_reserve((void **)&defs->values, &defs->size,
+                if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
                         constant->reg.id + reg_size, sizeof(*defs->values)))
-                {
-                    ctx->failed = true;
                     return;
-                }
                 defs->count = max(defs->count, constant->reg.id + reg_size);
 
                 assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
@@ -927,10 +875,10 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
         if (var->is_uniform && var->last_read)
         {
             if (var->data_type->reg_size > 1)
-                var->reg = allocate_range(&liveness, 1, UINT_MAX, var->data_type->reg_size);
+                var->reg = allocate_range(ctx, &liveness, 1, UINT_MAX, var->data_type->reg_size);
             else
             {
-                var->reg = allocate_register(&liveness, 1, UINT_MAX, 4);
+                var->reg = allocate_register(ctx, &liveness, 1, UINT_MAX, 4);
                 var->reg.writemask = (1u << var->data_type->dimx) - 1;
             }
             TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
@@ -942,10 +890,10 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
  * index to all (simultaneously live) variables or intermediate values. Agnostic
  * as to how many registers are actually available for the current backend, and
  * does not handle constants. */
-static void allocate_temp_registers(struct hlsl_ir_function_decl *entry_func)
+static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct liveness liveness = {0};
-    allocate_temp_registers_recurse(entry_func->body, &liveness);
+    allocate_temp_registers_recurse(ctx, entry_func->body, &liveness);
 }
 
 static bool sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic, bool output,
@@ -1216,6 +1164,7 @@ static struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const
 
 struct bytecode_buffer
 {
+    struct hlsl_ctx *ctx;
     uint32_t *data;
     size_t count, size;
     int status;
@@ -1229,7 +1178,8 @@ static unsigned int put_dword(struct bytecode_buffer *buffer, uint32_t value)
     if (buffer->status)
         return index;
 
-    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + 1, sizeof(*buffer->data)))
+    if (!hlsl_array_reserve(buffer->ctx, (void **)&buffer->data, &buffer->size,
+            buffer->count + 1, sizeof(*buffer->data)))
     {
         buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
         return index;
@@ -1270,7 +1220,8 @@ static unsigned int put_string(struct bytecode_buffer *buffer, const char *str)
     if (buffer->status)
         return index;
 
-    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->size, buffer->count + token_count, sizeof(*buffer->data)))
+    if (!hlsl_array_reserve(buffer->ctx, (void **)&buffer->data, &buffer->size,
+            buffer->count + token_count, sizeof(*buffer->data)))
     {
         buffer->status = E_OUTOFMEMORY;
         return index;
@@ -1478,7 +1429,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
                 }
                 vkd3d_string_buffer_printf(name, "$%s", var->name);
                 vkd3d_free((char *)var->name);
-                var->name = vkd3d_strdup(name->buffer);
+                var->name = hlsl_strdup(ctx, name->buffer);
                 vkd3d_string_buffer_release(&ctx->string_buffers, name);
             }
         }
@@ -1936,7 +1887,7 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct bytecode_buffer 
 static int write_sm1_shader(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct vkd3d_shader_code *out)
 {
-    struct bytecode_buffer buffer = {0};
+    struct bytecode_buffer buffer = {.ctx = ctx};
     int ret;
 
     put_dword(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
@@ -2018,7 +1969,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, NULL);
 
-    allocate_temp_registers(entry_func);
+    allocate_temp_registers(ctx, entry_func);
     if (ctx->profile->major_version < 4)
         allocate_const_registers(ctx, entry_func);
     allocate_semantic_registers(ctx);

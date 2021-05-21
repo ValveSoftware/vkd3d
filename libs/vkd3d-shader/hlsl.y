@@ -127,11 +127,11 @@ static struct hlsl_ir_node *node_from_list(struct list *list)
     return LIST_ENTRY(list_tail(list), struct hlsl_ir_node, entry);
 }
 
-static struct list *make_empty_list(void)
+static struct list *make_empty_list(struct hlsl_ctx *ctx)
 {
     struct list *list;
 
-    if ((list = vkd3d_malloc(sizeof(*list))))
+    if ((list = hlsl_alloc(ctx, sizeof(*list))))
         list_init(list);
     return list;
 }
@@ -286,7 +286,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
         hlsl_warning(ctx, *loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
                 src_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
-    if (!(cast = hlsl_new_cast(node, dst_type, loc)))
+    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
         return NULL;
     list_add_tail(instrs, &cast->node.entry);
     return &cast->node;
@@ -313,7 +313,7 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
     return modifiers | mod;
 }
 
-static bool append_conditional_break(struct list *cond_list)
+static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_list)
 {
     struct hlsl_ir_node *condition, *not;
     struct hlsl_ir_jump *jump;
@@ -324,15 +324,15 @@ static bool append_conditional_break(struct list *cond_list)
         return true;
 
     condition = node_from_list(cond_list);
-    if (!(not = hlsl_new_unary_expr(HLSL_IR_UNOP_LOGIC_NOT, condition, condition->loc)))
+    if (!(not = hlsl_new_unary_expr(ctx, HLSL_IR_UNOP_LOGIC_NOT, condition, condition->loc)))
         return false;
     list_add_tail(cond_list, &not->entry);
 
-    if (!(iff = hlsl_new_if(not, condition->loc)))
+    if (!(iff = hlsl_new_if(ctx, not, condition->loc)))
         return false;
     list_add_tail(cond_list, &iff->node.entry);
 
-    if (!(jump = hlsl_new_jump(HLSL_IR_JUMP_BREAK, condition->loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, condition->loc)))
         return false;
     list_add_head(&iff->then_instrs, &jump->node.entry);
     return true;
@@ -345,24 +345,24 @@ enum loop_type
     LOOP_DO_WHILE
 };
 
-static struct list *create_loop(enum loop_type type, struct list *init, struct list *cond,
+static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struct list *init, struct list *cond,
         struct list *iter, struct list *body, struct vkd3d_shader_location loc)
 {
     struct list *list = NULL;
     struct hlsl_ir_loop *loop = NULL;
     struct hlsl_ir_if *cond_jump = NULL;
 
-    if (!(list = make_empty_list()))
+    if (!(list = make_empty_list(ctx)))
         goto oom;
 
     if (init)
         list_move_head(list, init);
 
-    if (!(loop = hlsl_new_loop(loc)))
+    if (!(loop = hlsl_new_loop(ctx, loc)))
         goto oom;
     list_add_tail(list, &loop->node.entry);
 
-    if (!append_conditional_break(cond))
+    if (!append_conditional_break(ctx, cond))
         goto oom;
 
     if (type != LOOP_DO_WHILE)
@@ -504,7 +504,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
         if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, &loc)))
             return NULL;
 
-        if (!(store = hlsl_new_simple_store(ctx->cur_function->return_var, return_value)))
+        if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
             return NULL;
         list_add_after(&return_value->entry, &store->node.entry);
     }
@@ -514,7 +514,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
         return NULL;
     }
 
-    if (!(jump = hlsl_new_jump(HLSL_IR_JUMP_RETURN, loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, loc)))
         return NULL;
     list_add_tail(instrs, &jump->node.entry);
 
@@ -535,7 +535,7 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
         var = src->var;
         if (src->offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(HLSL_IR_BINOP_ADD, src->offset.node, offset)))
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, src->offset.node, offset)))
                 return NULL;
             list_add_tail(instrs, &add->entry);
             offset = add;
@@ -550,13 +550,13 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
         if (!(var = hlsl_new_synthetic_var(ctx, name, var_node->data_type, var_node->loc)))
             return NULL;
 
-        if (!(store = hlsl_new_simple_store(var, var_node)))
+        if (!(store = hlsl_new_simple_store(ctx, var, var_node)))
             return NULL;
 
         list_add_tail(instrs, &store->node.entry);
     }
 
-    if (!(load = hlsl_new_load(var, offset, data_type, loc)))
+    if (!(load = hlsl_new_load(ctx, var, offset, data_type, loc)))
         return NULL;
     list_add_tail(instrs, &load->node.entry);
     return load;
@@ -604,7 +604,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size * 4, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
-    if (!(mul = hlsl_new_binary_expr(HLSL_IR_BINOP_MUL, index, &c->node)))
+    if (!(mul = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_MUL, index, &c->node)))
         return NULL;
     list_add_tail(instrs, &mul->entry);
     index = mul;
@@ -676,13 +676,13 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
     if (type->type == HLSL_CLASS_MATRIX)
         assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(list = make_empty_list()))
+    if (!(list = make_empty_list(ctx)))
         return NULL;
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, fields, struct parse_variable_def, entry)
     {
         unsigned int i;
 
-        if (!(field = vkd3d_calloc(1, sizeof(*field))))
+        if (!(field = hlsl_alloc(ctx, sizeof(*field))))
         {
             vkd3d_free(v);
             return list;
@@ -767,7 +767,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
 
-    if (!(var = hlsl_new_var(param->name, param->type, loc, &param->semantic, param->modifiers, param->reg_reservation)))
+    if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers, param->reg_reservation)))
         return false;
     var->is_param = 1;
 
@@ -780,7 +780,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     return true;
 }
 
-static struct hlsl_reg_reservation *parse_reg_reservation(const char *reg_string)
+static struct hlsl_reg_reservation *parse_reg_reservation(struct hlsl_ctx *ctx, const char *reg_string)
 {
     enum vkd3d_shader_register_type type;
     struct hlsl_reg_reservation *reg_res;
@@ -811,7 +811,7 @@ static struct hlsl_reg_reservation *parse_reg_reservation(const char *reg_string
         return NULL;
     }
 
-    if (!(reg_res = vkd3d_malloc(sizeof(*reg_res))))
+    if (!(reg_res = hlsl_alloc(ctx, sizeof(*reg_res))))
         return NULL;
     reg_res->type = type;
     reg_res->regnum = regnum;
@@ -841,11 +841,11 @@ static const struct hlsl_ir_function_decl *get_overloaded_func(struct rb_tree *f
     return NULL;
 }
 
-static struct list *make_list(struct hlsl_ir_node *node)
+static struct list *make_list(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
 {
     struct list *list;
 
-    if (!(list = make_empty_list()))
+    if (!(list = make_empty_list(ctx)))
     {
         hlsl_free_instr(node);
         return NULL;
@@ -1112,13 +1112,13 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
                     "Implicit truncation of %s type.",
                     operands[i]->data_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
-        if (!(cast = hlsl_new_cast(operands[i], type, &operands[i]->loc)))
+        if (!(cast = hlsl_new_cast(ctx, operands[i], type, &operands[i]->loc)))
             return NULL;
         list_add_after(&operands[i]->entry, &cast->node.entry);
         operands[i] = &cast->node;
     }
 
-    if (!(expr = vkd3d_calloc(1, sizeof(*expr))))
+    if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;
     init_node(&expr->node, HLSL_IR_EXPR, type, *loc);
     expr->op = op;
@@ -1229,7 +1229,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             return NULL;
     }
 
-    if (!(store = vkd3d_malloc(sizeof(*store))))
+    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
 
     while (lhs->type != HLSL_IR_LOAD)
@@ -1283,7 +1283,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     /* Don't use the instruction itself as a source, as this makes structure
      * splitting easier. Instead copy it here. Since we retrieve sources from
      * the last instruction in the list, we do need to copy. */
-    if (!(copy = hlsl_new_copy(rhs)))
+    if (!(copy = hlsl_new_copy(ctx, rhs)))
         return NULL;
     list_add_tail(instrs, &copy->node.entry);
     return &copy->node;
@@ -1310,7 +1310,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     {
         struct hlsl_ir_expr *copy;
 
-        if (!(copy = hlsl_new_copy(lhs)))
+        if (!(copy = hlsl_new_copy(ctx, lhs)))
             return false;
         list_add_tail(instrs, &copy->node.entry);
 
@@ -1357,7 +1357,7 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
                 break;
             list_add_tail(list, &c->node.entry);
 
-            if (!(store = hlsl_new_store(var, &c->node, node, 0, node->loc)))
+            if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, node->loc)))
                 break;
             list_add_tail(list, &store->node.entry);
         }
@@ -1391,7 +1391,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     if (basic_type->type == HLSL_CLASS_MATRIX)
         assert(basic_type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(statements_list = make_empty_list()))
+    if (!(statements_list = make_empty_list(ctx)))
     {
         LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
             free_parse_variable_def(v);
@@ -1413,7 +1413,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
 
-        if (!(var = hlsl_new_var(v->name, type, v->loc, &v->semantic, modifiers, v->reg_reservation)))
+        if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
@@ -1538,7 +1538,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 continue;
             }
 
-            load = hlsl_new_var_load(var, var->loc);
+            load = hlsl_new_var_load(ctx, var, var->loc);
             list_add_tail(v->initializer.instrs, &load->node.entry);
             add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
             vkd3d_free(v->initializer.args);
@@ -1800,7 +1800,7 @@ hlsl_prog:
                 }
             }
 
-            hlsl_add_function(&ctx->functions, $2.name, $2.decl, false);
+            hlsl_add_function(ctx, $2.name, $2.decl, false);
         }
     | hlsl_prog declaration_statement
         {
@@ -1893,7 +1893,7 @@ any_identifier:
 fields_list:
       %empty
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
     | fields_list field
@@ -1996,7 +1996,7 @@ func_prototype:
 compound_statement:
       '{' '}'
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
     | '{' scope_start statement_list '}'
@@ -2048,7 +2048,7 @@ semantic:
 register_opt:
       ':' KW_REGISTER '(' any_identifier ')'
         {
-            $$ = parse_reg_reservation($4);
+            $$ = parse_reg_reservation(ctx, $4);
             vkd3d_free($4);
         }
     | ':' KW_REGISTER '(' any_identifier ',' any_identifier ')'
@@ -2056,14 +2056,14 @@ register_opt:
             FIXME("Ignoring shader target %s in a register reservation.\n", debugstr_a($4));
             vkd3d_free($4);
 
-            $$ = parse_reg_reservation($6);
+            $$ = parse_reg_reservation(ctx, $6);
             vkd3d_free($6);
         }
 
 parameters:
       scope_start
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
     | scope_start param_list
@@ -2074,12 +2074,11 @@ parameters:
 param_list:
       parameter
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
             if (!add_func_parameter(ctx, $$, &$1, @1))
             {
                 ERR("Error adding function parameter %s.\n", $1.name);
-                ctx->failed = true;
                 YYABORT;
             }
         }
@@ -2244,7 +2243,7 @@ declaration_statement:
     | struct_declaration
     | typedef
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
 
@@ -2272,7 +2271,7 @@ typedef:
 type_specs:
       type_spec
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
             list_add_head($$, &$1->entry);
         }
@@ -2285,7 +2284,7 @@ type_specs:
 type_spec:
       any_identifier arrays
         {
-            $$ = vkd3d_calloc(1, sizeof(*$$));
+            $$ = hlsl_alloc(ctx, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
             $$->arrays = $2;
@@ -2312,7 +2311,7 @@ variables_def_optional:
 variables_def:
       variable_def
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
             list_add_head($$, &$1->entry);
         }
@@ -2325,7 +2324,7 @@ variables_def:
 variable_def:
       any_identifier arrays colon_attribute
         {
-            $$ = vkd3d_calloc(1, sizeof(*$$));
+            $$ = hlsl_alloc(ctx, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
             $$->arrays = $2;
@@ -2334,7 +2333,7 @@ variable_def:
         }
     | any_identifier arrays colon_attribute '=' complex_initializer
         {
-            $$ = vkd3d_calloc(1, sizeof(*$$));
+            $$ = hlsl_alloc(ctx, sizeof(*$$));
             $$->loc = @1;
             $$->name = $1;
             $$->arrays = $2;
@@ -2437,7 +2436,7 @@ complex_initializer:
       initializer_expr
         {
             $$.args_count = 1;
-            if (!($$.args = vkd3d_malloc(sizeof(*$$.args))))
+            if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
                 YYABORT;
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
@@ -2458,7 +2457,7 @@ initializer_expr_list:
       initializer_expr
         {
             $$.args_count = 1;
-            if (!($$.args = vkd3d_malloc(sizeof(*$$.args))))
+            if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
                 YYABORT;
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
@@ -2509,7 +2508,7 @@ jump_statement:
         }
     | KW_RETURN ';'
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
             if (!add_return(ctx, $$, NULL, @1))
                 YYABORT;
@@ -2521,7 +2520,7 @@ selection_statement:
             struct hlsl_ir_node *condition = node_from_list($3);
             struct hlsl_ir_if *instr;
 
-            if (!(instr = hlsl_new_if(condition, @1)))
+            if (!(instr = hlsl_new_if(ctx, condition, @1)))
                 YYABORT;
             list_move_tail(&instr->then_instrs, $5.then_instrs);
             list_move_tail(&instr->else_instrs, $5.else_instrs);
@@ -2555,27 +2554,27 @@ if_body:
 loop_statement:
       KW_WHILE '(' expr ')' statement
         {
-            $$ = create_loop(LOOP_WHILE, NULL, $3, NULL, $5, @1);
+            $$ = create_loop(ctx, LOOP_WHILE, NULL, $3, NULL, $5, @1);
         }
     | KW_DO statement KW_WHILE '(' expr ')' ';'
         {
-            $$ = create_loop(LOOP_DO_WHILE, NULL, $5, NULL, $2, @1);
+            $$ = create_loop(ctx, LOOP_DO_WHILE, NULL, $5, NULL, $2, @1);
         }
     | KW_FOR '(' scope_start expr_statement expr_statement expr ')' statement
         {
-            $$ = create_loop(LOOP_FOR, $4, $5, $6, $8, @1);
+            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
             hlsl_pop_scope(ctx);
         }
     | KW_FOR '(' scope_start declaration expr_statement expr ')' statement
         {
-            $$ = create_loop(LOOP_FOR, $4, $5, $6, $8, @1);
+            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
             hlsl_pop_scope(ctx);
         }
 
 expr_statement:
       ';'
         {
-            if (!($$ = make_empty_list()))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
     | expr ';'
@@ -2588,33 +2587,33 @@ primary_expr:
         {
             struct hlsl_ir_constant *c;
 
-            if (!(c = vkd3d_malloc(sizeof(*c))))
+            if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_FLOAT], @1);
             c->value.f[0] = $1;
-            if (!($$ = make_list(&c->node)))
+            if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
     | C_INTEGER
         {
             struct hlsl_ir_constant *c;
 
-            if (!(c = vkd3d_malloc(sizeof(*c))))
+            if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_INT], @1);
             c->value.i[0] = $1;
-            if (!($$ = make_list(&c->node)))
+            if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
     | boolean
         {
             struct hlsl_ir_constant *c;
 
-            if (!(c = vkd3d_malloc(sizeof(*c))))
+            if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], @1);
             c->value.b[0] = $1;
-            if (!($$ = make_list(&c->node)))
+            if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
     | VAR_IDENTIFIER
@@ -2627,9 +2626,9 @@ primary_expr:
                 hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Variable \"%s\" is not defined.", $1);
                 YYABORT;
             }
-            if ((load = hlsl_new_var_load(var, @1)))
+            if ((load = hlsl_new_var_load(ctx, var, @1)))
             {
-                if (!($$ = make_list(&load->node)))
+                if (!($$ = make_list(ctx, &load->node)))
                     YYABORT;
             }
             else
@@ -2711,7 +2710,7 @@ postfix_expr:
                 YYABORT;
             }
 
-            if (!(cast = hlsl_new_cast(index, ctx->builtin_types.scalar[HLSL_TYPE_UINT], &index->loc)))
+            if (!(cast = hlsl_new_cast(ctx, index, ctx->builtin_types.scalar[HLSL_TYPE_UINT], &index->loc)))
             {
                 hlsl_free_instr_list($1);
                 YYABORT;
@@ -2793,14 +2792,14 @@ postfix_expr:
                         ctx->builtin_types.vector[$2->base_type][width - 1], &arg->loc)))
                     continue;
 
-                if (!(store = hlsl_new_store(var, NULL, arg,
+                if (!(store = hlsl_new_store(ctx, var, NULL, arg,
                         ((1 << width) - 1) << writemask_offset, arg->loc)))
                     YYABORT;
                 writemask_offset += width;
                 list_add_tail($4.instrs, &store->node.entry);
             }
             vkd3d_free($4.args);
-            if (!(load = hlsl_new_var_load(var, @2)))
+            if (!(load = hlsl_new_var_load(ctx, var, @2)))
                 YYABORT;
             $$ = append_unop($4.instrs, &load->node);
         }
@@ -2833,7 +2832,7 @@ unary_expr:
             if ($1 == UNARY_OP_PLUS)
                 $$ = $2;
             else
-                $$ = append_unop($2, hlsl_new_unary_expr(ops[$1], node_from_list($2), @1));
+                $$ = append_unop($2, hlsl_new_unary_expr(ctx, ops[$1], node_from_list($2), @1));
         }
 
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
@@ -2868,7 +2867,7 @@ unary_expr:
                 YYABORT;
             }
 
-            $$ = append_unop($6, &hlsl_new_cast(node_from_list($6), dst_type, &@3)->node);
+            $$ = append_unop($6, &hlsl_new_cast(ctx, node_from_list($6), dst_type, &@3)->node);
         }
 
 unary_op:
