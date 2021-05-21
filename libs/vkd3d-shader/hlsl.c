@@ -39,7 +39,8 @@ void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
     vkd3d_shader_verror(ctx->message_context, &loc, error, fmt, args);
     va_end(args);
 
-    ctx->failed = true;
+    if (!ctx->result)
+        ctx->result = VKD3D_ERROR_INVALID_SHADER;
 }
 
 void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
@@ -1648,10 +1649,10 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    if (ctx.failed)
+    if (ctx.result)
     {
         hlsl_ctx_cleanup(&ctx);
-        return VKD3D_ERROR_INVALID_SHADER;
+        return ctx.result;
     }
 
     if (!(entry_func = hlsl_get_func_decl(&ctx, entry_point)))

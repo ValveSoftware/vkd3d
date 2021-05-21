@@ -1968,8 +1968,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         allocate_const_registers(ctx, entry_func);
     allocate_semantic_registers(ctx);
 
-    if (ctx->failed)
-        return VKD3D_ERROR_INVALID_SHADER;
+    if (ctx->result)
+        return ctx->result;
 
     if (ctx->profile->major_version < 4)
         return write_sm1_shader(ctx, entry_func, out);

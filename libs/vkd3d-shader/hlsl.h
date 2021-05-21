@@ -428,7 +428,7 @@ struct hlsl_ctx
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_string_buffer_cache string_buffers;
-    bool failed;
+    int result;
 
     void *scanner;
 
@@ -544,7 +544,7 @@ static inline void *hlsl_alloc(struct hlsl_ctx *ctx, size_t size)
     void *ptr = vkd3d_calloc(1, size);
 
     if (!ptr)
-        ctx->failed = true;
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
     return ptr;
 }
 
@@ -553,7 +553,7 @@ static inline char *hlsl_strdup(struct hlsl_ctx *ctx, const char *string)
     char *ptr = vkd3d_strdup(string);
 
     if (!ptr)
-        ctx->failed = true;
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
     return ptr;
 }
 
@@ -563,7 +563,7 @@ static inline bool hlsl_array_reserve(struct hlsl_ctx *ctx, void **elements,
     bool ret = vkd3d_array_reserve(elements, capacity, element_count, element_size);
 
     if (!ret)
-        ctx->failed = true;
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
     return ret;
 }
 
@@ -572,7 +572,7 @@ static inline struct vkd3d_string_buffer *hlsl_get_string_buffer(struct hlsl_ctx
     struct vkd3d_string_buffer *ret = vkd3d_string_buffer_get(&ctx->string_buffers);
 
     if (!ret)
-        ctx->failed = true;
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
     return ret;
 }
 
