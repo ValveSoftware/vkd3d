@@ -456,15 +456,18 @@ static unsigned int index_instructions(struct list *instrs, unsigned int index)
 static void dump_function_decl(struct rb_entry *entry, void *context)
 {
     struct hlsl_ir_function_decl *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
+    struct hlsl_ctx *ctx = context;
 
     if (func->body)
-        hlsl_dump_function(func);
+        hlsl_dump_function(ctx, func);
 }
 
 static void dump_function(struct rb_entry *entry, void *context)
 {
     struct hlsl_ir_function *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
-    rb_for_each_entry(&func->overloads, dump_function_decl, NULL);
+    struct hlsl_ctx *ctx = context;
+
+    rb_for_each_entry(&func->overloads, dump_function_decl, ctx);
 }
 
 /* Compute the earliest and latest liveness for each variable. In the case that
@@ -1958,7 +1961,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     compute_liveness(ctx, entry_func);
 
     if (TRACE_ON())
-        rb_for_each_entry(&ctx->functions, dump_function, NULL);
+        rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
     allocate_temp_registers(ctx, entry_func);
     if (ctx->profile->major_version < 4)

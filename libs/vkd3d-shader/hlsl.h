@@ -581,20 +581,18 @@ static inline void hlsl_release_string_buffer(struct hlsl_ctx *ctx, struct vkd3d
     vkd3d_string_buffer_release(&ctx->string_buffers, buffer);
 }
 
-const char *debug_hlsl_type(const struct hlsl_type *type) DECLSPEC_HIDDEN;
+const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type) DECLSPEC_HIDDEN;
 const char *debug_hlsl_writemask(unsigned int writemask) DECLSPEC_HIDDEN;
 
-struct vkd3d_string_buffer *hlsl_type_to_string(struct vkd3d_string_buffer_cache *string_buffers,
-        const struct hlsl_type *type) DECLSPEC_HIDDEN;
-struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct vkd3d_string_buffer_cache *string_buffers,
-        unsigned int modifiers) DECLSPEC_HIDDEN;
+struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type) DECLSPEC_HIDDEN;
+struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsigned int modifiers) DECLSPEC_HIDDEN;
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type) DECLSPEC_HIDDEN;
 
 void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl,
         bool intrinsic) DECLSPEC_HIDDEN;
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var) DECLSPEC_HIDDEN;
 
-void hlsl_dump_function(const struct hlsl_ir_function_decl *func) DECLSPEC_HIDDEN;
+void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func) DECLSPEC_HIDDEN;
 
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;

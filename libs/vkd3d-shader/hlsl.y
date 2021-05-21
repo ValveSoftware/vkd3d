@@ -272,13 +272,13 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
 
-        src_string = hlsl_type_to_string(&ctx->string_buffers, src_type);
-        dst_string = hlsl_type_to_string(&ctx->string_buffers, dst_type);
+        src_string = hlsl_type_to_string(ctx, src_type);
+        dst_string = hlsl_type_to_string(ctx, dst_type);
         if (src_string && dst_string)
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Can't implicitly convert from %s to %s.", src_string->buffer, dst_string->buffer);
-        vkd3d_string_buffer_release(&ctx->string_buffers, src_string);
-        vkd3d_string_buffer_release(&ctx->string_buffers, dst_string);
+        hlsl_release_string_buffer(ctx, src_string);
+        hlsl_release_string_buffer(ctx, dst_string);
         return NULL;
     }
 
@@ -298,10 +298,10 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
     {
         struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, mod)))
+        if ((string = hlsl_modifiers_to_string(ctx, mod)))
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                     "Modifier '%s' was already specified.", string->buffer);
-        vkd3d_string_buffer_release(&ctx->string_buffers, string);
+        hlsl_release_string_buffer(ctx, string);
         return modifiers;
     }
     if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
@@ -974,10 +974,10 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
     {
         struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_type_to_string(&ctx->string_buffers, t1)))
+        if ((string = hlsl_type_to_string(ctx, t1)))
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
-        vkd3d_string_buffer_release(&ctx->string_buffers, string);
+        hlsl_release_string_buffer(ctx, string);
         return NULL;
     }
 
@@ -985,10 +985,10 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
     {
         struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_type_to_string(&ctx->string_buffers, t2)))
+        if ((string = hlsl_type_to_string(ctx, t2)))
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
-        vkd3d_string_buffer_release(&ctx->string_buffers, string);
+        hlsl_release_string_buffer(ctx, string);
         return NULL;
     }
 
@@ -997,15 +997,15 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
 
     if (!expr_compatible_data_types(t1, t2))
     {
-        struct vkd3d_string_buffer *t1_string = hlsl_type_to_string(&ctx->string_buffers, t1);
-        struct vkd3d_string_buffer *t2_string = hlsl_type_to_string(&ctx->string_buffers, t2);
+        struct vkd3d_string_buffer *t1_string = hlsl_type_to_string(ctx, t1);
+        struct vkd3d_string_buffer *t2_string = hlsl_type_to_string(ctx, t2);
 
         if (t1_string && t2_string)
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Expression data types \"%s\" and \"%s\" are incompatible.",
                     t1_string->buffer, t2_string->buffer);
-        vkd3d_string_buffer_release(&ctx->string_buffers, t1_string);
-        vkd3d_string_buffer_release(&ctx->string_buffers, t2_string);
+        hlsl_release_string_buffer(ctx, t1_string);
+        hlsl_release_string_buffer(ctx, t2_string);
         return NULL;
     }
 
@@ -1450,10 +1450,10 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, modifiers & invalid)))
+                if ((string = hlsl_modifiers_to_string(ctx, modifiers & invalid)))
                     hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Modifiers '%s' are not allowed on local variables.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
             }
             if (var->semantic.name)
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
@@ -1935,10 +1935,10 @@ field:
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, modifiers)))
+                if ((string = hlsl_modifiers_to_string(ctx, modifiers)))
                     hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Modifiers '%s' are not allowed on struct fields.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
             }
             $$ = gen_struct_fields(ctx, type, $3);
         }
@@ -2121,10 +2121,10 @@ input_mods:
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_modifiers_to_string(&ctx->string_buffers, $2)))
+                if ((string = hlsl_modifiers_to_string(ctx, $2)))
                     hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                             "Modifier \"%s\" was already specified.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
                 YYABORT;
             }
             $$ = $1 | $2;
@@ -2155,11 +2155,11 @@ type:
             {
                 struct vkd3d_string_buffer *string;
 
-                string = hlsl_type_to_string(&ctx->string_buffers, $3);
+                string = hlsl_type_to_string(ctx, $3);
                 if (string)
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Vector base type %s is not scalar.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
@@ -2177,11 +2177,11 @@ type:
             {
                 struct vkd3d_string_buffer *string;
 
-                string = hlsl_type_to_string(&ctx->string_buffers, $3);
+                string = hlsl_type_to_string(ctx, $3);
                 if (string)
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Matrix base type %s is not scalar.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
                 YYABORT;
             }
             if ($5 < 1 || $5 > 4)
@@ -2530,10 +2530,10 @@ selection_statement:
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_type_to_string(&ctx->string_buffers, condition->data_type)))
+                if ((string = hlsl_type_to_string(ctx, condition->data_type)))
                     hlsl_error(ctx, instr->node.loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "if condition type %s is not scalar.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
             }
             $$ = $3;
             list_add_tail($$, &instr->node.entry);
@@ -2745,10 +2745,10 @@ postfix_expr:
             {
                 struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_type_to_string(&ctx->string_buffers, $2)))
+                if ((string = hlsl_type_to_string(ctx, $2)))
                     hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Constructor data type %s is not numeric.", string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                hlsl_release_string_buffer(ctx, string);
                 YYABORT;
             }
             if ($2->dimx * $2->dimy != initializer_size(&$4))
@@ -2774,10 +2774,10 @@ postfix_expr:
                 {
                     struct vkd3d_string_buffer *string;
 
-                    if ((string = hlsl_type_to_string(&ctx->string_buffers, arg->data_type)))
+                    if ((string = hlsl_type_to_string(ctx, arg->data_type)))
                         hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                                 "Invalid type %s for constructor argument.", string->buffer);
-                    vkd3d_string_buffer_release(&ctx->string_buffers, string);
+                    hlsl_release_string_buffer(ctx, string);
                     continue;
                 }
                 width = hlsl_type_component_count(arg->data_type);
@@ -2857,13 +2857,13 @@ unary_expr:
             {
                 struct vkd3d_string_buffer *src_string, *dst_string;
 
-                src_string = hlsl_type_to_string(&ctx->string_buffers, src_type);
-                dst_string = hlsl_type_to_string(&ctx->string_buffers, dst_type);
+                src_string = hlsl_type_to_string(ctx, src_type);
+                dst_string = hlsl_type_to_string(ctx, dst_type);
                 if (src_string && dst_string)
                     hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Can't cast from %s to %s.",
                             src_string->buffer, dst_string->buffer);
-                vkd3d_string_buffer_release(&ctx->string_buffers, src_string);
-                vkd3d_string_buffer_release(&ctx->string_buffers, dst_string);
+                hlsl_release_string_buffer(ctx, src_string);
+                hlsl_release_string_buffer(ctx, dst_string);
                 YYABORT;
             }
 
