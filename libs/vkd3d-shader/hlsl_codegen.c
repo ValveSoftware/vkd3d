@@ -1106,6 +1106,13 @@ static unsigned int map_swizzle(unsigned int swizzle, unsigned int writemask)
 {
     unsigned int i, ret = 0;
 
+    /* Leave replicate swizzles alone; some instructions need them. */
+    if (swizzle == HLSL_SWIZZLE(X, X, X, X)
+            || swizzle == HLSL_SWIZZLE(Y, Y, Y, Y)
+            || swizzle == HLSL_SWIZZLE(Z, Z, Z, Z)
+            || swizzle == HLSL_SWIZZLE(W, W, W, W))
+        return swizzle;
+
     for (i = 0; i < 4; ++i)
     {
         if (writemask & (1 << i))
@@ -1750,6 +1757,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
     struct hlsl_ir_node *arg1 = expr->operands[0].node;
     struct hlsl_ir_node *arg2 = expr->operands[1].node;
+    unsigned int i;
 
     assert(instr->reg.allocated);
 
@@ -1775,6 +1783,17 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
 
         case HLSL_IR_UNOP_NEG:
             write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG);
+            break;
+
+        case HLSL_IR_UNOP_RCP:
+            for (i = 0; i < instr->data_type->dimx; ++i)
+            {
+                struct hlsl_reg src = arg1->reg, dst = instr->reg;
+
+                src.writemask = combine_writemasks(src.writemask, 1u << i);
+                dst.writemask = combine_writemasks(dst.writemask, 1u << i);
+                write_sm1_unary_op(ctx, buffer, D3DSIO_RCP, &dst, &src, 0);
+            }
             break;
 
         default:
