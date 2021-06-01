@@ -1733,6 +1733,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct bytecode_buffer *buffer,
             write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
+        case HLSL_IR_BINOP_SUB:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_SUB, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
         case HLSL_IR_UNOP_NEG:
             write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG);
             break;
