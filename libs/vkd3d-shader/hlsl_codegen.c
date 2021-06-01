@@ -332,7 +332,7 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
     struct hlsl_ir_expr *expr;
-    unsigned int i;
+    unsigned int i, dimx;
 
     if (instr->type != HLSL_IR_EXPR)
         return false;
@@ -346,6 +346,7 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     arg1 = hlsl_ir_constant(expr->operands[0].node);
     if (expr->operands[1].node)
         arg2 = hlsl_ir_constant(expr->operands[1].node);
+    dimx = instr->data_type->dimx;
 
     if (!(res = hlsl_alloc(ctx, sizeof(*res))))
         return false;
@@ -353,10 +354,45 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
 
     switch (instr->data_type->base_type)
     {
+        case HLSL_TYPE_FLOAT:
+        {
+            switch (expr->op)
+            {
+                case HLSL_IR_UNOP_CAST:
+                    if (instr->data_type->dimx != arg1->node.data_type->dimx
+                            || instr->data_type->dimy != arg1->node.data_type->dimy)
+                    {
+                        FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
+                                debug_hlsl_type(ctx, instr->data_type));
+                        vkd3d_free(res);
+                        return false;
+                    }
+
+                    switch (arg1->node.data_type->base_type)
+                    {
+                        case HLSL_TYPE_UINT:
+                            for (i = 0; i < dimx; ++i)
+                                res->value.f[i] = arg1->value.u[i];
+                            break;
+
+                        default:
+                            FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
+                                    debug_hlsl_type(ctx, instr->data_type));
+                            vkd3d_free(res);
+                            return false;
+                    }
+                    break;
+
+                default:
+                    FIXME("Fold float op %#x.\n", expr->op);
+                    vkd3d_free(res);
+                    return false;
+            }
+            break;
+        }
+
         case HLSL_TYPE_UINT:
         {
-            unsigned int i;
-
             switch (expr->op)
             {
                 case HLSL_IR_BINOP_ADD:
