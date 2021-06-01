@@ -212,7 +212,7 @@ struct hlsl_src
 
 struct hlsl_reg_reservation
 {
-    enum vkd3d_shader_register_type type;
+    char type;
     DWORD regnum;
 };
 

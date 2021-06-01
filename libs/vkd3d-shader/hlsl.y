@@ -782,28 +782,8 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
 
 static struct hlsl_reg_reservation *parse_reg_reservation(struct hlsl_ctx *ctx, const char *reg_string)
 {
-    enum vkd3d_shader_register_type type;
     struct hlsl_reg_reservation *reg_res;
     DWORD regnum = 0;
-
-    switch (reg_string[0])
-    {
-        case 'c':
-            type = VKD3DSPR_CONST;
-            break;
-        case 'i':
-            type = VKD3DSPR_CONSTINT;
-            break;
-        case 'b':
-            type = VKD3DSPR_CONSTBOOL;
-            break;
-        case 's':
-            type = VKD3DSPR_SAMPLER;
-            break;
-        default:
-            FIXME("Unsupported register type.\n");
-            return NULL;
-     }
 
     if (!sscanf(reg_string + 1, "%u", &regnum))
     {
@@ -813,7 +793,7 @@ static struct hlsl_reg_reservation *parse_reg_reservation(struct hlsl_ctx *ctx, 
 
     if (!(reg_res = hlsl_alloc(ctx, sizeof(*reg_res))))
         return NULL;
-    reg_res->type = type;
+    reg_res->type = reg_string[0];
     reg_res->regnum = regnum;
     return reg_res;
 }
