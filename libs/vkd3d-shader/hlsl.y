@@ -33,14 +33,14 @@ struct parse_parameter
     struct hlsl_type *type;
     const char *name;
     struct hlsl_semantic semantic;
-    const struct hlsl_reg_reservation *reg_reservation;
+    struct hlsl_reg_reservation reg_reservation;
     unsigned int modifiers;
 };
 
 struct parse_colon_attribute
 {
     struct hlsl_semantic semantic;
-    struct hlsl_reg_reservation *reg_reservation;
+    struct hlsl_reg_reservation reg_reservation;
 };
 
 struct parse_initializer
@@ -64,7 +64,7 @@ struct parse_variable_def
     char *name;
     struct parse_array_sizes arrays;
     struct hlsl_semantic semantic;
-    struct hlsl_reg_reservation *reg_reservation;
+    struct hlsl_reg_reservation reg_reservation;
     struct parse_initializer initializer;
 };
 
@@ -767,7 +767,7 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
 
-    if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers, param->reg_reservation)))
+    if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers, &param->reg_reservation)))
         return false;
     var->is_param = 1;
 
@@ -780,22 +780,17 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
     return true;
 }
 
-static struct hlsl_reg_reservation *parse_reg_reservation(struct hlsl_ctx *ctx, const char *reg_string)
+static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
 {
-    struct hlsl_reg_reservation *reg_res;
-    DWORD regnum = 0;
+    struct hlsl_reg_reservation reservation = {0};
 
-    if (!sscanf(reg_string + 1, "%u", &regnum))
+    if (!sscanf(reg_string + 1, "%u", &reservation.regnum))
     {
         FIXME("Unsupported register reservation syntax.\n");
-        return NULL;
+        return reservation;
     }
-
-    if (!(reg_res = hlsl_alloc(ctx, sizeof(*reg_res))))
-        return NULL;
-    reg_res->type = reg_string[0];
-    reg_res->regnum = regnum;
-    return reg_res;
+    reservation.type = reg_string[0];
+    return reservation;
 }
 
 static const struct hlsl_ir_function_decl *get_overloaded_func(struct rb_tree *funcs, char *name,
@@ -1354,7 +1349,6 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
     vkd3d_free((void *)v->semantic.name);
-    vkd3d_free(v->reg_reservation);
     vkd3d_free(v);
 }
 
@@ -1393,7 +1387,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
 
-        if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, v->reg_reservation)))
+        if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, &v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
@@ -1564,7 +1558,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     struct parse_if_body if_body;
     enum parse_unary_op unary_op;
     enum parse_assign_op assign_op;
-    struct hlsl_reg_reservation *reg_reservation;
+    struct hlsl_reg_reservation reg_reservation;
     struct parse_colon_attribute colon_attribute;
     struct hlsl_semantic semantic;
 }
@@ -1962,11 +1956,9 @@ func_prototype:
                         "Semantics are not allowed on void functions.");
             }
 
-            if ($7.reg_reservation)
-            {
+            if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
-                vkd3d_free($7.reg_reservation);
-            }
+
             if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, &$7.semantic, @3)))
                 YYABORT;
             $$.name = $3;
@@ -1999,12 +1991,12 @@ colon_attribute:
       %empty
         {
             $$.semantic.name = NULL;
-            $$.reg_reservation = NULL;
+            $$.reg_reservation.type = 0;
         }
     | semantic
         {
             $$.semantic = $1;
-            $$.reg_reservation = NULL;
+            $$.reg_reservation.type = 0;
         }
     | register_opt
         {
@@ -2028,7 +2020,7 @@ semantic:
 register_opt:
       ':' KW_REGISTER '(' any_identifier ')'
         {
-            $$ = parse_reg_reservation(ctx, $4);
+            $$ = parse_reg_reservation($4);
             vkd3d_free($4);
         }
     | ':' KW_REGISTER '(' any_identifier ',' any_identifier ')'
@@ -2036,7 +2028,7 @@ register_opt:
             FIXME("Ignoring shader target %s in a register reservation.\n", debugstr_a($4));
             vkd3d_free($4);
 
-            $$ = parse_reg_reservation(ctx, $6);
+            $$ = parse_reg_reservation($6);
             vkd3d_free($6);
         }
 

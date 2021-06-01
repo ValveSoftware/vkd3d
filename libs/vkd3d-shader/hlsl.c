@@ -95,7 +95,6 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
 {
     vkd3d_free((void *)decl->name);
     vkd3d_free((void *)decl->semantic.name);
-    vkd3d_free((void *)decl->reg_reservation);
     vkd3d_free(decl);
 }
 
@@ -406,7 +405,8 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
     if (semantic)
         var->semantic = *semantic;
     var->modifiers = modifiers;
-    var->reg_reservation = reg_reservation;
+    if (reg_reservation)
+        var->reg_reservation = *reg_reservation;
     return var;
 }
 

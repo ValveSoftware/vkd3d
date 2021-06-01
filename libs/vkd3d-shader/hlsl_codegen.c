@@ -35,7 +35,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     /* Use the synthetic name for the temp, rather than the uniform, so that we
      * can write the uniform name into the shader reflection data. */
 
-    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type, temp->loc, NULL, 0, temp->reg_reservation)))
+    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type, temp->loc, NULL, 0, &temp->reg_reservation)))
         return;
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
