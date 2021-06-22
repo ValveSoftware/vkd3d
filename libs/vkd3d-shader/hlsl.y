@@ -1561,6 +1561,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     struct hlsl_reg_reservation reg_reservation;
     struct parse_colon_attribute colon_attribute;
     struct hlsl_semantic semantic;
+    enum hlsl_buffer_type buffer_type;
 }
 
 %token KW_BLENDSTATE
@@ -1711,6 +1712,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
 %type <boolval> boolean
 
+%type <buffer_type> buffer_type
+
 %type <colon_attribute> colon_attribute
 
 %type <function> func_declaration
@@ -1776,6 +1779,7 @@ hlsl_prog:
 
             hlsl_add_function(ctx, $2.name, $2.decl, false);
         }
+    | hlsl_prog buffer_declaration
     | hlsl_prog declaration_statement
         {
             if (!list_empty($2))
@@ -1784,6 +1788,32 @@ hlsl_prog:
         }
     | hlsl_prog preproc_directive
     | hlsl_prog ';'
+
+buffer_declaration:
+      buffer_type any_identifier colon_attribute '{' declaration_statement_list '}'
+        {
+            struct hlsl_buffer *buffer;
+
+            if ($3.semantic.name)
+                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC, "Semantics are not allowed on buffers.");
+
+            if (!(buffer = hlsl_new_buffer(ctx, $1, $2, &$3.reg_reservation, @2)))
+                YYABORT;
+        }
+
+buffer_type:
+      KW_CBUFFER
+        {
+            $$ = HLSL_BUFFER_CONSTANT;
+        }
+    | KW_TBUFFER
+        {
+            $$ = HLSL_BUFFER_TEXTURE;
+        }
+
+declaration_statement_list:
+      declaration_statement
+    | declaration_statement_list declaration_statement
 
 preproc_directive:
       PRE_LINE STRING

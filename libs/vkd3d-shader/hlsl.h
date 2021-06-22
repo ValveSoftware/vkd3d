@@ -417,6 +417,21 @@ struct hlsl_vec4
     float f[4];
 };
 
+enum hlsl_buffer_type
+{
+    HLSL_BUFFER_CONSTANT,
+    HLSL_BUFFER_TEXTURE,
+};
+
+struct hlsl_buffer
+{
+    struct vkd3d_shader_location loc;
+    enum hlsl_buffer_type type;
+    const char *name;
+    struct hlsl_reg_reservation reservation;
+    struct list entry;
+};
+
 struct hlsl_ctx
 {
     const struct hlsl_profile_info *profile;
@@ -435,6 +450,7 @@ struct hlsl_ctx
     struct list scopes;
     struct list extern_vars;
 
+    struct list buffers;
     struct list types;
     struct rb_tree functions;
     const struct hlsl_ir_function_decl *cur_function;
@@ -609,6 +625,8 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
         unsigned int array_size) DECLSPEC_HIDDEN;
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2) DECLSPEC_HIDDEN;
+struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
+        const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
         struct vkd3d_shader_location *loc) DECLSPEC_HIDDEN;
 struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node) DECLSPEC_HIDDEN;

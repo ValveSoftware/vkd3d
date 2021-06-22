@@ -592,6 +592,22 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
     return decl;
 }
 
+struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
+        const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc)
+{
+    struct hlsl_buffer *buffer;
+
+    if (!(buffer = hlsl_alloc(ctx, sizeof(*buffer))))
+        return NULL;
+    buffer->type = type;
+    buffer->name = name;
+    if (reservation)
+        buffer->reservation = *reservation;
+    buffer->loc = loc;
+    list_add_tail(&ctx->buffers, &buffer->entry);
+    return buffer;
+}
+
 static int compare_hlsl_types_rb(const void *key, const struct rb_entry *entry)
 {
     const struct hlsl_type *type = RB_ENTRY_VALUE(entry, const struct hlsl_type, scope_entry);
@@ -1583,12 +1599,14 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *
 
     list_init(&ctx->static_initializers);
     list_init(&ctx->extern_vars);
+    list_init(&ctx->buffers);
 
     return true;
 }
 
 static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 {
+    struct hlsl_buffer *buffer, *next_buffer;
     struct hlsl_scope *scope, *next_scope;
     struct hlsl_ir_var *var, *next_var;
     struct hlsl_type *type, *next_type;
@@ -1611,6 +1629,12 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY_SAFE(type, next_type, &ctx->types, struct hlsl_type, entry)
         hlsl_free_type(type);
+
+    LIST_FOR_EACH_ENTRY_SAFE(buffer, next_buffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        vkd3d_free((void *)buffer->name);
+        vkd3d_free(buffer);
+    }
 }
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
