@@ -784,7 +784,7 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
 {
     struct hlsl_reg_reservation reservation = {0};
 
-    if (!sscanf(reg_string + 1, "%u", &reservation.regnum))
+    if (!sscanf(reg_string + 1, "%u", &reservation.index))
     {
         FIXME("Unsupported register reservation syntax.\n");
         return reservation;

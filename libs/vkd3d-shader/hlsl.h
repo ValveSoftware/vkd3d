@@ -213,7 +213,7 @@ struct hlsl_src
 struct hlsl_reg_reservation
 {
     char type;
-    DWORD regnum;
+    unsigned int index;
 };
 
 struct hlsl_ir_var
