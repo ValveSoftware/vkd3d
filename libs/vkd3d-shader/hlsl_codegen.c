@@ -93,7 +93,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     list_add_head(instrs, &load->node.entry);
 
-    if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
+    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, var->loc)))
         return;
     list_add_after(&load->node.entry, &offset->node.entry);
 
@@ -160,7 +160,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     list_add_before(&var->scope_entry, &output->scope_entry);
     list_add_tail(&ctx->extern_vars, &output->extern_entry);
 
-    if (!(offset = hlsl_new_uint_constant(ctx, field_offset * 4, var->loc)))
+    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, var->loc)))
         return;
     list_add_tail(instrs, &offset->node.entry);
 
@@ -291,7 +291,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         struct hlsl_ir_load *field_load;
         struct hlsl_ir_constant *c;
 
-        if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset * 4, instr->loc)))
+        if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, instr->loc)))
             return false;
         list_add_before(&instr->entry, &c->node.entry);
 
@@ -714,9 +714,8 @@ static bool is_range_available(struct liveness *liveness, unsigned int first_wri
 }
 
 static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liveness,
-        unsigned int first_write, unsigned int last_read, unsigned int reg_count)
+        unsigned int first_write, unsigned int last_read, unsigned int component_count)
 {
-    const unsigned int component_count = reg_count * 4;
     unsigned int i, component_idx;
     struct hlsl_reg ret = {0};
 
@@ -738,9 +737,9 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
 {
-    if (type->reg_size > 1)
+    if (type->reg_size > 4)
         return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class,
-                reg.id + type->reg_size - 1);
+                reg.id + (type->reg_size / 4) - 1);
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 
@@ -751,7 +750,7 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
 
     if (!var->reg.allocated && var->last_read)
     {
-        if (var->data_type->reg_size > 1)
+        if (var->data_type->reg_size > 4)
             var->reg = allocate_range(ctx, liveness, var->first_write,
                     var->last_read, var->data_type->reg_size);
         else
@@ -770,7 +769,7 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct list *i
     {
         if (!instr->reg.allocated && instr->last_read)
         {
-            if (instr->data_type->reg_size > 1)
+            if (instr->data_type->reg_size > 4)
                 instr->reg = allocate_range(ctx, liveness, instr->index,
                         instr->last_read, instr->data_type->reg_size);
             else
@@ -832,23 +831,23 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *
             {
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
                 const struct hlsl_type *type = instr->data_type;
+                unsigned int x, y, i, writemask, end_reg;
                 unsigned int reg_size = type->reg_size;
-                unsigned int x, y, i, writemask;
 
-                if (reg_size > 1)
+                if (reg_size > 4)
                     constant->reg = allocate_range(ctx, liveness, 1, UINT_MAX, reg_size);
                 else
                     constant->reg = allocate_register(ctx, liveness, 1, UINT_MAX, type->dimx);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
-                        constant->reg.id + reg_size, sizeof(*defs->values)))
+                        constant->reg.id + reg_size / 4, sizeof(*defs->values)))
                     return;
-                if (constant->reg.id + reg_size > defs->count)
+                end_reg = constant->reg.id + reg_size / 4;
+                if (end_reg > defs->count)
                 {
-                    memset(&defs->values[defs->count], 0,
-                            sizeof(*defs->values) * (constant->reg.id + reg_size - defs->count));
-                    defs->count = constant->reg.id + reg_size;
+                    memset(&defs->values[defs->count], 0, sizeof(*defs->values) * (end_reg - defs->count));
+                    defs->count = end_reg;
                 }
 
                 assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
@@ -931,7 +930,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     {
         if (var->is_uniform && var->last_read)
         {
-            if (var->data_type->reg_size > 1)
+            if (var->data_type->reg_size > 4)
                 var->reg = allocate_range(ctx, &liveness, 1, UINT_MAX, var->data_type->reg_size);
             else
             {
@@ -1520,7 +1519,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct bytecode_buffer *buf
         {
             put_dword(buffer, 0); /* name */
             put_dword(buffer, D3DXRS_FLOAT4 | (var->reg.id << 16));
-            put_dword(buffer, var->data_type->reg_size);
+            put_dword(buffer, var->data_type->reg_size / 4);
             put_dword(buffer, 0); /* type */
             put_dword(buffer, 0); /* FIXME: default value */
         }

@@ -567,7 +567,7 @@ static struct hlsl_ir_load *add_record_load(struct hlsl_ctx *ctx, struct list *i
 {
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset * 4, loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
 
@@ -601,7 +601,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
         return NULL;
     }
 
-    if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size * 4, loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_MUL, index, &c->node)))
@@ -663,7 +663,7 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     *modifiers &= ~HLSL_TYPE_MODIFIERS_MASK;
 
     if (new_type->type == HLSL_CLASS_MATRIX)
-        new_type->reg_size = hlsl_type_is_row_major(new_type) ? new_type->dimy : new_type->dimx;
+        new_type->reg_size = (hlsl_type_is_row_major(new_type) ? new_type->dimy : new_type->dimx) * 4;
     return new_type;
 }
 
@@ -738,7 +738,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, type->modifiers, v->loc);
         else
-            type->reg_size = hlsl_type_is_row_major(type) ? type->dimy : type->dimx;
+            type->reg_size = (hlsl_type_is_row_major(type) ? type->dimy : type->dimx) * 4;
 
         if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
@@ -1328,7 +1328,7 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
 
         if (hlsl_type_component_count(field->type) == hlsl_type_component_count(node->data_type))
         {
-            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset * 4, node->loc)))
+            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, node->loc)))
                 break;
             list_add_tail(list, &c->node.entry);
 
