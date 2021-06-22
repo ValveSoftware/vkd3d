@@ -843,7 +843,12 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
                         constant->reg.id + reg_size, sizeof(*defs->values)))
                     return;
-                defs->count = max(defs->count, constant->reg.id + reg_size);
+                if (constant->reg.id + reg_size > defs->count)
+                {
+                    memset(&defs->values[defs->count], 0,
+                            sizeof(*defs->values) * (constant->reg.id + reg_size - defs->count));
+                    defs->count = constant->reg.id + reg_size;
+                }
 
                 assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
 
