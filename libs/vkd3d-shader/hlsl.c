@@ -1599,7 +1599,13 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *
 
     list_init(&ctx->static_initializers);
     list_init(&ctx->extern_vars);
+
     list_init(&ctx->buffers);
+
+    if (!(ctx->globals_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
+            hlsl_strdup(ctx, "$Globals"), NULL, ctx->location)))
+        return false;
+    ctx->cur_buffer = ctx->globals_buffer;
 
     return true;
 }

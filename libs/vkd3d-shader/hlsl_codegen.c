@@ -41,6 +41,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
     uniform->is_uniform = 1;
     uniform->is_param = temp->is_param;
+    uniform->buffer = temp->buffer;
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return;

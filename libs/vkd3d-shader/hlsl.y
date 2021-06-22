@@ -1393,6 +1393,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             continue;
         }
 
+        var->buffer = ctx->cur_buffer;
+
         if (ctx->cur_scope == ctx->globals)
         {
             local = false;
@@ -1779,7 +1781,7 @@ hlsl_prog:
 
             hlsl_add_function(ctx, $2.name, $2.decl, false);
         }
-    | hlsl_prog buffer_declaration
+    | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement
         {
             if (!list_empty($2))
@@ -1790,15 +1792,19 @@ hlsl_prog:
     | hlsl_prog ';'
 
 buffer_declaration:
-      buffer_type any_identifier colon_attribute '{' declaration_statement_list '}'
+      buffer_type any_identifier colon_attribute
         {
-            struct hlsl_buffer *buffer;
-
             if ($3.semantic.name)
                 hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC, "Semantics are not allowed on buffers.");
 
-            if (!(buffer = hlsl_new_buffer(ctx, $1, $2, &$3.reg_reservation, @2)))
+            if (!(ctx->cur_buffer = hlsl_new_buffer(ctx, $1, $2, &$3.reg_reservation, @2)))
                 YYABORT;
+        }
+
+buffer_body:
+      '{' declaration_statement_list '}'
+        {
+            ctx->cur_buffer = ctx->globals_buffer;
         }
 
 buffer_type:

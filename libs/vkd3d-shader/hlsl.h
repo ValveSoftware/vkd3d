@@ -222,6 +222,7 @@ struct hlsl_ir_var
     struct vkd3d_shader_location loc;
     const char *name;
     struct hlsl_semantic semantic;
+    struct hlsl_buffer *buffer;
     unsigned int modifiers;
     struct hlsl_reg_reservation reg_reservation;
     struct list scope_entry, param_entry, extern_entry;
@@ -451,6 +452,7 @@ struct hlsl_ctx
     struct list extern_vars;
 
     struct list buffers;
+    struct hlsl_buffer *cur_buffer, *globals_buffer;
     struct list types;
     struct rb_tree functions;
     const struct hlsl_ir_function_decl *cur_function;
