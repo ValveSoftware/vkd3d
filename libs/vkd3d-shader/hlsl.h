@@ -329,8 +329,6 @@ enum hlsl_ir_expr_op
     HLSL_IR_BINOP_POW,
 
     HLSL_IR_TEROP_LERP,
-
-    HLSL_IR_SEQUENCE,
 };
 
 struct hlsl_ir_expr

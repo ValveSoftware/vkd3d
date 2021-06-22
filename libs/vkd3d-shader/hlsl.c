@@ -1015,8 +1015,6 @@ static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
         "pow",
 
         "lerp",
-
-        ",",
     };
 
     return op_names[expr->op];
