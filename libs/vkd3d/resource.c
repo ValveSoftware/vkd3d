@@ -2847,9 +2847,6 @@ static void vkd3d_create_buffer_uav(struct d3d12_desc *descriptor, struct d3d12_
         return;
     }
 
-    if (desc->u.Buffer.CounterOffsetInBytes)
-        FIXME("Ignoring counter offset %"PRIu64".\n", desc->u.Buffer.CounterOffsetInBytes);
-
     flags = vkd3d_view_flags_from_d3d12_buffer_uav_flags(desc->u.Buffer.Flags);
     if (!vkd3d_create_buffer_view_for_resource(device, resource, desc->Format,
             desc->u.Buffer.FirstElement, desc->u.Buffer.NumElements,
