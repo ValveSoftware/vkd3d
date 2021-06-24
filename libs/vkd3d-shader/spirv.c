@@ -1943,8 +1943,7 @@ struct vkd3d_symbol_resource_data
 
 struct vkd3d_symbol_sampler_data
 {
-    unsigned int register_space;
-    unsigned int register_index;
+    struct vkd3d_shader_register_range range;
 };
 
 struct vkd3d_symbol
@@ -5362,8 +5361,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
     struct vkd3d_symbol reg_symbol;
 
     vkd3d_symbol_make_sampler(&reg_symbol, reg);
-    reg_symbol.info.sampler.register_space = sampler->range.space;
-    reg_symbol.info.sampler.register_index = sampler->range.first;
+    reg_symbol.info.sampler.range = sampler->range;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 
     if (vkd3d_dxbc_compiler_has_combined_sampler(compiler, NULL, sampler))
@@ -7617,8 +7615,8 @@ static const struct vkd3d_symbol *vkd3d_dxbc_compiler_find_combined_sampler(stru
         if (!(entry = rb_get(&compiler->symbol_table, &key)))
             return NULL;
         sampler_symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
-        sampler_space = sampler_symbol->info.sampler.register_space;
-        sampler_index = sampler_symbol->info.sampler.register_index;
+        sampler_space = sampler_symbol->info.sampler.range.space;
+        sampler_index = sampler_symbol->info.sampler.range.first;
     }
     else
     {
