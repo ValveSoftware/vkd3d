@@ -98,6 +98,13 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     vkd3d_free(decl);
 }
 
+static bool hlsl_type_is_row_major(const struct hlsl_type *type)
+{
+    /* Default to column-major if the majority isn't explicitly set, which can
+     * happen for anonymous nodes. */
+    return !!(type->modifiers & HLSL_MODIFIER_ROW_MAJOR);
+}
+
 struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
@@ -276,7 +283,8 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
     return true;
 }
 
-struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, unsigned int default_majority)
+struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
+        unsigned int default_majority, unsigned int modifiers)
 {
     struct hlsl_struct_field *old_field, *field;
     struct hlsl_type *type;
@@ -297,14 +305,14 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
     type->base_type = old->base_type;
     type->dimx = old->dimx;
     type->dimy = old->dimy;
-    type->modifiers = old->modifiers;
+    type->modifiers = old->modifiers | modifiers;
     if (!(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
         type->modifiers |= default_majority;
     type->sampler_dim = old->sampler_dim;
     switch (old->type)
     {
         case HLSL_CLASS_ARRAY:
-            type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority);
+            type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority, modifiers);
             type->e.array.elements_count = old->e.array.elements_count;
             type->reg_size = type->e.array.elements_count * type->e.array.type->reg_size;
             break;
@@ -336,7 +344,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old, u
                     return NULL;
                 }
                 field->loc = old_field->loc;
-                field->type = hlsl_type_clone(ctx, old_field->type, default_majority);
+                field->type = hlsl_type_clone(ctx, old_field->type, default_majority, modifiers);
                 field->name = hlsl_strdup(ctx, old_field->name);
                 if (old_field->semantic.name)
                 {

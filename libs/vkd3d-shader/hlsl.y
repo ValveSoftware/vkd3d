@@ -624,13 +624,6 @@ static struct hlsl_struct_field *get_struct_field(struct list *fields, const cha
     return NULL;
 }
 
-bool hlsl_type_is_row_major(const struct hlsl_type *type)
-{
-    /* Default to column-major if the majority isn't explicitly set, which can
-     * happen for anonymous nodes. */
-    return !!(type->modifiers & HLSL_MODIFIER_ROW_MAJOR);
-}
-
 static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int *modifiers, struct vkd3d_shader_location loc)
 {
@@ -656,18 +649,15 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     if (!default_majority && !(*modifiers & HLSL_TYPE_MODIFIERS_MASK))
         return type;
 
-    if (!(new_type = hlsl_type_clone(ctx, type, default_majority)))
+    if (!(new_type = hlsl_type_clone(ctx, type, default_majority, *modifiers & HLSL_TYPE_MODIFIERS_MASK)))
         return NULL;
 
-    new_type->modifiers |= *modifiers;
     *modifiers &= ~HLSL_TYPE_MODIFIERS_MASK;
 
     if ((new_type->modifiers & HLSL_MODIFIER_ROW_MAJOR) && (new_type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR))
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "'row_major' and 'column_major' modifiers are mutually exclusive.");
 
-    if (new_type->type == HLSL_CLASS_MATRIX)
-        new_type->reg_size = (hlsl_type_is_row_major(new_type) ? new_type->dimy : new_type->dimx) * 4;
     return new_type;
 }
 
@@ -721,7 +711,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
     {
         if (!v->arrays.count)
         {
-            if (!(type = hlsl_type_clone(ctx, orig_type, 0)))
+            if (!(type = hlsl_type_clone(ctx, orig_type, 0, modifiers)))
                 return false;
         }
         else
@@ -737,12 +727,9 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
-        type->modifiers |= modifiers;
 
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, type->modifiers, v->loc);
-        else
-            type->reg_size = (hlsl_type_is_row_major(type) ? type->dimy : type->dimx) * 4;
 
         if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
@@ -1294,9 +1281,8 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
         list_add_tail(instrs, &copy->node.entry);
 
         /* Post increment/decrement expressions are considered const. */
-        if (!(copy->node.data_type = hlsl_type_clone(ctx, copy->node.data_type, 0)))
+        if (!(copy->node.data_type = hlsl_type_clone(ctx, copy->node.data_type, 0, HLSL_MODIFIER_CONST)))
             return false;
-        copy->node.data_type->modifiers |= HLSL_MODIFIER_CONST;
     }
 
     return true;

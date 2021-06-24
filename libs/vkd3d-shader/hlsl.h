@@ -676,9 +676,8 @@ void hlsl_pop_scope(struct hlsl_ctx *ctx) DECLSPEC_HIDDEN;
 bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type) DECLSPEC_HIDDEN;
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
-        unsigned int default_majority) DECLSPEC_HIDDEN;
+        unsigned int default_majority, unsigned int modifiers) DECLSPEC_HIDDEN;
 unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
-bool hlsl_type_is_row_major(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
 

@@ -236,3 +236,17 @@ float4 main() : sv_target
 {
     return float4(0, 0, 0, 0);
 }
+
+[pixel shader fail]
+typedef struct apple
+{
+    float a;
+} apple_t;
+
+uniform const apple_t a;
+
+float4 main() : sv_target
+{
+    a.a = 1;
+    return a.a;
+}
