@@ -737,9 +737,17 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
 {
+    static const char writemask_offset[] = {'w','x','y','z'};
+
     if (type->reg_size > 4)
+    {
+        if (type->reg_size & 3)
+            return vkd3d_dbg_sprintf("%c%u-%c%u.%c", class, reg.id, class,
+                    reg.id + (type->reg_size / 4), writemask_offset[type->reg_size & 3]);
+
         return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class,
                 reg.id + (type->reg_size / 4) - 1);
+    }
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 

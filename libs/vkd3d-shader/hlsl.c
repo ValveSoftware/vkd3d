@@ -112,23 +112,35 @@ static unsigned int get_array_size(const struct hlsl_type *type)
     return 1;
 }
 
-static void hlsl_type_calculate_reg_size(struct hlsl_type *type)
+static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type *type)
 {
+    bool is_sm4 = (ctx->profile->major_version >= 4);
+
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
-            type->reg_size = 4;
+            type->reg_size = is_sm4 ? type->dimx : 4;
             break;
 
         case HLSL_CLASS_MATRIX:
-            type->reg_size = 4 * (hlsl_type_is_row_major(type) ? type->dimy : type->dimx);
+            if (hlsl_type_is_row_major(type))
+                type->reg_size = is_sm4 ? (4 * (type->dimy - 1) + type->dimx) : (4 * type->dimy);
+            else
+                type->reg_size = is_sm4 ? (4 * (type->dimx - 1) + type->dimy) : (4 * type->dimx);
             break;
 
         case HLSL_CLASS_ARRAY:
-            assert(type->e.array.type->reg_size);
-            type->reg_size = type->e.array.elements_count * type->e.array.type->reg_size;
+        {
+            unsigned int element_size = type->e.array.type->reg_size;
+
+            assert(element_size);
+            if (is_sm4)
+                type->reg_size = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
+            else
+                type->reg_size = type->e.array.elements_count * element_size;
             break;
+        }
 
         case HLSL_CLASS_STRUCT:
         {
@@ -139,11 +151,22 @@ static void hlsl_type_calculate_reg_size(struct hlsl_type *type)
 
             LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
             {
-                type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
+                unsigned int field_size = field->type->reg_size;
+
+                assert(field_size);
+
+                /* Align to the next vec4 boundary if:
+                 *  (a) the type is a struct or array type, or
+                 *  (b) the type would cross a vec4 boundary; i.e. a vec3 and a
+                 *      vec1 can be packed together, but not a vec3 and a vec2.
+                 */
+                if (field->type->type > HLSL_CLASS_LAST_NUMERIC || (type->reg_size & 3) + field_size > 4)
+                    type->reg_size = align(type->reg_size, 4);
 
                 field->reg_offset = type->reg_size;
-                assert(field->type->reg_size);
-                type->reg_size += field->type->reg_size;
+                type->reg_size += field_size;
+
+                type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
             }
             break;
         }
@@ -165,7 +188,7 @@ struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hls
     type->base_type = base_type;
     type->dimx = dimx;
     type->dimy = dimy;
-    hlsl_type_calculate_reg_size(type);
+    hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
 
@@ -185,7 +208,7 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
     type->e.array.type = basic_type;
     type->dimx = basic_type->dimx;
     type->dimy = basic_type->dimy;
-    hlsl_type_calculate_reg_size(type);
+    hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
 
@@ -203,7 +226,7 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, s
     type->name = name;
     type->dimy = 1;
     type->e.elements = fields;
-    hlsl_type_calculate_reg_size(type);
+    hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
 
@@ -389,7 +412,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
             break;
     }
 
-    hlsl_type_calculate_reg_size(type);
+    hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
     return type;
