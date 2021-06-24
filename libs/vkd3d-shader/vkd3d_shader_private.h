@@ -727,7 +727,7 @@ struct vkd3d_shader_constant_buffer
 {
     struct vkd3d_shader_src_param src;
     unsigned int size;
-    unsigned int register_space, register_index;
+    struct vkd3d_shader_register_range range;
 };
 
 struct vkd3d_shader_structured_resource

@@ -686,12 +686,12 @@ static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction 
     const DWORD *end = &tokens[token_count];
 
     shader_sm4_read_src_param(priv, &tokens, end, VKD3D_DATA_FLOAT, &ins->declaration.cb.src);
-    ins->declaration.cb.register_index = shader_sm4_map_resource_idx(&ins->declaration.cb.src.reg, priv);
+    ins->declaration.cb.range.first = shader_sm4_map_resource_idx(&ins->declaration.cb.src.reg, priv);
     if (opcode_token & VKD3D_SM4_INDEX_TYPE_MASK)
         ins->flags |= VKD3DSI_INDEXED_DYNAMIC;
 
     ins->declaration.cb.size = ins->declaration.cb.src.reg.idx[2].offset;
-    ins->declaration.cb.register_space = 0;
+    ins->declaration.cb.range.space = 0;
 
     if (shader_is_sm_5_1(priv))
     {
@@ -702,7 +702,7 @@ static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction 
         }
 
         ins->declaration.cb.size = *tokens++;
-        shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.cb.register_space);
+        shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.cb.range.space);
     }
 }
 

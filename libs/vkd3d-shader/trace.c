@@ -1438,7 +1438,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
                 shader_print_subscript(compiler, ins->declaration.cb.size, NULL);
             shader_addline(buffer, ", %s",
                     ins->flags & VKD3DSI_INDEXED_DYNAMIC ? "dynamicIndexed" : "immediateIndexed");
-            shader_dump_register_space(compiler, ins->declaration.cb.register_space);
+            shader_dump_register_space(compiler, ins->declaration.cb.range.space);
             break;
 
         case VKD3DSIH_DCL_FUNCTION_BODY:

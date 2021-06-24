@@ -2403,8 +2403,8 @@ static bool vkd3d_dxbc_compiler_check_shader_visibility(const struct vkd3d_dxbc_
 static struct vkd3d_push_constant_buffer_binding *vkd3d_dxbc_compiler_find_push_constant_buffer(
         const struct vkd3d_dxbc_compiler *compiler, const struct vkd3d_shader_constant_buffer *cb)
 {
-    unsigned int register_space = cb->register_space;
-    unsigned int reg_idx = cb->register_index;
+    unsigned int register_space = cb->range.space;
+    unsigned int reg_idx = cb->range.first;
     unsigned int i;
 
     for (i = 0; i < compiler->shader_interface.push_constant_buffer_count; ++i)
@@ -5309,7 +5309,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_constant_buffer(struct vkd3d_dxbc_compi
             pointer_type_id, storage_class, 0);
 
     vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(compiler,
-            var_id, reg, cb->register_space, cb->register_index, VKD3D_SHADER_RESOURCE_BUFFER, false);
+            var_id, reg, cb->range.space, cb->range.first, VKD3D_SHADER_RESOURCE_BUFFER, false);
 
     vkd3d_dxbc_compiler_emit_register_debug_name(builder, var_id, reg);
 
