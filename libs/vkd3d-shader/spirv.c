@@ -1932,8 +1932,7 @@ struct vkd3d_symbol_register_data
 
 struct vkd3d_symbol_resource_data
 {
-    unsigned int register_space;
-    unsigned int register_index;
+    struct vkd3d_shader_register_range range;
     enum vkd3d_shader_component_type sampled_type;
     uint32_t type_id;
     const struct vkd3d_spirv_resource_type *resource_type_info;
@@ -5533,8 +5532,8 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
                 current->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX ? 0 : current->sampler_space,
                 current->sampler_index);
         symbol.id = var_id;
-        symbol.info.resource.register_space = resource_space;
-        symbol.info.resource.register_index = resource_index;
+        symbol.info.resource.range.space = resource_space;
+        symbol.info.resource.range.first = resource_index;
         symbol.info.resource.sampled_type = sampled_type;
         symbol.info.resource.type_id = image_type_id;
         symbol.info.resource.resource_type_info = resource_type_info;
@@ -5657,8 +5656,7 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
 
     vkd3d_symbol_make_resource(&resource_symbol, reg);
     resource_symbol.id = var_id;
-    resource_symbol.info.resource.register_space = register_space;
-    resource_symbol.info.resource.register_index = register_index;
+    resource_symbol.info.resource.range = resource->range;
     resource_symbol.info.resource.sampled_type = sampled_type;
     resource_symbol.info.resource.type_id = type_id;
     resource_symbol.info.resource.resource_type_info = resource_type_info;
@@ -7673,7 +7671,7 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
             image->image_type_id, image->id, SpvMemoryAccessMaskNone) : 0;
 
     image->image_type_id = vkd3d_dxbc_compiler_get_image_type_id(compiler, resource_reg,
-            symbol->info.resource.register_space, symbol->info.resource.register_index, image->resource_type_info,
+            symbol->info.resource.range.space, symbol->info.resource.range.first, image->resource_type_info,
             image->sampled_type, image->structure_stride || image->raw, depth_comparison);
 
     if (sampled)
