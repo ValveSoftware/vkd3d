@@ -2441,8 +2441,8 @@ static bool vkd3d_dxbc_compiler_has_combined_sampler(const struct vkd3d_dxbc_com
         if (!vkd3d_dxbc_compiler_check_shader_visibility(compiler, combined_sampler->shader_visibility))
             continue;
 
-        if ((!resource || (combined_sampler->resource_space == resource->register_space
-                && combined_sampler->resource_index == resource->register_index))
+        if ((!resource || (combined_sampler->resource_space == resource->range.space
+                && combined_sampler->resource_index == resource->range.first))
                 && (!sampler || (combined_sampler->sampler_space == sampler->register_space
                 && combined_sampler->sampler_index == sampler->register_index)))
             return true;
@@ -5554,8 +5554,8 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
     SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     const struct vkd3d_shader_register *reg = &resource->reg.reg;
     const struct vkd3d_spirv_resource_type *resource_type_info;
-    unsigned int register_space = resource->register_space;
-    unsigned int register_index = resource->register_index;
+    unsigned int register_space = resource->range.space;
+    unsigned int register_index = resource->range.first;
     enum vkd3d_shader_component_type sampled_type;
     struct vkd3d_symbol resource_symbol;
     bool is_uav;

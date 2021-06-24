@@ -636,11 +636,16 @@ struct vkd3d_shader_index_range
     unsigned int register_count;
 };
 
+struct vkd3d_shader_register_range
+{
+    unsigned int space;
+    unsigned int first, last;
+};
+
 struct vkd3d_shader_resource
 {
     struct vkd3d_shader_dst_param reg;
-    unsigned int register_space;
-    unsigned int register_index;
+    struct vkd3d_shader_register_range range;
 };
 
 enum vkd3d_decl_usage

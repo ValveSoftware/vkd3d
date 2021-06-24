@@ -666,8 +666,8 @@ static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_cont
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
     else
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
-    vkd3d_shader_scan_add_descriptor(context, type, resource->register_space,
-            resource->register_index, resource_type, resource_data_type, 0);
+    vkd3d_shader_scan_add_descriptor(context, type, resource->range.space,
+            resource->range.first, resource_type, resource_data_type, 0);
     if (type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
         vkd3d_shader_scan_add_uav_range(context, resource->reg.reg.idx[0].offset,
                 context->scan_descriptor_info->descriptor_count - 1);

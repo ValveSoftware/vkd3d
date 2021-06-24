@@ -1428,7 +1428,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_ins_modifiers(compiler, &ins->declaration.semantic.resource.reg);
             vkd3d_string_buffer_printf(buffer, "%s ", compiler->colours.reset);
             shader_dump_register(compiler, &ins->declaration.semantic.resource.reg.reg);
-            shader_dump_register_space(compiler, ins->declaration.semantic.resource.register_space);
+            shader_dump_register_space(compiler, ins->declaration.semantic.resource.range.space);
             break;
 
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
@@ -1531,14 +1531,14 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_RESOURCE_RAW:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.raw_resource.resource.reg);
-            shader_dump_register_space(compiler, ins->declaration.raw_resource.resource.register_space);
+            shader_dump_register_space(compiler, ins->declaration.raw_resource.resource.range.space);
             break;
 
         case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.structured_resource.resource.reg);
             shader_print_uint_literal(compiler, ", ", ins->declaration.structured_resource.byte_stride, "");
-            shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.register_space);
+            shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.range.space);
             break;
 
         case VKD3DSIH_DCL_SAMPLER:
@@ -1597,7 +1597,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_uav_flags(compiler, ins->flags);
             shader_addline(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.raw_resource.resource.reg);
-            shader_dump_register_space(compiler, ins->declaration.raw_resource.resource.register_space);
+            shader_dump_register_space(compiler, ins->declaration.raw_resource.resource.range.space);
             break;
 
         case VKD3DSIH_DCL_UAV_STRUCTURED:
@@ -1605,7 +1605,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_addline(buffer, " ");
             shader_dump_dst_param(compiler, &ins->declaration.structured_resource.resource.reg);
             shader_print_uint_literal(compiler, ", ", ins->declaration.structured_resource.byte_stride, "");
-            shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.register_space);
+            shader_dump_register_space(compiler, ins->declaration.structured_resource.resource.range.space);
             break;
 
         case VKD3DSIH_DEF:
