@@ -1,0 +1,11 @@
+[pixel shader]
+typedef const precise row_major float2x2 mat_t;
+float4 main() : sv_target
+{
+    const precise row_major mat_t mat = float2x2(0.1, 0.2, 0.3, 0.4);
+    return mat;
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)

@@ -659,8 +659,12 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     if (!(new_type = hlsl_type_clone(ctx, type, default_majority)))
         return NULL;
 
-    new_type->modifiers = add_modifiers(ctx, new_type->modifiers, *modifiers, loc);
+    new_type->modifiers |= *modifiers;
     *modifiers &= ~HLSL_TYPE_MODIFIERS_MASK;
+
+    if ((new_type->modifiers & HLSL_MODIFIER_ROW_MAJOR) && (new_type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                "'row_major' and 'column_major' modifiers are mutually exclusive.");
 
     if (new_type->type == HLSL_CLASS_MATRIX)
         new_type->reg_size = (hlsl_type_is_row_major(new_type) ? new_type->dimy : new_type->dimx) * 4;

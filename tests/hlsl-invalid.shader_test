@@ -219,3 +219,20 @@ float4 main(void) : sv_target
     in float f;
     return 0;
 }
+
+[pixel shader fail]
+const const float4 c;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+typedef row_major float4x4 mat_t;
+column_major mat_t m;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
