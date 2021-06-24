@@ -112,6 +112,18 @@ static unsigned int get_array_size(const struct hlsl_type *type)
     return 1;
 }
 
+unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset)
+{
+    /* Align to the next vec4 boundary if:
+     *  (a) the type is a struct or array type, or
+     *  (b) the type would cross a vec4 boundary; i.e. a vec3 and a
+     *      vec1 can be packed together, but not a vec3 and a vec2.
+     */
+    if (type->type > HLSL_CLASS_LAST_NUMERIC || (offset & 3) + type->reg_size > 4)
+        return align(offset, 4);
+    return offset;
+}
+
 static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type *type)
 {
     bool is_sm4 = (ctx->profile->major_version >= 4);
@@ -155,14 +167,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
 
                 assert(field_size);
 
-                /* Align to the next vec4 boundary if:
-                 *  (a) the type is a struct or array type, or
-                 *  (b) the type would cross a vec4 boundary; i.e. a vec3 and a
-                 *      vec1 can be packed together, but not a vec3 and a vec2.
-                 */
-                if (field->type->type > HLSL_CLASS_LAST_NUMERIC || (type->reg_size & 3) + field_size > 4)
-                    type->reg_size = align(type->reg_size, 4);
-
+                type->reg_size = hlsl_type_get_sm4_offset(field->type, type->reg_size);
                 field->reg_offset = type->reg_size;
                 type->reg_size += field_size;
 

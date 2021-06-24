@@ -228,6 +228,7 @@ struct hlsl_ir_var
     struct list scope_entry, param_entry, extern_entry;
 
     unsigned int first_write, last_read;
+    unsigned int buffer_offset;
     struct hlsl_reg reg;
 
     uint32_t is_input_semantic : 1;
@@ -431,6 +432,9 @@ struct hlsl_buffer
     const char *name;
     struct hlsl_reg_reservation reservation;
     struct list entry;
+
+    unsigned size, used_size;
+    struct hlsl_reg reg;
 };
 
 struct hlsl_ctx
@@ -678,6 +682,7 @@ bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type) DECLS
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, unsigned int modifiers) DECLSPEC_HIDDEN;
 unsigned int hlsl_type_component_count(struct hlsl_type *type) DECLSPEC_HIDDEN;
+unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset) DECLSPEC_HIDDEN;
 bool hlsl_type_is_void(const struct hlsl_type *type) DECLSPEC_HIDDEN;
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2) DECLSPEC_HIDDEN;
 

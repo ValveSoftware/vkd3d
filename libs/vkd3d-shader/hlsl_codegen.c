@@ -1115,6 +1115,105 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
     }
 }
 
+static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t index)
+{
+    const struct hlsl_buffer *buffer;
+
+    LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, const struct hlsl_buffer, entry)
+    {
+        if (buffer->used_size && buffer->reservation.type == 'b' && buffer->reservation.index == index)
+            return buffer;
+    }
+    return NULL;
+}
+
+static void calculate_buffer_offset(struct hlsl_ir_var *var)
+{
+    struct hlsl_buffer *buffer = var->buffer;
+
+    buffer->size = hlsl_type_get_sm4_offset(var->data_type, buffer->size);
+
+    var->buffer_offset = buffer->size;
+    TRACE("Allocated buffer offset %u to %s.\n", var->buffer_offset, var->name);
+    buffer->size += var->data_type->reg_size;
+    if (var->last_read)
+        buffer->used_size = buffer->size;
+}
+
+static void allocate_buffers(struct hlsl_ctx *ctx)
+{
+    struct hlsl_buffer *buffer, *params_buffer;
+    struct hlsl_ir_var *var;
+    uint32_t index = 0;
+
+    if (!(params_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
+            hlsl_strdup(ctx, "$Params"), NULL, ctx->location)))
+        return;
+
+    /* The $Globals and $Params buffers should be allocated first, before all
+     * explicit buffers. */
+    list_remove(&params_buffer->entry);
+    list_add_head(&ctx->buffers, &params_buffer->entry);
+    list_remove(&ctx->globals_buffer->entry);
+    list_add_head(&ctx->buffers, &ctx->globals_buffer->entry);
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_uniform)
+        {
+            if (var->is_param)
+                var->buffer = params_buffer;
+
+            calculate_buffer_offset(var);
+        }
+    }
+
+    LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        if (!buffer->used_size)
+            continue;
+
+        if (buffer->type == HLSL_BUFFER_CONSTANT)
+        {
+            if (buffer->reservation.type == 'b')
+            {
+                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx, buffer->reservation.index);
+
+                if (reserved_buffer && reserved_buffer != buffer)
+                {
+                    hlsl_error(ctx, buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                            "Multiple buffers bound to cb%u.", buffer->reservation.index);
+                    hlsl_note(ctx, reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
+                            "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.index);
+                }
+
+                buffer->reg.id = buffer->reservation.index;
+                buffer->reg.allocated = true;
+                TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
+            }
+            else if (!buffer->reservation.type)
+            {
+                while (get_reserved_buffer(ctx, index))
+                    ++index;
+
+                buffer->reg.id = index;
+                buffer->reg.allocated = true;
+                TRACE("Allocated %s to cb%u.\n", buffer->name, index);
+                ++index;
+            }
+            else
+            {
+                hlsl_error(ctx, buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Constant buffers must be allocated to register type 'b'.");
+            }
+        }
+        else
+        {
+            FIXME("Allocate registers for texture buffers.\n");
+        }
+    }
+}
+
 static unsigned int map_swizzle(unsigned int swizzle, unsigned int writemask)
 {
     unsigned int i, ret = 0;
@@ -2062,6 +2161,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     allocate_temp_registers(ctx, entry_func);
     if (ctx->profile->major_version < 4)
         allocate_const_registers(ctx, entry_func);
+    else
+        allocate_buffers(ctx);
     allocate_semantic_registers(ctx);
 
     if (ctx->result)
