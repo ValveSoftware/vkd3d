@@ -720,7 +720,7 @@ struct vkd3d_shader_register_semantic
 struct vkd3d_shader_sampler
 {
     struct vkd3d_shader_src_param src;
-    unsigned int register_space, register_index;
+    struct vkd3d_shader_register_range range;
 };
 
 struct vkd3d_shader_constant_buffer

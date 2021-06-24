@@ -1546,7 +1546,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_dump_register(compiler, &ins->declaration.sampler.src.reg);
             if (ins->flags == VKD3DSI_SAMPLER_COMPARISON_MODE)
                 shader_addline(buffer, ", comparisonMode");
-            shader_dump_register_space(compiler, ins->declaration.sampler.register_space);
+            shader_dump_register_space(compiler, ins->declaration.sampler.range.space);
             break;
 
         case VKD3DSIH_DCL_TEMPS:

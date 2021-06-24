@@ -2443,8 +2443,8 @@ static bool vkd3d_dxbc_compiler_has_combined_sampler(const struct vkd3d_dxbc_com
 
         if ((!resource || (combined_sampler->resource_space == resource->range.space
                 && combined_sampler->resource_index == resource->range.first))
-                && (!sampler || (combined_sampler->sampler_space == sampler->register_space
-                && combined_sampler->sampler_index == sampler->register_index)))
+                && (!sampler || (combined_sampler->sampler_space == sampler->range.space
+                && combined_sampler->sampler_index == sampler->range.first)))
             return true;
     }
 
@@ -5363,8 +5363,8 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
     struct vkd3d_symbol reg_symbol;
 
     vkd3d_symbol_make_sampler(&reg_symbol, reg);
-    reg_symbol.info.sampler.register_space = sampler->register_space;
-    reg_symbol.info.sampler.register_index = sampler->register_index;
+    reg_symbol.info.sampler.register_space = sampler->range.space;
+    reg_symbol.info.sampler.register_index = sampler->range.first;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 
     if (vkd3d_dxbc_compiler_has_combined_sampler(compiler, NULL, sampler))
@@ -5376,7 +5376,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
             ptr_type_id, storage_class, 0);
 
     vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(compiler, var_id, reg,
-            sampler->register_space, sampler->register_index, VKD3D_SHADER_RESOURCE_NONE, false);
+            sampler->range.space, sampler->range.first, VKD3D_SHADER_RESOURCE_NONE, false);
 
     vkd3d_dxbc_compiler_emit_register_debug_name(builder, var_id, reg);
 

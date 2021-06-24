@@ -716,8 +716,8 @@ static void shader_sm4_read_dcl_sampler(struct vkd3d_shader_instruction *ins,
     if (ins->flags & ~VKD3D_SM4_SAMPLER_COMPARISON)
         FIXME("Unhandled sampler mode %#x.\n", ins->flags);
     shader_sm4_read_src_param(priv, &tokens, end, VKD3D_DATA_SAMPLER, &ins->declaration.sampler.src);
-    ins->declaration.sampler.register_index = shader_sm4_map_resource_idx(&ins->declaration.sampler.src.reg, priv);
-    shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.sampler.register_space);
+    ins->declaration.sampler.range.first = shader_sm4_map_resource_idx(&ins->declaration.sampler.src.reg, priv);
+    shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.sampler.range.space);
 }
 
 static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins,
