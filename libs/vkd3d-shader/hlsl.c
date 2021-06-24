@@ -105,6 +105,54 @@ static bool hlsl_type_is_row_major(const struct hlsl_type *type)
     return !!(type->modifiers & HLSL_MODIFIER_ROW_MAJOR);
 }
 
+static unsigned int get_array_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_ARRAY)
+        return get_array_size(type->e.array.type) * type->e.array.elements_count;
+    return 1;
+}
+
+static void hlsl_type_calculate_reg_size(struct hlsl_type *type)
+{
+    switch (type->type)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+            type->reg_size = 4;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+            type->reg_size = 4 * (hlsl_type_is_row_major(type) ? type->dimy : type->dimx);
+            break;
+
+        case HLSL_CLASS_ARRAY:
+            assert(type->e.array.type->reg_size);
+            type->reg_size = type->e.array.elements_count * type->e.array.type->reg_size;
+            break;
+
+        case HLSL_CLASS_STRUCT:
+        {
+            struct hlsl_struct_field *field;
+
+            type->dimx = 0;
+            type->reg_size = 0;
+
+            LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+            {
+                type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
+
+                field->reg_offset = type->reg_size;
+                assert(field->type->reg_size);
+                type->reg_size += field->type->reg_size;
+            }
+            break;
+        }
+
+        case HLSL_CLASS_OBJECT:
+            break;
+    }
+}
+
 struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
@@ -117,10 +165,7 @@ struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hls
     type->base_type = base_type;
     type->dimx = dimx;
     type->dimy = dimy;
-    if (type_class == HLSL_CLASS_MATRIX)
-        type->reg_size = (hlsl_type_is_row_major(type) ? dimy : dimx) * 4;
-    else
-        type->reg_size = 4;
+    hlsl_type_calculate_reg_size(type);
 
     list_add_tail(&ctx->types, &type->entry);
 
@@ -129,31 +174,26 @@ struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hls
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size)
 {
-    struct hlsl_type *type = hlsl_new_type(ctx, NULL, HLSL_CLASS_ARRAY, HLSL_TYPE_FLOAT, 1, 1);
+    struct hlsl_type *type;
 
-    if (!type)
+    if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
 
+    type->type = HLSL_CLASS_ARRAY;
     type->modifiers = basic_type->modifiers;
     type->e.array.elements_count = array_size;
     type->e.array.type = basic_type;
-    type->reg_size = basic_type->reg_size * array_size;
     type->dimx = basic_type->dimx;
     type->dimy = basic_type->dimy;
-    return type;
-}
+    hlsl_type_calculate_reg_size(type);
 
-static DWORD get_array_size(const struct hlsl_type *type)
-{
-    if (type->type == HLSL_CLASS_ARRAY)
-        return get_array_size(type->e.array.type) * type->e.array.elements_count;
-    return 1;
+    list_add_tail(&ctx->types, &type->entry);
+
+    return type;
 }
 
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields)
 {
-    struct hlsl_struct_field *field;
-    unsigned int reg_size = 0;
     struct hlsl_type *type;
 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
@@ -161,17 +201,9 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, s
     type->type = HLSL_CLASS_STRUCT;
     type->base_type = HLSL_TYPE_VOID;
     type->name = name;
-    type->dimx = 0;
     type->dimy = 1;
     type->e.elements = fields;
-
-    LIST_FOR_EACH_ENTRY(field, fields, struct hlsl_struct_field, entry)
-    {
-        field->reg_offset = reg_size;
-        reg_size += field->type->reg_size;
-        type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
-    }
-    type->reg_size = reg_size;
+    hlsl_type_calculate_reg_size(type);
 
     list_add_tail(&ctx->types, &type->entry);
 
@@ -314,13 +346,10 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         case HLSL_CLASS_ARRAY:
             type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority, modifiers);
             type->e.array.elements_count = old->e.array.elements_count;
-            type->reg_size = type->e.array.elements_count * type->e.array.type->reg_size;
             break;
 
         case HLSL_CLASS_STRUCT:
         {
-            unsigned int reg_size = 0;
-
             if (!(type->e.elements = hlsl_alloc(ctx, sizeof(*type->e.elements))))
             {
                 vkd3d_free((void *)type->name);
@@ -351,22 +380,16 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
                     field->semantic.name = hlsl_strdup(ctx, old_field->semantic.name);
                     field->semantic.index = old_field->semantic.index;
                 }
-                field->reg_offset = reg_size;
-                reg_size += field->type->reg_size;
                 list_add_tail(type->e.elements, &field->entry);
             }
-            type->reg_size = reg_size;
             break;
         }
 
-        case HLSL_CLASS_MATRIX:
-            type->reg_size = (hlsl_type_is_row_major(type) ? type->dimy : type->dimx) * 4;
-            break;
-
         default:
-            type->reg_size = 4;
             break;
     }
+
+    hlsl_type_calculate_reg_size(type);
 
     list_add_tail(&ctx->types, &type->entry);
     return type;
