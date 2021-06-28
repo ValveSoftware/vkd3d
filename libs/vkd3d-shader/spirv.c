@@ -2461,8 +2461,9 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_dxbc_compiler_error(struct vkd3d_dxbc_
 }
 
 static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor_binding(
-        struct vkd3d_dxbc_compiler *compiler, const struct vkd3d_shader_register *reg, unsigned int register_space,
-        unsigned int reg_idx, enum vkd3d_shader_resource_type resource_type, bool is_uav_counter)
+        struct vkd3d_dxbc_compiler *compiler, const struct vkd3d_shader_register *reg,
+        const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
+        bool is_uav_counter)
 {
     const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
     enum vkd3d_shader_descriptor_type descriptor_type;
@@ -2499,7 +2500,7 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
             if (!vkd3d_dxbc_compiler_check_shader_visibility(compiler, current->shader_visibility))
                 continue;
 
-            if (current->register_space != register_space || current->register_index != reg_idx)
+            if (current->register_space != range->space || current->register_index != range->first)
                 continue;
 
             if (current->offset)
@@ -2507,7 +2508,7 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
                 FIXME("Atomic counter offsets are not supported yet.\n");
                 vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_DESCRIPTOR_BINDING,
                         "Descriptor binding for UAV counter %u, space %u has unsupported ‘offset’ %u.",
-                        reg_idx, register_space, current->offset);
+                        range->first, range->space, current->offset);
             }
 
             if (current->binding.count != 1)
@@ -2515,16 +2516,16 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
                 FIXME("Descriptor arrays are not supported.\n");
                 vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_DESCRIPTOR_BINDING,
                         "Descriptor binding for UAV counter %u, space %u has unsupported ‘count’ %u.",
-                        reg_idx, register_space, current->binding.count);
+                        range->first, range->space, current->binding.count);
             }
 
             return current->binding;
         }
         if (shader_interface->uav_counter_count)
         {
-            FIXME("Could not find descriptor binding for UAV counter %u, space %u.\n", reg_idx, register_space);
+            FIXME("Could not find descriptor binding for UAV counter %u, space %u.\n", range->first, range->space);
             vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND,
-                    "Could not find descriptor binding for UAV counter %u, space %u.", reg_idx, register_space);
+                    "Could not find descriptor binding for UAV counter %u, space %u.", range->first, range->space);
         }
     }
     else
@@ -2539,8 +2540,8 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
             if (!vkd3d_dxbc_compiler_check_shader_visibility(compiler, current->shader_visibility))
                 continue;
 
-            if (current->type != descriptor_type || current->register_space != register_space
-                    || current->register_index != reg_idx)
+            if (current->type != descriptor_type || current->register_space != range->space
+                    || current->register_index != range->first)
                 continue;
 
             if (current->binding.count != 1)
@@ -2549,7 +2550,7 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
                 vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_DESCRIPTOR_BINDING,
                         "Descriptor binding for type %#x, space %u, register %u, "
                         "shader type %#x has unsupported ‘count’ %u.",
-                        descriptor_type, register_space, reg_idx, compiler->shader_type, current->binding.count);
+                        descriptor_type, range->space, range->first, compiler->shader_type, current->binding.count);
             }
 
             return current->binding;
@@ -2557,10 +2558,10 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
         if (shader_interface->binding_count)
         {
             FIXME("Could not find binding for type %#x, space %u, register %u, shader type %#x.\n",
-                    descriptor_type, register_space, reg_idx, compiler->shader_type);
+                    descriptor_type, range->space, range->first, compiler->shader_type);
             vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND,
                     "Could not find descriptor binding for type %#x, space %u, register %u, shader type %#x.",
-                    descriptor_type, register_space, reg_idx, compiler->shader_type);
+                    descriptor_type, range->space, range->first, compiler->shader_type);
         }
     }
 
@@ -2586,8 +2587,7 @@ static void vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(struct vkd3d_dxb
 {
     struct vkd3d_shader_descriptor_binding binding;
 
-    binding = vkd3d_dxbc_compiler_get_descriptor_binding(compiler, reg, range->space,
-            range->first, resource_type, is_uav_counter);
+    binding = vkd3d_dxbc_compiler_get_descriptor_binding(compiler, reg, range, resource_type, is_uav_counter);
     vkd3d_dxbc_compiler_emit_descriptor_binding(compiler, variable_id, &binding);
 }
 
