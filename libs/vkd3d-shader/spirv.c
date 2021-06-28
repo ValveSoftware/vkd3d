@@ -5464,7 +5464,7 @@ static uint32_t vkd3d_dxbc_compiler_get_image_type_id(struct vkd3d_dxbc_compiler
 }
 
 static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_dxbc_compiler *compiler,
-        const struct vkd3d_shader_register *resource, unsigned int resource_space, unsigned int resource_index,
+        const struct vkd3d_shader_register *resource, const struct vkd3d_shader_register_range *resource_range,
         enum vkd3d_shader_resource_type resource_type, enum vkd3d_shader_component_type sampled_type,
         unsigned int structure_stride, bool raw, const struct vkd3d_spirv_resource_type *resource_type_info)
 {
@@ -5486,7 +5486,7 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
     {
         current = &shader_interface->combined_samplers[i];
 
-        if (current->resource_space != resource_space || current->resource_index != resource_index)
+        if (current->resource_space != resource_range->space || current->resource_index != resource_range->first)
             continue;
 
         if (!(current->flags & resource_type_flag))
@@ -5501,7 +5501,7 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
             vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_DESCRIPTOR_BINDING,
                     "Combined descriptor binding for resource %u, space %u, "
                     "and sampler %u, space %u has unsupported ‘count’ %u.",
-                    resource_index, resource_space, current->sampler_index,
+                    resource_range->first, resource_range->space, current->sampler_index,
                     current->sampler_space, current->binding.count);
         }
 
@@ -5510,8 +5510,8 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
         depth = current->sampler_index != VKD3D_SHADER_DUMMY_SAMPLER_INDEX
                 && (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE);
 
-        image_type_id = vkd3d_dxbc_compiler_get_image_type_id(compiler, resource, resource_space,
-                resource_index, resource_type_info, sampled_type, structure_stride || raw, depth);
+        image_type_id = vkd3d_dxbc_compiler_get_image_type_id(compiler, resource, resource_range->space,
+                resource_range->first, resource_type_info, sampled_type, structure_stride || raw, depth);
         type_id = vkd3d_spirv_get_op_type_sampled_image(builder, image_type_id);
 
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
@@ -5521,17 +5521,17 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
         vkd3d_dxbc_compiler_emit_descriptor_binding(compiler, var_id, &current->binding);
 
         if (current->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX)
-            vkd3d_spirv_build_op_name(builder, var_id, "t%u_%u_dummy_sampler", resource_space, resource_index);
+            vkd3d_spirv_build_op_name(builder, var_id, "t%u_%u_dummy_sampler", resource_range->space,
+                    resource_range->first);
         else
-            vkd3d_spirv_build_op_name(builder, var_id, "t%u_%u_s%u_%u", resource_space, resource_index,
+            vkd3d_spirv_build_op_name(builder, var_id, "t%u_%u_s%u_%u", resource_range->space, resource_range->first,
                     current->sampler_space, current->sampler_index);
 
         vkd3d_symbol_make_combined_sampler(&symbol, resource,
                 current->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX ? 0 : current->sampler_space,
                 current->sampler_index);
         symbol.id = var_id;
-        symbol.info.resource.range.space = resource_space;
-        symbol.info.resource.range.first = resource_index;
+        symbol.info.resource.range = *resource_range;
         symbol.info.resource.sampled_type = sampled_type;
         symbol.info.resource.type_id = image_type_id;
         symbol.info.resource.resource_type_info = resource_type_info;
@@ -5569,8 +5569,8 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
 
     if (vkd3d_dxbc_compiler_has_combined_sampler(compiler, resource, NULL))
     {
-        vkd3d_dxbc_compiler_emit_combined_sampler_declarations(compiler, reg, register_space,
-                register_index, resource_type, sampled_type, structure_stride, raw, resource_type_info);
+        vkd3d_dxbc_compiler_emit_combined_sampler_declarations(compiler, reg, &resource->range,
+                resource_type, sampled_type, structure_stride, raw, resource_type_info);
         return;
     }
 
