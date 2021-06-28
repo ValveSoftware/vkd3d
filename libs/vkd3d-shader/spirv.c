@@ -5422,7 +5422,7 @@ static SpvImageFormat image_format_for_image_read(enum vkd3d_shader_component_ty
 
 static const struct vkd3d_shader_descriptor_info *vkd3d_dxbc_compiler_get_descriptor_info(
         struct vkd3d_dxbc_compiler *compiler, enum vkd3d_shader_descriptor_type type,
-        unsigned int register_space, unsigned int register_index)
+        const struct vkd3d_shader_register_range *range)
 {
     const struct vkd3d_shader_scan_descriptor_info *descriptor_info = compiler->scan_descriptor_info;
     const struct vkd3d_shader_descriptor_info *d;
@@ -5431,7 +5431,7 @@ static const struct vkd3d_shader_descriptor_info *vkd3d_dxbc_compiler_get_descri
     for (i = 0; i < descriptor_info->descriptor_count; ++i)
     {
         d = &descriptor_info->descriptors[i];
-        if (d->type == type && d->register_space == register_space && d->register_index == register_index)
+        if (d->type == type && d->register_space == range->space && d->register_index == range->first)
             return d;
     }
 
@@ -5452,7 +5452,7 @@ static uint32_t vkd3d_dxbc_compiler_get_image_type_id(struct vkd3d_dxbc_compiler
     if (reg->type == VKD3DSPR_UAV)
     {
         d = vkd3d_dxbc_compiler_get_descriptor_info(compiler,
-                VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range->space, range->first);
+                VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
         if (raw_structured || (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ))
             format = image_format_for_image_read(data_type);
     }
@@ -5484,6 +5484,8 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
     {
+        struct vkd3d_shader_register_range sampler_range;
+
         current = &shader_interface->combined_samplers[i];
 
         if (current->resource_space != resource_range->space || current->resource_index != resource_range->first)
@@ -5505,8 +5507,11 @@ static void vkd3d_dxbc_compiler_emit_combined_sampler_declarations(struct vkd3d_
                     current->sampler_space, current->binding.count);
         }
 
+        sampler_range.space = current->sampler_space;
+        sampler_range.first = current->sampler_index;
+        sampler_range.last = current->sampler_index;
         d = vkd3d_dxbc_compiler_get_descriptor_info(compiler,
-                VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, current->sampler_space, current->sampler_index);
+                VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &sampler_range);
         depth = current->sampler_index != VKD3D_SHADER_DUMMY_SAMPLER_INDEX
                 && (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE);
 
@@ -5610,7 +5615,7 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
         const struct vkd3d_shader_descriptor_info *d;
 
         d = vkd3d_dxbc_compiler_get_descriptor_info(compiler,
-                VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, register_space, register_index);
+                VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, &resource->range);
 
         if (!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ))
             vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
