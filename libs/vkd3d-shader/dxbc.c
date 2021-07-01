@@ -694,7 +694,7 @@ static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction 
     const DWORD *end = &tokens[token_count];
 
     shader_sm4_read_src_param(priv, &tokens, end, VKD3D_DATA_FLOAT, &ins->declaration.cb.src);
-    ins->declaration.cb.range.first = shader_sm4_map_resource_idx(&ins->declaration.cb.src.reg, priv);
+    shader_sm4_set_descriptor_register_range(priv, &ins->declaration.cb.src.reg, &ins->declaration.cb.range);
     if (opcode_token & VKD3D_SM4_INDEX_TYPE_MASK)
         ins->flags |= VKD3DSI_INDEXED_DYNAMIC;
 
