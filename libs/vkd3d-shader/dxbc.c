@@ -630,6 +630,15 @@ static unsigned int shader_sm4_map_resource_idx(struct vkd3d_shader_register *re
         return reg->idx[0].offset;
 }
 
+static void shader_sm4_set_descriptor_register_range(struct vkd3d_sm4_data *priv,
+        struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
+{
+    range->first = reg->idx[shader_is_sm_5_1(priv) ? 1 : 0].offset;
+    range->last = reg->idx[shader_is_sm_5_1(priv) ? 2 : 0].offset;
+    if (range->last < range->first)
+        FIXME("Invalid register range [%u:%u].\n", range->first, range->last);
+}
+
 static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins,
         DWORD opcode, DWORD opcode_token, const DWORD *tokens, unsigned int token_count,
         struct vkd3d_sm4_data *priv)
@@ -654,8 +663,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins,
     }
     reg_data_type = opcode == VKD3D_SM4_OP_DCL_RESOURCE ? VKD3D_DATA_RESOURCE : VKD3D_DATA_UAV;
     shader_sm4_read_dst_param(priv, &tokens, end, reg_data_type, &semantic->resource.reg);
-    semantic->resource.range.first = shader_sm4_map_resource_idx(&semantic->resource.reg.reg, priv);
-    semantic->resource.range.last = semantic->resource.range.first;
+    shader_sm4_set_descriptor_register_range(priv, &semantic->resource.reg.reg, &semantic->resource.range);
 
     components = *tokens++;
     for (i = 0; i < VKD3D_VEC4_SIZE; i++)
