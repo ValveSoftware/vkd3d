@@ -622,14 +622,6 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins,
     ins->declaration.icb = &priv->icb;
 }
 
-static unsigned int shader_sm4_map_resource_idx(struct vkd3d_shader_register *reg, const struct vkd3d_sm4_data *priv)
-{
-    if (shader_is_sm_5_1(priv))
-        return reg->idx[1].offset;
-    else
-        return reg->idx[0].offset;
-}
-
 static void shader_sm4_set_descriptor_register_range(struct vkd3d_sm4_data *priv,
         struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
 {
@@ -991,8 +983,7 @@ static void shader_sm5_read_dcl_resource_raw(struct vkd3d_shader_instruction *in
     const DWORD *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_RESOURCE, &resource->resource.reg);
-    resource->resource.range.first = shader_sm4_map_resource_idx(&resource->resource.reg.reg, priv);
-    resource->resource.range.last = resource->resource.range.first;
+    shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     shader_sm4_read_register_space(priv, &tokens, end, &resource->resource.range.space);
 }
 
