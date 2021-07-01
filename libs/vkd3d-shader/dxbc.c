@@ -925,8 +925,7 @@ static void shader_sm5_read_dcl_uav_raw(struct vkd3d_shader_instruction *ins,
     const DWORD *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UAV, &resource->resource.reg);
-    resource->resource.range.first = shader_sm4_map_resource_idx(&resource->resource.reg.reg, priv);
-    resource->resource.range.last = resource->resource.range.first;
+    shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
     ins->flags = (opcode_token & VKD3D_SM5_UAV_FLAGS_MASK) >> VKD3D_SM5_UAV_FLAGS_SHIFT;
     shader_sm4_read_register_space(priv, &tokens, end, &resource->resource.range.space);
 }
