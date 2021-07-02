@@ -489,6 +489,8 @@ struct vkd3d_sm4_data
     struct list src_free;
     struct list src;
     struct vkd3d_shader_immediate_constant_buffer icb;
+
+    struct vkd3d_shader_message_context *message_context;
 };
 
 struct vkd3d_sm4_opcode_info
@@ -561,6 +563,16 @@ static bool shader_is_sm_5_1(const struct vkd3d_sm4_data *priv)
     return version->major >= 5 && version->minor >= 1;
 }
 
+static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_sm4_data *priv,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_verror(priv->message_context, NULL, error, format, args);
+    va_end(args);
+}
+
 static bool shader_sm4_read_src_param(struct vkd3d_sm4_data *priv, const DWORD **ptr, const DWORD *end,
         enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param);
 static bool shader_sm4_read_dst_param(struct vkd3d_sm4_data *priv, const DWORD **ptr, const DWORD *end,
@@ -628,7 +640,11 @@ static void shader_sm4_set_descriptor_register_range(struct vkd3d_sm4_data *priv
     range->first = reg->idx[shader_is_sm_5_1(priv) ? 1 : 0].offset;
     range->last = reg->idx[shader_is_sm_5_1(priv) ? 2 : 0].offset;
     if (range->last < range->first)
+    {
         FIXME("Invalid register range [%u:%u].\n", range->first, range->last);
+        shader_sm4_error(priv, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE,
+                "Last register %u must not be less than first register %u in range.\n", range->last, range->first);
+    }
 }
 
 static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins,
@@ -1343,7 +1359,7 @@ static enum vkd3d_data_type map_data_type(char t)
 }
 
 void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
-        const struct vkd3d_shader_signature *output_signature)
+        const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context)
 {
     DWORD version_token, token_count;
     struct vkd3d_sm4_data *priv;
@@ -1423,6 +1439,8 @@ void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
 
     list_init(&priv->src_free);
     list_init(&priv->src);
+
+    priv->message_context = message_context;
 
     return priv;
 }

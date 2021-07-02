@@ -69,6 +69,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_SIZE          = 6,
 
     VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF                = 1000,
+    VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE       = 1001,
 
     VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND = 2000,
     VKD3D_SHADER_ERROR_SPV_INVALID_REGISTER_TYPE        = 2001,
@@ -861,8 +862,10 @@ void vkd3d_shader_trace(void *data) DECLSPEC_HIDDEN;
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type) DECLSPEC_HIDDEN;
 
+struct vkd3d_shader_message_context;
+
 void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
-        const struct vkd3d_shader_signature *output_signature) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
 void shader_sm4_free(void *data) DECLSPEC_HIDDEN;
 void shader_sm4_read_header(void *data, const DWORD **ptr,
         struct vkd3d_shader_version *shader_version) DECLSPEC_HIDDEN;
