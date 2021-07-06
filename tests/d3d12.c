@@ -29766,6 +29766,114 @@ static void test_resource_allocation_info(void)
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
 }
 
+static void test_64kb_texture_alignment(void)
+{
+    ID3D12GraphicsCommandList *command_list;
+    D3D12_RESOURCE_ALLOCATION_INFO info;
+    D3D12_SUBRESOURCE_DATA texture_data;
+    D3D12_RESOURCE_DESC resource_desc;
+    struct test_context context;
+    struct resource_readback rb;
+    ID3D12Resource *textures[2];
+    D3D12_HEAP_DESC heap_desc;
+    ID3D12CommandQueue *queue;
+    uint32_t *upload_buffer;
+    ID3D12Device *device;
+    ID3D12Heap *heap;
+    unsigned int i;
+    D3D12_BOX box;
+    HRESULT hr;
+
+    if (!init_test_context(&context, NULL))
+        return;
+    device = context.device;
+    command_list = context.list;
+    queue = context.queue;
+
+    /* This results in an alignment of 0x20000 with RX580/RADV, but
+     * only with D3D12_TEXTURE_LAYOUT_UNKNOWN. Other cards/drivers may
+     * specify smaller alignments compatible with the 64kb D3D12 default. */
+    resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+    resource_desc.Alignment = 0;
+    resource_desc.Width = 1024;
+    resource_desc.Height = 1024;
+    resource_desc.DepthOrArraySize = 1;
+    resource_desc.MipLevels = 1;
+    resource_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    resource_desc.SampleDesc.Count = 1;
+    resource_desc.SampleDesc.Quality = 0;
+    resource_desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    resource_desc.Flags = 0;
+
+    info = ID3D12Device_GetResourceAllocationInfo(device, 0, 1, &resource_desc);
+
+    heap_desc.SizeInBytes = info.SizeInBytes * 2 + D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    memset(&heap_desc.Properties, 0, sizeof(heap_desc.Properties));
+    heap_desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heap_desc.Alignment = 0;
+    heap_desc.Flags = D3D12_HEAP_FLAG_DENY_BUFFERS | D3D12_HEAP_FLAG_DENY_RT_DS_TEXTURES;
+    hr = ID3D12Device_CreateHeap(device, &heap_desc, &IID_ID3D12Heap, (void **)&heap);
+    ok(hr == S_OK, "Failed to create heap, hr %#x.\n", hr);
+
+    /* Padding of info.SizeInBytes is (vulkan_alignment - d3d12_alignment), so this heap_offset calculation
+     * always results in a Vulkan-aligned offset which won't be adjusted upwards. */
+    hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT + info.SizeInBytes,
+            &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, (void **)&textures[1]);
+    ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
+    /* Some apps, e.g. WoW, ignore the alignment returned by GetResourceAllocationInfo() and use
+     * D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT. D3D12 requires support for this alignment. */
+    hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+            &resource_desc, D3D12_RESOURCE_STATE_COPY_DEST, NULL, &IID_ID3D12Resource, (void **)&textures[0]);
+    ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
+    upload_buffer = malloc(info.SizeInBytes);
+    ok(upload_buffer, "Failed to allocate memory.\n");
+
+    for (i = 0; i < resource_desc.Width * resource_desc.Height; ++i)
+        upload_buffer[i] = 0xcafef00d;
+    texture_data.pData = upload_buffer;
+    texture_data.RowPitch = resource_desc.Width * sizeof(uint32_t);
+    texture_data.SlicePitch = texture_data.RowPitch * resource_desc.Height;
+    upload_texture_data(textures[1], &texture_data, 1, queue, command_list);
+
+    for (i = 0; i < resource_desc.Width * resource_desc.Height; ++i)
+        upload_buffer[i] = 0xdeadbeef;
+    texture_data.SlicePitch = texture_data.RowPitch * resource_desc.Height;
+    reset_command_list(command_list, context.allocator);
+    /* Write data to the first texture to check if the second is overwritten.
+     * Resource overlap may still go undetected depending on the actual layout
+     * used by the driver. */
+    upload_texture_data(textures[0], &texture_data, 1, queue, command_list);
+
+    reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, textures[1],
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
+    set_box(&box, 0, 0, 0, resource_desc.Width, resource_desc.Height, 1);
+    check_readback_data_uint(&rb, &box, 0xcafef00d, 0);
+    release_resource_readback(&rb);
+
+    ID3D12Resource_Release(textures[1]);
+    /* Create an aliased texture. */
+    hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+            &resource_desc, D3D12_RESOURCE_STATE_COPY_SOURCE, NULL, &IID_ID3D12Resource, (void **)&textures[1]);
+    ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
+    /* If the heap could not be used, the texture is not aliased. */
+    reset_command_list(command_list, context.allocator);
+    get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
+    todo_if(info.Alignment > D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT)
+    check_readback_data_uint(&rb, &box, 0xdeadbeef, 0);
+    release_resource_readback(&rb);
+
+    free(upload_buffer);
+    ID3D12Resource_Release(textures[0]);
+    ID3D12Resource_Release(textures[1]);
+    ID3D12Heap_Release(heap);
+    destroy_test_context(&context);
+}
+
 static void test_suballocate_small_textures(void)
 {
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
@@ -33982,6 +34090,7 @@ START_TEST(d3d12)
     run_test(test_clip_distance);
     run_test(test_combined_clip_and_cull_distances);
     run_test(test_resource_allocation_info);
+    run_test(test_64kb_texture_alignment);
     run_test(test_suballocate_small_textures);
     run_test(test_command_list_initial_pipeline_state);
     run_test(test_blend_factor);
