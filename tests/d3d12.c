@@ -29863,7 +29863,6 @@ static void test_64kb_texture_alignment(void)
     /* If the heap could not be used, the texture is not aliased. */
     reset_command_list(command_list, context.allocator);
     get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
-    todo_if(info.Alignment > D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT)
     check_readback_data_uint(&rb, &box, 0xdeadbeef, 0);
     release_resource_readback(&rb);
 

@@ -1901,9 +1901,15 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
     VkResult vr;
 
     if (d3d12_resource_is_buffer(resource))
+    {
         VK_CALL(vkGetBufferMemoryRequirements(vk_device, resource->u.vk_buffer, &requirements));
+    }
     else
+    {
         VK_CALL(vkGetImageMemoryRequirements(vk_device, resource->u.vk_image, &requirements));
+        /* Padding in d3d12_device_GetResourceAllocationInfo() leaves room to align the offset. */
+        heap_offset = align(heap_offset, requirements.alignment);
+    }
 
     if (heap_offset % requirements.alignment)
     {

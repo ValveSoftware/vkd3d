@@ -3221,7 +3221,7 @@ static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResour
 
     if (desc->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
     {
-        info->SizeInBytes = desc->Width;
+        info->SizeInBytes = align(desc->Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
         info->Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
     }
     else
@@ -3235,9 +3235,18 @@ static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResour
         requested_alignment = desc->Alignment
                 ? desc->Alignment : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
         info->Alignment = max(info->Alignment, requested_alignment);
-    }
 
-    info->SizeInBytes = align(info->SizeInBytes, info->Alignment);
+        info->SizeInBytes = align(info->SizeInBytes, info->Alignment);
+
+        /* Pad by the maximum heap offset increase which may be needed to align to a higher
+         * Vulkan requirement an offset supplied by the calling application. This allows
+         * us to return the standard D3D12 alignment and adjust resource placement later. */
+        if (info->Alignment > requested_alignment)
+        {
+            info->SizeInBytes += info->Alignment - requested_alignment;
+            info->Alignment = requested_alignment;
+        }
+    }
 
     TRACE("Size %#"PRIx64", alignment %#"PRIx64".\n", info->SizeInBytes, info->Alignment);
 
