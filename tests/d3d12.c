@@ -740,7 +740,7 @@ static ID3D12PipelineState *create_compute_pipeline_state_(unsigned int line, ID
         ID3D12RootSignature *root_signature, const D3D12_SHADER_BYTECODE cs)
 {
     D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc;
-    ID3D12PipelineState *pipeline_state;
+    ID3D12PipelineState *pipeline_state = NULL;
     HRESULT hr;
 
     memset(&pipeline_state_desc, 0, sizeof(pipeline_state_desc));
@@ -33944,6 +33944,202 @@ static void test_hull_shader_patch_constant_inputs(void)
     destroy_test_context(&context);
 }
 
+static void test_resource_arrays(void)
+{
+    ID3D12Resource *input_buffers[8], *output_buffers[6];
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    ID3D12GraphicsCommandList *command_list;
+    unsigned int descriptor_count;
+    struct resource_readback rb;
+    struct test_context context;
+    ID3D12DescriptorHeap *heap;
+    ID3D12CommandQueue *queue;
+    ID3D12Device *device;
+    unsigned int i;
+    HRESULT hr;
+
+    static const D3D12_DESCRIPTOR_RANGE descriptor_ranges[] =
+    {
+        {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 8, 2, 2, 0},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 6, 1, 3, D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND},
+    };
+
+    static const struct uvec4 cb_data[] =
+    {
+        {0, 0},
+        {1, 1},
+        {0, 5},
+        {1, 4},
+        {2, 0},
+        {3, 1},
+    };
+
+    static const D3D12_ROOT_PARAMETER root_parameters[] =
+    {
+        {D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+                    .DescriptorTable = {ARRAY_SIZE(descriptor_ranges), descriptor_ranges}},
+        {D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS, .Constants = {2, 1, ARRAY_SIZE(cb_data) * 4}},
+    };
+
+    static const DWORD cs_code[] =
+    {
+#if 0
+        cbuffer cb : register(b2, space1)
+        {
+            uint2 c[6];
+        }
+
+        Buffer<uint> t1[2] : register(t2, space2);
+        Buffer<uint> t2[] : register(t4, space2);
+
+        RWBuffer<uint> u1[2] : register(u1, space3);
+        RWBuffer<uint> u2[] : register(u3, space3);
+
+        [numthreads(1, 1, 1)]
+        void main()
+        {
+            u1[c[0].x][0] = t1[c[0].y][0];
+            u1[c[1].x][0] = t1[c[1].y][0];
+            u2[c[2].x][0] = t2[c[2].y][0];
+            u2[c[3].x][0] = t2[c[3].y][0];
+            u2[c[4].x][0] = t2[c[4].y][0];
+            u2[c[5].x][0] = t2[c[5].y][0];
+        }
+#endif
+        0x43425844, 0xef615fd3, 0x708c1d93, 0xdb9908b4, 0xb1853d57, 0x00000001, 0x000004c8, 0x00000003,
+        0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000474, 0x00050051, 0x0000011d, 0x0100086a,
+        0x07000059, 0x00308e46, 0x00000000, 0x00000002, 0x00000002, 0x00000006, 0x00000001, 0x07000858,
+        0x00307e46, 0x00000000, 0x00000002, 0x00000003, 0x00004444, 0x00000002, 0x07000858, 0x00307e46,
+        0x00000001, 0x00000004, 0xffffffff, 0x00004444, 0x00000002, 0x0700089c, 0x0031ee46, 0x00000000,
+        0x00000001, 0x00000002, 0x00004444, 0x00000003, 0x0700089c, 0x0031ee46, 0x00000001, 0x00000003,
+        0xffffffff, 0x00004444, 0x00000003, 0x02000068, 0x00000001, 0x0400009b, 0x00000001, 0x00000001,
+        0x00000001, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000000,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000000, 0x00000002, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000000, 0x0d0000a4, 0x0621e0f2, 0x00000000, 0x00000001,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000001,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000000, 0x00000002, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000001, 0x0d0000a4, 0x0621e0f2, 0x00000000, 0x00000001,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000002,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000001, 0x00000004, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000002, 0x0d0000a4, 0x0621e0f2, 0x00000001, 0x00000003,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000003,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000001, 0x00000004, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000003, 0x0d0000a4, 0x0621e0f2, 0x00000001, 0x00000003,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000004,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000001, 0x00000004, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000004, 0x0d0000a4, 0x0621e0f2, 0x00000001, 0x00000003,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x07000036, 0x00100012, 0x00000000, 0x0030801a, 0x00000000, 0x00000002, 0x00000005,
+        0x0d00002d, 0x00100012, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x06207e46, 0x00000001, 0x00000004, 0x0010000a, 0x00000000, 0x07000036, 0x00100022, 0x00000000,
+        0x0030800a, 0x00000000, 0x00000002, 0x00000005, 0x0d0000a4, 0x0621e0f2, 0x00000001, 0x00000003,
+        0x0010001a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100006,
+        0x00000000, 0x0100003e,
+    };
+
+    static const uint32_t srv_data[] = {0x1, 0x4, 0x9, 0x10, 0x19, 0x24, 0x31, 0x40};
+    static const uint32_t uav_data[] = {0x1, 0x4, 0x40, 0x31, 0x9, 0x10};
+
+    if (!init_compute_test_context(&context))
+        return;
+    device = context.device;
+    command_list = context.list;
+    queue = context.queue;
+
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
+    root_signature_desc.pParameters = root_parameters;
+    hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+
+    for (i = 0, descriptor_count = 0; i < ARRAY_SIZE(descriptor_ranges); ++i)
+    {
+        descriptor_count += descriptor_ranges[i].NumDescriptors;
+    }
+    heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, descriptor_count);
+
+    for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
+    {
+        input_buffers[i] = create_default_buffer(device, sizeof(uint32_t),
+                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
+        upload_buffer_data(input_buffers[i], 0, sizeof(srv_data[i]), &srv_data[i], queue, command_list);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, input_buffers[i],
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+        memset(&srv_desc, 0, sizeof(srv_desc));
+        srv_desc.Format = DXGI_FORMAT_R32_UINT;
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv_desc.Buffer.FirstElement = 0;
+        srv_desc.Buffer.NumElements = 1;
+        ID3D12Device_CreateShaderResourceView(device, input_buffers[i], &srv_desc,
+                get_cpu_descriptor_handle(&context, heap, i));
+    }
+
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+    {
+        output_buffers[i] = create_default_buffer(device, sizeof(uint32_t),
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+        memset(&uav_desc, 0, sizeof(uav_desc));
+        uav_desc.Format = DXGI_FORMAT_R32_UINT;
+        uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uav_desc.Buffer.FirstElement = 0;
+        uav_desc.Buffer.NumElements = 1;
+        ID3D12Device_CreateUnorderedAccessView(device, output_buffers[i], NULL, &uav_desc,
+                get_cpu_descriptor_handle(&context, heap, ARRAY_SIZE(input_buffers) + i));
+    }
+
+    context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
+            shader_bytecode(cs_code, sizeof(cs_code)));
+    if (!context.pipeline_state)
+    {
+        skip("Shader descriptor arrays are not supported.\n");
+        goto done;
+    }
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
+            0, get_gpu_descriptor_handle(&context, heap, 0));
+    ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(command_list, 1, ARRAY_SIZE(cb_data) * 4, cb_data, 0);
+
+    ID3D12GraphicsCommandList_Dispatch(command_list, 1, 1, 1);
+
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+    {
+        vkd3d_test_set_context("buffer %u", i);
+        transition_sub_resource_state(command_list, output_buffers[i], 0,
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
+        todo_if(i)
+        check_readback_data_uint(&rb, NULL, uav_data[i], 0);
+        release_resource_readback(&rb);
+        reset_command_list(command_list, context.allocator);
+    }
+
+done:
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+        ID3D12Resource_Release(output_buffers[i]);
+    for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
+        ID3D12Resource_Release(input_buffers[i]);
+    ID3D12DescriptorHeap_Release(heap);
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -34113,4 +34309,5 @@ START_TEST(d3d12)
     run_test(test_sampler_register_space);
     run_test(test_hull_shader_relative_addressing);
     run_test(test_hull_shader_patch_constant_inputs);
+    run_test(test_resource_arrays);
 }
