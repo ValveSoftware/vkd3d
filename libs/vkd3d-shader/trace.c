@@ -766,6 +766,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
     unsigned int offset = reg->idx[0].offset;
+    bool is_descriptor = false;
 
     static const char * const rastout_reg_names[] = {"oPos", "oFog", "oPts"};
     static const char * const misctype_reg_names[] = {"vPos", "vFace"};
@@ -847,6 +848,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 
         case VKD3DSPR_SAMPLER:
             shader_addline(buffer, "s");
+            is_descriptor = true;
             break;
 
         case VKD3DSPR_MISCTYPE:
@@ -871,6 +873,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 
         case VKD3DSPR_CONSTBUFFER:
             shader_addline(buffer, "cb");
+            is_descriptor = true;
             break;
 
         case VKD3DSPR_IMMCONSTBUFFER:
@@ -891,10 +894,12 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 
         case VKD3DSPR_RESOURCE:
             shader_addline(buffer, "t");
+            is_descriptor = true;
             break;
 
         case VKD3DSPR_UAV:
             shader_addline(buffer, "u");
+            is_descriptor = true;
             break;
 
         case VKD3DSPR_OUTPOINTID:
@@ -1057,11 +1062,11 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 vkd3d_string_buffer_printf(buffer, "%u%s", offset, compiler->colours.reset);
             }
 
-            /* For CBs in sm < 5.1 we move the buffer offset from idx[1] to idx[2]
-             * to normalise it with 5.1.
-             * Here we should ignore it if it's a CB in sm < 5.1. */
+            /* For descriptors in sm < 5.1 we move the reg->idx values up one slot
+             * to normalise with 5.1.
+             * Here we should ignore it if it's a descriptor in sm < 5.1. */
             if (reg->idx[1].offset != ~0u &&
-                    (reg->type != VKD3DSPR_CONSTBUFFER || shader_ver_ge(&compiler->shader_version, 5, 1)))
+                    (!is_descriptor || shader_ver_ge(&compiler->shader_version, 5, 1)))
                 shader_print_subscript(compiler, reg->idx[1].offset, reg->idx[1].rel_addr);
 
             if (reg->idx[2].offset != ~0u)

@@ -637,8 +637,8 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins,
 static void shader_sm4_set_descriptor_register_range(struct vkd3d_sm4_data *priv,
         struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
 {
-    range->first = reg->idx[shader_is_sm_5_1(priv) ? 1 : 0].offset;
-    range->last = reg->idx[shader_is_sm_5_1(priv) ? 2 : 0].offset;
+    range->first = reg->idx[1].offset;
+    range->last = reg->idx[shader_is_sm_5_1(priv) ? 2 : 1].offset;
     if (range->last < range->first)
     {
         FIXME("Invalid register range [%u:%u].\n", range->first, range->last);
@@ -1516,6 +1516,21 @@ static bool shader_sm4_read_reg_idx(struct vkd3d_sm4_data *priv, const DWORD **p
     return true;
 }
 
+static bool sm4_register_is_descriptor(enum vkd3d_sm4_register_type register_type)
+{
+    switch (register_type)
+    {
+        case VKD3D_SM4_RT_SAMPLER:
+        case VKD3D_SM4_RT_RESOURCE:
+        case VKD3D_SM4_RT_CONSTBUFFER:
+        case VKD3D_SM5_RT_UAV:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr, const DWORD *end,
         enum vkd3d_data_type data_type, struct vkd3d_shader_register *param,
         enum vkd3d_shader_src_modifier *modifier)
@@ -1667,13 +1682,12 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
                 break;
         }
     }
-    else if (register_type == VKD3D_SM4_RT_CONSTBUFFER && order == 2)
+    else if (!shader_is_sm_5_1(priv) && sm4_register_is_descriptor(register_type))
     {
-        /* SM5.1 places the buffer offset in idx[2]; earlier versions place it
-         * in idx[1]. Normalize to SM5.1. */
+        /* SM5.1 places a symbol identifier in idx[0] and moves
+         * other values up one slot. Normalize to SM5.1. */
         param->idx[2] = param->idx[1];
-        param->idx[1].rel_addr = NULL;
-        param->idx[1].offset = 0;
+        param->idx[1] = param->idx[0];
     }
 
     map_register(priv, param);
