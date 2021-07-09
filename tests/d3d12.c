@@ -41,6 +41,11 @@ struct ivec4
     int x, y, z, w;
 };
 
+struct dvec2
+{
+    double x, y;
+};
+
 static bool compare_uvec4(const struct uvec4* v1, const struct uvec4 *v2)
 {
     return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z && v1->w == v2->w;
@@ -649,6 +654,21 @@ static bool is_memory_pool_L1_supported(ID3D12Device *device)
     }
 
     return !architecture.UMA;
+}
+
+static bool is_shader_float64_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return false;
+    }
+
+    return options.DoublePrecisionFloatShaderOps;
 }
 
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
@@ -7510,6 +7530,7 @@ static void test_shader_instructions(void)
     D3D12_SHADER_BYTECODE shader;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    bool test_shader_float64;
     ID3D12Resource *cb;
     unsigned int i;
     HRESULT hr;
@@ -9054,6 +9075,322 @@ static void test_shader_instructions(void)
         0x00100e46, 0x00000001, 0x0100003e,
     };
     static struct named_shader ps_swapc5 = {"swapc5", ps_swapc5_code, sizeof(ps_swapc5_code)};
+    static const DWORD ps_dmov_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            asuint(-src0.y, dst.x, dst.y);
+            asuint(-src0.x, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x16bd7e63, 0x6b535ab7, 0xb7f182c2, 0x6f3819a8, 0x00000001, 0x000000f0, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000e0, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000064, 0x00000050,
+        0x00000019, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x070000c7, 0x001000f2, 0x00000000, 0x802084e6, 0x00000041,
+        0x00000000, 0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x0100003e,
+        0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dmov = {"dmov", ps_dmov_code, sizeof(ps_dmov_code)};
+    static const DWORD ps_dadd_code[] =
+    {
+        /* Also test constant double2 vector. */
+#if 0
+        double src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = double2(src0 + 1.0000002433080226l, src0 + 2.000000481493771l);
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x23e20252, 0xf4d2708e, 0x87956944, 0xc61e7052, 0x00000001, 0x00000100, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000f0, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000074, 0x00000050,
+        0x0000001d, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x0b0000bf, 0x001000f2, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x00005002, 0x41500000, 0x3ff00000, 0x40a00000, 0x40000000, 0x05000036, 0x001020f2,
+        0x00000000, 0x00100e46, 0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dadd = {"dadd", ps_dadd_code, sizeof(ps_dadd_code)};
+    static const DWORD ps_dmin_dmax_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            asuint(min(src0.x, src0.y), dst.x, dst.y);
+            asuint(max(src0.x, src0.y), dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x6f8b547e, 0x3552757c, 0x92a81fa1, 0x00990b21, 0x00000001, 0x00000130, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000120, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000a4, 0x00000050,
+        0x00000029, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c1, 0x00100032, 0x00000000, 0x00208ee6, 0x00000000,
+        0x00000000, 0x00208446, 0x00000000, 0x00000000, 0x05000036, 0x00102032, 0x00000000, 0x00100046,
+        0x00000000, 0x090000c0, 0x00100032, 0x00000000, 0x00208ee6, 0x00000000, 0x00000000, 0x00208446,
+        0x00000000, 0x00000000, 0x05000036, 0x001020c2, 0x00000000, 0x00100406, 0x00000000, 0x0100003e,
+        0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dmin_dmax = {"dmin_dmax", ps_dmin_dmax_code, sizeof(ps_dmin_dmax_code)};
+    static const DWORD ps_dmovc_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = src0.x > 1.0 ? src0 : double2(4.5, 4.5);
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0xe3bae03a, 0x16178729, 0xc59e7f4a, 0x218fecac, 0x00000001, 0x00000134, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000124, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000a8, 0x00000050,
+        0x0000002a, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x0b0000c5, 0x00100012, 0x00000000, 0x00005002, 0x00000000,
+        0x3ff00000, 0x00000000, 0x00000000, 0x00208446, 0x00000000, 0x00000000, 0x0d0000c8, 0x001000f2,
+        0x00000000, 0x00100006, 0x00000000, 0x00208e46, 0x00000000, 0x00000000, 0x00005002, 0x00000000,
+        0x40120000, 0x00000000, 0x40120000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000,
+        0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dmovc = {"dmovc", ps_dmovc_code, sizeof(ps_dmovc_code)};
+    static const DWORD ps_dmodifier_code[] =
+    {
+        /* Already tested negation in the dmov test. */
+#if 0
+        double src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            asuint(abs(src0), dst.x, dst.y);
+            asuint(saturate(src0) + 1.5, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x15bb537e, 0x47ef3ae3, 0xba88acf7, 0x0b3624e0, 0x00000001, 0x00000144, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000134, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000b8, 0x00000050,
+        0x0000002e, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060020c7, 0x00100032, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x0a0000bf, 0x00100032, 0x00000000, 0x00100446, 0x00000000, 0x00005002, 0x00000000,
+        0x3ff80000, 0x00000000, 0x00000000, 0x05000036, 0x001020c2, 0x00000000, 0x00100406, 0x00000000,
+        0x070000c7, 0x00100032, 0x00000000, 0x80208446, 0x00000081, 0x00000000, 0x00000000, 0x05000036,
+        0x00102032, 0x00000000, 0x00100046, 0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001,
+        0x00000000,
+    };
+    static struct named_shader ps_dmodifier = {"dmodifier", ps_dmodifier_code, sizeof(ps_dmodifier_code)};
+    static const DWORD ps_deq_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = (uint4)0;
+            if (src0.x == src0.y)
+                dst.x = 0xffffffff;
+        }
+#endif
+        0x43425844, 0x24c9cee6, 0xd38c521f, 0xcde7c8b6, 0xc173a8e3, 0x00000001, 0x00000118, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000108, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000008c, 0x00000050,
+        0x00000023, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c3, 0x00100012, 0x00000000, 0x00208ee6, 0x00000000,
+        0x00000000, 0x00208446, 0x00000000, 0x00000000, 0x05000036, 0x00102012, 0x00000000, 0x0010000a,
+        0x00000000, 0x08000036, 0x001020e2, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_deq = {"deq", ps_deq_code, sizeof(ps_deq_code)};
+    static const DWORD ps_dne_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = (uint4)0;
+            if (src0.x != src0.y)
+                dst.x = 0xffffffff;
+        }
+#endif
+        0x43425844, 0x99700929, 0x3b743000, 0xdfc89958, 0xfc2b89ab, 0x00000001, 0x00000118, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000108, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000008c, 0x00000050,
+        0x00000023, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c6, 0x00100012, 0x00000000, 0x00208ee6, 0x00000000,
+        0x00000000, 0x00208446, 0x00000000, 0x00000000, 0x05000036, 0x00102012, 0x00000000, 0x0010000a,
+        0x00000000, 0x08000036, 0x001020e2, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dne = {"dne", ps_dne_code, sizeof(ps_dne_code)};
+    static const DWORD ps_dtou_code[] =
+    {
+#if 0
+        double src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = uint4(src0, -src0, 0, 0);
+        }
+#endif
+        0x43425844, 0x6ca74abd, 0xe970e02d, 0xa65b35db, 0xd2f58586, 0x00000001, 0x00000128, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000118, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000009c, 0x00000050,
+        0x00000027, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000d7, 0x00100012, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x070000d7, 0x00100022, 0x00000000, 0x80208446, 0x00000041, 0x00000000, 0x00000000,
+        0x05000036, 0x00102032, 0x00000000, 0x00100046, 0x00000000, 0x08000036, 0x001020c2, 0x00000000,
+        0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0100003e, 0x30494653, 0x00000008,
+        0x00000021, 0x00000000,
+    };
+    static struct named_shader ps_dtou = {"dtou", ps_dtou_code, sizeof(ps_dtou_code)};
+    static const DWORD ps_dtoi_code[] =
+    {
+#if 0
+        double src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = int4(src0, -src0, 0, 0);
+        }
+#endif
+        0x43425844, 0x38d82727, 0x8666b36c, 0x91954b7e, 0xf376163a, 0x00000001, 0x00000128, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000118, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000009c, 0x00000050,
+        0x00000027, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000d6, 0x00100012, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x070000d6, 0x00100022, 0x00000000, 0x80208446, 0x00000041, 0x00000000, 0x00000000,
+        0x05000036, 0x00102032, 0x00000000, 0x00100046, 0x00000000, 0x08000036, 0x001020c2, 0x00000000,
+        0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0100003e, 0x30494653, 0x00000008,
+        0x00000021, 0x00000000,
+    };
+    static const struct named_shader ps_dtoi = {"dtoi", ps_dtoi_code, sizeof(ps_dtoi_code)};
+    static const DWORD ps_utod_code[] =
+    {
+#if 0
+        uint2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = src0;
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x05733379, 0x8683d4b9, 0x718f0111, 0x28153519, 0x00000001, 0x000000ec, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000dc, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000060, 0x00000050,
+        0x00000018, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000d9, 0x001000f2, 0x00000000, 0x00208046, 0x00000000,
+        0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x0100003e, 0x30494653,
+        0x00000008, 0x00000021, 0x00000000,
+    };
+    static struct named_shader ps_utod = {"utod", ps_utod_code, sizeof(ps_utod_code)};
+    static const DWORD ps_itod_code[] =
+    {
+#if 0
+        int2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = src0;
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0xbf96ef6f, 0x3ca9fd26, 0xd9b5cfc6, 0x4ef98f41, 0x00000001, 0x000000ec, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000dc, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000060, 0x00000050,
+        0x00000018, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000d8, 0x001000f2, 0x00000000, 0x00208046, 0x00000000,
+        0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x0100003e, 0x30494653,
+        0x00000008, 0x00000021, 0x00000000,
+    };
+    static struct named_shader ps_itod = {"itod", ps_itod_code, sizeof(ps_itod_code)};
+    static const DWORD ps_ftod_code[] =
+    {
+#if 0
+        float2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = double2(src0.x, -src0.y);
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0xef37cacc, 0x9ff35467, 0x0c9af3ed, 0x01e295eb, 0x00000001, 0x00000108, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000f8, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000007c, 0x00000050,
+        0x0000001f, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000ca, 0x00100032, 0x00000000, 0x0020800a, 0x00000000,
+        0x00000000, 0x070000ca, 0x001000c2, 0x00000000, 0x8020801a, 0x00000041, 0x00000000, 0x00000000,
+        0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x0100003e, 0x30494653, 0x00000008,
+        0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_ftod = {"ftod", ps_ftod_code, sizeof(ps_ftod_code)};
+    static const DWORD ps_ddiv_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            asuint(src0.x / src0.y, dst.x, dst.y);
+            asuint(src0.y / src0.x, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0x6570ff79, 0xe1fd64a5, 0xb44313bb, 0xb5fdfa06, 0x00000001, 0x000000f8, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000e8, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000006c, 0x00000050,
+        0x0000001b, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000d2, 0x001000f2, 0x00000000, 0x00208e46, 0x00000000,
+        0x00000000, 0x002084e6, 0x00000000, 0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46,
+        0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000021, 0x00000000,
+    };
+    static const struct named_shader ps_ddiv = {"ddiv", ps_ddiv_code, sizeof(ps_ddiv_code)};
+    static const DWORD ps_drcp_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            double2 a = rcp(src0);
+            asuint(a.x, dst.x, dst.y);
+            asuint(a.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0xdcbd25ba, 0x2d5cccb9, 0x84ed8028, 0x3d62632a, 0x00000001, 0x000000ec, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x000000dc, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000060, 0x00000050,
+        0x00000018, 0x0102186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000d4, 0x001000f2, 0x00000000, 0x00208e46, 0x00000000,
+        0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000, 0x0100003e, 0x30494653,
+        0x00000008, 0x00000021, 0x00000000,
+    };
+    static struct named_shader ps_drcp = {"drcp", ps_drcp_code, sizeof(ps_drcp_code)};
     static const struct
     {
         const struct named_shader *ps;
@@ -9290,13 +9627,22 @@ static void test_shader_instructions(void)
                 struct vec4 src1;
                 struct vec4 src2;
             } f;
+            struct
+            {
+                struct dvec2 src0;
+                struct dvec2 src1;
+                struct dvec2 src2;
+            } d;
         } input;
         union
         {
             struct uvec4 u;
             struct ivec4 i;
             struct vec4 f;
+            struct dvec2 d;
         } output;
+        bool is_float64;
+        bool is_todo;
         bool skip_on_warp;
     }
     uint_tests[] =
@@ -9525,6 +9871,31 @@ static void test_shader_instructions(void)
         {&ps_movc, {{{1, 0, 0, 1}, {1, 2, 3, 4}, {5, 6, 7, 8}}}, {{1, 6, 7, 4}}},
         {&ps_movc, {{{0, 1, 1, 0}, {1, 2, 3, 4}, {5, 6, 7, 8}}}, {{5, 2, 3, 8}}},
         {&ps_movc, {{{1, 1, 1, 1}, {1, 2, 3, 4}, {5, 6, 7, 8}}}, {{1, 2, 3, 4}}},
+
+        {&ps_dmov,      {.d = {{2.5 + 1.0e-9, -3.5 - 1.0e-9}}},  {.d = {3.5 + 1.0e-9, -2.5 - 1.0e-9}}, true, true},
+        {&ps_dadd,      {.d = {{2.5, 0.0}}},  {.d = {2.5 + 1.0000002433080226, 2.5 + 2.000000481493771}}, true, true},
+        {&ps_dmin_dmax, {.d = {{-1.0, 1.0}}}, {.d = {-1.0, 1.0}}, true, true},
+        {&ps_dmovc,     {.d = {{0.5, 0.0}}},  {.d = {4.5, 4.5}}, true, true},
+        {&ps_dmovc,     {.d = {{1.5, 0.0}}},  {.d = {1.5, 0.0}}, true, true},
+        {&ps_dmodifier, {.d = {{1.5, 0.0}}},  {.d = {1.5f, 2.5f}}, true, true},
+        {&ps_dmodifier, {.d = {{-1.5, 0.0}}}, {.d = {1.5f, 1.5f}}, true, true},
+        {&ps_deq, {.d = {{0.0, 0.0}}}, {{0xffffffff}}, true, true},
+        {&ps_deq, {.d = {{1.0, 0.0}}}, {{0x00000000}}, true, true},
+        {&ps_dne, {.d = {{0.0, 0.0}}}, {{0x00000000}}, true, true},
+        {&ps_dne, {.d = {{1.0, 0.0}}}, {{0xffffffff}}, true, true},
+        {&ps_dtou, {.d = {{     -NAN}}}, {{ 0,  0 }}, true, true},
+        {&ps_dtou, {.d = {{      NAN}}}, {{ 0,  0 }}, true, true},
+        {&ps_dtou, {.d = {{-INFINITY}}}, {{ 0, ~0u}}, true, true},
+        {&ps_dtou, {.d = {{ INFINITY}}}, {{~0u, 0 }}, true, true},
+        {&ps_dtou, {.d = {{     -1.0}}}, {{ 0,  1 }}, true, true},
+        {&ps_dtou, {.d = {{      1.0}}}, {{ 1,  0 }}, true, true},
+        {&ps_dtoi, {.d = {{      1.0}}}, {.i = {1, -1}}, true, true},
+        {&ps_utod, {.u = {{3, 0xffffffff}}}, {.d = {3.0,  4294967295.0}}, true, true},
+        {&ps_itod, {.u = {{3,    INT_MIN}}}, {.d = {3.0, -2147483648.0}}, true, true},
+        {&ps_ftod, {.f = {{-2.5f,  -2.5f}}}, {.d = {-2.5,  2.5}}, true, true},
+        {&ps_ddiv, {.d = {{ 2.0,    4.0}}},  {.d = { 0.5,  2.0}}, true, true},
+        {&ps_ddiv, {.d = {{ 2.0,   -4.0}}},  {.d = {-0.5, -2.0}}, true, true},
+        {&ps_drcp, {.d = {{ 2.0,   -0.5}}},  {.d = { 0.5, -2.0}}, true, true},
 
         {
             &ps_swapc0,
@@ -9818,6 +10189,7 @@ static void test_shader_instructions(void)
         return;
     command_list = context.list;
     queue = context.queue;
+    test_shader_float64 = is_shader_float64_supported(context.device);
 
     context.root_signature = create_cb_root_signature(context.device,
             0, D3D12_SHADER_VISIBILITY_PIXEL, D3D12_ROOT_SIGNATURE_FLAG_NONE);
@@ -9888,6 +10260,12 @@ static void test_shader_instructions(void)
             continue;
         }
 
+        if (uint_tests[i].is_float64 && !test_shader_float64)
+        {
+            skip("Skipping shader '%s' float64 test.\n", uint_tests[i].ps->name);
+            continue;
+        }
+
         if (current_ps != uint_tests[i].ps)
         {
             if (context.pipeline_state)
@@ -9895,8 +10273,14 @@ static void test_shader_instructions(void)
             current_ps = uint_tests[i].ps;
             shader.pShaderBytecode = current_ps->code;
             shader.BytecodeLength = current_ps->size;
+            todo_if(uint_tests[i].is_todo)
             context.pipeline_state = create_pipeline_state(context.device,
                     context.root_signature, desc.rt_format, NULL, &shader, NULL);
+            if (!context.pipeline_state)
+            {
+                current_ps = NULL;
+                continue;
+            }
         }
 
         update_buffer_data(cb, 0, sizeof(uint_tests[i].input), &uint_tests[i].input);
