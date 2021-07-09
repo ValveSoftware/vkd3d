@@ -126,7 +126,7 @@ struct hlsl_type
     } e;
 
     unsigned int reg_size;
-    unsigned int bytecode_offset;
+    size_t bytecode_offset;
 };
 
 struct hlsl_semantic
@@ -144,7 +144,7 @@ struct hlsl_struct_field
     struct hlsl_semantic semantic;
     unsigned int reg_offset;
 
-    unsigned int name_bytecode_offset;
+    size_t name_bytecode_offset;
 };
 
 struct hlsl_reg
