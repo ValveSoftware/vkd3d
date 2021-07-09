@@ -41,3 +41,5 @@ struct shader_runner_ops
 };
 
 void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops, void *private);
+
+void run_shader_tests_d3d12(int argc, char **argv);

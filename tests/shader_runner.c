@@ -44,7 +44,6 @@
 
 #define COBJMACROS
 #define CONST_VTABLE
-#define VKD3D_TEST_NO_DEFS
 #include "vkd3d_test.h"
 #include "vkd3d_windows.h"
 #define WIDL_C_INLINE_WRAPPERS
@@ -460,4 +459,9 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
         ID3D10Blob_Release(context.ps_code);
 
     fclose(f);
+}
+
+START_TEST(shader_runner)
+{
+    run_shader_tests_d3d12(argc, argv);
 }

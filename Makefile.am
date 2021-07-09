@@ -51,7 +51,7 @@ vkd3d_cross_tests = \
 	tests/hlsl_d3d12
 
 vkd3d_shader_runners = \
-	tests/shader_runner_d3d12
+	tests/shader_runner
 
 vkd3d_shader_tests = \
 	tests/cast-to-float.shader_test \
@@ -269,11 +269,11 @@ TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @VULKAN_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
-tests_shader_runner_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
-tests_shader_runner_d3d12_SOURCES = tests/shader_runner_d3d12.c tests/shader_runner.c
+tests_shader_runner_LDADD = $(LDADD) @VULKAN_LIBS@
+tests_shader_runner_SOURCES = tests/shader_runner.c tests/shader_runner_d3d12.c
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
-SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
+SHADER_TEST_LOG_COMPILER = tests/shader_runner
 XFAIL_TESTS = \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \

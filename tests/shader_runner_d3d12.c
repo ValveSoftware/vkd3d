@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define VKD3D_TEST_NO_DEFS
 #include "d3d12_crosstest.h"
 #include "shader_runner.h"
 
@@ -71,7 +72,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .probe_vec4 = d3d12_runner_probe_vec4,
 };
 
-START_TEST(shader_runner_d3d12)
+void run_shader_tests_d3d12(int argc, char **argv)
 {
     static const struct test_context_desc desc =
     {
