@@ -103,7 +103,9 @@ vkd3d_shader_tests = \
 
 vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
-	tests/d3d12_test_utils.h
+	tests/d3d12_test_utils.h \
+	tests/shader_runner.h \
+	tests/utils.h
 
 vkd3d_demos = \
 	demos/vkd3d-gears \
@@ -268,6 +270,7 @@ tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @VULKAN_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
+tests_shader_runner_d3d12_SOURCES = tests/shader_runner_d3d12.c tests/shader_runner.c
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
