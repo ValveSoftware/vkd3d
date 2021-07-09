@@ -977,6 +977,8 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
             return VKD3D_SHADER_COMPONENT_UINT;
         case VKD3D_DATA_INT:
             return VKD3D_SHADER_COMPONENT_INT;
+        case VKD3D_DATA_DOUBLE:
+            return VKD3D_SHADER_COMPONENT_DOUBLE;
         default:
             FIXME("Unhandled data type %#x.\n", data_type);
             return VKD3D_SHADER_COMPONENT_UINT;
@@ -994,6 +996,8 @@ static inline enum vkd3d_data_type vkd3d_data_type_from_component_type(
             return VKD3D_DATA_UINT;
         case VKD3D_SHADER_COMPONENT_INT:
             return VKD3D_DATA_INT;
+        case VKD3D_SHADER_COMPONENT_DOUBLE:
+            return VKD3D_DATA_DOUBLE;
         default:
             FIXME("Unhandled component type %#x.\n", component_type);
             return VKD3D_DATA_FLOAT;

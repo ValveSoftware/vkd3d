@@ -1714,6 +1714,8 @@ static uint32_t vkd3d_spirv_get_type_id(struct vkd3d_spirv_builder *builder,
             case VKD3D_SHADER_COMPONENT_BOOL:
                 return vkd3d_spirv_get_op_type_bool(builder);
                 break;
+            case VKD3D_SHADER_COMPONENT_DOUBLE:
+                return vkd3d_spirv_get_op_type_float(builder, 64);
             default:
                 FIXME("Unhandled component type %#x.\n", component_type);
                 return 0;

@@ -1177,6 +1177,8 @@ enum vkd3d_shader_component_type
     VKD3D_SHADER_COMPONENT_FLOAT    = 0x3,
     /** Boolean. */
     VKD3D_SHADER_COMPONENT_BOOL     = 0x4,
+    /** 64-bit IEEE floating-point. */
+    VKD3D_SHADER_COMPONENT_DOUBLE   = 0x5,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPONENT_TYPE),
 };
