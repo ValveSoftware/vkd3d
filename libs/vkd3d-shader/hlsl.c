@@ -1664,6 +1664,9 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *
     if (!(ctx->globals_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
             hlsl_strdup(ctx, "$Globals"), NULL, ctx->location)))
         return false;
+    if (!(ctx->params_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
+            hlsl_strdup(ctx, "$Params"), NULL, ctx->location)))
+        return false;
     ctx->cur_buffer = ctx->globals_buffer;
 
     return true;

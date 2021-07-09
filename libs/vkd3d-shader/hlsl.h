@@ -456,7 +456,7 @@ struct hlsl_ctx
     struct list extern_vars;
 
     struct list buffers;
-    struct hlsl_buffer *cur_buffer, *globals_buffer;
+    struct hlsl_buffer *cur_buffer, *globals_buffer, *params_buffer;
     struct list types;
     struct rb_tree functions;
     const struct hlsl_ir_function_decl *cur_function;

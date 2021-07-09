@@ -1142,27 +1142,16 @@ static void calculate_buffer_offset(struct hlsl_ir_var *var)
 
 static void allocate_buffers(struct hlsl_ctx *ctx)
 {
-    struct hlsl_buffer *buffer, *params_buffer;
+    struct hlsl_buffer *buffer;
     struct hlsl_ir_var *var;
     uint32_t index = 0;
-
-    if (!(params_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
-            hlsl_strdup(ctx, "$Params"), NULL, ctx->location)))
-        return;
-
-    /* The $Globals and $Params buffers should be allocated first, before all
-     * explicit buffers. */
-    list_remove(&params_buffer->entry);
-    list_add_head(&ctx->buffers, &params_buffer->entry);
-    list_remove(&ctx->globals_buffer->entry);
-    list_add_head(&ctx->buffers, &ctx->globals_buffer->entry);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_uniform)
         {
             if (var->is_param)
-                var->buffer = params_buffer;
+                var->buffer = ctx->params_buffer;
 
             calculate_buffer_offset(var);
         }
