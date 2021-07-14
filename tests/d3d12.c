@@ -22366,6 +22366,139 @@ static void test_decrement_uav_counter(void)
     destroy_test_context(&context);
 }
 
+static void test_graphics_uav_counters(void)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_DESCRIPTOR_RANGE descriptor_ranges[1];
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
+    ID3D12DescriptorHeap *cpu_heap, *gpu_heap;
+    ID3D12GraphicsCommandList *command_list;
+    ID3D12Resource *buffer, *counter_buffer;
+    D3D12_ROOT_PARAMETER root_parameters[1];
+    struct test_context_desc desc;
+    struct test_context context;
+    struct resource_readback rb;
+    ID3D12CommandQueue *queue;
+    ID3D12Device *device;
+    uint32_t counter;
+    D3D12_BOX box;
+    HRESULT hr;
+
+    static const uint32_t clear_value[4] = {0};
+    static const DWORD ps_code[] =
+    {
+#if 0
+        RWStructuredBuffer<uint> u;
+
+        void main()
+        {
+            uint i = u.IncrementCounter();
+            ++u[i];
+        }
+#endif
+        0x43425844, 0x951850a3, 0xb2e7dcee, 0x6195cf5f, 0x3e1e6220, 0x00000001, 0x000000fc, 0x00000003,
+        0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x000000a8, 0x00000050, 0x0000002a, 0x0100086a,
+        0x0480009e, 0x0011e000, 0x00000000, 0x00000004, 0x02000068, 0x00000001, 0x050000b2, 0x00100012,
+        0x00000000, 0x0011e000, 0x00000000, 0x8b0000a7, 0x80002302, 0x00199983, 0x00100022, 0x00000000,
+        0x0010000a, 0x00000000, 0x00004001, 0x00000000, 0x0011e006, 0x00000000, 0x0700001e, 0x00100022,
+        0x00000000, 0x0010001a, 0x00000000, 0x00004001, 0x00000001, 0x090000a8, 0x0011e012, 0x00000000,
+        0x0010000a, 0x00000000, 0x00004001, 0x00000000, 0x0010001a, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+
+    memset(&desc, 0, sizeof(desc));
+    desc.rt_width = 64;
+    desc.rt_height = 1;
+    desc.no_root_signature = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    device = context.device;
+    command_list = context.list;
+    queue = context.queue;
+
+    descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    descriptor_ranges[0].NumDescriptors = 1;
+    descriptor_ranges[0].BaseShaderRegister = 0;
+    descriptor_ranges[0].RegisterSpace = 0;
+    descriptor_ranges[0].OffsetInDescriptorsFromTableStart = 0;
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    root_parameters[0].DescriptorTable.NumDescriptorRanges = 1;
+    root_parameters[0].DescriptorTable.pDescriptorRanges = descriptor_ranges;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+    root_signature_desc.NumParameters = 1;
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    ok(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+
+    cpu_heap = create_cpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    gpu_heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+
+    buffer = create_default_buffer(device, 64 * sizeof(uint32_t),
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    counter_buffer = create_default_buffer(device, D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT + sizeof(uint32_t),
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+
+    context.pipeline_state = create_pipeline_state(context.device, context.root_signature, 0, NULL, &ps, NULL);
+
+    memset(&uav_desc, 0, sizeof(uav_desc));
+    uav_desc.Format = DXGI_FORMAT_UNKNOWN;
+    uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+    uav_desc.Buffer.NumElements = 64;
+    uav_desc.Buffer.StructureByteStride = sizeof(uint32_t);
+    uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc,
+            get_cpu_descriptor_handle(&context, cpu_heap, 0));
+    uav_desc.Buffer.CounterOffsetInBytes = D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT;
+    ID3D12Device_CreateUnorderedAccessView(device, buffer, counter_buffer, &uav_desc,
+            get_cpu_descriptor_handle(&context, gpu_heap, 0));
+
+    ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &gpu_heap);
+
+    ID3D12GraphicsCommandList_ClearUnorderedAccessViewUint(command_list,
+            get_gpu_descriptor_handle(&context, gpu_heap, 0),
+            get_cpu_descriptor_handle(&context, cpu_heap, 0),
+            buffer, clear_value, 0, NULL);
+    uav_barrier(command_list, buffer);
+
+    counter = 0;
+    upload_buffer_data(counter_buffer, uav_desc.Buffer.CounterOffsetInBytes,
+            sizeof(counter), &counter, queue, command_list);
+    reset_command_list(command_list, context.allocator);
+    transition_sub_resource_state(command_list, counter_buffer, 0,
+            D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 0,
+            ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(gpu_heap));
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+
+    counter = read_uav_counter(&context, counter_buffer, uav_desc.Buffer.CounterOffsetInBytes);
+    todo
+    ok(counter == 64, "Got %u, expected 64.\n", counter);
+
+    transition_sub_resource_state(command_list, buffer, 0,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
+    set_box(&box, 0, 0, 0, uav_desc.Buffer.NumElements, 1, 1);
+    todo
+    check_readback_data_uint(&rb, &box, 1, 0);
+    release_resource_readback(&rb);
+
+    ID3D12Resource_Release(buffer);
+    ID3D12Resource_Release(counter_buffer);
+    ID3D12DescriptorHeap_Release(cpu_heap);
+    ID3D12DescriptorHeap_Release(gpu_heap);
+    destroy_test_context(&context);
+}
+
 static void test_atomic_instructions(void)
 {
     ID3D12Resource *ps_buffer, *cs_buffer, *cs_buffer2;
@@ -34631,6 +34764,7 @@ START_TEST(d3d12)
     run_test(test_cs_uav_store);
     run_test(test_uav_counters);
     run_test(test_decrement_uav_counter);
+    run_test(test_graphics_uav_counters);
     run_test(test_atomic_instructions);
     run_test(test_buffer_srv);
     run_test(test_create_query_heap);
