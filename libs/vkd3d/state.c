@@ -1414,9 +1414,9 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_device *device,
     return S_OK;
 }
 
-static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipeline_state *state,
+static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_state *state,
         struct d3d12_device *device, const struct d3d12_root_signature *root_signature,
-        const struct vkd3d_shader_scan_descriptor_info *shader_info)
+        const struct vkd3d_shader_scan_descriptor_info *shader_info, VkShaderStageFlags stage_flags)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkDescriptorSetLayout set_layouts[VKD3D_MAX_DESCRIPTOR_SETS + 1];
@@ -1425,6 +1425,8 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
     unsigned int uav_counter_count = 0;
     unsigned int i, j;
     HRESULT hr;
+
+    assert(vkd3d_popcount(stage_flags) == 1);
 
     for (i = 0; i < shader_info->descriptor_count; ++i)
     {
@@ -1437,6 +1439,16 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
 
     if (!uav_counter_count)
         return S_OK;
+
+    /* It should be possible to support other stages in Vulkan, but in a graphics pipeline
+     * D3D12 currently only supports counters in pixel shaders, and handling multiple stages
+     * would be more complex. */
+    if (!(stage_flags & (VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT)))
+    {
+        FIXME("Found a UAV counter for Vulkan shader stage %#x. UAV counters in a "
+                "graphics pipeline are only supported in pixel shaders.\n", stage_flags);
+        return E_INVALIDARG;
+    }
 
     if (!(binding_desc = vkd3d_calloc(uav_counter_count, sizeof(*binding_desc))))
         return E_OUTOFMEMORY;
@@ -1461,17 +1473,16 @@ static HRESULT d3d12_pipeline_state_init_compute_uav_counters(struct d3d12_pipel
 
         state->uav_counters[j].register_space = d->register_space;
         state->uav_counters[j].register_index = d->register_index;
-        state->uav_counters[j].shader_visibility = VKD3D_SHADER_VISIBILITY_COMPUTE;
+        state->uav_counters[j].shader_visibility = (stage_flags == VK_SHADER_STAGE_COMPUTE_BIT)
+                ? VKD3D_SHADER_VISIBILITY_COMPUTE : VKD3D_SHADER_VISIBILITY_PIXEL;
         state->uav_counters[j].binding.set = set_index;
         state->uav_counters[j].binding.binding = descriptor_binding;
         state->uav_counters[j].binding.count = 1;
 
-        /* FIXME: For the graphics pipeline we have to take the shader
-         * visibility into account. */
         binding_desc[j].binding = descriptor_binding;
         binding_desc[j].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
         binding_desc[j].descriptorCount = 1;
-        binding_desc[j].stageFlags = VK_SHADER_STAGE_ALL;
+        binding_desc[j].stageFlags = stage_flags;
         binding_desc[j].pImmutableSamplers = NULL;
 
         ++descriptor_binding;
@@ -1538,8 +1549,8 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
         return hresult_from_vkd3d_result(ret);
     }
 
-    if (FAILED(hr = d3d12_pipeline_state_init_compute_uav_counters(state,
-            device, root_signature, &shader_info)))
+    if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state,
+            device, root_signature, &shader_info, VK_SHADER_STAGE_COMPUTE_BIT)))
     {
         WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
         return hr;
