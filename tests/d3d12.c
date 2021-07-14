@@ -22054,7 +22054,8 @@ static void test_uav_counters(void)
         0x00000001, 0x0010000a, 0x00000000, 0x00004001, 0x00000000, 0x0010001a, 0x00000000, 0x0100003e,
     };
 
-    static const unsigned int counter_offsets[] = {0, 1, 255};
+    static const unsigned int counter_offsets[] = {0, D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT,
+            D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT * 2};
 
     if (!init_compute_test_context(&context))
         return;
@@ -22085,7 +22086,7 @@ static void test_uav_counters(void)
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     out_buffer = create_default_buffer(device, 1024,
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    counter_buffer = create_default_buffer(device, 1024,
+    counter_buffer = create_default_buffer(device, D3D12_UAV_COUNTER_PLACEMENT_ALIGNMENT * 2 + sizeof(uint32_t),
             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
 
     for (i = 0; i < ARRAY_SIZE(counter_offsets); ++i)
@@ -22103,15 +22104,14 @@ static void test_uav_counters(void)
         uav_desc.Buffer.NumElements = 256;
         uav_desc.Buffer.StructureByteStride = sizeof(uint32_t);
         uav_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
-        uav_desc.Buffer.CounterOffsetInBytes = counter_offsets[i] * sizeof(uint32_t);
-        ID3D12Device_CreateUnorderedAccessView(device, buffer, counter_buffer, &uav_desc,
-                get_cpu_descriptor_handle(&context, descriptor_heap, 0));
         ID3D12Device_CreateUnorderedAccessView(device, out_buffer, NULL, &uav_desc,
                 get_cpu_descriptor_handle(&context, descriptor_heap, 1));
+        uav_desc.Buffer.CounterOffsetInBytes = counter_offsets[i];
+        ID3D12Device_CreateUnorderedAccessView(device, buffer, counter_buffer, &uav_desc,
+                get_cpu_descriptor_handle(&context, descriptor_heap, 0));
 
         counter = 0;
-        upload_buffer_data(counter_buffer, counter_offsets[i] * sizeof(uint32_t),
-                sizeof(counter), &counter, queue, command_list);
+        upload_buffer_data(counter_buffer, counter_offsets[i], sizeof(counter), &counter, queue, command_list);
         reset_command_list(command_list, context.allocator);
         transition_sub_resource_state(command_list, counter_buffer, 0,
                 D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -22184,8 +22184,7 @@ static void test_uav_counters(void)
             id[j] = 0xdeadbeef;
         upload_buffer_data(buffer, 0, counter * sizeof(*id), id, queue, command_list);
         reset_command_list(command_list, context.allocator);
-        upload_buffer_data(counter_buffer, counter_offsets[i] * sizeof(uint32_t),
-                sizeof(counter), &counter, queue, command_list);
+        upload_buffer_data(counter_buffer, counter_offsets[i], sizeof(counter), &counter, queue, command_list);
         reset_command_list(command_list, context.allocator);
 
         transition_sub_resource_state(command_list, counter_buffer, 0,
