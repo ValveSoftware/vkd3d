@@ -399,7 +399,7 @@ HRESULT vkd3d_init_format_info(struct d3d12_device *device)
     if (FAILED(hr = vkd3d_init_depth_stencil_formats(device)))
         return hr;
 
-    if FAILED(hr = vkd3d_init_format_compatibility_lists(device))
+    if (FAILED(hr = vkd3d_init_format_compatibility_lists(device)))
         vkd3d_cleanup_depth_stencil_formats(device);
 
     return hr;
