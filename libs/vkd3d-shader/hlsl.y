@@ -1971,6 +1971,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
 %type <type> typedef_type
 
 %type <variable_def> type_spec
+%type <variable_def> variable_decl
 %type <variable_def> variable_def
 
 %%
@@ -2544,7 +2545,7 @@ variables_def:
             list_add_tail($$, &$3->entry);
         }
 
-variable_def:
+variable_decl:
       any_identifier arrays colon_attribute
         {
             $$ = hlsl_alloc(ctx, sizeof(*$$));
@@ -2554,15 +2555,13 @@ variable_def:
             $$->semantic = $3.semantic;
             $$->reg_reservation = $3.reg_reservation;
         }
-    | any_identifier arrays colon_attribute '=' complex_initializer
+
+variable_def:
+      variable_decl
+    | variable_decl '=' complex_initializer
         {
-            $$ = hlsl_alloc(ctx, sizeof(*$$));
-            $$->loc = @1;
-            $$->name = $1;
-            $$->arrays = $2;
-            $$->semantic = $3.semantic;
-            $$->reg_reservation = $3.reg_reservation;
-            $$->initializer = $5;
+            $$ = $1;
+            $$->initializer = $3;
         }
 
 arrays:
