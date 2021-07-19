@@ -103,6 +103,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_DEFAULT                          */ "default",
     /* VKD3DSIH_DEFB                             */ "defb",
     /* VKD3DSIH_DEFI                             */ "defi",
+    /* VKD3DSIH_DEQ                              */ "deq",
     /* VKD3DSIH_DIV                              */ "div",
     /* VKD3DSIH_DP2                              */ "dp2",
     /* VKD3DSIH_DP2ADD                           */ "dp2add",

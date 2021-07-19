@@ -310,6 +310,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_IMM_ATOMIC_UMAX                  = 0xbc,
     VKD3D_SM5_OP_IMM_ATOMIC_UMIN                  = 0xbd,
     VKD3D_SM5_OP_SYNC                             = 0xbe,
+    VKD3D_SM5_OP_DEQ                              = 0xc3,
     VKD3D_SM5_OP_EVAL_SAMPLE_INDEX                = 0xcc,
     VKD3D_SM5_OP_EVAL_CENTROID                    = 0xcd,
     VKD3D_SM5_OP_DCL_GS_INSTANCES                 = 0xce,
@@ -1011,6 +1012,7 @@ static void shader_sm5_read_sync(struct vkd3d_shader_instruction *ins,
 }
 
 /*
+ * d -> VKD3D_DATA_DOUBLE
  * f -> VKD3D_DATA_FLOAT
  * i -> VKD3D_DATA_INT
  * u -> VKD3D_DATA_UINT
@@ -1247,6 +1249,7 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM5_OP_IMM_ATOMIC_UMIN,                  VKD3DSIH_IMM_ATOMIC_UMIN,                  "uU",   "iu"},
     {VKD3D_SM5_OP_SYNC,                             VKD3DSIH_SYNC,                             "",     "",
             shader_sm5_read_sync},
+    {VKD3D_SM5_OP_DEQ,                              VKD3DSIH_DEQ,                              "u",    "dd"},
     {VKD3D_SM5_OP_EVAL_SAMPLE_INDEX,                VKD3DSIH_EVAL_SAMPLE_INDEX,                "f",    "fi"},
     {VKD3D_SM5_OP_EVAL_CENTROID,                    VKD3DSIH_EVAL_CENTROID,                    "f",    "f"},
     {VKD3D_SM5_OP_DCL_GS_INSTANCES,                 VKD3DSIH_DCL_GS_INSTANCES,                 "",     "",
@@ -1338,6 +1341,8 @@ static enum vkd3d_data_type map_data_type(char t)
 {
     switch (t)
     {
+        case 'd':
+            return VKD3D_DATA_DOUBLE;
         case 'f':
             return VKD3D_DATA_FLOAT;
         case 'i':

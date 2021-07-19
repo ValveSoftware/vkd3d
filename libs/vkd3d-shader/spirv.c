@@ -3308,6 +3308,7 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_reg(struct vkd3d_dxbc_compiler *co
     enum vkd3d_shader_component_type component_type;
     struct vkd3d_shader_register_info reg_info;
     unsigned int component_count;
+    unsigned int write_mask32;
     uint32_t type_id, val_id;
 
     if (reg->type == VKD3DSPR_IMMCONST)
@@ -3320,14 +3321,17 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_reg(struct vkd3d_dxbc_compiler *co
         type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
         return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
     }
+    assert(reg_info.component_type != VKD3D_SHADER_COMPONENT_DOUBLE);
     vkd3d_dxbc_compiler_emit_dereference_register(compiler, reg, &reg_info);
+
+    write_mask32 = (reg->data_type == VKD3D_DATA_DOUBLE) ? vkd3d_write_mask_32_from_64(write_mask) : write_mask;
 
     /* Intermediate value (no storage class). */
     if (reg_info.storage_class == SpvStorageClassMax)
     {
         val_id = reg_info.id;
     }
-    else if (component_count == 1)
+    else if (vkd3d_write_mask_component_count(write_mask32) == 1)
     {
         return vkd3d_dxbc_compiler_emit_load_scalar(compiler, reg, swizzle, write_mask, &reg_info);
     }
@@ -3339,7 +3343,7 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_reg(struct vkd3d_dxbc_compiler *co
     }
 
     val_id = vkd3d_dxbc_compiler_emit_swizzle(compiler,
-            val_id, reg_info.write_mask, reg_info.component_type, swizzle, write_mask);
+            val_id, reg_info.write_mask, reg_info.component_type, swizzle, write_mask32);
 
     if (component_type != reg_info.component_type)
     {
@@ -7066,6 +7070,7 @@ static void vkd3d_dxbc_compiler_emit_comparison_instruction(struct vkd3d_dxbc_co
 
     switch (instruction->handler_idx)
     {
+        case VKD3DSIH_DEQ:
         case VKD3DSIH_EQ:  op = SpvOpFOrdEqual; break;
         case VKD3DSIH_GE:  op = SpvOpFOrdGreaterThanEqual; break;
         case VKD3DSIH_IEQ: op = SpvOpIEqual; break;
@@ -9249,6 +9254,7 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
         case VKD3DSIH_UDIV:
             vkd3d_dxbc_compiler_emit_udiv(compiler, instruction);
             break;
+        case VKD3DSIH_DEQ:
         case VKD3DSIH_EQ:
         case VKD3DSIH_GE:
         case VKD3DSIH_IEQ:

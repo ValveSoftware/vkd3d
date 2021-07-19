@@ -190,6 +190,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_DEFAULT,
     VKD3DSIH_DEFB,
     VKD3DSIH_DEFI,
+    VKD3DSIH_DEQ,
     VKD3DSIH_DIV,
     VKD3DSIH_DP2,
     VKD3DSIH_DP2ADD,
@@ -1030,6 +1031,13 @@ static inline unsigned int vkd3d_write_mask_from_component_count(unsigned int co
 {
     assert(component_count <= VKD3D_VEC4_SIZE);
     return (VKD3DSP_WRITEMASK_0 << component_count) - 1;
+}
+
+static inline unsigned int vkd3d_write_mask_32_from_64(unsigned int write_mask64)
+{
+    unsigned int write_mask32 = (write_mask64 | (write_mask64 << 1))
+            & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_2);
+    return write_mask32 | (write_mask32 << 1);
 }
 
 static inline unsigned int vkd3d_swizzle_get_component(DWORD swizzle,
