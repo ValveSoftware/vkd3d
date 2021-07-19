@@ -2556,12 +2556,34 @@ variable_decl:
             $$->reg_reservation = $3.reg_reservation;
         }
 
+state:
+      any_identifier '=' expr ';'
+        {
+            vkd3d_free($1);
+            hlsl_free_instr_list($3);
+        }
+
+state_block_start:
+      %empty
+        {
+            ctx->in_state_block = 1;
+        }
+
+state_block:
+      %empty
+    | state_block state
+
 variable_def:
       variable_decl
     | variable_decl '=' complex_initializer
         {
             $$ = $1;
             $$->initializer = $3;
+        }
+    | variable_decl '{' state_block_start state_block '}'
+        {
+            $$ = $1;
+            ctx->in_state_block = 0;
         }
 
 arrays:
@@ -2825,7 +2847,10 @@ primary_expr:
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_FLOAT], @1);
             c->value[0].f = $1;
             if (!($$ = make_list(ctx, &c->node)))
+            {
+                hlsl_free_instr(&c->node);
                 YYABORT;
+            }
         }
     | C_INTEGER
         {
@@ -2836,7 +2861,10 @@ primary_expr:
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_INT], @1);
             c->value[0].i = $1;
             if (!($$ = make_list(ctx, &c->node)))
+            {
+                hlsl_free_instr(&c->node);
                 YYABORT;
+            }
         }
     | boolean
         {
@@ -2847,7 +2875,10 @@ primary_expr:
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], @1);
             c->value[0].b = $1;
             if (!($$ = make_list(ctx, &c->node)))
+            {
+                hlsl_free_instr(&c->node);
                 YYABORT;
+            }
         }
     | VAR_IDENTIFIER
         {
@@ -2859,13 +2890,13 @@ primary_expr:
                 hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Variable \"%s\" is not defined.", $1);
                 YYABORT;
             }
-            if ((load = hlsl_new_var_load(ctx, var, @1)))
+            if (!(load = hlsl_new_var_load(ctx, var, @1)))
+                YYABORT;
+            if (!($$ = make_list(ctx, &load->node)))
             {
-                if (!($$ = make_list(ctx, &load->node)))
-                    YYABORT;
+                hlsl_free_instr(&load->node);
+                YYABORT;
             }
-            else
-                $$ = NULL;
         }
     | '(' expr ')'
         {
@@ -2875,6 +2906,29 @@ primary_expr:
         {
             if (!($$ = add_call(ctx, $1, &$3, @1)))
                 YYABORT;
+        }
+    | NEW_IDENTIFIER
+        {
+            if (ctx->in_state_block)
+            {
+                struct hlsl_ir_load *load;
+                struct hlsl_ir_var *var;
+
+                if (!(var = hlsl_new_var(ctx, $1, ctx->builtin_types.scalar[HLSL_TYPE_INT], @1, NULL, 0, NULL)))
+                    YYABORT;
+                if (!(load = hlsl_new_var_load(ctx, var, @1)))
+                    YYABORT;
+                if (!($$ = make_list(ctx, &load->node)))
+                {
+                    hlsl_free_instr(&load->node);
+                    YYABORT;
+                }
+            }
+            else
+            {
+                hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Identifier \"%s\" is not declared.\n", $1);
+                YYABORT;
+            }
         }
 
 postfix_expr:
