@@ -28194,7 +28194,7 @@ static void test_line_tessellation(void)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
     D3D12_QUERY_HEAP_DESC query_heap_desc;
-    D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
+    D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv[2];
     D3D12_INPUT_LAYOUT_DESC input_layout;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
@@ -28361,10 +28361,10 @@ static void test_line_tessellation(void)
     static const D3D12_SO_DECLARATION_ENTRY so_declaration[] =
     {
         {0, "SV_POSITION",  0, 0, 4, 0},
-        {0, "COLOR",        0, 0, 4, 0},
-        {0, "PRIMITIVE_ID", 0, 0, 4, 0},
+        {0, "COLOR",        0, 0, 4, 1},
+        {0, "PRIMITIVE_ID", 0, 0, 4, 1},
     };
-    unsigned int strides[] = {48};
+    unsigned int strides[] = {16, 32};
     static const struct
     {
         struct vec4 position;
@@ -28450,13 +28450,17 @@ static void test_line_tessellation(void)
 
     so_buffer = create_default_buffer(context.device, 4096,
             D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_STREAM_OUT);
-    sobv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(so_buffer);
-    sobv.SizeInBytes = 1024;
-    sobv.BufferFilledSizeLocation = sobv.BufferLocation + sobv.SizeInBytes;
+
+    for (i = 0; i < ARRAY_SIZE(sobv); ++i)
+    {
+        sobv[i].BufferLocation = ID3D12Resource_GetGPUVirtualAddress(so_buffer) + i * 2048;
+        sobv[i].SizeInBytes = 1024;
+        sobv[i].BufferFilledSizeLocation = sobv[i].BufferLocation + sobv[i].SizeInBytes;
+    }
 
     ID3D12GraphicsCommandList_BeginQuery(command_list, query_heap, D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0, 0);
 
-    ID3D12GraphicsCommandList_SOSetTargets(command_list, 0, 1, &sobv);
+    ID3D12GraphicsCommandList_SOSetTargets(command_list, 0, 2, sobv);
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
@@ -28493,19 +28497,21 @@ static void test_line_tessellation(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(expected_data) / 3 ; ++i)
     {
-        data = get_readback_data(&rb, i, 0, 0, 3 * sizeof(*data));
+        data = get_readback_data(&rb, i, 0, 0, sizeof(*data));
         expected = &expected_data[3 * i + 0];
         ok(compare_vec4(data, expected, 1),
                 "Got position {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);
-        ++data;
+        data = get_readback_data(&rb, i + 2048 / (2 * sizeof(*data)), 0, 0, 2 * sizeof(*data));
         expected = &expected_data[3 * i + 1];
         bug_if(is_nvidia_device(context.device))
+        todo_if(i != 6)
         ok(compare_vec4(data, expected, 1),
                 "Got color {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);
         ++data;
         expected = &expected_data[3 * i + 2];
+        todo
         ok(compare_vec4(data, expected, 1),
                 "Got primitive ID {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);
