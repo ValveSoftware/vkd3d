@@ -28503,13 +28503,11 @@ static void test_line_tessellation(void)
         data = get_readback_data(&rb, i + 2048 / (2 * sizeof(*data)), 0, 0, 2 * sizeof(*data));
         expected = &expected_data[3 * i + 1];
         bug_if(is_nvidia_device(context.device))
-        todo_if(i != 6)
         ok(compare_vec4(data, expected, 1),
                 "Got color {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);
         ++data;
         expected = &expected_data[3 * i + 2];
-        todo
         ok(compare_vec4(data, expected, 1),
                 "Got primitive ID {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);

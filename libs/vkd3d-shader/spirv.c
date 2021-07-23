@@ -4136,12 +4136,14 @@ static void vkd3d_dxbc_compiler_decorate_xfb_output(struct vkd3d_dxbc_compiler *
             xfb_element = e;
             break;
         }
-
-        offset += 4 * e->component_count;
     }
 
     if (!xfb_element)
         return;
+
+    for (i = 0; xfb_element != &xfb_info->elements[i]; ++i)
+        if (xfb_info->elements[i].output_slot == xfb_element->output_slot)
+            offset += 4 * xfb_info->elements[i].component_count;
 
     if (xfb_element->component_index || xfb_element->component_count > component_count)
     {
