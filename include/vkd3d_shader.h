@@ -1137,7 +1137,10 @@ struct vkd3d_shader_descriptor_info
      * \ref vkd3d_shader_descriptor_info_flag.
      */
     unsigned int flags;
-    /** Size of this descriptor array, or 1 if a single descriptor. */
+    /**
+     *  Size of this descriptor array, or 1 if a single descriptor.
+     *  For an unbounded array this value is ~0u.
+     */
     unsigned int count;
 };
 

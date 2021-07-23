@@ -5541,13 +5541,15 @@ static const struct vkd3d_shader_descriptor_info *vkd3d_dxbc_compiler_get_descri
         const struct vkd3d_shader_register_range *range)
 {
     const struct vkd3d_shader_scan_descriptor_info *descriptor_info = compiler->scan_descriptor_info;
+    unsigned int register_last = (range->last == ~0u) ? range->first : range->last;
     const struct vkd3d_shader_descriptor_info *d;
     unsigned int i;
 
     for (i = 0; i < descriptor_info->descriptor_count; ++i)
     {
         d = &descriptor_info->descriptors[i];
-        if (d->type == type && d->register_space == range->space && d->register_index == range->first)
+        if (d->type == type && d->register_space == range->space && d->register_index <= range->first
+                    && (d->count == ~0u || d->count > register_last - d->register_index))
             return d;
     }
 

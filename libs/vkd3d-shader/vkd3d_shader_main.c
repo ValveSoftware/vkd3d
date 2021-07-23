@@ -601,7 +601,7 @@ static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *c
     d->resource_type = resource_type;
     d->resource_data_type = resource_data_type;
     d->flags = flags;
-    d->count = 1;
+    d->count = (range->last == ~0u) ? ~0u : range->last - range->first + 1;
     ++info->descriptor_count;
 
     return true;
