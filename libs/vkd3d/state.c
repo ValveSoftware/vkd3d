@@ -1190,6 +1190,19 @@ static void d3d12_pipeline_state_destroy_graphics(struct d3d12_pipeline_state *s
     }
 }
 
+static void d3d12_pipeline_uav_counter_state_cleanup(struct d3d12_pipeline_uav_counter_state *uav_counters,
+        struct d3d12_device *device)
+{
+    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+
+    if (uav_counters->vk_set_layout)
+        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, uav_counters->vk_set_layout, NULL));
+    if (uav_counters->vk_pipeline_layout)
+        VK_CALL(vkDestroyPipelineLayout(device->vk_device, uav_counters->vk_pipeline_layout, NULL));
+
+    vkd3d_free(uav_counters->bindings);
+}
+
 static ULONG STDMETHODCALLTYPE d3d12_pipeline_state_Release(ID3D12PipelineState *iface)
 {
     struct d3d12_pipeline_state *state = impl_from_ID3D12PipelineState(iface);
@@ -1209,12 +1222,7 @@ static ULONG STDMETHODCALLTYPE d3d12_pipeline_state_Release(ID3D12PipelineState 
         else if (d3d12_pipeline_state_is_compute(state))
             VK_CALL(vkDestroyPipeline(device->vk_device, state->u.compute.vk_pipeline, NULL));
 
-        if (state->vk_set_layout)
-            VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, state->vk_set_layout, NULL));
-        if (state->vk_pipeline_layout)
-            VK_CALL(vkDestroyPipelineLayout(device->vk_device, state->vk_pipeline_layout, NULL));
-
-        vkd3d_free(state->uav_counters);
+        d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
 
         vkd3d_free(state);
 
@@ -1452,12 +1460,12 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
 
     if (!(binding_desc = vkd3d_calloc(uav_counter_count, sizeof(*binding_desc))))
         return E_OUTOFMEMORY;
-    if (!(state->uav_counters = vkd3d_calloc(uav_counter_count, sizeof(*state->uav_counters))))
+    if (!(state->uav_counters.bindings = vkd3d_calloc(uav_counter_count, sizeof(*state->uav_counters.bindings))))
     {
         vkd3d_free(binding_desc);
         return E_OUTOFMEMORY;
     }
-    state->uav_counter_count = uav_counter_count;
+    state->uav_counters.binding_count = uav_counter_count;
 
     descriptor_binding = 0;
     for (set_index = 0; set_index < root_signature->vk_set_count; ++set_index)
@@ -1471,13 +1479,13 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
                 || !(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER))
             continue;
 
-        state->uav_counters[j].register_space = d->register_space;
-        state->uav_counters[j].register_index = d->register_index;
-        state->uav_counters[j].shader_visibility = (stage_flags == VK_SHADER_STAGE_COMPUTE_BIT)
+        state->uav_counters.bindings[j].register_space = d->register_space;
+        state->uav_counters.bindings[j].register_index = d->register_index;
+        state->uav_counters.bindings[j].shader_visibility = (stage_flags == VK_SHADER_STAGE_COMPUTE_BIT)
                 ? VKD3D_SHADER_VISIBILITY_COMPUTE : VKD3D_SHADER_VISIBILITY_PIXEL;
-        state->uav_counters[j].binding.set = set_index;
-        state->uav_counters[j].binding.binding = descriptor_binding;
-        state->uav_counters[j].binding.count = 1;
+        state->uav_counters.bindings[j].binding.set = set_index;
+        state->uav_counters.bindings[j].binding.binding = descriptor_binding;
+        state->uav_counters.bindings[j].binding.count = 1;
 
         binding_desc[j].binding = descriptor_binding;
         binding_desc[j].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
@@ -1491,25 +1499,25 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
 
     /* Create a descriptor set layout for UAV counters. */
     hr = vkd3d_create_descriptor_set_layout(device,
-            0, descriptor_binding, binding_desc, &state->vk_set_layout);
+            0, descriptor_binding, binding_desc, &state->uav_counters.vk_set_layout);
     vkd3d_free(binding_desc);
     if (FAILED(hr))
     {
-        vkd3d_free(state->uav_counters);
+        vkd3d_free(state->uav_counters.bindings);
         return hr;
     }
 
     /* Create a pipeline layout which is compatible for all other descriptor
      * sets with the root signature's pipeline layout.
      */
-    state->set_index = set_index;
-    set_layouts[set_index++] = state->vk_set_layout;
+    state->uav_counters.set_index = set_index;
+    set_layouts[set_index++] = state->uav_counters.vk_set_layout;
     if (FAILED(hr = vkd3d_create_pipeline_layout(device, set_index, set_layouts,
             root_signature->push_constant_range_count, root_signature->push_constant_ranges,
-            &state->vk_pipeline_layout)))
+            &state->uav_counters.vk_pipeline_layout)))
     {
-        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, state->vk_set_layout, NULL));
-        vkd3d_free(state->uav_counters);
+        VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, state->uav_counters.vk_set_layout, NULL));
+        vkd3d_free(state->uav_counters.bindings);
         return hr;
     }
 
@@ -1530,10 +1538,7 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     state->ID3D12PipelineState_iface.lpVtbl = &d3d12_pipeline_state_vtbl;
     state->refcount = 1;
 
-    state->vk_pipeline_layout = VK_NULL_HANDLE;
-    state->vk_set_layout = VK_NULL_HANDLE;
-    state->uav_counters = NULL;
-    state->uav_counter_count = 0;
+    memset(&state->uav_counters, 0, sizeof(state->uav_counters));
 
     if (!(root_signature = unsafe_impl_from_ID3D12RootSignature(desc->pRootSignature)))
     {
@@ -1565,31 +1570,23 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     shader_interface.push_constant_buffer_count = root_signature->root_constant_count;
     shader_interface.combined_samplers = NULL;
     shader_interface.combined_sampler_count = 0;
-    shader_interface.uav_counters = state->uav_counters;
-    shader_interface.uav_counter_count = state->uav_counter_count;
+    shader_interface.uav_counters = state->uav_counters.bindings;
+    shader_interface.uav_counter_count = state->uav_counters.binding_count;
 
-    vk_pipeline_layout = state->vk_pipeline_layout
-            ? state->vk_pipeline_layout : root_signature->vk_pipeline_layout;
+    vk_pipeline_layout = state->uav_counters.vk_pipeline_layout
+            ? state->uav_counters.vk_pipeline_layout : root_signature->vk_pipeline_layout;
     if (FAILED(hr = vkd3d_create_compute_pipeline(device, &desc->CS, &shader_interface,
             vk_pipeline_layout, &state->u.compute.vk_pipeline)))
     {
         WARN("Failed to create Vulkan compute pipeline, hr %#x.\n", hr);
-        if (state->vk_set_layout)
-            VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, state->vk_set_layout, NULL));
-        if (state->vk_pipeline_layout)
-            VK_CALL(vkDestroyPipelineLayout(device->vk_device, state->vk_pipeline_layout, NULL));
-        vkd3d_free(state->uav_counters);
+        d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
         return hr;
     }
 
     if (FAILED(hr = vkd3d_private_store_init(&state->private_store)))
     {
         VK_CALL(vkDestroyPipeline(device->vk_device, state->u.compute.vk_pipeline, NULL));
-        if (state->vk_set_layout)
-            VK_CALL(vkDestroyDescriptorSetLayout(device->vk_device, state->vk_set_layout, NULL));
-        if (state->vk_pipeline_layout)
-            VK_CALL(vkDestroyPipelineLayout(device->vk_device, state->vk_pipeline_layout, NULL));
-        vkd3d_free(state->uav_counters);
+        d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
         return hr;
     }
 
@@ -2075,10 +2072,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     state->ID3D12PipelineState_iface.lpVtbl = &d3d12_pipeline_state_vtbl;
     state->refcount = 1;
 
-    state->vk_pipeline_layout = VK_NULL_HANDLE;
-    state->vk_set_layout = VK_NULL_HANDLE;
-    state->uav_counters = NULL;
-    state->uav_counter_count = 0;
+    memset(&state->uav_counters, 0, sizeof(state->uav_counters));
     graphics->stage_count = 0;
 
     memset(&input_signature, 0, sizeof(input_signature));

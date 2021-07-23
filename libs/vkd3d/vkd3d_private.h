@@ -783,6 +783,16 @@ struct d3d12_compute_pipeline_state
     VkPipeline vk_pipeline;
 };
 
+struct d3d12_pipeline_uav_counter_state
+{
+    VkPipelineLayout vk_pipeline_layout;
+    VkDescriptorSetLayout vk_set_layout;
+    uint32_t set_index;
+
+    struct vkd3d_shader_uav_counter_binding *bindings;
+    unsigned int binding_count;
+};
+
 /* ID3D12PipelineState */
 struct d3d12_pipeline_state
 {
@@ -796,12 +806,7 @@ struct d3d12_pipeline_state
     } u;
     VkPipelineBindPoint vk_bind_point;
 
-    VkPipelineLayout vk_pipeline_layout;
-    VkDescriptorSetLayout vk_set_layout;
-    uint32_t set_index;
-
-    struct vkd3d_shader_uav_counter_binding *uav_counters;
-    unsigned int uav_counter_count;
+    struct d3d12_pipeline_uav_counter_state uav_counters;
 
     struct d3d12_device *device;
 
