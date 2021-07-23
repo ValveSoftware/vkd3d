@@ -5675,6 +5675,7 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
     const struct vkd3d_shader_register *reg = &resource->reg.reg;
     const struct vkd3d_spirv_resource_type *resource_type_info;
     enum vkd3d_shader_component_type sampled_type;
+    const struct vkd3d_symbol *array_symbol;
     struct vkd3d_symbol resource_symbol;
     bool is_uav;
 
@@ -5717,14 +5718,8 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
                 resource_type_info, sampled_type, structure_stride || raw, 0);
     }
 
-    ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
-    var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
-            ptr_type_id, storage_class, 0);
-
-    vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(compiler, var_id, reg,
-            &resource->range, resource_type, false);
-
-    vkd3d_dxbc_compiler_emit_register_debug_name(builder, var_id, reg);
+    var_id = vkd3d_dxbc_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
+            &resource->range, resource_type, &array_symbol);
 
     if (is_uav)
     {
@@ -5762,6 +5757,10 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
                 storage_class = SpvStorageClassUniform;
                 ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, struct_id);
             }
+            else
+            {
+                ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
+            }
 
             counter_var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
                     ptr_type_id, storage_class, 0);
@@ -5775,6 +5774,7 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
 
     vkd3d_symbol_make_resource(&resource_symbol, reg);
     resource_symbol.id = var_id;
+    resource_symbol.descriptor_array = array_symbol;
     resource_symbol.info.resource.range = resource->range;
     resource_symbol.info.resource.sampled_type = sampled_type;
     resource_symbol.info.resource.type_id = type_id;
@@ -7770,9 +7770,26 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
     if (!symbol)
         symbol = vkd3d_dxbc_compiler_find_resource(compiler, resource_reg);
 
-    image->id = symbol->id;
+    if (symbol->descriptor_array)
+    {
+        const struct vkd3d_symbol_descriptor_array_data *array_data = &symbol->descriptor_array->info.descriptor_array;
+        uint32_t ptr_type_id, index_id;
+
+        index_id = vkd3d_dxbc_compiler_get_descriptor_index(compiler, resource_reg,
+                array_data->binding_base_idx);
+
+        ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, array_data->storage_class,
+                array_data->contained_type_id);
+        image->image_type_id = array_data->contained_type_id;
+
+        image->id = vkd3d_spirv_build_op_access_chain(builder, ptr_type_id, symbol->id, &index_id, 1);
+    }
+    else
+    {
+        image->id = symbol->id;
+        image->image_type_id = symbol->info.resource.type_id;
+    }
     image->sampled_type = symbol->info.resource.sampled_type;
-    image->image_type_id = symbol->info.resource.type_id;
     image->resource_type_info = symbol->info.resource.resource_type_info;
     image->structure_stride = symbol->info.resource.structure_stride;
     image->raw = symbol->info.resource.raw;
