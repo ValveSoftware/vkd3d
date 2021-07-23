@@ -2268,8 +2268,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     shader_interface.push_constant_buffer_count = root_signature->root_constant_count;
     shader_interface.combined_samplers = NULL;
     shader_interface.combined_sampler_count = 0;
-    shader_interface.uav_counters = NULL;
-    shader_interface.uav_counter_count = 0;
 
     for (i = 0; i < ARRAY_SIZE(shader_stages); ++i)
     {
@@ -2290,19 +2288,16 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
             hr = hresult_from_vkd3d_result(ret);
             goto fail;
         }
-        for (j = 0; j < shader_info.descriptor_count; ++j)
+        if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state,
+                device, root_signature, &shader_info, shader_stages[i].stage)))
         {
-            const struct vkd3d_shader_descriptor_info *d = &shader_info.descriptors[j];
-
-            if (d->type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV
-                    && (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER))
-            {
-                FIXME("UAV counters not implemented for graphics pipelines.\n");
-                break;
-            }
+            WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
+            goto fail;
         }
         vkd3d_shader_free_scan_descriptor_info(&shader_info);
 
+        shader_interface.uav_counters = NULL;
+        shader_interface.uav_counter_count = 0;
         target_info = NULL;
         switch (shader_stages[i].stage)
         {
@@ -2328,6 +2323,8 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
                 break;
 
             case VK_SHADER_STAGE_FRAGMENT_BIT:
+                shader_interface.uav_counters = state->uav_counters.bindings;
+                shader_interface.uav_counter_count = state->uav_counters.binding_count;
                 target_info = &ps_target_info;
                 break;
 
@@ -2522,6 +2519,8 @@ fail:
         VK_CALL(vkDestroyShaderModule(device->vk_device, state->u.graphics.stages[i].module, NULL));
     }
     vkd3d_shader_free_shader_signature(&input_signature);
+
+    d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
 
     return hr;
 }
@@ -2811,7 +2810,8 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
     pipeline_desc.pDepthStencilState = &graphics->ds_desc;
     pipeline_desc.pColorBlendState = &blend_desc;
     pipeline_desc.pDynamicState = &dynamic_desc;
-    pipeline_desc.layout = graphics->root_signature->vk_pipeline_layout;
+    pipeline_desc.layout = state->uav_counters.vk_pipeline_layout ? state->uav_counters.vk_pipeline_layout
+            : graphics->root_signature->vk_pipeline_layout;
     pipeline_desc.subpass = 0;
     pipeline_desc.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_desc.basePipelineIndex = -1;

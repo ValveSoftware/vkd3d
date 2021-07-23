@@ -22481,14 +22481,12 @@ static void test_graphics_uav_counters(void)
     ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
 
     counter = read_uav_counter(&context, counter_buffer, uav_desc.Buffer.CounterOffsetInBytes);
-    todo
     ok(counter == 64, "Got %u, expected 64.\n", counter);
 
     transition_sub_resource_state(command_list, buffer, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, uav_desc.Buffer.NumElements, 1, 1);
-    todo
     check_readback_data_uint(&rb, &box, 1, 0);
     release_resource_readback(&rb);
 
