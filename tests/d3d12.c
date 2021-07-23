@@ -34624,6 +34624,7 @@ static void test_resource_arrays(void)
                 get_cpu_descriptor_handle(&context, heap, ARRAY_SIZE(input_buffers) + i));
     }
 
+    todo
     context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
             shader_bytecode(cs_code, sizeof(cs_code)));
     if (!context.pipeline_state)
