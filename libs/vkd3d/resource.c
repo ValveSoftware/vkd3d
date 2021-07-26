@@ -1911,6 +1911,13 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
         heap_offset = align(heap_offset, requirements.alignment);
     }
 
+    if (heap_offset > heap->desc.SizeInBytes || requirements.size > heap->desc.SizeInBytes - heap_offset)
+    {
+        ERR("Heap too small for the resource (offset %"PRIu64", resource size %"PRIu64", heap size %"PRIu64".\n",
+                heap_offset, requirements.size, heap->desc.SizeInBytes);
+        return E_INVALIDARG;
+    }
+
     if (heap_offset % requirements.alignment)
     {
         FIXME("Invalid heap offset %#"PRIx64" (alignment %#"PRIx64").\n",
