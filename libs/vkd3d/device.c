@@ -3515,8 +3515,7 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
 
     array_size = d3d12_resource_desc_get_layer_count(desc);
 
-    if (first_sub_resource >= desc->MipLevels * array_size
-            || sub_resource_count > desc->MipLevels * array_size - first_sub_resource)
+    if (!vkd3d_bound_range(first_sub_resource, sub_resource_count, desc->MipLevels * array_size))
     {
         WARN("Invalid sub-resource range %u-%u for resource.\n", first_sub_resource, sub_resource_count);
         return;

@@ -4422,7 +4422,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_IASetVertexBuffers(ID3D12Graphi
     null_resources = &list->device->null_resources;
     gpu_va_allocator = &list->device->gpu_va_allocator;
 
-    if (start_slot >= ARRAY_SIZE(list->strides) || view_count > ARRAY_SIZE(list->strides) - start_slot)
+    if (!vkd3d_bound_range(start_slot, view_count, ARRAY_SIZE(list->strides)))
     {
         WARN("Invalid start slot %u / view count %u.\n", start_slot, view_count);
         return;
@@ -4477,7 +4477,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SOSetTargets(ID3D12GraphicsComm
         return;
     }
 
-    if (start_slot >= ARRAY_SIZE(buffers) || view_count > ARRAY_SIZE(buffers) - start_slot)
+    if (!vkd3d_bound_range(start_slot, view_count, ARRAY_SIZE(buffers)))
     {
         WARN("Invalid start slot %u / view count %u.\n", start_slot, view_count);
         return;

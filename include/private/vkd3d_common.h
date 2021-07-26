@@ -134,6 +134,17 @@ static inline void *vkd3d_memmem( const void *haystack, size_t haystack_len, con
     return NULL;
 }
 
+static inline bool vkd3d_bound_range(size_t start, size_t count, size_t limit)
+{
+#ifdef HAVE_BUILTIN_ADD_OVERFLOW
+    size_t sum;
+
+    return !__builtin_add_overflow(start, count, &sum) && sum <= limit;
+#else
+    return start <= limit && count <= limit - start;
+#endif
+}
+
 static inline int ascii_isupper(int c)
 {
     return 'A' <= c && c <= 'Z';

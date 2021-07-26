@@ -127,6 +127,7 @@ AS_IF([test "x$with_xcb" != "xno"],
 dnl Check for functions
 VKD3D_CHECK_FUNC([HAVE_BUILTIN_CLZ], [__builtin_clz], [__builtin_clz(0)])
 VKD3D_CHECK_FUNC([HAVE_BUILTIN_POPCOUNT], [__builtin_popcount], [__builtin_popcount(0)])
+VKD3D_CHECK_FUNC([HAVE_BUILTIN_ADD_OVERFLOW], [__builtin_add_overflow], [__builtin_add_overflow(0, 0, (int *)0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_ADD_AND_FETCH], [__sync_add_and_fetch], [__sync_add_and_fetch((int *)0, 0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_SUB_AND_FETCH], [__sync_sub_and_fetch], [__sync_sub_and_fetch((int *)0, 0)])
 
