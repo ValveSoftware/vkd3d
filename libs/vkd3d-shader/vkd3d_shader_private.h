@@ -906,6 +906,36 @@ void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list,
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function) DECLSPEC_HIDDEN;
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args) DECLSPEC_HIDDEN;
 
+struct vkd3d_bytecode_buffer
+{
+    uint8_t *data;
+    size_t size, capacity;
+    int status;
+};
+
+size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size) DECLSPEC_HIDDEN;
+void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value) DECLSPEC_HIDDEN;
+
+static inline size_t put_u32(struct vkd3d_bytecode_buffer *buffer, uint32_t value)
+{
+    return bytecode_put_bytes(buffer, &value, sizeof(value));
+}
+
+static inline size_t put_f32(struct vkd3d_bytecode_buffer *buffer, float value)
+{
+    return bytecode_put_bytes(buffer, &value, sizeof(value));
+}
+
+static inline size_t put_string(struct vkd3d_bytecode_buffer *buffer, const char *string)
+{
+    return bytecode_put_bytes(buffer, string, strlen(string) + 1);
+}
+
+static inline size_t bytecode_get_size(struct vkd3d_bytecode_buffer *buffer)
+{
+    return buffer->size;
+}
+
 struct vkd3d_shader_location
 {
     const char *source_name;

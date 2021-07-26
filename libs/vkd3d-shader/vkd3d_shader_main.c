@@ -282,6 +282,34 @@ void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const stru
     va_end(args);
 }
 
+size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size)
+{
+    size_t aligned_size = align(size, 4);
+    size_t offset = buffer->size;
+
+    if (buffer->status)
+        return offset;
+
+    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->capacity, offset + aligned_size, 1))
+    {
+        buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
+        return offset;
+    }
+    memcpy(buffer->data + offset, bytes, size);
+    memset(buffer->data + offset + size, 0xab, aligned_size - size);
+    buffer->size = offset + aligned_size;
+    return offset;
+}
+
+void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value)
+{
+    if (buffer->status)
+        return;
+
+    assert(vkd3d_bound_range(offset, sizeof(value), buffer->size));
+    memcpy(buffer->data + offset, &value, sizeof(value));
+}
+
 static void vkd3d_shader_dump_blob(const char *path, const char *prefix, const void *data, size_t size)
 {
     static int shader_id = 0;
