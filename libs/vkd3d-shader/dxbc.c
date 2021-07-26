@@ -2930,9 +2930,7 @@ struct root_signature_writer_context
 {
     struct vkd3d_shader_message_context message_context;
 
-    DWORD *data;
-    size_t position;
-    size_t capacity;
+    struct vkd3d_bytecode_buffer buffer;
 
     size_t total_size_position;
     size_t chunk_position;
@@ -2943,12 +2941,10 @@ static bool write_dwords(struct root_signature_writer_context *context,
 {
     unsigned int i;
 
-    if (!vkd3d_array_reserve((void **)&context->data, &context->capacity,
-            context->position + count, sizeof(*context->data)))
-        return false;
     for (i = 0; i < count; ++i)
-        context->data[context->position++] = d;
-    return true;
+        put_u32(&context->buffer, d);
+
+    return !context->buffer.status;
 }
 
 static bool write_dword(struct root_signature_writer_context *context, DWORD d)
@@ -2958,22 +2954,19 @@ static bool write_dword(struct root_signature_writer_context *context, DWORD d)
 
 static bool write_float(struct root_signature_writer_context *context, float f)
 {
-    union
-    {
-        float f;
-        DWORD d;
-    } u;
-    u.f = f;
-    return write_dword(context, u.d);
+    put_f32(&context->buffer, f);
+    return !context->buffer.status;
 }
 
 static size_t get_chunk_offset(struct root_signature_writer_context *context)
 {
-    return (context->position - context->chunk_position) * sizeof(DWORD);
+    return bytecode_get_size(&context->buffer) - context->chunk_position;
 }
 
 static int shader_write_root_signature_header(struct root_signature_writer_context *context)
 {
+    struct vkd3d_bytecode_buffer *buffer = &context->buffer;
+
     if (!write_dword(context, TAG_DXBC))
         goto fail;
 
@@ -2984,7 +2977,7 @@ static int shader_write_root_signature_header(struct root_signature_writer_conte
     if (!write_dword(context, 0x00000001))
         goto fail;
 
-    context->total_size_position = context->position;
+    context->total_size_position = bytecode_get_size(buffer);
     if (!write_dword(context, 0xffffffff)) /* total size */
         goto fail;
 
@@ -2992,14 +2985,14 @@ static int shader_write_root_signature_header(struct root_signature_writer_conte
         goto fail;
 
     /* chunk offset */
-    if (!write_dword(context, (context->position + 1) * sizeof(DWORD)))
+    if (!write_dword(context, bytecode_get_size(buffer) + sizeof(uint32_t)))
         goto fail;
 
     if (!write_dword(context, TAG_RTS0))
         goto fail;
     if (!write_dword(context, 0xffffffff)) /* chunk size */
         goto fail;
-    context->chunk_position = context->position;
+    context->chunk_position = bytecode_get_size(buffer);
 
     return VKD3D_OK;
 
@@ -3155,11 +3148,12 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
         const struct vkd3d_shader_versioned_root_signature_desc *desc)
 {
     unsigned int parameter_count = versioned_root_signature_get_parameter_count(desc);
+    struct vkd3d_bytecode_buffer *buffer = &context->buffer;
     size_t parameters_position;
     unsigned int i;
     int ret;
 
-    parameters_position = context->position;
+    parameters_position = bytecode_get_size(buffer);
     for (i = 0; i < parameter_count; ++i)
     {
         if (!write_dword(context, versioned_root_signature_get_parameter_type(desc, i)))
@@ -3172,7 +3166,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
 
     for (i = 0; i < parameter_count; ++i)
     {
-        context->data[parameters_position + 3 * i + 2] = get_chunk_offset(context); /* offset */
+        set_u32(buffer, parameters_position + ((3 * i + 2) * sizeof(uint32_t)), get_chunk_offset(context));
 
         switch (versioned_root_signature_get_parameter_type(desc, i))
         {
@@ -3260,6 +3254,7 @@ fail:
 static int shader_write_root_signature(struct root_signature_writer_context *context,
         const struct vkd3d_shader_versioned_root_signature_desc *desc)
 {
+    struct vkd3d_bytecode_buffer *buffer = &context->buffer;
     size_t samplers_offset_position;
     int ret;
 
@@ -3273,7 +3268,7 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
 
     if (!write_dword(context, versioned_root_signature_get_static_sampler_count(desc)))
         goto fail;
-    samplers_offset_position = context->position;
+    samplers_offset_position = bytecode_get_size(buffer);
     if (!write_dword(context, 0xffffffff)) /* offset */
         goto fail;
 
@@ -3283,7 +3278,7 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
     if ((ret = shader_write_root_parameters(context, desc)) < 0)
         return ret;
 
-    context->data[samplers_offset_position] = get_chunk_offset(context);
+    set_u32(buffer, samplers_offset_position, get_chunk_offset(context));
     return shader_write_static_samplers(context, desc);
 
 fail:
@@ -3406,6 +3401,7 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
     struct root_signature_writer_context context;
     size_t total_size, chunk_size;
     uint32_t checksum[4];
+    unsigned int i;
     int ret;
 
     TRACE("root_signature %p, dxbc %p, messages %p.\n", root_signature, dxbc, messages);
@@ -3432,26 +3428,35 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
     memset(dxbc, 0, sizeof(*dxbc));
     if ((ret = shader_write_root_signature_header(&context)) < 0)
     {
-        vkd3d_free(context.data);
+        vkd3d_free(context.buffer.data);
         goto done;
     }
 
     if ((ret = shader_write_root_signature(&context, root_signature)) < 0)
     {
-        vkd3d_free(context.data);
+        vkd3d_free(context.buffer.data);
         goto done;
     }
 
-    total_size = context.position * sizeof(DWORD);
-    chunk_size = get_chunk_offset(&context);
-    context.data[context.total_size_position] = total_size;
-    context.data[context.chunk_position - 1] = chunk_size;
+    if (context.buffer.status)
+    {
+        vkd3d_shader_error(&context.message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
+                "Out of memory while writing root signature.");
+        vkd3d_free(context.buffer.data);
+        goto done;
+    }
 
-    dxbc->code = context.data;
+    total_size = bytecode_get_size(&context.buffer);
+    chunk_size = get_chunk_offset(&context);
+    set_u32(&context.buffer, context.total_size_position, total_size);
+    set_u32(&context.buffer, context.chunk_position - sizeof(uint32_t), chunk_size);
+
+    dxbc->code = context.buffer.data;
     dxbc->size = total_size;
 
     vkd3d_compute_dxbc_checksum(dxbc->code, dxbc->size, checksum);
-    memcpy((uint32_t *)dxbc->code + 1, checksum, sizeof(checksum));
+    for (i = 0; i < 4; ++i)
+        set_u32(&context.buffer, (i + 1) * sizeof(uint32_t), checksum[i]);
 
     ret = VKD3D_OK;
 
