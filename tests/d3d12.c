@@ -2286,6 +2286,13 @@ static void test_create_placed_resource(void)
             &IID_ID3D12Resource, (void **)&resource);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
+    /* Buffer + offset too large for the heap. */
+    hr = ID3D12Device_CreatePlacedResource(device, heap, heap_desc.SizeInBytes,
+            &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
+            &IID_ID3D12Resource, (void **)&resource);
+    todo
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
     ID3D12Heap_Release(heap);
 
     for (i = 0; i < ARRAY_SIZE(invalid_buffer_desc_tests); ++i)
