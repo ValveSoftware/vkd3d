@@ -3613,6 +3613,7 @@ static void vkd3d_dxbc_compiler_emit_store_reg(struct vkd3d_dxbc_compiler *compi
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     enum vkd3d_shader_component_type component_type;
     struct vkd3d_shader_register_info reg_info;
+    unsigned int src_write_mask = write_mask;
     uint32_t type_id;
 
     assert(reg->type != VKD3DSPR_IMMCONST);
@@ -3624,14 +3625,16 @@ static void vkd3d_dxbc_compiler_emit_store_reg(struct vkd3d_dxbc_compiler *compi
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
     if (component_type != reg_info.component_type)
     {
-        unsigned int component_count = vkd3d_write_mask_component_count(write_mask);
-        type_id = vkd3d_spirv_get_type_id(builder, reg_info.component_type, component_count);
+        if (reg->data_type == VKD3D_DATA_DOUBLE)
+            src_write_mask = vkd3d_write_mask_32_from_64(write_mask);
+        type_id = vkd3d_spirv_get_type_id(builder, reg_info.component_type,
+                vkd3d_write_mask_component_count(src_write_mask));
         val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
         component_type = reg_info.component_type;
     }
 
     vkd3d_dxbc_compiler_emit_store(compiler,
-            reg_info.id, reg_info.write_mask, component_type, reg_info.storage_class, write_mask, val_id);
+            reg_info.id, reg_info.write_mask, component_type, reg_info.storage_class, src_write_mask, val_id);
 }
 
 static uint32_t vkd3d_dxbc_compiler_emit_sat(struct vkd3d_dxbc_compiler *compiler,
@@ -9349,6 +9352,7 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
         case VKD3DSIH_HS_JOIN_PHASE:
             vkd3d_dxbc_compiler_enter_shader_phase(compiler, instruction);
             break;
+        case VKD3DSIH_DMOV:
         case VKD3DSIH_MOV:
             vkd3d_dxbc_compiler_emit_mov(compiler, instruction);
             break;

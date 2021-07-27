@@ -105,6 +105,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_DEFI                             */ "defi",
     /* VKD3DSIH_DEQ                              */ "deq",
     /* VKD3DSIH_DIV                              */ "div",
+    /* VKD3DSIH_DMOV                             */ "dmov",
     /* VKD3DSIH_DP2                              */ "dp2",
     /* VKD3DSIH_DP2ADD                           */ "dp2add",
     /* VKD3DSIH_DP3                              */ "dp3",
@@ -1121,6 +1122,9 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
     if (write_mask)
     {
         static const char write_mask_chars[] = "xyzw";
+
+        if (param->reg.data_type == VKD3D_DATA_DOUBLE)
+            write_mask = vkd3d_write_mask_32_from_64(write_mask);
 
         shader_addline(buffer, ".%s", compiler->colours.write_mask);
         if (write_mask & VKD3DSP_WRITEMASK_0)

@@ -311,6 +311,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_IMM_ATOMIC_UMIN                  = 0xbd,
     VKD3D_SM5_OP_SYNC                             = 0xbe,
     VKD3D_SM5_OP_DEQ                              = 0xc3,
+    VKD3D_SM5_OP_DMOV                             = 0xc7,
     VKD3D_SM5_OP_EVAL_SAMPLE_INDEX                = 0xcc,
     VKD3D_SM5_OP_EVAL_CENTROID                    = 0xcd,
     VKD3D_SM5_OP_DCL_GS_INSTANCES                 = 0xce,
@@ -1250,6 +1251,7 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM5_OP_SYNC,                             VKD3DSIH_SYNC,                             "",     "",
             shader_sm5_read_sync},
     {VKD3D_SM5_OP_DEQ,                              VKD3DSIH_DEQ,                              "u",    "dd"},
+    {VKD3D_SM5_OP_DMOV,                             VKD3DSIH_DMOV,                             "d",    "d"},
     {VKD3D_SM5_OP_EVAL_SAMPLE_INDEX,                VKD3DSIH_EVAL_SAMPLE_INDEX,                "f",    "fi"},
     {VKD3D_SM5_OP_EVAL_CENTROID,                    VKD3DSIH_EVAL_CENTROID,                    "f",    "f"},
     {VKD3D_SM5_OP_DCL_GS_INSTANCES,                 VKD3DSIH_DCL_GS_INSTANCES,                 "",     "",
@@ -1804,6 +1806,8 @@ static bool shader_sm4_read_dst_param(struct vkd3d_sm4_data *priv, const DWORD *
     }
 
     dst_param->write_mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+    if (data_type == VKD3D_DATA_DOUBLE)
+        dst_param->write_mask = vkd3d_write_mask_64_from_32(dst_param->write_mask);
     /* Scalar registers are declared with no write mask in shader bytecode. */
     if (!dst_param->write_mask && shader_sm4_is_scalar_register(&dst_param->reg))
         dst_param->write_mask = VKD3DSP_WRITEMASK_0;
