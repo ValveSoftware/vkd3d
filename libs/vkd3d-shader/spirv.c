@@ -2457,7 +2457,10 @@ static bool vkd3d_dxbc_compiler_has_combined_sampler(const struct vkd3d_dxbc_com
     if (!shader_interface->combined_sampler_count)
         return false;
 
-    if (resource && resource->reg.reg.type == VKD3DSPR_UAV)
+    if (resource && (resource->reg.reg.type == VKD3DSPR_UAV || resource->range.last != resource->range.first))
+        return false;
+
+    if (sampler && sampler->range.first != sampler->range.last)
         return false;
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
