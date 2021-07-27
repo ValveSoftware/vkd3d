@@ -2986,7 +2986,7 @@ static void shader_write_root_signature_header(struct root_signature_writer_cont
     context->chunk_position = bytecode_get_size(buffer);
 }
 
-static int shader_write_descriptor_ranges(struct root_signature_writer_context *context,
+static void shader_write_descriptor_ranges(struct vkd3d_bytecode_buffer *buffer,
         const struct vkd3d_shader_root_descriptor_table *table)
 {
     const struct vkd3d_shader_descriptor_range *ranges = table->descriptor_ranges;
@@ -2994,24 +2994,12 @@ static int shader_write_descriptor_ranges(struct root_signature_writer_context *
 
     for (i = 0; i < table->descriptor_range_count; ++i)
     {
-        if (!write_dword(context, ranges[i].range_type))
-            goto fail;
-        if (!write_dword(context, ranges[i].descriptor_count))
-            goto fail;
-        if (!write_dword(context, ranges[i].base_shader_register))
-            goto fail;
-        if (!write_dword(context, ranges[i].register_space))
-            goto fail;
-        if (!write_dword(context, ranges[i].descriptor_table_offset))
-            goto fail;
+        put_u32(buffer, ranges[i].range_type);
+        put_u32(buffer, ranges[i].descriptor_count);
+        put_u32(buffer, ranges[i].base_shader_register);
+        put_u32(buffer, ranges[i].register_space);
+        put_u32(buffer, ranges[i].descriptor_table_offset);
     }
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature descriptor ranges.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int shader_write_descriptor_ranges1(struct root_signature_writer_context *context,
@@ -3047,12 +3035,15 @@ fail:
 static int shader_write_descriptor_table(struct root_signature_writer_context *context,
         const struct vkd3d_shader_root_descriptor_table *table)
 {
+    struct vkd3d_bytecode_buffer *buffer = &context->buffer;
+
     if (!write_dword(context, table->descriptor_range_count))
         goto fail;
     if (!write_dword(context, get_chunk_offset(context) + sizeof(DWORD))) /* offset */
         goto fail;
 
-    return shader_write_descriptor_ranges(context, table);
+    shader_write_descriptor_ranges(buffer, table);
+    return VKD3D_OK;
 
 fail:
     vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
