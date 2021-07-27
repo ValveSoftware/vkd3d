@@ -2967,43 +2967,23 @@ static size_t get_chunk_offset(struct root_signature_writer_context *context)
     return bytecode_get_size(&context->buffer) - context->chunk_position;
 }
 
-static int shader_write_root_signature_header(struct root_signature_writer_context *context)
+static void shader_write_root_signature_header(struct root_signature_writer_context *context)
 {
     struct vkd3d_bytecode_buffer *buffer = &context->buffer;
+    unsigned int i;
 
-    if (!write_dword(context, TAG_DXBC))
-        goto fail;
+    put_u32(buffer, TAG_DXBC);
 
     /* The checksum is computed when all data is generated. */
-    if (!write_dwords(context, 4, 0x00000000))
-        goto fail;
-
-    if (!write_dword(context, 0x00000001))
-        goto fail;
-
-    context->total_size_position = bytecode_get_size(buffer);
-    if (!write_dword(context, 0xffffffff)) /* total size */
-        goto fail;
-
-    if (!write_dword(context, 1)) /* chunk count */
-        goto fail;
-
-    /* chunk offset */
-    if (!write_dword(context, bytecode_get_size(buffer) + sizeof(uint32_t)))
-        goto fail;
-
-    if (!write_dword(context, TAG_RTS0))
-        goto fail;
-    if (!write_dword(context, 0xffffffff)) /* chunk size */
-        goto fail;
+    for (i = 0; i < 4; ++i)
+        put_u32(buffer, 0);
+    put_u32(buffer, 1);
+    context->total_size_position = put_u32(buffer, 0xffffffff);
+    put_u32(buffer, 1); /* chunk count */
+    put_u32(buffer, bytecode_get_size(buffer) + sizeof(uint32_t)); /* chunk offset */
+    put_u32(buffer, TAG_RTS0);
+    put_u32(buffer, 0xffffffff);
     context->chunk_position = bytecode_get_size(buffer);
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature header.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int shader_write_descriptor_ranges(struct root_signature_writer_context *context,
@@ -3430,11 +3410,7 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
         goto done;
 
     memset(dxbc, 0, sizeof(*dxbc));
-    if ((ret = shader_write_root_signature_header(&context)) < 0)
-    {
-        vkd3d_free(context.buffer.data);
-        goto done;
-    }
+    shader_write_root_signature_header(&context);
 
     if ((ret = shader_write_root_signature(&context, root_signature)) < 0)
     {
