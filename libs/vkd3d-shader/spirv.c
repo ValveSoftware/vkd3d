@@ -2236,6 +2236,8 @@ struct vkd3d_dxbc_compiler
     struct vkd3d_shader_spec_constant *spec_constants;
     size_t spec_constants_size;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
+
+    struct vkd3d_string_buffer_cache string_buffers;
 };
 
 static bool is_control_point_phase(const struct vkd3d_shader_phase *phase)
@@ -2357,6 +2359,8 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
     }
 
     compiler->scan_descriptor_info = scan_descriptor_info;
+
+    vkd3d_string_buffer_cache_init(&compiler->string_buffers);
 
     vkd3d_dxbc_compiler_emit_initial_declarations(compiler);
 
@@ -2484,6 +2488,22 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_dxbc_compiler_error(struct vkd3d_dxbc_
     compiler->failed = true;
 }
 
+static struct vkd3d_string_buffer *vkd3d_shader_register_range_string(struct vkd3d_dxbc_compiler *compiler,
+        const struct vkd3d_shader_register_range *range)
+{
+    struct vkd3d_string_buffer *buffer = vkd3d_string_buffer_get(&compiler->string_buffers);
+
+    if (!buffer)
+        return NULL;
+
+    if (range->last != ~0u)
+        vkd3d_string_buffer_printf(buffer, "[%u:%u]", range->first, range->last);
+    else
+        vkd3d_string_buffer_printf(buffer, "[%u:*]", range->first);
+
+    return buffer;
+}
+
 static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor_binding(
         struct vkd3d_dxbc_compiler *compiler, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
@@ -2576,11 +2596,14 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
         }
         if (shader_interface->binding_count)
         {
-            FIXME("Could not find binding for type %#x, space %u, register %u, shader type %#x.\n",
-                    descriptor_type, range->space, range->first, compiler->shader_type);
+            struct vkd3d_string_buffer *buffer = vkd3d_shader_register_range_string(compiler, range);
+            const char *range_str = buffer ? buffer->buffer : "";
+            FIXME("Could not find descriptor binding for type %#x, space %u, registers %s, shader type %#x.\n",
+                    descriptor_type, range->space, range_str, compiler->shader_type);
             vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND,
-                    "Could not find descriptor binding for type %#x, space %u, register %u, shader type %#x.",
-                    descriptor_type, range->space, range->first, compiler->shader_type);
+                    "Could not find descriptor binding for type %#x, space %u, registers %s, shader type %#x.",
+                    descriptor_type, range->space, range_str, compiler->shader_type);
+            vkd3d_string_buffer_release(&compiler->string_buffers, buffer);
         }
     }
 
@@ -9610,6 +9633,8 @@ void vkd3d_dxbc_compiler_destroy(struct vkd3d_dxbc_compiler *compiler)
 
     vkd3d_free(compiler->shader_phases);
     vkd3d_free(compiler->spec_constants);
+
+    vkd3d_string_buffer_cache_cleanup(&compiler->string_buffers);
 
     vkd3d_free(compiler);
 }
