@@ -2433,6 +2433,9 @@ static struct vkd3d_push_constant_buffer_binding *vkd3d_dxbc_compiler_find_push_
     unsigned int reg_idx = cb->range.first;
     unsigned int i;
 
+    if (cb->range.first != cb->range.last)
+        return NULL;
+
     for (i = 0; i < compiler->shader_interface.push_constant_buffer_count; ++i)
     {
         struct vkd3d_push_constant_buffer_binding *current = &compiler->push_constants[i];
