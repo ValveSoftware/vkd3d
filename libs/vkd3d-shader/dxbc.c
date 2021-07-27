@@ -3030,23 +3030,15 @@ static void shader_write_descriptor_table(struct root_signature_writer_context *
     shader_write_descriptor_ranges(buffer, table);
 }
 
-static int shader_write_descriptor_table1(struct root_signature_writer_context *context,
+static void shader_write_descriptor_table1(struct root_signature_writer_context *context,
         const struct vkd3d_shader_root_descriptor_table1 *table)
 {
     struct vkd3d_bytecode_buffer *buffer = &context->buffer;
 
-    if (!write_dword(context, table->descriptor_range_count))
-        goto fail;
-    if (!write_dword(context, get_chunk_offset(context) + sizeof(DWORD))) /* offset */
-        goto fail;
+    put_u32(buffer, table->descriptor_range_count);
+    put_u32(buffer, get_chunk_offset(context) + sizeof(uint32_t)); /* offset */
 
     shader_write_descriptor_ranges1(buffer, table);
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature root descriptor table.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int shader_write_root_constants(struct root_signature_writer_context *context,
@@ -3133,7 +3125,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
                 if (desc->version == VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_0)
                     shader_write_descriptor_table(context, &desc->u.v_1_0.parameters[i].u.descriptor_table);
                 else
-                    ret = shader_write_descriptor_table1(context, &desc->u.v_1_1.parameters[i].u.descriptor_table);
+                    shader_write_descriptor_table1(context, &desc->u.v_1_1.parameters[i].u.descriptor_table);
                 break;
             case VKD3D_SHADER_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS:
                 ret = shader_write_root_constants(context, versioned_root_signature_get_root_constants(desc, i));
