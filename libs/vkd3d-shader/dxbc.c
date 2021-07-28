@@ -2940,22 +2940,6 @@ struct root_signature_writer_context
     size_t chunk_position;
 };
 
-static bool write_dwords(struct root_signature_writer_context *context,
-        unsigned int count, DWORD d)
-{
-    unsigned int i;
-
-    for (i = 0; i < count; ++i)
-        put_u32(&context->buffer, d);
-
-    return !context->buffer.status;
-}
-
-static bool write_dword(struct root_signature_writer_context *context, DWORD d)
-{
-    return write_dwords(context, 1, d);
-}
-
 static size_t get_chunk_offset(struct root_signature_writer_context *context)
 {
     return bytecode_get_size(&context->buffer) - context->chunk_position;
@@ -3140,22 +3124,12 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
     size_t samplers_offset_position;
     int ret;
 
-    if (!write_dword(context, desc->version))
-        goto fail;
-
-    if (!write_dword(context, versioned_root_signature_get_parameter_count(desc)))
-        goto fail;
-    if (!write_dword(context, get_chunk_offset(context) + 4 * sizeof(DWORD))) /* offset */
-        goto fail;
-
-    if (!write_dword(context, versioned_root_signature_get_static_sampler_count(desc)))
-        goto fail;
-    samplers_offset_position = bytecode_get_size(buffer);
-    if (!write_dword(context, 0xffffffff)) /* offset */
-        goto fail;
-
-    if (!write_dword(context, versioned_root_signature_get_flags(desc)))
-        goto fail;
+    put_u32(buffer, desc->version);
+    put_u32(buffer, versioned_root_signature_get_parameter_count(desc));
+    put_u32(buffer, get_chunk_offset(context) + 4 * sizeof(uint32_t)); /* offset */
+    put_u32(buffer, versioned_root_signature_get_static_sampler_count(desc));
+    samplers_offset_position = put_u32(buffer, 0xffffffff);
+    put_u32(buffer, versioned_root_signature_get_flags(desc));
 
     if ((ret = shader_write_root_parameters(context, desc)) < 0)
         return ret;
@@ -3163,11 +3137,6 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
     set_u32(buffer, samplers_offset_position, get_chunk_offset(context));
     shader_write_static_samplers(buffer, desc);
     return 0;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int validate_descriptor_table_v_1_0(const struct vkd3d_shader_root_descriptor_table *descriptor_table,
