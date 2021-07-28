@@ -3075,12 +3075,9 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     parameters_position = bytecode_get_size(buffer);
     for (i = 0; i < parameter_count; ++i)
     {
-        if (!write_dword(context, versioned_root_signature_get_parameter_type(desc, i)))
-            goto fail;
-        if (!write_dword(context, versioned_root_signature_get_parameter_shader_visibility(desc, i)))
-            goto fail;
-        if (!write_dword(context, 0xffffffff)) /* offset */
-            goto fail;
+        put_u32(buffer, versioned_root_signature_get_parameter_type(desc, i));
+        put_u32(buffer, versioned_root_signature_get_parameter_shader_visibility(desc, i));
+        put_u32(buffer, 0xffffffff); /* offset */
     }
 
     for (i = 0; i < parameter_count; ++i)
@@ -3116,11 +3113,6 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     }
 
     return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature root parameters.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int shader_write_static_samplers(struct root_signature_writer_context *context,
