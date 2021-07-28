@@ -4253,7 +4253,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetComputeRootConstantBufferVie
     TRACE("iface %p, root_parameter_index %u, address %#"PRIx64".\n",
             iface, root_parameter_index, address);
 
-    d3d12_command_list_set_root_cbv(list, VK_PIPELINE_BIND_POINT_COMPUTE, root_parameter_index, address);
+    d3d12_command_list_set_root_cbv(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE, root_parameter_index, address);
 }
 
 static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRootConstantBufferView(
@@ -4264,7 +4264,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRootConstantBufferVi
     TRACE("iface %p, root_parameter_index %u, address %#"PRIx64".\n",
             iface, root_parameter_index, address);
 
-    d3d12_command_list_set_root_cbv(list, VK_PIPELINE_BIND_POINT_GRAPHICS, root_parameter_index, address);
+    d3d12_command_list_set_root_cbv(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS, root_parameter_index, address);
 }
 
 static void d3d12_command_list_set_root_descriptor(struct d3d12_command_list *list,
