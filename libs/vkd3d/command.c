@@ -4125,7 +4125,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetComputeRootDescriptorTable(I
     TRACE("iface %p, root_parameter_index %u, base_descriptor %#"PRIx64".\n",
             iface, root_parameter_index, base_descriptor.ptr);
 
-    d3d12_command_list_set_descriptor_table(list, VK_PIPELINE_BIND_POINT_COMPUTE,
+    d3d12_command_list_set_descriptor_table(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE,
             root_parameter_index, base_descriptor);
 }
 
@@ -4137,7 +4137,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRootDescriptorTable(
     TRACE("iface %p, root_parameter_index %u, base_descriptor %#"PRIx64".\n",
             iface, root_parameter_index, base_descriptor.ptr);
 
-    d3d12_command_list_set_descriptor_table(list, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    d3d12_command_list_set_descriptor_table(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS,
             root_parameter_index, base_descriptor);
 }
 
