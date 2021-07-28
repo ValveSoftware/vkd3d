@@ -5567,8 +5567,9 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
     const SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &sampler->src.reg;
-    uint32_t type_id, ptr_type_id, var_id;
+    const struct vkd3d_symbol *array_symbol;
     struct vkd3d_symbol reg_symbol;
+    uint32_t type_id, var_id;
 
     vkd3d_symbol_make_sampler(&reg_symbol, reg);
     reg_symbol.info.sampler.range = sampler->range;
@@ -5578,18 +5579,13 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
         return;
 
     type_id = vkd3d_spirv_get_op_type_sampler(builder);
-    ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
-    var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
-            ptr_type_id, storage_class, 0);
-
-    vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(compiler, var_id, reg,
-            &sampler->range, VKD3D_SHADER_RESOURCE_NONE, false);
-
-    vkd3d_dxbc_compiler_emit_register_debug_name(builder, var_id, reg);
+    var_id = vkd3d_dxbc_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
+            &sampler->range, VKD3D_SHADER_RESOURCE_NONE, &array_symbol);
 
     vkd3d_symbol_make_register(&reg_symbol, reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
+    reg_symbol.descriptor_array = array_symbol;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 }
 
@@ -7907,10 +7903,24 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
 
     if (sampled)
     {
+        struct vkd3d_shader_register_info register_info;
+
         assert(image->image_id);
         assert(sampler_reg);
 
-        sampler_var_id = vkd3d_dxbc_compiler_get_register_id(compiler, sampler_reg);
+        if (!vkd3d_dxbc_compiler_get_register_info(compiler, sampler_reg, &register_info))
+            ERR("Failed to get sampler register info.\n");
+        sampler_var_id = register_info.id;
+        if (register_info.descriptor_array)
+        {
+            const struct vkd3d_symbol_descriptor_array_data *array_data
+                    = &register_info.descriptor_array->info.descriptor_array;
+            uint32_t ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder,
+                    register_info.storage_class, array_data->contained_type_id);
+            uint32_t array_idx = vkd3d_dxbc_compiler_get_descriptor_index(compiler,
+                    sampler_reg, array_data->binding_base_idx, VKD3D_SHADER_RESOURCE_NONE);
+            sampler_var_id = vkd3d_spirv_build_op_access_chain(builder, ptr_type_id, register_info.id, &array_idx, 1);
+        }
 
         sampler_id = vkd3d_spirv_build_op_load(builder,
                 vkd3d_spirv_get_op_type_sampler(builder), sampler_var_id, SpvMemoryAccessMaskNone);
