@@ -2933,7 +2933,7 @@ static bool d3d12_command_list_update_compute_state(struct d3d12_command_list *l
     if (!d3d12_command_list_update_compute_pipeline(list))
         return false;
 
-    d3d12_command_list_update_descriptors(list, VK_PIPELINE_BIND_POINT_COMPUTE);
+    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
 
     return true;
 }
@@ -2950,7 +2950,7 @@ static bool d3d12_command_list_begin_render_pass(struct d3d12_command_list *list
     if (!d3d12_command_list_update_current_framebuffer(list))
         return false;
 
-    d3d12_command_list_update_descriptors(list, VK_PIPELINE_BIND_POINT_GRAPHICS);
+    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS);
 
     if (list->current_render_pass != VK_NULL_HANDLE)
         return true;
