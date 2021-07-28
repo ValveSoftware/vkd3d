@@ -3056,22 +3056,12 @@ static void shader_write_root_descriptor(struct vkd3d_bytecode_buffer *buffer,
     put_u32(buffer, descriptor->register_space);
 }
 
-static int shader_write_root_descriptor1(struct root_signature_writer_context *context,
+static void shader_write_root_descriptor1(struct vkd3d_bytecode_buffer *buffer,
         const struct vkd3d_shader_root_descriptor1 *descriptor)
 {
-    if (!write_dword(context, descriptor->shader_register))
-        goto fail;
-    if (!write_dword(context, descriptor->register_space))
-        goto fail;
-    if (!write_dword(context, descriptor->flags))
-        goto fail;
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature root descriptor.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
+    put_u32(buffer, descriptor->shader_register);
+    put_u32(buffer, descriptor->register_space);
+    put_u32(buffer, descriptor->flags);
 }
 
 static int shader_write_root_parameters(struct root_signature_writer_context *context,
@@ -3081,7 +3071,6 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     struct vkd3d_bytecode_buffer *buffer = &context->buffer;
     size_t parameters_position;
     unsigned int i;
-    int ret;
 
     parameters_position = bytecode_get_size(buffer);
     for (i = 0; i < parameter_count; ++i)
@@ -3096,8 +3085,6 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
 
     for (i = 0; i < parameter_count; ++i)
     {
-        ret = VKD3D_OK;
-
         set_u32(buffer, parameters_position + ((3 * i + 2) * sizeof(uint32_t)), get_chunk_offset(context));
 
         switch (versioned_root_signature_get_parameter_type(desc, i))
@@ -3117,7 +3104,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
                 if (desc->version == VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_0)
                     shader_write_root_descriptor(buffer, &desc->u.v_1_0.parameters[i].u.descriptor);
                 else
-                    ret = shader_write_root_descriptor1(context, &desc->u.v_1_1.parameters[i].u.descriptor);
+                    shader_write_root_descriptor1(buffer, &desc->u.v_1_1.parameters[i].u.descriptor);
                 break;
             default:
                 FIXME("Unrecognized type %#x.\n", versioned_root_signature_get_parameter_type(desc, i));
@@ -3126,9 +3113,6 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
                         versioned_root_signature_get_parameter_type(desc, i));
                 return VKD3D_ERROR_INVALID_ARGUMENT;
         }
-
-        if (ret < 0)
-            return ret;
     }
 
     return VKD3D_OK;
