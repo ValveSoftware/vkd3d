@@ -4162,7 +4162,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetComputeRoot32BitConstant(ID3
     TRACE("iface %p, root_parameter_index %u, data 0x%08x, dst_offset %u.\n",
             iface, root_parameter_index, data, dst_offset);
 
-    d3d12_command_list_set_root_constants(list, VK_PIPELINE_BIND_POINT_COMPUTE,
+    d3d12_command_list_set_root_constants(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE,
             root_parameter_index, dst_offset, 1, &data);
 }
 
@@ -4174,7 +4174,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRoot32BitConstant(ID
     TRACE("iface %p, root_parameter_index %u, data 0x%08x, dst_offset %u.\n",
             iface, root_parameter_index, data, dst_offset);
 
-    d3d12_command_list_set_root_constants(list, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    d3d12_command_list_set_root_constants(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS,
             root_parameter_index, dst_offset, 1, &data);
 }
 
@@ -4186,7 +4186,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetComputeRoot32BitConstants(ID
     TRACE("iface %p, root_parameter_index %u, constant_count %u, data %p, dst_offset %u.\n",
             iface, root_parameter_index, constant_count, data, dst_offset);
 
-    d3d12_command_list_set_root_constants(list, VK_PIPELINE_BIND_POINT_COMPUTE,
+    d3d12_command_list_set_root_constants(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE,
             root_parameter_index, dst_offset, constant_count, data);
 }
 
@@ -4198,7 +4198,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRoot32BitConstants(I
     TRACE("iface %p, root_parameter_index %u, constant_count %u, data %p, dst_offset %u.\n",
             iface, root_parameter_index, constant_count, data, dst_offset);
 
-    d3d12_command_list_set_root_constants(list, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    d3d12_command_list_set_root_constants(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS,
             root_parameter_index, dst_offset, constant_count, data);
 }
 
