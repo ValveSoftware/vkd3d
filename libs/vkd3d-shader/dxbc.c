@@ -2956,12 +2956,6 @@ static bool write_dword(struct root_signature_writer_context *context, DWORD d)
     return write_dwords(context, 1, d);
 }
 
-static bool write_float(struct root_signature_writer_context *context, float f)
-{
-    put_f32(&context->buffer, f);
-    return !context->buffer.status;
-}
-
 static size_t get_chunk_offset(struct root_signature_writer_context *context)
 {
     return bytecode_get_size(&context->buffer) - context->chunk_position;
@@ -3115,7 +3109,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     return VKD3D_OK;
 }
 
-static int shader_write_static_samplers(struct root_signature_writer_context *context,
+static void shader_write_static_samplers(struct vkd3d_bytecode_buffer *buffer,
         const struct vkd3d_shader_versioned_root_signature_desc *desc)
 {
     const struct vkd3d_shader_static_sampler_desc *samplers = versioned_root_signature_get_static_samplers(desc);
@@ -3123,40 +3117,20 @@ static int shader_write_static_samplers(struct root_signature_writer_context *co
 
     for (i = 0; i < versioned_root_signature_get_static_sampler_count(desc); ++i)
     {
-        if (!write_dword(context, samplers[i].filter))
-            goto fail;
-        if (!write_dword(context, samplers[i].address_u))
-            goto fail;
-        if (!write_dword(context, samplers[i].address_v))
-            goto fail;
-        if (!write_dword(context, samplers[i].address_w))
-            goto fail;
-        if (!write_float(context, samplers[i].mip_lod_bias))
-            goto fail;
-        if (!write_dword(context, samplers[i].max_anisotropy))
-            goto fail;
-        if (!write_dword(context, samplers[i].comparison_func))
-            goto fail;
-        if (!write_dword(context, samplers[i].border_colour))
-            goto fail;
-        if (!write_float(context, samplers[i].min_lod))
-            goto fail;
-        if (!write_float(context, samplers[i].max_lod))
-            goto fail;
-        if (!write_dword(context, samplers[i].shader_register))
-            goto fail;
-        if (!write_dword(context, samplers[i].register_space))
-            goto fail;
-        if (!write_dword(context, samplers[i].shader_visibility))
-            goto fail;
+        put_u32(buffer, samplers[i].filter);
+        put_u32(buffer, samplers[i].address_u);
+        put_u32(buffer, samplers[i].address_v);
+        put_u32(buffer, samplers[i].address_w);
+        put_f32(buffer, samplers[i].mip_lod_bias);
+        put_u32(buffer, samplers[i].max_anisotropy);
+        put_u32(buffer, samplers[i].comparison_func);
+        put_u32(buffer, samplers[i].border_colour);
+        put_f32(buffer, samplers[i].min_lod);
+        put_f32(buffer, samplers[i].max_lod);
+        put_u32(buffer, samplers[i].shader_register);
+        put_u32(buffer, samplers[i].register_space);
+        put_u32(buffer, samplers[i].shader_visibility);
     }
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature static samplers.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
 static int shader_write_root_signature(struct root_signature_writer_context *context,
@@ -3187,7 +3161,8 @@ static int shader_write_root_signature(struct root_signature_writer_context *con
         return ret;
 
     set_u32(buffer, samplers_offset_position, get_chunk_offset(context));
-    return shader_write_static_samplers(context, desc);
+    shader_write_static_samplers(buffer, desc);
+    return 0;
 
 fail:
     vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
