@@ -4909,7 +4909,7 @@ static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
 
     d3d12_command_list_invalidate_current_pipeline(list);
     d3d12_command_list_invalidate_bindings(list, list->state);
-    d3d12_command_list_invalidate_root_parameters(list, VK_PIPELINE_BIND_POINT_COMPUTE);
+    d3d12_command_list_invalidate_root_parameters(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
 
     if (!d3d12_command_allocator_add_view(list->allocator, view))
         WARN("Failed to add view.\n");
