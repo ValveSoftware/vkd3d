@@ -1822,6 +1822,13 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
         vkd3d_spirv_build_op_extension(&stream, "SPV_KHR_shader_draw_parameters");
     if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityDemoteToHelperInvocationEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_demote_to_helper_invocation");
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityUniformBufferArrayDynamicIndexing)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityUniformTexelBufferArrayDynamicIndexingEXT)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilitySampledImageArrayDynamicIndexing)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageBufferArrayDynamicIndexing)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageTexelBufferArrayDynamicIndexingEXT)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageImageArrayDynamicIndexing))
+        vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_descriptor_indexing");
 
     if (builder->ext_instr_set_glsl_450)
         vkd3d_spirv_build_op_ext_inst_import(&stream, builder->ext_instr_set_glsl_450, "GLSL.std.450");
@@ -3126,18 +3133,59 @@ static bool register_is_descriptor(const struct vkd3d_shader_register *reg)
     }
 }
 
+static bool vkd3d_dxbc_compiler_enable_descriptor_indexing(struct vkd3d_dxbc_compiler *compiler,
+        enum vkd3d_shader_register_type reg_type, enum vkd3d_shader_resource_type resource_type)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    if (!vkd3d_dxbc_compiler_is_target_extension_supported(compiler,
+            VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING))
+        return false;
+
+    switch (reg_type)
+    {
+        case VKD3DSPR_CONSTBUFFER:
+            vkd3d_spirv_enable_capability(builder, SpvCapabilityUniformBufferArrayDynamicIndexing);
+            break;
+        case VKD3DSPR_RESOURCE:
+            vkd3d_spirv_enable_capability(builder, resource_type == VKD3D_SHADER_RESOURCE_BUFFER
+                    ? SpvCapabilityUniformTexelBufferArrayDynamicIndexingEXT
+                    : SpvCapabilitySampledImageArrayDynamicIndexing);
+            break;
+        case VKD3DSPR_UAV:
+            if (resource_type == VKD3D_SHADER_RESOURCE_BUFFER)
+                vkd3d_spirv_enable_capability(builder, compiler->ssbo_uavs
+                        ? SpvCapabilityStorageBufferArrayDynamicIndexing
+                        : SpvCapabilityStorageTexelBufferArrayDynamicIndexingEXT);
+            else
+                vkd3d_spirv_enable_capability(builder, SpvCapabilityStorageImageArrayDynamicIndexing);
+            break;
+        case VKD3DSPR_SAMPLER:
+            break;
+        default:
+            ERR("Unhandled register type %#x.\n", reg_type);
+            break;
+    }
+
+    return true;
+}
+
 static uint32_t vkd3d_dxbc_compiler_get_descriptor_index(struct vkd3d_dxbc_compiler *compiler,
-        const struct vkd3d_shader_register *reg, unsigned int binding_base_idx)
+        const struct vkd3d_shader_register *reg, unsigned int binding_base_idx,
+        enum vkd3d_shader_resource_type resource_type)
 {
     struct vkd3d_shader_register_index index = reg->idx[1];
     uint32_t index_id;
 
     if (index.rel_addr)
     {
-        FIXME("Descriptor dynamic indexing is not supported.\n");
-        vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_IDX_UNSUPPORTED,
-                "Cannot dynamically index a descriptor array of type %#x, id %u. "
-                "Dynamic indexing is not supported.", reg->type, reg->idx[0].offset);
+        if (!vkd3d_dxbc_compiler_enable_descriptor_indexing(compiler, reg->type, resource_type))
+        {
+            FIXME("The target environment does not support descriptor indexing.\n");
+            vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_IDX_UNSUPPORTED,
+                    "Cannot dynamically index a descriptor array of type %#x, id %u. "
+                    "The target environment does not support descriptor indexing.", reg->type, reg->idx[0].offset);
+        }
     }
 
     index.offset -= binding_base_idx;
@@ -3159,7 +3207,8 @@ static void vkd3d_dxbc_compiler_emit_dereference_register(struct vkd3d_dxbc_comp
         assert(!reg->idx[0].rel_addr);
         if (register_info->descriptor_array)
             indexes[index_count++] = vkd3d_dxbc_compiler_get_descriptor_index(compiler, reg,
-                    register_info->descriptor_array->info.descriptor_array.binding_base_idx);
+                    register_info->descriptor_array->info.descriptor_array.binding_base_idx,
+                    VKD3D_SHADER_RESOURCE_BUFFER);
         indexes[index_count++] = vkd3d_dxbc_compiler_get_constant_uint(compiler, register_info->member_idx);
         indexes[index_count++] = vkd3d_dxbc_compiler_emit_register_addressing(compiler, &reg->idx[2]);
     }
@@ -7821,7 +7870,7 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
         uint32_t ptr_type_id, index_id;
 
         index_id = vkd3d_dxbc_compiler_get_descriptor_index(compiler, resource_reg,
-                array_data->binding_base_idx);
+                array_data->binding_base_idx, symbol->info.resource.resource_type_info->resource_type);
 
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, array_data->storage_class,
                 array_data->contained_type_id);
