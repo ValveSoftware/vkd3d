@@ -3049,20 +3049,11 @@ static void shader_write_root_constants(struct vkd3d_bytecode_buffer *buffer,
     put_u32(buffer, constants->value_count);
 }
 
-static int shader_write_root_descriptor(struct root_signature_writer_context *context,
+static void shader_write_root_descriptor(struct vkd3d_bytecode_buffer *buffer,
         const struct vkd3d_shader_root_descriptor *descriptor)
 {
-    if (!write_dword(context, descriptor->shader_register))
-        goto fail;
-    if (!write_dword(context, descriptor->register_space))
-        goto fail;
-
-    return VKD3D_OK;
-
-fail:
-    vkd3d_shader_error(&context->message_context, NULL, VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY,
-            "Out of memory while writing root signature root descriptor.");
-    return VKD3D_ERROR_OUT_OF_MEMORY;
+    put_u32(buffer, descriptor->shader_register);
+    put_u32(buffer, descriptor->register_space);
 }
 
 static int shader_write_root_descriptor1(struct root_signature_writer_context *context,
@@ -3124,7 +3115,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
             case VKD3D_SHADER_ROOT_PARAMETER_TYPE_SRV:
             case VKD3D_SHADER_ROOT_PARAMETER_TYPE_UAV:
                 if (desc->version == VKD3D_SHADER_ROOT_SIGNATURE_VERSION_1_0)
-                    ret = shader_write_root_descriptor(context, &desc->u.v_1_0.parameters[i].u.descriptor);
+                    shader_write_root_descriptor(buffer, &desc->u.v_1_0.parameters[i].u.descriptor);
                 else
                     ret = shader_write_root_descriptor1(context, &desc->u.v_1_1.parameters[i].u.descriptor);
                 break;
