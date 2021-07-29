@@ -63,7 +63,9 @@ static bool compare_uint16(uint16_t a, uint16_t b, unsigned int max_diff)
 
 static bool compare_uint64(uint64_t a, uint64_t b, unsigned int max_diff)
 {
-    return llabs(a - b) <= max_diff;
+    uint64_t diff = a > b ? a - b : b - a;
+
+    return diff <= max_diff;
 }
 
 static ULONG get_refcount(void *iface)
