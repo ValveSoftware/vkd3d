@@ -2674,7 +2674,6 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
 
     descriptor_table = root_signature_get_descriptor_table(root_signature, index);
 
-    descriptor = base_descriptor;
     descriptor_count = 0;
     current_descriptor_write = descriptor_writes;
     current_image_info = image_infos;
@@ -2682,10 +2681,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
     {
         range = &descriptor_table->ranges[i];
 
-        if (range->offset != D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
-        {
-            descriptor = base_descriptor + range->offset;
-        }
+        descriptor = base_descriptor + range->offset;
 
         for (j = 0; j < range->descriptor_count; ++j, ++descriptor)
         {

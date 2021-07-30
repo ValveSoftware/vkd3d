@@ -591,6 +591,8 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
     for (i = 0; i < desc->NumParameters; ++i)
     {
         const D3D12_ROOT_PARAMETER *p = &desc->pParameters[i];
+        unsigned int offset = 0;
+
         if (p->ParameterType != D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
             continue;
 
@@ -603,6 +605,25 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
         table->range_count = range_count;
         if (!(table->ranges = vkd3d_calloc(table->range_count, sizeof(*table->ranges))))
             return E_OUTOFMEMORY;
+
+        for (j = 0; j < range_count; ++j)
+        {
+            range = &p->u.DescriptorTable.pDescriptorRanges[j];
+
+            if (range->OffsetInDescriptorsFromTableStart != D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
+                offset = range->OffsetInDescriptorsFromTableStart;
+
+            table->ranges[j].offset = offset;
+            table->ranges[j].descriptor_count = range->NumDescriptors;
+            table->ranges[j].descriptor_magic = vkd3d_descriptor_magic_from_d3d12(range->RangeType);
+            table->ranges[j].register_space = range->RegisterSpace;
+            table->ranges[j].base_register_idx = range->BaseShaderRegister;
+
+            TRACE("Descriptor table %u, range %u, offset %u, type %#x, count %u.\n", i, j,
+                    offset, range->RangeType, range->NumDescriptors);
+
+            offset += range->NumDescriptors;
+        }
 
         for (j = 0; j < range_count; ++j)
         {
@@ -638,12 +659,7 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
                 ++cur_binding;
             }
 
-            table->ranges[j].offset = range->OffsetInDescriptorsFromTableStart;
-            table->ranges[j].descriptor_count = range->NumDescriptors;
             table->ranges[j].binding = vk_binding;
-            table->ranges[j].descriptor_magic = vkd3d_descriptor_magic_from_d3d12(range->RangeType);
-            table->ranges[j].register_space = range->RegisterSpace;
-            table->ranges[j].base_register_idx = range->BaseShaderRegister;
         }
     }
 
