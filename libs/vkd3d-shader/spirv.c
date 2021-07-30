@@ -3582,15 +3582,12 @@ static void vkd3d_dxbc_compiler_emit_execution_mode1(struct vkd3d_dxbc_compiler 
 static uint32_t vkd3d_dxbc_compiler_emit_abs(struct vkd3d_dxbc_compiler *compiler,
         const struct vkd3d_shader_register *reg, DWORD write_mask, uint32_t val_id)
 {
-    unsigned int component_count = vkd3d_write_mask_component_count(write_mask);
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id;
 
-    if (reg->data_type == VKD3D_DATA_FLOAT)
-    {
-        type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, component_count);
+    type_id = vkd3d_dxbc_compiler_get_type_id_for_reg(compiler, reg, write_mask);
+    if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
         return vkd3d_spirv_build_op_glsl_std450_fabs(builder, type_id, val_id);
-    }
 
     FIXME("Unhandled data type %#x.\n", reg->data_type);
     return val_id;
