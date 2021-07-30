@@ -1457,6 +1457,10 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vulkan_info->shader_extensions[0] = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION;
     }
 
+    if (vulkan_info->EXT_descriptor_indexing)
+        vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
+                = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING;
+
     /* Disable unused Vulkan features. */
     features->shaderTessellationAndGeometryPointSize = VK_FALSE;
 
