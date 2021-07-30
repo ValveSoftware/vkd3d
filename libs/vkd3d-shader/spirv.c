@@ -2786,6 +2786,14 @@ static uint32_t vkd3d_dxbc_compiler_get_constant_float_vector(struct vkd3d_dxbc_
             component_count, (const uint32_t *)values);
 }
 
+static uint32_t vkd3d_dxbc_compiler_get_constant_double_vector(struct vkd3d_dxbc_compiler *compiler,
+        double value, unsigned int component_count)
+{
+    const double values[] = {value, value};
+    return vkd3d_dxbc_compiler_get_constant64(compiler, VKD3D_SHADER_COMPONENT_DOUBLE,
+            component_count, (const uint64_t *)values);
+}
+
 static uint32_t vkd3d_dxbc_compiler_get_type_id_for_reg(struct vkd3d_dxbc_compiler *compiler,
         const struct vkd3d_shader_register *reg, DWORD write_mask)
 {
@@ -3763,11 +3771,19 @@ static uint32_t vkd3d_dxbc_compiler_emit_sat(struct vkd3d_dxbc_compiler *compile
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, zero_id, one_id;
 
-    zero_id = vkd3d_dxbc_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
-    one_id = vkd3d_dxbc_compiler_get_constant_float_vector(compiler, 1.0f, component_count);
+    if (reg->data_type == VKD3D_DATA_DOUBLE)
+    {
+        zero_id = vkd3d_dxbc_compiler_get_constant_double_vector(compiler, 0.0, component_count);
+        one_id = vkd3d_dxbc_compiler_get_constant_double_vector(compiler, 1.0, component_count);
+    }
+    else
+    {
+        zero_id = vkd3d_dxbc_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
+        one_id = vkd3d_dxbc_compiler_get_constant_float_vector(compiler, 1.0f, component_count);
+    }
 
     type_id = vkd3d_dxbc_compiler_get_type_id_for_reg(compiler, reg, write_mask);
-    if (reg->data_type == VKD3D_DATA_FLOAT)
+    if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
         return vkd3d_spirv_build_op_glsl_std450_nclamp(builder, type_id, val_id, zero_id, one_id);
 
     FIXME("Unhandled data type %#x.\n", reg->data_type);
