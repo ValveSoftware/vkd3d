@@ -1147,6 +1147,21 @@ static uint32_t vkd3d_spirv_get_op_constant(struct vkd3d_spirv_builder *builder,
             vkd3d_spirv_build_op_constant);
 }
 
+static uint32_t vkd3d_spirv_build_op_constant64(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, const uint32_t *values, unsigned int value_count)
+{
+    assert(value_count == 2);
+    return vkd3d_spirv_build_op_trv(builder, &builder->global_stream,
+            SpvOpConstant, result_type, values, value_count);
+}
+
+static uint32_t vkd3d_spirv_get_op_constant64(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint64_t value)
+{
+    return vkd3d_spirv_build_once1v(builder, SpvOpConstant, result_type,
+            (const uint32_t *)&value, 2, vkd3d_spirv_build_op_constant64);
+}
+
 static uint32_t vkd3d_spirv_build_op_constant_composite(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, const uint32_t *constituents, unsigned int constituent_count)
 {
@@ -2709,6 +2724,35 @@ static uint32_t vkd3d_dxbc_compiler_get_constant(struct vkd3d_dxbc_compiler *com
     }
 }
 
+static uint32_t vkd3d_dxbc_compiler_get_constant64(struct vkd3d_dxbc_compiler *compiler,
+        enum vkd3d_shader_component_type component_type, unsigned int component_count, const uint64_t *values)
+{
+    uint32_t type_id, scalar_type_id, component_ids[VKD3D_DVEC2_SIZE];
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    unsigned int i;
+
+    assert(0 < component_count && component_count <= VKD3D_DVEC2_SIZE);
+    type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
+
+    if (component_type != VKD3D_SHADER_COMPONENT_DOUBLE)
+    {
+        FIXME("Unhandled component_type %#x.\n", component_type);
+        return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
+    }
+
+    if (component_count == 1)
+    {
+        return vkd3d_spirv_get_op_constant64(builder, type_id, *values);
+    }
+    else
+    {
+        scalar_type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
+        for (i = 0; i < component_count; ++i)
+            component_ids[i] = vkd3d_spirv_get_op_constant64(builder, scalar_type_id, values[i]);
+        return vkd3d_spirv_get_op_constant_composite(builder, type_id, component_ids, component_count);
+    }
+}
+
 static uint32_t vkd3d_dxbc_compiler_get_constant_uint(struct vkd3d_dxbc_compiler *compiler,
         uint32_t value)
 {
@@ -3079,7 +3123,7 @@ static bool vkd3d_dxbc_compiler_get_register_info(const struct vkd3d_dxbc_compil
     struct vkd3d_symbol reg_symbol, *symbol;
     struct rb_entry *entry;
 
-    assert(reg->type != VKD3DSPR_IMMCONST);
+    assert(reg->type != VKD3DSPR_IMMCONST && reg->type != VKD3DSPR_IMMCONST64);
 
     if (reg->type == VKD3DSPR_TEMP)
     {
@@ -3390,6 +3434,33 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_constant(struct vkd3d_dxbc_compile
             vkd3d_component_type_from_data_type(reg->data_type), component_count, values);
 }
 
+static uint32_t vkd3d_dxbc_compiler_emit_load_constant64(struct vkd3d_dxbc_compiler *compiler,
+        const struct vkd3d_shader_register *reg, DWORD swizzle, DWORD write_mask)
+{
+    unsigned int component_count = vkd3d_write_mask_component_count(write_mask);
+    uint64_t values[VKD3D_DVEC2_SIZE] = {0};
+    unsigned int i, j;
+
+    assert(reg->type == VKD3DSPR_IMMCONST64);
+
+    if (reg->immconst_type == VKD3D_IMMCONST_SCALAR)
+    {
+        for (i = 0; i < component_count; ++i)
+            values[i] = *reg->u.immconst_uint64;
+    }
+    else
+    {
+        for (i = 0, j = 0; i < VKD3D_DVEC2_SIZE; ++i)
+        {
+            if (write_mask & (VKD3DSP_WRITEMASK_0 << i))
+                values[j++] = reg->u.immconst_uint64[vkd3d_swizzle_get_component64(swizzle, i)];
+        }
+    }
+
+    return vkd3d_dxbc_compiler_get_constant64(compiler,
+            vkd3d_component_type_from_data_type(reg->data_type), component_count, values);
+}
+
 static uint32_t vkd3d_dxbc_compiler_emit_load_scalar(struct vkd3d_dxbc_compiler *compiler,
         const struct vkd3d_shader_register *reg, DWORD swizzle, DWORD write_mask,
         const struct vkd3d_shader_register_info *reg_info)
@@ -3400,7 +3471,7 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_scalar(struct vkd3d_dxbc_compiler 
     enum vkd3d_shader_component_type component_type;
     unsigned int skipped_component_mask;
 
-    assert(reg->type != VKD3DSPR_IMMCONST);
+    assert(reg->type != VKD3DSPR_IMMCONST && reg->type != VKD3DSPR_IMMCONST64);
     assert(vkd3d_write_mask_component_count(write_mask) == 1);
 
     component_idx = vkd3d_write_mask_get_component_idx(write_mask);
@@ -3450,6 +3521,8 @@ static uint32_t vkd3d_dxbc_compiler_emit_load_reg(struct vkd3d_dxbc_compiler *co
 
     if (reg->type == VKD3DSPR_IMMCONST)
         return vkd3d_dxbc_compiler_emit_load_constant(compiler, reg, swizzle, write_mask);
+    else if (reg->type == VKD3DSPR_IMMCONST64)
+        return vkd3d_dxbc_compiler_emit_load_constant64(compiler, reg, swizzle, write_mask);
 
     component_count = vkd3d_write_mask_component_count(write_mask);
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
@@ -3665,7 +3738,7 @@ static void vkd3d_dxbc_compiler_emit_store_reg(struct vkd3d_dxbc_compiler *compi
     unsigned int src_write_mask = write_mask;
     uint32_t type_id;
 
-    assert(reg->type != VKD3DSPR_IMMCONST);
+    assert(reg->type != VKD3DSPR_IMMCONST && reg->type != VKD3DSPR_IMMCONST64);
 
     if (!vkd3d_dxbc_compiler_get_register_info(compiler, reg, &reg_info))
         return;
@@ -6840,7 +6913,7 @@ static void vkd3d_dxbc_compiler_emit_mov(struct vkd3d_dxbc_compiler *compiler,
     uint32_t components[VKD3D_VEC4_SIZE];
     unsigned int i, component_count;
 
-    if (src->reg.type == VKD3DSPR_IMMCONST || dst->modifiers || src->modifiers)
+    if (src->reg.type == VKD3DSPR_IMMCONST || src->reg.type == VKD3DSPR_IMMCONST64 || dst->modifiers || src->modifiers)
         goto general_implementation;
 
     vkd3d_dxbc_compiler_get_register_info(compiler, &dst->reg, &dst_reg_info);

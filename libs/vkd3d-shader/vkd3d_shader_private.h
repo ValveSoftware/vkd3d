@@ -621,6 +621,7 @@ struct vkd3d_shader_register
     {
         DWORD immconst_uint[VKD3D_VEC4_SIZE];
         float immconst_float[VKD3D_VEC4_SIZE];
+        uint64_t immconst_uint64[VKD3D_DVEC2_SIZE];
         double immconst_double[VKD3D_DVEC2_SIZE];
         unsigned fp_body_idx;
     } u;
@@ -1085,6 +1086,12 @@ static inline unsigned int vkd3d_swizzle_get_component(DWORD swizzle,
         unsigned int idx)
 {
     return (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx)) & VKD3D_SHADER_SWIZZLE_MASK;
+}
+
+static inline unsigned int vkd3d_swizzle_get_component64(DWORD swizzle,
+        unsigned int idx)
+{
+    return ((swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx * 2)) & VKD3D_SHADER_SWIZZLE_MASK) / 2u;
 }
 
 static inline unsigned int vkd3d_compact_swizzle(unsigned int swizzle, unsigned int write_mask)
