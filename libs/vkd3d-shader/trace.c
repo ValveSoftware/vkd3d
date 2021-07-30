@@ -722,6 +722,17 @@ static void shader_print_float_literal(struct vkd3d_d3d_asm_compiler *compiler,
                 prefix, compiler->colours.literal, f, compiler->colours.reset, suffix);
 }
 
+static void shader_print_double_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, double d, const char *suffix)
+{
+    if (isfinite(d) && signbit(d))
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%.15e%s%s",
+                prefix, compiler->colours.literal, -d, compiler->colours.reset, suffix);
+    else
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%.15e%s%s",
+                prefix, compiler->colours.literal, d, compiler->colours.reset, suffix);
+}
+
 static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, int i, const char *suffix)
 {
@@ -884,6 +895,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
 
         case VKD3DSPR_IMMCONST:
             shader_addline(buffer, "l");
+            break;
+
+        case VKD3DSPR_IMMCONST64:
+            shader_addline(buffer, "d");
             break;
 
         case VKD3DSPR_CONSTBUFFER:
@@ -1058,6 +1073,29 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
         }
         shader_addline(buffer, ")");
     }
+    else if (reg->type == VKD3DSPR_IMMCONST64)
+    {
+        shader_addline(buffer, "%s(", compiler->colours.reset);
+        /* A double2 vector is treated as a float4 vector in enum vkd3d_immconst_type. */
+        if (reg->immconst_type == VKD3D_IMMCONST_SCALAR || reg->immconst_type == VKD3D_IMMCONST_VEC4)
+        {
+            if (reg->data_type == VKD3D_DATA_DOUBLE)
+            {
+                shader_print_double_literal(compiler, "", reg->u.immconst_double[0], "");
+                if (reg->immconst_type == VKD3D_IMMCONST_VEC4)
+                    shader_print_double_literal(compiler, ", ", reg->u.immconst_double[1], "");
+            }
+            else
+            {
+                shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
+            }
+        }
+        else
+        {
+            shader_addline(buffer, "<unhandled immconst_type %#x>", reg->immconst_type);
+        }
+        shader_addline(buffer, ")");
+    }
     else if (reg->type != VKD3DSPR_RASTOUT
             && reg->type != VKD3DSPR_MISCTYPE
             && reg->type != VKD3DSPR_NULL)
@@ -1181,7 +1219,8 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
         default:                  shader_addline(buffer, "_unknown_modifier(%#x)", src_modifier);
     }
 
-    if (param->reg.type != VKD3DSPR_IMMCONST && param->reg.type != VKD3DSPR_SAMPLER)
+    if (param->reg.type != VKD3DSPR_IMMCONST && param->reg.type != VKD3DSPR_IMMCONST64
+            && param->reg.type != VKD3DSPR_SAMPLER)
     {
         static const char swizzle_chars[] = "xyzw";
         DWORD swizzle_x = (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(0)) & VKD3D_SHADER_SWIZZLE_MASK;

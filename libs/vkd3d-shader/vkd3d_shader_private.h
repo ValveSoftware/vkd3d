@@ -58,6 +58,7 @@
 #include <string.h>
 
 #define VKD3D_VEC4_SIZE 4
+#define VKD3D_DVEC2_SIZE 2
 
 enum vkd3d_shader_error
 {
@@ -387,6 +388,7 @@ enum vkd3d_shader_register_type
     VKD3DSPR_LABEL = 18,
     VKD3DSPR_PREDICATE = 19,
     VKD3DSPR_IMMCONST,
+    VKD3DSPR_IMMCONST64,
     VKD3DSPR_CONSTBUFFER,
     VKD3DSPR_IMMCONSTBUFFER,
     VKD3DSPR_PRIMID,
@@ -619,6 +621,7 @@ struct vkd3d_shader_register
     {
         DWORD immconst_uint[VKD3D_VEC4_SIZE];
         float immconst_float[VKD3D_VEC4_SIZE];
+        double immconst_double[VKD3D_DVEC2_SIZE];
         unsigned fp_body_idx;
     } u;
 };

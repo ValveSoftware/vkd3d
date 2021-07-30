@@ -331,6 +331,7 @@ enum vkd3d_sm4_register_type
     VKD3D_SM4_RT_OUTPUT                  = 0x02,
     VKD3D_SM4_RT_INDEXABLE_TEMP          = 0x03,
     VKD3D_SM4_RT_IMMCONST                = 0x04,
+    VKD3D_SM4_RT_IMMCONST64              = 0x05,
     VKD3D_SM4_RT_SAMPLER                 = 0x06,
     VKD3D_SM4_RT_RESOURCE                = 0x07,
     VKD3D_SM4_RT_CONSTBUFFER             = 0x08,
@@ -1265,7 +1266,7 @@ static const enum vkd3d_shader_register_type register_type_table[] =
     /* VKD3D_SM4_RT_OUTPUT */                  VKD3DSPR_OUTPUT,
     /* VKD3D_SM4_RT_INDEXABLE_TEMP */          VKD3DSPR_IDXTEMP,
     /* VKD3D_SM4_RT_IMMCONST */                VKD3DSPR_IMMCONST,
-    /* UNKNOWN */                              ~0u,
+    /* VKD3D_SM4_RT_IMMCONST64 */              VKD3DSPR_IMMCONST64,
     /* VKD3D_SM4_RT_SAMPLER */                 VKD3DSPR_SAMPLER,
     /* VKD3D_SM4_RT_RESOURCE */                VKD3DSPR_RESOURCE,
     /* VKD3D_SM4_RT_CONSTBUFFER */             VKD3DSPR_CONSTBUFFER,
@@ -1656,21 +1657,23 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
         return false;
     }
 
-    if (register_type == VKD3D_SM4_RT_IMMCONST)
+    if (register_type == VKD3D_SM4_RT_IMMCONST || register_type == VKD3D_SM4_RT_IMMCONST64)
     {
         enum vkd3d_sm4_dimension dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT;
+        unsigned int dword_count;
 
         switch (dimension)
         {
             case VKD3D_SM4_DIMENSION_SCALAR:
                 param->immconst_type = VKD3D_IMMCONST_SCALAR;
-                if (end - *ptr < 1)
+                dword_count = 1 + (register_type == VKD3D_SM4_RT_IMMCONST64);
+                if (end - *ptr < dword_count)
                 {
                     WARN("Invalid ptr %p, end %p.\n", *ptr, end);
                     return false;
                 }
-                memcpy(param->u.immconst_uint, *ptr, 1 * sizeof(DWORD));
-                *ptr += 1;
+                memcpy(param->u.immconst_uint, *ptr, dword_count * sizeof(DWORD));
+                *ptr += dword_count;
                 break;
 
             case VKD3D_SM4_DIMENSION_VEC4:
@@ -1744,7 +1747,7 @@ static bool shader_sm4_read_src_param(struct vkd3d_sm4_data *priv, const DWORD *
         return false;
     }
 
-    if (src_param->reg.type == VKD3DSPR_IMMCONST)
+    if (src_param->reg.type == VKD3DSPR_IMMCONST || src_param->reg.type == VKD3DSPR_IMMCONST64)
     {
         src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     }
