@@ -1547,6 +1547,7 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     struct vkd3d_shader_scan_descriptor_info shader_info;
     struct vkd3d_shader_interface_info shader_interface;
     const struct d3d12_root_signature *root_signature;
+    struct vkd3d_shader_spirv_target_info target_info;
     VkPipelineLayout vk_pipeline_layout;
     HRESULT hr;
     int ret;
@@ -1578,8 +1579,14 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     }
     vkd3d_shader_free_scan_descriptor_info(&shader_info);
 
+    memset(&target_info, 0, sizeof(target_info));
+    target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
+    target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    target_info.extensions = device->vk_info.shader_extensions;
+    target_info.extension_count = device->vk_info.shader_extension_count;
+
     shader_interface.type = VKD3D_SHADER_STRUCTURE_TYPE_INTERFACE_INFO;
-    shader_interface.next = NULL;
+    shader_interface.next = &target_info;
     shader_interface.bindings = root_signature->descriptor_mapping;
     shader_interface.binding_count = root_signature->binding_count;
     shader_interface.push_constant_buffers = root_signature->root_constants;
