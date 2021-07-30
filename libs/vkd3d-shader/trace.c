@@ -59,6 +59,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_CRS                              */ "crs",
     /* VKD3DSIH_CUT                              */ "cut",
     /* VKD3DSIH_CUT_STREAM                       */ "cut_stream",
+    /* VKD3DSIH_DADD                             */ "dadd",
     /* VKD3DSIH_DCL                              */ "dcl",
     /* VKD3DSIH_DCL_CONSTANT_BUFFER              */ "dcl_constantBuffer",
     /* VKD3DSIH_DCL_FUNCTION_BODY                */ "dcl_function_body",
