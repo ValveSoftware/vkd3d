@@ -580,7 +580,6 @@ static uint32_t vkd3d_descriptor_magic_from_d3d12(D3D12_DESCRIPTOR_RANGE_TYPE ty
 static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_root_signature *root_signature,
         const D3D12_ROOT_SIGNATURE_DESC *desc, struct vkd3d_descriptor_set_context *context)
 {
-    VkDescriptorSetLayoutBinding *cur_binding = context->current_binding;
     struct d3d12_root_descriptor_table *table;
     const D3D12_DESCRIPTOR_RANGE *range;
     unsigned int i, j, k, range_count;
@@ -627,7 +626,11 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
 
         for (j = 0; j < range_count; ++j)
         {
+            VkDescriptorSetLayoutBinding *cur_binding;
+
             range = &p->u.DescriptorTable.pDescriptorRanges[j];
+
+            cur_binding = context->current_binding;
 
             vk_binding = d3d12_root_signature_assign_vk_bindings(root_signature,
                     vkd3d_descriptor_type_from_d3d12_range_type(range->RangeType),
@@ -660,10 +663,11 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
             }
 
             table->ranges[j].binding = vk_binding;
+
+            context->current_binding = cur_binding;
         }
     }
 
-    context->current_binding = cur_binding;
     return S_OK;
 }
 
