@@ -2870,10 +2870,7 @@ static void test_root_signature_limits(void)
     descriptor_ranges[0].NumDescriptors = 0x1001;
     descriptor_ranges[0].OffsetInDescriptorsFromTableStart = 0xfffff000;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12RootSignature_Release(root_signature);
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
