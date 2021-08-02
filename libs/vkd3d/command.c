@@ -2592,7 +2592,7 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
 static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_descriptor_write,
         VkDescriptorImageInfo *vk_image_info, const struct d3d12_desc *descriptor,
         uint32_t descriptor_range_magic, VkDescriptorSet vk_descriptor_set,
-        uint32_t vk_binding, unsigned int index)
+        uint32_t vk_binding, unsigned int index, bool use_array)
 {
     const struct vkd3d_view *view = descriptor->u.view;
 
@@ -2602,8 +2602,8 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
     vk_descriptor_write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_descriptor_write->pNext = NULL;
     vk_descriptor_write->dstSet = vk_descriptor_set;
-    vk_descriptor_write->dstBinding = vk_binding + index;
-    vk_descriptor_write->dstArrayElement = 0;
+    vk_descriptor_write->dstBinding = use_array ? vk_binding : vk_binding + index;
+    vk_descriptor_write->dstArrayElement = use_array ? index : 0;
     vk_descriptor_write->descriptorCount = 1;
     vk_descriptor_write->descriptorType = descriptor->vk_descriptor_type;
     vk_descriptor_write->pImageInfo = NULL;
@@ -2620,7 +2620,8 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
         case VKD3D_DESCRIPTOR_MAGIC_UAV:
             /* We use separate bindings for buffer and texture SRVs/UAVs.
              * See d3d12_root_signature_init(). */
-            vk_descriptor_write->dstBinding = vk_binding + 2 * index;
+            if (!use_array)
+                vk_descriptor_write->dstBinding = vk_binding + 2 * index;
             if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
                     && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
                 ++vk_descriptor_write->dstBinding;
@@ -2707,7 +2708,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
 
             if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write,
                     current_image_info, descriptor, range->descriptor_magic,
-                    bindings->descriptor_set, range->binding, j))
+                    bindings->descriptor_set, range->binding, j, root_signature->use_descriptor_arrays))
                 continue;
 
             ++descriptor_count;

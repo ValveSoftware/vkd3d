@@ -34635,7 +34635,6 @@ static void test_resource_arrays(void)
                 get_cpu_descriptor_handle(&context, heap, ARRAY_SIZE(input_buffers) + i));
     }
 
-    todo
     context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
             shader_bytecode(cs_code, sizeof(cs_code)));
     if (!context.pipeline_state)
@@ -34658,7 +34657,6 @@ static void test_resource_arrays(void)
         transition_sub_resource_state(command_list, output_buffers[i], 0,
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-        todo_if(i)
         check_readback_data_uint(&rb, NULL, uav_data[i], 0);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);

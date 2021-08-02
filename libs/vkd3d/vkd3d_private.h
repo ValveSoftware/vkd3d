@@ -702,6 +702,7 @@ struct d3d12_root_signature
     VkPipelineLayout vk_pipeline_layout;
     uint32_t vk_set_count;
     VkDescriptorSetLayout vk_set_layouts[VKD3D_MAX_DESCRIPTOR_SETS];
+    bool use_descriptor_arrays;
 
     struct d3d12_root_parameter *parameters;
     unsigned int parameter_count;
