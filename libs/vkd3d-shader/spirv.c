@@ -7363,6 +7363,7 @@ static void vkd3d_dxbc_compiler_emit_comparison_instruction(struct vkd3d_dxbc_co
         case VKD3DSIH_INE: op = SpvOpINotEqual; break;
         case VKD3DSIH_DLT:
         case VKD3DSIH_LT:  op = SpvOpFOrdLessThan; break;
+        case VKD3DSIH_DNE:
         case VKD3DSIH_NE:  op = SpvOpFUnordNotEqual; break;
         case VKD3DSIH_UGE: op = SpvOpUGreaterThanEqual; break;
         case VKD3DSIH_ULT: op = SpvOpULessThan; break;
@@ -9575,6 +9576,7 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
         case VKD3DSIH_DEQ:
         case VKD3DSIH_DGE:
         case VKD3DSIH_DLT:
+        case VKD3DSIH_DNE:
         case VKD3DSIH_EQ:
         case VKD3DSIH_GE:
         case VKD3DSIH_IEQ:
