@@ -9252,6 +9252,52 @@ static void test_shader_instructions(void)
         0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
     };
     static struct named_shader ps_dne = {"dne", ps_dne_code, sizeof(ps_dne_code)};
+    static const DWORD ps_dge_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = (uint4)0;
+            if (src0.x >= src0.y)
+                dst.x = 0xffffffff;
+        }
+#endif
+        0x43425844, 0xad9e15a9, 0x80ed9af5, 0x039e7dbd, 0xac8b1634, 0x00000001, 0x00000118, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000108, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000008c, 0x00000050,
+        0x00000023, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c4, 0x00100012, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x00208ee6, 0x00000000, 0x00000000, 0x05000036, 0x00102012, 0x00000000, 0x0010000a,
+        0x00000000, 0x08000036, 0x001020e2, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dge = {"dge", ps_dge_code, sizeof(ps_dge_code)};
+    static const DWORD ps_dlt_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            dst = (uint4)0;
+            if (src0.x < src0.y)
+                dst.x = 0xffffffff;
+        }
+#endif
+        0x43425844, 0xc42b9ef5, 0xd24453bd, 0xc6bc7933, 0x1ba2cbcd, 0x00000001, 0x00000118, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000108, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000008c, 0x00000050,
+        0x00000023, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c5, 0x00100012, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x00208ee6, 0x00000000, 0x00000000, 0x05000036, 0x00102012, 0x00000000, 0x0010000a,
+        0x00000000, 0x08000036, 0x001020e2, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static struct named_shader ps_dlt = {"dlt", ps_dlt_code, sizeof(ps_dlt_code)};
     static const DWORD ps_dtou_code[] =
     {
 #if 0
@@ -9898,6 +9944,11 @@ static void test_shader_instructions(void)
         {&ps_deq, {.d = {{1.0, 0.0}}}, {{0x00000000}}, true},
         {&ps_dne, {.d = {{0.0, 0.0}}}, {{0x00000000}}, true, true},
         {&ps_dne, {.d = {{1.0, 0.0}}}, {{0xffffffff}}, true, true},
+        {&ps_dge, {.d = {{0.0, 1.0}}}, {{0x00000000}}, true, true},
+        {&ps_dge, {.d = {{1.0, 1.0}}}, {{0xffffffff}}, true, true},
+        {&ps_dge, {.d = {{1.5, 1.0}}}, {{0xffffffff}}, true, true},
+        {&ps_dlt, {.d = {{0.0, 1.0}}}, {{0xffffffff}}, true, true},
+        {&ps_dlt, {.d = {{1.0, 1.0}}}, {{0x00000000}}, true, true},
         {&ps_dtou, {.d = {{     -NAN}}}, {{ 0,  0 }}, true, true},
         {&ps_dtou, {.d = {{      NAN}}}, {{ 0,  0 }}, true, true},
         {&ps_dtou, {.d = {{-INFINITY}}}, {{ 0, ~0u}}, true, true},
