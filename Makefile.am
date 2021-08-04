@@ -299,7 +299,7 @@ demos_triangle_CFLAGS = $(DEMOS_CFLAGS)
 demos_triangle_LDADD = $(DEMOS_LDADD)
 endif
 
-EXTRA_DIST += $(vkd3d_test_headers) $(vkd3d_demos_headers)
+noinst_HEADERS = $(vkd3d_test_headers) $(vkd3d_demos_headers)
 
 VKD3D_V_WIDL = $(vkd3d_v_widl_@AM_V@)
 vkd3d_v_widl_ = $(vkd3d_v_widl_@AM_DEFAULT_V@)
