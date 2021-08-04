@@ -15,7 +15,7 @@ AS_VAR_IF([vkd3d_cross_cc], [$3],
   AC_MSG_CHECKING([whether $CC works])
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
                     [AC_MSG_RESULT([yes])
-                    $2=`expr "$CC" : '\(.*\)-gcc'`],
+                    $2=`expr "$CC" : '\(.*\)-gcc' \| "$CC" : '\(.*\)-clang'`],
                     [AC_MSG_RESULT([no])])
   CC="$vkd3d_cc_saved"])
 AS_VAR_POPDEF([vkd3d_cross_cc])dnl
@@ -34,7 +34,7 @@ AS_VAR_IF([vkd3d_cross_cc], [$3],
   AC_MSG_CHECKING([whether $CC works])
   AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
                     [AC_MSG_RESULT([yes])
-                    $2=`expr "$CC" : '\(.*\)-gcc'`],
+                    $2=`expr "$CC" : '\(.*\)-gcc' \| "$CC" : '\(.*\)-clang'`],
                     [AC_MSG_RESULT([no])])
   CC="$vkd3d_cc_saved"])
 AS_VAR_POPDEF([vkd3d_cross_cc])dnl
