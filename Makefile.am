@@ -170,7 +170,9 @@ libvkd3d_shader_la_SOURCES = \
 	libs/vkd3d-shader/checksum.c \
 	libs/vkd3d-shader/dxbc.c \
 	libs/vkd3d-shader/hlsl.c \
+	libs/vkd3d-shader/hlsl.h \
 	libs/vkd3d-shader/hlsl_codegen.c \
+	libs/vkd3d-shader/preproc.h \
 	libs/vkd3d-shader/spirv.c \
 	libs/vkd3d-shader/trace.c \
 	libs/vkd3d-shader/vkd3d_shader.map \
