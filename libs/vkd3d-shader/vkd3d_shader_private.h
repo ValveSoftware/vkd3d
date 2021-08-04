@@ -194,6 +194,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_DEFB,
     VKD3DSIH_DEFI,
     VKD3DSIH_DEQ,
+    VKD3DSIH_DGE,
     VKD3DSIH_DIV,
     VKD3DSIH_DMOV,
     VKD3DSIH_DP2,
