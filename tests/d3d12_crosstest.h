@@ -52,6 +52,7 @@ typedef int HRESULT;
 #include <inttypes.h>
 #include <limits.h>
 #include <math.h>
+#include <stddef.h>
 #include <time.h>
 
 #ifdef _WIN32
