@@ -555,19 +555,6 @@ enum vkd3d_shader_conditional_op
     VKD3D_SHADER_CONDITIONAL_OP_Z  = 1
 };
 
-#define VKD3D_SM1_VS  0xfffeu
-#define VKD3D_SM1_PS  0xffffu
-#define VKD3D_SM4_PS  0x0000u
-#define VKD3D_SM4_VS  0x0001u
-#define VKD3D_SM4_GS  0x0002u
-#define VKD3D_SM5_HS  0x0003u
-#define VKD3D_SM5_DS  0x0004u
-#define VKD3D_SM5_CS  0x0005u
-
-/* Shader version tokens, and shader end tokens */
-#define VKD3DPS_VERSION(major, minor) ((VKD3D_SM1_PS << 16) | ((major) << 8) | (minor))
-#define VKD3DVS_VERSION(major, minor) ((VKD3D_SM1_VS << 16) | ((major) << 8) | (minor))
-
 #define MAX_IMMEDIATE_CONSTANT_BUFFER_SIZE 4096
 #define MAX_REG_OUTPUT 32
 
