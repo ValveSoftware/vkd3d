@@ -2448,6 +2448,26 @@ type:
         {
             $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_3D];
         }
+    | KW_TEXTURE
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_GENERIC);
+        }
+    | KW_TEXTURE1D
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_1D);
+        }
+    | KW_TEXTURE2D
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_2D);
+        }
+    | KW_TEXTURE3D
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_3D);
+        }
+    | KW_TEXTURECUBE
+        {
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_CUBE);
+        }
     | TYPE_IDENTIFIER
         {
             $$ = hlsl_get_type(ctx->cur_scope, $1, true);
