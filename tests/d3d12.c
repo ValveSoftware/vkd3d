@@ -22865,7 +22865,7 @@ static void test_atomic_instructions(void)
             is_todo = test->i.x < 0
                     && (!strcmp(instructions[j], "atomic_imax") || !strcmp(instructions[j], "atomic_imin"));
 
-            bug_if(is_todo && is_nvidia_device(device))
+            bug_if(is_todo)
             todo_if(is_todo)
             ok(value == expected, "Test %u: Got %#x (%d), expected %#x (%d) for '%s' "
                     "with inputs (%u, %u), (%d), %#x (%d).\n",
@@ -22885,7 +22885,7 @@ static void test_atomic_instructions(void)
             unsigned int value = get_readback_uint(&rb, j, 0, 0);
             unsigned int expected = test->expected_result[j];
 
-            bug_if(test->i.x < 0 && todo_instruction && is_nvidia_device(device))
+            bug_if(test->i.x < 0 && todo_instruction)
             todo_if(test->i.x < 0 && todo_instruction)
             ok(value == expected, "Test %u: Got %#x (%d), expected %#x (%d) for '%s' "
                     "with inputs (%u, %u), (%d), %#x (%d).\n",
@@ -34362,7 +34362,7 @@ static void test_hull_shader_relative_addressing(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    check_triangles(&rb, &expected_triangle, 1);
+    bug_if(is_radv_device(context.device)) check_triangles(&rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
