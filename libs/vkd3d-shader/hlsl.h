@@ -380,7 +380,6 @@ struct hlsl_ir_constant
         int32_t i;
         float f;
         double d;
-        bool b;
     } value[4];
     struct hlsl_reg reg;
 };

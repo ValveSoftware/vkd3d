@@ -1023,7 +1023,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
         switch (type->base_type)
         {
             case HLSL_TYPE_BOOL:
-                vkd3d_string_buffer_printf(buffer, "%s ", value->b ? "true" : "false");
+                vkd3d_string_buffer_printf(buffer, "%s ", value->i ? "true" : "false");
                 break;
 
             case HLSL_TYPE_DOUBLE:

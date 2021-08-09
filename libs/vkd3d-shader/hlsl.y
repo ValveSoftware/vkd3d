@@ -826,6 +826,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
             {
                 case HLSL_TYPE_UINT:
                     return value->u;
+                case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_INT:
                     return value->i;
                 case HLSL_TYPE_FLOAT:
@@ -833,8 +834,6 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
                     return value->f;
                 case HLSL_TYPE_DOUBLE:
                     return value->d;
-                case HLSL_TYPE_BOOL:
-                    return value->b;
                 default:
                     assert(0);
                     return 0;
@@ -2873,7 +2872,7 @@ primary_expr:
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], @1);
-            c->value[0].b = $1;
+            c->value[0].i = $1;
             if (!($$ = make_list(ctx, &c->node)))
             {
                 hlsl_free_instr(&c->node);

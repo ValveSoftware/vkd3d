@@ -929,15 +929,12 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *
 
                         switch (type->base_type)
                         {
-                            case HLSL_TYPE_BOOL:
-                                f = value->b;
-                                break;
-
                             case HLSL_TYPE_FLOAT:
                             case HLSL_TYPE_HALF:
                                 f = value->f;
                                 break;
 
+                            case HLSL_TYPE_BOOL:
                             case HLSL_TYPE_INT:
                                 f = value->i;
                                 break;
