@@ -9935,7 +9935,7 @@ static void test_shader_instructions(void)
 
         {&ps_dmov,      {.d = {{2.5 + 1.0e-9, -3.5 - 1.0e-9}}},  {.d = {3.5 + 1.0e-9, -2.5 - 1.0e-9}}, true},
         {&ps_dadd,      {.d = {{2.5, 0.0}}},  {.d = {2.5 + 1.0000002433080226, 2.5 + 2.000000481493771}}, true},
-        {&ps_dmin_dmax, {.d = {{-1.0, 1.0}}}, {.d = {-1.0, 1.0}}, true, true},
+        {&ps_dmin_dmax, {.d = {{-1.0, 1.0}}}, {.d = {-1.0, 1.0}}, true},
         {&ps_dmovc,     {.d = {{0.5, 0.0}}},  {.d = {4.5, 4.5}}, true, true},
         {&ps_dmovc,     {.d = {{1.5, 0.0}}},  {.d = {1.5, 0.0}}, true, true},
         {&ps_dmodifier, {.d = {{1.5, 0.0}}},  {.d = {1.5f, 2.5f}}, true},

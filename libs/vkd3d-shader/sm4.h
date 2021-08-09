@@ -319,6 +319,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_SYNC                             = 0xbe,
     VKD3D_SM5_OP_DADD                             = 0xbf,
     VKD3D_SM5_OP_DMAX                             = 0xc0,
+    VKD3D_SM5_OP_DMIN                             = 0xc1,
     VKD3D_SM5_OP_DEQ                              = 0xc3,
     VKD3D_SM5_OP_DGE                              = 0xc4,
     VKD3D_SM5_OP_DLT                              = 0xc5,
