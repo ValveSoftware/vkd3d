@@ -1023,6 +1023,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
                 }
 
+                case HLSL_OP1_LOG2:
+                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
+                    break;
+
                 case HLSL_OP1_NEG:
                     write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_NEGATE);
                     break;
