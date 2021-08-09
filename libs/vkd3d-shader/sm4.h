@@ -328,6 +328,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_EVAL_SAMPLE_INDEX                = 0xcc,
     VKD3D_SM5_OP_EVAL_CENTROID                    = 0xcd,
     VKD3D_SM5_OP_DCL_GS_INSTANCES                 = 0xce,
+    VKD3D_SM5_OP_DFMA                             = 0xd3,
 };
 
 enum vkd3d_sm4_instruction_modifier
