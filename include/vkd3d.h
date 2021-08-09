@@ -153,10 +153,10 @@ struct vkd3d_image_resource_create_info
     D3D12_RESOURCE_STATES present_state;
 };
 
-#if defined(__GNUC__) && !defined(__MINGW32__)
-# define VKD3D_API __attribute__((visibility("default")))
+#ifdef LIBVKD3D_SOURCE
+# define VKD3D_API VKD3D_EXPORT
 #else
-# define VKD3D_API
+# define VKD3D_API VKD3D_IMPORT
 #endif
 
 #ifndef VKD3D_NO_PROTOTYPES

@@ -34,10 +34,10 @@ extern "C" {
 #define VKD3D_WAIT_FAILED (~0u)
 #define VKD3D_INFINITE (~0u)
 
-#if defined(__GNUC__) && !defined(__MINGW32__)
-# define VKD3D_UTILS_API __attribute__((visibility("default")))
+#ifdef LIBVKD3D_UTILS_SOURCE
+# define VKD3D_UTILS_API VKD3D_EXPORT
 #else
-# define VKD3D_UTILS_API
+# define VKD3D_UTILS_API VKD3D_IMPORT
 #endif
 
 /* 1.0 */

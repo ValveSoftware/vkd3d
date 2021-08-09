@@ -53,6 +53,17 @@ enum vkd3d_result
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_RESULT),
 };
 
+#ifdef _WIN32
+# define VKD3D_IMPORT __declspec(dllimport)
+# define VKD3D_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+# define VKD3D_IMPORT
+# define VKD3D_EXPORT __attribute__((visibility("default")))
+#else
+# define VKD3D_IMPORT
+# define VKD3D_EXPORT
+#endif
+
 #ifdef __cplusplus
 }
 #endif  /* __cplusplus */

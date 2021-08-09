@@ -1340,10 +1340,10 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
             | ((w & VKD3D_SHADER_SWIZZLE_MASK) << VKD3D_SHADER_SWIZZLE_SHIFT(3));
 }
 
-#if defined(__GNUC__) && !defined(__MINGW32__)
-# define VKD3D_SHADER_API __attribute__((visibility("default")))
+#ifdef LIBVKD3D_SHADER_SOURCE
+# define VKD3D_SHADER_API VKD3D_EXPORT
 #else
-# define VKD3D_SHADER_API
+# define VKD3D_SHADER_API VKD3D_IMPORT
 #endif
 
 #ifndef VKD3D_SHADER_NO_PROTOTYPES
