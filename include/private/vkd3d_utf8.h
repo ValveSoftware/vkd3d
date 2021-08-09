@@ -21,6 +21,6 @@
 
 #include "vkd3d_common.h"
 
-char *vkd3d_strdup_w_utf8(const WCHAR *wstr, size_t wchar_size) DECLSPEC_HIDDEN;
+char *vkd3d_strdup_w_utf8(const WCHAR *wstr, size_t wchar_size);
 
 #endif /* __VKD3D_UTF8_H */

@@ -31,7 +31,7 @@
 #define VKD3D_DEBUG_BUFFER_COUNT 64
 #define VKD3D_DEBUG_BUFFER_SIZE 512
 
-extern const char *vkd3d_dbg_env_name DECLSPEC_HIDDEN;
+extern const char *vkd3d_dbg_env_name;
 
 static const char *debug_level_names[] =
 {

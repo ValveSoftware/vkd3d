@@ -65,7 +65,6 @@ static inline char *vkd3d_strdup(const char *string)
     return ptr;
 }
 
-bool vkd3d_array_reserve(void **elements, size_t *capacity,
-        size_t element_count, size_t element_size) DECLSPEC_HIDDEN;
+bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size);
 
 #endif  /* __VKD3D_MEMORY_H */

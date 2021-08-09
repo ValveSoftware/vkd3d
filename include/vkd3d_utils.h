@@ -34,37 +34,44 @@ extern "C" {
 #define VKD3D_WAIT_FAILED (~0u)
 #define VKD3D_INFINITE (~0u)
 
+#if defined(__GNUC__) && !defined(__MINGW32__)
+# define VKD3D_UTILS_API __attribute__((visibility("default")))
+#else
+# define VKD3D_UTILS_API
+#endif
+
 /* 1.0 */
-HANDLE vkd3d_create_event(void);
-HRESULT vkd3d_signal_event(HANDLE event);
-unsigned int vkd3d_wait_event(HANDLE event, unsigned int milliseconds);
-void vkd3d_destroy_event(HANDLE event);
+VKD3D_UTILS_API HANDLE vkd3d_create_event(void);
+VKD3D_UTILS_API HRESULT vkd3d_signal_event(HANDLE event);
+VKD3D_UTILS_API unsigned int vkd3d_wait_event(HANDLE event, unsigned int milliseconds);
+VKD3D_UTILS_API void vkd3d_destroy_event(HANDLE event);
 
 #define D3D12CreateDevice(a, b, c, d) D3D12CreateDeviceVKD3D(a, b, c, d, VKD3D_UTILS_API_VERSION)
-HRESULT WINAPI D3D12CreateRootSignatureDeserializer(const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
-HRESULT WINAPI D3D12GetDebugInterface(REFIID iid, void **debug);
-HRESULT WINAPI D3D12SerializeRootSignature(const D3D12_ROOT_SIGNATURE_DESC *desc,
+VKD3D_UTILS_API HRESULT WINAPI D3D12CreateRootSignatureDeserializer(
+        const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
+VKD3D_UTILS_API HRESULT WINAPI D3D12GetDebugInterface(REFIID iid, void **debug);
+VKD3D_UTILS_API HRESULT WINAPI D3D12SerializeRootSignature(const D3D12_ROOT_SIGNATURE_DESC *desc,
         D3D_ROOT_SIGNATURE_VERSION version, ID3DBlob **blob, ID3DBlob **error_blob);
 
 /* 1.2 */
-HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL feature_level,
+VKD3D_UTILS_API HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL feature_level,
         REFIID iid, void **device, enum vkd3d_api_version api_version);
-HRESULT WINAPI D3D12CreateVersionedRootSignatureDeserializer(const void *data,
+VKD3D_UTILS_API HRESULT WINAPI D3D12CreateVersionedRootSignatureDeserializer(const void *data,
         SIZE_T data_size, REFIID iid, void **deserializer);
-HRESULT WINAPI D3D12SerializeVersionedRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *desc,
+VKD3D_UTILS_API HRESULT WINAPI D3D12SerializeVersionedRootSignature(const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *desc,
         ID3DBlob **blob, ID3DBlob **error_blob);
 
 /* 1.3 */
-HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
+VKD3D_UTILS_API HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include, const char *entrypoint,
         const char *target, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages);
-HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
+VKD3D_UTILS_API HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include, const char *entrypoint,
         const char *target, UINT flags, UINT effect_flags, UINT secondary_flags,
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
         ID3DBlob **error_messages);
-HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob);
-HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename,
+VKD3D_UTILS_API HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob);
+VKD3D_UTILS_API HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include,
         ID3DBlob **shader, ID3DBlob **error_messages);
 

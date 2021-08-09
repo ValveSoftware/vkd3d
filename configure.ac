@@ -54,6 +54,7 @@ AC_SUBST([VKD3D_CFLAGS])
 AS_IF([test "x${GCC}" = "xyes"],
       [VKD3D_CFLAGS="-Wall -pipe"
       VKD3D_CHECK_CFLAGS([-std=c99])
+      VKD3D_CHECK_CFLAGS([-fvisibility=hidden])
       VKD3D_CHECK_CFLAGS([-Wdeclaration-after-statement])
       VKD3D_CHECK_CFLAGS([-Wimplicit-fallthrough])
       VKD3D_CHECK_CFLAGS([-Winit-self])

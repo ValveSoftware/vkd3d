@@ -1340,6 +1340,12 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
             | ((w & VKD3D_SHADER_SWIZZLE_MASK) << VKD3D_SHADER_SWIZZLE_SHIFT(3));
 }
 
+#if defined(__GNUC__) && !defined(__MINGW32__)
+# define VKD3D_SHADER_API __attribute__((visibility("default")))
+#else
+# define VKD3D_SHADER_API
+#endif
+
 #ifndef VKD3D_SHADER_NO_PROTOTYPES
 
 /**
@@ -1353,7 +1359,7 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
  * string is null-terminated and UTF-8 encoded. This may be a pointer to static
  * data in libvkd3d-shader; it should not be freed.
  */
-const char *vkd3d_shader_get_version(unsigned int *major, unsigned int *minor);
+VKD3D_SHADER_API const char *vkd3d_shader_get_version(unsigned int *major, unsigned int *minor);
 /**
  * Returns the source types supported, with any target type, by
  * vkd3d_shader_compile().
@@ -1368,7 +1374,7 @@ const char *vkd3d_shader_get_version(unsigned int *major, unsigned int *minor);
  * vkd3d-shader. This array may be a pointer to static data in libvkd3d-shader;
  * it should not be freed.
  */
-const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(unsigned int *count);
+VKD3D_SHADER_API const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(unsigned int *count);
 /**
  * Returns the target types supported, with the given source type, by
  * vkd3d_shader_compile().
@@ -1382,7 +1388,7 @@ const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(uns
  * vkd3d-shader. This array may be a pointer to static data in libvkd3d-shader;
  * it should not be freed.
  */
-const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
+VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         enum vkd3d_shader_source_type source_type, unsigned int *count);
 
 /**
@@ -1428,7 +1434,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
+VKD3D_SHADER_API int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages);
 /**
  * Free shader messages allocated by another vkd3d-shader function, such as
@@ -1437,7 +1443,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
  * \param messages Messages to free. This pointer is optional and may be NULL,
  * in which case no action will be taken.
  */
-void vkd3d_shader_free_messages(char *messages);
+VKD3D_SHADER_API void vkd3d_shader_free_messages(char *messages);
 /**
  * Free shader code allocated by another vkd3d-shader function, such as
  * vkd3d_shader_compile().
@@ -1447,7 +1453,7 @@ void vkd3d_shader_free_messages(char *messages);
  *
  * \param code Code to free.
  */
-void vkd3d_shader_free_shader_code(struct vkd3d_shader_code *code);
+VKD3D_SHADER_API void vkd3d_shader_free_shader_code(struct vkd3d_shader_code *code);
 
 /**
  * Convert a byte code description of a shader root signature to a structural
@@ -1479,7 +1485,7 @@ void vkd3d_shader_free_shader_code(struct vkd3d_shader_code *code);
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
+VKD3D_SHADER_API int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_versioned_root_signature_desc *root_signature, char **messages);
 /**
  * Free a structural representation of a shader root signature allocated by
@@ -1491,7 +1497,8 @@ int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
  *
  * \param root_signature Signature description to free.
  */
-void vkd3d_shader_free_root_signature(struct vkd3d_shader_versioned_root_signature_desc *root_signature);
+VKD3D_SHADER_API void vkd3d_shader_free_root_signature(
+        struct vkd3d_shader_versioned_root_signature_desc *root_signature);
 
 /**
  * Convert a structural description of a shader root signature to a byte code
@@ -1516,7 +1523,8 @@ void vkd3d_shader_free_root_signature(struct vkd3d_shader_versioned_root_signatu
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_root_signature_desc *root_signature,
+VKD3D_SHADER_API int vkd3d_shader_serialize_root_signature(
+        const struct vkd3d_shader_versioned_root_signature_desc *root_signature,
         struct vkd3d_shader_code *dxbc, char **messages);
 /**
  * Convert a structural representation of a root signature to a different
@@ -1538,7 +1546,7 @@ int vkd3d_shader_serialize_root_signature(const struct vkd3d_shader_versioned_ro
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_convert_root_signature(struct vkd3d_shader_versioned_root_signature_desc *dst,
+VKD3D_SHADER_API int vkd3d_shader_convert_root_signature(struct vkd3d_shader_versioned_root_signature_desc *dst,
         enum vkd3d_shader_root_signature_version version, const struct vkd3d_shader_versioned_root_signature_desc *src);
 
 /**
@@ -1565,7 +1573,7 @@ int vkd3d_shader_convert_root_signature(struct vkd3d_shader_versioned_root_signa
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char **messages);
+VKD3D_SHADER_API int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char **messages);
 /**
  * Free members of struct vkd3d_shader_scan_descriptor_info() allocated by
  * vkd3d_shader_scan().
@@ -1575,7 +1583,8 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
  *
  * \param scan_descriptor_info Descriptor information to free.
  */
-void vkd3d_shader_free_scan_descriptor_info(struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info);
+VKD3D_SHADER_API void vkd3d_shader_free_scan_descriptor_info(
+        struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info);
 
 /**
  * Read the input signature of a compiled shader, returning a structural
@@ -1601,7 +1610,7 @@ void vkd3d_shader_free_scan_descriptor_info(struct vkd3d_shader_scan_descriptor_
  *
  * \return A member of \ref vkd3d_result.
  */
-int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
+VKD3D_SHADER_API int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_signature *signature, char **messages);
 /**
  * Find a single element of a parsed input signature.
@@ -1622,7 +1631,7 @@ int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
  * NULL if no such element was found. If not NULL, the return value points into
  * the \a signature parameter and should not be explicitly freed.
  */
-struct vkd3d_shader_signature_element *vkd3d_shader_find_signature_element(
+VKD3D_SHADER_API struct vkd3d_shader_signature_element *vkd3d_shader_find_signature_element(
         const struct vkd3d_shader_signature *signature, const char *semantic_name,
         unsigned int semantic_index, unsigned int stream_index);
 /**
@@ -1634,7 +1643,7 @@ struct vkd3d_shader_signature_element *vkd3d_shader_find_signature_element(
  *
  * \param signature Signature description to free.
  */
-void vkd3d_shader_free_shader_signature(struct vkd3d_shader_signature *signature);
+VKD3D_SHADER_API void vkd3d_shader_free_shader_signature(struct vkd3d_shader_signature *signature);
 
 /* 1.3 */
 
@@ -1662,7 +1671,7 @@ void vkd3d_shader_free_shader_signature(struct vkd3d_shader_signature *signature
  *
  * \since 1.3
  */
-int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
+VKD3D_SHADER_API int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages);
 
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */

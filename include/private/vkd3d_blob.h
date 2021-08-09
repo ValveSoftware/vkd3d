@@ -22,6 +22,6 @@
 #include "vkd3d_windows.h"
 #include "vkd3d_d3dcommon.h"
 
-HRESULT vkd3d_blob_create(void *buffer, SIZE_T size, ID3D10Blob **blob) DECLSPEC_HIDDEN;
+HRESULT vkd3d_blob_create(void *buffer, SIZE_T size, ID3D10Blob **blob);
 
 #endif  /* __VKD3D_BLOB_H */

@@ -858,20 +858,20 @@ static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_reg
     return reg->type == VKD3DSPR_OUTPUT || reg->type == VKD3DSPR_COLOROUT;
 }
 
-void vkd3d_shader_trace(void *data) DECLSPEC_HIDDEN;
+void vkd3d_shader_trace(void *data);
 
-const char *shader_get_type_prefix(enum vkd3d_shader_type type) DECLSPEC_HIDDEN;
+const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 
 struct vkd3d_shader_message_context;
 
 void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
-        const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
-void shader_sm4_free(void *data) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context);
+void shader_sm4_free(void *data);
 void shader_sm4_read_header(void *data, const DWORD **ptr,
-        struct vkd3d_shader_version *shader_version) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_version *shader_version);
 void shader_sm4_read_instruction(void *data, const DWORD **ptr,
-        struct vkd3d_shader_instruction *ins) DECLSPEC_HIDDEN;
-bool shader_sm4_is_end(void *data, const DWORD **ptr) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_instruction *ins);
+bool shader_sm4_is_end(void *data, const DWORD **ptr);
 
 struct vkd3d_string_buffer
 {
@@ -887,20 +887,18 @@ struct vkd3d_string_buffer_cache
 };
 
 enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out) DECLSPEC_HIDDEN;
-void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
-struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
-void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
-void vkd3d_string_buffer_cache_cleanup(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
-void vkd3d_string_buffer_cache_init(struct vkd3d_string_buffer_cache *list) DECLSPEC_HIDDEN;
-int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer,
-        const char *format, ...) VKD3D_PRINTF_FUNC(2, 3) DECLSPEC_HIDDEN;
-void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list,
-        struct vkd3d_string_buffer *buffer) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out);
+void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);
+struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list);
+void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer);
+void vkd3d_string_buffer_cache_cleanup(struct vkd3d_string_buffer_cache *list);
+void vkd3d_string_buffer_cache_init(struct vkd3d_string_buffer_cache *list);
+int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *format, ...) VKD3D_PRINTF_FUNC(2, 3);
+void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list, struct vkd3d_string_buffer *buffer);
 #define vkd3d_string_buffer_trace(buffer) \
         vkd3d_string_buffer_trace_(buffer, __FUNCTION__)
-void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function) DECLSPEC_HIDDEN;
-int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args) DECLSPEC_HIDDEN;
+void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function);
+int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args);
 
 struct vkd3d_bytecode_buffer
 {
@@ -909,8 +907,8 @@ struct vkd3d_bytecode_buffer
     int status;
 };
 
-size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size) DECLSPEC_HIDDEN;
-void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value) DECLSPEC_HIDDEN;
+size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size);
+void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value);
 
 static inline size_t put_u32(struct vkd3d_bytecode_buffer *buffer, uint32_t value)
 {
@@ -944,53 +942,51 @@ struct vkd3d_shader_message_context
     struct vkd3d_string_buffer messages;
 };
 
-void vkd3d_shader_message_context_cleanup(struct vkd3d_shader_message_context *context) DECLSPEC_HIDDEN;
-bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context,
-        char **out) DECLSPEC_HIDDEN;
+void vkd3d_shader_message_context_cleanup(struct vkd3d_shader_message_context *context);
+bool vkd3d_shader_message_context_copy_messages(struct vkd3d_shader_message_context *context, char **out);
 void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
-        enum vkd3d_shader_log_level log_level) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_log_level log_level);
 void vkd3d_shader_message_context_trace_messages_(const struct vkd3d_shader_message_context *context,
-        const char *function) DECLSPEC_HIDDEN;
+        const char *function);
 #define vkd3d_shader_message_context_trace_messages(context) \
         vkd3d_shader_message_context_trace_messages_(context, __FUNCTION__)
 void vkd3d_shader_error(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(4, 5);
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_error error, const char *format, va_list args);
 void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_log_level level, const char *format, va_list args) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_log_level level, const char *format, va_list args);
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
-        enum vkd3d_shader_error error, const char *format, va_list args) DECLSPEC_HIDDEN;
+        enum vkd3d_shader_error error, const char *format, va_list args);
 
-void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader) DECLSPEC_HIDDEN;
+void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader);
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
-        struct vkd3d_shader_message_context *message_context, const char *source_name,
-        struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
-void free_shader_desc(struct vkd3d_shader_desc *desc) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);
+void free_shader_desc(struct vkd3d_shader_desc *desc);
 
 int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *signature) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *signature);
 
 struct vkd3d_dxbc_compiler;
 
 struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader_version *shader_version,
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
-        struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_message_context *message_context);
 int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_instruction *instruction);
 int vkd3d_dxbc_compiler_generate_spirv(struct vkd3d_dxbc_compiler *compiler,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *spirv) DECLSPEC_HIDDEN;
-void vkd3d_dxbc_compiler_destroy(struct vkd3d_dxbc_compiler *compiler) DECLSPEC_HIDDEN;
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *spirv);
+void vkd3d_dxbc_compiler_destroy(struct vkd3d_dxbc_compiler *compiler);
 
-void vkd3d_compute_dxbc_checksum(const void *dxbc, size_t size, uint32_t checksum[4]) DECLSPEC_HIDDEN;
+void vkd3d_compute_dxbc_checksum(const void *dxbc, size_t size, uint32_t checksum[4]);
 
 int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context) DECLSPEC_HIDDEN;
+        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context);
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type(
         enum vkd3d_data_type data_type)
