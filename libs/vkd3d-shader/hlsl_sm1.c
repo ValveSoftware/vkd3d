@@ -268,9 +268,9 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
         }
     }
 
-    type->bytecode_offset = put_u32(buffer, sm1_class(type) | (sm1_base_type(type) << 16));
-    put_u32(buffer, type->dimy | (type->dimx << 16));
-    put_u32(buffer, array_size | (field_count << 16));
+    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm1_class(type), sm1_base_type(type)));
+    put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
+    put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);
 }
 
@@ -352,7 +352,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
         if (!var->semantic.name && var->reg.allocated)
         {
             put_u32(buffer, 0); /* name */
-            put_u32(buffer, D3DXRS_FLOAT4 | (var->reg.id << 16));
+            put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->reg.id));
             put_u32(buffer, var->data_type->reg_size / 4);
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */
@@ -381,7 +381,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     set_u32(buffer, creator_offset, offset - ctab_start);
 
     ctab_end = bytecode_get_size(buffer);
-    set_u32(buffer, size_offset, D3DSIO_COMMENT | (((ctab_end - ctab_offset) / sizeof(uint32_t)) << 16));
+    set_u32(buffer, size_offset, vkd3d_make_u32(D3DSIO_COMMENT, (ctab_end - ctab_offset) / sizeof(uint32_t)));
 }
 
 static uint32_t sm1_encode_register_type(D3DSHADER_PARAM_REGISTER_TYPE type)

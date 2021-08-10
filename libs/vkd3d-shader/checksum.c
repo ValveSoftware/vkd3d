@@ -156,8 +156,7 @@ static void byte_reverse(unsigned char *buf, unsigned longs)
 
     do
     {
-        t = ((unsigned)buf[3] << 8 | buf[2]) << 16 |
-            ((unsigned)buf[1] << 8 | buf[0]);
+        t = vkd3d_make_u32(vkd3d_make_u16(buf[0], buf[1]), vkd3d_make_u16(buf[2], buf[3]));
         *(unsigned int *)buf = t;
         buf += 4;
     } while (--longs);

@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -143,6 +144,16 @@ static inline bool vkd3d_bound_range(size_t start, size_t count, size_t limit)
 #else
     return start <= limit && count <= limit - start;
 #endif
+}
+
+static inline uint16_t vkd3d_make_u16(uint8_t low, uint8_t high)
+{
+    return low | ((uint16_t)high << 8);
+}
+
+static inline uint32_t vkd3d_make_u32(uint16_t low, uint16_t high)
+{
+    return low | ((uint32_t)high << 16);
 }
 
 static inline int ascii_isupper(int c)
