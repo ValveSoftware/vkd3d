@@ -371,6 +371,11 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
 
                     switch (arg1->node.data_type->base_type)
                     {
+                        case HLSL_TYPE_INT:
+                            for (i = 0; i < dimx; ++i)
+                                res->value.f[i] = arg1->value.i[i];
+                            break;
+
                         case HLSL_TYPE_UINT:
                             for (i = 0; i < dimx; ++i)
                                 res->value.f[i] = arg1->value.u[i];
