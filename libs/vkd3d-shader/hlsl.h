@@ -302,7 +302,6 @@ enum hlsl_ir_expr_op
     HLSL_IR_UNOP_SAT,
 
     HLSL_IR_BINOP_ADD,
-    HLSL_IR_BINOP_SUB,
     HLSL_IR_BINOP_MUL,
     HLSL_IR_BINOP_DIV,
 
