@@ -1,4 +1,6 @@
 /*
+ * HLSL utility functions
+ *
  * Copyright 2012 Matteo Bruni for CodeWeavers
  * Copyright 2019-2020 Zebediah Figura for CodeWeavers
  *
@@ -1447,6 +1449,80 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     rb_put(&func->overloads, decl->parameters, &decl->entry);
     func->intrinsic = intrinsic;
     rb_put(&ctx->functions, func->name, &func->entry);
+}
+
+unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask)
+{
+    unsigned int i, ret = 0;
+
+    /* Leave replicate swizzles alone; some instructions need them. */
+    if (swizzle == HLSL_SWIZZLE(X, X, X, X)
+            || swizzle == HLSL_SWIZZLE(Y, Y, Y, Y)
+            || swizzle == HLSL_SWIZZLE(Z, Z, Z, Z)
+            || swizzle == HLSL_SWIZZLE(W, W, W, W))
+        return swizzle;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (writemask & (1 << i))
+        {
+            ret |= (swizzle & 3) << (i * 2);
+            swizzle >>= 2;
+        }
+    }
+    return ret;
+}
+
+unsigned int hlsl_swizzle_from_writemask(unsigned int writemask)
+{
+    static const unsigned int swizzles[16] =
+    {
+        0,
+        HLSL_SWIZZLE(X, X, X, X),
+        HLSL_SWIZZLE(Y, Y, Y, Y),
+        HLSL_SWIZZLE(X, Y, X, X),
+        HLSL_SWIZZLE(Z, Z, Z, Z),
+        HLSL_SWIZZLE(X, Z, X, X),
+        HLSL_SWIZZLE(Y, Z, X, X),
+        HLSL_SWIZZLE(X, Y, Z, X),
+        HLSL_SWIZZLE(W, W, W, W),
+        HLSL_SWIZZLE(X, W, X, X),
+        HLSL_SWIZZLE(Y, W, X, X),
+        HLSL_SWIZZLE(X, Y, W, X),
+        HLSL_SWIZZLE(Z, W, X, X),
+        HLSL_SWIZZLE(X, Z, W, X),
+        HLSL_SWIZZLE(Y, Z, W, X),
+        HLSL_SWIZZLE(X, Y, Z, W),
+    };
+
+    return swizzles[writemask & 0xf];
+}
+
+unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second)
+{
+    unsigned int ret = 0, i, j = 0;
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (first & (1 << i))
+        {
+            if (second & (1 << j++))
+                ret |= (1 << i);
+        }
+    }
+
+    return ret;
+}
+
+unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsigned int dim)
+{
+    unsigned int ret = 0, i;
+    for (i = 0; i < dim; ++i)
+    {
+        unsigned int s = (second >> (i * 2)) & 3;
+        ret |= ((first >> (s * 2)) & 3) << (i * 2);
+    }
+    return ret;
 }
 
 static const struct hlsl_profile_info *get_target_info(const char *target)

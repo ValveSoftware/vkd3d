@@ -22,6 +22,7 @@
 
 #include "vkd3d_shader_private.h"
 #include "rbtree.h"
+#include "vkd3d_d3dx9shader.h"
 
 /* The general IR structure is inspired by Mesa GLSL hir, even though the code
  * ends up being quite different in practice. Anyway, here comes the relevant
@@ -678,6 +679,18 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_type_is_void(const struct hlsl_type *type);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
+
+unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsigned int dim);
+unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
+unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask);
+unsigned int hlsl_swizzle_from_writemask(unsigned int writemask);
+
+struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type);
+
+bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
+        bool output, D3DSHADER_PARAM_REGISTER_TYPE *type, unsigned int *reg);
+bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx);
+int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out);
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
 
