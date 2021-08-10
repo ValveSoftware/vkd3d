@@ -401,6 +401,11 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
         {
             switch (expr->op)
             {
+                case HLSL_IR_UNOP_NEG:
+                    for (i = 0; i < instr->data_type->dimx; ++i)
+                        res->value.u[i] = -arg1->value.u[i];
+                    break;
+
                 case HLSL_IR_BINOP_ADD:
                     for (i = 0; i < instr->data_type->dimx; ++i)
                         res->value.u[i] = arg1->value.u[i] + arg2->value.u[i];
