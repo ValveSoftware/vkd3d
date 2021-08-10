@@ -1000,9 +1000,9 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc,
             root_signature->push_constant_ranges, &root_signature->push_constant_range_count)))
         goto fail;
-    if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &context)))
-        goto fail;
     if (FAILED(hr = d3d12_root_signature_init_static_samplers(root_signature, device, desc, &context)))
+        goto fail;
+    if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &context)))
         goto fail;
 
     root_signature->main_set = root_signature->vk_set_count;
