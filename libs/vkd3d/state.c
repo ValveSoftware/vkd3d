@@ -514,9 +514,50 @@ static HRESULT d3d12_root_signature_init_push_constants(struct d3d12_root_signat
 struct vkd3d_descriptor_set_context
 {
     VkDescriptorSetLayoutBinding *current_binding;
+    VkDescriptorSetLayoutBinding *first_binding;
     unsigned int descriptor_index;
     uint32_t descriptor_binding;
 };
+
+static bool vkd3d_validate_descriptor_set_count(struct d3d12_device *device, unsigned int set_count)
+{
+    uint32_t max_count = min(VKD3D_MAX_DESCRIPTOR_SETS, device->vk_info.device_limits.maxBoundDescriptorSets);
+
+    if (set_count > max_count)
+    {
+        ERR("Required descriptor set count exceeds maximum allowed count of %u.\n", max_count);
+        return false;
+    }
+
+    return true;
+}
+
+static HRESULT vkd3d_create_descriptor_set_layout(struct d3d12_device *device,
+        VkDescriptorSetLayoutCreateFlags flags, unsigned int binding_count,
+        const VkDescriptorSetLayoutBinding *bindings, VkDescriptorSetLayout *set_layout);
+
+static HRESULT d3d12_root_signature_append_descriptor_set_layout(struct d3d12_root_signature *root_signature,
+    struct vkd3d_descriptor_set_context *context, VkDescriptorSetLayoutCreateFlags flags)
+{
+    HRESULT hr;
+
+    if (!context->descriptor_binding)
+        return S_OK;
+
+    if (!vkd3d_validate_descriptor_set_count(root_signature->device, root_signature->vk_set_count + 1))
+        return E_INVALIDARG;
+
+    if (FAILED(hr = vkd3d_create_descriptor_set_layout(root_signature->device,
+            flags, context->descriptor_binding, context->first_binding,
+            &root_signature->vk_set_layouts[root_signature->vk_set_count])))
+        return hr;
+    ++root_signature->vk_set_count;
+
+    context->current_binding = context->first_binding;
+    context->descriptor_binding = 0;
+
+    return S_OK;
+}
 
 static void d3d12_root_signature_append_vk_binding(struct d3d12_root_signature *root_signature,
         enum vkd3d_shader_descriptor_type descriptor_type, unsigned int register_space, unsigned int register_idx,
@@ -906,6 +947,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     root_signature->descriptor_mapping = NULL;
     root_signature->static_sampler_count = 0;
     root_signature->static_samplers = NULL;
+    root_signature->device = device;
 
     if (desc->Flags & ~(D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
             | D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT))
@@ -942,22 +984,18 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
 
     if (!(binding_desc = vkd3d_calloc(info.binding_count, sizeof(*binding_desc))))
         goto fail;
+    context.first_binding = binding_desc;
     context.current_binding = binding_desc;
 
     if (FAILED(hr = d3d12_root_signature_init_root_descriptors(root_signature, desc, &context)))
         goto fail;
 
     /* We use KHR_push_descriptor for root descriptor parameters. */
-    if (vk_info->KHR_push_descriptor && context.descriptor_binding)
+    if (vk_info->KHR_push_descriptor)
     {
-        if (FAILED(hr = vkd3d_create_descriptor_set_layout(device,
-                VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
-                context.descriptor_binding, binding_desc, &root_signature->vk_set_layouts[0])))
+        if (FAILED(hr = d3d12_root_signature_append_descriptor_set_layout(root_signature,
+                &context, VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR)))
             goto fail;
-        ++root_signature->vk_set_count;
-
-        context.current_binding = binding_desc;
-        context.descriptor_binding = 0;
     }
 
     if (FAILED(hr = d3d12_root_signature_init_push_constants(root_signature, desc,
@@ -969,14 +1007,10 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
         goto fail;
 
     root_signature->main_set = root_signature->vk_set_count;
-    if (context.descriptor_binding)
-    {
-        if (FAILED(hr = vkd3d_create_descriptor_set_layout(device,
-                0, context.descriptor_binding, binding_desc,
-                &root_signature->vk_set_layouts[root_signature->vk_set_count])))
-            goto fail;
-        ++root_signature->vk_set_count;
-    }
+
+    if (FAILED(hr = d3d12_root_signature_append_descriptor_set_layout(root_signature, &context, 0)))
+        goto fail;
+
     vkd3d_free(binding_desc);
     binding_desc = NULL;
 
@@ -988,7 +1022,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     if (FAILED(hr = vkd3d_private_store_init(&root_signature->private_store)))
         goto fail;
 
-    d3d12_device_add_ref(root_signature->device = device);
+    d3d12_device_add_ref(device);
 
     return S_OK;
 
