@@ -608,7 +608,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
     init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            hlsl_new_type(ctx, NULL, HLSL_CLASS_VECTOR, val->data_type->base_type, components, 1), *loc);
+            ctx->builtin_types.vector[val->data_type->base_type][components - 1], *loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;

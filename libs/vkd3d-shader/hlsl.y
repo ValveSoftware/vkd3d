@@ -2394,7 +2394,7 @@ type:
                 YYABORT;
             }
 
-            $$ = hlsl_new_type(ctx, NULL, HLSL_CLASS_VECTOR, $3->base_type, $5, 1);
+            $$ = ctx->builtin_types.vector[$3->base_type][$5 - 1];
         }
     | KW_MATRIX '<' type ',' C_INTEGER ',' C_INTEGER '>'
         {
