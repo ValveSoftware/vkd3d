@@ -649,6 +649,7 @@ struct d3d12_root_descriptor_table_range
     unsigned int descriptor_count;
     uint32_t binding;
 
+    enum vkd3d_shader_descriptor_type type;
     uint32_t descriptor_magic;
     unsigned int register_space;
     unsigned int base_register_idx;
