@@ -458,6 +458,8 @@ struct hlsl_ctx
     {
         struct hlsl_type *scalar[HLSL_TYPE_LAST_SCALAR + 1];
         struct hlsl_type *vector[HLSL_TYPE_LAST_SCALAR + 1][4];
+        /* matrix[float][2][4] is a float4x2, i.e. dimx = 2, dimy = 4 */
+        struct hlsl_type *matrix[HLSL_TYPE_LAST_SCALAR + 1][4][4];
         struct hlsl_type *sampler[HLSL_SAMPLER_DIM_MAX + 1];
         struct hlsl_type *Void;
     } builtin_types;
@@ -652,8 +654,6 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
         struct hlsl_ir_node *val, struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
         const struct vkd3d_shader_location loc);
-struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
-        enum hlsl_base_type base_type, unsigned dimx, unsigned dimy);
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location loc);
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,

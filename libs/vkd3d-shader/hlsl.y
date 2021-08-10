@@ -1018,7 +1018,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
         return ctx->builtin_types.scalar[base];
     if (type == HLSL_CLASS_VECTOR)
         return ctx->builtin_types.vector[base][dimx - 1];
-    return hlsl_new_type(ctx, NULL, type, base, dimx, dimy);
+    return ctx->builtin_types.matrix[base][dimx - 1][dimy - 1];
 }
 
 static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs, enum hlsl_ir_expr_op op,
@@ -2422,7 +2422,7 @@ type:
                 YYABORT;
             }
 
-            $$ = hlsl_new_type(ctx, NULL, HLSL_CLASS_MATRIX, $3->base_type, $7, $5);
+            $$ = ctx->builtin_types.matrix[$3->base_type][$7 - 1][$5 - 1];
         }
     | KW_VOID
         {
