@@ -99,6 +99,7 @@ vkd3d_shader_tests = \
 	tests/swizzle-5.shader_test \
 	tests/swizzle-6.shader_test \
 	tests/swizzle-7.shader_test \
+	tests/texture-load.shader_test \
 	tests/trigonometry.shader_test \
 	tests/writemask-assignop-0.shader_test \
 	tests/writemask-assignop-1.shader_test \
@@ -299,6 +300,7 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
 	tests/max.shader_test \
+	tests/texture-load.shader_test \
 	tests/trigonometry.shader_test \
 	tests/writemask-assignop-1.shader_test
 endif

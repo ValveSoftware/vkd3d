@@ -697,6 +697,95 @@ static inline ID3D12Resource *create_default_texture3d_(unsigned int line, ID3D1
             width, height, depth, miplevel_count, format, flags, initial_state);
 }
 
+static void copy_sub_resource_data(const D3D12_MEMCPY_DEST *dst, const D3D12_SUBRESOURCE_DATA *src,
+        unsigned int row_count, unsigned int slice_count, size_t row_size)
+{
+    const BYTE *src_slice_ptr;
+    BYTE *dst_slice_ptr;
+    unsigned int z, y;
+
+    for (z = 0; z < slice_count; ++z)
+    {
+        dst_slice_ptr = (BYTE *)dst->pData + z * dst->SlicePitch;
+        src_slice_ptr = (const BYTE*)src->pData + z * src->SlicePitch;
+        for (y = 0; y < row_count; ++y)
+            memcpy(dst_slice_ptr + y * dst->RowPitch, src_slice_ptr + y * src->RowPitch, row_size);
+    }
+}
+
+#define upload_texture_data(a, b, c, d, e) upload_texture_data_(__LINE__, a, b, c, d, e)
+static inline void upload_texture_data_(unsigned int line, ID3D12Resource *texture,
+        const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
+        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+{
+    D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
+    D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts;
+    uint64_t *row_sizes, required_size;
+    D3D12_RESOURCE_DESC resource_desc;
+    ID3D12Resource *upload_buffer;
+    D3D12_MEMCPY_DEST dst_data;
+    ID3D12Device *device;
+    UINT *row_counts;
+    unsigned int i;
+    HRESULT hr;
+    void *ptr;
+
+    layouts = calloc(sub_resource_count, sizeof(*layouts));
+    ok(layouts, "Failed to allocate memory.\n");
+    row_counts = calloc(sub_resource_count, sizeof(*row_counts));
+    ok(row_counts, "Failed to allocate memory.\n");
+    row_sizes = calloc(sub_resource_count, sizeof(*row_sizes));
+    ok(row_sizes, "Failed to allocate memory.\n");
+
+    resource_desc = ID3D12Resource_GetDesc(texture);
+    hr = ID3D12Resource_GetDevice(texture, &IID_ID3D12Device, (void **)&device);
+    ok_(line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
+
+    ID3D12Device_GetCopyableFootprints(device, &resource_desc, 0, sub_resource_count,
+            0, layouts, row_counts, row_sizes, &required_size);
+
+    upload_buffer = create_upload_buffer_(line, device, required_size, NULL);
+
+    hr = ID3D12Resource_Map(upload_buffer, 0, NULL, (void **)&ptr);
+    ok_(line)(SUCCEEDED(hr), "Failed to map upload buffer, hr %#x.\n", hr);
+    for (i = 0; i < sub_resource_count; ++i)
+    {
+        dst_data.pData = (BYTE *)ptr + layouts[i].Offset;
+        dst_data.RowPitch = layouts[i].Footprint.RowPitch;
+        dst_data.SlicePitch = layouts[i].Footprint.RowPitch * row_counts[i];
+        copy_sub_resource_data(&dst_data, &data[i],
+                row_counts[i], layouts[i].Footprint.Depth, row_sizes[i]);
+    }
+    ID3D12Resource_Unmap(upload_buffer, 0, NULL);
+
+    for (i = 0; i < sub_resource_count; ++i)
+    {
+        dst_location.pResource = texture;
+        dst_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        dst_location.SubresourceIndex = i;
+
+        src_location.pResource = upload_buffer;
+        src_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        src_location.PlacedFootprint = layouts[i];
+
+        ID3D12GraphicsCommandList_CopyTextureRegion(command_list,
+                &dst_location, 0, 0, 0, &src_location, NULL);
+    }
+
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
+
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+
+    ID3D12Resource_Release(upload_buffer);
+    ID3D12Device_Release(device);
+
+    free(layouts);
+    free(row_counts);
+    free(row_sizes);
+}
+
 static HRESULT create_root_signature(ID3D12Device *device, const D3D12_ROOT_SIGNATURE_DESC *desc,
         ID3D12RootSignature **root_signature)
 {
