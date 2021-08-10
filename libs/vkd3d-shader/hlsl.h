@@ -166,6 +166,7 @@ enum hlsl_ir_node_type
     HLSL_IR_LOAD,
     HLSL_IR_LOOP,
     HLSL_IR_JUMP,
+    HLSL_IR_RESOURCE_LOAD,
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
 };
@@ -239,6 +240,7 @@ struct hlsl_ir_var
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
+    uint32_t has_resource_access : 1;
 };
 
 struct hlsl_ir_function
@@ -364,6 +366,19 @@ struct hlsl_ir_load
 {
     struct hlsl_ir_node node;
     struct hlsl_deref src;
+};
+
+enum hlsl_resource_load_type
+{
+    HLSL_RESOURCE_LOAD,
+};
+
+struct hlsl_ir_resource_load
+{
+    struct hlsl_ir_node node;
+    enum hlsl_resource_load_type load_type;
+    struct hlsl_deref resource;
+    struct hlsl_src coords;
 };
 
 struct hlsl_ir_store
@@ -520,6 +535,12 @@ static inline struct hlsl_ir_loop *hlsl_ir_loop(const struct hlsl_ir_node *node)
     return CONTAINING_RECORD(node, struct hlsl_ir_loop, node);
 }
 
+static inline struct hlsl_ir_resource_load *hlsl_ir_resource_load(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_RESOURCE_LOAD);
+    return CONTAINING_RECORD(node, struct hlsl_ir_resource_load, node);
+}
+
 static inline struct hlsl_ir_store *hlsl_ir_store(const struct hlsl_ir_node *node)
 {
     assert(node->type == HLSL_IR_STORE);
@@ -647,6 +668,9 @@ struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type 
 struct hlsl_ir_load *hlsl_new_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_type *type, struct vkd3d_shader_location loc);
 struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_location loc);
+struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *offset,
+        struct hlsl_ir_node *coords, struct vkd3d_shader_location loc);
 struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs);
 struct hlsl_ir_store *hlsl_new_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc);

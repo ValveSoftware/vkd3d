@@ -778,6 +778,11 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
                 hlsl_fixme(ctx, instr->loc, "SM1 matrix expression.");
                 continue;
             }
+            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
+            {
+                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
+                break;
+            }
 
             assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
         }

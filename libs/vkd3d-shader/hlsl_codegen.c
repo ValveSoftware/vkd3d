@@ -503,6 +503,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_CONSTANT:
         case HLSL_IR_EXPR:
         case HLSL_IR_LOAD:
+        case HLSL_IR_RESOURCE_LOAD:
         case HLSL_IR_SWIZZLE:
             if (list_empty(&instr->uses))
             {
@@ -640,6 +641,16 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
                     loop_last ? loop_last : loop->next_index);
             break;
         }
+        case HLSL_IR_RESOURCE_LOAD:
+        {
+            struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
+
+            load->resource.var->has_resource_access = 1;
+            if (load->resource.offset.node)
+                load->resource.offset.node->last_read = instr->index;
+            load->coords.node->last_read = instr->index;
+            break;
+        }
         case HLSL_IR_SWIZZLE:
         {
             struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
@@ -665,7 +676,10 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
             var->first_write = var->last_read = 0;
+            var->has_resource_access = 0;
+        }
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)

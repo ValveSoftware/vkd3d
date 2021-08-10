@@ -1285,6 +1285,11 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
                 FIXME("Matrix operations need to be lowered.\n");
                 break;
             }
+            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
+            {
+                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
+                break;
+            }
 
             assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
         }
