@@ -1448,6 +1448,10 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_LOAD:
             write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource, coords);
             break;
+
+        case HLSL_RESOURCE_SAMPLE:
+            hlsl_fixme(ctx, load->node.loc, "Resource sample instruction.");
+            break;
     }
 }
 

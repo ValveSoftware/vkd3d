@@ -623,8 +623,9 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 }
 
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
-        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *offset,
-        struct hlsl_ir_node *coords, struct vkd3d_shader_location loc)
+        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
+        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
+        struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_resource_load *load;
 
@@ -633,7 +634,9 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
     init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, loc);
     load->load_type = type;
     load->resource.var = resource;
-    hlsl_src_from_node(&load->resource.offset, offset);
+    hlsl_src_from_node(&load->resource.offset, resource_offset);
+    load->sampler.var = sampler;
+    hlsl_src_from_node(&load->sampler.offset, sampler_offset);
     hlsl_src_from_node(&load->coords, coords);
     return load;
 }
@@ -1050,12 +1053,19 @@ static void dump_ir_var(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer
 
 static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
 {
-    vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
-    if (deref->offset.node)
+    if (deref->var)
     {
-        vkd3d_string_buffer_printf(buffer, "[");
-        dump_src(buffer, &deref->offset);
-        vkd3d_string_buffer_printf(buffer, "]");
+        vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
+        if (deref->offset.node)
+        {
+            vkd3d_string_buffer_printf(buffer, "[");
+            dump_src(buffer, &deref->offset);
+            vkd3d_string_buffer_printf(buffer, "]");
+        }
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(buffer, "(nil)");
     }
 }
 
@@ -1230,10 +1240,13 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     static const char *const type_names[] =
     {
         [HLSL_RESOURCE_LOAD] = "load_resource",
+        [HLSL_RESOURCE_SAMPLE] = "sample",
     };
 
     vkd3d_string_buffer_printf(buffer, "%s(resource = ", type_names[load->load_type]);
     dump_deref(buffer, &load->resource);
+    vkd3d_string_buffer_printf(buffer, ", sampler = ");
+    dump_deref(buffer, &load->sampler);
     vkd3d_string_buffer_printf(buffer, ", coords = ");
     dump_src(buffer, &load->coords);
     vkd3d_string_buffer_printf(buffer, ")");
@@ -1410,6 +1423,7 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
 static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 {
     hlsl_src_remove(&load->coords);
+    hlsl_src_remove(&load->sampler.offset);
     hlsl_src_remove(&load->resource.offset);
     vkd3d_free(load);
 }
