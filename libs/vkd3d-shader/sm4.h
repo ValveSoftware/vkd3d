@@ -331,6 +331,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_DCL_GS_INSTANCES                 = 0xce,
     VKD3D_SM5_OP_DDIV                             = 0xd2,
     VKD3D_SM5_OP_DFMA                             = 0xd3,
+    VKD3D_SM5_OP_DRCP                             = 0xd4,
 };
 
 enum vkd3d_sm4_instruction_modifier

@@ -119,6 +119,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_DP2ADD                           */ "dp2add",
     /* VKD3DSIH_DP3                              */ "dp3",
     /* VKD3DSIH_DP4                              */ "dp4",
+    /* VKD3DSIH_DRCP                             */ "drcp",
     /* VKD3DSIH_DST                              */ "dst",
     /* VKD3DSIH_DSX                              */ "dsx",
     /* VKD3DSIH_DSX_COARSE                       */ "deriv_rtx_coarse",

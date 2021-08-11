@@ -10010,7 +10010,7 @@ static void test_shader_instructions(void)
         {&ps_dmul, {.d = {{ 1.5,    3.0}}},  {.d = { 4.5, -4.5}}, true},
         {&ps_ddiv, {.d = {{ 2.0,    4.0}}},  {.d = { 0.5,  2.0}}, true},
         {&ps_ddiv, {.d = {{ 2.0,   -4.0}}},  {.d = {-0.5, -2.0}}, true},
-        {&ps_drcp, {.d = {{ 2.0,   -0.5}}},  {.d = { 0.5, -2.0}}, true, true},
+        {&ps_drcp, {.d = {{ 2.0,   -0.5}}},  {.d = { 0.5, -2.0}}, true},
 
         {
             &ps_swapc0,

@@ -812,6 +812,7 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
             shader_sm4_read_declaration_count},
     {VKD3D_SM5_OP_DDIV,                             VKD3DSIH_DDIV,                             "d",    "dd"},
     {VKD3D_SM5_OP_DFMA,                             VKD3DSIH_DFMA,                             "d",    "ddd"},
+    {VKD3D_SM5_OP_DRCP,                             VKD3DSIH_DRCP,                             "d",    "d"},
 };
 
 static const enum vkd3d_shader_register_type register_type_table[] =
