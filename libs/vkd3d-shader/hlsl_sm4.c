@@ -763,6 +763,7 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
 
         case VKD3D_SM4_RT_CONSTBUFFER:
         case VKD3D_SM4_RT_INPUT:
+        case VKD3D_SM4_RT_RESOURCE:
         case VKD3D_SM4_RT_TEMP:
             return VKD3D_SM4_SWIZZLE_VEC4;
 
@@ -779,12 +780,24 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
     if (var->is_uniform)
     {
-        reg->type = VKD3D_SM4_RT_CONSTBUFFER;
-        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
-        reg->idx[0] = var->buffer->reg.id;
-        reg->idx[1] = var->buffer_offset / 4;
-        reg->idx_count = 2;
-        *writemask = ((1u << data_type->dimx) - 1) << (var->buffer_offset & 3);
+        if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_TEXTURE)
+        {
+            reg->type = VKD3D_SM4_RT_RESOURCE;
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->idx[0] = var->reg.id;
+            reg->idx_count = 1;
+            *writemask = VKD3DSP_WRITEMASK_ALL;
+        }
+        else
+        {
+            assert(data_type->type <= HLSL_CLASS_VECTOR);
+            reg->type = VKD3D_SM4_RT_CONSTBUFFER;
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->idx[0] = var->buffer->reg.id;
+            reg->idx[1] = var->buffer_offset / 4;
+            reg->idx_count = 2;
+            *writemask = ((1u << data_type->dimx) - 1) << (var->buffer_offset & 3);
+        }
     }
     else if (var->is_input_semantic)
     {
@@ -1153,6 +1166,50 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
+        const struct hlsl_deref *resource, const struct hlsl_ir_node *coords)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_LD;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, coords);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+
+    /* Mipmap level is in the last component in the IR, but needs to be in the W
+     * component in the instruction. */
+    switch (resource_type->sampler_dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, X, X, Y), 4);
+            break;
+
+        case HLSL_SAMPLER_DIM_2D:
+            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, Y, X, Z), 4);
+            break;
+
+        case HLSL_SAMPLER_DIM_3D:
+        case HLSL_SAMPLER_DIM_CUBE:
+            break;
+
+        case HLSL_SAMPLER_DIM_GENERIC:
+            assert(0);
+    }
+
+    sm4_register_from_deref(ctx, &instr.srcs[1].reg, &writemask, resource, resource_type);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_expr(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
@@ -1374,6 +1431,26 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_resource_load(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
+{
+    const struct hlsl_type *resource_type = load->resource.var->data_type;
+    const struct hlsl_ir_node *coords = load->coords.node;
+
+    if (!load->resource.var->is_uniform)
+    {
+        hlsl_fixme(ctx, load->node.loc, "Load from non-uniform resource variable.");
+        return;
+    }
+
+    switch (load->load_type)
+    {
+        case HLSL_RESOURCE_LOAD:
+            write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource, coords);
+            break;
+    }
+}
+
 static void write_sm4_store(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_store *store)
 {
@@ -1501,6 +1578,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
             case HLSL_IR_LOAD:
                 write_sm4_load(ctx, &buffer, hlsl_ir_load(instr));
+                break;
+
+            case HLSL_IR_RESOURCE_LOAD:
+                write_sm4_resource_load(ctx, &buffer, hlsl_ir_resource_load(instr));
                 break;
 
             case HLSL_IR_STORE:
