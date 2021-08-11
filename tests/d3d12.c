@@ -10007,7 +10007,7 @@ static void test_shader_instructions(void)
         {&ps_utod, {.u = {{3, 0xffffffff}}}, {.d = {3.0,  4294967295.0}}, true, true},
         {&ps_itod, {.u = {{3,    INT_MIN}}}, {.d = {3.0, -2147483648.0}}, true, true},
         {&ps_ftod, {.f = {{-2.5f,  -2.5f}}}, {.d = {-2.5,  2.5}}, true, true},
-        {&ps_dmul, {.d = {{ 1.5,    3.0}}},  {.d = { 4.5, -4.5}}, true, true},
+        {&ps_dmul, {.d = {{ 1.5,    3.0}}},  {.d = { 4.5, -4.5}}, true},
         {&ps_ddiv, {.d = {{ 2.0,    4.0}}},  {.d = { 0.5,  2.0}}, true, true},
         {&ps_ddiv, {.d = {{ 2.0,   -4.0}}},  {.d = {-0.5, -2.0}}, true, true},
         {&ps_drcp, {.d = {{ 2.0,   -0.5}}},  {.d = { 0.5, -2.0}}, true, true},

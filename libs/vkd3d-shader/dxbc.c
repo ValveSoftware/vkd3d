@@ -800,6 +800,7 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM5_OP_DADD,                             VKD3DSIH_DADD,                             "d",    "dd"},
     {VKD3D_SM5_OP_DMAX,                             VKD3DSIH_DMAX,                             "d",    "dd"},
     {VKD3D_SM5_OP_DMIN,                             VKD3DSIH_DMIN,                             "d",    "dd"},
+    {VKD3D_SM5_OP_DMUL,                             VKD3DSIH_DMUL,                             "d",    "dd"},
     {VKD3D_SM5_OP_DEQ,                              VKD3DSIH_DEQ,                              "u",    "dd"},
     {VKD3D_SM5_OP_DGE,                              VKD3DSIH_DGE,                              "u",    "dd"},
     {VKD3D_SM5_OP_DLT,                              VKD3DSIH_DLT,                              "u",    "dd"},
