@@ -328,6 +328,7 @@ enum hlsl_ir_expr_op
     HLSL_OP2_MUL,
     HLSL_OP2_NEQUAL,
     HLSL_OP2_RSHIFT,
+    HLSL_OP2_SAMPLE,
 
     HLSL_OP3_LERP,
 };
