@@ -189,6 +189,11 @@ struct hlsl_ir_node
     struct hlsl_reg reg;
 };
 
+struct hlsl_block
+{
+    struct list instrs;
+};
+
 struct hlsl_src
 {
     struct hlsl_ir_node *node;
@@ -259,7 +264,7 @@ struct hlsl_ir_function_decl
     struct rb_entry entry;
     struct hlsl_ir_function *func;
     struct list *parameters;
-    struct list body;
+    struct hlsl_block body;
     bool has_body;
 };
 
@@ -267,15 +272,15 @@ struct hlsl_ir_if
 {
     struct hlsl_ir_node node;
     struct hlsl_src condition;
-    struct list then_instrs;
-    struct list else_instrs;
+    struct hlsl_block then_instrs;
+    struct hlsl_block else_instrs;
 };
 
 struct hlsl_ir_loop
 {
     struct hlsl_ir_node node;
     /* loop condition is stored in the body (as "if (!condition) break;") */
-    struct list body;
+    struct hlsl_block body;
     unsigned int next_index; /* liveness index of the end of the loop */
 };
 
