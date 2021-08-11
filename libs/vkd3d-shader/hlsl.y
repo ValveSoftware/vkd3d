@@ -2363,6 +2363,12 @@ static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
     return intrinsic_tex(ctx, params, loc, "tex2D", HLSL_SAMPLER_DIM_2D);
 }
 
+static bool intrinsic_tex3D(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex3D", HLSL_SAMPLER_DIM_3D);
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -2388,6 +2394,7 @@ intrinsic_functions[] =
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
     {"tex2D",                              -1, false, intrinsic_tex2D},
+    {"tex3D",                              -1, false, intrinsic_tex3D},
 };
 
 static int intrinsic_function_name_compare(const void *a, const void *b)
