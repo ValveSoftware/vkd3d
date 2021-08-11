@@ -202,6 +202,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_DMAX,
     VKD3DSIH_DMIN,
     VKD3DSIH_DMOV,
+    VKD3DSIH_DMOVC,
     VKD3DSIH_DMUL,
     VKD3DSIH_DNE,
     VKD3DSIH_DP2,
