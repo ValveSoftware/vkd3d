@@ -100,6 +100,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_DCL_UAV_STRUCTURED               */ "dcl_uav_structured",
     /* VKD3DSIH_DCL_UAV_TYPED                    */ "dcl_uav_typed",
     /* VKD3DSIH_DCL_VERTICES_OUT                 */ "dcl_maxOutputVertexCount",
+    /* VKD3DSIH_DDIV                             */ "ddiv",
     /* VKD3DSIH_DEF                              */ "def",
     /* VKD3DSIH_DEFAULT                          */ "default",
     /* VKD3DSIH_DEFB                             */ "defb",
