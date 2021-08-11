@@ -9365,6 +9365,31 @@ static void test_shader_instructions(void)
         0x00000021, 0x00000000,
     };
     static const struct named_shader ps_dtoi = {"dtoi", ps_dtoi_code, sizeof(ps_dtoi_code)};
+    static const DWORD ps_dtof_code[] =
+    {
+#if 0
+        double src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            float2 f = float2(src0, -src0);
+            dst.x = asuint(f.x);
+            dst.y = asuint(f.y);
+            dst.zw = 0;
+        }
+#endif
+        0x43425844, 0xa920927f, 0xac06725f, 0x310edf68, 0xec6ab7cd, 0x00000001, 0x00000128, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000118, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x0000009c, 0x00000050,
+        0x00000027, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x060000c9, 0x00100012, 0x00000000, 0x00208446, 0x00000000,
+        0x00000000, 0x070000c9, 0x00100022, 0x00000000, 0x80208446, 0x00000041, 0x00000000, 0x00000000,
+        0x05000036, 0x00102032, 0x00000000, 0x00100046, 0x00000000, 0x08000036, 0x001020c2, 0x00000000,
+        0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x0100003e, 0x30494653, 0x00000008,
+        0x00000001, 0x00000000,
+    };
+    static const struct named_shader ps_dtof = {"dtof", ps_dtof_code, sizeof(ps_dtof_code)};
     static const DWORD ps_utod_code[] =
     {
 #if 0
@@ -10004,6 +10029,7 @@ static void test_shader_instructions(void)
         {&ps_dtou, {.d = {{     -1.0}}}, {{ 0,  1 }}, true, true},
         {&ps_dtou, {.d = {{      1.0}}}, {{ 1,  0 }}, true, true},
         {&ps_dtoi, {.d = {{      1.0}}}, {.i = {1, -1}}, true, true},
+        {&ps_dtof, {.d = {{      1.5}}}, {.f = {1.5f, -1.5f}}, true, true},
         {&ps_utod, {.u = {{3, 0xffffffff}}}, {.d = {3.0,  4294967295.0}}, true, true},
         {&ps_itod, {.u = {{3,    INT_MIN}}}, {.d = {3.0, -2147483648.0}}, true, true},
         {&ps_ftod, {.f = {{-2.5f,  -2.5f}}}, {.d = {-2.5,  2.5}}, true, true},
