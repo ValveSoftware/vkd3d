@@ -34,6 +34,13 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     /* Use the synthetic name for the temp, rather than the uniform, so that we
      * can write the uniform name into the shader reflection data. */
 
+    if (!temp->first_write)
+    {
+        temp->is_uniform = 1;
+        list_add_tail(&ctx->extern_vars, &temp->extern_entry);
+        return;
+    }
+
     if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type, temp->loc, NULL, 0, &temp->reg_reservation)))
         return;
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
@@ -66,6 +73,14 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *input;
+
+    /* We still need to split up non-vector types. */
+    if (!var->first_write && var->data_type->type <= HLSL_CLASS_VECTOR)
+    {
+        var->is_input_semantic = 1;
+        list_add_tail(&ctx->extern_vars, &var->extern_entry);
+        return;
+    }
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return;
@@ -137,6 +152,14 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_store *store;
     struct hlsl_ir_var *output;
     struct hlsl_ir_load *load;
+
+    /* We still need to split up non-vector types. */
+    if (!var->last_read && var->data_type->type <= HLSL_CLASS_VECTOR)
+    {
+        var->is_output_semantic = 1;
+        list_add_tail(&ctx->extern_vars, &var->extern_entry);
+        return;
+    }
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return;
@@ -1299,6 +1322,12 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     bool progress;
 
     list_move_head(&body->instrs, &ctx->static_initializers);
+
+    /* Do an initial liveness pass for externs so that we don't create
+     * unnecessary temps. Note that we might modify the instruction stream
+     * during the pass, but we're only checking whether a variable was read to
+     * or written from at all, so it's okay. */
+    compute_liveness(ctx, entry_func);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
