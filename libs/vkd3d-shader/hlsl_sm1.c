@@ -768,7 +768,7 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 {
     const struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, entry_func->body, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &entry_func->body, struct hlsl_ir_node, entry)
     {
         if (instr->data_type)
         {

@@ -567,7 +567,7 @@ static void dump_function_decl(struct rb_entry *entry, void *context)
     struct hlsl_ir_function_decl *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     struct hlsl_ctx *ctx = context;
 
-    if (func->body)
+    if (func->has_body)
         hlsl_dump_function(ctx, func);
 }
 
@@ -671,7 +671,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     struct hlsl_ir_var *var;
 
     /* Index 0 means unused; index 1 means function entry, so start at 2. */
-    index_instructions(entry_func->body, 2);
+    index_instructions(&entry_func->body, 2);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
@@ -693,7 +693,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     if (entry_func->return_var)
         entry_func->return_var->last_read = UINT_MAX;
 
-    compute_liveness_recurse(entry_func->body, 0, 0);
+    compute_liveness_recurse(&entry_func->body, 0, 0);
 }
 
 struct liveness
@@ -998,7 +998,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     struct liveness liveness = {0};
     struct hlsl_ir_var *var;
 
-    allocate_const_registers_recurse(ctx, entry_func->body, &liveness);
+    allocate_const_registers_recurse(ctx, &entry_func->body, &liveness);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -1023,7 +1023,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct liveness liveness = {0};
-    allocate_temp_registers_recurse(ctx, entry_func->body, &liveness);
+    allocate_temp_registers_recurse(ctx, &entry_func->body, &liveness);
     ctx->temp_count = liveness.reg_count;
 }
 
@@ -1297,22 +1297,23 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
 
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
+    struct list *const body = &entry_func->body;
     struct hlsl_ir_var *var;
     bool progress;
 
-    list_move_head(entry_func->body, &ctx->static_initializers);
+    list_move_head(body, &ctx->static_initializers);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
         if (var->modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, entry_func->body, var);
+            prepend_uniform_copy(ctx, body, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
         if (var->data_type->type == HLSL_CLASS_OBJECT || (var->modifiers & HLSL_STORAGE_UNIFORM))
         {
-            prepend_uniform_copy(ctx, entry_func->body, var);
+            prepend_uniform_copy(ctx, body, var);
         }
         else
         {
@@ -1321,9 +1322,9 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
                         "Parameter \"%s\" is missing a semantic.", var->name);
 
             if (var->modifiers & HLSL_STORAGE_IN)
-                prepend_input_var_copy(ctx, entry_func->body, var);
+                prepend_input_var_copy(ctx, body, var);
             if (var->modifiers & HLSL_STORAGE_OUT)
-                append_output_var_copy(ctx, entry_func->body, var);
+                append_output_var_copy(ctx, body, var);
         }
     }
     if (entry_func->return_var)
@@ -1332,24 +1333,24 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
             hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
-        append_output_var_copy(ctx, entry_func->body, entry_func->return_var);
+        append_output_var_copy(ctx, body, entry_func->return_var);
     }
 
-    while (transform_ir(ctx, fold_redundant_casts, entry_func->body, NULL));
+    while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
     {
-        progress = transform_ir(ctx, split_array_copies, entry_func->body, NULL);
-        progress |= transform_ir(ctx, split_struct_copies, entry_func->body, NULL);
+        progress = transform_ir(ctx, split_array_copies, body, NULL);
+        progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
-    while (transform_ir(ctx, fold_constants, entry_func->body, NULL));
+    while (transform_ir(ctx, fold_constants, body, NULL));
 
     if (ctx->profile->major_version < 4)
-        transform_ir(ctx, lower_division, entry_func->body, NULL);
+        transform_ir(ctx, lower_division, body, NULL);
 
     do
         compute_liveness(ctx, entry_func);
-    while (transform_ir(ctx, dce, entry_func->body, NULL));
+    while (transform_ir(ctx, dce, body, NULL));
 
     compute_liveness(ctx, entry_func);
 
