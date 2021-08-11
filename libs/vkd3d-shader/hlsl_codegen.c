@@ -1304,35 +1304,26 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
-        if (var->data_type->type == HLSL_CLASS_OBJECT)
-            list_add_tail(&ctx->extern_vars, &var->extern_entry);
-        else if (var->modifiers & HLSL_STORAGE_UNIFORM)
+        if (var->modifiers & HLSL_STORAGE_UNIFORM)
             prepend_uniform_copy(ctx, entry_func->body, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
-        if (var->data_type->type == HLSL_CLASS_OBJECT)
+        if (var->data_type->type == HLSL_CLASS_OBJECT || (var->modifiers & HLSL_STORAGE_UNIFORM))
         {
-            list_add_tail(&ctx->extern_vars, &var->extern_entry);
+            prepend_uniform_copy(ctx, entry_func->body, var);
         }
         else
         {
-            if (var->modifiers & HLSL_STORAGE_UNIFORM)
-            {
-                prepend_uniform_copy(ctx, entry_func->body, var);
-            }
-            else
-            {
-                if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic.name)
-                    hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
-                            "Parameter \"%s\" is missing a semantic.", var->name);
+            if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic.name)
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                        "Parameter \"%s\" is missing a semantic.", var->name);
 
-                if (var->modifiers & HLSL_STORAGE_IN)
-                    prepend_input_var_copy(ctx, entry_func->body, var);
-                if (var->modifiers & HLSL_STORAGE_OUT)
-                    append_output_var_copy(ctx, entry_func->body, var);
-            }
+            if (var->modifiers & HLSL_STORAGE_IN)
+                prepend_input_var_copy(ctx, entry_func->body, var);
+            if (var->modifiers & HLSL_STORAGE_OUT)
+                append_output_var_copy(ctx, entry_func->body, var);
         }
     }
     if (entry_func->return_var)
