@@ -3127,6 +3127,12 @@ static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
     return intrinsic_tex(ctx, params, loc, "tex2D", HLSL_SAMPLER_DIM_2D);
 }
 
+static bool intrinsic_tex3D(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex3D", HLSL_SAMPLER_DIM_3D);
+}
+
 static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3224,6 +3230,7 @@ intrinsic_functions[] =
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
     {"tex2D",                              -1, false, intrinsic_tex2D},
+    {"tex3D",                              -1, false, intrinsic_tex3D},
     {"transpose",                           1, true,  intrinsic_transpose},
 };
 
