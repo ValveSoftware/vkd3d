@@ -3067,6 +3067,66 @@ static bool intrinsic_step(struct hlsl_ctx *ctx,
     return !!add_implicit_conversion(ctx, params->instrs, ge, type, loc);
 }
 
+static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc, const char *name, enum hlsl_sampler_dim dim)
+{
+    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
+    const struct hlsl_type *sampler_type;
+    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_load *sampler_load;
+    struct hlsl_ir_node *coords;
+
+    if (params->args_count != 2 && params->args_count != 4)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to function '%s': expected 2 or 4, but got %u.", name, params->args_count);
+        return false;
+    }
+
+    if (params->args_count == 4)
+    {
+        hlsl_fixme(ctx, loc, "Samples with gradients are not implemented.\n");
+    }
+
+    sampler_type = params->args[0]->data_type;
+    if (sampler_type->type != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+            || (sampler_type->sampler_dim != dim && sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC))
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, sampler_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 1 of '%s': expected 'sampler' or '%s', but got '%s'.",
+                    name, ctx->builtin_types.sampler[dim]->name, string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+    else
+    {
+        /* Only HLSL_IR_LOAD can return an object. */
+        sampler_load = hlsl_ir_load(params->args[0]);
+
+        load_params.resource = sampler_load->src;
+    }
+
+    if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, hlsl_sampler_dim_count(dim)), loc)))
+        coords = params->args[1];
+
+    load_params.coords = coords;
+    load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    list_add_tail(params->instrs, &load->node.entry);
+    return true;
+}
+
+static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex2D", HLSL_SAMPLER_DIM_2D);
+}
+
 static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3163,6 +3223,7 @@ intrinsic_functions[] =
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
+    {"tex2D",                              -1, false, intrinsic_tex2D},
     {"transpose",                           1, true,  intrinsic_transpose},
 };
 
