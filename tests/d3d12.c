@@ -9432,6 +9432,29 @@ static void test_shader_instructions(void)
         0x00000001, 0x00000000,
     };
     static struct named_shader ps_ftod = {"ftod", ps_ftod_code, sizeof(ps_ftod_code)};
+    static const DWORD ps_dmul_code[] =
+    {
+#if 0
+        double2 src0;
+
+        void main(out uint4 dst : SV_Target)
+        {
+            asuint(src0.x * src0.y, dst.x, dst.y);
+            asuint(src0.x * -src0.y, dst.z, dst.w);
+        }
+#endif
+        0x43425844, 0xe8fbac4e, 0x46b3cd8c, 0x6a38f67a, 0xfe02dbd5, 0x00000001, 0x00000134, 0x00000004,
+        0x00000030, 0x00000040, 0x00000074, 0x00000124, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000a8, 0x00000050,
+        0x0000002a, 0x0100186a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x02000068, 0x00000001, 0x090000c2, 0x00100032, 0x00000000, 0x00208ee6, 0x00000000,
+        0x00000000, 0x00208446, 0x00000000, 0x00000000, 0x05000036, 0x00102032, 0x00000000, 0x00100046,
+        0x00000000, 0x0a0000c2, 0x00100032, 0x00000000, 0x80208ee6, 0x00000041, 0x00000000, 0x00000000,
+        0x00208446, 0x00000000, 0x00000000, 0x05000036, 0x001020c2, 0x00000000, 0x00100406, 0x00000000,
+        0x0100003e, 0x30494653, 0x00000008, 0x00000001, 0x00000000,
+    };
+    static const struct named_shader ps_dmul = {"dmul", ps_dmul_code, sizeof(ps_dmul_code)};
     static const DWORD ps_ddiv_code[] =
     {
 #if 0
@@ -9984,6 +10007,7 @@ static void test_shader_instructions(void)
         {&ps_utod, {.u = {{3, 0xffffffff}}}, {.d = {3.0,  4294967295.0}}, true, true},
         {&ps_itod, {.u = {{3,    INT_MIN}}}, {.d = {3.0, -2147483648.0}}, true, true},
         {&ps_ftod, {.f = {{-2.5f,  -2.5f}}}, {.d = {-2.5,  2.5}}, true, true},
+        {&ps_dmul, {.d = {{ 1.5,    3.0}}},  {.d = { 4.5, -4.5}}, true, true},
         {&ps_ddiv, {.d = {{ 2.0,    4.0}}},  {.d = { 0.5,  2.0}}, true, true},
         {&ps_ddiv, {.d = {{ 2.0,   -4.0}}},  {.d = {-0.5, -2.0}}, true, true},
         {&ps_drcp, {.d = {{ 2.0,   -0.5}}},  {.d = { 0.5, -2.0}}, true, true},
