@@ -519,7 +519,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     return jump;
 }
 
-static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
+static bool add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
         struct hlsl_ir_node *offset, struct hlsl_type *data_type, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *add = NULL;
@@ -546,33 +546,33 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
 
         sprintf(name, "<deref-%p>", var_node);
         if (!(var = hlsl_new_synthetic_var(ctx, name, var_node->data_type, var_node->loc)))
-            return NULL;
+            return false;
 
         if (!(store = hlsl_new_simple_store(ctx, var, var_node)))
-            return NULL;
+            return false;
 
         list_add_tail(instrs, &store->node.entry);
     }
 
     if (!(load = hlsl_new_load(ctx, var, offset, data_type, loc)))
-        return NULL;
+        return false;
     list_add_tail(instrs, &load->node.entry);
-    return load;
+    return true;
 }
 
-static struct hlsl_ir_load *add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
+static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
         const struct hlsl_struct_field *field, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_constant *c;
 
     if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
-        return NULL;
+        return false;
     list_add_tail(instrs, &c->node.entry);
 
     return add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
-static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
+static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
 {
     const struct hlsl_type *expr_type = array->data_type;
@@ -588,7 +588,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     {
         /* This needs to be lowered now, while we still have type information. */
         FIXME("Index of matrix or vector type.\n");
-        return NULL;
+        return false;
     }
     else
     {
@@ -596,14 +596,14 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Scalar expressions cannot be array-indexed.");
         else
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Expression cannot be array-indexed.");
-        return NULL;
+        return false;
     }
 
     if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
-        return NULL;
+        return false;
     list_add_tail(instrs, &c->node.entry);
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
-        return NULL;
+        return false;
     list_add_tail(instrs, &mul->entry);
     index = mul;
 
