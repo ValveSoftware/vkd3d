@@ -147,6 +147,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_FIRSTBIT_LO                      */ "firstbit_lo",
     /* VKD3DSIH_FIRSTBIT_SHI                     */ "firstbit_shi",
     /* VKD3DSIH_FRC                              */ "frc",
+    /* VKD3DSIH_FTOD                             */ "ftod",
     /* VKD3DSIH_FTOI                             */ "ftoi",
     /* VKD3DSIH_FTOU                             */ "ftou",
     /* VKD3DSIH_GATHER4                          */ "gather4",
