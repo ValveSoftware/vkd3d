@@ -561,33 +561,36 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
     return c;
 }
 
-struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
-        struct hlsl_ir_node *arg, struct vkd3d_shader_location loc)
+struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_type *data_type,
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_expr *expr;
+    unsigned int i;
 
     if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, arg->data_type, loc);
+    init_node(&expr->node, HLSL_IR_EXPR, data_type, loc);
     expr->op = op;
-    hlsl_src_from_node(&expr->operands[0], arg);
+    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
+        hlsl_src_from_node(&expr->operands[i], operands[i]);
     return &expr->node;
+}
+
+struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *arg, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg};
+
+    return hlsl_new_expr(ctx, op, arg->data_type, operands, loc);
 }
 
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2)
 {
-    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg1, arg2};
 
     assert(hlsl_types_are_equal(arg1->data_type, arg2->data_type));
-
-    if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
-        return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, arg1->data_type, arg1->loc);
-    expr->op = op;
-    hlsl_src_from_node(&expr->operands[0], arg1);
-    hlsl_src_from_node(&expr->operands[1], arg2);
-    return &expr->node;
+    return hlsl_new_expr(ctx, op, arg1->data_type, operands, arg1->loc);
 }
 
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc)
@@ -1147,6 +1150,7 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
         [HLSL_OP1_NEG]          = "-",
         [HLSL_OP1_NRM]          = "nrm",
         [HLSL_OP1_RCP]          = "rcp",
+        [HLSL_OP1_REINTERPRET]  = "reinterpret",
         [HLSL_OP1_RSQ]          = "rsq",
         [HLSL_OP1_SAT]          = "sat",
         [HLSL_OP1_SIGN]         = "sign",
