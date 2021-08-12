@@ -1012,6 +1012,47 @@ static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     return true;
 }
 
+/* Lower samples from separate texture and sampler variables to samples from
+ * synthesized combined samplers. That is, translate SM4-style samples in the
+ * source to SM1-style samples in the bytecode. */
+static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_resource_load *sample;
+    struct vkd3d_string_buffer *name;
+    struct hlsl_ir_var *var;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+    sample = hlsl_ir_resource_load(instr);
+    if (sample->load_type != HLSL_RESOURCE_SAMPLE || sample->sampler.var)
+        return false;
+
+    if (!(name = hlsl_get_string_buffer(ctx)))
+        return false;
+    vkd3d_string_buffer_printf(name, "<resource>%s", sample->resource.var->name);
+
+    TRACE("Lowering to separate resource %s.\n", debugstr_a(name->buffer));
+
+    if (!(var = hlsl_get_var(ctx->globals, name->buffer)))
+    {
+        struct hlsl_type *data_type = hlsl_new_texture_type(ctx, sample->resource.var->data_type->sampler_dim,
+                ctx->builtin_types.vector[HLSL_TYPE_FLOAT][4 - 1]);
+
+        if (!(var = hlsl_new_synthetic_var(ctx, name->buffer, data_type, instr->loc)))
+        {
+            hlsl_release_string_buffer(ctx, name);
+            return false;
+        }
+    }
+    hlsl_release_string_buffer(ctx, name);
+
+    sample->sampler.var = sample->resource.var;
+    hlsl_src_from_node(&sample->sampler.offset, sample->resource.offset.node);
+    sample->resource.var = var;
+    hlsl_src_remove(&sample->resource.offset);
+    return true;
+}
+
 static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_swizzle *swizzle;
@@ -1950,6 +1991,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (ctx->profile->major_version < 4)
         transform_ir(ctx, lower_separate_samples, body, NULL);
+    else
+        transform_ir(ctx, lower_combined_samples, body, NULL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
