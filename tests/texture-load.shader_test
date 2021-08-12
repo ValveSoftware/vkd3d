@@ -17,3 +17,18 @@ probe rgba (0, 0) (0.1, 0.2, 0.3, 0.4)
 probe rgba (1, 0) (0.5, 0.7, 0.6, 0.8)
 probe rgba (0, 1) (0.6, 0.5, 0.2, 0.1)
 probe rgba (1, 1) (0.8, 0.0, 0.7, 1.0)
+
+[pixel shader]
+Texture2D t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return t[pos.yx];
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.1, 0.2, 0.3, 0.4)
+probe rgba (1, 0) (0.6, 0.5, 0.2, 0.1)
+probe rgba (0, 1) (0.5, 0.7, 0.6, 0.8)
+probe rgba (1, 1) (0.8, 0.0, 0.7, 1.0)

@@ -443,8 +443,6 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
         ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
         ID3D12PipelineState_Release(pso);
-        transition_resource_state(command_list, context->c.render_target,
-                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     }
     else if (match_string(line, "probe all rgba", &line))
     {
@@ -457,8 +455,12 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             goto err;
         if (ret < 5)
             ulps = 0;
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         check_sub_resource_vec4(context->c.render_target, 0, context->c.queue, context->c.list, &v, ulps);
         reset_command_list(context->c.list, context->c.allocator);
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
     else if (match_string(line, "probe rect rgba", &line))
     {
@@ -475,6 +477,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         if (ret < 9)
             ulps = 0;
 
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + w;
@@ -483,6 +487,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         check_readback_data_vec4(&rb, &rect, &v, ulps);
         release_resource_readback(&rb);
         reset_command_list(context->c.list, context->c.allocator);
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
     else if (match_string(line, "probe rgba", &line))
     {
@@ -498,6 +504,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         if (ret < 7)
             ulps = 0;
 
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + 1;
@@ -506,6 +514,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         check_readback_data_vec4(&rb, &rect, &v, ulps);
         release_resource_readback(&rb);
         reset_command_list(context->c.list, context->c.allocator);
+        transition_resource_state(context->c.list, context->c.render_target,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
     else if (match_string(line, "uniform", &line))
     {
