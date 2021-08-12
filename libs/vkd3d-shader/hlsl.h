@@ -310,6 +310,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_NEG,
     HLSL_OP1_NRM,
     HLSL_OP1_RCP,
+    HLSL_OP1_REINTERPRET,
     HLSL_OP1_ROUND,
     HLSL_OP1_RSQ,
     HLSL_OP1_SAT,
@@ -740,6 +741,8 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node);
+struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_type *data_type,
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], struct vkd3d_shader_location loc);
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc);
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc);
