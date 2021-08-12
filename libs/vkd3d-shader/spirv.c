@@ -6792,6 +6792,7 @@ static SpvOp vkd3d_dxbc_compiler_map_alu_instruction(const struct vkd3d_shader_i
         {VKD3DSIH_NOT,        SpvOpNot},
         {VKD3DSIH_OR,         SpvOpBitwiseOr},
         {VKD3DSIH_USHR,       SpvOpShiftRightLogical},
+        {VKD3DSIH_UTOD,       SpvOpConvertUToF},
         {VKD3DSIH_UTOF,       SpvOpConvertUToF},
         {VKD3DSIH_XOR,        SpvOpBitwiseXor},
     };
@@ -9549,6 +9550,7 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
         case VKD3DSIH_NOT:
         case VKD3DSIH_OR:
         case VKD3DSIH_USHR:
+        case VKD3DSIH_UTOD:
         case VKD3DSIH_UTOF:
         case VKD3DSIH_XOR:
             vkd3d_dxbc_compiler_emit_alu_instruction(compiler, instruction);

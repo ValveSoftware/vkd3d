@@ -373,6 +373,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_UMIN,
     VKD3DSIH_UMUL,
     VKD3DSIH_USHR,
+    VKD3DSIH_UTOD,
     VKD3DSIH_UTOF,
     VKD3DSIH_XOR,
 

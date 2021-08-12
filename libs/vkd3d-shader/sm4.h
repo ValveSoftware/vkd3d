@@ -338,6 +338,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_DTOI                             = 0xd6,
     VKD3D_SM5_OP_DTOU                             = 0xd7,
     VKD3D_SM5_OP_ITOD                             = 0xd8,
+    VKD3D_SM5_OP_UTOD                             = 0xd9,
 };
 
 enum vkd3d_sm4_instruction_modifier
