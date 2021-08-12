@@ -80,6 +80,14 @@ enum texture_data_type
     TEXTURE_DATA_UINT,
 };
 
+struct sampler
+{
+    unsigned int slot;
+
+    D3D12_FILTER filter;
+    D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
+};
+
 struct texture
 {
     unsigned int slot;
@@ -108,6 +116,9 @@ struct shader_context
 
     struct texture *textures;
     size_t texture_count;
+
+    struct sampler *samplers;
+    size_t sampler_count;
 };
 
 static ID3D10Blob *compile_shader(const char *source, const char *target)
@@ -139,6 +150,7 @@ enum parse_state
     STATE_NONE,
     STATE_PREPROC,
     STATE_PREPROC_INVALID,
+    STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEXTURE,
@@ -193,6 +205,69 @@ static void parse_texture_format(struct texture *texture, const char *line)
     texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     texture->data_type = TEXTURE_DATA_FLOAT;
     texture->texel_size = 16;
+}
+
+static D3D12_TEXTURE_ADDRESS_MODE parse_sampler_address_mode(const char *line, const char **rest)
+{
+    if (match_string(line, "border", rest))
+        return D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    if (match_string(line, "clamp", rest))
+        return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    if (match_string(line, "mirror once", rest))
+        return D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE;
+    if (match_string(line, "mirror", rest))
+        return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
+    if (match_string(line, "wrap", rest))
+        return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    fprintf(stderr, "Malformed address mode '%s'.\n", line);
+    return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+}
+
+static void parse_sampler_directive(struct sampler *sampler, const char *line)
+{
+    const char *const orig_line = line;
+
+    if (match_string(line, "address", &line))
+    {
+        sampler->u_address = parse_sampler_address_mode(line, &line);
+        sampler->v_address = parse_sampler_address_mode(line, &line);
+        sampler->w_address = parse_sampler_address_mode(line, &line);
+    }
+    else if (match_string(line, "filter", &line))
+    {
+        static const struct
+        {
+            const char *string;
+            D3D12_FILTER filter;
+        }
+        filters[] =
+        {
+            {"point point point",       D3D12_FILTER_MIN_MAG_MIP_POINT},
+            {"point point linear",      D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR},
+            {"point linear point",      D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT},
+            {"point linear linear",     D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR},
+            {"linear point point",      D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT},
+            {"linear point linear",     D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR},
+            {"linear linear point",     D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT},
+            {"linear linear linear",    D3D12_FILTER_MIN_MAG_MIP_LINEAR},
+        };
+        unsigned int i;
+
+        for (i = 0; i < ARRAY_SIZE(filters); ++i)
+        {
+            if (match_string(line, filters[i].string, &line))
+                sampler->filter = filters[i].filter;
+        }
+    }
+    else
+    {
+        goto err;
+    }
+
+    return;
+
+err:
+    fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
 static void parse_texture_directive(struct texture *texture, const char *line)
@@ -266,6 +341,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         ID3D12GraphicsCommandList *command_list = context->c.list;
         D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
         D3D12_ROOT_PARAMETER root_params[3], *root_param;
+        D3D12_STATIC_SAMPLER_DESC static_samplers[1];
         static const float clear_color[4];
         unsigned int uniform_index;
         ID3D12PipelineState *pso;
@@ -274,6 +350,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
         root_signature_desc.NumParameters = 0;
         root_signature_desc.pParameters = root_params;
+        root_signature_desc.NumStaticSamplers = 0;
+        root_signature_desc.pStaticSamplers = static_samplers;
 
         if (context->uniform_count)
         {
@@ -305,20 +383,39 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             range->RegisterSpace = 0;
             range->OffsetInDescriptorsFromTableStart = 0;
 
-            texture->heap = create_gpu_descriptor_heap(context->c.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-            texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                    texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-            resource_data.pData = texture->data;
-            resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
-            upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
-            reset_command_list(command_list, context->c.allocator);
-            transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
-                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
-                    NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+            if (!texture->resource)
+            {
+                texture->heap = create_gpu_descriptor_heap(context->c.device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+                texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
+                        texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+                resource_data.pData = texture->data;
+                resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
+                upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
+                reset_command_list(command_list, context->c.allocator);
+                transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
+                        NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+            }
         }
 
         assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
+
+        for (i = 0; i < context->sampler_count; ++i)
+        {
+            D3D12_STATIC_SAMPLER_DESC *sampler_desc = &static_samplers[root_signature_desc.NumStaticSamplers++];
+            const struct sampler *sampler = &context->samplers[i];
+
+            memset(sampler_desc, 0, sizeof(*sampler_desc));
+            sampler_desc->Filter = sampler->filter;
+            sampler_desc->AddressU = sampler->u_address;
+            sampler_desc->AddressV = sampler->v_address;
+            sampler_desc->AddressW = sampler->w_address;
+            sampler_desc->ShaderRegister = sampler->slot;
+            sampler_desc->RegisterSpace = 0;
+            sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        }
 
         if (context->c.root_signature)
             ID3D12RootSignature_Release(context->c.root_signature);
@@ -482,6 +579,22 @@ err:
     fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
+static struct sampler *get_sampler(struct shader_context *context, unsigned int slot)
+{
+    struct sampler *sampler;
+    size_t i;
+
+    for (i = 0; i < context->sampler_count; ++i)
+    {
+        sampler = &context->samplers[i];
+
+        if (sampler->slot == slot)
+            return sampler;
+    }
+
+    return NULL;
+}
+
 static struct texture *get_texture(struct shader_context *context, unsigned int slot)
 {
     struct texture *texture;
@@ -509,6 +622,7 @@ START_TEST(shader_runner_d3d12)
     size_t shader_source_size = 0, shader_source_len = 0;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
+    struct sampler *current_sampler;
     struct texture *current_texture;
     struct shader_context context;
     const char *filename = NULL;
@@ -555,6 +669,7 @@ START_TEST(shader_runner_d3d12)
             switch (state)
             {
                 case STATE_NONE:
+                case STATE_SAMPLER:
                 case STATE_TEST:
                 case STATE_TEXTURE:
                     break;
@@ -650,10 +765,35 @@ START_TEST(shader_runner_d3d12)
             if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
+
+                if (context.ps_code)
+                    ID3D10Blob_Release(context.ps_code);
+                context.ps_code = NULL;
             }
             else if (!strcmp(line, "[pixel shader fail]\n"))
             {
                 state = STATE_SHADER_INVALID_PIXEL;
+            }
+            else if (sscanf(line, "[sampler %u]\n", &index))
+            {
+                state = STATE_SAMPLER;
+
+                if ((current_sampler = get_sampler(&context, index)))
+                {
+                    memset(current_sampler, 0, sizeof(*current_sampler));
+                }
+                else
+                {
+                    context.samplers = realloc(context.samplers,
+                            ++context.sampler_count * sizeof(*context.samplers));
+                    current_sampler = &context.samplers[context.sampler_count - 1];
+                    memset(current_sampler, 0, sizeof(*current_sampler));
+                }
+                current_sampler->slot = index;
+                current_sampler->filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+                current_sampler->u_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+                current_sampler->v_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+                current_sampler->w_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
             }
             else if (sscanf(line, "[texture %u]\n", &index))
             {
@@ -710,6 +850,10 @@ START_TEST(shader_runner_d3d12)
                     shader_source_len += len;
                     break;
                 }
+
+                case STATE_SAMPLER:
+                    parse_sampler_directive(current_sampler, line);
+                    break;
 
                 case STATE_TEXTURE:
                     parse_texture_directive(current_texture, line);
