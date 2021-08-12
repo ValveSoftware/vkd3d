@@ -747,13 +747,83 @@ static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
     return true;
 }
 
+static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_node *index, unsigned int dim_count, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_load *coords_load;
+    struct hlsl_deref coords_deref;
+    struct hlsl_ir_constant *zero;
+    struct hlsl_ir_store *store;
+    struct hlsl_ir_var *coords;
+
+    if (!(coords = hlsl_new_synthetic_var(ctx, "coords",
+            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count + 1), loc)))
+        return NULL;
+
+    hlsl_init_simple_deref_from_var(&coords_deref, coords);
+    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
+        return NULL;
+    list_add_tail(instrs, &store->node.entry);
+
+    if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
+        return NULL;
+    list_add_tail(instrs, &zero->node.entry);
+
+    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, &zero->node, 1u << dim_count, loc)))
+        return NULL;
+    list_add_tail(instrs, &store->node.entry);
+
+    if (!(coords_load = hlsl_new_var_load(ctx, coords, *loc)))
+        return NULL;
+    list_add_tail(instrs, &coords_load->node.entry);
+
+    return &coords_load->node;
+}
+
 static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
-    const struct hlsl_type *expr_type = array->data_type;
+    const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
     struct hlsl_ir_expr *cast;
 
-    if (index->data_type->type != HLSL_CLASS_SCALAR)
+    if (expr_type->type == HLSL_CLASS_OBJECT && expr_type->base_type == HLSL_TYPE_TEXTURE
+            && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    {
+        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
+        unsigned int dim_count = hlsl_sampler_dim_count(expr_type->sampler_dim);
+        /* Only HLSL_IR_LOAD can return an object. */
+        struct hlsl_ir_load *object_load = hlsl_ir_load(array);
+        struct hlsl_ir_resource_load *resource_load;
+
+        if (index_type->type > HLSL_CLASS_VECTOR || index_type->dimx != dim_count)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, expr_type)))
+                hlsl_error(ctx, &index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Array index of type '%s' must be of type 'uint%u'.", string->buffer, dim_count);
+            hlsl_release_string_buffer(ctx, string);
+            return false;
+        }
+
+        if (!(index = add_implicit_conversion(ctx, instrs, index,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count), &index->loc)))
+            return false;
+
+        if (!(index = add_zero_mipmap_level(ctx, instrs, index, dim_count, loc)))
+            return false;
+
+        load_params.format = expr_type->e.resource_format;
+        load_params.resource = object_load->src;
+        load_params.coords = index;
+
+        if (!(resource_load = hlsl_new_resource_load(ctx, &load_params, loc)))
+            return false;
+        list_add_tail(instrs, &resource_load->node.entry);
+        return true;
+    }
+
+    if (index_type->type != HLSL_CLASS_SCALAR)
     {
         hlsl_error(ctx, &index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Array index is not scalar.");
         return false;
