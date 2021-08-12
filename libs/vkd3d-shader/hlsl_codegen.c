@@ -1221,6 +1221,64 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
     }
 }
 
+static const struct hlsl_ir_var *get_reserved_sampler(struct hlsl_ctx *ctx, uint32_t index)
+{
+    const struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
+    {
+        if (var->has_resource_access && var->reg_reservation.type == 's' && var->reg_reservation.index == index)
+            return var;
+    }
+    return NULL;
+}
+
+static void allocate_samplers(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var;
+    uint32_t index = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->has_resource_access || var->data_type->type != HLSL_CLASS_OBJECT
+                || var->data_type->base_type != HLSL_TYPE_SAMPLER)
+            continue;
+
+        if (var->reg_reservation.type == 's')
+        {
+            const struct hlsl_ir_var *reserved_sampler = get_reserved_sampler(ctx, var->reg_reservation.index);
+
+            if (reserved_sampler && reserved_sampler != var)
+            {
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                        "Multiple samplers bound to s%u.", var->reg_reservation.index);
+                hlsl_note(ctx, reserved_sampler->loc, VKD3D_SHADER_LOG_ERROR,
+                        "Sampler '%s' is already bound to s%u.", reserved_sampler->name,
+                        var->reg_reservation.index);
+            }
+
+            var->reg.id = var->reg_reservation.index;
+            var->reg.allocated = true;
+            TRACE("Allocated reserved %s to s%u.\n", var->name, index);
+        }
+        else if (!var->reg_reservation.type)
+        {
+            while (get_reserved_sampler(ctx, index))
+                ++index;
+
+            var->reg.id = index;
+            var->reg.allocated = true;
+            TRACE("Allocated %s to s%u.\n", var->name, index);
+            ++index;
+        }
+        else
+        {
+            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "Samplers must be bound to register type 's'.");
+        }
+    }
+}
+
 static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint32_t index)
 {
     const struct hlsl_ir_var *var;
@@ -1402,6 +1460,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         allocate_textures(ctx);
     }
     allocate_semantic_registers(ctx);
+    allocate_samplers(ctx);
 
     if (ctx->result)
         return ctx->result;
