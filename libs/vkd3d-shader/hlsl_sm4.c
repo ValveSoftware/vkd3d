@@ -595,7 +595,10 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
             continue;
 
-        string_offset = put_string(&buffer, var->name);
+        if (!strncmp(var->name, "<resource>", strlen("<resource>")))
+            string_offset = put_string(&buffer, var->name + strlen("<resource>"));
+        else
+            string_offset = put_string(&buffer, var->name);
         set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
     }
 
@@ -1514,8 +1517,8 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE:
-            if (!load->sampler.var)
-                hlsl_fixme(ctx, load->node.loc, "SM4 combined sample expression.\n");
+            /* Combined sample expressions were lowered by lower_combined_samples(). */
+            assert(load->sampler.var);
             write_sm4_sample(ctx, buffer, resource_type, &load->node, &load->resource, &load->sampler, coords);
             break;
     }
