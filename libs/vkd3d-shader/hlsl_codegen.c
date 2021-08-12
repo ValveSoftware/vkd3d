@@ -256,8 +256,38 @@ static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
         hlsl_src_remove(src);
         hlsl_src_from_node(src, new);
     }
-    list_remove(&old->entry);
-    hlsl_free_instr(old);
+}
+
+/* Lower casts from vec1 to vecN to swizzles. */
+static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_type *src_type, *dst_type;
+    struct hlsl_ir_expr *cast;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    cast = hlsl_ir_expr(instr);
+    src_type = cast->operands[0].node->data_type;
+    dst_type = cast->node.data_type;
+
+    if (cast->op == HLSL_OP1_CAST
+            && src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR
+            && src_type->dimx == 1)
+    {
+        struct hlsl_ir_swizzle *swizzle;
+
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, &cast->node, &cast->node.loc)))
+            return false;
+        list_add_after(&cast->node.entry, &swizzle->node.entry);
+
+        cast->node.data_type = ctx->builtin_types.scalar[dst_type->base_type];
+        replace_node(&cast->node, &swizzle->node);
+        hlsl_src_remove(&swizzle->val);
+        hlsl_src_from_node(&swizzle->val, &cast->node);
+        return true;
+    }
+
+    return false;
 }
 
 static bool is_vec1(const struct hlsl_type *type)
@@ -280,6 +310,8 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
                 || (src_type->base_type == dst_type->base_type && is_vec1(src_type) && is_vec1(dst_type)))
         {
             replace_node(&expr->node, expr->operands[0].node);
+            list_remove(&expr->node.entry);
+            hlsl_free_instr(&expr->node);
             return true;
         }
     }
@@ -579,6 +611,8 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
 
     list_add_before(&expr->node.entry, &res->node.entry);
     replace_node(&expr->node, &res->node);
+    list_remove(&expr->node.entry);
+    hlsl_free_instr(&expr->node);
     return true;
 }
 
@@ -1517,6 +1551,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
     }
 
+    transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
     {
