@@ -747,7 +747,7 @@ struct sm4_instruction
     {
         struct sm4_register reg;
         unsigned int swizzle;
-    } srcs[2];
+    } srcs[3];
     unsigned int src_count;
 
     uint32_t idx[2];
@@ -759,6 +759,7 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
     switch (type)
     {
         case VKD3D_SM4_RT_IMMCONST:
+        case VKD3D_SM4_RT_SAMPLER:
             return VKD3D_SM4_SWIZZLE_NONE;
 
         case VKD3D_SM4_RT_CONSTBUFFER:
@@ -784,6 +785,14 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         {
             reg->type = VKD3D_SM4_RT_RESOURCE;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->idx[0] = var->reg.id;
+            reg->idx_count = 1;
+            *writemask = VKD3DSP_WRITEMASK_ALL;
+        }
+        else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
+        {
+            reg->type = VKD3D_SM4_RT_SAMPLER;
+            reg->dim = VKD3D_SM4_DIMENSION_NONE;
             reg->idx[0] = var->reg.id;
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
@@ -1224,6 +1233,32 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
+        const struct hlsl_deref *resource, const struct hlsl_deref *sampler, const struct hlsl_ir_node *coords)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SAMPLE;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, coords);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+
+    sm4_register_from_deref(ctx, &instr.srcs[1].reg, &writemask, resource, resource_type);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+
+    sm4_register_from_deref(ctx, &instr.srcs[2].reg, &writemask, sampler, sampler->var->data_type);
+
+    instr.src_count = 3;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_expr(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
@@ -1451,6 +1486,21 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     const struct hlsl_type *resource_type = load->resource.var->data_type;
     const struct hlsl_ir_node *coords = load->coords.node;
 
+    if (load->sampler.var)
+    {
+        const struct hlsl_type *sampler_type = load->sampler.var->data_type;
+
+        assert(sampler_type->type == HLSL_CLASS_OBJECT);
+        assert(sampler_type->base_type == HLSL_TYPE_SAMPLER);
+        assert(sampler_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC);
+
+        if (!load->sampler.var->is_uniform)
+        {
+            hlsl_fixme(ctx, load->node.loc, "Sample using non-uniform sampler variable.");
+            return;
+        }
+    }
+
     if (!load->resource.var->is_uniform)
     {
         hlsl_fixme(ctx, load->node.loc, "Load from non-uniform resource variable.");
@@ -1464,7 +1514,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE:
-            hlsl_fixme(ctx, load->node.loc, "Resource sample instruction.");
+            if (!load->sampler.var)
+                hlsl_fixme(ctx, load->node.loc, "SM4 combined sample expression.\n");
+            write_sm4_sample(ctx, buffer, resource_type, &load->node, &load->resource, &load->sampler, coords);
             break;
     }
 }
