@@ -327,6 +327,7 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_DNE                              = 0xc6,
     VKD3D_SM5_OP_DMOV                             = 0xc7,
     VKD3D_SM5_OP_DMOVC                            = 0xc8,
+    VKD3D_SM5_OP_DTOF                             = 0xc9,
     VKD3D_SM5_OP_FTOD                             = 0xca,
     VKD3D_SM5_OP_EVAL_SAMPLE_INDEX                = 0xcc,
     VKD3D_SM5_OP_EVAL_CENTROID                    = 0xcd,

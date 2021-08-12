@@ -10029,7 +10029,7 @@ static void test_shader_instructions(void)
         {&ps_dtou, {.d = {{     -1.0}}}, {{ 0,  1 }}, true, true},
         {&ps_dtou, {.d = {{      1.0}}}, {{ 1,  0 }}, true, true},
         {&ps_dtoi, {.d = {{      1.0}}}, {.i = {1, -1}}, true, true},
-        {&ps_dtof, {.d = {{      1.5}}}, {.f = {1.5f, -1.5f}}, true, true},
+        {&ps_dtof, {.d = {{      1.5}}}, {.f = {1.5f, -1.5f}}, true},
         {&ps_utod, {.u = {{3, 0xffffffff}}}, {.d = {3.0,  4294967295.0}}, true, true},
         {&ps_itod, {.u = {{3,    INT_MIN}}}, {.d = {3.0, -2147483648.0}}, true, true},
         {&ps_ftod, {.f = {{-2.5f,  -2.5f}}}, {.d = {-2.5,  2.5}}, true},
