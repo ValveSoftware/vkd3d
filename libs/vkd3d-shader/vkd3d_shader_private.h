@@ -278,6 +278,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_INEG,
     VKD3DSIH_ISHL,
     VKD3DSIH_ISHR,
+    VKD3DSIH_ITOD,
     VKD3DSIH_ITOF,
     VKD3DSIH_LABEL,
     VKD3DSIH_LD,

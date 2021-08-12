@@ -189,6 +189,7 @@ static const char * const shader_opcode_names[] =
     /* VKD3DSIH_INEG                             */ "ineg",
     /* VKD3DSIH_ISHL                             */ "ishl",
     /* VKD3DSIH_ISHR                             */ "ishr",
+    /* VKD3DSIH_ITOD                             */ "itod",
     /* VKD3DSIH_ITOF                             */ "itof",
     /* VKD3DSIH_LABEL                            */ "label",
     /* VKD3DSIH_LD                               */ "ld",
