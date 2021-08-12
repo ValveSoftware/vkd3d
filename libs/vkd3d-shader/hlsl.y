@@ -1962,6 +1962,42 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], loc);
 }
 
+/* Find the type corresponding to the given source type, with the same
+ * dimensions but a different base type. */
+static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
+        const struct hlsl_type *type, enum hlsl_base_type base_type)
+{
+    return hlsl_get_numeric_type(ctx, type->type, base_type, type->dimx, type->dimy);
+}
+
+static bool intrinsic_asuint(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *data_type;
+    struct hlsl_ir_node *expr;
+
+    if (params->args_count != 1 && params->args_count != 3)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to function 'asuint': expected 1 or 3, but got %u.", params->args_count);
+        return false;
+    }
+
+    if (params->args_count == 3)
+    {
+        hlsl_fixme(ctx, loc, "Double-to-integer conversion.");
+        return false;
+    }
+
+    data_type = convert_numeric_type(ctx, params->args[0]->data_type, HLSL_TYPE_UINT);
+    operands[0] = params->args[0];
+    if (!(expr = hlsl_new_expr(ctx, HLSL_OP1_REINTERPRET, data_type, operands, *loc)))
+        return false;
+    list_add_tail(params->instrs, &expr->entry);
+    return true;
+}
+
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2282,6 +2318,7 @@ intrinsic_functions[] =
 {
     /* Note: these entries should be kept in alphabetical order. */
     {"abs",                                 1, true,  intrinsic_abs},
+    {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cross",                               2, true,  intrinsic_cross},
     {"floor",                               1, true,  intrinsic_floor},
