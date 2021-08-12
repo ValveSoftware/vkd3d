@@ -1657,6 +1657,56 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     return false;
 }
 
+/* Lower samples from separate texture and sampler variables to samples from
+ * synthesized combined samplers. That is, translate SM4-style samples in the
+ * source to SM1-style samples in the bytecode. */
+static bool lower_separate_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_resource_load *sample;
+    struct vkd3d_string_buffer *string;
+    struct hlsl_ir_var *var;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+    sample = hlsl_ir_resource_load(instr);
+    if (sample->load_type != HLSL_RESOURCE_SAMPLE || !sample->sampler.var)
+        return false;
+
+    if (!(string = hlsl_get_string_buffer(ctx)))
+        return false;
+    vkd3d_string_buffer_printf(string, "%s+%s", sample->sampler.var->name, sample->resource.var->name);
+
+    TRACE("Lowering to combined sampler %s.\n", debugstr_a(string->buffer));
+
+    if (!(var = hlsl_get_var(ctx->globals, string->buffer)))
+    {
+        struct hlsl_type *data_type = hlsl_new_texture_type(ctx, sample->resource.var->data_type->sampler_dim,
+                ctx->builtin_types.vector[HLSL_TYPE_FLOAT][4 - 1]);
+        char *name;
+
+        if (!(name = hlsl_strdup(ctx, string->buffer)))
+        {
+            hlsl_release_string_buffer(ctx, string);
+            return false;
+        }
+
+        if (!(var = hlsl_new_var(ctx, name, data_type, instr->loc, NULL, 0, NULL)))
+        {
+            vkd3d_free(name);
+            hlsl_release_string_buffer(ctx, string);
+            return false;
+        }
+        list_add_tail(&ctx->globals->vars, &var->scope_entry);
+    }
+    hlsl_release_string_buffer(ctx, string);
+
+    sample->resource.var = var;
+    hlsl_src_remove(&sample->resource.offset);
+    sample->sampler.var = NULL;
+    hlsl_src_remove(&sample->sampler.offset);
+    return true;
+}
+
 static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_swizzle *swizzle;
@@ -3177,6 +3227,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_return(ctx, entry_func, body, false);
 
     while (transform_ir(ctx, lower_calls, body, NULL));
+
+    if (ctx->profile->major_version < 4)
+        transform_ir(ctx, lower_separate_samples, body, NULL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
