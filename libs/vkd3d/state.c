@@ -664,6 +664,7 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
     for (i = 0; i < desc->NumParameters; ++i)
     {
         const D3D12_ROOT_PARAMETER *p = &desc->pParameters[i];
+        enum vkd3d_shader_visibility shader_visibility;
         unsigned int offset = 0;
 
         if (p->ParameterType != D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE)
@@ -673,6 +674,7 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
 
         table = &root_signature->parameters[i].u.descriptor_table;
         range_count = p->u.DescriptorTable.NumDescriptorRanges;
+        shader_visibility = vkd3d_shader_visibility_from_d3d12(p->ShaderVisibility);
 
         root_signature->parameters[i].parameter_type = p->ParameterType;
         table->range_count = range_count;
@@ -723,7 +725,7 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
 
             vk_binding = d3d12_root_signature_assign_vk_bindings(root_signature,
                     range->type, range->register_space, range->base_register_idx, range->descriptor_count, false, true,
-                    vkd3d_shader_visibility_from_d3d12(p->ShaderVisibility), context);
+                    shader_visibility, context);
 
             /* Unroll descriptor range. */
             for (k = 0; k < range->descriptor_count; ++k)
