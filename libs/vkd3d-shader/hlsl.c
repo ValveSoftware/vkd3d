@@ -273,6 +273,22 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     return type;
 }
 
+struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format)
+{
+    struct hlsl_type *type;
+
+    if (!(type = vkd3d_calloc(1, sizeof(*type))))
+        return NULL;
+    type->type = HLSL_CLASS_OBJECT;
+    type->base_type = HLSL_TYPE_UAV;
+    type->dimx = format->dimx;
+    type->dimy = 1;
+    type->sampler_dim = dim;
+    type->e.resource_format = format;
+    list_add_tail(&ctx->types, &type->entry);
+    return type;
+}
+
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive)
 {
     struct rb_entry *entry = rb_get(&scope->types, name);
@@ -341,7 +357,8 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         return false;
     if (t1->base_type != t2->base_type)
         return false;
-    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
+    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE
+            || t1->base_type == HLSL_TYPE_UAV)
     {
         if (t1->sampler_dim != t2->sampler_dim)
             return false;
@@ -929,6 +946,11 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                     }
 
                     vkd3d_string_buffer_printf(string, "Texture%s<%s%u>", dimensions[type->sampler_dim],
+                            base_types[type->e.resource_format->base_type], type->e.resource_format->dimx);
+                    return string;
+
+                case HLSL_TYPE_UAV:
+                    vkd3d_string_buffer_printf(string, "RWTexture%s<%s%u>", dimensions[type->sampler_dim],
                             base_types[type->e.resource_format->base_type], type->e.resource_format->dimx);
                     return string;
 

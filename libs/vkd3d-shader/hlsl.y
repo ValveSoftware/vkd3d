@@ -2126,6 +2126,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %token KW_RETURN
 %token KW_REGISTER
 %token KW_ROW_MAJOR
+%token KW_RWTEXTURE1D
+%token KW_RWTEXTURE2D
+%token KW_RWTEXTURE3D
 %token KW_SAMPLER
 %token KW_SAMPLER1D
 %token KW_SAMPLER2D
@@ -2263,7 +2266,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <reg_reservation> register_opt
 
-%type <sampler_dim> texture_type
+%type <sampler_dim> texture_type uav_type
 
 %type <semantic> semantic
 
@@ -2698,6 +2701,20 @@ texture_type:
             $$ = HLSL_SAMPLER_DIM_CUBE;
         }
 
+uav_type:
+      KW_RWTEXTURE1D
+        {
+            $$ = HLSL_SAMPLER_DIM_1D;
+        }
+    | KW_RWTEXTURE2D
+        {
+            $$ = HLSL_SAMPLER_DIM_2D;
+        }
+    | KW_RWTEXTURE3D
+        {
+            $$ = HLSL_SAMPLER_DIM_3D;
+        }
+
 type:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
@@ -2794,6 +2811,20 @@ type:
                 hlsl_release_string_buffer(ctx, string);
             }
             $$ = hlsl_new_texture_type(ctx, $1, $3);
+        }
+    | uav_type '<' type '>'
+        {
+            if ($3->type > HLSL_CLASS_VECTOR)
+            {
+                struct vkd3d_string_buffer *string;
+
+                string = hlsl_type_to_string(ctx, $3);
+                if (string)
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "UAV data type %s is not scalar or vector.\n", string->buffer);
+                hlsl_release_string_buffer(ctx, string);
+            }
+            $$ = hlsl_new_uav_type(ctx, $1, $3);
         }
     | TYPE_IDENTIFIER
         {
