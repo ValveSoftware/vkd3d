@@ -512,7 +512,7 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
     return pipeline_layout;
 }
 
-static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkRenderPass render_pass,
+static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *runner, VkRenderPass render_pass,
         VkPipelineLayout pipeline_layout, D3D_PRIMITIVE_TOPOLOGY primitive_topology)
 {
     VkPipelineInputAssemblyStateCreateInfo ia_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -640,6 +640,27 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkR
     VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
     vkd3d_shader_free_shader_signature(&vs_input_signature);
     vkd3d_shader_free_shader_code(&vs_dxbc);
+
+    return pipeline;
+}
+
+static VkPipeline create_compute_pipeline(const struct vulkan_shader_runner *runner, VkPipelineLayout pipeline_layout)
+{
+    VkComputePipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    VkPipeline pipeline;
+    bool ret;
+
+    ret = create_shader_stage(runner, &pipeline_desc.stage, "cs",
+            VK_SHADER_STAGE_COMPUTE_BIT, runner->r.cs_source, NULL);
+    todo_if (runner->r.is_todo) ok(ret, "Failed to compile shader.\n");
+    if (!ret)
+        return VK_NULL_HANDLE;
+
+    pipeline_desc.layout = pipeline_layout;
+
+    VK_CALL(vkCreateComputePipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
+
+    VK_CALL(vkDestroyShaderModule(runner->device, pipeline_desc.stage.module, NULL));
 
     return pipeline;
 }
@@ -856,6 +877,49 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
     VK_CALL(vkCreateFramebuffer(runner->device, &fb_desc, NULL, fb));
 }
 
+static bool vulkan_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
+{
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+
+    VkCommandBuffer cmd_buffer = runner->cmd_buffer;
+    VkDescriptorSetLayout set_layout;
+    VkPipelineLayout pipeline_layout;
+    VkDevice device = runner->device;
+    VkPipeline pipeline;
+    bool ret = false;
+    unsigned int i;
+
+    /* Create this before compiling shaders, it will assign resource bindings. */
+    set_layout = create_descriptor_set_layout(runner);
+
+    pipeline_layout = create_pipeline_layout(runner, set_layout);
+    if (!(pipeline = create_compute_pipeline(runner, pipeline_layout)))
+        goto out;
+
+    begin_command_buffer(runner);
+
+    VK_CALL(vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline));
+
+    bind_resources(runner, VK_PIPELINE_BIND_POINT_COMPUTE, set_layout, pipeline_layout);
+
+    VK_CALL(vkCmdDispatch(cmd_buffer, x, y, z));
+
+    end_command_buffer(runner);
+
+    VK_CALL(vkDestroyPipeline(device, pipeline, NULL));
+    VK_CALL(vkResetDescriptorPool(device, runner->descriptor_pool, 0));
+
+    ret = true;
+out:
+    for (i = 0; i < runner->r.sampler_count; ++i)
+        VK_CALL(vkDestroySampler(device, runner->samplers[i].vk_sampler, NULL));
+
+    VK_CALL(vkDestroyPipelineLayout(device, pipeline_layout, NULL));
+    VK_CALL(vkDestroyDescriptorSetLayout(device, set_layout, NULL));
+
+    return ret;
+}
+
 static bool vulkan_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -872,7 +936,7 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     VkClearRect clear_rect;
     VkPipeline pipeline;
     VkFramebuffer fb;
-    bool ret = true;
+    bool ret = false;
     unsigned int i;
 
     create_render_pass_and_framebuffer(runner, &render_pass, &fb);
@@ -881,11 +945,8 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     set_layout = create_descriptor_set_layout(runner);
 
     pipeline_layout = create_pipeline_layout(runner, set_layout);
-    if (!(pipeline = create_pipeline(runner, render_pass, pipeline_layout, primitive_topology)))
-    {
-        ret = false;
+    if (!(pipeline = create_graphics_pipeline(runner, render_pass, pipeline_layout, primitive_topology)))
         goto out;
-    }
 
     begin_command_buffer(runner);
 
@@ -917,6 +978,7 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     VK_CALL(vkDestroyPipeline(device, pipeline, NULL));
     VK_CALL(vkResetDescriptorPool(device, runner->descriptor_pool, 0));
 
+    ret = true;
 out:
     for (i = 0; i < runner->r.sampler_count; ++i)
         VK_CALL(vkDestroySampler(device, runner->samplers[i].vk_sampler, NULL));
@@ -997,6 +1059,7 @@ static const struct shader_runner_ops vulkan_runner_ops =
 {
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
+    .dispatch = vulkan_runner_dispatch,
     .draw = vulkan_runner_draw,
     .get_resource_readback = vulkan_runner_get_resource_readback,
     .release_readback = vulkan_runner_release_readback,

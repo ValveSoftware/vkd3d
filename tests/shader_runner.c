@@ -80,6 +80,7 @@ enum parse_state
     STATE_REQUIRE,
     STATE_RESOURCE,
     STATE_SAMPLER,
+    STATE_SHADER_COMPUTE,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
@@ -371,13 +372,24 @@ static void set_uniforms(struct shader_runner *runner, size_t offset, size_t cou
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     char *rest;
+    int ret;
 
     runner->is_todo = false;
 
     if (match_string(line, "todo", &line))
         runner->is_todo = true;
 
-    if (match_string(line, "draw quad", &line))
+    if (match_string(line, "dispatch", &line))
+    {
+        unsigned int x, y, z;
+
+        ret = sscanf(line, "%u %u %u", &x, &y, &z);
+        if (ret < 3)
+            fatal_error("Malformed dispatch arguments '%s'.\n", line);
+
+        runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
+    }
+    else if (match_string(line, "draw quad", &line))
     {
         struct resource_params params;
         struct input_element *element;
@@ -471,8 +483,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int left, top, right, bottom, ulps, slot;
         struct resource_readback *rb;
         struct resource *resource;
-        int ret, len;
         RECT rect;
+        int len;
 
         if (runner->last_render_failed)
             return;
@@ -705,6 +717,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     free(current_resource.data);
                     break;
 
+                case STATE_SHADER_COMPUTE:
+                    free(runner->cs_source);
+                    runner->cs_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
                 case STATE_SHADER_PIXEL:
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
@@ -812,7 +832,11 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
         {
             unsigned int index;
 
-            if (!strcmp(line, "[require]\n"))
+            if (!strcmp(line, "[compute shader]\n"))
+            {
+                state = STATE_SHADER_COMPUTE;
+            }
+            else if (!strcmp(line, "[require]\n"))
             {
                 state = STATE_REQUIRE;
             }
@@ -933,6 +957,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
 
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
+                case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_INVALID_PIXEL_TODO:
                 case STATE_SHADER_PIXEL:
