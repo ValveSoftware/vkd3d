@@ -1455,6 +1455,88 @@ static void allocate_textures(struct hlsl_ctx *ctx)
     }
 }
 
+static const struct hlsl_ir_var *get_reserved_uav(struct hlsl_ctx *ctx, uint32_t index)
+{
+    const struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
+    {
+        if (var->has_resource_access && var->reg_reservation.type == 'u' && var->reg_reservation.index == index)
+            return var;
+    }
+    return NULL;
+}
+
+static void allocate_uavs(struct hlsl_ctx *ctx)
+{
+    uint32_t rtv_count = 0, index;
+    struct hlsl_ir_var *var;
+
+    /* UAVs in pixel shaders occupy the same namespace as RTVs before shader
+     * model 5.1. */
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL
+            && ctx->profile->major_version >= 4
+            && (ctx->profile->major_version < 5 || ctx->profile->minor_version < 1))
+    {
+        LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        {
+            D3D_NAME usage;
+
+            if (!var->is_output_semantic)
+                continue;
+
+            if (hlsl_sm4_usage_from_semantic(ctx, &var->semantic, true, &usage) && usage == D3D_NAME_TARGET)
+                rtv_count = max(rtv_count, var->semantic.index + 1);
+        }
+    }
+    index = rtv_count;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->has_resource_access || var->data_type->type != HLSL_CLASS_OBJECT
+                || var->data_type->base_type != HLSL_TYPE_UAV)
+            continue;
+
+        if (var->reg_reservation.type == 'u')
+        {
+            const struct hlsl_ir_var *reserved_uav = get_reserved_uav(ctx, var->reg_reservation.index);
+
+            if (reserved_uav && reserved_uav != var)
+            {
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                        "Multiple UAVs bound to u%u.", var->reg_reservation.index);
+                hlsl_note(ctx, reserved_uav->loc, VKD3D_SHADER_LOG_ERROR,
+                        "UAV '%s' is already bound to u%u.", reserved_uav->name,
+                        var->reg_reservation.index);
+            }
+
+            if (var->reg_reservation.index < rtv_count)
+                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                        "UAV '%s' is bound to u%u, but %u RTVs are currently in use.",
+                        var->name, var->reg_reservation.index, rtv_count);
+
+            var->reg.id = var->reg_reservation.index;
+            var->reg.allocated = true;
+            TRACE("Allocated reserved %s to u%u.\n", var->name, index);
+        }
+        else if (!var->reg_reservation.type)
+        {
+            while (get_reserved_uav(ctx, index))
+                ++index;
+
+            var->reg.id = index;
+            var->reg.allocated = true;
+            TRACE("Allocated %s to u%u.\n", var->name, index);
+            ++index;
+        }
+        else
+        {
+            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "UAVs must be bound to register type 'u'.");
+        }
+    }
+}
+
 static bool type_is_single_reg(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
@@ -1574,6 +1656,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
     allocate_temp_registers(ctx, entry_func);
+    allocate_semantic_registers(ctx);
     if (ctx->profile->major_version < 4)
     {
         allocate_const_registers(ctx, entry_func);
@@ -1582,8 +1665,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     {
         allocate_buffers(ctx);
         allocate_textures(ctx);
+        allocate_uavs(ctx);
     }
-    allocate_semantic_registers(ctx);
     allocate_samplers(ctx);
 
     if (ctx->result)
