@@ -2592,10 +2592,12 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
 
 static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_descriptor_write,
         VkDescriptorImageInfo *vk_image_info, const struct d3d12_desc *descriptor,
-        uint32_t descriptor_range_magic, VkDescriptorSet *vk_descriptor_sets,
-        uint32_t vk_binding, unsigned int index, bool use_array)
+        const struct d3d12_root_descriptor_table_range *range, VkDescriptorSet *vk_descriptor_sets,
+        unsigned int index, bool use_array)
 {
+    uint32_t descriptor_range_magic = range->descriptor_magic;
     const struct vkd3d_view *view = descriptor->u.view;
+    uint32_t vk_binding = range->binding;
 
     if (descriptor->magic != descriptor_range_magic)
         return false;
@@ -2707,9 +2709,8 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
                 }
             }
 
-            if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write,
-                    current_image_info, descriptor, range->descriptor_magic,
-                    bindings->descriptor_sets, range->binding, j, root_signature->use_descriptor_arrays))
+            if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write, current_image_info,
+                    descriptor, range, bindings->descriptor_sets, j, root_signature->use_descriptor_arrays))
                 continue;
 
             ++descriptor_count;
