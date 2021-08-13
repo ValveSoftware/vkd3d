@@ -2284,6 +2284,7 @@ object_types[] =
 {
     { HLSL_TYPE_SAMPLER, 's' },
     { HLSL_TYPE_TEXTURE, 't' },
+    { HLSL_TYPE_UAV, 'u' },
 };
 
 static const struct object_type_info *get_object_type_info(enum hlsl_base_type type)
@@ -2302,7 +2303,20 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 {
     const struct object_type_info *type_info = get_object_type_info(type);
     struct hlsl_ir_var *var;
-    uint32_t index = 0;
+    uint32_t min_index = 0;
+    uint32_t index;
+
+    if (type == HLSL_TYPE_UAV)
+    {
+        LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        {
+            if (var->semantic.name && (!ascii_strcasecmp(var->semantic.name, "color")
+                    || !ascii_strcasecmp(var->semantic.name, "sv_target")))
+                min_index = max(min_index, var->semantic.index + 1);
+        }
+    }
+
+    index = min_index;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -2315,7 +2329,13 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, type_info->reg_name,
                     var->reg_reservation.index);
 
-            if (reserved_object && reserved_object != var)
+            if (var->reg_reservation.index < min_index)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                        "UAV index (%u) must be higher than the maximum render target index (%u).",
+                        var->reg_reservation.index, min_index - 1);
+            }
+            else if (reserved_object && reserved_object != var)
             {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "Multiple objects bound to %c%u.", type_info->reg_name,
@@ -2578,6 +2598,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         allocate_buffers(ctx);
         allocate_objects(ctx, HLSL_TYPE_TEXTURE);
+        allocate_objects(ctx, HLSL_TYPE_UAV);
     }
     allocate_semantic_registers(ctx);
     allocate_objects(ctx, HLSL_TYPE_SAMPLER);
