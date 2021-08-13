@@ -5864,7 +5864,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
         if (cmd_list->is_recording)
         {
             d3d12_device_mark_as_removed(command_queue->device, DXGI_ERROR_INVALID_CALL,
-                    "Command list %p is in recording state.\n", command_lists[i]);
+                    "Command list %p is in recording state.", command_lists[i]);
             vkd3d_free(buffers);
             return;
         }
