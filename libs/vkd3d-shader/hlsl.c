@@ -1211,9 +1211,6 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
         case HLSL_IR_SWIZZLE:
             dump_ir_swizzle(buffer, hlsl_ir_swizzle(instr));
             break;
-
-        default:
-            vkd3d_string_buffer_printf(buffer, "<No dump function for %s>", hlsl_node_type_to_string(instr->type));
     }
 }
 
@@ -1361,9 +1358,6 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
         case HLSL_IR_SWIZZLE:
             free_ir_swizzle(hlsl_ir_swizzle(node));
             break;
-
-        default:
-            FIXME("Unsupported node type %s.\n", hlsl_node_type_to_string(node->type));
     }
 }
 
