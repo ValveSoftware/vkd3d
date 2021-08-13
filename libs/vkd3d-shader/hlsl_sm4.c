@@ -413,6 +413,8 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
             return D3D_SIT_SAMPLER;
         case HLSL_TYPE_TEXTURE:
             return D3D_SIT_TEXTURE;
+        case HLSL_TYPE_UAV:
+            return D3D_SIT_UAV_RWTYPED;
         default:
             assert(0);
             return 0;
