@@ -1033,64 +1033,53 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
 
 static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
 {
-    static const char * const op_names[] =
+    static const char *const op_names[] =
     {
-        "~",
-        "!",
-        "-",
-        "abs",
-        "sign",
-        "rcp",
-        "rsq",
-        "sqrt",
-        "nrm",
-        "exp2",
-        "log2",
+        [HLSL_IR_UNOP_ABS]          = "abs",
+        [HLSL_IR_UNOP_BIT_NOT]      = "~",
+        [HLSL_IR_UNOP_CAST]         = "cast",
+        [HLSL_IR_UNOP_COS]          = "cos",
+        [HLSL_IR_UNOP_COS_REDUCED]  = "cos_reduced",
+        [HLSL_IR_UNOP_DSX]          = "dsx",
+        [HLSL_IR_UNOP_DSY]          = "dsy",
+        [HLSL_IR_UNOP_EXP2]         = "exp2",
+        [HLSL_IR_UNOP_FRACT]        = "fract",
+        [HLSL_IR_UNOP_LOG2]         = "log2",
+        [HLSL_IR_UNOP_LOGIC_NOT]    = "!",
+        [HLSL_IR_UNOP_NEG]          = "-",
+        [HLSL_IR_UNOP_NRM]          = "nrm",
+        [HLSL_IR_UNOP_RCP]          = "rcp",
+        [HLSL_IR_UNOP_RSQ]          = "rsq",
+        [HLSL_IR_UNOP_SAT]          = "sat",
+        [HLSL_IR_UNOP_SIGN]         = "sign",
+        [HLSL_IR_UNOP_SIN]          = "sin",
+        [HLSL_IR_UNOP_SIN_REDUCED]  = "sin_reduced",
+        [HLSL_IR_UNOP_SQRT]         = "sqrt",
 
-        "cast",
+        [HLSL_IR_BINOP_ADD]         = "+",
+        [HLSL_IR_BINOP_BIT_AND]     = "&",
+        [HLSL_IR_BINOP_BIT_OR]      = "|",
+        [HLSL_IR_BINOP_BIT_XOR]     = "^",
+        [HLSL_IR_BINOP_CRS]         = "crs",
+        [HLSL_IR_BINOP_DIV]         = "/",
+        [HLSL_IR_BINOP_DOT]         = "dot",
+        [HLSL_IR_BINOP_EQUAL]       = "==",
+        [HLSL_IR_BINOP_GEQUAL]      = ">=",
+        [HLSL_IR_BINOP_GREATER]     = ">",
+        [HLSL_IR_BINOP_LEQUAL]      = "<=",
+        [HLSL_IR_BINOP_LESS]        = "<",
+        [HLSL_IR_BINOP_LOGIC_AND]   = "&&",
+        [HLSL_IR_BINOP_LOGIC_OR]    = "||",
+        [HLSL_IR_BINOP_LSHIFT]      = "<<",
+        [HLSL_IR_BINOP_MAX]         = "max",
+        [HLSL_IR_BINOP_MIN]         = "min",
+        [HLSL_IR_BINOP_MOD]         = "%",
+        [HLSL_IR_BINOP_MUL]         = "*",
+        [HLSL_IR_BINOP_NEQUAL]      = "!=",
+        [HLSL_IR_BINOP_POW]         = "pow",
+        [HLSL_IR_BINOP_RSHIFT]      = ">>",
 
-        "fract",
-
-        "sin",
-        "cos",
-        "sin_reduced",
-        "cos_reduced",
-
-        "dsx",
-        "dsy",
-
-        "sat",
-
-        "+",
-        "*",
-        "/",
-
-        "%",
-
-        "<",
-        ">",
-        "<=",
-        ">=",
-        "==",
-        "!=",
-
-        "&&",
-        "||",
-
-        "<<",
-        ">>",
-        "&",
-        "|",
-        "^",
-
-        "dot",
-        "crs",
-        "min",
-        "max",
-
-        "pow",
-
-        "lerp",
+        [HLSL_IR_TEROP_LERP]        = "lerp",
     };
 
     return op_names[expr->op];
