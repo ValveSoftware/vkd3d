@@ -105,6 +105,7 @@ vkd3d_shader_tests = \
 	tests/texture-load-typed.shader_test \
 	tests/trigonometry.shader_test \
 	tests/uav.shader_test \
+	tests/uav-load.shader_test \
 	tests/writemask-assignop-0.shader_test \
 	tests/writemask-assignop-1.shader_test \
 	tests/writemask-assignop-2.shader_test \
@@ -306,6 +307,7 @@ XFAIL_TESTS = \
 	tests/max.shader_test \
 	tests/trigonometry.shader_test \
 	tests/uav.shader_test \
+	tests/uav-load.shader_test \
 	tests/writemask-assignop-1.shader_test
 endif
 
