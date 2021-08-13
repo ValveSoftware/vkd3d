@@ -912,7 +912,8 @@ struct vkd3d_pipeline_bindings
     const struct d3d12_root_signature *root_signature;
 
     VkPipelineBindPoint vk_bind_point;
-    VkDescriptorSet descriptor_set;
+    size_t descriptor_set_count;
+    VkDescriptorSet descriptor_sets[VKD3D_MAX_DESCRIPTOR_SETS - 1];
     bool in_use;
 
     D3D12_GPU_DESCRIPTOR_HANDLE descriptor_tables[D3D12_MAX_ROOT_COST];
