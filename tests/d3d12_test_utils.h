@@ -557,7 +557,7 @@ static void release_resource_readback(struct resource_readback *rb)
 }
 
 #define check_readback_data_float(a, b, c, d) check_readback_data_float_(__LINE__, a, b, c, d)
-static void check_readback_data_float_(unsigned int line, struct resource_readback *rb,
+static inline void check_readback_data_float_(unsigned int line, struct resource_readback *rb,
         const RECT *rect, float expected, unsigned int max_diff)
 {
     RECT r = {0, 0, rb->width, rb->height};
@@ -968,6 +968,26 @@ static ID3D12PipelineState *create_pipeline_state_(unsigned int line, ID3D12Devi
     ok_(line)(SUCCEEDED(hr), "Failed to create graphics pipeline state, hr %#x.\n", hr);
 
     return SUCCEEDED(hr) ? pipeline_state : NULL;
+}
+
+#define create_compute_pipeline_state(a, b, c) create_compute_pipeline_state_(__LINE__, a, b, c)
+static inline ID3D12PipelineState *create_compute_pipeline_state_(unsigned int line, ID3D12Device *device,
+        ID3D12RootSignature *root_signature, const D3D12_SHADER_BYTECODE cs)
+{
+    D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc;
+    ID3D12PipelineState *pipeline_state = NULL;
+    HRESULT hr;
+
+    memset(&pipeline_state_desc, 0, sizeof(pipeline_state_desc));
+    pipeline_state_desc.pRootSignature = root_signature;
+    pipeline_state_desc.CS = cs;
+    pipeline_state_desc.NodeMask = 0;
+    pipeline_state_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+    hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state);
+    ok_(line)(SUCCEEDED(hr), "Failed to create compute pipeline state, hr %#x.\n", hr);
+
+    return pipeline_state;
 }
 
 struct test_context_desc

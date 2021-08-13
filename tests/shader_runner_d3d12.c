@@ -117,12 +117,16 @@ enum shader_model
 struct shader_context
 {
     struct test_context c;
+    ID3D12CommandQueue *compute_queue;
+    ID3D12CommandAllocator *compute_allocator;
+    ID3D12GraphicsCommandList *compute_list;
     enum shader_model minimum_shader_model;
 
-    ID3D10Blob *ps_code;
+    ID3D10Blob *cs_code, *ps_code;
 
     uint32_t *uniforms;
     size_t uniform_count;
+    unsigned int uniform_index;
 
     struct texture *textures;
     size_t texture_count;
@@ -177,6 +181,7 @@ enum parse_state
     STATE_PREPROC_INVALID,
     STATE_REQUIRE,
     STATE_SAMPLER,
+    STATE_SHADER_COMPUTE,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEXTURE,
@@ -395,111 +400,157 @@ err:
     fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
+static ID3D12RootSignature *shader_test_create_root_signature(struct shader_context *context,
+        ID3D12CommandQueue *queue, ID3D12CommandAllocator *allocator, ID3D12GraphicsCommandList *command_list)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
+    D3D12_ROOT_PARAMETER root_params[3], *root_param;
+    D3D12_STATIC_SAMPLER_DESC static_samplers[1];
+    ID3D12RootSignature *root_signature;
+    HRESULT hr;
+    size_t i;
+
+    root_signature_desc.NumParameters = 0;
+    root_signature_desc.pParameters = root_params;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = static_samplers;
+
+    if (context->uniform_count)
+    {
+        context->uniform_index = root_signature_desc.NumParameters++;
+        root_param = &root_params[context->uniform_index];
+        root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        root_param->Constants.ShaderRegister = 0;
+        root_param->Constants.RegisterSpace = 0;
+        root_param->Constants.Num32BitValues = context->uniform_count;
+        root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+
+    for (i = 0; i < context->texture_count; ++i)
+    {
+        struct texture *texture = &context->textures[i];
+        D3D12_DESCRIPTOR_RANGE *range = &texture->descriptor_range;
+        D3D12_SUBRESOURCE_DATA resource_data;
+
+        texture->root_index = root_signature_desc.NumParameters++;
+        root_param = &root_params[texture->root_index];
+        root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        root_param->DescriptorTable.NumDescriptorRanges = 1;
+        root_param->DescriptorTable.pDescriptorRanges = range;
+        root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        range->RangeType = texture->uav ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+        range->NumDescriptors = 1;
+        range->BaseShaderRegister = texture->slot;
+        range->RegisterSpace = 0;
+        range->OffsetInDescriptorsFromTableStart = 0;
+
+        if (!texture->resource)
+        {
+            D3D12_RESOURCE_STATES resource_state;
+
+            if (texture->uav)
+                resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            else
+                resource_state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                        | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
+            texture->heap = create_gpu_descriptor_heap(context->c.device,
+                    D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+            texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
+                    texture->format, texture->uav ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : 0,
+                    D3D12_RESOURCE_STATE_COPY_DEST);
+            resource_data.pData = texture->data;
+            resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
+            upload_texture_data(texture->resource, &resource_data, 1, queue, command_list);
+            reset_command_list(command_list, allocator);
+            transition_resource_state(command_list, texture->resource,
+                    D3D12_RESOURCE_STATE_COPY_DEST, resource_state);
+            if (texture->uav)
+                ID3D12Device_CreateUnorderedAccessView(context->c.device, texture->resource,
+                        NULL, NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+            else
+                ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
+                        NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+        }
+    }
+
+    assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
+
+    for (i = 0; i < context->sampler_count; ++i)
+    {
+        D3D12_STATIC_SAMPLER_DESC *sampler_desc = &static_samplers[root_signature_desc.NumStaticSamplers++];
+        const struct sampler *sampler = &context->samplers[i];
+
+        memset(sampler_desc, 0, sizeof(*sampler_desc));
+        sampler_desc->Filter = sampler->filter;
+        sampler_desc->AddressU = sampler->u_address;
+        sampler_desc->AddressV = sampler->v_address;
+        sampler_desc->AddressW = sampler->w_address;
+        sampler_desc->ShaderRegister = sampler->slot;
+        sampler_desc->RegisterSpace = 0;
+        sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+
+    hr = create_root_signature(context->c.device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    return root_signature;
+}
+
 static void parse_test_directive(struct shader_context *context, const char *line)
 {
     const char *const orig_line = line;
     int ret;
 
-    if (match_string(line, "draw quad", &line))
+    if (match_string(line, "dispatch", &line))
+    {
+        D3D12_SHADER_BYTECODE cs
+                = {ID3D10Blob_GetBufferPointer(context->cs_code), ID3D10Blob_GetBufferSize(context->cs_code)};
+        ID3D12GraphicsCommandList *command_list = context->compute_list;
+        ID3D12RootSignature *root_signature;
+        ID3D12PipelineState *pso;
+        unsigned int x, y, z;
+        HRESULT hr;
+        size_t i;
+
+        ret = sscanf(line, "%u %u %u", &x, &y, &z);
+        if (ret < 3)
+            goto err;
+
+        root_signature = shader_test_create_root_signature(context,
+                context->compute_queue, context->compute_allocator, command_list);
+
+        pso = create_compute_pipeline_state(context->c.device, root_signature, cs);
+        ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
+        ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+        for (i = 0; i < context->texture_count; ++i)
+            ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, context->textures[i].root_index,
+                    get_gpu_descriptor_handle(&context->c, context->textures[i].heap, 0));
+        ID3D12GraphicsCommandList_Dispatch(command_list, x, y, z);
+        ID3D12PipelineState_Release(pso);
+        ID3D12RootSignature_Release(root_signature);
+
+        /* Subsequent UAV probes will use the graphics command list, so make
+         * sure that the above barriers are actually executed. */
+        hr = ID3D12GraphicsCommandList_Close(command_list);
+        ok(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+        exec_command_list(context->compute_queue, command_list);
+        wait_queue_idle(context->c.device, context->compute_queue);
+        reset_command_list(command_list, context->compute_allocator);
+    }
+    else if (match_string(line, "draw quad", &line))
     {
         D3D12_SHADER_BYTECODE ps
                 = {ID3D10Blob_GetBufferPointer(context->ps_code), ID3D10Blob_GetBufferSize(context->ps_code)};
         ID3D12GraphicsCommandList *command_list = context->c.list;
-        D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
-        D3D12_ROOT_PARAMETER root_params[3], *root_param;
-        D3D12_STATIC_SAMPLER_DESC static_samplers[1];
         static const float clear_color[4];
-        unsigned int uniform_index;
         ID3D12PipelineState *pso;
-        HRESULT hr;
         size_t i;
-
-        root_signature_desc.NumParameters = 0;
-        root_signature_desc.pParameters = root_params;
-        root_signature_desc.NumStaticSamplers = 0;
-        root_signature_desc.pStaticSamplers = static_samplers;
-
-        if (context->uniform_count)
-        {
-            uniform_index = root_signature_desc.NumParameters++;
-            root_param = &root_params[uniform_index];
-            root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-            root_param->Constants.ShaderRegister = 0;
-            root_param->Constants.RegisterSpace = 0;
-            root_param->Constants.Num32BitValues = context->uniform_count;
-            root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        }
-
-        for (i = 0; i < context->texture_count; ++i)
-        {
-            struct texture *texture = &context->textures[i];
-            D3D12_DESCRIPTOR_RANGE *range = &texture->descriptor_range;
-            D3D12_SUBRESOURCE_DATA resource_data;
-
-            texture->root_index = root_signature_desc.NumParameters++;
-            root_param = &root_params[texture->root_index];
-            root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            root_param->DescriptorTable.NumDescriptorRanges = 1;
-            root_param->DescriptorTable.pDescriptorRanges = range;
-            root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-            range->RangeType = texture->uav ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-            range->NumDescriptors = 1;
-            range->BaseShaderRegister = texture->slot;
-            range->RegisterSpace = 0;
-            range->OffsetInDescriptorsFromTableStart = 0;
-
-            if (!texture->resource)
-            {
-                D3D12_RESOURCE_STATES resource_state;
-
-                if (texture->uav)
-                    resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-                else
-                    resource_state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-                            | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-
-                texture->heap = create_gpu_descriptor_heap(context->c.device,
-                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-                texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                        texture->format, texture->uav ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : 0,
-                        D3D12_RESOURCE_STATE_COPY_DEST);
-                resource_data.pData = texture->data;
-                resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
-                upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
-                reset_command_list(command_list, context->c.allocator);
-                transition_resource_state(command_list, texture->resource,
-                        D3D12_RESOURCE_STATE_COPY_DEST, resource_state);
-                if (texture->uav)
-                    ID3D12Device_CreateUnorderedAccessView(context->c.device, texture->resource,
-                            NULL, NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
-                else
-                    ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
-                            NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
-            }
-        }
-
-        assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
-
-        for (i = 0; i < context->sampler_count; ++i)
-        {
-            D3D12_STATIC_SAMPLER_DESC *sampler_desc = &static_samplers[root_signature_desc.NumStaticSamplers++];
-            const struct sampler *sampler = &context->samplers[i];
-
-            memset(sampler_desc, 0, sizeof(*sampler_desc));
-            sampler_desc->Filter = sampler->filter;
-            sampler_desc->AddressU = sampler->u_address;
-            sampler_desc->AddressV = sampler->v_address;
-            sampler_desc->AddressW = sampler->w_address;
-            sampler_desc->ShaderRegister = sampler->slot;
-            sampler_desc->RegisterSpace = 0;
-            sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        }
 
         if (context->c.root_signature)
             ID3D12RootSignature_Release(context->c.root_signature);
-        hr = create_root_signature(context->c.device, &root_signature_desc, &context->c.root_signature);
-        ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+        context->c.root_signature = shader_test_create_root_signature(context,
+                context->c.queue, context->c.allocator, command_list);
 
         pso = create_pipeline_state(context->c.device, context->c.root_signature,
                 context->c.render_target_desc.Format, NULL, &ps, NULL);
@@ -508,7 +559,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
         ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->c.root_signature);
         if (context->uniform_count)
-            ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
+            ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, context->uniform_index,
                     context->uniform_count, context->uniforms, 0);
         for (i = 0; i < context->texture_count; ++i)
             ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, context->textures[i].root_index,
@@ -759,14 +810,15 @@ START_TEST(shader_runner_d3d12)
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
     size_t shader_source_size = 0, shader_source_len = 0;
+    struct sampler *current_sampler = NULL;
+    struct texture *current_texture = NULL;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
-    struct sampler *current_sampler;
-    struct texture *current_texture;
     struct shader_context context;
     const char *filename = NULL;
     char *shader_source = NULL;
     char line[256];
+    HRESULT hr;
     FILE *f;
 
     parse_args(argc, argv);
@@ -797,6 +849,17 @@ START_TEST(shader_runner_d3d12)
     memset(&context, 0, sizeof(context));
     init_test_context(&context.c, &desc);
 
+    context.compute_queue = create_command_queue(context.c.device,
+            D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+
+    hr = ID3D12Device_CreateCommandAllocator(context.c.device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            &IID_ID3D12CommandAllocator, (void **)&context.compute_allocator);
+    ok(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateCommandList(context.c.device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            context.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context.compute_list);
+    ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
+
     for (;;)
     {
         char *ret = fgets(line, sizeof(line), f);
@@ -813,6 +876,22 @@ START_TEST(shader_runner_d3d12)
                 case STATE_TEST:
                 case STATE_TEXTURE:
                     break;
+
+                case STATE_SHADER_COMPUTE:
+                {
+                    static const char *const shader_models[] =
+                    {
+                        [SHADER_MODEL_4_0] = "cs_4_0",
+                        [SHADER_MODEL_4_1] = "cs_4_1",
+                        [SHADER_MODEL_5_0] = "cs_5_0",
+                        [SHADER_MODEL_5_1] = "cs_5_1",
+                    };
+
+                    if (!(context.cs_code = compile_shader(shader_source, shader_models[context.minimum_shader_model])))
+                        return;
+                    shader_source_len = 0;
+                    break;
+                }
 
                 case STATE_SHADER_PIXEL:
                 {
@@ -916,6 +995,14 @@ START_TEST(shader_runner_d3d12)
             {
                 state = STATE_REQUIRE;
             }
+            else if (!strcmp(line, "[compute shader]\n"))
+            {
+                state = STATE_SHADER_COMPUTE;
+
+                if (context.cs_code)
+                    ID3D10Blob_Release(context.cs_code);
+                context.cs_code = NULL;
+            }
             else if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
@@ -1017,6 +1104,7 @@ START_TEST(shader_runner_d3d12)
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_INVALID_PIXEL:
+                case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_PIXEL:
                 {
                     size_t len = strlen(line);
@@ -1050,6 +1138,9 @@ START_TEST(shader_runner_d3d12)
         ID3D10Blob_Release(context.ps_code);
     for (i = 0; i < context.texture_count; ++i)
         free_texture(&context.textures[i]);
+    ID3D12GraphicsCommandList_Release(context.compute_list);
+    ID3D12CommandAllocator_Release(context.compute_allocator);
+    ID3D12CommandQueue_Release(context.compute_queue);
     destroy_test_context(&context.c);
 
     fclose(f);

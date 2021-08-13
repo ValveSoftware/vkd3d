@@ -1,0 +1,21 @@
+[require]
+shader model >= 5.0
+
+[uav 0]
+format r32 float
+size (1, 1)
+
+0.1
+
+[compute shader]
+RWTexture2D<float> u;
+
+    [numthreads(1, 1, 1)]
+void main()
+{
+    u[uint2(0, 0)] = -123.0;
+}
+
+[test]
+dispatch 1 1 1
+probe uav 0 r (0, 0) (-123.0);

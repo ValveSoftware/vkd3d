@@ -634,26 +634,6 @@ static ID3D12RootSignature *create_texture_root_signature_(unsigned int line,
     return root_signature;
 }
 
-#define create_compute_pipeline_state(a, b, c) create_compute_pipeline_state_(__LINE__, a, b, c)
-static ID3D12PipelineState *create_compute_pipeline_state_(unsigned int line, ID3D12Device *device,
-        ID3D12RootSignature *root_signature, const D3D12_SHADER_BYTECODE cs)
-{
-    D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc;
-    ID3D12PipelineState *pipeline_state = NULL;
-    HRESULT hr;
-
-    memset(&pipeline_state_desc, 0, sizeof(pipeline_state_desc));
-    pipeline_state_desc.pRootSignature = root_signature;
-    pipeline_state_desc.CS = cs;
-    pipeline_state_desc.NodeMask = 0;
-    pipeline_state_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
-    hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
-            &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    ok_(line)(SUCCEEDED(hr), "Failed to create compute pipeline state, hr %#x.\n", hr);
-
-    return pipeline_state;
-}
-
 #define create_command_signature(a, b) create_command_signature_(__LINE__, a, b)
 static ID3D12CommandSignature *create_command_signature_(unsigned int line,
         ID3D12Device *device, D3D12_INDIRECT_ARGUMENT_TYPE argument_type)
