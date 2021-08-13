@@ -386,6 +386,8 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
             return D3D_SIT_SAMPLER;
         case HLSL_TYPE_TEXTURE:
             return D3D_SIT_TEXTURE;
+        case HLSL_TYPE_UAV:
+            return D3D_SIT_UAV_RWTYPED;
         default:
             assert(0);
             return 0;
@@ -550,18 +552,18 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
         put_u32(&buffer, 0); /* name */
         put_u32(&buffer, sm4_resource_type(var->data_type));
-        if (var->data_type->base_type == HLSL_TYPE_TEXTURE)
+        if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
+        {
+            put_u32(&buffer, 0); /* return type */
+            put_u32(&buffer, 0); /* dimension */
+            put_u32(&buffer, 0); /* multisample count */
+        }
+        else
         {
             put_u32(&buffer, sm4_return_type(var->data_type));
             put_u32(&buffer, sm4_rdef_resource_dimension(var->data_type));
             put_u32(&buffer, ~0u); /* FIXME */
             flags |= (var->data_type->e.resource_format->dimx - 1) << 2;
-        }
-        else
-        {
-            put_u32(&buffer, 0); /* return type */
-            put_u32(&buffer, 0); /* dimension */
-            put_u32(&buffer, 0); /* multisample count */
         }
         put_u32(&buffer, var->reg.id); /* bind point */
         put_u32(&buffer, 1); /* bind count */
