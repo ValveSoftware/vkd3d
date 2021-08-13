@@ -324,7 +324,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
         return true;
 
     condition = node_from_list(cond_list);
-    if (!(not = hlsl_new_unary_expr(ctx, HLSL_IR_UNOP_LOGIC_NOT, condition, condition->loc)))
+    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, condition->loc)))
         return false;
     list_add_tail(cond_list, &not->entry);
 
@@ -535,7 +535,7 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
         var = src->var;
         if (src->offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, src->offset.node, offset)))
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, src->offset.node, offset)))
                 return NULL;
             list_add_tail(instrs, &add->entry);
             offset = add;
@@ -604,7 +604,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
     if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
-    if (!(mul = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_MUL, index, &c->node)))
+    if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
         return NULL;
     list_add_tail(instrs, &mul->entry);
     index = mul;
@@ -1117,16 +1117,16 @@ static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
     static const enum hlsl_ir_expr_op ops[] =
     {
         0,
-        HLSL_IR_BINOP_ADD,
+        HLSL_OP2_ADD,
         0,
-        HLSL_IR_BINOP_MUL,
-        HLSL_IR_BINOP_DIV,
-        HLSL_IR_BINOP_MOD,
-        HLSL_IR_BINOP_LSHIFT,
-        HLSL_IR_BINOP_RSHIFT,
-        HLSL_IR_BINOP_BIT_AND,
-        HLSL_IR_BINOP_BIT_OR,
-        HLSL_IR_BINOP_BIT_XOR,
+        HLSL_OP2_MUL,
+        HLSL_OP2_DIV,
+        HLSL_OP2_MOD,
+        HLSL_OP2_LSHIFT,
+        HLSL_OP2_RSHIFT,
+        HLSL_OP2_BIT_AND,
+        HLSL_OP2_BIT_OR,
+        HLSL_OP2_BIT_XOR,
     };
 
     return ops[op];
@@ -1181,7 +1181,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         struct hlsl_ir_node *args[3] = {rhs};
         struct hlsl_ir_expr *expr;
 
-        if (!(expr = add_expr(ctx, instrs, HLSL_IR_UNOP_NEG, args, &rhs->loc)))
+        if (!(expr = add_expr(ctx, instrs, HLSL_OP1_NEG, args, &rhs->loc)))
             return NULL;
         rhs = &expr->node;
         assign_op = ASSIGN_OP_ADD;
@@ -1211,7 +1211,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     while (lhs->type != HLSL_IR_LOAD)
     {
-        if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_IR_UNOP_CAST)
+        if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
             FIXME("Cast on the lhs.\n");
             vkd3d_free(store);
@@ -2835,8 +2835,7 @@ unary_expr:
         }
     | unary_op unary_expr
         {
-            enum hlsl_ir_expr_op ops[] = {0, HLSL_IR_UNOP_NEG,
-                    HLSL_IR_UNOP_LOGIC_NOT, HLSL_IR_UNOP_BIT_NOT};
+            static const enum hlsl_ir_expr_op ops[] = {0, HLSL_OP1_NEG, HLSL_OP1_LOGIC_NOT, HLSL_OP1_BIT_NOT};
 
             if ($1 == UNARY_OP_PLUS)
                 $$ = $2;
@@ -2901,31 +2900,31 @@ mul_expr:
       unary_expr
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_MUL, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_MUL, @2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_DIV, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_DIV, @2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_MOD, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_MOD, @2);
         }
 
 add_expr:
       mul_expr
     | add_expr '+' mul_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_ADD, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_ADD, @2);
         }
     | add_expr '-' mul_expr
         {
             struct hlsl_ir_node *neg;
 
-            if (!(neg = hlsl_new_unary_expr(ctx, HLSL_IR_UNOP_NEG, node_from_list($3), @2)))
+            if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), @2)))
                 YYABORT;
             list_add_tail($3, &neg->entry);
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_ADD, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_ADD, @2);
         }
 
 shift_expr:
@@ -2943,30 +2942,30 @@ relational_expr:
       shift_expr
     | relational_expr '<' shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_LESS, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_LESS, @2);
         }
     | relational_expr '>' shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_GREATER, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_GREATER, @2);
         }
     | relational_expr OP_LE shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_LEQUAL, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_LEQUAL, @2);
         }
     | relational_expr OP_GE shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_GEQUAL, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_GEQUAL, @2);
         }
 
 equality_expr:
       relational_expr
     | equality_expr OP_EQ relational_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_EQUAL, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_EQUAL, @2);
         }
     | equality_expr OP_NE relational_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_IR_BINOP_NEQUAL, @2);
+            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_NEQUAL, @2);
         }
 
 bitand_expr:

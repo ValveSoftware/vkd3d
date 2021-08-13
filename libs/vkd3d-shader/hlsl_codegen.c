@@ -250,7 +250,7 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         const struct hlsl_type *src_type = expr->operands[0].node->data_type;
         const struct hlsl_type *dst_type = expr->node.data_type;
 
-        if (expr->op != HLSL_IR_UNOP_CAST)
+        if (expr->op != HLSL_OP1_CAST)
             return false;
 
         if (hlsl_types_are_equal(src_type, dst_type)
@@ -297,7 +297,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         offset = &c->node;
         if (rhs_load->src.offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, rhs_load->src.offset.node, &c->node)))
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, rhs_load->src.offset.node, &c->node)))
                 return false;
             list_add_before(&instr->entry, &add->entry);
             offset = add;
@@ -309,7 +309,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         offset = &c->node;
         if (store->lhs.offset.node)
         {
-            if (!(add = hlsl_new_binary_expr(ctx, HLSL_IR_BINOP_ADD, store->lhs.offset.node, &c->node)))
+            if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, store->lhs.offset.node, &c->node)))
                 return false;
             list_add_before(&instr->entry, &add->entry);
             offset = add;
@@ -358,7 +358,7 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
         {
             switch (expr->op)
             {
-                case HLSL_IR_UNOP_CAST:
+                case HLSL_OP1_CAST:
                     if (instr->data_type->dimx != arg1->node.data_type->dimx
                             || instr->data_type->dimy != arg1->node.data_type->dimy)
                     {
@@ -400,17 +400,17 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
         {
             switch (expr->op)
             {
-                case HLSL_IR_UNOP_NEG:
+                case HLSL_OP1_NEG:
                     for (i = 0; i < instr->data_type->dimx; ++i)
                         res->value.u[i] = -arg1->value.u[i];
                     break;
 
-                case HLSL_IR_BINOP_ADD:
+                case HLSL_OP2_ADD:
                     for (i = 0; i < instr->data_type->dimx; ++i)
                         res->value.u[i] = arg1->value.u[i] + arg2->value.u[i];
                     break;
 
-                case HLSL_IR_BINOP_MUL:
+                case HLSL_OP2_MUL:
                     for (i = 0; i < instr->data_type->dimx; ++i)
                         res->value.u[i] = arg1->value.u[i] * arg2->value.u[i];
                     break;
@@ -443,13 +443,13 @@ static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     if (instr->type != HLSL_IR_EXPR)
         return false;
     expr = hlsl_ir_expr(instr);
-    if (expr->op != HLSL_IR_BINOP_DIV)
+    if (expr->op != HLSL_OP2_DIV)
         return false;
 
-    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_IR_UNOP_RCP, expr->operands[1].node, instr->loc)))
+    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_OP1_RCP, expr->operands[1].node, instr->loc)))
         return false;
     list_add_before(&expr->node.entry, &rcp->entry);
-    expr->op = HLSL_IR_BINOP_MUL;
+    expr->op = HLSL_OP2_MUL;
     hlsl_src_remove(&expr->operands[1]);
     hlsl_src_from_node(&expr->operands[1], rcp);
     return true;

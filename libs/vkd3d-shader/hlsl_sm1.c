@@ -612,19 +612,11 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     switch (expr->op)
     {
-        case HLSL_IR_BINOP_ADD:
-            write_sm1_binary_op(ctx, buffer, D3DSIO_ADD, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_IR_BINOP_MUL:
-            write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
-            break;
-
-        case HLSL_IR_UNOP_NEG:
+        case HLSL_OP1_NEG:
             write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG);
             break;
 
-        case HLSL_IR_UNOP_RCP:
+        case HLSL_OP1_RCP:
             for (i = 0; i < instr->data_type->dimx; ++i)
             {
                 struct hlsl_reg src = arg1->reg, dst = instr->reg;
@@ -633,6 +625,14 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
                 dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
                 write_sm1_unary_op(ctx, buffer, D3DSIO_RCP, &dst, &src, 0);
             }
+            break;
+
+        case HLSL_OP2_ADD:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_ADD, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
+        case HLSL_OP2_MUL:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
         default:
