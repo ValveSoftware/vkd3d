@@ -606,7 +606,8 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     if (instr->data_type->base_type != HLSL_TYPE_FLOAT)
     {
-        FIXME("Non-float operations need to be lowered.\n");
+        /* These need to be lowered. */
+        hlsl_fixme(ctx, instr->loc, "SM1 non-float expression.");
         return;
     }
 
@@ -636,7 +637,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         default:
-            FIXME("Unhandled op %u.\n", expr->op);
+            hlsl_fixme(ctx, instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
             break;
     }
 }
@@ -765,8 +766,9 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         {
             if (instr->data_type->type == HLSL_CLASS_MATRIX)
             {
-                FIXME("Matrix operations need to be lowered.\n");
-                break;
+                /* These need to be lowered. */
+                hlsl_fixme(ctx, instr->loc, "SM1 matrix expression.");
+                continue;
             }
 
             assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);

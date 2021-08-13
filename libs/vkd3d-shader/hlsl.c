@@ -55,6 +55,23 @@ void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
     va_end(args);
 }
 
+void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, const char *fmt, ...)
+{
+    struct vkd3d_string_buffer *string;
+    va_list args;
+
+    va_start(args, fmt);
+    string = hlsl_get_string_buffer(ctx);
+    vkd3d_string_buffer_printf(string, "Aborting due to not yet implemented feature: ");
+    vkd3d_string_buffer_vprintf(string, fmt, args);
+    vkd3d_shader_error(ctx->message_context, &loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "%s", string->buffer);
+    hlsl_release_string_buffer(ctx, string);
+    va_end(args);
+
+    if (!ctx->result)
+        ctx->result = VKD3D_ERROR_NOT_IMPLEMENTED;
+}
+
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)
 {
     struct hlsl_scope *scope = ctx->cur_scope;
@@ -1031,7 +1048,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
         vkd3d_string_buffer_printf(buffer, "}");
 }
 
-static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
+const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
 {
     static const char *const op_names[] =
     {
@@ -1082,14 +1099,14 @@ static const char *debug_expr_op(const struct hlsl_ir_expr *expr)
         [HLSL_OP3_LERP]        = "lerp",
     };
 
-    return op_names[expr->op];
+    return op_names[op];
 }
 
 static void dump_ir_expr(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
     unsigned int i;
 
-    vkd3d_string_buffer_printf(buffer, "%s (", debug_expr_op(expr));
+    vkd3d_string_buffer_printf(buffer, "%s (", debug_hlsl_expr_op(expr->op));
     for (i = 0; i < 3 && expr->operands[i].node; ++i)
     {
         dump_src(buffer, &expr->operands[i]);

@@ -1213,7 +1213,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
-            FIXME("Cast on the lhs.\n");
+            hlsl_fixme(ctx, lhs->loc, "Cast on the LHS.");
             vkd3d_free(store);
             return NULL;
         }
@@ -1223,7 +1223,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             unsigned int width, s = swizzle->swizzle;
 
             if (lhs->data_type->type == HLSL_CLASS_MATRIX)
-                FIXME("Assignments with writemasks and matrices on lhs are not supported yet.\n");
+                hlsl_fixme(ctx, lhs->loc, "Matrix assignment with a writemask.");
 
             if (!invert_swizzle(&s, &writemask, &width))
             {
@@ -1338,7 +1338,9 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
             list_add_tail(list, &store->node.entry);
         }
         else
-            FIXME("Initializing with \"mismatched\" fields is not supported yet.\n");
+        {
+            hlsl_fixme(ctx, node->loc, "Implicit cast in structure initializer.");
+        }
     }
 
     vkd3d_free(initializer->args);
@@ -1502,14 +1504,14 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             }
             if (v->arrays.count)
             {
-                FIXME("Initializing arrays is not supported yet.\n");
+                hlsl_fixme(ctx, v->loc, "Array initializer.");
                 free_parse_initializer(&v->initializer);
                 vkd3d_free(v);
                 continue;
             }
             if (v->initializer.args_count > 1)
             {
-                FIXME("Complex initializers are not supported yet.\n");
+                hlsl_fixme(ctx, v->loc, "Complex initializer.");
                 free_parse_initializer(&v->initializer);
                 vkd3d_free(v);
                 continue;
@@ -1786,7 +1788,7 @@ hlsl_prog:
     | hlsl_prog declaration_statement
         {
             if (!list_empty($2))
-                FIXME("Uniform initializer.\n");
+                hlsl_fixme(ctx, @2, "Uniform initializer.");
             hlsl_free_instr_list($2);
         }
     | hlsl_prog preproc_directive
@@ -2769,7 +2771,7 @@ postfix_expr:
             }
 
             if ($2->type == HLSL_CLASS_MATRIX)
-                FIXME("Matrix constructors are not supported yet.\n");
+                hlsl_fixme(ctx, @2, "Matrix constructor.");
 
             sprintf(name, "<constructor-%x>", counter++);
             if (!(var = hlsl_new_synthetic_var(ctx, name, $2, @2)))
@@ -2931,11 +2933,11 @@ shift_expr:
       add_expr
     | shift_expr OP_LEFTSHIFT add_expr
         {
-            FIXME("Left shift.\n");
+            hlsl_fixme(ctx, @$, "Left shift.");
         }
     | shift_expr OP_RIGHTSHIFT add_expr
         {
-            FIXME("Right shift.\n");
+            hlsl_fixme(ctx, @$, "Right shift.");
         }
 
 relational_expr:
@@ -2972,42 +2974,42 @@ bitand_expr:
       equality_expr
     | bitand_expr '&' equality_expr
         {
-            FIXME("Bitwise AND.\n");
+            hlsl_fixme(ctx, @$, "Bitwise AND.");
         }
 
 bitxor_expr:
       bitand_expr
     | bitxor_expr '^' bitand_expr
         {
-            FIXME("Bitwise XOR.\n");
+            hlsl_fixme(ctx, @$, "Bitwise XOR.");
         }
 
 bitor_expr:
       bitxor_expr
     | bitor_expr '|' bitxor_expr
         {
-            FIXME("Bitwise OR.\n");
+            hlsl_fixme(ctx, @$, "Bitwise OR.");
         }
 
 logicand_expr:
       bitor_expr
     | logicand_expr OP_AND bitor_expr
         {
-            FIXME("Logical AND.\n");
+            hlsl_fixme(ctx, @$, "Logical AND.");
         }
 
 logicor_expr:
       logicand_expr
     | logicor_expr OP_OR logicand_expr
         {
-            FIXME("Logical OR.\n");
+            hlsl_fixme(ctx, @$, "Logical OR.");
         }
 
 conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            FIXME("Ternary operator.\n");
+            hlsl_fixme(ctx, @$, "Ternary operator.");
         }
 
 assignment_expr:

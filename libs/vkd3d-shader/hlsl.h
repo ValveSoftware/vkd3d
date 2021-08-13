@@ -590,6 +590,7 @@ static inline void hlsl_release_string_buffer(struct hlsl_ctx *ctx, struct vkd3d
     vkd3d_string_buffer_release(&ctx->string_buffers, buffer);
 }
 
+const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
 const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 const char *debug_hlsl_writemask(unsigned int writemask);
 
@@ -651,6 +652,8 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
 void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);
+void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+        const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4);
 void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);
 void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
