@@ -98,6 +98,7 @@ struct texture
     unsigned int width, height;
     uint8_t *data;
     size_t data_size, data_capacity;
+    bool uav;
 
     D3D12_DESCRIPTOR_RANGE descriptor_range;
     ID3D12DescriptorHeap *heap;
@@ -105,9 +106,18 @@ struct texture
     unsigned int root_index;
 };
 
+enum shader_model
+{
+    SHADER_MODEL_4_0 = 0,
+    SHADER_MODEL_4_1,
+    SHADER_MODEL_5_0,
+    SHADER_MODEL_5_1,
+};
+
 struct shader_context
 {
     struct test_context c;
+    enum shader_model minimum_shader_model;
 
     ID3D10Blob *ps_code;
 
@@ -137,6 +147,21 @@ static ID3D10Blob *compile_shader(const char *source, const char *target)
     return blob;
 }
 
+static struct texture *get_texture(struct shader_context *context, unsigned int slot, bool uav)
+{
+    struct texture *texture;
+    size_t i;
+
+    for (i = 0; i < context->texture_count; ++i)
+    {
+        texture = &context->textures[i];
+        if (texture->slot == slot && texture->uav == uav)
+            return texture;
+    }
+
+    return NULL;
+}
+
 static void free_texture(struct texture *texture)
 {
     ID3D12DescriptorHeap_Release(texture->heap);
@@ -150,6 +175,7 @@ enum parse_state
     STATE_NONE,
     STATE_PREPROC,
     STATE_PREPROC_INVALID,
+    STATE_REQUIRE,
     STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
@@ -161,6 +187,8 @@ static bool match_string(const char *line, const char *token, const char **const
 {
     size_t len = strlen(token);
 
+    while (isspace(*line))
+        ++line;
     if (strncmp(line, token, len) || !isspace(line[len]))
         return false;
     if (rest)
@@ -221,6 +249,43 @@ static D3D12_TEXTURE_ADDRESS_MODE parse_sampler_address_mode(const char *line, c
         return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     fprintf(stderr, "Malformed address mode '%s'.\n", line);
     return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+}
+
+static void parse_require_directive(struct shader_context *context, const char *line)
+{
+    const char *const orig_line = line;
+
+    if (match_string(line, "shader model >=", &line))
+    {
+        static const char *const model_strings[] =
+        {
+            [SHADER_MODEL_4_0] = "4.0",
+            [SHADER_MODEL_4_1] = "4.1",
+            [SHADER_MODEL_5_0] = "5.0",
+            [SHADER_MODEL_5_1] = "5.1",
+        };
+        unsigned int i;
+
+        for (i = 0; i < ARRAY_SIZE(model_strings); ++i)
+        {
+            if (match_string(line, model_strings[i], &line))
+            {
+                context->minimum_shader_model = i;
+                return;
+            }
+        }
+
+        fprintf(stderr, "Unknown shader model '%s'.\n", line);
+    }
+    else
+    {
+        goto err;
+    }
+
+    return;
+
+err:
+    fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
 static void parse_sampler_directive(struct sampler *sampler, const char *line)
@@ -333,6 +398,7 @@ err:
 static void parse_test_directive(struct shader_context *context, const char *line)
 {
     const char *const orig_line = line;
+    int ret;
 
     if (match_string(line, "draw quad", &line))
     {
@@ -377,7 +443,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             root_param->DescriptorTable.pDescriptorRanges = range;
             root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-            range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+            range->RangeType = texture->uav ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
             range->NumDescriptors = 1;
             range->BaseShaderRegister = texture->slot;
             range->RegisterSpace = 0;
@@ -385,18 +451,31 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (!texture->resource)
             {
+                D3D12_RESOURCE_STATES resource_state;
+
+                if (texture->uav)
+                    resource_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                else
+                    resource_state = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                            | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+
                 texture->heap = create_gpu_descriptor_heap(context->c.device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
                 texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                        texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+                        texture->format, texture->uav ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : 0,
+                        D3D12_RESOURCE_STATE_COPY_DEST);
                 resource_data.pData = texture->data;
                 resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
                 upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
                 reset_command_list(command_list, context->c.allocator);
-                transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
-                        NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+                transition_resource_state(command_list, texture->resource,
+                        D3D12_RESOURCE_STATE_COPY_DEST, resource_state);
+                if (texture->uav)
+                    ID3D12Device_CreateUnorderedAccessView(context->c.device, texture->resource,
+                            NULL, NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+                else
+                    ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
+                            NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
             }
         }
 
@@ -444,11 +523,78 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
         ID3D12PipelineState_Release(pso);
     }
+    else if (match_string(line, "probe uav", &line))
+    {
+        unsigned int x, y, ulps;
+        unsigned int slot;
+        char *rest;
+
+        slot = strtoul(line, &rest, 10);
+        if (rest == line)
+            goto err;
+        line = rest;
+
+        if (match_string(line, "r", &line))
+        {
+            struct texture *texture = get_texture(context, slot, true);
+            struct resource_readback rb;
+            float expect;
+            RECT rect;
+
+            ret = sscanf(line, "( %u , %u ) ( %f ) %u", &x, &y, &expect, &ulps);
+            if (ret < 3)
+                goto err;
+            if (ret < 4)
+                ulps = 0;
+
+            transition_resource_state(context->c.list, texture->resource,
+                    D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            get_texture_readback_with_command_list(texture->resource, 0, &rb, context->c.queue, context->c.list);
+            rect.left = x;
+            rect.right = x + 1;
+            rect.top = y;
+            rect.bottom = y + 1;
+            check_readback_data_float(&rb, &rect, expect, ulps);
+            release_resource_readback(&rb);
+            reset_command_list(context->c.list, context->c.allocator);
+            transition_resource_state(context->c.list, texture->resource,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        }
+        else if (match_string(line, "rgba", &line))
+        {
+            struct texture *texture = get_texture(context, slot, true);
+            struct resource_readback rb;
+            struct vec4 v;
+            RECT rect;
+
+            ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
+            if (ret < 6)
+                goto err;
+            if (ret < 7)
+                ulps = 0;
+
+            transition_resource_state(context->c.list, texture->resource,
+                    D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            get_texture_readback_with_command_list(texture->resource, 0, &rb, context->c.queue, context->c.list);
+            rect.left = x;
+            rect.right = x + 1;
+            rect.top = y;
+            rect.bottom = y + 1;
+            check_readback_data_vec4(&rb, &rect, &v, ulps);
+            release_resource_readback(&rb);
+            reset_command_list(context->c.list, context->c.allocator);
+            transition_resource_state(context->c.list, texture->resource,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        }
+        else
+        {
+            goto err;
+        }
+    }
     else if (match_string(line, "probe all rgba", &line))
     {
         unsigned int ulps;
         struct vec4 v;
-        int ret;
 
         ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 4)
@@ -468,7 +614,6 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         struct resource_readback rb;
         struct vec4 v;
         RECT rect;
-        int ret;
 
         ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f ) %u",
                      &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w, &ulps);
@@ -478,7 +623,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             ulps = 0;
 
         transition_resource_state(context->c.list, context->c.render_target,
-                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + w;
@@ -488,7 +633,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         release_resource_readback(&rb);
         reset_command_list(context->c.list, context->c.allocator);
         transition_resource_state(context->c.list, context->c.render_target,
-                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
     else if (match_string(line, "probe rgba", &line))
     {
@@ -496,7 +641,6 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         unsigned int x, y, ulps;
         struct vec4 v;
         RECT rect;
-        int ret;
 
         ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 6)
@@ -505,7 +649,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             ulps = 0;
 
         transition_resource_state(context->c.list, context->c.render_target,
-                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + 1;
@@ -515,7 +659,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         release_resource_readback(&rb);
         reset_command_list(context->c.list, context->c.allocator);
         transition_resource_state(context->c.list, context->c.render_target,
-                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
     else if (match_string(line, "uniform", &line))
     {
@@ -605,21 +749,6 @@ static struct sampler *get_sampler(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-static struct texture *get_texture(struct shader_context *context, unsigned int slot)
-{
-    struct texture *texture;
-    size_t i;
-
-    for (i = 0; i < context->texture_count; ++i)
-    {
-        texture = &context->textures[i];
-        if (texture->slot == slot)
-            return texture;
-    }
-
-    return NULL;
-}
-
 START_TEST(shader_runner_d3d12)
 {
     static const struct test_context_desc desc =
@@ -679,16 +808,27 @@ START_TEST(shader_runner_d3d12)
             switch (state)
             {
                 case STATE_NONE:
+                case STATE_REQUIRE:
                 case STATE_SAMPLER:
                 case STATE_TEST:
                 case STATE_TEXTURE:
                     break;
 
                 case STATE_SHADER_PIXEL:
-                    if (!(context.ps_code = compile_shader(shader_source, "ps_4_0")))
+                {
+                    static const char *const shader_models[] =
+                    {
+                        [SHADER_MODEL_4_0] = "ps_4_0",
+                        [SHADER_MODEL_4_1] = "ps_4_1",
+                        [SHADER_MODEL_5_0] = "ps_5_0",
+                        [SHADER_MODEL_5_1] = "ps_5_1",
+                    };
+
+                    if (!(context.ps_code = compile_shader(shader_source, shader_models[context.minimum_shader_model])))
                         return;
                     shader_source_len = 0;
                     break;
+                }
 
                 case STATE_SHADER_INVALID_PIXEL:
                 {
@@ -772,7 +912,11 @@ START_TEST(shader_runner_d3d12)
         {
             unsigned int index;
 
-            if (!strcmp(line, "[pixel shader]\n"))
+            if (!strcmp(line, "[require]\n"))
+            {
+                state = STATE_REQUIRE;
+            }
+            else if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
 
@@ -809,7 +953,7 @@ START_TEST(shader_runner_d3d12)
             {
                 state = STATE_TEXTURE;
 
-                if ((current_texture = get_texture(&context, index)))
+                if ((current_texture = get_texture(&context, index, false)))
                 {
                     free_texture(current_texture);
                 }
@@ -821,6 +965,28 @@ START_TEST(shader_runner_d3d12)
                     memset(current_texture, 0, sizeof(*current_texture));
                 }
                 current_texture->slot = index;
+                current_texture->uav = false;
+                current_texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_texture->data_type = TEXTURE_DATA_FLOAT;
+                current_texture->texel_size = 16;
+            }
+            else if (sscanf(line, "[uav %u]\n", &index))
+            {
+                state = STATE_TEXTURE;
+
+                if ((current_texture = get_texture(&context, index, true)))
+                {
+                    free_texture(current_texture);
+                }
+                else
+                {
+                    context.textures = realloc(context.textures,
+                            ++context.texture_count * sizeof(*context.textures));
+                    current_texture = &context.textures[context.texture_count - 1];
+                    memset(current_texture, 0, sizeof(*current_texture));
+                }
+                current_texture->slot = index;
+                current_texture->uav = true;
                 current_texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_texture->data_type = TEXTURE_DATA_FLOAT;
                 current_texture->texel_size = 16;
@@ -860,6 +1026,10 @@ START_TEST(shader_runner_d3d12)
                     shader_source_len += len;
                     break;
                 }
+
+                case STATE_REQUIRE:
+                    parse_require_directive(&context, line);
+                    break;
 
                 case STATE_SAMPLER:
                     parse_sampler_directive(current_sampler, line);

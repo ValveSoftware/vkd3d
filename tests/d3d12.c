@@ -283,43 +283,9 @@ static uint64_t get_readback_uint64(struct resource_readback *rb, unsigned int x
     return *(uint64_t *)get_readback_data(rb, x, y, 0, sizeof(uint64_t));
 }
 
-static float get_readback_float(struct resource_readback *rb, unsigned int x, unsigned int y)
-{
-    return *(float *)get_readback_data(rb, x, y, 0, sizeof(float));
-}
-
 static const struct uvec4 *get_readback_uvec4(struct resource_readback *rb, unsigned int x, unsigned int y)
 {
     return get_readback_data(rb, x, y, 0, sizeof(struct uvec4));
-}
-
-#define check_readback_data_float(a, b, c, d) check_readback_data_float_(__LINE__, a, b, c, d)
-static void check_readback_data_float_(unsigned int line, struct resource_readback *rb,
-        const RECT *rect, float expected, unsigned int max_diff)
-{
-    RECT r = {0, 0, rb->width, rb->height};
-    unsigned int x = 0, y;
-    bool all_match = true;
-    float got = 0;
-
-    if (rect)
-        r = *rect;
-
-    for (y = r.top; y < r.bottom; ++y)
-    {
-        for (x = r.left; x < r.right; ++x)
-        {
-            got = get_readback_float(rb, x, y);
-            if (!compare_float(got, expected, max_diff))
-            {
-                all_match = false;
-                break;
-            }
-        }
-        if (!all_match)
-            break;
-    }
-    ok_(line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
 }
 
 #define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__LINE__, a, b, c, d, e, f)

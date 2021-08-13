@@ -1,0 +1,56 @@
+[require]
+shader model >= 5.0
+
+[pixel shader fail]
+RWTexture2D<float4> u;
+
+float4 main() : sv_target
+{
+    /* All four components must be written in a single statement. */
+    u[uint2(0, 0)].xy = float4(1, 2);
+    u[uint2(0, 0)].zw = float4(3, 4);
+    return 0;
+}
+
+[pixel shader fail]
+Texture2D<float4> u;
+
+float4 main() : sv_target
+{
+    /* SRVs are not writable. */
+    u[uint2(0, 0)].xyzw = float4(1, 2, 3, 4);
+    return 0;
+}
+
+[uav 1]
+format r32 float
+size (2, 2)
+
+0.1 0.2
+0.3 0.4
+
+[uav 2]
+size (1, 1)
+
+0.5 0.6 0.7 0.8
+
+[pixel shader]
+RWTexture2D<float> u;
+RWTexture2D<float4> v;
+
+float4 main() : sv_target
+{
+    u[uint2(0, 0)] = 0.5;
+    u[uint2(0, 1)].x = 0.6;
+    u[uint2(1, 1)] = 0.7;
+    v[uint2(0, 0)].yxwz = float4(1, 2, 3, 4);
+    return 0;
+}
+
+[test]
+draw quad
+probe uav 1 r (0, 0) (0.5)
+probe uav 1 r (0, 1) (0.6)
+probe uav 1 r (1, 0) (0.2)
+probe uav 1 r (1, 1) (0.7)
+probe uav 2 rgba (0, 0) (2.0, 1.0, 4.0, 3.0)

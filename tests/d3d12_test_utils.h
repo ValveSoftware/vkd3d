@@ -533,6 +533,11 @@ static void *get_readback_data(struct resource_readback *rb,
     return &((BYTE *)rb->data)[slice_pitch * z + rb->row_pitch * y + x * element_size];
 }
 
+static float get_readback_float(struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return *(float *)get_readback_data(rb, x, y, 0, sizeof(float));
+}
+
 static unsigned int get_readback_uint(struct resource_readback *rb,
         unsigned int x, unsigned int y, unsigned int z)
 {
@@ -549,6 +554,35 @@ static void release_resource_readback(struct resource_readback *rb)
     D3D12_RANGE range = {0, 0};
     ID3D12Resource_Unmap(rb->resource, 0, &range);
     ID3D12Resource_Release(rb->resource);
+}
+
+#define check_readback_data_float(a, b, c, d) check_readback_data_float_(__LINE__, a, b, c, d)
+static void check_readback_data_float_(unsigned int line, struct resource_readback *rb,
+        const RECT *rect, float expected, unsigned int max_diff)
+{
+    RECT r = {0, 0, rb->width, rb->height};
+    unsigned int x = 0, y;
+    bool all_match = true;
+    float got = 0;
+
+    if (rect)
+        r = *rect;
+
+    for (y = r.top; y < r.bottom; ++y)
+    {
+        for (x = r.left; x < r.right; ++x)
+        {
+            got = get_readback_float(rb, x, y);
+            if (!compare_float(got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
 }
 
 #define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__LINE__, a, b, c, d)
