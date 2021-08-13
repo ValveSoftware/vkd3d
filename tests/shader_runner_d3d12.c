@@ -45,6 +45,10 @@ struct d3d12_shader_runner
     struct test_context test_context;
 
     ID3D12DescriptorHeap *heap, *rtv_heap;
+
+    ID3D12CommandQueue *compute_queue;
+    ID3D12CommandAllocator *compute_allocator;
+    ID3D12GraphicsCommandList *compute_list;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -158,41 +162,16 @@ static void d3d12_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static bool d3d12_runner_draw(struct shader_runner *r,
-        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
+static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shader_runner *runner,
+        ID3D12CommandQueue *queue, ID3D12CommandAllocator *allocator,
+        ID3D12GraphicsCommandList *command_list, unsigned int *uniform_index)
 {
-    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
-    struct test_context *test_context = &runner->test_context;
-
-    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
-    ID3D12GraphicsCommandList *command_list = test_context->list;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
     D3D12_ROOT_PARAMETER root_params[3], *root_param;
-    ID3D12CommandQueue *queue = test_context->queue;
-    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     D3D12_STATIC_SAMPLER_DESC static_samplers[1];
-    ID3D12Device *device = test_context->device;
-    static const float clear_color[4];
-    unsigned int uniform_index = 0;
-    ID3D10Blob *vs_code, *ps_code;
-    unsigned int rtv_count = 0;
-    ID3D12PipelineState *pso;
+    ID3D12RootSignature *root_signature;
     HRESULT hr;
     size_t i;
-
-    ps_code = compile_shader(runner, runner->r.ps_source, "ps");
-    vs_code = compile_shader(runner, runner->r.vs_source, "vs");
-    todo_if (runner->r.is_todo) ok(ps_code && vs_code, "Failed to compile shaders.\n");
-
-    if (!ps_code || !vs_code)
-    {
-        if (ps_code)
-            ID3D10Blob_Release(ps_code);
-        if (vs_code)
-            ID3D10Blob_Release(vs_code);
-        return false;
-    }
 
     root_signature_desc.NumParameters = 0;
     root_signature_desc.pParameters = root_params;
@@ -200,20 +179,10 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     root_signature_desc.pStaticSamplers = static_samplers;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
-    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
-    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
-    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
-    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
-    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    pso_desc.SampleDesc.Count = 1;
-    pso_desc.SampleMask = ~(UINT)0;
-
     if (runner->r.uniform_count)
     {
-        uniform_index = root_signature_desc.NumParameters++;
-        root_param = &root_params[uniform_index];
+        *uniform_index = root_signature_desc.NumParameters++;
+        root_param = &root_params[*uniform_index];
         root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         root_param->Constants.ShaderRegister = 0;
         root_param->Constants.RegisterSpace = 0;
@@ -250,11 +219,6 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
-                pso_desc.RTVFormats[resource->r.slot] = resource->r.format;
-                pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.slot + 1);
-                pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-                break;
-
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -277,11 +241,149 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
+    hr = create_root_signature(runner->test_context.device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    return root_signature;
+}
+
+static void add_pso(struct test_context *test_context, ID3D12PipelineState *pso)
+{
+    vkd3d_array_reserve((void **)&test_context->pso, &test_context->pso_capacity,
+            test_context->pso_count + 1, sizeof(*test_context->pso));
+    test_context->pso[test_context->pso_count++] = pso;
+}
+
+static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
+{
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
+
+    ID3D12GraphicsCommandList *command_list = runner->compute_list;
+    ID3D12CommandAllocator *allocator = runner->compute_allocator;
+    ID3D12CommandQueue *queue = runner->compute_queue;
+    ID3D12Device *device = test_context->device;
+    ID3D12RootSignature *root_signature;
+    unsigned int uniform_index;
+    ID3D12PipelineState *pso;
+    D3D12_SHADER_BYTECODE cs;
+    ID3D10Blob *cs_code;
+    HRESULT hr;
+    size_t i;
+
+    cs_code = compile_shader(runner, runner->r.cs_source, "cs");
+    todo_if (runner->r.is_todo) ok(cs_code, "Failed to compile shader.\n");
+    if (!cs_code)
+        return false;
+
+    root_signature = d3d12_runner_create_root_signature(runner, queue, allocator, command_list, &uniform_index);
+
+    cs.pShaderBytecode = ID3D10Blob_GetBufferPointer(cs_code);
+    cs.BytecodeLength = ID3D10Blob_GetBufferSize(cs_code);
+    pso = create_compute_pipeline_state(device, root_signature, cs);
+    ID3D10Blob_Release(cs_code);
+    add_pso(test_context, pso);
+
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    if (runner->r.uniform_count)
+        ID3D12GraphicsCommandList_SetComputeRoot32BitConstants(command_list, uniform_index,
+                runner->r.uniform_count, runner->r.uniforms, 0);
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+
+        switch (resource->r.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
+                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                break;
+
+            case RESOURCE_TYPE_UAV:
+                ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
+                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
+        }
+    }
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
+    ID3D12GraphicsCommandList_Dispatch(command_list, x, y, z);
+    ID3D12RootSignature_Release(root_signature);
+
+    /* Finish the command list so that we can destroy objects.
+     * Also, subsequent UAV probes will use the graphics command list, so make
+     * sure that the above barriers are actually executed. */
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    ok(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+    reset_command_list(command_list, allocator);
+
+    return true;
+}
+
+static bool d3d12_runner_draw(struct shader_runner *r,
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
+{
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
+
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
+    ID3D12GraphicsCommandList *command_list = test_context->list;
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
+    ID3D12CommandQueue *queue = test_context->queue;
+    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
+    ID3D12Device *device = test_context->device;
+    static const float clear_color[4];
+    ID3D10Blob *vs_code, *ps_code;
+    unsigned int uniform_index;
+    unsigned int rtv_count = 0;
+    ID3D12PipelineState *pso;
+    HRESULT hr;
+    size_t i;
+
+    ps_code = compile_shader(runner, runner->r.ps_source, "ps");
+    vs_code = compile_shader(runner, runner->r.vs_source, "vs");
+    todo_if (runner->r.is_todo) ok(ps_code && vs_code, "Failed to compile shaders.\n");
+
+    if (!ps_code || !vs_code)
+    {
+        if (ps_code)
+            ID3D10Blob_Release(ps_code);
+        if (vs_code)
+            ID3D10Blob_Release(vs_code);
+        return false;
+    }
+
     if (test_context->root_signature)
         ID3D12RootSignature_Release(test_context->root_signature);
-    hr = create_root_signature(device, &root_signature_desc, &test_context->root_signature);
-    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    test_context->root_signature = d3d12_runner_create_root_signature(runner,
+            queue, test_context->allocator, command_list, &uniform_index);
 
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+
+        if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+        {
+            pso_desc.RTVFormats[resource->r.slot] = resource->r.format;
+            pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.slot + 1);
+            pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+        }
+    }
+
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
+    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso_desc.SampleDesc.Count = 1;
+    pso_desc.SampleMask = ~(UINT)0;
     pso_desc.pRootSignature = test_context->root_signature;
 
     input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
@@ -307,9 +409,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     free(input_element_descs);
-    vkd3d_array_reserve((void **)&test_context->pso, &test_context->pso_capacity,
-            test_context->pso_count + 1, sizeof(*test_context->pso));
-    test_context->pso[test_context->pso_count++] = pso;
+    add_pso(test_context, pso);
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, test_context->root_signature);
     if (runner->r.uniform_count)
@@ -403,6 +503,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
 {
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
+    .dispatch = d3d12_runner_dispatch,
     .draw = d3d12_runner_draw,
     .get_resource_readback = d3d12_runner_get_resource_readback,
     .release_readback = d3d12_runner_release_readback,
@@ -418,14 +519,31 @@ void run_shader_tests_d3d12(int argc, char **argv)
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
     struct d3d12_shader_runner runner = {0};
+    ID3D12Device *device;
+    HRESULT hr;
 
     parse_args(argc, argv);
     enable_d3d12_debug_layer(argc, argv);
     init_adapter_info();
     init_test_context(&runner.test_context, &desc);
+    device = runner.test_context.device;
+
+    runner.compute_queue = create_command_queue(device,
+            D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+
+    hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            &IID_ID3D12CommandAllocator, (void **)&runner.compute_allocator);
+    ok(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
+    ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
     run_shader_tests(&runner.r, argc, argv, &d3d12_runner_ops);
 
+    ID3D12GraphicsCommandList_Release(runner.compute_list);
+    ID3D12CommandAllocator_Release(runner.compute_allocator);
+    ID3D12CommandQueue_Release(runner.compute_queue);
     if (runner.heap)
         ID3D12DescriptorHeap_Release(runner.heap);
     if (runner.rtv_heap)

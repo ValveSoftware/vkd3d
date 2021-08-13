@@ -304,6 +304,11 @@ static D3DDECLUSAGE vertex_decl_usage_from_name(const char *name)
     fatal_error("Cannot translate usage \"%s\" to a d3d9 usage.\n", name);
 }
 
+static bool d3d9_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
+{
+    fatal_error("Compute shaders are not supported.\n");
+}
+
 static bool d3d9_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -504,6 +509,7 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .check_requirements = d3d9_runner_check_requirements,
     .create_resource = d3d9_runner_create_resource,
     .destroy_resource = d3d9_runner_destroy_resource,
+    .dispatch = d3d9_runner_dispatch,
     .draw = d3d9_runner_draw,
     .get_resource_readback = d3d9_runner_get_resource_readback,
     .release_readback = d3d9_runner_release_readback,

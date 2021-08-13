@@ -65,6 +65,7 @@ vkd3d_shader_tests = \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
 	tests/cast-to-uint.shader_test \
+	tests/compute.shader_test \
 	tests/conditional.shader_test \
 	tests/floor.shader_test \
 	tests/hlsl-array-dimension.shader_test \

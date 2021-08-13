@@ -424,6 +424,91 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
+static ID3D11SamplerState *create_sampler(ID3D11Device *device, const struct sampler *sampler)
+{
+    ID3D11SamplerState *d3d11_sampler;
+    D3D11_SAMPLER_DESC desc = {0};
+    HRESULT hr;
+
+    /* Members of D3D11_FILTER are compatible with D3D12_FILTER. */
+    desc.Filter = (D3D11_FILTER)sampler->filter;
+    /* Members of D3D11_TEXTURE_ADDRESS_MODE are compatible with D3D12_TEXTURE_ADDRESS_MODE. */
+    desc.AddressU = (D3D11_TEXTURE_ADDRESS_MODE)sampler->u_address;
+    desc.AddressV = (D3D11_TEXTURE_ADDRESS_MODE)sampler->v_address;
+    desc.AddressW = (D3D11_TEXTURE_ADDRESS_MODE)sampler->w_address;
+    desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    desc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    hr = ID3D11Device_CreateSamplerState(device, &desc, &d3d11_sampler);
+    ok(hr == S_OK, "Failed to create sampler state, hr %#lx.\n", hr);
+    return d3d11_sampler;
+}
+
+static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned int y, unsigned int z)
+{
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    ID3D11DeviceContext *context = runner->immediate_context;
+    ID3D11Device *device = runner->device;
+    ID3D11ComputeShader *cs;
+    ID3D10Blob *cs_code;
+    HRESULT hr;
+    size_t i;
+
+    if (!(cs_code = compile_shader(runner->r.cs_source, "cs", runner->r.minimum_shader_model)))
+        return false;
+
+    hr = ID3D11Device_CreateComputeShader(device, ID3D10Blob_GetBufferPointer(cs_code),
+            ID3D10Blob_GetBufferSize(cs_code), NULL, &cs);
+    ok(hr == S_OK, "Failed to create compute shader, hr %#lx.\n", hr);
+
+    if (runner->r.uniform_count)
+    {
+        ID3D11Buffer *cb;
+
+        cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
+                runner->r.uniform_count * sizeof(*runner->r.uniforms), runner->r.uniforms);
+        ID3D11DeviceContext_CSSetConstantBuffers(context, 0, 1, &cb);
+        ID3D11Buffer_Release(cb);
+    }
+
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
+
+        switch (resource->r.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                ID3D11DeviceContext_CSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
+                break;
+
+            case RESOURCE_TYPE_UAV:
+                ID3D11DeviceContext_CSSetUnorderedAccessViews(context, resource->r.slot, 1, &resource->uav, NULL);
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
+        }
+    }
+
+    for (i = 0; i < runner->r.sampler_count; ++i)
+    {
+        struct sampler *sampler = &runner->r.samplers[i];
+        ID3D11SamplerState *d3d11_sampler;
+
+        d3d11_sampler = create_sampler(device, sampler);
+        ID3D11DeviceContext_CSSetSamplers(context, sampler->slot, 1, &d3d11_sampler);
+        ID3D11SamplerState_Release(d3d11_sampler);
+    }
+
+    ID3D11DeviceContext_CSSetShader(context, cs, NULL, 0);
+    ID3D11DeviceContext_Dispatch(context, x, y, z);
+
+    ID3D11ComputeShader_Release(cs);
+
+    return true;
+}
+
 static bool d3d11_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -501,19 +586,8 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     {
         struct sampler *sampler = &runner->r.samplers[i];
         ID3D11SamplerState *d3d11_sampler;
-        D3D11_SAMPLER_DESC desc = {0};
 
-        /* Members of D3D11_FILTER are compatible with D3D12_FILTER. */
-        desc.Filter = (D3D11_FILTER)sampler->filter;
-        /* Members of D3D11_TEXTURE_ADDRESS_MODE are compatible with D3D12_TEXTURE_ADDRESS_MODE. */
-        desc.AddressU = (D3D11_TEXTURE_ADDRESS_MODE)sampler->u_address;
-        desc.AddressV = (D3D11_TEXTURE_ADDRESS_MODE)sampler->v_address;
-        desc.AddressW = (D3D11_TEXTURE_ADDRESS_MODE)sampler->w_address;
-        desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-        desc.MaxLOD = D3D11_FLOAT32_MAX;
-
-        hr = ID3D11Device_CreateSamplerState(device, &desc, &d3d11_sampler);
-        ok(hr == S_OK, "Failed to create sampler state, hr %#lx.\n", hr);
+        d3d11_sampler = create_sampler(device, sampler);
         ID3D11DeviceContext_PSSetSamplers(context, sampler->slot, 1, &d3d11_sampler);
         ID3D11SamplerState_Release(d3d11_sampler);
     }
@@ -607,6 +681,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
 {
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
+    .dispatch = d3d11_runner_dispatch,
     .draw = d3d11_runner_draw,
     .get_resource_readback = d3d11_runner_get_resource_readback,
     .release_readback = d3d11_runner_release_readback,
