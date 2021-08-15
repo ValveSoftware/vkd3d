@@ -855,6 +855,16 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
+        else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_UAV)
+        {
+            reg->type = VKD3D_SM5_RT_UAV;
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            if (swizzle_type)
+                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
+            reg->idx[0] = var->reg.id;
+            reg->idx_count = 1;
+            *writemask = VKD3DSP_WRITEMASK_ALL;
+        }
         else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
         {
             reg->type = VKD3D_SM4_RT_SAMPLER;
@@ -1397,24 +1407,28 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
         const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords)
 {
+    bool uav = (resource_type->base_type == HLSL_TYPE_UAV);
     struct sm4_instruction instr;
     unsigned int dim_count;
 
     memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_LD;
+    instr.opcode = uav ? VKD3D_SM5_OP_LD_UAV_TYPED : VKD3D_SM4_OP_LD;
 
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
 
-    /* Mipmap level is in the last component in the IR, but needs to be in the W
-     * component in the instruction. */
-    dim_count = hlsl_sampler_dim_count(resource_type->sampler_dim);
-    if (dim_count == 1)
-        instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, X, X, Y), 4);
-    if (dim_count == 2)
-        instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, Y, X, Z), 4);
+    if (!uav)
+    {
+        /* Mipmap level is in the last component in the IR, but needs to be in the W
+         * component in the instruction. */
+        dim_count = hlsl_sampler_dim_count(resource_type->sampler_dim);
+        if (dim_count == 1)
+            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, X, X, Y), 4);
+        if (dim_count == 2)
+            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, Y, X, Z), 4);
+    }
 
     sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
 

@@ -786,7 +786,8 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
     struct hlsl_ir_expr *cast;
 
-    if (expr_type->type == HLSL_CLASS_OBJECT && expr_type->base_type == HLSL_TYPE_TEXTURE
+    if (expr_type->type == HLSL_CLASS_OBJECT
+            && (expr_type->base_type == HLSL_TYPE_TEXTURE || expr_type->base_type == HLSL_TYPE_UAV)
             && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
