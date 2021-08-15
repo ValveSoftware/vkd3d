@@ -1278,6 +1278,27 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_store_uav_typed(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_deref *dst, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
+
+    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, dst, dst->var->data_type);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, coords);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+    sm4_register_from_node(&instr.srcs[1].reg, &writemask, value);
+    instr.srcs[1].swizzle = hlsl_swizzle_from_writemask(writemask);
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_expr(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
@@ -1540,6 +1561,18 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     }
 }
 
+static void write_sm4_resource_store(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_store *store)
+{
+    if (!store->resource.var->is_uniform)
+    {
+        hlsl_fixme(ctx, store->node.loc, "Store to non-uniform resource variable.");
+        return;
+    }
+
+    write_sm4_store_uav_typed(ctx, buffer, &store->resource, store->coords.node, store->value.node);
+}
+
 static void write_sm4_store(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_store *store)
 {
@@ -1673,6 +1706,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
             case HLSL_IR_RESOURCE_LOAD:
                 write_sm4_resource_load(ctx, &buffer, hlsl_ir_resource_load(instr));
+                break;
+
+            case HLSL_IR_RESOURCE_STORE:
+                write_sm4_resource_store(ctx, &buffer, hlsl_ir_resource_store(instr));
                 break;
 
             case HLSL_IR_STORE:
