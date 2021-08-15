@@ -939,6 +939,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
+        case HLSL_IR_RESOURCE_STORE:
         case HLSL_IR_STORE:
             WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
@@ -1243,7 +1244,6 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
-    struct hlsl_ir_store *store;
     struct hlsl_ir_expr *copy;
     DWORD writemask = 0;
 
@@ -1277,15 +1277,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             return NULL;
     }
 
-    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
-        return NULL;
-
-    while (lhs->type != HLSL_IR_LOAD)
+    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_RESOURCE_LOAD)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
             hlsl_fixme(ctx, lhs->loc, "Cast on the LHS.");
-            vkd3d_free(store);
             return NULL;
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
@@ -1299,15 +1295,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             if (!invert_swizzle(&s, &writemask, &width))
             {
                 hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
-                vkd3d_free(store);
                 return NULL;
             }
 
             if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
-            {
-                vkd3d_free(store);
                 return NULL;
-            }
             list_add_tail(instrs, &new_swizzle->node.entry);
 
             lhs = swizzle->val.node;
@@ -1316,17 +1308,61 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         else
         {
             hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid lvalue.");
-            vkd3d_free(store);
             return NULL;
         }
     }
 
-    init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
-    store->writemask = writemask;
-    store->lhs.var = hlsl_ir_load(lhs)->src.var;
-    hlsl_src_from_node(&store->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
-    hlsl_src_from_node(&store->rhs, rhs);
-    list_add_tail(instrs, &store->node.entry);
+    if (lhs->type == HLSL_IR_RESOURCE_LOAD)
+    {
+        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(lhs);
+        struct hlsl_ir_resource_store *store;
+        struct hlsl_type *resource_type;
+        struct hlsl_ir_swizzle *coords;
+        unsigned int dim_count;
+
+        /* Such an lvalue was produced by an index expression. */
+        assert(load->load_type == HLSL_RESOURCE_LOAD);
+        resource_type = load->resource.var->data_type;
+        assert(resource_type->type == HLSL_CLASS_OBJECT);
+        assert(resource_type->base_type == HLSL_TYPE_TEXTURE
+                || resource_type->base_type == HLSL_TYPE_UAV);
+
+        if (resource_type->base_type != HLSL_TYPE_UAV)
+            hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Read-only resources cannot be stored to.");
+
+        dim_count = sampler_dim_count(resource_type->sampler_dim);
+
+        if (writemask != ((1u << resource_type->e.resource_format->dimx) - 1))
+            hlsl_error(ctx, lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK,
+                    "Resource store expressions must write to all components.");
+
+        /* Remove the implicit mipmap level. */
+        assert(load->coords.node->data_type->type == HLSL_CLASS_VECTOR);
+        assert(load->coords.node->data_type->base_type == HLSL_TYPE_UINT);
+        assert(load->coords.node->data_type->dimx == dim_count + 1);
+        if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dim_count, load->coords.node, &lhs->loc)))
+            return NULL;
+        list_add_tail(instrs, &coords->node.entry);
+
+        if (!(store = hlsl_new_resource_store(ctx, load->resource.var,
+                load->resource.offset.node, &coords->node, rhs, lhs->loc)))
+            return NULL;
+        list_add_tail(instrs, &store->node.entry);
+    }
+    else
+    {
+        struct hlsl_ir_store *store;
+
+        if (!(store = hlsl_alloc(ctx, sizeof(*store))))
+            return NULL;
+        init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
+        store->writemask = writemask;
+        store->lhs.var = hlsl_ir_load(lhs)->src.var;
+        hlsl_src_from_node(&store->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
+        hlsl_src_from_node(&store->rhs, rhs);
+        list_add_tail(instrs, &store->node.entry);
+    }
 
     /* Don't use the instruction itself as a source, as this makes structure
      * splitting easier. Instead copy it here. Since we retrieve sources from
