@@ -1159,6 +1159,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
+        case HLSL_IR_RESOURCE_STORE:
         case HLSL_IR_STORE:
             WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
@@ -1699,7 +1700,6 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
-    struct hlsl_ir_store *store;
     struct hlsl_ir_expr *copy;
     unsigned int writemask = 0;
 
@@ -1724,7 +1724,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
         return NULL;
 
-    while (lhs->type != HLSL_IR_LOAD)
+    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_RESOURCE_LOAD)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
@@ -1761,9 +1761,50 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
     }
 
-    if (!(store = hlsl_new_store_index(ctx, &hlsl_ir_load(lhs)->src, NULL, rhs, writemask, &rhs->loc)))
-        return NULL;
-    list_add_tail(instrs, &store->node.entry);
+    if (lhs->type == HLSL_IR_RESOURCE_LOAD)
+    {
+        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(lhs);
+        struct hlsl_ir_resource_store *store;
+        struct hlsl_type *resource_type;
+        struct hlsl_ir_swizzle *coords;
+        unsigned int dim_count;
+
+        /* Such an lvalue was produced by an index expression. */
+        assert(load->load_type == HLSL_RESOURCE_LOAD);
+        resource_type = hlsl_deref_get_type(ctx, &load->resource);
+        assert(resource_type->type == HLSL_CLASS_OBJECT);
+        assert(resource_type->base_type == HLSL_TYPE_TEXTURE || resource_type->base_type == HLSL_TYPE_UAV);
+
+        if (resource_type->base_type != HLSL_TYPE_UAV)
+            hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Read-only resources cannot be stored to.");
+
+        dim_count = hlsl_sampler_dim_count(resource_type->sampler_dim);
+
+        if (writemask != ((1u << resource_type->e.resource_format->dimx) - 1))
+            hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK,
+                    "Resource store expressions must write to all components.");
+
+        /* Remove the (implicit) mipmap level from the load expression. */
+        assert(load->coords.node->data_type->type == HLSL_CLASS_VECTOR);
+        assert(load->coords.node->data_type->base_type == HLSL_TYPE_UINT);
+        assert(load->coords.node->data_type->dimx == dim_count + 1);
+        if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dim_count, load->coords.node, &lhs->loc)))
+            return NULL;
+        list_add_tail(instrs, &coords->node.entry);
+
+        if (!(store = hlsl_new_resource_store(ctx, &load->resource, &coords->node, rhs, &lhs->loc)))
+            return NULL;
+        list_add_tail(instrs, &store->node.entry);
+    }
+    else
+    {
+        struct hlsl_ir_store *store;
+
+        if (!(store = hlsl_new_store_index(ctx, &hlsl_ir_load(lhs)->src, NULL, rhs, writemask, &rhs->loc)))
+            return NULL;
+        list_add_tail(instrs, &store->node.entry);
+    }
 
     /* Don't use the instruction itself as a source, as this makes structure
      * splitting easier. Instead copy it here. Since we retrieve sources from

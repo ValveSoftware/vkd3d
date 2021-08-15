@@ -373,7 +373,7 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
     return true;
 }
 
-static struct hlsl_type *get_type_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
+struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
 {
     struct hlsl_type *type;
     unsigned int i;
@@ -400,7 +400,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
     list_init(&block->instrs);
 
     path_len = 0;
-    path_type = get_type_from_deref(ctx, prefix);
+    path_type = hlsl_deref_get_type(ctx, prefix);
     path_index = index;
     while (!type_is_single_component(path_type))
     {
@@ -415,7 +415,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
     for (i = 0; i < prefix->path_len; ++i)
         hlsl_src_from_node(&deref->path[deref_path_len++], prefix->path[i].node);
 
-    path_type = get_type_from_deref(ctx, prefix);
+    path_type = hlsl_deref_get_type(ctx, prefix);
     path_index = index;
     while (!type_is_single_component(path_type))
     {
@@ -1045,7 +1045,7 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
 
     assert(!deref->offset.node);
 
-    type = get_type_from_deref(ctx, deref);
+    type = hlsl_deref_get_type(ctx, deref);
     if (idx)
         type = hlsl_get_element_type_from_path_index(ctx, type, idx);
 
@@ -1087,7 +1087,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;
 
-    type = get_type_from_deref(ctx, deref);
+    type = hlsl_deref_get_type(ctx, deref);
     comp_type = hlsl_type_get_component_type(ctx, type, comp);
     init_node(&load->node, HLSL_IR_LOAD, comp_type, loc);
 
@@ -1127,6 +1127,20 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
     return load;
+}
+
+struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
+        struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_resource_store *store;
+
+    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
+        return NULL;
+    init_node(&store->node, HLSL_IR_RESOURCE_STORE, NULL, loc);
+    hlsl_copy_deref(ctx, &store->resource, resource);
+    hlsl_src_from_node(&store->coords, coords);
+    hlsl_src_from_node(&store->value, value);
+    return store;
 }
 
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
@@ -1511,6 +1525,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
         "HLSL_IR_LOOP",
         "HLSL_IR_JUMP",
         "HLSL_IR_RESOURCE_LOAD",
+        "HLSL_IR_RESOURCE_STORE",
         "HLSL_IR_STORE",
         "HLSL_IR_SWIZZLE",
     };
@@ -1800,6 +1815,17 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
+static void dump_ir_resource_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_resource_store *store)
+{
+    vkd3d_string_buffer_printf(buffer, "store_resource(resource = ");
+    dump_deref(buffer, &store->resource);
+    vkd3d_string_buffer_printf(buffer, ", coords = ");
+    dump_src(buffer, &store->coords);
+    vkd3d_string_buffer_printf(buffer, ", value = ");
+    dump_src(buffer, &store->value);
+    vkd3d_string_buffer_printf(buffer, ")");
+}
+
 static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
 {
     vkd3d_string_buffer_printf(buffer, "= (");
@@ -1865,6 +1891,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_RESOURCE_LOAD:
             dump_ir_resource_load(buffer, hlsl_ir_resource_load(instr));
+            break;
+
+        case HLSL_IR_RESOURCE_STORE:
+            dump_ir_resource_store(buffer, hlsl_ir_resource_store(instr));
             break;
 
         case HLSL_IR_STORE:
@@ -1992,6 +2022,14 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
     vkd3d_free(load);
 }
 
+static void free_ir_resource_store(struct hlsl_ir_resource_store *store)
+{
+    hlsl_src_remove(&store->resource.offset);
+    hlsl_src_remove(&store->coords);
+    hlsl_src_remove(&store->value);
+    vkd3d_free(store);
+}
+
 static void free_ir_store(struct hlsl_ir_store *store)
 {
     hlsl_src_remove(&store->rhs);
@@ -2037,6 +2075,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_RESOURCE_LOAD:
             free_ir_resource_load(hlsl_ir_resource_load(node));
+            break;
+
+        case HLSL_IR_RESOURCE_STORE:
+            free_ir_resource_store(hlsl_ir_resource_store(node));
             break;
 
         case HLSL_IR_STORE:

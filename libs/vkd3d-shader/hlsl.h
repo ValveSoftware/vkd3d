@@ -178,6 +178,7 @@ enum hlsl_ir_node_type
     HLSL_IR_LOOP,
     HLSL_IR_JUMP,
     HLSL_IR_RESOURCE_LOAD,
+    HLSL_IR_RESOURCE_STORE,
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
 };
@@ -410,6 +411,13 @@ struct hlsl_ir_resource_load
     struct hlsl_src coords, lod, texel_offset;
 };
 
+struct hlsl_ir_resource_store
+{
+    struct hlsl_ir_node node;
+    struct hlsl_deref resource;
+    struct hlsl_src coords, value;
+};
+
 struct hlsl_ir_store
 {
     struct hlsl_ir_node node;
@@ -576,6 +584,12 @@ static inline struct hlsl_ir_resource_load *hlsl_ir_resource_load(const struct h
 {
     assert(node->type == HLSL_IR_RESOURCE_LOAD);
     return CONTAINING_RECORD(node, struct hlsl_ir_resource_load, node);
+}
+
+static inline struct hlsl_ir_resource_store *hlsl_ir_resource_store(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_RESOURCE_STORE);
+    return CONTAINING_RECORD(node, struct hlsl_ir_resource_store, node);
 }
 
 static inline struct hlsl_ir_store *hlsl_ir_store(const struct hlsl_ir_node *node)
@@ -781,6 +795,8 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
 struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_location loc);
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
+        struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
         struct hlsl_struct_field *fields, size_t field_count);
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
@@ -829,6 +845,7 @@ unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
 unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask);
 unsigned int hlsl_swizzle_from_writemask(unsigned int writemask);
 
+struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
 bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         unsigned int *start, unsigned int *count);
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset);
