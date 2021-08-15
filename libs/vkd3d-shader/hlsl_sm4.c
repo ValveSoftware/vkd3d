@@ -999,12 +999,13 @@ static void write_sm4_dcl_sampler(struct vkd3d_bytecode_buffer *buffer, const st
 
 static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
 {
+    bool uav = (var->data_type->base_type == HLSL_TYPE_UAV);
     const struct sm4_instruction instr =
     {
-        .opcode = VKD3D_SM4_OP_DCL_RESOURCE
+        .opcode = (uav ? VKD3D_SM5_OP_DCL_UAV_TYPED : VKD3D_SM4_OP_DCL_RESOURCE)
                 | (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
 
-        .dsts[0].reg.type = VKD3D_SM4_RT_RESOURCE,
+        .dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE,
         .dsts[0].reg.idx = {var->reg.id},
         .dsts[0].reg.idx_count = 1,
         .dst_count = 1,
@@ -1612,7 +1613,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
         if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
             write_sm4_dcl_sampler(&buffer, var);
-        else if (var->data_type->base_type == HLSL_TYPE_TEXTURE)
+        else if (var->data_type->base_type == HLSL_TYPE_TEXTURE || var->data_type->base_type == HLSL_TYPE_UAV)
             write_sm4_dcl_texture(&buffer, var);
     }
 
