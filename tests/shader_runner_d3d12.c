@@ -178,7 +178,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         RECT rect;
         int ret;
 
-        ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f )", &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w);
+        ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f ) %u",
+                     &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 8)
             goto err;
         if (ret < 9)
