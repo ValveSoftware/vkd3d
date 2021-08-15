@@ -178,6 +178,7 @@ enum hlsl_ir_node_type
     HLSL_IR_LOOP,
     HLSL_IR_JUMP,
     HLSL_IR_RESOURCE_LOAD,
+    HLSL_IR_RESOURCE_STORE,
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
 };
@@ -405,6 +406,13 @@ struct hlsl_ir_resource_load
     struct hlsl_src texel_offset;
 };
 
+struct hlsl_ir_resource_store
+{
+    struct hlsl_ir_node node;
+    struct hlsl_deref resource;
+    struct hlsl_src coords, value;
+};
+
 struct hlsl_ir_store
 {
     struct hlsl_ir_node node;
@@ -563,6 +571,12 @@ static inline struct hlsl_ir_resource_load *hlsl_ir_resource_load(const struct h
 {
     assert(node->type == HLSL_IR_RESOURCE_LOAD);
     return CONTAINING_RECORD(node, struct hlsl_ir_resource_load, node);
+}
+
+static inline struct hlsl_ir_resource_store *hlsl_ir_resource_store(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_RESOURCE_STORE);
+    return CONTAINING_RECORD(node, struct hlsl_ir_resource_store, node);
 }
 
 static inline struct hlsl_ir_store *hlsl_ir_store(const struct hlsl_ir_node *node)
@@ -757,6 +771,9 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
         enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
         struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
         struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx,
+        struct hlsl_ir_var *resource, struct hlsl_ir_node *offset, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs);
 struct hlsl_ir_store *hlsl_new_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc);

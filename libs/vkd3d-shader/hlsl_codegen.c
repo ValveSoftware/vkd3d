@@ -1160,6 +1160,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
+        case HLSL_IR_RESOURCE_STORE:
             break;
     }
 
@@ -1292,6 +1293,18 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             load->coords.node->last_read = instr->index;
             if (load->texel_offset.node)
                 load->texel_offset.node->last_read = instr->index;
+            break;
+        }
+        case HLSL_IR_RESOURCE_STORE:
+        {
+            struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
+
+            var = store->resource.var;
+            var->last_read = max(var->last_read, var_last_read);
+            if (store->resource.offset.node)
+                store->resource.offset.node->last_read = instr->index;
+            store->coords.node->last_read = instr->index;
+            store->value.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_SWIZZLE:
