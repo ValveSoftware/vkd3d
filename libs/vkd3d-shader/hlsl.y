@@ -598,7 +598,8 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     struct hlsl_ir_expr *cast;
     struct hlsl_ir_node *mul;
 
-    if (expr_type->type == HLSL_CLASS_OBJECT && expr_type->base_type == HLSL_TYPE_TEXTURE
+    if (expr_type->type == HLSL_CLASS_OBJECT
+            && (expr_type->base_type == HLSL_TYPE_TEXTURE || expr_type->base_type == HLSL_TYPE_UAV)
             && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         unsigned int dim_count = sampler_dim_count(expr_type->sampler_dim);
