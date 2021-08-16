@@ -2534,9 +2534,58 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     return ret;
 }
 
+static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_attribute *attr)
+{
+    unsigned int i;
+
+    ctx->found_numthreads = 1;
+
+    if (attr->args_count != 3)
+    {
+        hlsl_error(ctx, &attr->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Expected 3 parameters for [numthreads] attribute, but got %u.", attr->args_count);
+        return;
+    }
+
+    for (i = 0; i < attr->args_count; ++i)
+    {
+        const struct hlsl_ir_node *instr = attr->args[i].node;
+        const struct hlsl_type *type = instr->data_type;
+        const struct hlsl_ir_constant *constant;
+
+        if (type->type != HLSL_CLASS_SCALAR
+                || (type->base_type != HLSL_TYPE_INT && type->base_type != HLSL_TYPE_UINT))
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, type)))
+                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Wrong type for argument %u of [numthreads]: expected int or uint, but got %s.",
+                        i, string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            break;
+        }
+
+        if (instr->type != HLSL_IR_CONSTANT)
+        {
+            hlsl_fixme(ctx, &instr->loc, "Non-constant expression in [numthreads] initializer.");
+            break;
+        }
+        constant = hlsl_ir_constant(instr);
+
+        if ((type->base_type == HLSL_TYPE_INT && constant->value[0].i <= 0)
+                || (type->base_type == HLSL_TYPE_UINT && !constant->value[0].u))
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_THREAD_COUNT,
+                    "Thread count must be a positive integer.");
+
+        ctx->thread_count[i] = constant->value[0].u;
+    }
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
+    const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block *const body = &entry_func->body;
     struct hlsl_ir_var *var;
     unsigned int i;
@@ -2578,8 +2627,19 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     for (i = 0; i < entry_func->attr_count; ++i)
-        hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
-                "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
+    {
+        const struct hlsl_attribute *attr = entry_func->attrs[i];
+
+        if (!strcmp(attr->name, "numthreads") && profile->type == VKD3D_SHADER_TYPE_COMPUTE)
+            parse_numthreads_attribute(ctx, attr);
+        else
+            hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
+                    "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
+    }
+
+    if (profile->type == VKD3D_SHADER_TYPE_COMPUTE && !ctx->found_numthreads)
+        hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
+                "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
     transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
@@ -2606,7 +2666,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
     while (progress);
 
-    if (ctx->profile->major_version < 4)
+    if (profile->major_version < 4)
         transform_ir(ctx, lower_division, body, NULL);
 
     transform_ir(ctx, validate_static_object_references, body, NULL);
@@ -2625,7 +2685,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
     allocate_temp_registers(ctx, entry_func);
-    if (ctx->profile->major_version < 4)
+    if (profile->major_version < 4)
     {
         allocate_const_registers(ctx, entry_func);
     }
