@@ -846,7 +846,8 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
 }
 
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc)
+        struct list *parameters, const struct hlsl_semantic *semantic,
+        unsigned int attr_count, const struct hlsl_attribute *const *attrs, struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_function_decl *decl;
 
@@ -856,6 +857,8 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
     decl->return_type = return_type;
     decl->parameters = parameters;
     decl->loc = loc;
+    decl->attr_count = attr_count;
+    decl->attrs = attrs;
 
     if (!hlsl_types_are_equal(return_type, ctx->builtin_types.Void))
     {
@@ -1732,8 +1735,25 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
     }
 }
 
+void hlsl_free_attribute(struct hlsl_attribute *attr)
+{
+    unsigned int i;
+
+    for (i = 0; i < attr->args_count; ++i)
+        hlsl_src_remove(&attr->args[i]);
+    hlsl_free_instr_list(&attr->instrs);
+    vkd3d_free((void *)attr->name);
+    vkd3d_free(attr);
+}
+
 static void free_function_decl(struct hlsl_ir_function_decl *decl)
 {
+    unsigned int i;
+
+    for (i = 0; i < decl->attr_count; ++i)
+        hlsl_free_attribute((void *)decl->attrs[i]);
+    vkd3d_free((void *)decl->attrs);
+
     vkd3d_free(decl->parameters);
     hlsl_free_instr_list(&decl->body.instrs);
     vkd3d_free(decl);
@@ -1781,6 +1801,7 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
         {
             struct hlsl_ir_function_decl *old_decl =
                     RB_ENTRY_VALUE(old_entry, struct hlsl_ir_function_decl, entry);
+            unsigned int i;
 
             if (!decl->has_body)
             {
@@ -1788,6 +1809,15 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
                 vkd3d_free(name);
                 return;
             }
+
+            for (i = 0; i < decl->attr_count; ++i)
+                hlsl_free_attribute((void *)decl->attrs[i]);
+            vkd3d_free((void *)decl->attrs);
+            decl->attr_count = old_decl->attr_count;
+            decl->attrs = old_decl->attrs;
+            old_decl->attr_count = 0;
+            old_decl->attrs = NULL;
+
             rb_remove(&func->overloads, old_entry);
             free_function_decl(old_decl);
         }
