@@ -1,0 +1,119 @@
+# Test HLSL attribute syntax. The compiler ignores unrecognized attributes, so
+# we need to get the parsing syntax right. Most of the following tests which
+# succeed print warnings.
+
+[pixel shader]
+
+    [numthreads]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [ numthreads ]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [numthreads(1)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [numthreads("")]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [numthreads("one")]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+uniform float4 f;
+
+    [numthreads(1, "one", 3 + 9, -9.8e4, -float2(1, 2), f)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [numthreads()]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [numthreads(1,)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [numthreads(f)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [numthreads(float2(1))]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [not_a_real_attribute_name]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+uniform float4 f;
+
+    [f]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+# this is valid IDL syntax, but not HLSL
+    [one, two]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [one][two]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [one][one]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [one][one(1)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [one][One]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+    [numthreads]
+float4 main();
+
+    [numthreads]
+float4 main() : sv_target { return 0; }
+
+[pixel shader]
+
+/* Expressions with side effects are forbidden in attributes—see
+ * hlsl-numthreads.shader_test for an example—but not if the attribute is
+ * ignored. */
+static int i = 1;
+
+    [one(i++)]
+    [two(++i)]
+    [three(i = 4)]
+float4 main() : sv_target { return 0; }
+
+[pixel shader fail]
+
+    [one]
+float4 f;
+
+float4 main() : sv_target { return 0; }

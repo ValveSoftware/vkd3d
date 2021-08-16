@@ -62,6 +62,7 @@ vkd3d_shader_tests = \
 	tests/compute.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-clamp.shader_test \
 	tests/hlsl-comma.shader_test \
@@ -72,6 +73,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
+	tests/hlsl-numthreads.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
@@ -289,6 +291,7 @@ XFAIL_TESTS = \
 	tests/compute.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-for.shader_test \
@@ -296,6 +299,7 @@ XFAIL_TESTS = \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
+	tests/hlsl-numthreads.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \

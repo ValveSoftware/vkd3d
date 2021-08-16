@@ -182,6 +182,7 @@ enum parse_state
     STATE_REQUIRE,
     STATE_SAMPLER,
     STATE_SHADER_COMPUTE,
+    STATE_SHADER_INVALID_COMPUTE,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
     STATE_TEXTURE,
@@ -909,6 +910,27 @@ START_TEST(shader_runner_d3d12)
                     break;
                 }
 
+                case STATE_SHADER_INVALID_COMPUTE:
+                {
+                    ID3D10Blob *blob = NULL, *errors = NULL;
+                    HRESULT hr;
+
+                    hr = D3DCompile(shader_source, strlen(shader_source), NULL,
+                            NULL, NULL, "main", "cs_4_0", 0, 0, &blob, &errors);
+                    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+                    ok(!blob, "Expected no compiled shader blob.\n");
+                    ok(!!errors, "Expected non-NULL error blob.\n");
+                    if (!errors)
+                        return;
+
+                    if (vkd3d_test_state.debug_level)
+                        trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+                    ID3D10Blob_Release(errors);
+
+                    shader_source_len = 0;
+                    break;
+                }
+
                 case STATE_SHADER_INVALID_PIXEL:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -1002,6 +1024,10 @@ START_TEST(shader_runner_d3d12)
                 if (context.cs_code)
                     ID3D10Blob_Release(context.cs_code);
                 context.cs_code = NULL;
+            }
+            else if (!strcmp(line, "[compute shader fail]\n"))
+            {
+                state = STATE_SHADER_INVALID_COMPUTE;
             }
             else if (!strcmp(line, "[pixel shader]\n"))
             {
@@ -1103,6 +1129,7 @@ START_TEST(shader_runner_d3d12)
 
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
+                case STATE_SHADER_INVALID_COMPUTE:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_PIXEL:

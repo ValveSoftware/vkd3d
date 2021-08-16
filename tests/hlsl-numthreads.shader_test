@@ -1,0 +1,192 @@
+# Test allowed syntax for the "numthreads" attribute.
+
+[require]
+shader model >= 5.0
+
+[compute shader]
+
+    [numthreads(1, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, 1, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(0, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, 0, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, 1, 0)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(-1, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, -1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, 1, -1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(1, -1, -1)]
+void main() {}
+
+[compute shader]
+
+    [numthreads(uint(1), 1, 1)]
+void main() {}
+
+[compute shader]
+
+    [numthreads(int(1), 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(float(1), 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads(uint1(1), 1, 1)]
+void main() {}
+
+[compute shader]
+
+    [numthreads(int(1), 1, 1)]
+void main() {}
+
+[compute shader]
+
+    [numthreads(1 + 1, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+    [numthreads("1", 1, 1)]
+void main() {}
+
+[compute shader]
+static int x = 1;
+
+    [numthreads(x, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+void main() {}
+
+[compute shader fail]
+
+    [NumThreads(1, 1, 1)]
+void main() {}
+
+[compute shader]
+
+    [numthreads(1, 1, 1)]
+void main();
+
+void main() {}
+
+[compute shader fail]
+
+void main() {}
+
+    [numthreads(1, 1, 1)]
+void main();
+
+[compute shader fail]
+
+void main();
+
+    [numthreads(1, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+/* Expressions with side effects are forbidden in attributes (but not if the
+ * attribute is ignored). */
+
+static int x = 1;
+
+    [numthreads(x++, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+static int x = 1;
+
+    [numthreads(++x, 1, 1)]
+void main() {}
+
+[compute shader fail]
+
+static int x = 1;
+
+    [numthreads((x = 2), 1, 1)]
+void main() {}
+
+[compute shader]
+
+static int x = 1;
+
+    [numthreads(++x, 1, 1)]
+void func() {}
+
+    [bogus(++x)]
+    [numthreads(1, 1, 1)]
+void main() { func(); }
+
+[uav 0]
+format r32 float
+size (2, 2)
+
+1.0 1.0
+1.0 1.0
+
+[compute shader]
+/* Attributes are taken from the first function, and dropped from the second. */
+RWTexture2D<float> u;
+
+    [numthreads(2, 1, 1)]
+void main(uint2 id);
+
+    [numthreads(1, 2, 1)]
+void main(uint2 id : sv_dispatchthreadid)
+{
+    u[id] = 2.0;
+}
+
+[test]
+dispatch 1 1 1
+probe uav 0 r (0, 0) (2.0);
+probe uav 0 r (0, 1) (1.0);
+probe uav 0 r (1, 0) (2.0);
+probe uav 0 r (1, 1) (1.0);
