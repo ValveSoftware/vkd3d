@@ -1034,6 +1034,35 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     return true;
 }
 
+#define init_compute_test_context(context) init_compute_test_context_(__LINE__, context)
+static inline bool init_compute_test_context_(unsigned int line, struct test_context *context)
+{
+    ID3D12Device *device;
+    HRESULT hr;
+
+    memset(context, 0, sizeof(*context));
+
+    if (!(context->device = create_device()))
+    {
+        skip_(line)("Failed to create device.\n");
+        return false;
+    }
+    device = context->device;
+
+    context->queue = create_command_queue_(line, device,
+            D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+
+    hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            &IID_ID3D12CommandAllocator, (void **)&context->allocator);
+    ok_(line)(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
+    ok_(line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
+
+    return true;
+}
+
 static inline void destroy_pipeline_state_objects(struct test_context *context)
 {
     size_t i;

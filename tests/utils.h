@@ -35,6 +35,11 @@ struct vec4
     float x, y, z, w;
 };
 
+struct uvec4
+{
+    unsigned int x, y, z, w;
+};
+
 struct resource_readback
 {
     uint64_t width;
@@ -95,6 +100,11 @@ static bool compare_float(float f, float g, unsigned int ulps)
         return false;
 
     return true;
+}
+
+static inline bool compare_uvec4(const struct uvec4 *v1, const struct uvec4 *v2)
+{
+    return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z && v1->w == v2->w;
 }
 
 static inline bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
