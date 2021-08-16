@@ -2,17 +2,17 @@
 % we need to get the parsing syntax right. Most of the following tests which
 % succeed print warnings.
 
-[pixel shader todo]
+[pixel shader]
 
     [numthreads]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [ numthreads ]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [numthreads(1)]
 float4 main() : sv_target { return 0; }
@@ -55,12 +55,12 @@ float4 main() : sv_target { return 0; }
     [numthreads(float2(1))]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [not_a_real_attribute_name]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
 uniform float4 f;
 
@@ -72,27 +72,27 @@ float4 main() : sv_target { return 0; }
     [one, two]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [one][two]
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
     [one][one]
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
     [one][one(1)]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [one][One]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
     [numthreads]
 float4 main();
@@ -100,7 +100,7 @@ float4 main();
     [numthreads]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader]
 
 /* Expressions with side effects are forbidden in attributes—see
  * hlsl-numthreads.shader_test for an example—but not if the attribute is

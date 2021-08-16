@@ -2539,6 +2539,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 {
     struct hlsl_block *const body = &entry_func->body;
     struct hlsl_ir_var *var;
+    unsigned int i;
     bool progress;
 
     list_move_head(&body->instrs, &ctx->static_initializers);
@@ -2575,6 +2576,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
         append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
     }
+
+    for (i = 0; i < entry_func->attr_count; ++i)
+        hlsl_warning(ctx, &entry_func->attrs[i]->loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE,
+                "Ignoring unknown attribute \"%s\".", entry_func->attrs[i]->name);
 
     transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));

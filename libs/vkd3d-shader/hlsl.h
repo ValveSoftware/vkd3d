@@ -212,6 +212,15 @@ struct hlsl_src
     struct list entry;
 };
 
+struct hlsl_attribute
+{
+    const char *name;
+    struct list instrs;
+    struct vkd3d_shader_location loc;
+    unsigned int args_count;
+    struct hlsl_src args[];
+};
+
 #define HLSL_STORAGE_EXTERN          0x00000001
 #define HLSL_STORAGE_NOINTERPOLATION 0x00000002
 #define HLSL_MODIFIER_PRECISE        0x00000004
@@ -279,6 +288,8 @@ struct hlsl_ir_function_decl
     struct list *parameters;
     struct hlsl_block body;
     bool has_body;
+    unsigned int attr_count;
+    const struct hlsl_attribute *const *attrs;
 };
 
 struct hlsl_ir_if
@@ -741,6 +752,7 @@ void hlsl_cleanup_deref(struct hlsl_deref *deref);
 
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
 
+void hlsl_free_attribute(struct hlsl_attribute *attr);
 void hlsl_free_instr(struct hlsl_ir_node *node);
 void hlsl_free_instr_list(struct list *list);
 void hlsl_free_type(struct hlsl_type *type);
@@ -771,7 +783,7 @@ struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op
 struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx,
         float f, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc);
+        struct list *parameters, const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc);
 struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
         const struct vkd3d_shader_location *loc);

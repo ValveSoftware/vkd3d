@@ -8,52 +8,52 @@ shader model >= 5.0
     [numthreads(1, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, 1, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(0, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, 0, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, 1, 0)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(-1, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, -1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, 1, -1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(1, -1, -1)]
 void main() {}
@@ -68,12 +68,12 @@ void main() {}
     [numthreads(int(1), 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(float(1), 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [numthreads(uint1(1), 1, 1)]
 void main() {}
@@ -103,7 +103,7 @@ void main() {}
 
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
     [NumThreads(1, 1, 1)]
 void main() {}
@@ -115,21 +115,21 @@ void main();
 
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
 void main() {}
 
     [numthreads(1, 1, 1)]
 void main();
 
-[compute shader fail]
+[compute shader fail todo]
 
 void main();
 
     [numthreads(1, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
 /* Expressions with side effects are forbidden in attributes (but not if the
  * attribute is ignored). */
@@ -139,14 +139,14 @@ static int x = 1;
     [numthreads(x++, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
 static int x = 1;
 
     [numthreads(++x, 1, 1)]
 void main() {}
 
-[compute shader fail]
+[compute shader fail todo]
 
 static int x = 1;
 

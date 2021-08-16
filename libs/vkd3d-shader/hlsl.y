@@ -102,6 +102,12 @@ enum parse_assign_op
     ASSIGN_OP_XOR,
 };
 
+struct parse_attribute_list
+{
+    unsigned int count;
+    const struct hlsl_attribute **attrs;
+};
+
 }
 
 %code provides
@@ -3036,6 +3042,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     struct hlsl_semantic semantic;
     enum hlsl_buffer_type buffer_type;
     enum hlsl_sampler_dim sampler_dim;
+    struct hlsl_attribute *attr;
+    struct parse_attribute_list attr_list;
 }
 
 %token KW_BLENDSTATE
@@ -3185,6 +3193,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <assign_op> assign_op
 
+%type <attr> attribute
+
+%type <attr_list> attribute_list
+
 %type <boolval> boolean
 
 %type <buffer_type> buffer_type
@@ -3196,6 +3208,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <function> func_declaration
 %type <function> func_prototype
+%type <function> func_prototype_no_attrs
 
 %type <initializer> complex_initializer
 %type <initializer> complex_initializer_list
@@ -3435,6 +3448,68 @@ field:
                 YYABORT;
         }
 
+attribute:
+      '[' any_identifier ']'
+        {
+            if (!($$ = hlsl_alloc(ctx, offsetof(struct hlsl_attribute, args[0]))))
+            {
+                vkd3d_free($2);
+                YYABORT;
+            }
+            $$->name = $2;
+            list_init(&$$->instrs);
+            $$->loc = @$;
+            $$->args_count = 0;
+        }
+    | '[' any_identifier '(' initializer_expr_list ')' ']'
+        {
+            unsigned int i;
+
+            if (!($$ = hlsl_alloc(ctx, offsetof(struct hlsl_attribute, args[$4.args_count]))))
+            {
+                vkd3d_free($2);
+                free_parse_initializer(&$4);
+                YYABORT;
+            }
+            $$->name = $2;
+            list_init(&$$->instrs);
+            list_move_tail(&$$->instrs, $4.instrs);
+            vkd3d_free($4.instrs);
+            $$->loc = @$;
+            $$->args_count = $4.args_count;
+            for (i = 0; i < $4.args_count; ++i)
+                hlsl_src_from_node(&$$->args[i], $4.args[i]);
+        }
+
+attribute_list:
+      attribute
+        {
+            $$.count = 1;
+            if (!($$.attrs = hlsl_alloc(ctx, sizeof(*$$.attrs))))
+            {
+                hlsl_free_attribute($1);
+                YYABORT;
+            }
+            $$.attrs[0] = $1;
+        }
+    | attribute_list attribute
+        {
+            const struct hlsl_attribute **new_array;
+
+            $$ = $1;
+            if (!(new_array = vkd3d_realloc($$.attrs, ($$.count + 1) * sizeof(*$$.attrs))))
+            {
+                unsigned int i;
+
+                for (i = 0; i < $$.count; ++i)
+                    hlsl_free_attribute((void *)$$.attrs[i]);
+                vkd3d_free($$.attrs);
+                YYABORT;
+            }
+            $$.attrs = new_array;
+            $$.attrs[$$.count++] = $2;
+        }
+
 func_declaration:
       func_prototype compound_statement
         {
@@ -3450,7 +3525,7 @@ func_declaration:
             hlsl_pop_scope(ctx);
         }
 
-func_prototype:
+func_prototype_no_attrs:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
       var_modifiers type var_identifier '(' parameters ')' colon_attribute
         {
@@ -3483,10 +3558,19 @@ func_prototype:
             if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
 
-            if (!($$.decl = hlsl_new_func_decl(ctx, type, $5, &$7.semantic, @3)))
+            if (!($$.decl = hlsl_new_func_decl(ctx, type, $5, &$7.semantic, &@3)))
                 YYABORT;
             $$.name = $3;
             ctx->cur_function = $$.decl;
+        }
+
+func_prototype:
+      func_prototype_no_attrs
+    | attribute_list func_prototype_no_attrs
+        {
+            $2.decl->attr_count = $1.count;
+            $2.decl->attrs = $1.attrs;
+            $$ = $2;
         }
 
 compound_statement:
