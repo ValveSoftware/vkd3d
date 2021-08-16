@@ -7,7 +7,7 @@ size (1, 1)
 
 0.1
 
-[compute shader todo]
+[compute shader]
 RWTexture2D<float> u;
 
     [numthreads(1, 1, 1)]
@@ -17,5 +17,5 @@ void main()
 }
 
 [test]
-todo dispatch 1 1 1
-todo probe uav 0 (0, 0) r (-123.0)
+dispatch 1 1 1
+probe uav 0 (0, 0) r (-123.0)
