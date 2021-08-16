@@ -95,6 +95,12 @@ enum parse_assign_op
     ASSIGN_OP_XOR,
 };
 
+struct parse_attribute_list
+{
+    unsigned int count;
+    const struct hlsl_attribute **attrs;
+};
+
 }
 
 %code provides
@@ -2126,6 +2132,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     struct hlsl_semantic semantic;
     enum hlsl_buffer_type buffer_type;
     enum hlsl_sampler_dim sampler_dim;
+    struct hlsl_attribute *attr;
+    struct parse_attribute_list attr_list;
 }
 
 %token KW_BLENDSTATE
@@ -2276,6 +2284,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <arrays> arrays
 
 %type <assign_op> assign_op
+
+%type <attr> attribute
+
+%type <attr_list> attribute_list
 
 %type <boolval> boolean
 
@@ -2519,6 +2531,67 @@ field:
             $$ = gen_struct_fields(ctx, type, $3);
         }
 
+attribute:
+      '[' any_identifier ']'
+        {
+            if (!($$ = hlsl_alloc(ctx, offsetof(struct hlsl_attribute, args[0]))))
+            {
+                vkd3d_free($2);
+                YYABORT;
+            }
+            $$->name = $2;
+            list_init(&$$->instrs);
+            $$->loc = @$;
+            $$->args_count = 0;
+        }
+    | '[' any_identifier '(' initializer_expr_list ')' ']'
+        {
+            unsigned int i;
+
+            if (!($$ = hlsl_alloc(ctx, offsetof(struct hlsl_attribute, args[$4.args_count]))))
+            {
+                vkd3d_free($2);
+                free_parse_initializer(&$4);
+                YYABORT;
+            }
+            $$->name = $2;
+            list_init(&$$->instrs);
+            list_move_tail(&$$->instrs, $4.instrs);
+            vkd3d_free($4.instrs);
+            $$->loc = @$;
+            $$->args_count = $4.args_count;
+            for (i = 0; i < $4.args_count; ++i)
+                hlsl_src_from_node(&$$->args[i], $4.args[i]);
+        }
+
+attribute_list:
+      attribute
+        {
+            $$.count = 1;
+            if (!($$.attrs = hlsl_alloc(ctx, sizeof(*$$.attrs))))
+            {
+                hlsl_free_attribute($1);
+                YYABORT;
+            }
+            $$.attrs[0] = $1;
+        }
+    | attribute_list attribute
+        {
+            const struct hlsl_attribute **new_array;
+
+            $$ = $1;
+            if (!(new_array = vkd3d_realloc($$.attrs, ($$.count + 1) * sizeof(*$$.attrs))))
+            {
+                unsigned int i;
+
+                for (i = 0; i < $$.count; ++i)
+                    hlsl_free_attribute((void *)$$.attrs[i]);
+                vkd3d_free($$.attrs);
+                YYABORT;
+            }
+            $$.attrs[$$.count++] = $2;
+        }
+
 func_declaration:
       func_prototype compound_statement
         {
@@ -2563,9 +2636,42 @@ func_prototype:
             if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
 
-            if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, &$7.semantic, @3)))
+            if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, &$7.semantic, 0, NULL, @3)))
                 YYABORT;
             $$.name = $3;
+            ctx->cur_function = $$.decl;
+        }
+    /* var_modifiers is necessary to avoid shift/reduce conflicts. */
+    | attribute_list var_modifiers type var_identifier '(' parameters ')' colon_attribute
+        {
+            struct hlsl_ir_var *var;
+
+            if ($2)
+            {
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers are not allowed on functions.");
+                YYABORT;
+            }
+            if ((var = hlsl_get_var(ctx->globals, $4)))
+            {
+                hlsl_error(ctx, @4, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                        "\"%s\" is already declared as a variable.", $4);
+                hlsl_note(ctx, var->loc, VKD3D_SHADER_LOG_ERROR,
+                        "\"%s\" was previously declared here.", $4);
+                YYABORT;
+            }
+            if (hlsl_type_is_void($3) && $8.semantic.name)
+            {
+                hlsl_error(ctx, @8, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                        "Semantics are not allowed on void functions.");
+            }
+
+            if ($8.reg_reservation.type)
+                FIXME("Unexpected register reservation for a function.\n");
+
+            if (!($$.decl = hlsl_new_func_decl(ctx, $3, $6, &$8.semantic, $1.count, $1.attrs, @4)))
+                YYABORT;
+            $$.name = $4;
             ctx->cur_function = $$.decl;
         }
 
