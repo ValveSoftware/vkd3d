@@ -81,6 +81,8 @@ enum parse_state
     STATE_RESOURCE,
     STATE_SAMPLER,
     STATE_SHADER_COMPUTE,
+    STATE_SHADER_INVALID_COMPUTE,
+    STATE_SHADER_INVALID_COMPUTE_TODO,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
@@ -653,6 +655,30 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
     return stride;
 }
 
+static void compile_invalid_shader(const char *source, size_t len, const char *profile)
+{
+    ID3D10Blob *blob = NULL, *errors = NULL;
+    HRESULT hr;
+
+    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
+    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+    if (hr == S_OK)
+    {
+        ID3D10Blob_Release(blob);
+    }
+    else
+    {
+        assert_that(!blob, "Expected no compiled shader blob.\n");
+        assert_that(!!errors, "Expected non-NULL error blob.\n");
+    }
+    if (errors)
+    {
+        if (vkd3d_test_state.debug_level)
+            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+        ID3D10Blob_Release(errors);
+    }
+}
+
 void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
@@ -741,35 +767,19 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     shader_source_size = 0;
                     break;
 
-                case STATE_SHADER_INVALID_PIXEL:
-                case STATE_SHADER_INVALID_PIXEL_TODO:
-                {
-                    ID3D10Blob *blob = NULL, *errors = NULL;
-                    HRESULT hr;
-
-                    hr = D3DCompile(shader_source, strlen(shader_source), NULL,
-                            NULL, NULL, "main", "ps_4_0", 0, 0, &blob, &errors);
-                    todo_if (state == STATE_SHADER_INVALID_PIXEL_TODO)
-                        ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
-                    if (hr == S_OK)
-                    {
-                        ID3D10Blob_Release(blob);
-                    }
-                    else
-                    {
-                        ok(!blob, "Expected no compiled shader blob.\n");
-                        ok(!!errors, "Expected non-NULL error blob.\n");
-                    }
-                    if (errors)
-                    {
-                        if (vkd3d_test_state.debug_level)
-                            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-                        ID3D10Blob_Release(errors);
-                    }
-
+                case STATE_SHADER_INVALID_COMPUTE:
+                case STATE_SHADER_INVALID_COMPUTE_TODO:
+                    todo_if (state == STATE_SHADER_INVALID_COMPUTE_TODO)
+                        compile_invalid_shader(shader_source, shader_source_len, "cs_4_0");
                     shader_source_len = 0;
                     break;
-                }
+
+                case STATE_SHADER_INVALID_PIXEL:
+                case STATE_SHADER_INVALID_PIXEL_TODO:
+                    todo_if (state == STATE_SHADER_INVALID_PIXEL_TODO)
+                        compile_invalid_shader(shader_source, shader_source_len, "ps_4_0");
+                    shader_source_len = 0;
+                    break;
 
                 case STATE_PREPROC_INVALID:
                 {
@@ -835,6 +845,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             if (!strcmp(line, "[compute shader]\n"))
             {
                 state = STATE_SHADER_COMPUTE;
+            }
+            else if (!strcmp(line, "[compute shader fail]\n"))
+            {
+                state = STATE_SHADER_INVALID_COMPUTE;
+            }
+            else if (!strcmp(line, "[compute shader fail todo]\n"))
+            {
+                state = STATE_SHADER_INVALID_COMPUTE_TODO;
             }
             else if (!strcmp(line, "[require]\n"))
             {
@@ -958,6 +976,8 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_COMPUTE:
+                case STATE_SHADER_INVALID_COMPUTE:
+                case STATE_SHADER_INVALID_COMPUTE_TODO:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_INVALID_PIXEL_TODO:
                 case STATE_SHADER_PIXEL:

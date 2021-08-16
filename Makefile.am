@@ -66,6 +66,7 @@ vkd3d_shader_tests = \
 	tests/conditional.shader_test \
 	tests/floor.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-clamp.shader_test \
 	tests/hlsl-comma.shader_test \
@@ -99,6 +100,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
 	tests/hlsl-numeric-types.shader_test \
+	tests/hlsl-numthreads.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
