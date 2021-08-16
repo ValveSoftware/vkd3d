@@ -2017,6 +2017,13 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    if (profile->type == VKD3D_SHADER_TYPE_COMPUTE)
+    {
+        const struct vkd3d_shader_location loc = {.source_name = compile_info->source_name};
+
+        hlsl_fixme(&ctx, loc, "Compute shader thread count.\n");
+    }
+
     ret = hlsl_emit_dxbc(&ctx, entry_func, dxbc);
 
     hlsl_ctx_cleanup(&ctx);
