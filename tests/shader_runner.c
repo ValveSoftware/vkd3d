@@ -82,6 +82,8 @@ enum parse_state
     STATE_SAMPLER,
     STATE_SHADER_COMPUTE,
     STATE_SHADER_COMPUTE_TODO,
+    STATE_SHADER_INVALID_COMPUTE,
+    STATE_SHADER_INVALID_COMPUTE_TODO,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
@@ -792,6 +794,13 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     shader_source_size = 0;
                     break;
 
+                case STATE_SHADER_INVALID_COMPUTE:
+                case STATE_SHADER_INVALID_COMPUTE_TODO:
+                    todo_if (state == STATE_SHADER_INVALID_COMPUTE_TODO)
+                        compile_shader(runner, shader_source, shader_source_len, "cs", true);
+                    shader_source_len = 0;
+                    break;
+
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_INVALID_PIXEL_TODO:
                     todo_if (state == STATE_SHADER_INVALID_PIXEL_TODO)
@@ -867,6 +876,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             else if (!strcmp(line, "[compute shader todo]\n"))
             {
                 state = STATE_SHADER_COMPUTE_TODO;
+            }
+            else if (!strcmp(line, "[compute shader fail]\n"))
+            {
+                state = STATE_SHADER_INVALID_COMPUTE;
+            }
+            else if (!strcmp(line, "[compute shader fail todo]\n"))
+            {
+                state = STATE_SHADER_INVALID_COMPUTE_TODO;
             }
             else if (!strcmp(line, "[require]\n"))
             {
@@ -995,6 +1012,8 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
+                case STATE_SHADER_INVALID_COMPUTE:
+                case STATE_SHADER_INVALID_COMPUTE_TODO:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_INVALID_PIXEL_TODO:
                 case STATE_SHADER_PIXEL:
