@@ -518,7 +518,10 @@ struct hlsl_ctx
     } constant_defs;
     uint32_t temp_count;
 
+    uint32_t thread_count[3];
+
     uint32_t in_state_block : 1;
+    uint32_t found_numthreads : 1;
 };
 
 enum hlsl_error_level
