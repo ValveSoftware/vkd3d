@@ -755,7 +755,7 @@ struct sm4_instruction
     } srcs[3];
     unsigned int src_count;
 
-    uint32_t idx[2];
+    uint32_t idx[3];
     unsigned int idx_count;
 };
 
@@ -1124,6 +1124,19 @@ static void write_sm4_dcl_temps(struct vkd3d_bytecode_buffer *buffer, uint32_t t
 
         .idx = {temp_count},
         .idx_count = 1,
+    };
+
+    write_sm4_instruction(buffer, &instr);
+}
+
+static void write_sm4_dcl_thread_group(struct vkd3d_bytecode_buffer *buffer, const uint32_t thread_count[3])
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM5_OP_DCL_THREAD_GROUP,
+
+        .idx = {thread_count[0], thread_count[1], thread_count[2]},
+        .idx_count = 3,
     };
 
     write_sm4_instruction(buffer, &instr);
@@ -1668,6 +1681,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
             write_sm4_dcl_semantic(ctx, &buffer, var);
     }
+
+    if (profile->type == VKD3D_SHADER_TYPE_COMPUTE)
+        write_sm4_dcl_thread_group(&buffer, ctx->thread_count);
 
     if (ctx->temp_count)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);

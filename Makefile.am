@@ -288,7 +288,6 @@ XFAIL_TESTS = \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
 	tests/cast-to-uint.shader_test \
-	tests/compute.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-attributes.shader_test \
@@ -310,7 +309,6 @@ XFAIL_TESTS = \
 	tests/math.shader_test \
 	tests/max.shader_test \
 	tests/trigonometry.shader_test \
-	tests/uav-load.shader_test \
 	tests/writemask-assignop-1.shader_test
 endif
 
