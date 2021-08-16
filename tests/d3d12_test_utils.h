@@ -19,6 +19,11 @@
 #ifndef __VKD3D_D3D12_TEST_UTILS_H
 #define __VKD3D_D3D12_TEST_UTILS_H
 
+struct uvec4
+{
+    unsigned int x, y, z, w;
+};
+
 struct vec4
 {
     float x, y, z, w;
@@ -96,6 +101,11 @@ static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
             && compare_uint((c1 >> 8) & 0xff, (c2 >> 8) & 0xff, max_diff)
             && compare_uint((c1 >> 16) & 0xff, (c2 >> 16) & 0xff, max_diff)
             && compare_uint((c1 >> 24) & 0xff, (c2 >> 24) & 0xff, max_diff);
+}
+
+static inline bool compare_uvec4(const struct uvec4* v1, const struct uvec4 *v2)
+{
+    return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z && v1->w == v2->w;
 }
 
 static bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
@@ -1124,6 +1134,35 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     context->pipeline_state = create_pipeline_state_(line, device,
             context->root_signature, context->render_target_desc.Format,
             NULL, desc ? desc->ps : NULL, NULL);
+
+    return true;
+}
+
+#define init_compute_test_context(context) init_compute_test_context_(__LINE__, context)
+static inline bool init_compute_test_context_(unsigned int line, struct test_context *context)
+{
+    ID3D12Device *device;
+    HRESULT hr;
+
+    memset(context, 0, sizeof(*context));
+
+    if (!(context->device = create_device()))
+    {
+        skip_(line)("Failed to create device.\n");
+        return false;
+    }
+    device = context->device;
+
+    context->queue = create_command_queue_(line, device,
+            D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+
+    hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            &IID_ID3D12CommandAllocator, (void **)&context->allocator);
+    ok_(line)(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
+            context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
+    ok_(line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
     return true;
 }

@@ -31,11 +31,6 @@ struct vec2
     float x, y;
 };
 
-struct uvec4
-{
-    unsigned int x, y, z, w;
-};
-
 struct ivec4
 {
     int x, y, z, w;
@@ -45,11 +40,6 @@ struct dvec2
 {
     double x, y;
 };
-
-static bool compare_uvec4(const struct uvec4* v1, const struct uvec4 *v2)
-{
-    return v1->x == v2->x && v1->y == v2->y && v1->z == v2->z && v1->w == v2->w;
-}
 
 static bool compare_uint8(uint8_t a, uint8_t b, unsigned int max_diff)
 {
@@ -668,35 +658,6 @@ static ID3D12CommandSignature *create_command_signature_(unsigned int line,
     ok_(line)(hr == S_OK, "Failed to create command signature, hr %#x.\n", hr);
 
     return command_signature;
-}
-
-#define init_compute_test_context(context) init_compute_test_context_(__LINE__, context)
-static bool init_compute_test_context_(unsigned int line, struct test_context *context)
-{
-    ID3D12Device *device;
-    HRESULT hr;
-
-    memset(context, 0, sizeof(*context));
-
-    if (!(context->device = create_device()))
-    {
-        skip_(line)("Failed to create device.\n");
-        return false;
-    }
-    device = context->device;
-
-    context->queue = create_command_queue_(line, device,
-            D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
-
-    hr = ID3D12Device_CreateCommandAllocator(device, D3D12_COMMAND_LIST_TYPE_COMPUTE,
-            &IID_ID3D12CommandAllocator, (void **)&context->allocator);
-    ok_(line)(hr == S_OK, "Failed to create command allocator, hr %#x.\n", hr);
-
-    hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
-            context->allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&context->list);
-    ok_(line)(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
-
-    return true;
 }
 
 struct depth_stencil_resource

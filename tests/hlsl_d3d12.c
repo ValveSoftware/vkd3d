@@ -416,6 +416,166 @@ static void test_preprocess(void)
     ID3D10Blob_Release(errors);
 }
 
+#define compile_shader(a, b) compile_shader_(__LINE__, a, b, 0)
+#define compile_shader_flags(a, b, c) compile_shader_(__LINE__, a, b, c)
+static ID3D10Blob *compile_shader_(unsigned int line, const char *source, const char *target, UINT flags)
+{
+    ID3D10Blob *blob = NULL, *errors = NULL;
+    HRESULT hr;
+
+    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", target, flags, 0, &blob, &errors);
+    ok_(line)(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
+    if (errors)
+    {
+        if (vkd3d_test_state.debug_level)
+            trace_(line)("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+        ID3D10Blob_Release(errors);
+    }
+    return blob;
+}
+
+static void test_thread_id(void)
+{
+    ID3D12GraphicsCommandList *command_list;
+    struct resource_readback rb;
+    struct test_context context;
+    ID3D12Resource *textures[3];
+    ID3D12DescriptorHeap *heap;
+    unsigned int i, x, y, z;
+    ID3D12Device *device;
+    ID3D10Blob *cs_code;
+    HRESULT hr;
+
+    static const char cs_source[] =
+        "RWTexture3D<uint4> group_uav, thread_uav, dispatch_uav;\n"
+        "[numthreads(5, 3, 2)]\n"
+        "void main(uint3 group : sv_groupid, uint3 thread : sv_groupthreadid, uint3 dispatch : sv_dispatchthreadid)\n"
+        "{\n"
+        "    group_uav[dispatch] = uint4(group, 1);\n"
+        "    thread_uav[dispatch] = uint4(thread, 2);\n"
+        "    dispatch_uav[dispatch] = uint4(dispatch, 3);\n"
+        "}";
+
+    static const D3D12_DESCRIPTOR_RANGE descriptor_range = {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0, 0, 0};
+
+    static const D3D12_ROOT_PARAMETER root_parameter =
+    {
+        .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+        .DescriptorTable = {1, &descriptor_range},
+    };
+
+    static const D3D12_ROOT_SIGNATURE_DESC root_signature_desc =
+    {
+        .NumParameters = 1,
+        .pParameters = &root_parameter,
+    };
+
+    if (!init_compute_test_context(&context))
+        return;
+    command_list = context.list;
+    device = context.device;
+
+    hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+
+    heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 3);
+
+    for (i = 0; i < 3; ++i)
+    {
+        textures[i] = create_default_texture3d(device, 16, 8, 8, 1, DXGI_FORMAT_R32G32B32A32_UINT,
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        ID3D12Device_CreateUnorderedAccessView(device, textures[i], NULL, NULL,
+                get_cpu_descriptor_handle(&context, heap, i));
+    }
+
+    todo cs_code = compile_shader(cs_source, "cs_5_0");
+    if (cs_code)
+    {
+        context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
+                shader_bytecode(ID3D10Blob_GetBufferPointer(cs_code), ID3D10Blob_GetBufferSize(cs_code)));
+
+        ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+        ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+        ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
+                0, get_gpu_descriptor_handle(&context, heap, 0));
+        ID3D12GraphicsCommandList_Dispatch(command_list, 2, 2, 2);
+
+        transition_resource_state(command_list, textures[0],
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        get_texture_readback_with_command_list(textures[0], 0, &rb, context.queue, command_list);
+        for (x = 0; x < 16; ++x)
+        {
+            for (y = 0; y < 8; ++y)
+            {
+                for (z = 0; z < 8; ++z)
+                {
+                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                    struct uvec4 expect = {x / 5, y / 3, z / 2, 1};
+
+                    if (x >= 10 || y >= 6 || z >= 4)
+                        memset(&expect, 0, sizeof(expect));
+
+                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                            v->x, v->y, v->z, v->w, x, y, z);
+                }
+            }
+        }
+        release_resource_readback(&rb);
+        reset_command_list(command_list, context.allocator);
+
+        transition_resource_state(command_list, textures[1],
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        get_texture_readback_with_command_list(textures[1], 0, &rb, context.queue, command_list);
+        for (x = 0; x < 16; ++x)
+        {
+            for (y = 0; y < 8; ++y)
+            {
+                for (z = 0; z < 8; ++z)
+                {
+                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                    struct uvec4 expect = {x % 5, y % 3, z % 2, 2};
+
+                    if (x >= 10 || y >= 6 || z >= 4)
+                        memset(&expect, 0, sizeof(expect));
+
+                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                            v->x, v->y, v->z, v->w, x, y, z);
+                }
+            }
+        }
+        release_resource_readback(&rb);
+        reset_command_list(command_list, context.allocator);
+
+        transition_resource_state(command_list, textures[2],
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        get_texture_readback_with_command_list(textures[2], 0, &rb, context.queue, command_list);
+        for (x = 0; x < 16; ++x)
+        {
+            for (y = 0; y < 8; ++y)
+            {
+                for (z = 0; z < 8; ++z)
+                {
+                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                    struct uvec4 expect = {x, y, z, 3};
+
+                    if (x >= 10 || y >= 6 || z >= 4)
+                        memset(&expect, 0, sizeof(expect));
+
+                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                            v->x, v->y, v->z, v->w, x, y, z);
+                }
+            }
+        }
+        release_resource_readback(&rb);
+        reset_command_list(command_list, context.allocator);
+    }
+
+    for (i = 0; i < 3; ++i)
+        ID3D12Resource_Release(textures[i]);
+    ID3D12DescriptorHeap_Release(heap);
+    destroy_test_context(&context);
+}
+
 START_TEST(hlsl_d3d12)
 {
     parse_args(argc, argv);
@@ -423,4 +583,5 @@ START_TEST(hlsl_d3d12)
     init_adapter_info();
 
     run_test(test_preprocess);
+    run_test(test_thread_id);
 }
