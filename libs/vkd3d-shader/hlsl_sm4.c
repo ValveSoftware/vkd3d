@@ -23,6 +23,11 @@
 #include "vkd3d_d3dcommon.h"
 #include "sm4.h"
 
+static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
+{
+    return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
+}
+
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, enum vkd3d_sm4_register_type *type, bool *has_idx)
 {
@@ -991,51 +996,103 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         put_u32(buffer, instr->idx[j]);
 }
 
-static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
+static void write_sm4_dcl_constant_buffer(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
 {
-    const struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
+    struct sm4_instruction instr;
 
-        .srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
-        .srcs[0].reg.type = VKD3D_SM4_RT_CONSTBUFFER,
-        .srcs[0].reg.idx = {cbuffer->reg.id, (cbuffer->used_size + 3) / 4},
-        .srcs[0].reg.idx_count = 2,
-        .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
-        .src_count = 1,
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER;
+
+    instr.srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+    instr.srcs[0].reg.type = VKD3D_SM4_RT_CONSTBUFFER;
+    if (shader_is_sm_5_1(ctx))
+    {
+        instr.srcs[0].reg.idx[0] = cbuffer->reg.id;
+        instr.srcs[0].reg.idx[1] = cbuffer->reg.index;
+        instr.srcs[0].reg.idx[2] = cbuffer->reg.index; /* FIXME: array end */
+        instr.srcs[0].reg.idx_count = 3;
+
+        instr.idx[0] = (cbuffer->used_size + 3) / 4;
+        instr.idx[1] = cbuffer->reg.space;
+        instr.idx_count = 2;
+    }
+    else
+    {
+        instr.srcs[0].reg.idx[0] = cbuffer->reg.id;
+        instr.srcs[0].reg.idx[1] = (cbuffer->used_size + 3) / 4;
+        instr.srcs[0].reg.idx_count = 2;
+    }
+    instr.srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
+static void write_sm4_dcl_sampler(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_DCL_SAMPLER;
+
+    if (shader_is_sm_5_1(ctx))
+    {
+        instr.srcs[0].reg.type = VKD3D_SM4_RT_SAMPLER;
+        instr.srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+        instr.srcs[0].reg.idx[0] = var->reg.id;
+        instr.srcs[0].reg.idx[1] = var->reg.index;
+        instr.srcs[0].reg.idx[2] = var->reg.index; /* FIXME: array end */
+        instr.srcs[0].reg.idx_count = 3;
+        instr.srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W);
+        instr.src_count = 1;
+
+        instr.idx[0] = var->reg.space;
+        instr.idx_count = 1;
+    }
+    else
+    {
+        instr.dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER;
+        instr.dsts[0].reg.idx[0] = var->reg.id;
+        instr.dsts[0].reg.idx_count = 1;
+        instr.dst_count = 1;
     };
     write_sm4_instruction(buffer, &instr);
 }
 
-static void write_sm4_dcl_sampler(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
-{
-    const struct sm4_instruction instr =
-    {
-        .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
-
-        .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
-        .dsts[0].reg.idx = {var->reg.id},
-        .dsts[0].reg.idx_count = 1,
-        .dst_count = 1,
-    };
-    write_sm4_instruction(buffer, &instr);
-}
-
-static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+static void write_sm4_dcl_texture(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
 {
     bool uav = (var->data_type->base_type == HLSL_TYPE_UAV);
-    const struct sm4_instruction instr =
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = (uav ? VKD3D_SM5_OP_DCL_UAV_TYPED : VKD3D_SM4_OP_DCL_RESOURCE);
+    instr.opcode |= (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT);
+
+    if (shader_is_sm_5_1(ctx))
     {
-        .opcode = (uav ? VKD3D_SM5_OP_DCL_UAV_TYPED : VKD3D_SM4_OP_DCL_RESOURCE)
-                | (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
+        instr.srcs[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE;
+        instr.srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+        instr.srcs[0].reg.idx[0] = var->reg.id;
+        instr.srcs[0].reg.idx[1] = var->reg.index;
+        instr.srcs[0].reg.idx[2] = var->reg.index; /* FIXME: array end */
+        instr.srcs[0].reg.idx_count = 3;
+        instr.srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W);
+        instr.src_count = 1;
 
-        .dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE,
-        .dsts[0].reg.idx = {var->reg.id},
-        .dsts[0].reg.idx_count = 1,
-        .dst_count = 1,
+        instr.idx[0] = sm4_return_type(var->data_type) * 0x1111;
+        instr.idx[1] = var->reg.space;
+        instr.idx_count = 2;
+    }
+    else
+    {
+        instr.dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE;
+        instr.dsts[0].reg.idx[0] = var->reg.id;
+        instr.dsts[0].reg.idx_count = 1;
+        instr.dst_count = 1;
 
-        .idx_count = 1,
-        .idx[0] = sm4_return_type(var->data_type) * 0x1111,
+        instr.idx[0] = sm4_return_type(var->data_type) * 0x1111;
+        instr.idx_count = 1;
     };
     write_sm4_instruction(buffer, &instr);
 }
@@ -1714,7 +1771,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
-            write_sm4_dcl_constant_buffer(&buffer, cbuffer);
+            write_sm4_dcl_constant_buffer(ctx, &buffer, cbuffer);
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
@@ -1723,9 +1780,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
             continue;
 
         if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
-            write_sm4_dcl_sampler(&buffer, var);
+            write_sm4_dcl_sampler(ctx, &buffer, var);
         else if (var->data_type->base_type == HLSL_TYPE_TEXTURE || var->data_type->base_type == HLSL_TYPE_UAV)
-            write_sm4_dcl_texture(&buffer, var);
+            write_sm4_dcl_texture(ctx, &buffer, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
