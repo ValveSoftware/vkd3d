@@ -1761,7 +1761,9 @@ static const struct hlsl_profile_info *get_target_info(const char *target)
         {"cs_4_0",              VKD3D_SHADER_TYPE_COMPUTE,  4, 0, 0, 0, false},
         {"cs_4_1",              VKD3D_SHADER_TYPE_COMPUTE,  4, 1, 0, 0, false},
         {"cs_5_0",              VKD3D_SHADER_TYPE_COMPUTE,  5, 0, 0, 0, false},
+        {"cs_5_1",              VKD3D_SHADER_TYPE_COMPUTE,  5, 1, 0, 0, false},
         {"ds_5_0",              VKD3D_SHADER_TYPE_DOMAIN,   5, 0, 0, 0, false},
+        {"ds_5_1",              VKD3D_SHADER_TYPE_DOMAIN,   5, 1, 0, 0, false},
         {"fx_2_0",              VKD3D_SHADER_TYPE_EFFECT,   2, 0, 0, 0, false},
         {"fx_4_0",              VKD3D_SHADER_TYPE_EFFECT,   4, 0, 0, 0, false},
         {"fx_4_1",              VKD3D_SHADER_TYPE_EFFECT,   4, 1, 0, 0, false},
@@ -1769,7 +1771,9 @@ static const struct hlsl_profile_info *get_target_info(const char *target)
         {"gs_4_0",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 0, 0, 0, false},
         {"gs_4_1",              VKD3D_SHADER_TYPE_GEOMETRY, 4, 1, 0, 0, false},
         {"gs_5_0",              VKD3D_SHADER_TYPE_GEOMETRY, 5, 0, 0, 0, false},
+        {"gs_5_1",              VKD3D_SHADER_TYPE_GEOMETRY, 5, 1, 0, 0, false},
         {"hs_5_0",              VKD3D_SHADER_TYPE_HULL,     5, 0, 0, 0, false},
+        {"hs_5_1",              VKD3D_SHADER_TYPE_HULL,     5, 1, 0, 0, false},
         {"ps.1.0",              VKD3D_SHADER_TYPE_PIXEL,    1, 0, 0, 0, false},
         {"ps.1.1",              VKD3D_SHADER_TYPE_PIXEL,    1, 1, 0, 0, false},
         {"ps.1.2",              VKD3D_SHADER_TYPE_PIXEL,    1, 2, 0, 0, false},
@@ -1797,6 +1801,7 @@ static const struct hlsl_profile_info *get_target_info(const char *target)
         {"ps_4_0_level_9_3",    VKD3D_SHADER_TYPE_PIXEL,    4, 0, 9, 3, false},
         {"ps_4_1",              VKD3D_SHADER_TYPE_PIXEL,    4, 1, 0, 0, false},
         {"ps_5_0",              VKD3D_SHADER_TYPE_PIXEL,    5, 0, 0, 0, false},
+        {"ps_5_1",              VKD3D_SHADER_TYPE_PIXEL,    5, 1, 0, 0, false},
         {"tx_1_0",              VKD3D_SHADER_TYPE_TEXTURE,  1, 0, 0, 0, false},
         {"vs.1.0",              VKD3D_SHADER_TYPE_VERTEX,   1, 0, 0, 0, false},
         {"vs.1.1",              VKD3D_SHADER_TYPE_VERTEX,   1, 1, 0, 0, false},
@@ -1818,6 +1823,7 @@ static const struct hlsl_profile_info *get_target_info(const char *target)
         {"vs_4_0_level_9_3",    VKD3D_SHADER_TYPE_VERTEX,   4, 0, 9, 3, false},
         {"vs_4_1",              VKD3D_SHADER_TYPE_VERTEX,   4, 1, 0, 0, false},
         {"vs_5_0",              VKD3D_SHADER_TYPE_VERTEX,   5, 0, 0, 0, false},
+        {"vs_5_1",              VKD3D_SHADER_TYPE_VERTEX,   5, 1, 0, 0, false},
     };
 
     for (i = 0; i < ARRAY_SIZE(profiles); ++i)
