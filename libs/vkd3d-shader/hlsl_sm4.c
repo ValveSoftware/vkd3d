@@ -2107,6 +2107,10 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
                     &load->sampler, coords, HLSL_SWIZZLE(W, W, W, W), texel_offset);
             break;
+
+        case HLSL_RESOURCE_SAMPLE_LOD:
+            hlsl_fixme(ctx, &load->node.loc, "SM4 sample-LOD expression.");
+            break;
     }
 }
 
