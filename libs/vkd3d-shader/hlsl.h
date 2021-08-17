@@ -393,6 +393,7 @@ enum hlsl_resource_load_type
 {
     HLSL_RESOURCE_LOAD,
     HLSL_RESOURCE_SAMPLE,
+    HLSL_RESOURCE_SAMPLE_LOD,
     HLSL_RESOURCE_GATHER_RED,
     HLSL_RESOURCE_GATHER_GREEN,
     HLSL_RESOURCE_GATHER_BLUE,
@@ -404,8 +405,7 @@ struct hlsl_ir_resource_load
     struct hlsl_ir_node node;
     enum hlsl_resource_load_type load_type;
     struct hlsl_deref resource, sampler;
-    struct hlsl_src coords;
-    struct hlsl_src texel_offset;
+    struct hlsl_src coords, lod, texel_offset;
 };
 
 struct hlsl_ir_store
@@ -776,6 +776,9 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
         enum hlsl_resource_load_type type, struct hlsl_deref *resource, struct hlsl_deref *sampler,
         struct hlsl_ir_node *coords, struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        struct hlsl_deref *resource, struct hlsl_deref *sampler, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *texel_offset, struct hlsl_ir_node *lod, const struct vkd3d_shader_location *loc);
 
 struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_location loc);
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
