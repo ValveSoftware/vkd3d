@@ -25,6 +25,7 @@
 #define VKD3D_SM5_HS  0x0003u
 #define VKD3D_SM5_DS  0x0004u
 #define VKD3D_SM5_CS  0x0005u
+#define VKD3D_SM4_LIB 0xfff0u
 
 #define VKD3D_SM4_INSTRUCTION_MODIFIER        (0x1u << 31)
 
