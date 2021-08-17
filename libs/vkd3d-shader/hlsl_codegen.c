@@ -21,6 +21,11 @@
 #include "hlsl.h"
 #include <stdio.h>
 
+static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
+{
+    return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
+}
+
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
@@ -1265,13 +1270,14 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t index)
+static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t space, uint32_t index)
 {
     const struct hlsl_buffer *buffer;
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, const struct hlsl_buffer, entry)
     {
-        if (buffer->used_size && buffer->reservation.type == 'b' && buffer->reservation.index == index)
+        if (buffer->used_size && buffer->reservation.type == 'b'
+                && buffer->reservation.space == space && buffer->reservation.index == index)
             return buffer;
     }
     return NULL;
@@ -1293,8 +1299,8 @@ static void calculate_buffer_offset(struct hlsl_ir_var *var)
 static void allocate_buffers(struct hlsl_ctx *ctx)
 {
     struct hlsl_buffer *buffer;
+    uint32_t index = 0, id = 0;
     struct hlsl_ir_var *var;
-    uint32_t index = 0;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -1314,30 +1320,45 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
         if (buffer->type == HLSL_BUFFER_CONSTANT)
         {
-            if (buffer->reservation.type == 'b')
+            const struct hlsl_reg_reservation *reservation = &buffer->reservation;
+
+            if (reservation->type == 'b')
             {
-                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx, buffer->reservation.index);
+                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(
+                        ctx, reservation->space, reservation->index);
 
                 if (reserved_buffer && reserved_buffer != buffer)
                 {
                     hlsl_error(ctx, buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                            "Multiple buffers bound to cb%u.", buffer->reservation.index);
+                            "Multiple buffers bound to space %u, index %u.", reservation->space, reservation->index);
                     hlsl_note(ctx, reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
-                            "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.index);
+                            "Buffer %s is already bound to space %u, index %u.",
+                            reserved_buffer->name, reservation->space, reservation->index);
                 }
 
-                buffer->reg.id = buffer->reservation.index;
+                buffer->reg.space = reservation->space;
+                buffer->reg.index = reservation->index;
+                if (shader_is_sm_5_1(ctx))
+                    buffer->reg.id = id++;
+                else
+                    buffer->reg.id = reservation->index;
                 buffer->reg.allocated = true;
-                TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
+                TRACE("Allocated reserved %s to space%u, cb%u.\n",
+                        buffer->name, reservation->space, reservation->index);
             }
-            else if (!buffer->reservation.type)
+            else if (!reservation->type)
             {
-                while (get_reserved_buffer(ctx, index))
+                while (get_reserved_buffer(ctx, 0, index))
                     ++index;
 
-                buffer->reg.id = index;
+                buffer->reg.space = 0;
+                buffer->reg.index = index;
+                if (shader_is_sm_5_1(ctx))
+                    buffer->reg.id = id++;
+                else
+                    buffer->reg.id = index;
                 buffer->reg.allocated = true;
-                TRACE("Allocated %s to cb%u.\n", buffer->name, index);
+                TRACE("Allocated %s to space0, cb%u.\n", buffer->name, index);
                 ++index;
             }
             else
