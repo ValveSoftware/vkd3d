@@ -809,6 +809,19 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
     return load;
 }
 
+struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
+        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *texel_offset, struct hlsl_ir_node *lod, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_resource_load *load;
+
+    if ((load = hlsl_new_resource_load(ctx, data_type, HLSL_RESOURCE_SAMPLE_LOD,
+            resource, resource_offset, sampler, sampler_offset, coords, texel_offset, loc)))
+        hlsl_src_from_node(&load->lod, lod);
+    return load;
+}
+
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc)
 {
@@ -1439,6 +1452,7 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         [HLSL_RESOURCE_LOAD] = "load_resource",
         [HLSL_RESOURCE_SAMPLE] = "sample",
+        [HLSL_RESOURCE_SAMPLE_LOD] = "sample_lod",
         [HLSL_RESOURCE_GATHER_RED] = "gather_red",
         [HLSL_RESOURCE_GATHER_GREEN] = "gather_green",
         [HLSL_RESOURCE_GATHER_BLUE] = "gather_blue",
@@ -1456,6 +1470,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         vkd3d_string_buffer_printf(buffer, ", offset = ");
         dump_src(buffer, &load->texel_offset);
+    }
+    if (load->lod.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", lod = ");
+        dump_src(buffer, &load->lod);
     }
     vkd3d_string_buffer_printf(buffer, ")");
 }
@@ -1660,6 +1679,7 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
 static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 {
     hlsl_src_remove(&load->coords);
+    hlsl_src_remove(&load->lod);
     cleanup_deref(&load->sampler);
     cleanup_deref(&load->resource);
     hlsl_src_remove(&load->texel_offset);
