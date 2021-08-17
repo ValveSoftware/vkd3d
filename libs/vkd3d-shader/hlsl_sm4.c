@@ -764,7 +764,7 @@ struct sm4_instruction
     {
         struct sm4_register reg;
         unsigned int swizzle;
-    } srcs[3];
+    } srcs[4];
     unsigned int src_count;
 
     uint32_t idx[3];
@@ -1308,6 +1308,35 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_sample_lod(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst, const struct hlsl_deref *resource,
+        const struct hlsl_deref *sampler, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *lod)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SAMPLE_LOD;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, coords);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+
+    sm4_register_from_deref(ctx, &instr.srcs[1].reg, &writemask, resource, resource_type);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+
+    sm4_register_from_deref(ctx, &instr.srcs[2].reg, &writemask, sampler, sampler->var->data_type);
+
+    sm4_register_from_node(&instr.srcs[3].reg, &writemask, lod);
+    instr.srcs[3].swizzle = hlsl_swizzle_from_writemask(writemask);
+
+    instr.src_count = 4;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_store_uav_typed(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_deref *dst, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
 {
@@ -1590,7 +1619,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE_LOD:
-            hlsl_fixme(ctx, load->node.loc, "SM4 sample-LOD expression.");
+            assert(load->sampler.var);
+            write_sm4_sample_lod(ctx, buffer, resource_type, &load->node,
+                    &load->resource, &load->sampler, coords, load->lod.node);
             break;
     }
 }
