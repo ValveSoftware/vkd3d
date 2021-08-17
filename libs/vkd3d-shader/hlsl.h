@@ -392,7 +392,7 @@ struct hlsl_attribute
 struct hlsl_reg_reservation
 {
     char reg_type;
-    unsigned int reg_index;
+    unsigned int reg_space, reg_index;
 
     char offset_type;
     unsigned int offset_index;
