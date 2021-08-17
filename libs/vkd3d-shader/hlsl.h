@@ -252,7 +252,7 @@ struct hlsl_attribute
 struct hlsl_reg_reservation
 {
     char type;
-    unsigned int index;
+    unsigned int space, index;
 };
 
 struct hlsl_ir_var
