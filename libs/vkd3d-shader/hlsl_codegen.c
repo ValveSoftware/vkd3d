@@ -1272,5 +1272,5 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     if (ctx->profile->major_version < 4)
         return hlsl_sm1_write(ctx, entry_func, out);
     else
-        return VKD3D_ERROR_NOT_IMPLEMENTED;
+        return hlsl_sm4_write(ctx, entry_func, out);
 }

@@ -141,6 +141,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
         pso = create_pipeline_state(context->c.device, context->c.root_signature,
                 context->c.render_target_desc.Format, NULL, &ps, NULL);
+        if (!pso)
+            return;
 
         ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->c.root_signature);
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 0,

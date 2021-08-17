@@ -844,7 +844,7 @@ static ID3D12PipelineState *create_pipeline_state_(unsigned int line, ID3D12Devi
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
     ok_(line)(SUCCEEDED(hr), "Failed to create graphics pipeline state, hr %#x.\n", hr);
 
-    return pipeline_state;
+    return SUCCEEDED(hr) ? pipeline_state : NULL;
 }
 
 struct test_context_desc

@@ -1,5 +1,6 @@
 /*
  * Copyright 2008-2009 Henri Verbeet for CodeWeavers
+ * Copyright 2010 Rico Schüller
  * Copyright 2017 Józef Kucia for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
@@ -19,6 +20,64 @@
 
 #include "vkd3d_shader_private.h"
 #include "sm4.h"
+
+void dxbc_writer_init(struct dxbc_writer *dxbc)
+{
+    memset(dxbc, 0, sizeof(*dxbc));
+}
+
+void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void *data, size_t size)
+{
+    struct dxbc_writer_section *section;
+
+    assert(dxbc->section_count < ARRAY_SIZE(dxbc->sections));
+
+    section = &dxbc->sections[dxbc->section_count++];
+    section->tag = tag;
+    section->data = data;
+    section->size = size;
+}
+
+int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
+{
+    size_t size_position, offsets_position, checksum_position, i;
+    struct vkd3d_bytecode_buffer buffer = {0};
+    uint32_t checksum[4];
+
+    put_u32(&buffer, TAG_DXBC);
+
+    checksum_position = bytecode_get_size(&buffer);
+    for (i = 0; i < 4; ++i)
+        put_u32(&buffer, 0);
+
+    put_u32(&buffer, 1); /* version */
+    size_position = put_u32(&buffer, 0);
+    put_u32(&buffer, dxbc->section_count);
+
+    offsets_position = bytecode_get_size(&buffer);
+    for (i = 0; i < dxbc->section_count; ++i)
+        put_u32(&buffer, 0);
+
+    for (i = 0; i < dxbc->section_count; ++i)
+    {
+        set_u32(&buffer, offsets_position + i * sizeof(uint32_t), bytecode_get_size(&buffer));
+        put_u32(&buffer, dxbc->sections[i].tag);
+        put_u32(&buffer, dxbc->sections[i].size);
+        bytecode_put_bytes(&buffer, dxbc->sections[i].data, dxbc->sections[i].size);
+    }
+    set_u32(&buffer, size_position, bytecode_get_size(&buffer));
+
+    vkd3d_compute_dxbc_checksum(buffer.data, buffer.size, checksum);
+    for (i = 0; i < 4; ++i)
+        set_u32(&buffer, checksum_position + i * sizeof(uint32_t), checksum[i]);
+
+    if (!buffer.status)
+    {
+        out->code = buffer.data;
+        out->size = buffer.size;
+    }
+    return buffer.status;
+}
 
 struct vkd3d_shader_src_param_entry
 {
@@ -1591,22 +1650,6 @@ bool shader_sm4_is_end(void *data, const DWORD **ptr)
     struct vkd3d_sm4_data *priv = data;
     return *ptr == priv->end;
 }
-
-#define MAKE_TAG(ch0, ch1, ch2, ch3) \
-    ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
-    ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
-#define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
-#define TAG_ISGN MAKE_TAG('I', 'S', 'G', 'N')
-#define TAG_ISG1 MAKE_TAG('I', 'S', 'G', '1')
-#define TAG_OSGN MAKE_TAG('O', 'S', 'G', 'N')
-#define TAG_OSG5 MAKE_TAG('O', 'S', 'G', '5')
-#define TAG_OSG1 MAKE_TAG('O', 'S', 'G', '1')
-#define TAG_PCSG MAKE_TAG('P', 'C', 'S', 'G')
-#define TAG_PSG1 MAKE_TAG('P', 'S', 'G', '1')
-#define TAG_SHDR MAKE_TAG('S', 'H', 'D', 'R')
-#define TAG_SHEX MAKE_TAG('S', 'H', 'E', 'X')
-#define TAG_AON9 MAKE_TAG('A', 'o', 'n', '9')
-#define TAG_RTS0 MAKE_TAG('R', 'T', 'S', '0')
 
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)
 {

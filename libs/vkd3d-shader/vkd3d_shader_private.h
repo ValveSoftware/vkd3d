@@ -1137,4 +1137,39 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define VKD3D_DXBC_MAX_SOURCE_COUNT 6
 #define VKD3D_DXBC_HEADER_SIZE (8 * sizeof(uint32_t))
 
+#define MAKE_TAG(ch0, ch1, ch2, ch3) \
+    ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
+    ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
+#define TAG_AON9 MAKE_TAG('A', 'o', 'n', '9')
+#define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
+#define TAG_ISG1 MAKE_TAG('I', 'S', 'G', '1')
+#define TAG_ISGN MAKE_TAG('I', 'S', 'G', 'N')
+#define TAG_OSG1 MAKE_TAG('O', 'S', 'G', '1')
+#define TAG_OSG5 MAKE_TAG('O', 'S', 'G', '5')
+#define TAG_OSGN MAKE_TAG('O', 'S', 'G', 'N')
+#define TAG_PCSG MAKE_TAG('P', 'C', 'S', 'G')
+#define TAG_PSG1 MAKE_TAG('P', 'S', 'G', '1')
+#define TAG_RTS0 MAKE_TAG('R', 'T', 'S', '0')
+#define TAG_SHDR MAKE_TAG('S', 'H', 'D', 'R')
+#define TAG_SHEX MAKE_TAG('S', 'H', 'E', 'X')
+
+struct dxbc_writer_section
+{
+    uint32_t tag;
+    const uint8_t *data;
+    size_t size;
+};
+
+#define DXBC_MAX_SECTION_COUNT 5
+
+struct dxbc_writer
+{
+    unsigned int section_count;
+    struct dxbc_writer_section sections[DXBC_MAX_SECTION_COUNT];
+};
+
+void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void *data, size_t size);
+void dxbc_writer_init(struct dxbc_writer *dxbc);
+int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
+
 #endif  /* __VKD3D_SHADER_PRIVATE_H */
