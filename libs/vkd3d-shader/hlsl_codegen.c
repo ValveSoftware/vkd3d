@@ -2985,13 +2985,14 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, char type, uint32_t index)
+static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, char type, uint32_t space, uint32_t index)
 {
     const struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->last_read && var->reg_reservation.type == type && var->reg_reservation.index == index)
+        if (var->last_read && var->reg_reservation.type == type
+                && var->reg_reservation.space == space && var->reg_reservation.index == index)
             return var;
     }
     return NULL;
@@ -3024,11 +3025,11 @@ static const struct object_type_info *get_object_type_info(enum hlsl_base_type t
 static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 {
     const struct object_type_info *type_info = get_object_type_info(type);
+    uint32_t min_index = 0, id = 0;
     struct hlsl_ir_var *var;
-    uint32_t min_index = 0;
     uint32_t index;
 
-    if (type == HLSL_TYPE_UAV)
+    if (type == HLSL_TYPE_UAV && !shader_is_sm_5_1(ctx))
     {
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
@@ -3042,14 +3043,16 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        const struct hlsl_reg_reservation *reservation = &var->reg_reservation;
+
         if (!var->last_read || var->data_type->type != HLSL_CLASS_OBJECT
                 || var->data_type->base_type != type)
             continue;
 
-        if (var->reg_reservation.type == type_info->reg_name)
+        if (reservation->type == type_info->reg_name)
         {
-            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, type_info->reg_name,
-                    var->reg_reservation.index);
+            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx,
+                    type_info->reg_name, reservation->space, reservation->index);
 
             if (var->reg_reservation.index < min_index)
             {
@@ -3060,25 +3063,37 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             else if (reserved_object && reserved_object != var)
             {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                        "Multiple objects bound to %c%u.", type_info->reg_name,
-                        var->reg_reservation.index);
+                        "Multiple objects bound to %c%u, space %u.", type_info->reg_name,
+                        reservation->index, reservation->space);
                 hlsl_note(ctx, &reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
-                        "Object '%s' is already bound to %c%u.", reserved_object->name,
-                        type_info->reg_name, var->reg_reservation.index);
+                        "Object '%s' is already bound to %c%u, space %u.", reserved_object->name,
+                        type_info->reg_name, reservation->index, reservation->space);
             }
 
-            var->reg.id = var->reg_reservation.index;
+            var->reg.space = reservation->space;
+            var->reg.index = reservation->index;
+            if (shader_is_sm_5_1(ctx))
+                var->reg.id = id++;
+            else
+                var->reg.id = reservation->index;
             var->reg.allocated = true;
-            TRACE("Allocated reserved %s to %c%u.\n", var->name, type_info->reg_name, var->reg_reservation.index);
+            TRACE("Allocated reserved %s to %c%u, space %u, id %u.\n", var->name,
+                    type_info->reg_name, var->reg.index, var->reg.space, var->reg.id);
         }
         else if (!var->reg_reservation.type)
         {
-            while (get_reserved_object(ctx, type_info->reg_name, index))
+            while (get_reserved_object(ctx, type_info->reg_name, 0, index))
                 ++index;
 
-            var->reg.id = index;
+            var->reg.space = 0;
+            var->reg.index = index;
+            if (shader_is_sm_5_1(ctx))
+                var->reg.id = id++;
+            else
+                var->reg.id = index;
             var->reg.allocated = true;
-            TRACE("Allocated object to %c%u.\n", type_info->reg_name, index);
+            TRACE("Allocated %s to %c%u, space 0, id %u.\n", var->name,
+                    type_info->reg_name, var->reg.index, var->reg.id);
             ++index;
         }
         else
