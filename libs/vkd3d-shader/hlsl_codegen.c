@@ -1447,13 +1447,14 @@ static void allocate_samplers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint32_t index)
+static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint32_t index, uint32_t space)
 {
     const struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->has_resource_access && var->reg_reservation.type == 't' && var->reg_reservation.index == index)
+        if (var->has_resource_access && var->reg_reservation.type == 't'
+                && var->reg_reservation.space == space && var->reg_reservation.index == index)
             return var;
     }
     return NULL;
@@ -1461,40 +1462,54 @@ static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint
 
 static void allocate_textures(struct hlsl_ctx *ctx)
 {
+    uint32_t index = 0, id = 0;
     struct hlsl_ir_var *var;
-    uint32_t index = 0;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        const struct hlsl_reg_reservation *reservation = &var->reg_reservation;
+
         if (!var->has_resource_access || var->data_type->type != HLSL_CLASS_OBJECT
                 || var->data_type->base_type != HLSL_TYPE_TEXTURE)
             continue;
 
-        if (var->reg_reservation.type == 't')
+        if (reservation->type == 't')
         {
-            const struct hlsl_ir_var *reserved_texture = get_reserved_texture(ctx, var->reg_reservation.index);
+            const struct hlsl_ir_var *reserved_texture = get_reserved_texture(
+                    ctx, reservation->space, reservation->index);
 
             if (reserved_texture && reserved_texture != var)
             {
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                        "Multiple textures bound to t%u.", var->reg_reservation.index);
+                        "Multiple textures bound to t%u, space %u.", reservation->index, reservation->space);
                 hlsl_note(ctx, reserved_texture->loc, VKD3D_SHADER_LOG_ERROR,
-                        "Texture '%s' is already bound to t%u.", reserved_texture->name,
-                        var->reg_reservation.index);
+                        "Texture '%s' is already bound to t%u, space %u.",
+                        reserved_texture->name, reservation->index, reservation->space);
             }
 
-            var->reg.id = var->reg_reservation.index;
+            var->reg.space = reservation->space;
+            var->reg.index = reservation->index;
+            if (shader_is_sm_5_1(ctx))
+                var->reg.id = id++;
+            else
+                var->reg.id = reservation->index;
             var->reg.allocated = true;
-            TRACE("Allocated reserved %s to t%u.\n", var->name, index);
+            TRACE("Allocated reserved %s to t%u, space %u, id %u.\n", var->name,
+                    var->reg.index, var->reg.space, var->reg.id);
         }
-        else if (!var->reg_reservation.type)
+        else if (!reservation->type)
         {
-            while (get_reserved_texture(ctx, index))
+            while (get_reserved_texture(ctx, 0, index))
                 ++index;
 
-            var->reg.id = index;
+            var->reg.space = 0;
+            var->reg.index = index;
+            if (shader_is_sm_5_1(ctx))
+                var->reg.id = id++;
+            else
+                var->reg.id = index;
             var->reg.allocated = true;
-            TRACE("Allocated %s to t%u.\n", var->name, index);
+            TRACE("Allocated %s to t%u, space 0, id %u.\n", var->name, var->reg.index, var->reg.id);
             ++index;
         }
         else
