@@ -677,6 +677,19 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
     return load;
 }
 
+struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
+        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *lod, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_resource_load *load;
+
+    if ((load = hlsl_new_resource_load(ctx, data_type, HLSL_RESOURCE_SAMPLE_LOD,
+            resource, resource_offset, sampler, sampler_offset, coords, loc)))
+        hlsl_src_from_node(&load->lod, lod);
+    return load;
+}
+
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, struct vkd3d_shader_location *loc)
 {
@@ -1288,6 +1301,7 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         [HLSL_RESOURCE_LOAD] = "load_resource",
         [HLSL_RESOURCE_SAMPLE] = "sample",
+        [HLSL_RESOURCE_SAMPLE_LOD] = "sample_lod",
     };
 
     vkd3d_string_buffer_printf(buffer, "%s(resource = ", type_names[load->load_type]);
@@ -1296,6 +1310,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     dump_deref(buffer, &load->sampler);
     vkd3d_string_buffer_printf(buffer, ", coords = ");
     dump_src(buffer, &load->coords);
+    if (load->lod.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", lod = ");
+        dump_src(buffer, &load->lod);
+    }
     vkd3d_string_buffer_printf(buffer, ")");
 }
 
@@ -1485,6 +1504,7 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
 static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 {
     hlsl_src_remove(&load->coords);
+    hlsl_src_remove(&load->lod);
     hlsl_src_remove(&load->sampler.offset);
     hlsl_src_remove(&load->resource.offset);
     vkd3d_free(load);

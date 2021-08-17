@@ -799,6 +799,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             }
 
             load->coords.node->last_read = instr->index;
+            if (load->lod.node)
+                load->lod.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_RESOURCE_STORE:

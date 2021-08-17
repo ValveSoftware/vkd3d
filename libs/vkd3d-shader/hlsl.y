@@ -2087,6 +2087,54 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         list_add_tail(instrs, &load->node.entry);
         return true;
     }
+    else if (!strcmp(name, "SampleLevel"))
+    {
+        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        const struct hlsl_type *sampler_type;
+        struct hlsl_ir_resource_load *load;
+        struct hlsl_ir_load *sampler_load;
+        struct hlsl_ir_node *coords, *lod;
+
+        if (params->args_count != 3 && params->args_count != 4)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to method 'SampleLevel': expected 3 or 4, but got %u.", params->args_count);
+            return false;
+        }
+        if (params->args_count == 4)
+            FIXME("Ignoring offset parameter.\n");
+
+        sampler_type = params->args[0]->data_type;
+        if (sampler_type->type != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+                || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, sampler_type)))
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Wrong type for argument 0 of Sample(): expected 'sampler', but got '%s'.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            return false;
+        }
+
+        /* Only HLSL_IR_LOAD can return an object. */
+        sampler_load = hlsl_ir_load(params->args[0]);
+
+        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[1],
+                ctx->builtin_types.vector[HLSL_TYPE_FLOAT][sampler_dim - 1], &loc)))
+            coords = params->args[1];
+
+        if (!(lod = add_implicit_conversion(ctx, instrs, params->args[2],
+                ctx->builtin_types.scalar[HLSL_TYPE_FLOAT], &loc)))
+            lod = params->args[2];
+
+        if (!(load = hlsl_new_sample_lod(ctx, object_type->e.resource_format,
+                object_load->src.var, object_load->src.offset.node,
+                sampler_load->src.var, sampler_load->src.offset.node, coords, lod, loc)))
+            return false;
+        list_add_tail(instrs, &load->node.entry);
+        return true;
+    }
     else
     {
         struct vkd3d_string_buffer *string;

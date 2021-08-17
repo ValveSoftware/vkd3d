@@ -1588,6 +1588,10 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             assert(load->sampler.var);
             write_sm4_sample(ctx, buffer, resource_type, &load->node, &load->resource, &load->sampler, coords);
             break;
+
+        case HLSL_RESOURCE_SAMPLE_LOD:
+            hlsl_fixme(ctx, load->node.loc, "SM4 sample-LOD expression.");
+            break;
     }
 }
 

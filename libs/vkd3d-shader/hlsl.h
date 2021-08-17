@@ -393,6 +393,7 @@ enum hlsl_resource_load_type
 {
     HLSL_RESOURCE_LOAD,
     HLSL_RESOURCE_SAMPLE,
+    HLSL_RESOURCE_SAMPLE_LOD,
 };
 
 struct hlsl_ir_resource_load
@@ -400,7 +401,7 @@ struct hlsl_ir_resource_load
     struct hlsl_ir_node node;
     enum hlsl_resource_load_type load_type;
     struct hlsl_deref resource, sampler;
-    struct hlsl_src coords;
+    struct hlsl_src coords, lod;
 };
 
 struct hlsl_ir_resource_store
@@ -717,6 +718,10 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
 struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx,
         struct hlsl_ir_var *resource, struct hlsl_ir_node *offset, struct hlsl_ir_node *coords,
         struct hlsl_ir_node *value, struct vkd3d_shader_location loc);
+struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
+        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
+        struct hlsl_ir_node *lod, struct vkd3d_shader_location loc);
 struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs);
 struct hlsl_ir_store *hlsl_new_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc);
