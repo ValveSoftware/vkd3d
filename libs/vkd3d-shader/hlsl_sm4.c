@@ -129,12 +129,17 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
 static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type)
 {
     const struct hlsl_type *array_type = get_array_type(type);
+    const char *name = array_type->name ? array_type->name : "<unnamed>";
+    const struct hlsl_profile_info *profile = ctx->profile;
     unsigned int field_count = 0, array_size = 0;
+    size_t fields_offset = 0, name_offset = 0;
     struct hlsl_struct_field *field;
-    size_t fields_offset = 0;
 
     if (type->bytecode_offset)
         return;
+
+    if (profile->major_version >= 5)
+        name_offset = put_string(buffer, name);
 
     if (type->type == HLSL_CLASS_ARRAY)
         array_size = get_array_size(type);
@@ -162,6 +167,15 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     put_u32(buffer, type->dimy | (type->dimx << 16));
     put_u32(buffer, array_size | (field_count << 16));
     put_u32(buffer, fields_offset);
+
+    if (profile->major_version >= 5)
+    {
+        put_u32(buffer, 0); /* FIXME: unknown */
+        put_u32(buffer, 0); /* FIXME: unknown */
+        put_u32(buffer, 0); /* FIXME: unknown */
+        put_u32(buffer, 0); /* FIXME: unknown */
+        put_u32(buffer, name_offset);
+    }
 }
 
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
@@ -196,6 +210,18 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     put_u32(&buffer, (target_types[profile->type] << 16) | (profile->major_version << 8) | profile->minor_version);
     put_u32(&buffer, 0); /* FIXME: compilation flags */
     creator_position = put_u32(&buffer, 0);
+
+    if (profile->major_version >= 5)
+    {
+        put_u32(&buffer, TAG_RD11);
+        put_u32(&buffer, 15 * sizeof(uint32_t)); /* size of RDEF header including this header */
+        put_u32(&buffer, 6 * sizeof(uint32_t)); /* size of buffer desc */
+        put_u32(&buffer, 8 * sizeof(uint32_t)); /* size of binding desc */
+        put_u32(&buffer, 10 * sizeof(uint32_t)); /* size of variable desc */
+        put_u32(&buffer, 9 * sizeof(uint32_t)); /* size of type desc */
+        put_u32(&buffer, 3 * sizeof(uint32_t)); /* size of member desc */
+        put_u32(&buffer, 0); /* unknown; possibly a null terminator */
+    }
 
     /* Bound resources. */
 
@@ -293,6 +319,14 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                 put_u32(&buffer, flags);
                 put_u32(&buffer, 0); /* type */
                 put_u32(&buffer, 0); /* FIXME: default value */
+
+                if (profile->major_version >= 5)
+                {
+                    put_u32(&buffer, 0); /* texture start */
+                    put_u32(&buffer, 0); /* texture count */
+                    put_u32(&buffer, 0); /* sampler start */
+                    put_u32(&buffer, 0); /* sampler count */
+                }
             }
         }
 
@@ -301,7 +335,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         {
             if (var->is_uniform && var->buffer == cbuffer)
             {
-                size_t var_offset = vars_start + j * 6 * sizeof(uint32_t);
+                const unsigned int var_size = (profile->major_version >= 5 ? 10 : 6);
+                size_t var_offset = vars_start + j * var_size * sizeof(uint32_t);
                 size_t string_offset = put_string(&buffer, var->name);
 
                 set_u32(&buffer, var_offset, string_offset);
