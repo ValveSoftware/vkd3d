@@ -23,14 +23,155 @@
 #include "vkd3d_d3dcommon.h"
 #include "sm4.h"
 
+static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_ARRAY)
+        return get_array_type(type->e.array.type);
+    return type;
+}
+
+static unsigned int get_array_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_ARRAY)
+        return get_array_size(type->e.array.type) * type->e.array.elements_count;
+    return 1;
+}
+
+static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
+{
+    switch (type->type)
+    {
+        case HLSL_CLASS_ARRAY:
+            return sm4_class(type->e.array.type);
+        case HLSL_CLASS_MATRIX:
+            assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
+            if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
+                return D3D_SVC_MATRIX_COLUMNS;
+            else
+                return D3D_SVC_MATRIX_ROWS;
+        case HLSL_CLASS_OBJECT:
+            return D3D_SVC_OBJECT;
+        case HLSL_CLASS_SCALAR:
+            return D3D_SVC_SCALAR;
+        case HLSL_CLASS_STRUCT:
+            return D3D_SVC_STRUCT;
+        case HLSL_CLASS_VECTOR:
+            return D3D_SVC_VECTOR;
+        default:
+            ERR("Invalid class %#x.\n", type->type);
+            assert(0);
+            return 0;
+    }
+}
+
+static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
+{
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_BOOL:
+            return D3D_SVT_BOOL;
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            return D3D_SVT_FLOAT;
+        case HLSL_TYPE_INT:
+            return D3D_SVT_INT;
+        case HLSL_TYPE_PIXELSHADER:
+            return D3D_SVT_PIXELSHADER;
+        case HLSL_TYPE_SAMPLER:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3D_SVT_SAMPLER1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3D_SVT_SAMPLER2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3D_SVT_SAMPLER3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3D_SVT_SAMPLERCUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3D_SVT_SAMPLER;
+                default:
+                    assert(0);
+            }
+            break;
+        case HLSL_TYPE_STRING:
+            return D3D_SVT_STRING;
+        case HLSL_TYPE_TEXTURE:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3D_SVT_TEXTURE1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3D_SVT_TEXTURE2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3D_SVT_TEXTURE3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3D_SVT_TEXTURECUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3D_SVT_TEXTURE;
+                default:
+                    assert(0);
+            }
+            break;
+        case HLSL_TYPE_UINT:
+            return D3D_SVT_UINT;
+        case HLSL_TYPE_VERTEXSHADER:
+            return D3D_SVT_VERTEXSHADER;
+        case HLSL_TYPE_VOID:
+            return D3D_SVT_VOID;
+        default:
+            assert(0);
+    }
+    assert(0);
+    return 0;
+}
+
+static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type)
+{
+    const struct hlsl_type *array_type = get_array_type(type);
+    unsigned int field_count = 0, array_size = 0;
+    struct hlsl_struct_field *field;
+    size_t fields_offset = 0;
+
+    if (type->bytecode_offset)
+        return;
+
+    if (type->type == HLSL_CLASS_ARRAY)
+        array_size = get_array_size(type);
+
+    if (array_type->type == HLSL_CLASS_STRUCT)
+    {
+        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        {
+            field->name_bytecode_offset = put_string(buffer, field->name);
+            write_sm4_type(ctx, buffer, field->type);
+        }
+
+        fields_offset = bytecode_get_size(buffer);
+
+        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        {
+            put_u32(buffer, field->name_bytecode_offset);
+            put_u32(buffer, field->type->bytecode_offset);
+            put_u32(buffer, field->reg_offset);
+            ++field_count;
+        }
+    }
+
+    type->bytecode_offset = put_u32(buffer, sm4_class(type) | (sm4_base_type(type) << 16));
+    put_u32(buffer, type->dimy | (type->dimx << 16));
+    put_u32(buffer, array_size | (field_count << 16));
+    put_u32(buffer, fields_offset);
+}
+
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
     size_t cbuffer_position, resource_position, creator_position;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
+    unsigned int cbuffer_count = 0, i, j;
     const struct hlsl_buffer *cbuffer;
-    unsigned int cbuffer_count = 0, i;
 
     static const uint16_t target_types[] =
     {
@@ -150,8 +291,23 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                 put_u32(&buffer, var->buffer_offset);
                 put_u32(&buffer, var->data_type->reg_size * sizeof(float));
                 put_u32(&buffer, flags);
-                put_u32(&buffer, 0); /* FIXME: type */
+                put_u32(&buffer, 0); /* type */
                 put_u32(&buffer, 0); /* FIXME: default value */
+            }
+        }
+
+        j = 0;
+        LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        {
+            if (var->is_uniform && var->buffer == cbuffer)
+            {
+                size_t var_offset = vars_start + j * 6 * sizeof(uint32_t);
+                size_t string_offset = put_string(&buffer, var->name);
+
+                set_u32(&buffer, var_offset, string_offset);
+                write_sm4_type(ctx, &buffer, var->data_type);
+                set_u32(&buffer, var_offset + 4 * sizeof(uint32_t), var->data_type->bytecode_offset);
+                ++j;
             }
         }
     }
