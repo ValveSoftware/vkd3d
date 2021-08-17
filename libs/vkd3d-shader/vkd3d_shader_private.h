@@ -1149,6 +1149,8 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define TAG_OSGN MAKE_TAG('O', 'S', 'G', 'N')
 #define TAG_PCSG MAKE_TAG('P', 'C', 'S', 'G')
 #define TAG_PSG1 MAKE_TAG('P', 'S', 'G', '1')
+#define TAG_RD11 MAKE_TAG('R', 'D', '1', '1')
+#define TAG_RDEF MAKE_TAG('R', 'D', 'E', 'F')
 #define TAG_RTS0 MAKE_TAG('R', 'T', 'S', '0')
 #define TAG_SHDR MAKE_TAG('S', 'H', 'D', 'R')
 #define TAG_SHEX MAKE_TAG('S', 'H', 'E', 'X')
