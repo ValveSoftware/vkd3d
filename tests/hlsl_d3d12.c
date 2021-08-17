@@ -488,87 +488,84 @@ static void test_thread_id(void)
                 get_cpu_descriptor_handle(&context, heap, i));
     }
 
-    todo cs_code = compile_shader(cs_source, "cs_5_0");
-    if (cs_code)
+    cs_code = compile_shader(cs_source, "cs_5_0");
+    context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
+            shader_bytecode(ID3D10Blob_GetBufferPointer(cs_code), ID3D10Blob_GetBufferSize(cs_code)));
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
+            0, get_gpu_descriptor_handle(&context, heap, 0));
+    ID3D12GraphicsCommandList_Dispatch(command_list, 2, 2, 2);
+
+    transition_resource_state(command_list, textures[0],
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_texture_readback_with_command_list(textures[0], 0, &rb, context.queue, command_list);
+    for (x = 0; x < 16; ++x)
     {
-        context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
-                shader_bytecode(ID3D10Blob_GetBufferPointer(cs_code), ID3D10Blob_GetBufferSize(cs_code)));
-
-        ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
-        ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
-        ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
-                0, get_gpu_descriptor_handle(&context, heap, 0));
-        ID3D12GraphicsCommandList_Dispatch(command_list, 2, 2, 2);
-
-        transition_resource_state(command_list, textures[0],
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(textures[0], 0, &rb, context.queue, command_list);
-        for (x = 0; x < 16; ++x)
+        for (y = 0; y < 8; ++y)
         {
-            for (y = 0; y < 8; ++y)
+            for (z = 0; z < 8; ++z)
             {
-                for (z = 0; z < 8; ++z)
-                {
-                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
-                    struct uvec4 expect = {x / 5, y / 3, z / 2, 1};
+                const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                struct uvec4 expect = {x / 5, y / 3, z / 2, 1};
 
-                    if (x >= 10 || y >= 6 || z >= 4)
-                        memset(&expect, 0, sizeof(expect));
+                if (x >= 10 || y >= 6 || z >= 4)
+                    memset(&expect, 0, sizeof(expect));
 
-                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
-                            v->x, v->y, v->z, v->w, x, y, z);
-                }
+                ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                        v->x, v->y, v->z, v->w, x, y, z);
             }
         }
-        release_resource_readback(&rb);
-        reset_command_list(command_list, context.allocator);
-
-        transition_resource_state(command_list, textures[1],
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(textures[1], 0, &rb, context.queue, command_list);
-        for (x = 0; x < 16; ++x)
-        {
-            for (y = 0; y < 8; ++y)
-            {
-                for (z = 0; z < 8; ++z)
-                {
-                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
-                    struct uvec4 expect = {x % 5, y % 3, z % 2, 2};
-
-                    if (x >= 10 || y >= 6 || z >= 4)
-                        memset(&expect, 0, sizeof(expect));
-
-                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
-                            v->x, v->y, v->z, v->w, x, y, z);
-                }
-            }
-        }
-        release_resource_readback(&rb);
-        reset_command_list(command_list, context.allocator);
-
-        transition_resource_state(command_list, textures[2],
-                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(textures[2], 0, &rb, context.queue, command_list);
-        for (x = 0; x < 16; ++x)
-        {
-            for (y = 0; y < 8; ++y)
-            {
-                for (z = 0; z < 8; ++z)
-                {
-                    const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
-                    struct uvec4 expect = {x, y, z, 3};
-
-                    if (x >= 10 || y >= 6 || z >= 4)
-                        memset(&expect, 0, sizeof(expect));
-
-                    ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
-                            v->x, v->y, v->z, v->w, x, y, z);
-                }
-            }
-        }
-        release_resource_readback(&rb);
-        reset_command_list(command_list, context.allocator);
     }
+    release_resource_readback(&rb);
+    reset_command_list(command_list, context.allocator);
+
+    transition_resource_state(command_list, textures[1],
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_texture_readback_with_command_list(textures[1], 0, &rb, context.queue, command_list);
+    for (x = 0; x < 16; ++x)
+    {
+        for (y = 0; y < 8; ++y)
+        {
+            for (z = 0; z < 8; ++z)
+            {
+                const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                struct uvec4 expect = {x % 5, y % 3, z % 2, 2};
+
+                if (x >= 10 || y >= 6 || z >= 4)
+                    memset(&expect, 0, sizeof(expect));
+
+                ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                        v->x, v->y, v->z, v->w, x, y, z);
+            }
+        }
+    }
+    release_resource_readback(&rb);
+    reset_command_list(command_list, context.allocator);
+
+    transition_resource_state(command_list, textures[2],
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_texture_readback_with_command_list(textures[2], 0, &rb, context.queue, command_list);
+    for (x = 0; x < 16; ++x)
+    {
+        for (y = 0; y < 8; ++y)
+        {
+            for (z = 0; z < 8; ++z)
+            {
+                const struct uvec4 *v = get_readback_data(&rb, x, y, z, sizeof(struct uvec4));
+                struct uvec4 expect = {x, y, z, 3};
+
+                if (x >= 10 || y >= 6 || z >= 4)
+                    memset(&expect, 0, sizeof(expect));
+
+                ok(compare_uvec4(v, &expect), "Got {%u, %u, %u, %u} at (%u, %u, %u).\n",
+                        v->x, v->y, v->z, v->w, x, y, z);
+            }
+        }
+    }
+    release_resource_readback(&rb);
+    reset_command_list(command_list, context.allocator);
 
     for (i = 0; i < 3; ++i)
         ID3D12Resource_Release(textures[i]);

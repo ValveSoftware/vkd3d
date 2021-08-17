@@ -38,15 +38,19 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
     }
     register_table[] =
     {
-        {"sv_primitiveid",  false, VKD3D_SHADER_TYPE_GEOMETRY, VKD3D_SM4_RT_PRIMID, false},
+        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM5_RT_THREAD_ID,         false},
+        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM5_RT_THREAD_GROUP_ID,   false},
+        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM5_RT_LOCAL_THREAD_ID,   false},
+
+        {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SM4_RT_PRIMID,            false},
 
         /* Put sv_target in this table, instead of letting it fall through to
          * default varying allocation, so that the register index matches the
          * usage index. */
-        {"color",           true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_OUTPUT,     true},
-        {"depth",           true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_DEPTHOUT,   false},
-        {"sv_depth",        true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_DEPTHOUT,   false},
-        {"sv_target",       true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_OUTPUT,     true},
+        {"color",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_RT_OUTPUT,            true},
+        {"depth",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_RT_DEPTHOUT,          false},
+        {"sv_depth",            true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_RT_DEPTHOUT,          false},
+        {"sv_target",           true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_RT_OUTPUT,            true},
     };
 
     for (i = 0; i < ARRAY_SIZE(register_table); ++i)
@@ -78,6 +82,10 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semant
     }
     semantics[] =
     {
+        {"sv_dispatchthreadid",         false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
+        {"sv_groupid",                  false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
+        {"sv_groupthreadid",            false, VKD3D_SHADER_TYPE_COMPUTE,   ~0u},
+
         {"position",                    false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
         {"sv_position",                 false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
         {"sv_primitiveid",              false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_PRIMITIVE_ID},
@@ -144,6 +152,8 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
 
         ret = hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
         assert(ret);
+        if (usage == ~0u)
+            continue;
         usage_idx = var->semantic.index;
 
         if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx))
@@ -206,6 +216,8 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
             continue;
 
         hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+        if (usage == ~0u)
+            continue;
 
         if (usage == D3D_NAME_TARGET && !ascii_strcasecmp(semantic, "color"))
             string_offset = put_string(&buffer, "SV_Target");
@@ -769,8 +781,11 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
 
         case VKD3D_SM4_RT_CONSTBUFFER:
         case VKD3D_SM4_RT_INPUT:
+        case VKD3D_SM5_RT_LOCAL_THREAD_ID:
         case VKD3D_SM4_RT_RESOURCE:
         case VKD3D_SM4_RT_TEMP:
+        case VKD3D_SM5_RT_THREAD_GROUP_ID:
+        case VKD3D_SM5_RT_THREAD_ID:
         case VKD3D_SM5_RT_UAV:
             return VKD3D_SM4_SWIZZLE_VEC4;
 
@@ -1063,6 +1078,8 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
 
     hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+    if (usage == ~0u)
+        usage = D3D_NAME_UNDEFINED;
 
     if (var->is_input_semantic)
     {
