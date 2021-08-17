@@ -1603,6 +1603,27 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
     }
 }
 
+static void write_sm4_sample_lod(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst, const struct hlsl_deref *resource,
+        const struct hlsl_deref *sampler, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *lod)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SAMPLE_LOD;
+
+    sm4_dst_from_node(&instr.dsts[0], dst);
+    instr.dst_count = 1;
+
+    sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
+    sm4_src_from_deref(ctx, &instr.srcs[2], sampler, sampler->var->data_type, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(&instr.srcs[3], lod, VKD3DSP_WRITEMASK_ALL);
+    instr.src_count = 4;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_store_uav_typed(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_deref *dst, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
 {
@@ -2109,7 +2130,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE_LOD:
-            hlsl_fixme(ctx, &load->node.loc, "SM4 sample-LOD expression.");
+            assert(load->sampler.var);
+            write_sm4_sample_lod(ctx, buffer, resource_type, &load->node,
+                    &load->resource, &load->sampler, coords, load->lod.node);
             break;
     }
 }
