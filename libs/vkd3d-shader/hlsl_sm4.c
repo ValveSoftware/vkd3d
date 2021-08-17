@@ -879,8 +879,17 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0] = var->reg.id;
-            reg->idx_count = 1;
+            if (shader_is_sm_5_1(ctx))
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx[1] = var->reg.index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx_count = 1;
+            }
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_UAV)
@@ -889,8 +898,17 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0] = var->reg.id;
-            reg->idx_count = 1;
+            if (shader_is_sm_5_1(ctx))
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx[1] = var->reg.index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx_count = 1;
+            }
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
@@ -899,8 +917,17 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_NONE;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-            reg->idx[0] = var->reg.id;
-            reg->idx_count = 1;
+            if (shader_is_sm_5_1(ctx))
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx[1] = var->reg.index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0] = var->reg.id;
+                reg->idx_count = 1;
+            }
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else
@@ -912,9 +939,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0] = var->buffer->reg.id;
-            reg->idx[1] = offset / 4;
-            reg->idx_count = 2;
+            if (shader_is_sm_5_1(ctx))
+            {
+                reg->idx[0] = var->buffer->reg.id;
+                reg->idx[1] = var->buffer->reg.index; /* FIXME: array index */
+                reg->idx[2] = offset / 4;
+                reg->idx_count = 3;
+            }
+            else
+            {
+                reg->idx[0] = var->buffer->reg.id;
+                reg->idx[1] = offset / 4;
+                reg->idx_count = 2;
+            }
             *writemask = ((1u << data_type->dimx) - 1) << (offset & 3);
         }
     }
