@@ -90,6 +90,9 @@ target_type_info[] =
         "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
         "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",
         true},
+    {VKD3D_SHADER_TARGET_GLSL,
+        "glsl", "An 'OpenGL Shading Language' shader.\n",
+        false}
 };
 
 static bool read_shader(struct vkd3d_shader_code *shader, FILE *f)

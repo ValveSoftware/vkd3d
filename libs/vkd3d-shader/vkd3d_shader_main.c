@@ -1032,6 +1032,15 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return ret;
     }
 
+    if (compile_info->target_type == VKD3D_SHADER_TARGET_GLSL)
+    {
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+                "Internal compiler error: Unhandled instruction.");
+        vkd3d_shader_parser_destroy(&parser);
+        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+        return VKD3D_ERROR;
+    }
+
     if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser.shader_version,
             &parser.shader_desc, compile_info, &scan_descriptor_info, message_context)))
     {
@@ -1280,6 +1289,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         VKD3D_SHADER_TARGET_SPIRV_TEXT,
 #endif
         VKD3D_SHADER_TARGET_D3D_ASM,
+        VKD3D_SHADER_TARGET_GLSL,
     };
 
     static const enum vkd3d_shader_target_type hlsl_types[] =

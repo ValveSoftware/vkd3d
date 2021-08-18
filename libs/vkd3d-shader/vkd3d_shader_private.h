@@ -115,6 +115,8 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED             = 5017,
 
     VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION       = 5300,
+
+    VKD3D_SHADER_ERROR_GLSL_INTERNAL                    = 6000,
 };
 
 enum vkd3d_shader_opcode

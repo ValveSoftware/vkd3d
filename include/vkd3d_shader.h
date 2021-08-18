@@ -491,6 +491,10 @@ enum vkd3d_shader_target_type
      * the format used for Direct3D shader model 4 and 5 shaders.
      */
     VKD3D_SHADER_TARGET_DXBC_TPF,
+    /**
+     * An 'OpenGL Shading Language' shader.
+     */
+    VKD3D_SHADER_TARGET_GLSL,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_TARGET_TYPE),
 };
