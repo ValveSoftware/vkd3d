@@ -24,7 +24,7 @@
 #include "sm4.h"
 
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
-        bool output, enum vkd3d_sm4_register_type *type, uint32_t *reg)
+        bool output, enum vkd3d_sm4_register_type *type, bool *has_idx)
 {
     unsigned int i;
 
@@ -56,7 +56,7 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
                 && ctx->profile->type == register_table[i].shader_type)
         {
             *type = register_table[i].type;
-            *reg = register_table[i].has_idx ? semantic->index : ~0u;
+            *has_idx = register_table[i].has_idx;
             return true;
         }
     }
@@ -137,6 +137,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         enum vkd3d_sm4_register_type type;
         uint32_t usage_idx, reg_idx;
         D3D_NAME usage;
+        bool has_idx;
 
         if ((output && !var->is_output_semantic) || (!output && !var->is_input_semantic))
             continue;
@@ -145,7 +146,11 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         assert(ret);
         usage_idx = var->semantic.index;
 
-        if (!hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &reg_idx))
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx))
+        {
+            reg_idx = has_idx ? var->semantic.index : ~0u;
+        }
+        else
         {
             assert(var->reg.allocated);
             type = VKD3D_SM4_RT_INPUT;
@@ -574,6 +579,9 @@ struct sm4_instruction
     } srcs[2];
     unsigned int src_count;
 
+    uint32_t idx[2];
+    unsigned int idx_count;
+
     unsigned int has_dst;
 };
 
@@ -582,6 +590,7 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
     switch (type)
     {
         case VKD3D_SM4_RT_CONSTBUFFER:
+        case VKD3D_SM4_RT_INPUT:
             return VKD3D_SM4_SWIZZLE_VEC4;
 
         default:
@@ -615,6 +624,7 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         size += sm4_register_order(&instr->dst.reg);
     for (i = 0; i < instr->src_count; ++i)
         size += sm4_register_order(&instr->srcs[i].reg);
+    size += instr->idx_count;
 
     token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
     put_u32(buffer, token);
@@ -640,6 +650,9 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
             put_u32(buffer, instr->srcs[i].reg.idx[j]);
     }
+
+    for (j = 0; j < instr->idx_count; ++j)
+        put_u32(buffer, instr->idx[j]);
 }
 
 static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
@@ -658,11 +671,103 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+{
+    const struct hlsl_profile_info *profile = ctx->profile;
+    const bool output = var->is_output_semantic;
+    D3D_NAME usage;
+    bool has_idx;
+
+    struct sm4_instruction instr =
+    {
+        .dst.reg.dim = VKD3D_SM4_DIMENSION_VEC4,
+        .has_dst = 1,
+    };
+
+    if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &instr.dst.reg.type, &has_idx))
+    {
+        if (has_idx)
+        {
+            instr.dst.reg.idx[0] = var->semantic.index;
+            instr.dst.reg.idx_count = 1;
+        }
+        else
+        {
+            instr.dst.reg.idx_count = 0;
+        }
+        instr.dst.writemask = (1 << var->data_type->dimx) - 1;
+    }
+    else
+    {
+        instr.dst.reg.type = output ? VKD3D_SM4_RT_OUTPUT : VKD3D_SM4_RT_INPUT;
+        instr.dst.reg.idx[0] = var->reg.id;
+        instr.dst.reg.idx_count = 1;
+        instr.dst.writemask = var->reg.writemask;
+    }
+
+    if (instr.dst.reg.type == VKD3D_SM4_RT_DEPTHOUT)
+        instr.dst.reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+
+    hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+
+    if (var->is_input_semantic)
+    {
+        switch (usage)
+        {
+            case D3D_NAME_UNDEFINED:
+                instr.opcode = (profile->type == VKD3D_SHADER_TYPE_PIXEL)
+                        ? VKD3D_SM4_OP_DCL_INPUT_PS : VKD3D_SM4_OP_DCL_INPUT;
+                break;
+
+            case D3D_NAME_INSTANCE_ID:
+            case D3D_NAME_PRIMITIVE_ID:
+            case D3D_NAME_VERTEX_ID:
+                instr.opcode = (profile->type == VKD3D_SHADER_TYPE_PIXEL)
+                        ? VKD3D_SM4_OP_DCL_INPUT_PS_SGV : VKD3D_SM4_OP_DCL_INPUT_SGV;
+                break;
+
+            default:
+                instr.opcode = (profile->type == VKD3D_SHADER_TYPE_PIXEL)
+                        ? VKD3D_SM4_OP_DCL_INPUT_PS_SIV : VKD3D_SM4_OP_DCL_INPUT_SIV;
+                break;
+        }
+
+        if (profile->type == VKD3D_SHADER_TYPE_PIXEL)
+            instr.opcode |= VKD3DSIM_LINEAR << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
+    }
+    else
+    {
+        if (usage == D3D_NAME_UNDEFINED || profile->type == VKD3D_SHADER_TYPE_PIXEL)
+            instr.opcode = VKD3D_SM4_OP_DCL_OUTPUT;
+        else
+            instr.opcode = VKD3D_SM4_OP_DCL_OUTPUT_SIV;
+    }
+
+    switch (usage)
+    {
+        case D3D_NAME_COVERAGE:
+        case D3D_NAME_DEPTH:
+        case D3D_NAME_DEPTH_GREATER_EQUAL:
+        case D3D_NAME_DEPTH_LESS_EQUAL:
+        case D3D_NAME_TARGET:
+        case D3D_NAME_UNDEFINED:
+            break;
+
+        default:
+            instr.idx_count = 1;
+            instr.idx[0] = usage;
+            break;
+    }
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct hlsl_buffer *cbuffer;
+    const struct hlsl_ir_var *var;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -684,6 +789,12 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     {
         if (cbuffer->reg.allocated)
             write_sm4_dcl_constant_buffer(&buffer, cbuffer);
+    }
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
+            write_sm4_dcl_semantic(ctx, &buffer, var);
     }
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);

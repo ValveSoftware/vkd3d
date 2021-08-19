@@ -1048,6 +1048,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     else
     {
         D3D_NAME usage;
+        bool has_idx;
 
         if (!hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage))
         {
@@ -1055,7 +1056,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
                     "Invalid semantic '%s'.", var->semantic.name);
             return;
         }
-        builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
+        if ((builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx)))
+            reg = has_idx ? var->semantic.index : 0;
     }
 
     if (builtin)
