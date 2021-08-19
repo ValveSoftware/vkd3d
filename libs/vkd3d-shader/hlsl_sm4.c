@@ -549,10 +549,120 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     dxbc_writer_add_section(dxbc, TAG_RDEF, buffer.data, buffer.size);
 }
 
+struct sm4_register
+{
+    enum vkd3d_sm4_register_type type;
+    uint32_t idx[2];
+    unsigned int idx_count;
+    enum vkd3d_sm4_dimension dim;
+};
+
+struct sm4_instruction
+{
+    enum vkd3d_sm4_opcode opcode;
+
+    struct
+    {
+        struct sm4_register reg;
+        unsigned int writemask;
+    } dst;
+
+    struct
+    {
+        struct sm4_register reg;
+        unsigned int swizzle;
+    } srcs[2];
+    unsigned int src_count;
+
+    unsigned int has_dst;
+};
+
+static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
+{
+    switch (type)
+    {
+        case VKD3D_SM4_RT_CONSTBUFFER:
+            return VKD3D_SM4_SWIZZLE_VEC4;
+
+        default:
+            FIXME("Unhandled register type %#x.\n", type);
+            return VKD3D_SM4_SWIZZLE_VEC4;
+    }
+}
+
+static uint32_t sm4_encode_register(const struct sm4_register *reg)
+{
+    return (reg->type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
+            | (reg->idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT)
+            | (reg->dim << VKD3D_SM4_DIMENSION_SHIFT);
+}
+
+static uint32_t sm4_register_order(const struct sm4_register *reg)
+{
+    uint32_t order = 1;
+    if (reg->type == VKD3D_SM4_RT_IMMCONST)
+        order += reg->dim == VKD3D_SM4_DIMENSION_VEC4 ? 4 : 1;
+    order += reg->idx_count;
+    return order;
+}
+
+static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const struct sm4_instruction *instr)
+{
+    uint32_t token = instr->opcode;
+    unsigned int size = 1, i, j;
+
+    if (instr->has_dst)
+        size += sm4_register_order(&instr->dst.reg);
+    for (i = 0; i < instr->src_count; ++i)
+        size += sm4_register_order(&instr->srcs[i].reg);
+
+    token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
+    put_u32(buffer, token);
+
+    if (instr->has_dst)
+    {
+        token = sm4_encode_register(&instr->dst.reg);
+        if (instr->dst.reg.dim == VKD3D_SM4_DIMENSION_VEC4)
+            token |= instr->dst.writemask << VKD3D_SM4_WRITEMASK_SHIFT;
+        put_u32(buffer, token);
+
+        for (j = 0; j < instr->dst.reg.idx_count; ++j)
+            put_u32(buffer, instr->dst.reg.idx[j]);
+    }
+
+    for (i = 0; i < instr->src_count; ++i)
+    {
+        token = sm4_encode_register(&instr->srcs[i].reg);
+        token |= sm4_swizzle_type(instr->srcs[i].reg.type) << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+        token |= instr->srcs[i].swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
+        put_u32(buffer, token);
+
+        for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
+            put_u32(buffer, instr->srcs[i].reg.idx[j]);
+    }
+}
+
+static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
+{
+    const struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
+
+        .srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
+        .srcs[0].reg.type = VKD3D_SM4_RT_CONSTBUFFER,
+        .srcs[0].reg.idx = {cbuffer->reg.id, (cbuffer->used_size + 3) / 4},
+        .srcs[0].reg.idx_count = 2,
+        .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
+        .src_count = 1,
+    };
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
+    const struct hlsl_buffer *cbuffer;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -569,6 +679,12 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     put_u32(&buffer, vkd3d_make_u32((profile->major_version << 4) | profile->minor_version, shader_types[profile->type]));
     put_u32(&buffer, 0); /* FIXME: instruction token count */
+
+    LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
+    {
+        if (cbuffer->reg.allocated)
+            write_sm4_dcl_constant_buffer(&buffer, cbuffer);
+    }
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
 }
