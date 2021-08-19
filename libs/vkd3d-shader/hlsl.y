@@ -1390,7 +1390,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                 "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
 
-    if (!(one = hlsl_new_uint_constant(ctx, 1, loc)))
+    if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
         return false;
     list_add_tail(instrs, &one->node.entry);
 

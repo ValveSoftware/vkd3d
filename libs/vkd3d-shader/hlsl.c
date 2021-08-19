@@ -566,6 +566,18 @@ struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir
     return hlsl_new_store(ctx, lhs, NULL, rhs, 0, rhs->loc);
 }
 
+struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
+        const struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_constant *c;
+
+    if (!(c = hlsl_alloc(ctx, sizeof(*c))))
+        return NULL;
+    init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_INT], loc);
+    c->value[0].i = n;
+    return c;
+}
+
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location loc)
 {
