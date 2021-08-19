@@ -762,6 +762,19 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_dcl_temps(struct vkd3d_bytecode_buffer *buffer, uint32_t temp_count)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_TEMPS,
+
+        .idx = {temp_count},
+        .idx_count = 1,
+    };
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -796,6 +809,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
             write_sm4_dcl_semantic(ctx, &buffer, var);
     }
+
+    if (ctx->temp_count)
+        write_sm4_dcl_temps(&buffer, ctx->temp_count);
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
 }

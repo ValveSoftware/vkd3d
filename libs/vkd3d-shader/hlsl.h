@@ -469,6 +469,7 @@ struct hlsl_ctx
         struct hlsl_vec4 *values;
         size_t count, size;
     } constant_defs;
+    uint32_t temp_count;
 };
 
 enum hlsl_error_level

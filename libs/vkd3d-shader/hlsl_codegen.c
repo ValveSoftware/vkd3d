@@ -685,6 +685,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 struct liveness
 {
     size_t size;
+    uint32_t reg_count;
     struct
     {
         /* 0 if not live yet. */
@@ -747,6 +748,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *
     ret.id = component_idx / 4;
     ret.writemask = writemask;
     ret.allocated = true;
+    liveness->reg_count = max(liveness->reg_count, ret.id + 1);
     return ret;
 }
 
@@ -782,6 +784,7 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
         liveness->regs[component_idx + i].last_read = last_read;
     ret.id = component_idx / 4;
     ret.allocated = true;
+    liveness->reg_count = max(liveness->reg_count, ret.id + align(component_count, 4));
     return ret;
 }
 
@@ -1008,6 +1011,7 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
 {
     struct liveness liveness = {0};
     allocate_temp_registers_recurse(ctx, entry_func->body, &liveness);
+    ctx->temp_count = liveness.reg_count;
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
