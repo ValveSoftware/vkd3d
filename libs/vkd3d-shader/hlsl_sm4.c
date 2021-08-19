@@ -775,6 +775,16 @@ static void write_sm4_dcl_temps(struct vkd3d_bytecode_buffer *buffer, uint32_t t
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_RET,
+    };
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
@@ -812,6 +822,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     if (ctx->temp_count)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);
+
+    write_sm4_ret(&buffer);
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
 }
