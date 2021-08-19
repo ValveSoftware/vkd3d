@@ -166,6 +166,20 @@ static inline int ascii_tolower(int c)
     return ascii_isupper(c) ? c - 'A' + 'a' : c;
 }
 
+static inline int ascii_strncasecmp(const char *a, const char *b, size_t n)
+{
+    int c_a, c_b;
+
+    while (n--)
+    {
+        c_a = ascii_tolower(*a++);
+        c_b = ascii_tolower(*b++);
+        if (c_a != c_b || !c_a)
+            return c_a - c_b;
+    }
+    return 0;
+}
+
 static inline int ascii_strcasecmp(const char *a, const char *b)
 {
     int c_a, c_b;

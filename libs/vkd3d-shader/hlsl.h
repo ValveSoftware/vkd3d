@@ -22,7 +22,9 @@
 
 #include "vkd3d_shader_private.h"
 #include "rbtree.h"
+#include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3dx9shader.h"
+#include "sm4.h"
 
 /* The general IR structure is inspired by Mesa GLSL hir, even though the code
  * ends up being quite different in practice. Anyway, here comes the relevant
@@ -683,6 +685,10 @@ bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
 bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx);
 int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out);
 
+bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx,
+        const struct hlsl_semantic *semantic, bool output, D3D_NAME *usage);
+bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
+        bool output, enum vkd3d_sm4_register_type *type, uint32_t *reg);
 int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out);
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);

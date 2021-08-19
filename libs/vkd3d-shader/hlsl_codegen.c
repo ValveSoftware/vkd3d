@@ -1012,13 +1012,26 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
 {
+    static const char *shader_names[] =
+    {
+        [VKD3D_SHADER_TYPE_PIXEL] = "Pixel",
+        [VKD3D_SHADER_TYPE_VERTEX] = "Vertex",
+        [VKD3D_SHADER_TYPE_GEOMETRY] = "Geometry",
+        [VKD3D_SHADER_TYPE_HULL] = "Hull",
+        [VKD3D_SHADER_TYPE_DOMAIN] = "Domain",
+        [VKD3D_SHADER_TYPE_COMPUTE] = "Compute",
+    };
+
+    unsigned int type;
+    uint32_t reg;
+    bool builtin;
+
     assert(var->semantic.name);
 
     if (ctx->profile->major_version < 4)
     {
-        D3DSHADER_PARAM_REGISTER_TYPE type;
-        uint32_t reg, usage_idx;
         D3DDECLUSAGE usage;
+        uint32_t usage_idx;
 
         if (!hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
         {
@@ -1027,19 +1040,35 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
             return;
         }
 
-        if (hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg))
+        if ((!output && !var->last_read) || (output && !var->first_write))
+            return;
+
+        builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
+    }
+    else
+    {
+        D3D_NAME usage;
+
+        if (!hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage))
         {
-            TRACE("%s %s semantic %s[%u] matches predefined register %#x[%u].\n",
-                    ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL ? "Pixel" : "Vertex", output ? "output" : "input",
-                    var->semantic.name, var->semantic.index, type, reg);
+            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                    "Invalid semantic '%s'.", var->semantic.name);
+            return;
         }
-        else
-        {
-            var->reg.allocated = true;
-            var->reg.id = (*counter)++;
-            var->reg.writemask = (1 << var->data_type->dimx) - 1;
-            TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v', var->reg, var->data_type));
-        }
+        builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
+    }
+
+    if (builtin)
+    {
+        TRACE("%s %s semantic %s[%u] matches predefined register %#x[%u].\n", shader_names[ctx->profile->type],
+                output ? "output" : "input", var->semantic.name, var->semantic.index, type, reg);
+    }
+    else
+    {
+        var->reg.allocated = true;
+        var->reg.id = (*counter)++;
+        var->reg.writemask = (1 << var->data_type->dimx) - 1;
+        TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v', var->reg, var->data_type));
     }
 }
 
@@ -1050,9 +1079,9 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_input_semantic && var->last_read)
+        if (var->is_input_semantic)
             allocate_semantic_register(ctx, var, &input_counter, false);
-        if (var->is_output_semantic && var->first_write)
+        if (var->is_output_semantic)
             allocate_semantic_register(ctx, var, &output_counter, true);
     }
 }

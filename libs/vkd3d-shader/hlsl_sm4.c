@@ -23,6 +23,201 @@
 #include "vkd3d_d3dcommon.h"
 #include "sm4.h"
 
+bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
+        bool output, enum vkd3d_sm4_register_type *type, uint32_t *reg)
+{
+    unsigned int i;
+
+    static const struct
+    {
+        const char *semantic;
+        bool output;
+        enum vkd3d_shader_type shader_type;
+        enum vkd3d_sm4_register_type type;
+        bool has_idx;
+    }
+    register_table[] =
+    {
+        {"sv_primitiveid",  false, VKD3D_SHADER_TYPE_GEOMETRY, VKD3D_SM4_RT_PRIMID, false},
+
+        /* Put sv_target in this table, instead of letting it fall through to
+         * default varying allocation, so that the register index matches the
+         * usage index. */
+        {"color",           true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_OUTPUT,     true},
+        {"depth",           true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_DEPTHOUT,   false},
+        {"sv_depth",        true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_DEPTHOUT,   false},
+        {"sv_target",       true, VKD3D_SHADER_TYPE_PIXEL, VKD3D_SM4_RT_OUTPUT,     true},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(register_table); ++i)
+    {
+        if (!ascii_strcasecmp(semantic->name, register_table[i].semantic)
+                && output == register_table[i].output
+                && ctx->profile->type == register_table[i].shader_type)
+        {
+            *type = register_table[i].type;
+            *reg = register_table[i].has_idx ? semantic->index : ~0u;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
+        bool output, D3D_NAME *usage)
+{
+    unsigned int i;
+
+    static const struct
+    {
+        const char *name;
+        bool output;
+        enum vkd3d_shader_type shader_type;
+        D3DDECLUSAGE usage;
+    }
+    semantics[] =
+    {
+        {"position",                    false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
+        {"sv_position",                 false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
+        {"sv_primitiveid",              false, VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_PRIMITIVE_ID},
+
+        {"position",                    true,  VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
+        {"sv_position",                 true,  VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_POSITION},
+        {"sv_primitiveid",              true,  VKD3D_SHADER_TYPE_GEOMETRY,  D3D_NAME_PRIMITIVE_ID},
+
+        {"position",                    false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_POSITION},
+        {"sv_position",                 false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_POSITION},
+
+        {"color",                       true,  VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_TARGET},
+        {"depth",                       true,  VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_DEPTH},
+        {"sv_target",                   true,  VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_TARGET},
+        {"sv_depth",                    true,  VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_DEPTH},
+
+        {"sv_position",                 false, VKD3D_SHADER_TYPE_VERTEX,    D3D_NAME_UNDEFINED},
+
+        {"position",                    true,  VKD3D_SHADER_TYPE_VERTEX,    D3D_NAME_POSITION},
+        {"sv_position",                 true,  VKD3D_SHADER_TYPE_VERTEX,    D3D_NAME_POSITION},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(semantics); ++i)
+    {
+        if (!ascii_strcasecmp(semantic->name, semantics[i].name)
+                && output == semantics[i].output
+                && ctx->profile->type == semantics[i].shader_type
+                && !ascii_strncasecmp(semantic->name, "sv_", 3))
+        {
+            *usage = semantics[i].usage;
+            return true;
+        }
+    }
+
+    if (!ascii_strncasecmp(semantic->name, "sv_", 3))
+        return false;
+
+    *usage = D3D_NAME_UNDEFINED;
+    return true;
+}
+
+static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, bool output)
+{
+    struct vkd3d_bytecode_buffer buffer = {0};
+    struct vkd3d_string_buffer *string;
+    const struct hlsl_ir_var *var;
+    size_t count_position;
+    unsigned int i;
+    bool ret;
+
+    count_position = put_u32(&buffer, 0);
+    put_u32(&buffer, 8); /* unknown */
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        unsigned int width = (1u << var->data_type->dimx) - 1, use_mask;
+        enum vkd3d_sm4_register_type type;
+        uint32_t usage_idx, reg_idx;
+        D3D_NAME usage;
+
+        if ((output && !var->is_output_semantic) || (!output && !var->is_input_semantic))
+            continue;
+
+        ret = hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+        assert(ret);
+        usage_idx = var->semantic.index;
+
+        if (!hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &reg_idx))
+        {
+            assert(var->reg.allocated);
+            type = VKD3D_SM4_RT_INPUT;
+            reg_idx = var->reg.id;
+        }
+
+        use_mask = width; /* FIXME: accurately report use mask */
+        if (output)
+            use_mask = 0xf ^ use_mask;
+
+        /* Special pixel shader semantics (TARGET, DEPTH, COVERAGE). */
+        if (usage >= 64)
+            usage = 0;
+
+        put_u32(&buffer, 0); /* name */
+        put_u32(&buffer, usage_idx);
+        put_u32(&buffer, usage);
+        switch (var->data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                put_u32(&buffer, D3D_REGISTER_COMPONENT_FLOAT32);
+                break;
+
+            case HLSL_TYPE_INT:
+                put_u32(&buffer, D3D_REGISTER_COMPONENT_SINT32);
+                break;
+
+            case HLSL_TYPE_BOOL:
+            case HLSL_TYPE_UINT:
+                put_u32(&buffer, D3D_REGISTER_COMPONENT_UINT32);
+                break;
+
+            default:
+                if ((string = hlsl_type_to_string(ctx, var->data_type)))
+                    hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Invalid data type %s for semantic variable %s.", string->buffer, var->name);
+                hlsl_release_string_buffer(ctx, string);
+                put_u32(&buffer, D3D_REGISTER_COMPONENT_UNKNOWN);
+        }
+        put_u32(&buffer, reg_idx);
+        put_u32(&buffer, vkd3d_make_u16(width, use_mask));
+    }
+
+    i = 0;
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        const char *semantic = var->semantic.name;
+        size_t string_offset;
+        D3D_NAME usage;
+
+        if ((output && !var->is_output_semantic) || (!output && !var->is_input_semantic))
+            continue;
+
+        hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+
+        if (usage == D3D_NAME_TARGET && !ascii_strcasecmp(semantic, "color"))
+            string_offset = put_string(&buffer, "SV_Target");
+        else if (usage == D3D_NAME_DEPTH && !ascii_strcasecmp(semantic, "depth"))
+            string_offset = put_string(&buffer, "SV_Depth");
+        else if (usage == D3D_NAME_POSITION && !ascii_strcasecmp(semantic, "position"))
+            string_offset = put_string(&buffer, "SV_Position");
+        else
+            string_offset = put_string(&buffer, semantic);
+        set_u32(&buffer, (2 + i++ * 6) * sizeof(uint32_t), string_offset);
+    }
+
+    set_u32(&buffer, count_position, i);
+
+    dxbc_writer_add_section(dxbc, output ? TAG_OSGN : TAG_ISGN, buffer.data, buffer.size);
+}
+
 static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
 {
     if (type->type == HLSL_CLASS_ARRAY)
@@ -386,10 +581,13 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     dxbc_writer_init(&dxbc);
 
+    write_sm4_signature(ctx, &dxbc, false);
+    write_sm4_signature(ctx, &dxbc, true);
     write_sm4_rdef(ctx, &dxbc);
     write_sm4_shdr(ctx, &dxbc);
 
-    ret = dxbc_writer_write(&dxbc, out);
+    if (!(ret = ctx->result))
+        ret = dxbc_writer_write(&dxbc, out);
     for (i = 0; i < dxbc.section_count; ++i)
         vkd3d_free((void *)dxbc.sections[i].data);
     return ret;
