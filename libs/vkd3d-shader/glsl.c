@@ -59,6 +59,8 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
 {
     switch (instruction->handler_idx)
     {
+        case VKD3DSIH_DCL_INPUT:
+            break;
         default:
             vkd3d_glsl_compiler_error(generator,
                     VKD3D_SHADER_ERROR_GLSL_INTERNAL,
