@@ -169,6 +169,7 @@ libvkd3d_shader_la_SOURCES = \
 	include/vkd3d_shader.h \
 	libs/vkd3d-shader/checksum.c \
 	libs/vkd3d-shader/dxbc.c \
+	libs/vkd3d-shader/glsl.c \
 	libs/vkd3d-shader/hlsl.c \
 	libs/vkd3d-shader/hlsl.h \
 	libs/vkd3d-shader/hlsl_codegen.c \

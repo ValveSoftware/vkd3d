@@ -1034,11 +1034,22 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_GLSL)
     {
-        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                "Internal compiler error: Unhandled instruction.");
+        struct vkd3d_glsl_generator *glsl_generator;
+
+        if (!(glsl_generator = vkd3d_glsl_generator_create(compile_info, message_context)))
+        {
+            ERR("Failed to create GLSL generator.\n");
+            vkd3d_shader_parser_destroy(&parser);
+            vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+            return VKD3D_ERROR;
+        }
+
+        ret = vkd3d_glsl_generator_generate(parser.data, parser.ptr, glsl_generator, out);
+
+        vkd3d_glsl_generator_destroy(glsl_generator);
         vkd3d_shader_parser_destroy(&parser);
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        return VKD3D_ERROR;
+        return ret;
     }
 
     if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser.shader_version,
