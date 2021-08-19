@@ -136,6 +136,12 @@ static struct list *make_empty_list(struct hlsl_ctx *ctx)
     return list;
 }
 
+static void destroy_instr_list(struct list *list)
+{
+    hlsl_free_instr_list(list);
+    vkd3d_free(list);
+}
+
 static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
 {
     if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
@@ -385,10 +391,10 @@ oom:
     vkd3d_free(loop);
     vkd3d_free(cond_jump);
     vkd3d_free(list);
-    hlsl_free_instr_list(init);
-    hlsl_free_instr_list(cond);
-    hlsl_free_instr_list(iter);
-    hlsl_free_instr_list(body);
+    destroy_instr_list(init);
+    destroy_instr_list(cond);
+    destroy_instr_list(iter);
+    destroy_instr_list(body);
     return NULL;
 }
 
@@ -405,7 +411,7 @@ static unsigned int initializer_size(const struct parse_initializer *initializer
 
 static void free_parse_initializer(struct parse_initializer *initializer)
 {
-    hlsl_free_instr_list(initializer->instrs);
+    destroy_instr_list(initializer->instrs);
     vkd3d_free(initializer->args);
 }
 
@@ -1789,7 +1795,7 @@ hlsl_prog:
         {
             if (!list_empty($2))
                 hlsl_fixme(ctx, @2, "Uniform initializer.");
-            hlsl_free_instr_list($2);
+            destroy_instr_list($2);
         }
     | hlsl_prog preproc_directive
     | hlsl_prog ';'
@@ -2364,7 +2370,7 @@ arrays:
             unsigned int size = evaluate_array_dimension(node_from_list($2));
             uint32_t *new_array;
 
-            hlsl_free_instr_list($2);
+            destroy_instr_list($2);
 
             $$ = $4;
 
@@ -2656,7 +2662,7 @@ postfix_expr:
         {
             if (!add_increment(ctx, $1, false, true, @2))
             {
-                hlsl_free_instr_list($1);
+                destroy_instr_list($1);
                 YYABORT;
             }
             $$ = $1;
@@ -2665,7 +2671,7 @@ postfix_expr:
         {
             if (!add_increment(ctx, $1, true, true, @2))
             {
-                hlsl_free_instr_list($1);
+                destroy_instr_list($1);
                 YYABORT;
             }
             $$ = $1;
@@ -2717,20 +2723,20 @@ postfix_expr:
             if (index->data_type->type != HLSL_CLASS_SCALAR)
             {
                 hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Array index is not scalar.");
-                hlsl_free_instr_list($1);
+                destroy_instr_list($1);
                 YYABORT;
             }
 
             if (!(cast = hlsl_new_cast(ctx, index, ctx->builtin_types.scalar[HLSL_TYPE_UINT], &index->loc)))
             {
-                hlsl_free_instr_list($1);
+                destroy_instr_list($1);
                 YYABORT;
             }
             list_add_tail($1, &cast->node.entry);
 
             if (!add_array_load(ctx, $1, array, &cast->node, @2))
             {
-                hlsl_free_instr_list($1);
+                destroy_instr_list($1);
                 YYABORT;
             }
             $$ = $1;
@@ -2821,7 +2827,7 @@ unary_expr:
         {
             if (!add_increment(ctx, $2, false, false, @1))
             {
-                hlsl_free_instr_list($2);
+                destroy_instr_list($2);
                 YYABORT;
             }
             $$ = $2;
@@ -2830,7 +2836,7 @@ unary_expr:
         {
             if (!add_increment(ctx, $2, true, false, @1))
             {
-                hlsl_free_instr_list($2);
+                destroy_instr_list($2);
                 YYABORT;
             }
             $$ = $2;

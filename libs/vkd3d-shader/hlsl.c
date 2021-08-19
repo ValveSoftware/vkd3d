@@ -1278,7 +1278,6 @@ void hlsl_free_instr_list(struct list *list)
      * the "uses" list. */
     LIST_FOR_EACH_ENTRY_SAFE_REV(node, next_node, list, struct hlsl_ir_node, entry)
         hlsl_free_instr(node);
-    vkd3d_free(list);
 }
 
 static void free_ir_constant(struct hlsl_ir_constant *constant)
@@ -1297,12 +1296,8 @@ static void free_ir_expr(struct hlsl_ir_expr *expr)
 
 static void free_ir_if(struct hlsl_ir_if *if_node)
 {
-    struct hlsl_ir_node *node, *next_node;
-
-    LIST_FOR_EACH_ENTRY_SAFE(node, next_node, &if_node->then_instrs, struct hlsl_ir_node, entry)
-        hlsl_free_instr(node);
-    LIST_FOR_EACH_ENTRY_SAFE(node, next_node, &if_node->else_instrs, struct hlsl_ir_node, entry)
-        hlsl_free_instr(node);
+    hlsl_free_instr_list(&if_node->then_instrs);
+    hlsl_free_instr_list(&if_node->else_instrs);
     hlsl_src_remove(&if_node->condition);
     vkd3d_free(if_node);
 }
@@ -1320,10 +1315,7 @@ static void free_ir_load(struct hlsl_ir_load *load)
 
 static void free_ir_loop(struct hlsl_ir_loop *loop)
 {
-    struct hlsl_ir_node *node, *next_node;
-
-    LIST_FOR_EACH_ENTRY_SAFE(node, next_node, &loop->body, struct hlsl_ir_node, entry)
-        hlsl_free_instr(node);
+    hlsl_free_instr_list(&loop->body);
     vkd3d_free(loop);
 }
 
@@ -1342,6 +1334,8 @@ static void free_ir_swizzle(struct hlsl_ir_swizzle *swizzle)
 
 void hlsl_free_instr(struct hlsl_ir_node *node)
 {
+    assert(list_empty(&node->uses));
+
     switch (node->type)
     {
         case HLSL_IR_CONSTANT:
@@ -1382,6 +1376,7 @@ static void free_function_decl(struct hlsl_ir_function_decl *decl)
 {
     vkd3d_free(decl->parameters);
     hlsl_free_instr_list(decl->body);
+    vkd3d_free(decl->body);
     vkd3d_free(decl);
 }
 
