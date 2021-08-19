@@ -163,9 +163,9 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         }
     }
 
-    type->bytecode_offset = put_u32(buffer, sm4_class(type) | (sm4_base_type(type) << 16));
-    put_u32(buffer, type->dimy | (type->dimx << 16));
-    put_u32(buffer, array_size | (field_count << 16));
+    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(type), sm4_base_type(type)));
+    put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
+    put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);
 
     if (profile->major_version >= 5)
@@ -207,7 +207,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     cbuffer_position = put_u32(&buffer, 0);
     put_u32(&buffer, cbuffer_count); /* bound resource count */
     resource_position = put_u32(&buffer, 0);
-    put_u32(&buffer, (target_types[profile->type] << 16) | (profile->major_version << 8) | profile->minor_version);
+    put_u32(&buffer, vkd3d_make_u32(vkd3d_make_u16(profile->minor_version, profile->major_version),
+            target_types[profile->type]));
     put_u32(&buffer, 0); /* FIXME: compilation flags */
     creator_position = put_u32(&buffer, 0);
 
@@ -371,7 +372,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         VKD3D_SM4_LIB,
     };
 
-    put_u32(&buffer, (shader_types[profile->type] << 16) | (profile->major_version << 4) | profile->minor_version);
+    put_u32(&buffer, vkd3d_make_u32((profile->major_version << 4) | profile->minor_version, shader_types[profile->type]));
     put_u32(&buffer, 0); /* FIXME: instruction token count */
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
