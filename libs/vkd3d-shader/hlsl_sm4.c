@@ -791,6 +791,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct hlsl_buffer *cbuffer;
     const struct hlsl_ir_var *var;
+    size_t token_count_position;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -806,7 +807,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     };
 
     put_u32(&buffer, vkd3d_make_u32((profile->major_version << 4) | profile->minor_version, shader_types[profile->type]));
-    put_u32(&buffer, 0); /* FIXME: instruction token count */
+    token_count_position = put_u32(&buffer, 0);
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
@@ -824,6 +825,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);
 
     write_sm4_ret(&buffer);
+
+    set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
 }
