@@ -1036,7 +1036,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     {
         struct vkd3d_glsl_generator *glsl_generator;
 
-        if (!(glsl_generator = vkd3d_glsl_generator_create(compile_info, message_context)))
+        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser.shader_version, compile_info, message_context)))
         {
             ERR("Failed to create GLSL generator.\n");
             vkd3d_shader_parser_destroy(&parser);

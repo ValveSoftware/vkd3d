@@ -986,7 +986,8 @@ int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
 
 struct vkd3d_glsl_generator;
 
-struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_compile_info *compile_info,
+struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context);
 int vkd3d_glsl_generator_generate(void *parser_data, const uint32_t *parser_ptr,
         struct vkd3d_glsl_generator *generator,

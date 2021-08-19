@@ -20,13 +20,15 @@
 
 struct vkd3d_glsl_generator
 {
+    struct vkd3d_shader_version version;
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
     bool failed;
 };
 
-struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_compile_info *compile_info,
+struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_glsl_generator *generator;
@@ -35,6 +37,7 @@ struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shad
         return NULL;
 
     memset(generator, 0, sizeof(*generator));
+    generator->version = *version;
     generator->location.source_name = compile_info->source_name;
     generator->location.line = 2; /* Line 1 is the version token. */
     generator->message_context = message_context;
@@ -54,6 +57,21 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
     return;
 }
 
+static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
+        const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_shader_version *version = &generator->version;
+
+    /*
+    * TODO: Implement in_subroutine
+    * TODO: shader_glsl_generate_shader_epilogue(generator);
+    */
+    if (version->major >= 4)
+    {
+        vkd3d_string_buffer_printf(&generator->buffer, "return;\n");
+    }
+}
+
 static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -61,6 +79,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
     {
         case VKD3DSIH_DCL_INPUT:
         case VKD3DSIH_DCL_OUTPUT_SIV:
+            break;
+        case VKD3DSIH_RET:
+            shader_glsl_ret(generator, instruction);
             break;
         default:
             vkd3d_glsl_compiler_error(generator,
