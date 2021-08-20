@@ -1,0 +1,38 @@
+
+
+	List of vkd3d subsection maintainers
+
+When submitting patches to vkd3d, the guidelines at
+<https://wiki.winehq.org/SubmittingPatches> should be followed. This file
+contains a list of maintainers for subsections of vkd3d. If you have
+questions about your work in an area of vkd3d, you may find a list of
+knowledgeable people here.
+
+This file uses a similar format to the Linux kernel MAINTAINERS file.
+Descriptions of section entries used here:
+
+	M: Primary maintainer. CC patches to: FullName <address@domain>
+	P: Other knowledgeable person. FullName <address@domain>
+	F: Files and directories with wildcard patterns.
+	   One pattern per line.  Multiple F: lines acceptable.
+
+Maintainers List
+
+		-----------------------------------
+
+HLSL compiler
+M:	Zebediah Figura <zfigura@codeweavers.com>
+P:	Matteo Bruni <mbruni@codeweavers.com>
+P:	Francisco Casas <fcasas@codeweavers.com>
+P:	Giovanni Mascellani <gmascellani@codeweavers.com>
+F:	libs/vkd3d-shader/hlsl*
+
+HLSL preprocessor
+M:	Zebediah Figura <zfigura@codeweavers.com>
+P:	Matteo Bruni <mbruni@codeweavers.com>
+F:	libs/vkd3d-shader/preproc*
+
+THE REST
+M:	Henri Verbeet <hverbeet@codeweavers.com>
+F:	*
+F:	*/
