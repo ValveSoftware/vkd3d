@@ -34797,6 +34797,188 @@ done:
     destroy_test_context(&context);
 }
 
+static void test_unbounded_resource_arrays(void)
+{
+    ID3D12Resource *constant_buffers[64], *input_buffers[64], *output_buffers[128];
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
+    D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc;
+    ID3D12GraphicsCommandList *command_list;
+    struct resource_readback rb;
+    struct test_context context;
+    ID3D12DescriptorHeap *heap;
+    ID3D12CommandQueue *queue;
+    ID3D12Device *device;
+    unsigned int i;
+    HRESULT hr;
+
+    static const D3D12_DESCRIPTOR_RANGE descriptor_ranges[] =
+    {
+        {D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, 2, 1, 0},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 2, 1, 64},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 1, 128},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 2, 127},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 3, 192},
+    };
+
+    static const D3D12_ROOT_PARAMETER root_parameters[] =
+    {
+        {D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+                    .DescriptorTable = {ARRAY_SIZE(descriptor_ranges), descriptor_ranges}},
+    };
+
+    static const DWORD cs_code[] =
+    {
+        /* Compiled with /res_may_alias (but it has no effect on the output from fxc 10.1). */
+#if 0
+        struct cb
+        {
+            uint value;
+        };
+        ConstantBuffer<cb> c1[] : register(b2, space1);
+
+        Buffer<uint> t1[] : register(t2, space1);
+
+        RWBuffer<uint> u1[] : register(u1, space1);
+        RWBuffer<uint> u2[] : register(u2, space2);
+        RWBuffer<uint> u3[] : register(u1, space3);
+
+        [numthreads(64, 1, 1)]
+        void main(uint id : SV_DispatchThreadID)
+        {
+            uint i = c1[NonUniformResourceIndex(id)].value;
+            /* fxc emits a race condition error on the below statements apparently because it fails to account
+             * for id being the thread id. The error check is skipped if the statements are conditional. */
+            if (id < 64)
+            {
+                u1[NonUniformResourceIndex(id)][0] = t1[NonUniformResourceIndex(i)][0];
+                /* If u2 is an alias of u1, this should copy u1. */
+                u3[NonUniformResourceIndex(id)][0] = u2[NonUniformResourceIndex(id)][0];
+            }
+        }
+#endif
+        0x43425844, 0x82871767, 0x87353509, 0x8ccc50cb, 0x5006dd54, 0x00000001, 0x00000250, 0x00000003,
+        0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x000001fc, 0x00050051, 0x0000007f, 0x0100086a,
+        0x07000859, 0x00308e46, 0x00000000, 0x00000002, 0xffffffff, 0x00000001, 0x00000001, 0x07000858,
+        0x00307e46, 0x00000000, 0x00000002, 0xffffffff, 0x00004444, 0x00000001, 0x0700089c, 0x0031ee46,
+        0x00000000, 0x00000001, 0xffffffff, 0x00004444, 0x00000001, 0x0700089c, 0x0031ee46, 0x00000001,
+        0x00000002, 0xffffffff, 0x00004444, 0x00000002, 0x0700089c, 0x0031ee46, 0x00000002, 0x00000001,
+        0xffffffff, 0x00004444, 0x00000003, 0x0200005f, 0x00020012, 0x02000068, 0x00000001, 0x0400009b,
+        0x00000040, 0x00000001, 0x00000001, 0x0600004f, 0x00100012, 0x00000000, 0x0002000a, 0x00004001,
+        0x00000040, 0x0304001f, 0x0010000a, 0x00000000, 0x04000036, 0x00100012, 0x00000000, 0x0002000a,
+        0x0a000036, 0x00100022, 0x00000000, 0x8630800a, 0x00020001, 0x00000000, 0x00000002, 0x0010000a,
+        0x00000000, 0x00000000, 0x0e00002d, 0x00100022, 0x00000000, 0x00004002, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x86207e16, 0x00020001, 0x00000000, 0x00000002, 0x0010001a, 0x00000000,
+        0x0e0000a4, 0x8621e0f2, 0x00020001, 0x00000000, 0x00000001, 0x0010000a, 0x00000000, 0x00004002,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00100556, 0x00000000, 0x0e0000a3, 0x00100022,
+        0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x8621ee16, 0x00020001,
+        0x00000001, 0x00000002, 0x0010000a, 0x00000000, 0x0e0000a4, 0x8621e0f2, 0x00020001, 0x00000002,
+        0x00000001, 0x0010000a, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00100556, 0x00000000, 0x01000015, 0x0100003e,
+    };
+
+    if (!init_compute_test_context(&context))
+        return;
+    device = context.device;
+    command_list = context.list;
+    queue = context.queue;
+
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
+    root_signature_desc.pParameters = root_parameters;
+    hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    todo
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    if (FAILED(hr))
+        goto done;
+
+    heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 256);
+
+    for (i = 0; i < ARRAY_SIZE(constant_buffers); ++i)
+    {
+        uint32_t cb_data = 63 - i;
+        constant_buffers[i] = create_default_buffer(device, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT,
+                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
+        upload_buffer_data(constant_buffers[i], 0, sizeof(cb_data), &cb_data, queue, command_list);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, constant_buffers[i],
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+        cbv_desc.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(constant_buffers[i]);
+        cbv_desc.SizeInBytes = align(sizeof(cb_data), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+        ID3D12Device_CreateConstantBufferView(context.device, &cbv_desc, get_cpu_descriptor_handle(&context, heap, i));
+    }
+
+    for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
+    {
+        uint32_t srv_data = i ^ 0x35;
+        input_buffers[i] = create_default_buffer(device, sizeof(uint32_t),
+                D3D12_RESOURCE_FLAG_NONE, D3D12_RESOURCE_STATE_COPY_DEST);
+        upload_buffer_data(input_buffers[i], 0, sizeof(srv_data), &srv_data, queue, command_list);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, input_buffers[i],
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+
+        memset(&srv_desc, 0, sizeof(srv_desc));
+        srv_desc.Format = DXGI_FORMAT_R32_UINT;
+        srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        srv_desc.Buffer.FirstElement = 0;
+        srv_desc.Buffer.NumElements = 1;
+        ID3D12Device_CreateShaderResourceView(device, input_buffers[i], &srv_desc,
+                get_cpu_descriptor_handle(&context, heap, ARRAY_SIZE(constant_buffers) + i));
+    }
+
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+    {
+        output_buffers[i] = create_default_buffer(device, sizeof(uint32_t),
+                D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+        memset(&uav_desc, 0, sizeof(uav_desc));
+        uav_desc.Format = DXGI_FORMAT_R32_UINT;
+        uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        uav_desc.Buffer.FirstElement = 0;
+        uav_desc.Buffer.NumElements = 1;
+        ID3D12Device_CreateUnorderedAccessView(device, output_buffers[i], NULL,
+                &uav_desc, get_cpu_descriptor_handle(&context, heap,
+                ARRAY_SIZE(constant_buffers) + ARRAY_SIZE(input_buffers) + i));
+    }
+
+    context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
+            shader_bytecode(cs_code, sizeof(cs_code)));
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list,
+            0, get_gpu_descriptor_handle(&context, heap, 0));
+
+    ID3D12GraphicsCommandList_Dispatch(command_list, 1, 1, 1);
+
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+    {
+        vkd3d_test_set_context("buffer %u", i);
+        transition_sub_resource_state(command_list, output_buffers[i], 0,
+                D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
+        /* Buffers at index >= 64 are aliased. */
+        check_readback_data_uint(&rb, NULL, (i < 64 ? 63 - i : 127 - i) ^ 0x35, 0);
+        release_resource_readback(&rb);
+        reset_command_list(command_list, context.allocator);
+    }
+
+    for (i = 0; i < ARRAY_SIZE(output_buffers); ++i)
+        ID3D12Resource_Release(output_buffers[i]);
+    for (i = 0; i < ARRAY_SIZE(input_buffers); ++i)
+        ID3D12Resource_Release(input_buffers[i]);
+    for (i = 0; i < ARRAY_SIZE(constant_buffers); ++i)
+        ID3D12Resource_Release(constant_buffers[i]);
+    ID3D12DescriptorHeap_Release(heap);
+done:
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -34968,4 +35150,5 @@ START_TEST(d3d12)
     run_test(test_hull_shader_relative_addressing);
     run_test(test_hull_shader_patch_constant_inputs);
     run_test(test_resource_arrays);
+    run_test(test_unbounded_resource_arrays);
 }
