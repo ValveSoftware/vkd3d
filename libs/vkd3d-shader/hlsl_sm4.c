@@ -605,7 +605,42 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 {
     const struct hlsl_ir_var *var = deref->var;
 
-    if (var->is_output_semantic)
+    if (var->is_uniform)
+    {
+        reg->type = VKD3D_SM4_RT_CONSTBUFFER;
+        reg->idx[0] = var->buffer->reg.id;
+        reg->idx[1] = var->buffer_offset / 4;
+        reg->idx_count = 2;
+        *writemask = ((1u << data_type->dimx) - 1) << (var->buffer_offset & 3);
+    }
+    else if (var->is_input_semantic)
+    {
+        bool has_idx;
+
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, false, &reg->type, &has_idx))
+        {
+            if (has_idx)
+            {
+                reg->idx[0] = var->semantic.index;
+                reg->idx_count = 1;
+            }
+
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            *writemask = (1u << data_type->dimx) - 1;
+        }
+        else
+        {
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+
+            assert(hlsl_reg.allocated);
+            reg->type = VKD3D_SM4_RT_INPUT;
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->idx[0] = hlsl_reg.id;
+            reg->idx_count = 1;
+            *writemask = hlsl_reg.writemask;
+        }
+    }
+    else if (var->is_output_semantic)
     {
         bool has_idx;
 
@@ -844,6 +879,25 @@ static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_load(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_MOV;
+
+    sm4_register_from_node(&instr.dst.reg, &instr.dst.writemask, &load->node);
+    instr.has_dst = 1;
+
+    sm4_register_from_deref(ctx, &instr.srcs[0].reg, &writemask, &load->src, load->node.data_type);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dst.writemask);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_store(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_store *store)
 {
@@ -927,6 +981,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
         switch (instr->type)
         {
+            case HLSL_IR_LOAD:
+                write_sm4_load(ctx, &buffer, hlsl_ir_load(instr));
+                break;
+
             case HLSL_IR_STORE:
                 write_sm4_store(ctx, &buffer, hlsl_ir_store(instr));
                 break;
