@@ -1200,7 +1200,7 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
     if (offset_node && offset_node->type != HLSL_IR_CONSTANT)
     {
         FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
-        return ret;
+        offset_node = NULL;
     }
 
     ret = var->reg;
