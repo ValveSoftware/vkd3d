@@ -591,12 +591,71 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
     {
         case VKD3D_SM4_RT_CONSTBUFFER:
         case VKD3D_SM4_RT_INPUT:
+        case VKD3D_SM4_RT_TEMP:
             return VKD3D_SM4_SWIZZLE_VEC4;
 
         default:
             FIXME("Unhandled register type %#x.\n", type);
             return VKD3D_SM4_SWIZZLE_VEC4;
     }
+}
+
+static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *reg,
+        unsigned int *writemask, const struct hlsl_deref *deref, const struct hlsl_type *data_type)
+{
+    const struct hlsl_ir_var *var = deref->var;
+
+    if (var->is_output_semantic)
+    {
+        bool has_idx;
+
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, true, &reg->type, &has_idx))
+        {
+            if (has_idx)
+            {
+                reg->idx[0] = var->semantic.index;
+                reg->idx_count = 1;
+            }
+
+            if (reg->type == VKD3D_SM4_RT_DEPTHOUT)
+                reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
+            else
+                reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            *writemask = (1u << data_type->dimx) - 1;
+        }
+        else
+        {
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+
+            assert(hlsl_reg.allocated);
+            reg->type = VKD3D_SM4_RT_OUTPUT;
+            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->idx[0] = hlsl_reg.id;
+            reg->idx_count = 1;
+            *writemask = hlsl_reg.writemask;
+        }
+    }
+    else
+    {
+        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+
+        assert(hlsl_reg.allocated);
+        reg->type = VKD3D_SM4_RT_TEMP;
+        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+        reg->idx[0] = hlsl_reg.id;
+        reg->idx_count = 1;
+        *writemask = hlsl_reg.writemask;
+    }
+}
+
+static void sm4_register_from_node(struct sm4_register *reg, unsigned int *writemask, const struct hlsl_ir_node *instr)
+{
+    assert(instr->reg.allocated);
+    reg->type = VKD3D_SM4_RT_TEMP;
+    reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+    reg->idx[0] = instr->reg.id;
+    reg->idx_count = 1;
+    *writemask = instr->reg.writemask;
 }
 
 static uint32_t sm4_encode_register(const struct sm4_register *reg)
@@ -785,11 +844,40 @@ static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
     write_sm4_instruction(buffer, &instr);
 }
 
-static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
+static void write_sm4_store(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_store *store)
+{
+    const struct hlsl_ir_node *rhs = store->rhs.node;
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
+    {
+        hlsl_fixme(ctx, store->node.loc, "Store to a matrix variable.\n");
+        return;
+    }
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_MOV;
+
+    sm4_register_from_deref(ctx, &instr.dst.reg, &writemask, &store->lhs, rhs->data_type);
+    instr.dst.writemask = hlsl_combine_writemasks(writemask, store->writemask);
+    instr.has_dst = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, rhs);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dst.writemask);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
+static void write_sm4_shdr(struct hlsl_ctx *ctx,
+        const struct hlsl_ir_function_decl *entry_func, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct hlsl_buffer *cbuffer;
+    const struct hlsl_ir_node *instr;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
 
@@ -824,6 +912,30 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     if (ctx->temp_count)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);
 
+    LIST_FOR_EACH_ENTRY(instr, entry_func->body, struct hlsl_ir_node, entry)
+    {
+        if (instr->data_type)
+        {
+            if (instr->data_type->type == HLSL_CLASS_MATRIX)
+            {
+                FIXME("Matrix operations need to be lowered.\n");
+                break;
+            }
+
+            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
+        }
+
+        switch (instr->type)
+        {
+            case HLSL_IR_STORE:
+                write_sm4_store(ctx, &buffer, hlsl_ir_store(instr));
+                break;
+
+            default:
+                FIXME("Unhandled instruction type %s.\n", hlsl_node_type_to_string(instr->type));
+        }
+    }
+
     write_sm4_ret(&buffer);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
@@ -842,7 +954,7 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     write_sm4_signature(ctx, &dxbc, false);
     write_sm4_signature(ctx, &dxbc, true);
     write_sm4_rdef(ctx, &dxbc);
-    write_sm4_shdr(ctx, &dxbc);
+    write_sm4_shdr(ctx, entry_func, &dxbc);
 
     if (!(ret = ctx->result))
         ret = dxbc_writer_write(&dxbc, out);
