@@ -894,6 +894,27 @@ static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    sm4_register_from_node(&instr.dst.reg, &instr.dst.writemask, dst);
+    instr.has_dst = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src1);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dst.writemask);
+    sm4_register_from_node(&instr.srcs[1].reg, &writemask, src2);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dst.writemask);
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_constant(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_constant *constant)
 {
@@ -916,6 +937,43 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     instr.src_count = 1,
 
     write_sm4_instruction(buffer, &instr);
+}
+
+static void write_sm4_expr(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
+{
+    const struct hlsl_ir_node *arg1 = expr->operands[0].node;
+    const struct hlsl_ir_node *arg2 = expr->operands[1].node;
+
+    assert(expr->node.reg.allocated);
+
+    switch (expr->node.data_type->base_type)
+    {
+        case HLSL_TYPE_FLOAT:
+        {
+            switch (expr->op)
+            {
+                case HLSL_OP2_ADD:
+                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
+                    break;
+
+                default:
+                    hlsl_fixme(ctx, expr->node.loc, "SM4 float \"%s\" expression.", debug_hlsl_expr_op(expr->op));
+                    break;
+            }
+            break;
+        }
+
+        default:
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, expr->node.data_type)))
+                hlsl_fixme(ctx, expr->node.loc, "SM4 %s expression.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            break;
+        }
+    }
 }
 
 static void write_sm4_load(struct hlsl_ctx *ctx,
@@ -1042,6 +1100,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         {
             case HLSL_IR_CONSTANT:
                 write_sm4_constant(ctx, &buffer, hlsl_ir_constant(instr));
+                break;
+
+            case HLSL_IR_EXPR:
+                write_sm4_expr(ctx, &buffer, hlsl_ir_expr(instr));
                 break;
 
             case HLSL_IR_LOAD:

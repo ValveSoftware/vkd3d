@@ -273,7 +273,6 @@ XFAIL_TESTS = \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
-	tests/hlsl-struct-assignment.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
