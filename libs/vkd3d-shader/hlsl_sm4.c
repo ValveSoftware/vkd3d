@@ -925,6 +925,26 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_swizzle(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_swizzle *swizzle)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_MOV;
+
+    sm4_register_from_node(&instr.dst.reg, &instr.dst.writemask, &swizzle->node);
+    instr.has_dst = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, swizzle->val.node);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
+            swizzle->swizzle, swizzle->node.data_type->dimx), instr.dst.writemask);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx,
         const struct hlsl_ir_function_decl *entry_func, struct dxbc_writer *dxbc)
 {
@@ -987,6 +1007,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
             case HLSL_IR_STORE:
                 write_sm4_store(ctx, &buffer, hlsl_ir_store(instr));
+                break;
+
+            case HLSL_IR_SWIZZLE:
+                write_sm4_swizzle(ctx, &buffer, hlsl_ir_swizzle(instr));
                 break;
 
             default:
