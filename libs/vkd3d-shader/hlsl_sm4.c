@@ -560,6 +560,7 @@ struct sm4_register
     uint32_t idx[2];
     unsigned int idx_count;
     enum vkd3d_sm4_dimension dim;
+    uint32_t immconst_uint[4];
 };
 
 struct sm4_instruction
@@ -589,6 +590,9 @@ static unsigned int sm4_swizzle_type(enum vkd3d_sm4_register_type type)
 {
     switch (type)
     {
+        case VKD3D_SM4_RT_IMMCONST:
+            return VKD3D_SM4_SWIZZLE_NONE;
+
         case VKD3D_SM4_RT_CONSTBUFFER:
         case VKD3D_SM4_RT_INPUT:
         case VKD3D_SM4_RT_TEMP:
@@ -743,6 +747,17 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
 
         for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
             put_u32(buffer, instr->srcs[i].reg.idx[j]);
+
+        if (instr->srcs[i].reg.type == VKD3D_SM4_RT_IMMCONST)
+        {
+            put_u32(buffer, instr->srcs[i].reg.immconst_uint[0]);
+            if (instr->srcs[i].reg.dim == VKD3D_SM4_DIMENSION_VEC4)
+            {
+                put_u32(buffer, instr->srcs[i].reg.immconst_uint[1]);
+                put_u32(buffer, instr->srcs[i].reg.immconst_uint[2]);
+                put_u32(buffer, instr->srcs[i].reg.immconst_uint[3]);
+            }
+        }
     }
 
     for (j = 0; j < instr->idx_count; ++j)
@@ -879,6 +894,30 @@ static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_constant(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_constant *constant)
+{
+    const unsigned int dimx = constant->node.data_type->dimx;
+    struct sm4_instruction instr;
+    unsigned int i;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_MOV;
+
+    sm4_register_from_node(&instr.dst.reg, &instr.dst.writemask, &constant->node);
+    instr.has_dst = 1;
+
+    instr.srcs[0].reg.dim = (dimx > 1) ? VKD3D_SM4_DIMENSION_VEC4 : VKD3D_SM4_DIMENSION_SCALAR;
+    instr.srcs[0].reg.type = VKD3D_SM4_RT_IMMCONST;
+    instr.srcs[0].reg.idx[0] = constant->reg.id;
+    instr.srcs[0].reg.idx_count = 1;
+    for (i = 0; i < dimx; ++i)
+        instr.srcs[0].reg.immconst_uint[i] = constant->value.u[i];
+    instr.src_count = 1,
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
 {
@@ -1001,6 +1040,10 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
         switch (instr->type)
         {
+            case HLSL_IR_CONSTANT:
+                write_sm4_constant(ctx, &buffer, hlsl_ir_constant(instr));
+                break;
+
             case HLSL_IR_LOAD:
                 write_sm4_load(ctx, &buffer, hlsl_ir_load(instr));
                 break;

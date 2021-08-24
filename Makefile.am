@@ -277,14 +277,6 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
-	tests/swizzle-0.shader_test \
-	tests/swizzle-1.shader_test \
-	tests/swizzle-2.shader_test \
-	tests/swizzle-3.shader_test \
-	tests/swizzle-4.shader_test \
-	tests/swizzle-5.shader_test \
-	tests/swizzle-6.shader_test \
-	tests/swizzle-7.shader_test \
 	tests/trigonometry.shader_test \
 	tests/writemask-assignop-0.shader_test \
 	tests/writemask-assignop-1.shader_test \
