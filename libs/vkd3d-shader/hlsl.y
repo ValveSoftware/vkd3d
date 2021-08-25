@@ -1017,13 +1017,9 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
     return HLSL_TYPE_INT;
 }
 
-static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
-        struct vkd3d_shader_location *loc)
+static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
+        struct vkd3d_shader_location *loc, enum hlsl_type_class *type, unsigned int *dimx, unsigned int *dimy)
 {
-    enum hlsl_type_class type;
-    enum hlsl_base_type base;
-    unsigned int dimx, dimy;
-
     if (t1->type > HLSL_CLASS_LAST_NUMERIC)
     {
         struct vkd3d_string_buffer *string;
@@ -1032,7 +1028,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
-        return NULL;
+        return false;
     }
 
     if (t2->type > HLSL_CLASS_LAST_NUMERIC)
@@ -1043,11 +1039,8 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
             hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Expression of type \"%s\" cannot be used in a numeric expression.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
-        return NULL;
+        return false;
     }
-
-    if (hlsl_types_are_equal(t1, t2))
-        return t1;
 
     if (!expr_compatible_data_types(t1, t2))
     {
@@ -1060,28 +1053,26 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
                     t1_string->buffer, t2_string->buffer);
         hlsl_release_string_buffer(ctx, t1_string);
         hlsl_release_string_buffer(ctx, t2_string);
-        return NULL;
+        return false;
     }
-
-    base = expr_common_base_type(t1->base_type, t2->base_type);
 
     if (t1->dimx == 1 && t1->dimy == 1)
     {
-        type = t2->type;
-        dimx = t2->dimx;
-        dimy = t2->dimy;
+        *type = t2->type;
+        *dimx = t2->dimx;
+        *dimy = t2->dimy;
     }
     else if (t2->dimx == 1 && t2->dimy == 1)
     {
-        type = t1->type;
-        dimx = t1->dimx;
-        dimy = t1->dimy;
+        *type = t1->type;
+        *dimx = t1->dimx;
+        *dimy = t1->dimy;
     }
     else if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX)
     {
-        type = HLSL_CLASS_MATRIX;
-        dimx = min(t1->dimx, t2->dimx);
-        dimy = min(t1->dimy, t2->dimy);
+        *type = HLSL_CLASS_MATRIX;
+        *dimx = min(t1->dimx, t2->dimx);
+        *dimy = min(t1->dimy, t2->dimy);
     }
     else
     {
@@ -1092,39 +1083,54 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
         max_dim_2 = max(t2->dimx, t2->dimy);
         if (t1->dimx * t1->dimy == t2->dimx * t2->dimy)
         {
-            type = HLSL_CLASS_VECTOR;
-            dimx = max(t1->dimx, t2->dimx);
-            dimy = 1;
+            *type = HLSL_CLASS_VECTOR;
+            *dimx = max(t1->dimx, t2->dimx);
+            *dimy = 1;
         }
         else if (max_dim_1 <= max_dim_2)
         {
-            type = t1->type;
-            if (type == HLSL_CLASS_VECTOR)
+            *type = t1->type;
+            if (*type == HLSL_CLASS_VECTOR)
             {
-                dimx = max_dim_1;
-                dimy = 1;
+                *dimx = max_dim_1;
+                *dimy = 1;
             }
             else
             {
-                dimx = t1->dimx;
-                dimy = t1->dimy;
+                *dimx = t1->dimx;
+                *dimy = t1->dimy;
             }
         }
         else
         {
-            type = t2->type;
-            if (type == HLSL_CLASS_VECTOR)
+            *type = t2->type;
+            if (*type == HLSL_CLASS_VECTOR)
             {
-                dimx = max_dim_2;
-                dimy = 1;
+                *dimx = max_dim_2;
+                *dimy = 1;
             }
             else
             {
-                dimx = t2->dimx;
-                dimy = t2->dimy;
+                *dimx = t2->dimx;
+                *dimy = t2->dimy;
             }
         }
     }
+
+    return true;
+}
+
+static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
+        struct vkd3d_shader_location *loc)
+{
+    enum hlsl_type_class type;
+    enum hlsl_base_type base;
+    unsigned int dimx, dimy;
+
+    if (!expr_common_shape(ctx, t1, t2, loc, &type, &dimx, &dimy))
+        return NULL;
+
+    base = expr_common_base_type(t1->base_type, t2->base_type);
 
     if (type == HLSL_CLASS_SCALAR)
         return ctx->builtin_types.scalar[base];
