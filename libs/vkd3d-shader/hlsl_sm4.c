@@ -1658,6 +1658,33 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
     }
 }
 
+static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_if *iff)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_IF | VKD3D_SM4_CONDITIONAL_NZ,
+        .src_count = 1,
+    };
+    unsigned int writemask;
+
+    assert(iff->condition.node->data_type->dimx == 1);
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, iff->condition.node);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+    write_sm4_instruction(buffer, &instr);
+
+    write_sm4_block(ctx, buffer, &iff->then_instrs);
+
+    instr.opcode = VKD3D_SM4_OP_ELSE;
+    instr.src_count = 0;
+    write_sm4_instruction(buffer, &instr);
+
+    write_sm4_block(ctx, buffer, &iff->else_instrs);
+
+    instr.opcode = VKD3D_SM4_OP_ENDIF;
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
 {
@@ -1830,6 +1857,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
             case HLSL_IR_EXPR:
                 write_sm4_expr(ctx, buffer, hlsl_ir_expr(instr));
+                break;
+
+            case HLSL_IR_IF:
+                write_sm4_if(ctx, buffer, hlsl_ir_if(instr));
                 break;
 
             case HLSL_IR_LOAD:
