@@ -37,7 +37,7 @@ static inline void *vkd3d_malloc(size_t size)
 static inline void *vkd3d_realloc(void *ptr, size_t size)
 {
     if (!(ptr = realloc(ptr, size)))
-        ERR("Out of memory.\n");
+        ERR("Out of memory, size %zu.\n", size);
     return ptr;
 }
 
