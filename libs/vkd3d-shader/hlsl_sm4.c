@@ -23,6 +23,8 @@
 #include "vkd3d_d3dcommon.h"
 #include "sm4.h"
 
+static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_block *block);
+
 static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
 {
     return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
@@ -1675,6 +1677,22 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_loop(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_loop *loop)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_LOOP,
+    };
+
+    write_sm4_instruction(buffer, &instr);
+
+    write_sm4_block(ctx, buffer, &loop->body);
+
+    instr.opcode = VKD3D_SM4_OP_ENDLOOP;
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
 {
@@ -1816,6 +1834,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
             case HLSL_IR_LOAD:
                 write_sm4_load(ctx, buffer, hlsl_ir_load(instr));
+                break;
+
+            case HLSL_IR_LOOP:
+                write_sm4_loop(ctx, buffer, hlsl_ir_loop(instr));
                 break;
 
             case HLSL_IR_RESOURCE_LOAD:
