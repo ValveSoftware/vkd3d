@@ -1676,6 +1676,28 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
                 }
 
+                case HLSL_OP2_NEQUAL:
+                {
+                    const struct hlsl_type *src_type = arg1->data_type;
+
+                    switch (src_type->base_type)
+                    {
+                        case HLSL_TYPE_FLOAT:
+                            write_sm4_binary_op(buffer, VKD3D_SM4_OP_NE, &expr->node, arg1, arg2);
+                            break;
+
+                        case HLSL_TYPE_BOOL:
+                        case HLSL_TYPE_INT:
+                        case HLSL_TYPE_UINT:
+                            write_sm4_binary_op(buffer, VKD3D_SM4_OP_INE, &expr->node, arg1, arg2);
+                            break;
+
+                        default:
+                            break;
+                    }
+                    break;
+                }
+
                 default:
                     hlsl_fixme(ctx, expr->node.loc, "SM4 bool \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
                     break;
