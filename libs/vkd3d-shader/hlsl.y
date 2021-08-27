@@ -917,7 +917,7 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
     int t1_idx = -1, t2_idx = -1, i;
 
     if (t1 == t2)
-        return t1;
+        return t1 == HLSL_TYPE_BOOL ? HLSL_TYPE_INT : t1;
 
     for (i = 0; i < ARRAY_SIZE(types); ++i)
     {
