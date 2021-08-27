@@ -916,6 +916,9 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
     };
     int t1_idx = -1, t2_idx = -1, i;
 
+    if (t1 == t2)
+        return t1;
+
     for (i = 0; i < ARRAY_SIZE(types); ++i)
     {
         /* Always convert away from HLSL_TYPE_HALF */
@@ -981,10 +984,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
         return NULL;
     }
 
-    if (t1->base_type == t2->base_type)
-        base = t1->base_type;
-    else
-        base = expr_common_base_type(t1->base_type, t2->base_type);
+    base = expr_common_base_type(t1->base_type, t2->base_type);
 
     if (t1->dimx == 1 && t1->dimy == 1)
     {
