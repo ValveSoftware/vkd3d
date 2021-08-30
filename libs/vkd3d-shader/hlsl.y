@@ -1731,7 +1731,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
 %type <semantic> semantic
 
-%type <type> base_type
 %type <type> field_type
 %type <type> named_struct_spec
 %type <type> unnamed_struct_spec
@@ -2145,11 +2144,7 @@ input_mod:
         }
 
 type:
-      base_type
-        {
-            $$ = $1;
-        }
-    | KW_VECTOR '<' base_type ',' C_INTEGER '>'
+      KW_VECTOR '<' type ',' C_INTEGER '>'
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
@@ -2171,7 +2166,7 @@ type:
 
             $$ = hlsl_new_type(ctx, NULL, HLSL_CLASS_VECTOR, $3->base_type, $5, 1);
         }
-    | KW_MATRIX '<' base_type ',' C_INTEGER ',' C_INTEGER '>'
+    | KW_MATRIX '<' type ',' C_INTEGER ',' C_INTEGER '>'
         {
             if ($3->type != HLSL_CLASS_SCALAR)
             {
@@ -2199,9 +2194,7 @@ type:
 
             $$ = hlsl_new_type(ctx, NULL, HLSL_CLASS_MATRIX, $3->base_type, $7, $5);
         }
-
-base_type:
-      KW_VOID
+    | KW_VOID
         {
             $$ = ctx->builtin_types.Void;
         }
