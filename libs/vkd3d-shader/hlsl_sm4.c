@@ -957,6 +957,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
                     break;
 
+                case HLSL_OP2_MUL:
+                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
+                    break;
+
                 default:
                     hlsl_fixme(ctx, expr->node.loc, "SM4 float \"%s\" expression.", debug_hlsl_expr_op(expr->op));
                     break;
