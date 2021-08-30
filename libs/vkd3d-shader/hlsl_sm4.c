@@ -561,6 +561,7 @@ struct sm4_register
     unsigned int idx_count;
     enum vkd3d_sm4_dimension dim;
     uint32_t immconst_uint[4];
+    unsigned int mod;
 };
 
 struct sm4_instruction
@@ -710,6 +711,8 @@ static uint32_t sm4_register_order(const struct sm4_register *reg)
     if (reg->type == VKD3D_SM4_RT_IMMCONST)
         order += reg->dim == VKD3D_SM4_DIMENSION_VEC4 ? 4 : 1;
     order += reg->idx_count;
+    if (reg->mod)
+        ++order;
     return order;
 }
 
@@ -743,7 +746,12 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         token = sm4_encode_register(&instr->srcs[i].reg);
         token |= sm4_swizzle_type(instr->srcs[i].reg.type) << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= instr->srcs[i].swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
+        if (instr->srcs[i].reg.mod)
+            token |= VKD3D_SM4_REGISTER_MODIFIER;
         put_u32(buffer, token);
+
+        if (instr->srcs[i].reg.mod)
+            put_u32(buffer, instr->srcs[i].reg.mod);
 
         for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
             put_u32(buffer, instr->srcs[i].reg.idx[j]);
@@ -894,6 +902,26 @@ static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_unary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, unsigned int src_mod)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    sm4_register_from_node(&instr.dst.reg, &instr.dst.writemask, dst);
+    instr.has_dst = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dst.writemask);
+    instr.srcs[0].reg.mod = src_mod;
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -953,6 +981,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
         {
             switch (expr->op)
             {
+                case HLSL_OP1_NEG:
+                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_NEGATE);
+                    break;
+
                 case HLSL_OP2_ADD:
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
                     break;
