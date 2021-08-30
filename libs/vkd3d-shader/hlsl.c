@@ -1803,7 +1803,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     if (!hlsl_ctx_init(&ctx, profile, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    if (hlsl_lexer_compile(&ctx, hlsl) == 2)
+    if ((ret = hlsl_lexer_compile(&ctx, hlsl)) == 2)
     {
         hlsl_ctx_cleanup(&ctx);
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1813,6 +1813,14 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     {
         hlsl_ctx_cleanup(&ctx);
         return ctx.result;
+    }
+
+    /* If parsing failed without an error condition being recorded, we
+     * plausibly hit some unimplemented feature. */
+    if (ret)
+    {
+        hlsl_ctx_cleanup(&ctx);
+        return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
     if (!(entry_func = hlsl_get_func_decl(&ctx, entry_point)))
