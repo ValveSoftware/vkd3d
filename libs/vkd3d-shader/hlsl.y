@@ -1083,9 +1083,9 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
         max_dim_2 = max(t2->dimx, t2->dimy);
         if (t1->dimx * t1->dimy == t2->dimx * t2->dimy)
         {
-            *type = HLSL_CLASS_VECTOR;
-            *dimx = max(t1->dimx, t2->dimx);
-            *dimy = 1;
+            *type = t1->type;
+            *dimx = t1->dimx;
+            *dimy = t1->dimy;
         }
         else if (max_dim_1 <= max_dim_2)
         {
@@ -1116,6 +1116,11 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
             }
         }
     }
+
+    if (*type == HLSL_CLASS_MATRIX && *dimy == 1)
+        *type = HLSL_CLASS_VECTOR;
+    if (*type == HLSL_CLASS_VECTOR && *dimx == 1)
+        *type = HLSL_CLASS_SCALAR;
 
     return true;
 }
