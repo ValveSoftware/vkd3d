@@ -674,7 +674,7 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!options.explicit_colour && has_colour(output))
+    if (!options.explicit_colour && !getenv("NO_COLOUR") && !getenv("NO_COLOR") && has_colour(output))
         options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
 

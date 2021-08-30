@@ -45,6 +45,11 @@ removed in the future versions of vkd3d.
 Some of debug variables are lists of elements. Elements must be separated by
 commas or semicolons.
 
+ * NO_COLOR - this is an alias of NO_COLOUR.
+
+ * NO_COLOUR - when set, vkd3d-compiler will default to monochrome output,
+   even when the output supports colour.
+
  * VKD3D_CONFIG - a list of options that change the behavior of libvkd3d.
     * vk_debug - enables Vulkan debug extensions.
 
