@@ -2836,7 +2836,7 @@ unary_expr:
 
             if ($2)
             {
-                hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on casts.");
                 YYABORT;
             }
