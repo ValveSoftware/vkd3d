@@ -1239,11 +1239,12 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     if (param->reg.type != VKD3DSPR_IMMCONST && param->reg.type != VKD3DSPR_IMMCONST64
             && param->reg.type != VKD3DSPR_SAMPLER)
     {
+        unsigned int swizzle_x = vkd3d_swizzle_get_component(swizzle, 0);
+        unsigned int swizzle_y = vkd3d_swizzle_get_component(swizzle, 1);
+        unsigned int swizzle_z = vkd3d_swizzle_get_component(swizzle, 2);
+        unsigned int swizzle_w = vkd3d_swizzle_get_component(swizzle, 3);
+
         static const char swizzle_chars[] = "xyzw";
-        DWORD swizzle_x = (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(0)) & VKD3D_SHADER_SWIZZLE_MASK;
-        DWORD swizzle_y = (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(1)) & VKD3D_SHADER_SWIZZLE_MASK;
-        DWORD swizzle_z = (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(2)) & VKD3D_SHADER_SWIZZLE_MASK;
-        DWORD swizzle_w = (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(3)) & VKD3D_SHADER_SWIZZLE_MASK;
 
         if (swizzle_x == swizzle_y
                 && swizzle_x == swizzle_z
