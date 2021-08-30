@@ -147,6 +147,17 @@ static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers
                 "'row_major' and 'column_major' modifiers are only allowed for matrices.");
 }
 
+static struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_class type,
+        enum hlsl_base_type base_type, unsigned int dimx, unsigned int dimy)
+{
+    if (type == HLSL_CLASS_SCALAR)
+        return ctx->builtin_types.scalar[base_type];
+    else if (type == HLSL_CLASS_VECTOR)
+        return ctx->builtin_types.vector[base_type][dimx - 1];
+    else
+        return ctx->builtin_types.matrix[base_type][dimx - 1][dimy - 1];
+}
+
 static bool convertible_data_type(struct hlsl_type *type)
 {
     return type->type != HLSL_CLASS_OBJECT;
@@ -1721,12 +1732,7 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
 static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
         const struct hlsl_type *type, enum hlsl_base_type base_type)
 {
-    if (type->type == HLSL_CLASS_SCALAR)
-        return ctx->builtin_types.scalar[base_type];
-    else if (type->type == HLSL_CLASS_VECTOR)
-        return ctx->builtin_types.vector[base_type][type->dimx - 1];
-    else
-        return ctx->builtin_types.matrix[base_type][type->dimx - 1][type->dimy - 1];
+    return get_numeric_type(ctx, type->type, base_type, type->dimx, type->dimy);
 }
 
 static bool intrinsic_asuint(struct hlsl_ctx *ctx,
