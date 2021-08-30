@@ -96,8 +96,8 @@ vkd3d_test_headers = \
 	tests/d3d12_test_utils.h
 
 vkd3d_demos = \
-	demos/gears \
-	demos/triangle
+	demos/vkd3d-gears \
+	demos/vkd3d-triangle
 
 vkd3d_demos_headers = \
 	demos/demo.h \
@@ -286,13 +286,15 @@ endif
 if BUILD_DEMOS
 DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @XCB_LIBS@ @VULKAN_LIBS@
 DEMOS_CFLAGS = $(AM_CFLAGS) @XCB_CFLAGS@
-noinst_PROGRAMS = $(vkd3d_demos)
+bin_PROGRAMS += $(vkd3d_demos)
 
-demos_gears_CFLAGS = $(DEMOS_CFLAGS)
-demos_gears_LDADD = $(DEMOS_LDADD) -lm
+demos_vkd3d_gears_SOURCES = demos/gears.c
+demos_vkd3d_gears_CFLAGS = $(DEMOS_CFLAGS)
+demos_vkd3d_gears_LDADD = $(DEMOS_LDADD) -lm
 
-demos_triangle_CFLAGS = $(DEMOS_CFLAGS)
-demos_triangle_LDADD = $(DEMOS_LDADD)
+demos_vkd3d_triangle_SOURCES = demos/triangle.c
+demos_vkd3d_triangle_CFLAGS = $(DEMOS_CFLAGS)
+demos_vkd3d_triangle_LDADD = $(DEMOS_LDADD)
 endif
 
 noinst_HEADERS = $(vkd3d_test_headers) $(vkd3d_demos_headers)
@@ -362,7 +364,9 @@ if HAVE_CROSSTARGET32
 CROSS32_CC = @CROSSCC32@
 CROSS32_DLLTOOL = @CROSSTARGET32@-dlltool
 CROSS32_IMPLIBS = $(cross_implibs:=.cross32.a)
-CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe) $(vkd3d_demos:=.cross32.exe) $(vkd3d_shader_runners:=.cross32.exe)
+CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe) \
+	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe) \
+	$(vkd3d_shader_runners:=.cross32.exe)
 CROSS32_FILES = $(CROSS32_IMPLIBS) $(CROSS32_EXEFILES)
 
 CLEANFILES += $(CROSS32_FILES)
@@ -387,7 +391,9 @@ if HAVE_CROSSTARGET64
 CROSS64_CC = @CROSSCC64@
 CROSS64_DLLTOOL = @CROSSTARGET64@-dlltool
 CROSS64_IMPLIBS = $(cross_implibs:=.cross64.a)
-CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe) $(vkd3d_demos:=.cross64.exe) $(vkd3d_shader_runners:=.cross64.exe)
+CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe) \
+	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe) \
+	$(vkd3d_shader_runners:=.cross64.exe)
 CROSS64_FILES = $(CROSS64_IMPLIBS) $(CROSS64_EXEFILES)
 
 CLEANFILES += $(CROSS64_FILES)
