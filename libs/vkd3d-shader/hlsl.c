@@ -1829,6 +1829,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
 
         hlsl_error(&ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
                 "Entry point \"%s\" is not defined.", entry_point);
+        hlsl_ctx_cleanup(&ctx);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
