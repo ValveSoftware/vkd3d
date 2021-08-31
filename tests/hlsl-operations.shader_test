@@ -1,0 +1,86 @@
+[pixel shader]
+float4 main(uniform float zero, uniform float one, uniform float x, uniform float y,
+            float4 pos : SV_POSITION) : SV_TARGET
+{
+    int izero = zero;
+    int ione = one;
+    int ix = x;
+    int iy = y;
+    uint uzero = zero;
+    uint uone = one;
+    uint ux = x;
+    uint uy = y;
+
+    if (pos.x == 0.5)
+        return float4(x + y, x - y, x * y, x / y);
+    if (pos.x == 1.5)
+        return float4(ix + iy, ix - iy, ix * iy, ix / iy);
+    if (pos.x == 2.5)
+        return float4(ux + uy, ux - uy, ux * uy, ux / uy);
+    if (pos.x == 3.5)
+        return float4(x % y, +x, -x, y / x);
+    if (pos.x == 4.5)
+        return float4(ix % iy, +ix, -ix, iy / ix);
+    if (pos.x == 5.5)
+        return float4(ux % uy, +ux, -ux, uy / ux);
+    if (pos.x == 6.5)
+        return float4(x == y, x != y, x < y, x <= y);
+    if (pos.x == 7.5)
+        return float4(x > y, x >= y, !x, !zero);
+    if (pos.x == 8.5)
+        return float4(ix == iy, ix != iy, ix < iy, ix <= iy);
+    if (pos.x == 9.5)
+        return float4(ix > iy, ix >= iy, !ix, !izero);
+    if (pos.x == 10.5)
+        return float4(ix & iy, ix | iy, ix ^ iy, ~ix);
+    if (pos.x == 11.5)
+        return float4(ix >> 2, ix << 2, iy >> 2, iy << 2);
+    if (pos.x == 12.5)
+        return float4(ux == uy, ux != uy, ux < uy, ux <= uy);
+    if (pos.x == 13.5)
+        return float4(ux > uy, ux >= uy, !ux, !uzero);
+    if (pos.x == 14.5)
+        return float4(ux & uy, ux | uy, ux ^ uy, ~ux);
+    if (pos.x == 15.5)
+        return float4(ux >> 2, ux << 2, uy >> 2, uy << 2);
+    if (pos.x == 16.5)
+        return float4(zero && zero, zero && one, one && zero, one && one);
+    if (pos.x == 17.5)
+        return float4(zero || zero, zero || one, one || zero, one || one);
+    if (pos.x == 18.5)
+        return float4(izero && izero, izero && ione, ione && izero, ione && ione);
+    if (pos.x == 19.5)
+        return float4(izero || izero, izero || ione, ione || izero, ione || ione);
+    if (pos.x == 20.5)
+        return float4(uzero && uzero, uzero && uone, uone && uzero, uone && uone);
+    if (pos.x == 21.5)
+        return float4(uzero || uzero, uzero || uone, uone || uzero, uone || uone);
+
+    return float4(0.0, 0.0, 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 0.0 1.0 5.0 15.0
+draw quad
+probe rgba (0, 0) (20.0, -10.0, 75.0, 0.33333333) 1
+probe rgba (1, 0) (20.0, -10.0, 75.0, 0.0)
+probe rgba (2, 0) (20.0, 4294967300.0, 75.0, 0.0)
+probe rgba (3, 0) (5.0, 5.0, -5.0, 3.0) 1
+probe rgba (4, 0) (5.0, 5.0, -5.0, 3.0)
+probe rgba (5, 0) (5.0, 5.0, 4294967300.0, 3.0)
+probe rgba (6, 0) (0.0, 1.0, 1.0, 1.0)
+probe rgba (7, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (8, 0) (0.0, 1.0, 1.0, 1.0)
+probe rgba (9, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (10, 0) (5.0, 15.0, 10.0, -6.0)
+probe rgba (11, 0) (1.0, 20.0, 3.0, 60.0)
+probe rgba (12, 0) (0.0, 1.0, 1.0, 1.0)
+probe rgba (13, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (14, 0) (5.0, 15.0, 10.0, 4294967300.0)
+probe rgba (15, 0) (1.0, 20.0, 3.0, 60.0)
+probe rgba (16, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (17, 0) (0.0, 1.0, 1.0, 1.0)
+probe rgba (18, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (19, 0) (0.0, 1.0, 1.0, 1.0)
+probe rgba (20, 0) (0.0, 0.0, 0.0, 1.0)
+probe rgba (21, 0) (0.0, 1.0, 1.0, 1.0)
