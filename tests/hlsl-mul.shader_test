@@ -1,0 +1,78 @@
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float x = 10.0;
+    float1 v1 = float1(10.0);
+    float3 v3 = float3(1.0, 2.0, 3.0);
+    float4 v4 = float4(1.0, 2.0, 3.0, 4.0);
+    float1x1 m11 = float1x1(10.0);
+    float1x4 m14 = float1x4(1.0, 2.0, 3.0, 4.0);
+    float4x1 m41 = float4x1(1.0, 2.0, 3.0, 4.0);
+    float3x3 m33 = float3x3(1.0, 2.0, 3.0,
+                            4.0, 5.0, 6.0,
+                            7.0, 8.0, 9.0);
+    float4x4 m44 = float4x4(1.0, 2.0, 3.0, 4.0,
+                            5.0, 6.0, 7.0, 8.0,
+                            9.0, 10.0, 11.0, 12.0,
+                            13.0, 14.0, 15.0, 16.0);
+
+    if (pos.x == 0.5)
+        return mul(m44, v4);
+    if (pos.x == 1.5)
+        return mul(v4, m44);
+    if (pos.x == 2.5)
+        return mul(m44, v3);
+    if (pos.x == 3.5)
+        return mul(v3, m44);
+    if (pos.x == 4.5)
+        return float4(mul(m33, v4), 0.0);
+    if (pos.x == 5.5)
+        return float4(mul(v4, m33), 0.0);
+    if (pos.x == 6.5)
+        return mul(x, m44)[1];
+    if (pos.x == 7.5)
+        return mul(m44, x)[1];
+    if (pos.x == 8.5)
+        return mul(v1, m44);
+    if (pos.x == 9.5)
+        return mul(m44, v1);
+    if (pos.x == 10.5)
+        return mul(m11, m44);
+    if (pos.x == 11.5)
+        return mul(m44, m11);
+    if (pos.x == 12.5)
+        return mul(m14, m44);
+    if (pos.x == 13.5)
+        return mul(m44, m14)[1];
+    if (pos.x == 14.5)
+        return mul(m41, m44)[1];
+    if (pos.x == 15.5)
+        return mul(m44, m41);
+    if (pos.x == 16.5)
+        return mul(m33, m44)[1];
+    if (pos.x == 17.5)
+        return float4(mul(m44, m33)[1], 0.0);
+
+    return float4(0.0, 0.0, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (30.0, 70.0, 110.0, 150.0)
+probe rgba (1, 0) (90.0, 100.0, 110.0, 120.0)
+probe rgba (2, 0) (14.0, 38.0, 62.0, 86.0)
+probe rgba (3, 0) (38.0, 44.0, 50.0, 56.0)
+probe rgba (4, 0) (14.0, 32.0, 50.0, 0.0)
+probe rgba (5, 0) (30.0, 36.0, 42.0, 0.0)
+probe rgba (6, 0) (50.0, 60.0, 70.0, 80.0)
+probe rgba (7, 0) (50.0, 60.0, 70.0, 80.0)
+probe rgba (8, 0) (10.0, 20.0, 30.0, 40.0)
+probe rgba (9, 0) (10.0, 50.0, 90.0, 130.0)
+probe rgba (10, 0) (10.0, 20.0, 30.0, 40.0)
+probe rgba (11, 0) (10.0, 50.0, 90.0, 130.0)
+probe rgba (12, 0) (90.0, 100.0, 110.0, 120.0)
+probe rgba (13, 0) (5.0, 10.0, 15.0, 20.0)
+probe rgba (14, 0) (2.0, 4.0, 6.0, 8.0)
+probe rgba (15, 0) (30.0, 70.0, 110.0, 150.0)
+probe rgba (16, 0) (83.0, 98.0, 113.0, 128.0)
+probe rgba (17, 0) (78.0, 96.0, 114.0, 0.0)
