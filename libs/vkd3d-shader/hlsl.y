@@ -790,25 +790,17 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
     return reservation;
 }
 
-static const struct hlsl_ir_function_decl *get_overloaded_func(struct rb_tree *funcs, char *name,
-        struct list *params, bool exact_signature)
+static const struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs, char *name, struct list *params)
 {
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
 
-    entry = rb_get(funcs, name);
-    if (entry)
+    if ((entry = rb_get(funcs, name)))
     {
         func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
 
-        entry = rb_get(&func->overloads, params);
-        if (!entry)
-        {
-            if (!exact_signature)
-                FIXME("No exact match, search for a compatible overloaded function (if any).\n");
-            return NULL;
-        }
-        return RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
+        if ((entry = rb_get(&func->overloads, params)))
+            return RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     }
     return NULL;
 }
@@ -1813,7 +1805,7 @@ hlsl_prog:
         {
             const struct hlsl_ir_function_decl *decl;
 
-            decl = get_overloaded_func(&ctx->functions, $2.name, $2.decl->parameters, true);
+            decl = get_func_decl(&ctx->functions, $2.name, $2.decl->parameters);
             if (decl && !decl->func->intrinsic)
             {
                 if (decl->body && $2.decl->body)
