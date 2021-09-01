@@ -1694,8 +1694,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 }
 
-static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *profile,
-        struct vkd3d_shader_message_context *message_context)
+static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
+        const struct hlsl_profile_info *profile, struct vkd3d_shader_message_context *message_context)
 {
     memset(ctx, 0, sizeof(*ctx));
 
@@ -1705,7 +1705,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct hlsl_profile_info *
 
     if (!(ctx->source_files = hlsl_alloc(ctx, sizeof(*ctx->source_files))))
         return false;
-    if (!(ctx->source_files[0] = hlsl_strdup(ctx, "")))
+    if (!(ctx->source_files[0] = hlsl_strdup(ctx, source_name ? source_name : "<anonymous>")))
     {
         vkd3d_free(ctx->source_files);
         return false;
@@ -1800,7 +1800,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
 
     vkd3d_shader_dump_shader(compile_info->source_type, profile->type, &compile_info->source);
 
-    if (!hlsl_ctx_init(&ctx, profile, message_context))
+    if (!hlsl_ctx_init(&ctx, compile_info->source_name, profile, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     if ((ret = hlsl_lexer_compile(&ctx, hlsl)) == 2)
