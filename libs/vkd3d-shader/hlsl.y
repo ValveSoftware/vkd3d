@@ -1555,16 +1555,83 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
     return args.decl;
 }
 
+static bool intrinsic_max(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {params->args[0], params->args[1]};
+
+    return !!add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc);
+}
+
+static const struct intrinsic_function
+{
+    const char *name;
+    int param_count;
+    bool check_numeric;
+    bool (*handler)(struct hlsl_ctx *ctx, const struct parse_initializer *params, struct vkd3d_shader_location loc);
+}
+intrinsic_functions[] =
+{
+    {"max",                                 2, true,  intrinsic_max},
+};
+
+static int intrinsic_function_name_compare(const void *a, const void *b)
+{
+    const struct intrinsic_function *func = b;
+
+    return strcmp(a, func->name);
+}
+
 static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
     const struct hlsl_ir_function_decl *decl;
+    struct intrinsic_function *intrinsic;
 
     if ((decl = find_function_call(ctx, name, params)))
     {
         hlsl_fixme(ctx, loc, "Call to user-defined function \"%s\".", name);
         free_parse_initializer(params);
         return NULL;
+    }
+    else if ((intrinsic = bsearch(name, intrinsic_functions, ARRAY_SIZE(intrinsic_functions),
+            sizeof(*intrinsic_functions), intrinsic_function_name_compare)))
+    {
+        if (intrinsic->param_count >= 0 && params->args_count != intrinsic->param_count)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to function '%s': expected %u, but got %u.\n",
+                    name, intrinsic->param_count, params->args_count);
+            free_parse_initializer(params);
+            return NULL;
+        }
+
+        if (intrinsic->check_numeric)
+        {
+            unsigned int i;
+
+            for (i = 0; i < params->args_count; ++i)
+            {
+                if (params->args[i]->data_type->type > HLSL_CLASS_LAST_NUMERIC)
+                {
+                    struct vkd3d_string_buffer *string;
+
+                    if ((string = hlsl_type_to_string(ctx, params->args[i]->data_type)))
+                        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Wrong type for argument %u of '%s': expected a numeric type, but got '%s'.\n",
+                                i + 1, name, string->buffer);
+                    hlsl_release_string_buffer(ctx, string);
+                    free_parse_initializer(params);
+                    return NULL;
+                }
+            }
+        }
+
+        if (!intrinsic->handler(ctx, params, loc))
+        {
+            free_parse_initializer(params);
+            return NULL;
+        }
     }
     else
     {

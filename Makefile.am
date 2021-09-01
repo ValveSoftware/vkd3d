@@ -72,6 +72,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
+	tests/max.shader_test \
 	tests/preproc-if.shader_test \
 	tests/preproc-ifdef.shader_test \
 	tests/preproc-if-expr.shader_test \
@@ -278,6 +279,7 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
+	tests/max.shader_test \
 	tests/trigonometry.shader_test \
 	tests/writemask-assignop-1.shader_test
 endif

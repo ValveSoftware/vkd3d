@@ -136,6 +136,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         static const float clear_color[4];
         ID3D12PipelineState *pso;
 
+        if (context->c.root_signature)
+            ID3D12RootSignature_Release(context->c.root_signature);
         context->c.root_signature = create_32bit_constants_root_signature(context->c.device,
                 0, context->uniform_count, D3D12_SHADER_VISIBILITY_ALL);
 

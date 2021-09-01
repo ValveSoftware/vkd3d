@@ -1,0 +1,23 @@
+[pixel shader]
+float4 main(uniform float u, uniform float v) : sv_target
+{
+    return float4(max(u, v), max(2, 2.1), max(true, 2), max(-1, -1));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.0 0.0
+draw quad
+probe all rgba (0.7, 2.1, 2.0, -1.0)
+
+[pixel shader]
+float4 main(uniform float2 u, uniform float2 v) : sv_target
+{
+    float3 a = float3(-0.1, 0.2, 0.3);
+
+    return float4(max(u, v), max(a, u));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.4 0.8
+draw quad
+probe all rgba (0.7, 0.8, 0.7, 0.2)
