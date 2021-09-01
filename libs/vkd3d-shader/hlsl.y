@@ -1523,6 +1523,67 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     return statements_list;
 }
 
+struct find_function_call_args
+{
+    const struct parse_initializer *params;
+    const struct hlsl_ir_function_decl *decl;
+};
+
+static void find_function_call_exact(struct rb_entry *entry, void *context)
+{
+    const struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, const struct hlsl_ir_function_decl, entry);
+    struct find_function_call_args *args = context;
+    const struct hlsl_ir_var *param;
+    unsigned int i = 0;
+
+    LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+    {
+        if (i >= args->params->args_count
+                || !hlsl_types_are_equal(param->data_type, args->params->args[i++]->data_type))
+            return;
+    }
+    if (i == args->params->args_count)
+        args->decl = decl;
+}
+
+static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
+        const char *name, const struct parse_initializer *params)
+{
+    struct find_function_call_args args = {.params = params};
+    struct hlsl_ir_function *func;
+    struct rb_entry *entry;
+
+    if (!(entry = rb_get(&ctx->functions, name)))
+        return NULL;
+    func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
+
+    rb_for_each_entry(&func->overloads, find_function_call_exact, &args);
+    if (!args.decl)
+        FIXME("Search for compatible overloads.\n");
+    return args.decl;
+}
+
+static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
+        struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    const struct hlsl_ir_function_decl *decl;
+
+    if ((decl = find_function_call(ctx, name, params)))
+    {
+        hlsl_fixme(ctx, loc, "Call to user-defined function \"%s\".", name);
+        free_parse_initializer(params);
+        return NULL;
+    }
+    else
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Function \"%s\" is not defined.", name);
+        free_parse_initializer(params);
+        return NULL;
+    }
+    vkd3d_free(params->args);
+    return params->instrs;
+}
+
 }
 
 %locations
@@ -1714,6 +1775,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 %type <function> func_prototype
 
 %type <initializer> complex_initializer
+%type <initializer> func_arguments
 %type <initializer> initializer_expr_list
 
 %type <if_body> if_body
@@ -2575,6 +2637,16 @@ expr_statement:
             $$ = $1;
         }
 
+func_arguments:
+      %empty
+        {
+            $$.args = NULL;
+            $$.args_count = 0;
+            if (!($$.instrs = make_empty_list(ctx)))
+                YYABORT;
+        }
+    | initializer_expr_list
+
 primary_expr:
       C_FLOAT
         {
@@ -2630,6 +2702,11 @@ primary_expr:
     | '(' expr ')'
         {
             $$ = $2;
+        }
+    | var_identifier '(' func_arguments ')'
+        {
+            if (!($$ = add_call(ctx, $1, &$3, @1)))
+                YYABORT;
         }
 
 postfix_expr:
