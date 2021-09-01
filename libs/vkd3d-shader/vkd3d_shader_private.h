@@ -874,7 +874,15 @@ static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_reg
     return reg->type == VKD3DSPR_OUTPUT || reg->type == VKD3DSPR_COLOROUT;
 }
 
-void vkd3d_shader_trace(void *data);
+struct vkd3d_shader_parser
+{
+    struct vkd3d_shader_desc shader_desc;
+    struct vkd3d_shader_version shader_version;
+    void *data;
+    const uint32_t *ptr;
+};
+
+void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 

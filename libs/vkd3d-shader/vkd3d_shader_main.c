@@ -367,14 +367,6 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
             shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
-struct vkd3d_shader_parser
-{
-    struct vkd3d_shader_desc shader_desc;
-    struct vkd3d_shader_version shader_version;
-    void *data;
-    const DWORD *ptr;
-};
-
 static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
@@ -960,7 +952,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     if (TRACE_ON())
-        vkd3d_shader_trace(parser.data);
+        vkd3d_shader_trace(&parser);
 
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {

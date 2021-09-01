@@ -1900,12 +1900,12 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
     return result;
 }
 
-void vkd3d_shader_trace(void *data)
+void vkd3d_shader_trace(struct vkd3d_shader_parser *parser)
 {
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(data, NULL, &code) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(parser->data, NULL, &code) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;
