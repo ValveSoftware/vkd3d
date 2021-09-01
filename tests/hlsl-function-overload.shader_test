@@ -1,0 +1,40 @@
+[pixel shader fail]
+/* The same function signature cannot be defined twice. */
+
+float func(int arg)
+{
+    return 0.1;
+}
+
+float func(int arg)
+{
+    return 0.1;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader]
+/* Test a basic overload. */
+float func(int arg)
+{
+    return 0.1;
+}
+
+float func(uint arg)
+{
+    return 0.2;
+}
+
+float4 main() : sv_target
+{
+    int i = 1;
+    uint u = 1;
+    return float4(func(i), func(u), func(int2(1, 1)), func(uint2(1, 1)));
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.2, 0.1, 0.2)
