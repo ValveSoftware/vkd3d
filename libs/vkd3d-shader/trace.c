@@ -1771,7 +1771,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     shader_addline(buffer, "\n");
 }
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
+enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out)
 {
     enum vkd3d_shader_compile_option_formatting_flags formatting;
@@ -1831,17 +1831,17 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
     vkd3d_string_buffer_init(buffer);
 
     shader_version = &compiler.shader_version;
-    shader_sm4_read_header(data, &ptr, shader_version);
+    shader_sm4_read_header(parser->data, &ptr, shader_version);
     vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    while (!shader_sm4_is_end(data, &ptr))
+    while (!shader_sm4_is_end(parser->data, &ptr))
     {
         struct vkd3d_shader_instruction ins;
 
-        shader_sm4_read_instruction(data, &ptr, &ins);
+        shader_sm4_read_instruction(parser->data, &ptr, &ins);
         if (ins.handler_idx == VKD3DSIH_INVALID)
         {
             WARN("Skipping unrecognized instruction.\n");
@@ -1905,7 +1905,7 @@ void vkd3d_shader_trace(struct vkd3d_shader_parser *parser)
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(parser->data, NULL, &code) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(parser, NULL, &code) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;

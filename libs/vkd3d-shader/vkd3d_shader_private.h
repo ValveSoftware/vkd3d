@@ -910,7 +910,7 @@ struct vkd3d_string_buffer_cache
     size_t count, max_count, capacity;
 };
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(void *data,
+enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out);
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);
 struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list);
