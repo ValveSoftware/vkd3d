@@ -1555,6 +1555,20 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
     return args.decl;
 }
 
+static bool intrinsic_clamp(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {params->args[0], params->args[1]};
+    struct hlsl_ir_expr *max;
+
+    if (!(max = add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc)))
+        return false;
+
+    args[0] = &max->node;
+    args[1] = params->args[2];
+    return !!add_expr(ctx, params->instrs, HLSL_OP2_MIN, args, &loc);
+}
+
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1572,6 +1586,7 @@ static const struct intrinsic_function
 }
 intrinsic_functions[] =
 {
+    {"clamp",                               3, true,  intrinsic_clamp},
     {"max",                                 2, true,  intrinsic_max},
 };
 

@@ -56,6 +56,7 @@ vkd3d_shader_runners = \
 vkd3d_shader_tests = \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-clamp.shader_test \
 	tests/hlsl-comma.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-function-overload.shader_test \
@@ -266,6 +267,7 @@ SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
 XFAIL_TESTS = \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-clamp.shader_test \
 	tests/hlsl-comma.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-function-overload.shader_test \
