@@ -975,7 +975,8 @@ void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const stru
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args);
 
-void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader);
+void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
+        enum vkd3d_shader_type shader_type, const struct vkd3d_shader_code *shader);
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);

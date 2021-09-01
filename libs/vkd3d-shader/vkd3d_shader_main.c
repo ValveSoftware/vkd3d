@@ -310,7 +310,8 @@ void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value
     memcpy(buffer->data + offset, &value, sizeof(value));
 }
 
-static void vkd3d_shader_dump_blob(const char *path, const char *prefix, const void *data, size_t size)
+static void vkd3d_shader_dump_blob(const char *path, const char *prefix,
+        const char *suffix, const void *data, size_t size)
 {
     static int shader_id = 0;
     char filename[1024];
@@ -319,7 +320,7 @@ static void vkd3d_shader_dump_blob(const char *path, const char *prefix, const v
 
     id = InterlockedIncrement(&shader_id) - 1;
 
-    snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%u.dxbc", path, prefix, id);
+    snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%u.%s", path, prefix, id, suffix);
     if ((f = fopen(filename, "wb")))
     {
         if (fwrite(data, 1, size, f) != size)
@@ -333,7 +334,22 @@ static void vkd3d_shader_dump_blob(const char *path, const char *prefix, const v
     }
 }
 
-void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_shader_code *shader)
+static const char *shader_get_source_type_suffix(enum vkd3d_shader_source_type type)
+{
+    switch (type)
+    {
+        case VKD3D_SHADER_SOURCE_DXBC_TPF:
+            return "dxbc";
+        case VKD3D_SHADER_SOURCE_HLSL:
+            return "hlsl";
+        default:
+            FIXME("Unhandled source type %#x.\n", type);
+            return "bin";
+    }
+}
+
+void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
+        enum vkd3d_shader_type shader_type, const struct vkd3d_shader_code *shader)
 {
     static bool enabled = true;
     const char *path;
@@ -347,7 +363,8 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_type type, const struct vkd3d_sh
         return;
     }
 
-    vkd3d_shader_dump_blob(path, shader_get_type_prefix(type), shader->code, shader->size);
+    vkd3d_shader_dump_blob(path, shader_get_type_prefix(shader_type),
+            shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
 struct vkd3d_shader_parser
@@ -1022,7 +1039,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return ret;
     }
 
-    vkd3d_shader_dump_shader(parser.shader_version.type, &compile_info->source);
+    vkd3d_shader_dump_shader(compile_info->source_type, parser.shader_version.type, &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
