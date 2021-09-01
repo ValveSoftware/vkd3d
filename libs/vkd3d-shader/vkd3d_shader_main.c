@@ -1006,7 +1006,22 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
-    ret = scan_dxbc(compile_info, &message_context);
+    switch (compile_info->source_type)
+    {
+        case VKD3D_SHADER_SOURCE_DXBC_TPF:
+            ret = scan_dxbc(compile_info, &message_context);
+            break;
+
+        case VKD3D_SHADER_SOURCE_HLSL:
+            FIXME("HLSL support not implemented.\n");
+            ret = VKD3D_ERROR_NOT_IMPLEMENTED;
+            break;
+
+        default:
+            ERR("Unsupported source type %#x.\n", compile_info->source_type);
+            ret = VKD3D_ERROR_INVALID_ARGUMENT;
+            break;
+    }
 
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
