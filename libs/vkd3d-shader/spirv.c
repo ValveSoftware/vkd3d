@@ -1800,6 +1800,8 @@ static void vkd3d_spirv_builder_free(struct vkd3d_spirv_builder *builder)
 
     vkd3d_spirv_stream_free(&builder->insertion_stream);
 
+    vkd3d_free(builder->capabilities);
+
     rb_destroy(&builder->declarations, vkd3d_spirv_declaration_free, NULL);
 
     vkd3d_free(builder->iface);
