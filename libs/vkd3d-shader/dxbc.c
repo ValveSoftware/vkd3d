@@ -1647,10 +1647,10 @@ fail:
     return;
 }
 
-bool shader_sm4_is_end(void *data, const DWORD **ptr)
+bool shader_sm4_is_end(struct vkd3d_shader_parser *parser, const uint32_t **ptr)
 {
-    struct vkd3d_sm4_data *priv = data;
-    return *ptr == priv->end;
+    struct vkd3d_sm4_data *sm4 = parser->data;
+    return *ptr == sm4->end;
 }
 
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)

@@ -1837,7 +1837,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    while (!shader_sm4_is_end(parser->data, &ptr))
+    while (!shader_sm4_is_end(parser, &ptr))
     {
         struct vkd3d_shader_instruction ins;
 

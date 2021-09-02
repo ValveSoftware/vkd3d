@@ -954,7 +954,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     if (TRACE_ON())
         vkd3d_shader_trace(&parser);
 
-    while (!shader_sm4_is_end(parser.data, &parser.ptr))
+    while (!shader_sm4_is_end(&parser, &parser.ptr))
     {
         shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
 
@@ -1085,7 +1085,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    while (!shader_sm4_is_end(parser.data, &parser.ptr))
+    while (!shader_sm4_is_end(&parser, &parser.ptr))
     {
         shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
 
