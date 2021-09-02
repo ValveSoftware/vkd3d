@@ -956,7 +956,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
 
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {
-        shader_sm4_read_instruction(parser.data, &parser.ptr, &instruction);
+        shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {
@@ -1068,7 +1068,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
             return VKD3D_ERROR;
         }
 
-        ret = vkd3d_glsl_generator_generate(parser.data, parser.ptr, glsl_generator, out);
+        ret = vkd3d_glsl_generator_generate(glsl_generator, &parser, out);
 
         vkd3d_glsl_generator_destroy(glsl_generator);
         vkd3d_shader_parser_destroy(&parser);
@@ -1087,7 +1087,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 
     while (!shader_sm4_is_end(parser.data, &parser.ptr))
     {
-        shader_sm4_read_instruction(parser.data, &parser.ptr, &instruction);
+        shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {

@@ -95,9 +95,8 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
     return;
 }
 
-int vkd3d_glsl_generator_generate(void *parser_data, const uint32_t *parser_ptr,
-        struct vkd3d_glsl_generator *generator,
-        struct vkd3d_shader_code *out)
+int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
+        struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out)
 {
     void *code;
     struct vkd3d_shader_instruction ins;
@@ -105,9 +104,9 @@ int vkd3d_glsl_generator_generate(void *parser_data, const uint32_t *parser_ptr,
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
-    while (!shader_sm4_is_end(parser_data, &parser_ptr))
+    while (!shader_sm4_is_end(parser->data, &parser->ptr))
     {
-        shader_sm4_read_instruction(parser_data, &parser_ptr, &ins);
+        shader_sm4_read_instruction(parser, &parser->ptr, &ins);
 
         if (ins.handler_idx == VKD3DSIH_INVALID)
         {

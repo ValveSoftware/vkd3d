@@ -1841,7 +1841,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     {
         struct vkd3d_shader_instruction ins;
 
-        shader_sm4_read_instruction(parser->data, &ptr, &ins);
+        shader_sm4_read_instruction(parser, &ptr, &ins);
         if (ins.handler_idx == VKD3DSIH_INVALID)
         {
             WARN("Skipping unrecognized instruction.\n");

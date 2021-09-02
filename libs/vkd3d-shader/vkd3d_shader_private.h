@@ -893,8 +893,8 @@ void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
 void shader_sm4_free(struct vkd3d_shader_parser *parser);
 void shader_sm4_read_header(struct vkd3d_shader_parser *parser,
         const uint32_t **ptr, struct vkd3d_shader_version *shader_version);
-void shader_sm4_read_instruction(void *data, const DWORD **ptr,
-        struct vkd3d_shader_instruction *ins);
+void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser,
+        const uint32_t **ptr, struct vkd3d_shader_instruction *ins);
 bool shader_sm4_is_end(void *data, const DWORD **ptr);
 
 struct vkd3d_string_buffer
@@ -998,9 +998,8 @@ struct vkd3d_glsl_generator;
 struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context);
-int vkd3d_glsl_generator_generate(void *parser_data, const uint32_t *parser_ptr,
-        struct vkd3d_glsl_generator *generator,
-        struct vkd3d_shader_code *out);
+int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
+        struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out);
 void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
 
 struct vkd3d_dxbc_compiler;

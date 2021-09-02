@@ -1527,24 +1527,25 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
     }
 }
 
-void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_shader_instruction *ins)
+void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser,
+        const uint32_t **ptr, struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_sm4_opcode_info *opcode_info;
-    DWORD opcode_token, opcode, previous_token;
-    struct vkd3d_sm4_data *priv = data;
+    uint32_t opcode_token, opcode, previous_token;
+    struct vkd3d_sm4_data *sm4 = parser->data;
     unsigned int i, len;
     size_t remaining;
     const DWORD *p;
     DWORD precise;
 
-    list_move_head(&priv->src_free, &priv->src);
+    list_move_head(&sm4->src_free, &sm4->src);
 
-    if (*ptr >= priv->end)
+    if (*ptr >= sm4->end)
     {
         WARN("End of byte-code, failed to read opcode.\n");
         goto fail;
     }
-    remaining = priv->end - *ptr;
+    remaining = sm4->end - *ptr;
 
     opcode_token = *(*ptr)++;
     opcode = opcode_token & VKD3D_SM4_OPCODE_MASK;
@@ -1581,9 +1582,9 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
     ins->structured = false;
     ins->predicate = NULL;
     ins->dst_count = strlen(opcode_info->dst_info);
-    ins->dst = priv->dst_param;
+    ins->dst = sm4->dst_param;
     ins->src_count = strlen(opcode_info->src_info);
-    ins->src = priv->src_param;
+    ins->src = sm4->src_param;
     ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
     ins->resource_stride = 0;
     ins->resource_data_type[0] = VKD3D_DATA_FLOAT;
@@ -1597,7 +1598,7 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
 
     if (opcode_info->read_opcode_func)
     {
-        opcode_info->read_opcode_func(ins, opcode, opcode_token, p, len, priv);
+        opcode_info->read_opcode_func(ins, opcode, opcode_token, p, len, sm4);
     }
     else
     {
@@ -1618,19 +1619,19 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
 
         for (i = 0; i < ins->dst_count; ++i)
         {
-            if (!(shader_sm4_read_dst_param(priv, &p, *ptr, map_data_type(opcode_info->dst_info[i]),
-                    &priv->dst_param[i])))
+            if (!(shader_sm4_read_dst_param(sm4, &p, *ptr, map_data_type(opcode_info->dst_info[i]),
+                    &sm4->dst_param[i])))
             {
                 ins->handler_idx = VKD3DSIH_INVALID;
                 return;
             }
-            priv->dst_param[i].modifiers |= instruction_dst_modifier;
+            sm4->dst_param[i].modifiers |= instruction_dst_modifier;
         }
 
         for (i = 0; i < ins->src_count; ++i)
         {
-            if (!(shader_sm4_read_src_param(priv, &p, *ptr, map_data_type(opcode_info->src_info[i]),
-                    &priv->src_param[i])))
+            if (!(shader_sm4_read_src_param(sm4, &p, *ptr, map_data_type(opcode_info->src_info[i]),
+                    &sm4->src_param[i])))
             {
                 ins->handler_idx = VKD3DSIH_INVALID;
                 return;
@@ -1641,7 +1642,7 @@ void shader_sm4_read_instruction(void *data, const DWORD **ptr, struct vkd3d_sha
     return;
 
 fail:
-    *ptr = priv->end;
+    *ptr = sm4->end;
     ins->handler_idx = VKD3DSIH_INVALID;
     return;
 }
