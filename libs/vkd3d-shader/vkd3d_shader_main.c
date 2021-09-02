@@ -394,7 +394,7 @@ static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
 
 static void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
-    shader_sm4_free(parser->data);
+    shader_sm4_free(parser);
     free_shader_desc(&parser->shader_desc);
 }
 

@@ -1075,17 +1075,17 @@ void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
     return priv;
 }
 
-void shader_sm4_free(void *data)
+void shader_sm4_free(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_src_param_entry *e1, *e2;
-    struct vkd3d_sm4_data *priv = data;
+    struct vkd3d_sm4_data *sm4 = parser->data;
 
-    list_move_head(&priv->src_free, &priv->src);
-    LIST_FOR_EACH_ENTRY_SAFE(e1, e2, &priv->src_free, struct vkd3d_shader_src_param_entry, entry)
+    list_move_head(&sm4->src_free, &sm4->src);
+    LIST_FOR_EACH_ENTRY_SAFE(e1, e2, &sm4->src_free, struct vkd3d_shader_src_param_entry, entry)
     {
         vkd3d_free(e1);
     }
-    vkd3d_free(priv);
+    vkd3d_free(sm4);
 }
 
 static struct vkd3d_shader_src_param *get_src_param(struct vkd3d_sm4_data *priv)

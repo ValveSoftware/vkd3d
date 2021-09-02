@@ -890,7 +890,7 @@ struct vkd3d_shader_message_context;
 
 void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
         const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context);
-void shader_sm4_free(void *data);
+void shader_sm4_free(struct vkd3d_shader_parser *parser);
 void shader_sm4_read_header(void *data, const DWORD **ptr,
         struct vkd3d_shader_version *shader_version);
 void shader_sm4_read_instruction(void *data, const DWORD **ptr,
