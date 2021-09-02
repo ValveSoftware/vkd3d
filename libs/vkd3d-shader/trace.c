@@ -1781,7 +1781,6 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     struct vkd3d_string_buffer *buffer;
     unsigned int indent, i;
     const char *indent_str;
-    const DWORD *ptr;
     void *code;
 
     static const struct vkd3d_d3d_asm_colours no_colours =
@@ -1831,17 +1830,17 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     vkd3d_string_buffer_init(buffer);
 
     shader_version = &compiler.shader_version;
-    shader_sm4_read_header(parser, &ptr, shader_version);
+    shader_sm4_read_header(parser, shader_version);
     vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    while (!shader_sm4_is_end(parser, &ptr))
+    while (!shader_sm4_is_end(parser))
     {
         struct vkd3d_shader_instruction ins;
 
-        shader_sm4_read_instruction(parser, &ptr, &ins);
+        shader_sm4_read_instruction(parser, &ins);
         if (ins.handler_idx == VKD3DSIH_INVALID)
         {
             WARN("Skipping unrecognized instruction.\n");

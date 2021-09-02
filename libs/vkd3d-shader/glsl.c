@@ -104,9 +104,9 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
-    while (!shader_sm4_is_end(parser, &parser->ptr))
+    while (!shader_sm4_is_end(parser))
     {
-        shader_sm4_read_instruction(parser, &parser->ptr, &ins);
+        shader_sm4_read_instruction(parser, &ins);
 
         if (ins.handler_idx == VKD3DSIH_INVALID)
         {

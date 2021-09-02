@@ -1110,12 +1110,11 @@ static struct vkd3d_shader_src_param *get_src_param(struct vkd3d_sm4_data *priv)
     return &e->param;
 }
 
-void shader_sm4_read_header(struct vkd3d_shader_parser *parser,
-        const uint32_t **ptr, struct vkd3d_shader_version *shader_version)
+void shader_sm4_read_header(struct vkd3d_shader_parser *parser, struct vkd3d_shader_version *shader_version)
 {
     struct vkd3d_sm4_data *sm4 = parser->data;
 
-    *ptr = sm4->start;
+    parser->ptr = sm4->start;
     *shader_version = sm4->shader_version;
 }
 
@@ -1527,12 +1526,12 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
     }
 }
 
-void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser,
-        const uint32_t **ptr, struct vkd3d_shader_instruction *ins)
+void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_sm4_opcode_info *opcode_info;
     uint32_t opcode_token, opcode, previous_token;
     struct vkd3d_sm4_data *sm4 = parser->data;
+    const uint32_t **ptr = &parser->ptr;
     unsigned int i, len;
     size_t remaining;
     const DWORD *p;
@@ -1647,10 +1646,18 @@ fail:
     return;
 }
 
-bool shader_sm4_is_end(struct vkd3d_shader_parser *parser, const uint32_t **ptr)
+bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_sm4_data *sm4 = parser->data;
-    return *ptr == sm4->end;
+
+    return parser->ptr == sm4->end;
+}
+
+void shader_sm4_reset(struct vkd3d_shader_parser *parser)
+{
+    struct vkd3d_sm4_data *sm4 = parser->data;
+
+    parser->ptr = sm4->start;
 }
 
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)

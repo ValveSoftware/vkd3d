@@ -388,7 +388,7 @@ static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    shader_sm4_read_header(parser, &parser->ptr, &parser->shader_version);
+    shader_sm4_read_header(parser, &parser->shader_version);
     return VKD3D_OK;
 }
 
@@ -952,11 +952,14 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     if (TRACE_ON())
-        vkd3d_shader_trace(&parser);
-
-    while (!shader_sm4_is_end(&parser, &parser.ptr))
     {
-        shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
+        vkd3d_shader_trace(&parser);
+        shader_sm4_reset(&parser);
+    }
+
+    while (!shader_sm4_is_end(&parser))
+    {
+        shader_sm4_read_instruction(&parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {
@@ -1085,9 +1088,9 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    while (!shader_sm4_is_end(&parser, &parser.ptr))
+    while (!shader_sm4_is_end(&parser))
     {
-        shader_sm4_read_instruction(&parser, &parser.ptr, &instruction);
+        shader_sm4_read_instruction(&parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {

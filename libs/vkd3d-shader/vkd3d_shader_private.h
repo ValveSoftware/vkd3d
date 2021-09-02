@@ -891,11 +891,10 @@ struct vkd3d_shader_message_context;
 void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
         const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context);
 void shader_sm4_free(struct vkd3d_shader_parser *parser);
-void shader_sm4_read_header(struct vkd3d_shader_parser *parser,
-        const uint32_t **ptr, struct vkd3d_shader_version *shader_version);
-void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser,
-        const uint32_t **ptr, struct vkd3d_shader_instruction *ins);
-bool shader_sm4_is_end(struct vkd3d_shader_parser *parser, const uint32_t **ptr);
+void shader_sm4_read_header(struct vkd3d_shader_parser *parser, struct vkd3d_shader_version *shader_version);
+void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins);
+bool shader_sm4_is_end(struct vkd3d_shader_parser *parser);
+void shader_sm4_reset(struct vkd3d_shader_parser *parser);
 
 struct vkd3d_string_buffer
 {
