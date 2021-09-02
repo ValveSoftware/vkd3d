@@ -1110,12 +1110,13 @@ static struct vkd3d_shader_src_param *get_src_param(struct vkd3d_sm4_data *priv)
     return &e->param;
 }
 
-void shader_sm4_read_header(void *data, const DWORD **ptr, struct vkd3d_shader_version *shader_version)
+void shader_sm4_read_header(struct vkd3d_shader_parser *parser,
+        const uint32_t **ptr, struct vkd3d_shader_version *shader_version)
 {
-    struct vkd3d_sm4_data *priv = data;
+    struct vkd3d_sm4_data *sm4 = parser->data;
 
-    *ptr = priv->start;
-    *shader_version = priv->shader_version;
+    *ptr = sm4->start;
+    *shader_version = sm4->shader_version;
 }
 
 static bool shader_sm4_read_reg_idx(struct vkd3d_sm4_data *priv, const DWORD **ptr, const DWORD *end,

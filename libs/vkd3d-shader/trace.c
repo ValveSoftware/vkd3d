@@ -1831,7 +1831,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     vkd3d_string_buffer_init(buffer);
 
     shader_version = &compiler.shader_version;
-    shader_sm4_read_header(parser->data, &ptr, shader_version);
+    shader_sm4_read_header(parser, &ptr, shader_version);
     vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);

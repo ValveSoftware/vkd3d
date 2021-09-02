@@ -388,7 +388,7 @@ static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    shader_sm4_read_header(parser->data, &parser->ptr, &parser->shader_version);
+    shader_sm4_read_header(parser, &parser->ptr, &parser->shader_version);
     return VKD3D_OK;
 }
 
