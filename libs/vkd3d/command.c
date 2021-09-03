@@ -2398,12 +2398,10 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_list_Reset(ID3D12GraphicsCommandL
     return hr;
 }
 
-static HRESULT STDMETHODCALLTYPE d3d12_command_list_ClearState(ID3D12GraphicsCommandList2 *iface,
+static void STDMETHODCALLTYPE d3d12_command_list_ClearState(ID3D12GraphicsCommandList2 *iface,
         ID3D12PipelineState *pipeline_state)
 {
     FIXME("iface %p, pipline_state %p stub!\n", iface, pipeline_state);
-
-    return E_NOTIMPL;
 }
 
 static bool d3d12_command_list_has_depth_stencil_view(struct d3d12_command_list *list)
