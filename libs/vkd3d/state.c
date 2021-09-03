@@ -2754,6 +2754,8 @@ static enum VkPrimitiveTopology vk_topology_from_d3d12_topology(D3D12_PRIMITIVE_
         case D3D_PRIMITIVE_TOPOLOGY_31_CONTROL_POINT_PATCHLIST:
         case D3D_PRIMITIVE_TOPOLOGY_32_CONTROL_POINT_PATCHLIST:
             return VK_PRIMITIVE_TOPOLOGY_PATCH_LIST;
+        case D3D_PRIMITIVE_TOPOLOGY_UNDEFINED:
+            return VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         default:
             FIXME("Unhandled primitive topology %#x.\n", topology);
             return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
@@ -2937,6 +2939,12 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
     ia_desc.flags = 0;
     ia_desc.topology = vk_topology_from_d3d12_topology(topology);
     ia_desc.primitiveRestartEnable = !!graphics->index_buffer_strip_cut_value;
+
+    if (ia_desc.topology == VK_PRIMITIVE_TOPOLOGY_MAX_ENUM)
+    {
+        WARN("Primitive topology is undefined.\n");
+        return VK_NULL_HANDLE;
+    }
 
     tessellation_info.sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO;
     tessellation_info.pNext = NULL;

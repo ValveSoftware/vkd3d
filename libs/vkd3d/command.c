@@ -3660,12 +3660,6 @@ static void STDMETHODCALLTYPE d3d12_command_list_IASetPrimitiveTopology(ID3D12Gr
 
     TRACE("iface %p, topology %#x.\n", iface, topology);
 
-    if (topology == D3D_PRIMITIVE_TOPOLOGY_UNDEFINED)
-    {
-        WARN("Ignoring D3D_PRIMITIVE_TOPOLOGY_UNDEFINED.\n");
-        return;
-    }
-
     if (list->primitive_topology == topology)
         return;
 
