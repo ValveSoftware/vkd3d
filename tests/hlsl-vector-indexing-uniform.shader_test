@@ -1,4 +1,4 @@
-# Use a uniform to prevent the compiler from optimizing.
+% Use a uniform to prevent the compiler from optimizing.
 
 [pixel shader]
 uniform int i;
