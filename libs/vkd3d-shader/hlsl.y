@@ -597,6 +597,34 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     return !!add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
+static unsigned int matrix_minor_size(struct hlsl_type *type)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+static struct hlsl_ir_node *add_matrix_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *matrix,
+        unsigned int offset, const struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_constant *c;
+    struct hlsl_type *mat_type = matrix->data_type, *vec_type;
+    struct hlsl_ir_load *load;
+
+    assert(mat_type->type == HLSL_CLASS_MATRIX);
+    vec_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, mat_type->base_type, matrix_minor_size(mat_type), 1);
+
+    if (!(c = hlsl_new_uint_constant(ctx, offset * sizeof(float), loc)))
+        return NULL;
+    list_add_tail(instrs, &c->node.entry);
+
+    if (!(load = add_load(ctx, instrs, matrix, &c->node, vec_type, loc)))
+        return NULL;
+
+    return &load->node;
+}
+
 static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
 {
     switch (dim)
@@ -1854,6 +1882,66 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], &loc);
 }
 
+static bool intrinsic_mul(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1];
+    struct hlsl_type *t1 = arg1->data_type, *t2 = arg2->data_type, *ret_type;
+    struct hlsl_ir_var *var;
+    struct hlsl_ir_load *load;
+    enum hlsl_base_type base = expr_common_base_type(t1->base_type, t2->base_type);
+    char name[32];
+    static unsigned int counter = 0;
+    unsigned int i;
+
+    if (t1->type != HLSL_CLASS_VECTOR || t2->type != HLSL_CLASS_MATRIX)
+    {
+        hlsl_fixme(ctx, loc, "Unimplemented matrix multiplication.");
+        return false;
+    }
+    if (t1->dimx != t2->dimy)
+    {
+        hlsl_fixme(ctx, loc, "Matrix multiplication with incompatible shape.");
+        return false;
+    }
+    if (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+    {
+        hlsl_fixme(ctx, loc, "Unimplemented multiplication of a row-major matrix.");
+        return false;
+    }
+
+    ret_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, base, t2->dimx, 1);
+
+    sprintf(name, "<mul-%x>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name, ret_type, loc);
+    if (!var)
+        return false;
+
+    for (i = 0; i < t2->dimx; ++i)
+    {
+        struct hlsl_ir_node *load;
+        struct hlsl_ir_expr *expr;
+        struct hlsl_ir_store *store;
+
+        if (!(load = add_matrix_load(ctx, params->instrs, arg2, i, loc)))
+            return false;
+
+        if (!(expr = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DOT, arg1, load, &loc)))
+            return false;
+
+        if (!(store = hlsl_new_store(ctx, var, NULL, &expr->node, 1u << i, loc)))
+            return false;
+        list_add_before(params->instrs, &store->node.entry);
+    }
+
+    load = hlsl_new_load(ctx, var, NULL, ret_type, loc);
+    if (!load)
+        return false;
+    list_add_before(params->instrs, &load->node.entry);
+
+    return true;
+}
+
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1955,6 +2043,7 @@ intrinsic_functions[] =
     {"dot",                                 2, true,  intrinsic_dot},
     {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
+    {"mul",                                 2, true,  intrinsic_mul},
     {"pow",                                 2, true,  intrinsic_pow},
     {"saturate",                            1, true,  intrinsic_saturate},
     {"tex2D",                              -1, false, intrinsic_tex2D},
