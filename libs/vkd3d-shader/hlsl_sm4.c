@@ -1306,6 +1306,30 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_binary_op_with_null(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    instr.dsts[0].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[0].reg.idx_count = 0;
+    sm4_register_from_node(&instr.dsts[1].reg, &instr.dsts[1].writemask, dst);
+    instr.dst_count = 2;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src1);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[1].writemask);
+    sm4_register_from_node(&instr.srcs[1].reg, &writemask, src2);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[1].writemask);
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_constant(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_constant *constant)
 {
@@ -1642,6 +1666,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     }
                     break;
                 }
+
+                case HLSL_OP2_MUL:
+                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_UMUL, &expr->node, arg1, arg2);
+                    break;
 
                 default:
                     hlsl_fixme(ctx, expr->node.loc, "SM4 uint \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
