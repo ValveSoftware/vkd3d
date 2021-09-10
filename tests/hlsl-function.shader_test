@@ -1,0 +1,167 @@
+[pixel shader fail]
+
+float4 func();
+
+float4 main() : sv_target
+{
+    return func();
+}
+
+% It's legal to call an undefined function in unused code, though.
+
+[pixel shader]
+
+float4 func();
+
+float4 unused()
+{
+    return func();
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+
+void func(inout float o)
+{
+    o += 0.1;
+}
+
+float4 main() : sv_target
+{
+    float x = 0;
+    func(x + 1);
+    return 0;
+}
+
+[pixel shader fail]
+
+void func(inout float2 o)
+{
+    o += 0.1;
+}
+
+float4 main() : sv_target
+{
+    float2 x = 0;
+    func(x.yy);
+    return 0;
+}
+
+[pixel shader fail]
+
+void func(out float o)
+{
+    o = 0.1;
+}
+
+float4 main() : sv_target
+{
+    const float x = 0;
+    func(x);
+    return x;
+}
+
+[pixel shader fail]
+
+void func(inout float o)
+{
+}
+
+float4 main() : sv_target
+{
+    const float x = 0;
+    func(x);
+    return x;
+}
+
+[pixel shader fail]
+
+void func()
+{
+}
+
+float4 main() : sv_target
+{
+    return func();
+}
+
+[pixel shader fail]
+
+% Returning a void expression from a void function is legal in C, but not in HLSL.
+
+void foo()
+{
+}
+
+void bar()
+{
+    return foo();
+}
+
+float4 main() : sv_target
+{
+    bar();
+    return 0;
+}
+
+[pixel shader fail]
+
+float4 main() : sv_target
+{
+    func();
+    return 0;
+}
+
+void func()
+{
+}
+
+[pixel shader]
+
+float func(in float a, out float b, inout float c)
+{
+    c -= 0.2;
+    b = a * 2;
+    return a + 0.2;
+}
+
+float4 main() : sv_target
+{
+    float x[2], ret;
+
+    x[0] = 0.1;
+    x[1] = 0.9;
+    ret = func(0.3, x[0], x[1]);
+
+    return float4(ret, x[0], x[1], 0);
+}
+
+[test]
+draw quad
+probe all rgba (0.5, 0.6, 0.7, 0)
+
+[pixel shader]
+
+void func(in float a, inout float2 b)
+{
+    b.y += 0.1;
+    b *= a;
+}
+
+float4 main() : sv_target
+{
+    float3 q = float3(0.1, 0.2, 0.3);
+
+    func(3.0, q.zx);
+    func(0.5, q.yz);
+    return float4(q, 0);
+}
+
+[test]
+draw quad
+probe all rgba (0.6, 0.1, 0.5, 0)
+
