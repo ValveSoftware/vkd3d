@@ -1802,6 +1802,23 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, &max->node, params->args[2], &loc);
 }
 
+static bool intrinsic_lerp(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_expr *neg, *add, *mul;
+
+    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, params->args[0], &loc)))
+        return false;
+
+    if (!(add = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, params->args[1], &neg->node, &loc)))
+        return false;
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[2], &add->node, &loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, params->args[0], &mul->node, &loc);
+}
+
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1906,6 +1923,7 @@ intrinsic_functions[] =
     {"abs",                                 1, true,  intrinsic_abs},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
+    {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
     {"pow",                                 2, true,  intrinsic_pow},
     {"saturate",                            1, true,  intrinsic_saturate},
