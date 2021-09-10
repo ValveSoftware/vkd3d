@@ -1844,6 +1844,29 @@ static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_jump(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_jump *jump)
+{
+    struct sm4_instruction instr = {};
+
+    switch (jump->type)
+    {
+        case HLSL_IR_JUMP_RETURN:
+            assert(0);
+            break;
+
+        case HLSL_IR_JUMP_BREAK:
+            instr.opcode = VKD3D_SM4_OP_BREAK;
+            break;
+
+        default:
+            hlsl_fixme(ctx, jump->node.loc, "Jump type %#x.\n", jump->type);
+            return;
+    }
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
 {
@@ -2010,6 +2033,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
         switch (instr->type)
         {
+            case HLSL_IR_CALL:
+                assert(0);
+                break;
+
             case HLSL_IR_CONSTANT:
                 write_sm4_constant(ctx, buffer, hlsl_ir_constant(instr));
                 break;
@@ -2020,6 +2047,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
             case HLSL_IR_IF:
                 write_sm4_if(ctx, buffer, hlsl_ir_if(instr));
+                break;
+
+            case HLSL_IR_JUMP:
+                write_sm4_jump(ctx, buffer, hlsl_ir_jump(instr));
                 break;
 
             case HLSL_IR_LOAD:
@@ -2045,9 +2076,6 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
             case HLSL_IR_SWIZZLE:
                 write_sm4_swizzle(ctx, buffer, hlsl_ir_swizzle(instr));
                 break;
-
-            default:
-                hlsl_fixme(ctx, instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
         }
     }
 }
