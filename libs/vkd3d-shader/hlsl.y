@@ -1254,6 +1254,29 @@ static struct list *add_binary_comparison_expr_last(struct hlsl_ctx *ctx, struct
     return instrs1;
 }
 
+static struct hlsl_ir_expr *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *cast_types[HLSL_MAX_OPERANDS], *ret_type;
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    unsigned int dim;
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg1, arg2};
+
+    if (arg1->data_type->type == HLSL_CLASS_MATRIX)
+        return NULL;
+    if (arg2->data_type->type == HLSL_CLASS_MATRIX)
+        return NULL;
+
+    dim = min(arg1->data_type->dimx, arg2->data_type->dimx);
+
+    cast_types[0] = get_numeric_type(ctx, HLSL_CLASS_VECTOR, base, dim, 1);
+    cast_types[1] = cast_types[0];
+    ret_type = get_numeric_type(ctx, HLSL_CLASS_SCALAR, base, 1, 1);
+
+    return add_expr(ctx, instrs, op, args, cast_types, ret_type, loc);
+}
+
 static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
 {
     static const enum hlsl_ir_expr_op ops[] =
@@ -1802,6 +1825,12 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, &max->node, params->args[2], &loc);
 }
 
+static bool intrinsic_dot(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    return !!add_binary_dot_expr(ctx, params->instrs, HLSL_OP2_DOT, params->args[0], params->args[1], &loc);
+}
+
 static bool intrinsic_lerp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1923,6 +1952,7 @@ intrinsic_functions[] =
     {"abs",                                 1, true,  intrinsic_abs},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
+    {"dot",                                 2, true,  intrinsic_dot},
     {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
     {"pow",                                 2, true,  intrinsic_pow},
