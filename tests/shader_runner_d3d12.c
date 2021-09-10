@@ -242,11 +242,38 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             }
             memcpy(context->uniforms + offset, &v, sizeof(v));
         }
+        else if (match_string(line, "float", &line))
+        {
+            float f;
+
+            if (sscanf(line, "%f", &f) < 1)
+                goto err;
+            if (offset + 1 > context->uniform_count)
+            {
+                context->uniform_count = offset + 1;
+                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
+            }
+            memcpy(context->uniforms + offset, &f, sizeof(f));
+        }
+        else if (match_string(line, "int", &line))
+        {
+            int i;
+
+            if (sscanf(line, "%i", &i) < 1)
+                goto err;
+            if (offset + 1 > context->uniform_count)
+            {
+                context->uniform_count = offset + 1;
+                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
+            }
+            memcpy(context->uniforms + offset, &i, sizeof(i));
+        }
         else if (match_string(line, "uint", &line))
         {
             unsigned int u;
 
-            sscanf(line, "%u", &u);
+            if (sscanf(line, "%u", &u) < 1)
+                goto err;
             if (offset + 1 > context->uniform_count)
             {
                 context->uniform_count = offset + 1;

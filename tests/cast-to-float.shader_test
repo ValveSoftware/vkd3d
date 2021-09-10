@@ -1,0 +1,29 @@
+[pixel shader]
+
+float4 main(uniform int i, uniform uint u, uniform bool b, uniform half h) : sv_target
+{
+    return float4(((float)i) + 1.5, ((float)u) - 2.5, ((float)b) / 2, h);
+}
+
+[test]
+uniform 0 int -1
+uniform 1 uint 3
+uniform 2 int -2
+uniform 3 float 0.5
+draw quad
+probe all rgba (0.5, 0.5, 0.5, 0.5)
+
+[pixel shader]
+
+float4 main() : sv_target
+{
+    int i = -1;
+    uint u = 3;
+    bool b = true;
+    half h = 0.5;
+    return float4(((float)i) + 1.5, ((float)u) - 2.5, ((float)b) / 2, h);
+}
+
+[test]
+draw quad
+probe all rgba (0.5, 0.5, 0.5, 0.5)
