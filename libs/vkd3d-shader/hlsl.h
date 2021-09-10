@@ -224,6 +224,7 @@ struct hlsl_reg
  *   types can be casted seamlessly to (struct hlsl_ir_node *) and vice-versa. */
 enum hlsl_ir_node_type
 {
+    HLSL_IR_CALL,
     HLSL_IR_CONSTANT,
     HLSL_IR_EXPR,
     HLSL_IR_IF,
@@ -390,6 +391,12 @@ struct hlsl_ir_function_decl
     const struct hlsl_attribute *const *attrs;
 };
 
+struct hlsl_ir_call
+{
+    struct hlsl_ir_node node;
+    const struct hlsl_ir_function_decl *decl;
+};
+
 struct hlsl_ir_if
 {
     struct hlsl_ir_node node;
@@ -408,6 +415,8 @@ struct hlsl_ir_loop
 
 enum hlsl_ir_expr_op
 {
+    HLSL_OP0_VOID,
+
     HLSL_OP1_ABS,
     HLSL_OP1_BIT_NOT,
     HLSL_OP1_CAST,
@@ -696,6 +705,12 @@ struct hlsl_resource_load_params
     struct hlsl_ir_node *coords, *lod, *texel_offset;
 };
 
+static inline struct hlsl_ir_call *hlsl_ir_call(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_CALL);
+    return CONTAINING_RECORD(node, struct hlsl_ir_call, node);
+}
+
 static inline struct hlsl_ir_constant *hlsl_ir_constant(const struct hlsl_ir_node *node)
 {
     assert(node->type == HLSL_IR_CONSTANT);
@@ -913,6 +928,8 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
 struct hlsl_ir_constant *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc);
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
         const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc);
+struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *decl,
+        const struct vkd3d_shader_location *loc);
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,

@@ -9,7 +9,7 @@ float4 main() : sv_target
 
 % It's legal to call an undefined function in unused code, though.
 
-[pixel shader todo]
+[pixel shader]
 
 float4 func();
 
@@ -23,7 +23,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 void func(inout float o)
 {
@@ -37,7 +37,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 void func(inout float2 o)
 {
@@ -51,7 +51,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 void func(out float o)
 {
@@ -65,7 +65,7 @@ float4 main() : sv_target
     return x;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 void func(inout float o)
 {
@@ -78,7 +78,7 @@ float4 main() : sv_target
     return x;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 void func()
 {
@@ -118,7 +118,7 @@ void func()
 {
 }
 
-[pixel shader todo]
+[pixel shader]
 
 float func(in float a, out float b, inout float c)
 {
@@ -139,10 +139,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-probe all rgba (0.5, 0.6, 0.7, 0)
+draw quad
+todo probe all rgba (0.5, 0.6, 0.7, 0)
 
-[pixel shader todo]
+[pixel shader]
 
 void func(in float a, inout float2 b)
 {
@@ -160,5 +160,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-probe all rgba (0.6, 0.1, 0.5, 0)
+draw quad
+todo probe all rgba (0.6, 0.1, 0.5, 0)
