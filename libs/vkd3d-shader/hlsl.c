@@ -535,7 +535,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
     if (!(c = hlsl_alloc(ctx, sizeof(*c))))
         return NULL;
     init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_UINT], loc);
-    c->value.u[0] = n;
+    c->value[0].u = n;
     return c;
 }
 
@@ -1018,26 +1018,28 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
         vkd3d_string_buffer_printf(buffer, "{");
     for (x = 0; x < type->dimx; ++x)
     {
+        const union hlsl_constant_value *value = &constant->value[x];
+
         switch (type->base_type)
         {
             case HLSL_TYPE_BOOL:
-                vkd3d_string_buffer_printf(buffer, "%s ", constant->value.b[x] ? "true" : "false");
+                vkd3d_string_buffer_printf(buffer, "%s ", value->b ? "true" : "false");
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                vkd3d_string_buffer_printf(buffer, "%.16e ", constant->value.d[x]);
+                vkd3d_string_buffer_printf(buffer, "%.16e ", value->d);
                 break;
 
             case HLSL_TYPE_FLOAT:
-                vkd3d_string_buffer_printf(buffer, "%.8e ", constant->value.f[x]);
+                vkd3d_string_buffer_printf(buffer, "%.8e ", value->f);
                 break;
 
             case HLSL_TYPE_INT:
-                vkd3d_string_buffer_printf(buffer, "%d ", constant->value.i[x]);
+                vkd3d_string_buffer_printf(buffer, "%d ", value->i);
                 break;
 
             case HLSL_TYPE_UINT:
-                vkd3d_string_buffer_printf(buffer, "%u ", constant->value.u[x]);
+                vkd3d_string_buffer_printf(buffer, "%u ", value->u);
                 break;
 
             default:

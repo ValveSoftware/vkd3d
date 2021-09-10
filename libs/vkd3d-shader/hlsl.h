@@ -374,14 +374,14 @@ struct hlsl_ir_store
 struct hlsl_ir_constant
 {
     struct hlsl_ir_node node;
-    union
+    union hlsl_constant_value
     {
-        unsigned u[4];
-        int i[4];
-        float f[4];
-        double d[4];
-        bool b[4];
-    } value;
+        uint32_t u;
+        int32_t i;
+        float f;
+        double d;
+        bool b;
+    } value[4];
     struct hlsl_reg reg;
 };
 
