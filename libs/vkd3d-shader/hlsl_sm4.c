@@ -1306,6 +1306,28 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     write_sm4_instruction(buffer, &instr);
 }
 
+/* dp# instructions don't map the swizzle. */
+static void write_sm4_binary_op_dot(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src1);
+    instr.srcs[0].swizzle = hlsl_swizzle_from_writemask(writemask);
+    sm4_register_from_node(&instr.srcs[1].reg, &writemask, src2);
+    instr.srcs[1].swizzle = hlsl_swizzle_from_writemask(writemask);
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_binary_op_with_null(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -1567,6 +1589,30 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 
                 case HLSL_OP2_MUL:
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
+                    break;
+
+                case HLSL_OP2_DOT:
+                    switch (arg1->data_type->dimx)
+                    {
+                    case 4:
+                        write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP4, &expr->node, arg1, arg2);
+                        break;
+
+                    case 3:
+                        write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP3, &expr->node, arg1, arg2);
+                        break;
+
+                    case 2:
+                        write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP2, &expr->node, arg1, arg2);
+                        break;
+
+                    case 1:
+                        write_sm4_binary_op(buffer, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
+                        break;
+
+                    default:
+                        assert(0);
+                    }
                     break;
 
                 default:
