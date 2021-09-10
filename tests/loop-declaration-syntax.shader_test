@@ -11,8 +11,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.0, 1.0, 0.0, 1.0)
+draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 
 % They can also be used after the loop terminates.
