@@ -19,6 +19,11 @@
 #ifndef __VKD3D_D3D12_TEST_UTILS_H
 #define __VKD3D_D3D12_TEST_UTILS_H
 
+struct ivec4
+{
+    int x, y, z, w;
+};
+
 struct uvec4
 {
     unsigned int x, y, z, w;

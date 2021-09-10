@@ -747,6 +747,19 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             }
             memcpy(context->uniforms + offset, &f, sizeof(f));
         }
+        else if (match_string(line, "int4", &line))
+        {
+            struct ivec4 v;
+
+            if (sscanf(line, "%d %d %d %d", &v.x, &v.y, &v.z, &v.w) < 4)
+                goto err;
+            if (offset + 4 > context->uniform_count)
+            {
+                context->uniform_count = offset + 4;
+                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
+            }
+            memcpy(context->uniforms + offset, &v, sizeof(v));
+        }
         else if (match_string(line, "int", &line))
         {
             int i;

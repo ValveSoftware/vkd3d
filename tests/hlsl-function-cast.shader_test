@@ -1,0 +1,103 @@
+% Test implicit and explicit casts on function output parameters.
+
+[pixel shader]
+
+uniform float4 f;
+
+void func(out float4 o)
+{
+    o = f;
+}
+
+float4 main() : sv_target
+{
+    int4 x;
+    func(x);
+    return x;
+}
+
+[test]
+uniform 0 float4 -1.9 -1.0 2.9 4.0
+draw quad
+probe all rgba (-1.0, -1.0, 2.0, 4.0)
+
+% As above, but cast "x" to float4 first.
+
+[pixel shader]
+
+uniform float4 f;
+
+void func(out float4 o)
+{
+    o = f;
+}
+
+float4 main() : sv_target
+{
+    int4 x;
+    func((float4)x);
+    return x;
+}
+
+[test]
+uniform 0 float4 -1.9 -1.0 2.9 4.0
+draw quad
+probe all rgba (-1.0, -1.0, 2.0, 4.0)
+
+% As above, but declare "x" as float4 and cast it to int4.
+
+[pixel shader]
+
+uniform float4 f;
+
+void func(out float4 o)
+{
+    o = f;
+}
+
+float4 main() : sv_target
+{
+    float4 x;
+    func((int4)x);
+    return x;
+}
+
+[test]
+uniform 0 float4 -1.9 -1.0 2.9 4.0
+draw quad
+probe all rgba (-1.0, -1.0, 2.0, 4.0)
+
+[pixel shader]
+
+void func(inout float4 a)
+{
+    a += 0.1;
+}
+
+float4 main(uniform int4 i) : sv_target
+{
+    int4 x = i;
+    func(x);
+    return x;
+}
+
+[test]
+uniform 0 int4 -2 0 1 -3000000
+draw quad
+probe all rgba (-1.0, 0.0, 1.0, -3000000.0)
+
+% You can't cast an inout parameter, though.
+
+[pixel shader fail]
+
+void func(inout float4 a)
+{
+    a += 0.1;
+}
+
+float4 main(uniform int4 i) : sv_target
+{
+    int4 x = i;
+    func((float4)x);
+    return x;
+}

@@ -31,11 +31,6 @@ struct vec2
     float x, y;
 };
 
-struct ivec4
-{
-    int x, y, z, w;
-};
-
 struct dvec2
 {
     double x, y;
