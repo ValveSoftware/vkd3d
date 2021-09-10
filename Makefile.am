@@ -57,6 +57,7 @@ vkd3d_shader_tests = \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
+	tests/cast-to-uint.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-bool-cast.shader_test \
@@ -272,6 +273,7 @@ XFAIL_TESTS = \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
+	tests/cast-to-uint.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-bool-cast.shader_test \
