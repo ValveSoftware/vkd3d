@@ -501,21 +501,29 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     struct hlsl_type *return_type = ctx->cur_function->return_type;
     struct hlsl_ir_jump *jump;
 
-    if (return_value)
+    if (hlsl_type_is_void(return_type))
     {
-        struct hlsl_ir_store *store;
-
-        if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, &loc)))
-            return NULL;
-
-        if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
-            return NULL;
-        list_add_after(&return_value->entry, &store->node.entry);
+        if (return_value)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Void functions cannot return a value.");
     }
-    else if (!hlsl_type_is_void(return_type))
+    else
     {
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void function must return a value.");
-        return NULL;
+        if (return_value)
+        {
+            struct hlsl_ir_store *store;
+
+            if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, &loc)))
+                return NULL;
+
+            if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
+                return NULL;
+            list_add_after(&return_value->entry, &store->node.entry);
+        }
+        else
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void functions must return a value.");
+            return NULL;
+        }
     }
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, loc)))
