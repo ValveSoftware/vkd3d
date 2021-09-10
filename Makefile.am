@@ -55,6 +55,7 @@ vkd3d_shader_runners = \
 
 vkd3d_shader_tests = \
 	tests/cast-to-float.shader_test \
+	tests/cast-to-half.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-bool-cast.shader_test \
@@ -268,6 +269,7 @@ tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner_d3d12
 XFAIL_TESTS = \
 	tests/cast-to-float.shader_test \
+	tests/cast-to-half.shader_test \
 	tests/conditional.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-bool-cast.shader_test \
