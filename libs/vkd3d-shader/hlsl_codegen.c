@@ -272,12 +272,12 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
     if (instr->type != HLSL_IR_EXPR)
         return false;
     cast = hlsl_ir_expr(instr);
+    if (cast->op != HLSL_OP1_CAST)
+        return false;
     src_type = cast->operands[0].node->data_type;
     dst_type = cast->node.data_type;
 
-    if (cast->op == HLSL_OP1_CAST
-            && src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR
-            && src_type->dimx == 1)
+    if (src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR && src_type->dimx == 1)
     {
         struct hlsl_ir_swizzle *swizzle;
 
@@ -305,11 +305,13 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     if (instr->type == HLSL_IR_EXPR)
     {
         struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
-        const struct hlsl_type *src_type = expr->operands[0].node->data_type;
         const struct hlsl_type *dst_type = expr->node.data_type;
+        const struct hlsl_type *src_type;
 
         if (expr->op != HLSL_OP1_CAST)
             return false;
+
+        src_type = expr->operands[0].node->data_type;
 
         if (hlsl_types_are_equal(src_type, dst_type)
                 || (src_type->base_type == dst_type->base_type && is_vec1(src_type) && is_vec1(dst_type)))
@@ -522,6 +524,8 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     if (instr->type != HLSL_IR_EXPR)
         return false;
     expr = hlsl_ir_expr(instr);
+    if (!expr->operands[0].node)
+        return false;
 
     for (i = 0; i < ARRAY_SIZE(expr->operands); ++i)
     {
