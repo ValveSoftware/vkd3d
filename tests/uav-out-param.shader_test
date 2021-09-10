@@ -23,5 +23,5 @@ void main()
 }
 
 [test]
-todo dispatch 1 1 1
+dispatch 1 1 1
 todo probe uav 0 (0, 0) rgba (0.1, 0.3, 0.3, 0.5)
