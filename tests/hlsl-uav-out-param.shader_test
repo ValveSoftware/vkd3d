@@ -1,0 +1,27 @@
+[require]
+shader model >= 5.0
+
+[uav 0]
+format r32g32b32a32 float
+size (1, 1)
+
+0.1 0.2 0.3 0.4
+
+[compute shader]
+
+RWTexture2D<float4> u;
+
+void func(inout float4 f)
+{
+    f.xz += 0.1;
+}
+
+    [numthreads(1, 1, 1)]
+void main()
+{
+    func(u[uint2(0, 0)].yzwx);
+}
+
+[test]
+dispatch 1 1 1
+probe uav 0 rgba (0, 0) (0.1, 0.3, 0.3, 0.5)
