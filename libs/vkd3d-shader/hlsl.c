@@ -1484,6 +1484,21 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
     return names[type];
 }
 
+const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type)
+{
+    static const char * const names[] =
+    {
+        "HLSL_IR_JUMP_BREAK",
+        "HLSL_IR_JUMP_CONTINUE",
+        "HLSL_IR_JUMP_DISCARD",
+        "HLSL_IR_JUMP_RETURN",
+    };
+
+    if (type >= ARRAY_SIZE(names))
+        return "Unexpected jump type";
+    return names[type];
+}
+
 static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr);
 
 static void dump_instr_list(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct list *list)
