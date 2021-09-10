@@ -1,0 +1,41 @@
+[pixel shader]
+
+float4 main(uniform float f, uniform uint u, uniform bool b, uniform half h) : sv_target
+{
+    float4 ret;
+
+    ret.x = ((float)(int)f) - 1.5;
+    ret.y = ((float)(int)u) + 2.5;
+    ret.z = ((float)(int)b) / 2;
+    ret.w = ((float)(int)h) + 3.5;
+    return ret;
+}
+
+[test]
+uniform 0 float 2.6
+uniform 1 int -2
+uniform 2 int -2
+uniform 3 float -3.6
+draw quad
+probe all rgba (0.5, 0.5, 0.5, 0.5)
+
+[pixel shader]
+
+float4 main() : sv_target
+{
+    float f = 2.6;
+    uint u = 0xfffffffe;
+    bool b = true;
+    half h = -3.6;
+    float4 ret;
+
+    ret.x = ((float)(int)f) - 1.5;
+    ret.y = ((float)(int)u) + 2.5;
+    ret.z = ((float)(int)b) / 2;
+    ret.w = ((float)(int)h) + 3.5;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.5, 0.5, 0.5, 0.5)
