@@ -515,7 +515,38 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     return true;
 }
 
-static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_constant *value, *res;
+    struct hlsl_ir_swizzle *swizzle;
+    unsigned int i, swizzle_bits;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+    if (swizzle->val.node->type != HLSL_IR_CONSTANT)
+        return false;
+    value = hlsl_ir_constant(swizzle->val.node);
+
+    if (!(res = hlsl_alloc(ctx, sizeof(*res))))
+        return false;
+    init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
+
+    swizzle_bits = swizzle->swizzle;
+    for (i = 0; i < swizzle->node.data_type->dimx; ++i)
+    {
+        res->value[i] = value->value[swizzle_bits & 3];
+        swizzle_bits >>= 2;
+    }
+
+    list_add_before(&swizzle->node.entry, &res->node.entry);
+    replace_node(&swizzle->node, &res->node);
+    list_remove(&swizzle->node.entry);
+    hlsl_free_instr(&swizzle->node);
+    return true;
+}
+
+static bool fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
     struct hlsl_ir_expr *expr;
@@ -1813,7 +1844,12 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
-    while (transform_ir(ctx, fold_constants, body, NULL));
+    do
+    {
+        progress = transform_ir(ctx, fold_constant_exprs, body, NULL);
+        progress |= transform_ir(ctx, fold_constant_swizzles, body, NULL);
+    }
+    while (progress);
 
     if (profile->major_version < 4)
         transform_ir(ctx, lower_division, body, NULL);
