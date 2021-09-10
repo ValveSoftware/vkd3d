@@ -515,6 +515,8 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     if (instr->type != HLSL_IR_EXPR)
         return false;
     expr = hlsl_ir_expr(instr);
+    if (!expr->operands[0].node)
+        return false;
 
     if (instr->data_type->type > HLSL_CLASS_VECTOR)
         return false;
