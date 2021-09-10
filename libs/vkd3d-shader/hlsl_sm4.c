@@ -1086,6 +1086,51 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             break;
         }
 
+        case HLSL_TYPE_UINT:
+        {
+            switch (expr->op)
+            {
+                case HLSL_OP1_CAST:
+                {
+                    const struct hlsl_type *src_type = arg1->data_type;
+
+                    /* Narrowing casts need to be lowered. */
+                    if (src_type->dimx != expr->node.data_type->dimx)
+                        hlsl_fixme(ctx, expr->node.loc, "SM4 narrowing cast.\n");
+
+                    switch (src_type->base_type)
+                    {
+                        case HLSL_TYPE_HALF:
+                        case HLSL_TYPE_FLOAT:
+                            write_sm4_unary_op(buffer, VKD3D_SM4_OP_FTOU, &expr->node, arg1, 0);
+                            break;
+
+                        case HLSL_TYPE_INT:
+                        case HLSL_TYPE_UINT:
+                            write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+                            break;
+
+                        case HLSL_TYPE_BOOL:
+                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from bool to uint.\n");
+                            break;
+
+                        case HLSL_TYPE_DOUBLE:
+                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from double to uint.\n");
+                            break;
+
+                        default:
+                            break;
+                    }
+                    break;
+                }
+
+                default:
+                    hlsl_fixme(ctx, expr->node.loc, "SM4 uint \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
+                    break;
+            }
+            break;
+        }
+
         default:
         {
             struct vkd3d_string_buffer *string;
