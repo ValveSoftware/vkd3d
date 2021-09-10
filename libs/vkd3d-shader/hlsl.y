@@ -943,12 +943,13 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
             FIXME("Unhandled type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
 
+        case HLSL_IR_CALL:
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
         case HLSL_IR_RESOURCE_STORE:
         case HLSL_IR_STORE:
-            WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
+            assert(0);
             return 0;
     }
 
@@ -1651,12 +1652,12 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 struct find_function_call_args
 {
     const struct parse_initializer *params;
-    const struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function_decl *decl;
 };
 
 static void find_function_call_exact(struct rb_entry *entry, void *context)
 {
-    const struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, const struct hlsl_ir_function_decl, entry);
+    struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     struct find_function_call_args *args = context;
     const struct hlsl_ir_var *param;
     unsigned int i = 0;
@@ -1671,7 +1672,7 @@ static void find_function_call_exact(struct rb_entry *entry, void *context)
         args->decl = decl;
 }
 
-static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
+static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         const char *name, const struct parse_initializer *params)
 {
     struct find_function_call_args args = {.params = params};
@@ -1877,64 +1878,129 @@ static int intrinsic_function_name_compare(const void *a, const void *b)
 }
 
 static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
-        struct parse_initializer *params, struct vkd3d_shader_location loc)
+        struct parse_initializer *args, struct vkd3d_shader_location loc)
 {
-    const struct hlsl_ir_function_decl *decl;
     struct intrinsic_function *intrinsic;
+    struct hlsl_ir_function_decl *decl;
 
-    if ((decl = find_function_call(ctx, name, params)))
+    if ((decl = find_function_call(ctx, name, args)))
     {
-        hlsl_fixme(ctx, loc, "Call to user-defined function \"%s\".", name);
-        free_parse_initializer(params);
-        return NULL;
+        struct hlsl_ir_call *call;
+        struct hlsl_ir_var *param;
+        unsigned int i;
+
+        assert(args->args_count == list_count(decl->parameters));
+
+        i = 0;
+        LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+        {
+            struct hlsl_ir_node *arg = args->args[i++];
+
+            if (!hlsl_types_are_equal(arg->data_type, param->data_type))
+            {
+                hlsl_fixme(ctx, arg->loc, "Implicit cast of a function argument.");
+                continue;
+            }
+
+            if (param->modifiers & HLSL_STORAGE_IN)
+            {
+                struct hlsl_ir_store *store;
+
+                if (!(store = hlsl_new_simple_store(ctx, param, arg)))
+                    goto fail;
+                list_add_tail(args->instrs, &store->node.entry);
+            }
+        }
+
+        if (!(call = hlsl_new_call(ctx, decl, loc)))
+            goto fail;
+        list_add_tail(args->instrs, &call->node.entry);
+
+        i = 0;
+        LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+        {
+            struct hlsl_ir_node *arg = args->args[i++];
+
+            if (param->modifiers & HLSL_STORAGE_OUT)
+            {
+                struct hlsl_ir_load *load;
+
+                if (arg->data_type->modifiers & HLSL_MODIFIER_CONST)
+                    hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
+                            "Output argument to \"%s\" is const.", decl->func->name);
+
+                if (!(load = hlsl_new_var_load(ctx, param, arg->loc)))
+                    goto fail;
+                list_add_tail(args->instrs, &load->node.entry);
+
+                if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node))
+                    goto fail;
+            }
+        }
+
+        if (decl->return_var)
+        {
+            struct hlsl_ir_load *load;
+
+            if (!(load = hlsl_new_var_load(ctx, decl->return_var, loc)))
+                goto fail;
+            list_add_tail(args->instrs, &load->node.entry);
+        }
+        else
+        {
+            struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+            struct hlsl_ir_node *expr;
+
+            if (!(expr = hlsl_new_expr(ctx, HLSL_OP0_VOID, ctx->builtin_types.Void, operands, loc)))
+                goto fail;
+            list_add_tail(args->instrs, &expr->entry);
+        }
     }
     else if ((intrinsic = bsearch(name, intrinsic_functions, ARRAY_SIZE(intrinsic_functions),
             sizeof(*intrinsic_functions), intrinsic_function_name_compare)))
     {
-        if (intrinsic->param_count >= 0 && params->args_count != intrinsic->param_count)
+        if (intrinsic->param_count >= 0 && args->args_count != intrinsic->param_count)
         {
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                     "Wrong number of arguments to function '%s': expected %u, but got %u.\n",
-                    name, intrinsic->param_count, params->args_count);
-            free_parse_initializer(params);
-            return NULL;
+                    name, intrinsic->param_count, args->args_count);
+            goto fail;
         }
 
         if (intrinsic->check_numeric)
         {
             unsigned int i;
 
-            for (i = 0; i < params->args_count; ++i)
+            for (i = 0; i < args->args_count; ++i)
             {
-                if (params->args[i]->data_type->type > HLSL_CLASS_LAST_NUMERIC)
+                if (args->args[i]->data_type->type > HLSL_CLASS_LAST_NUMERIC)
                 {
                     struct vkd3d_string_buffer *string;
 
-                    if ((string = hlsl_type_to_string(ctx, params->args[i]->data_type)))
+                    if ((string = hlsl_type_to_string(ctx, args->args[i]->data_type)))
                         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                                 "Wrong type for argument %u of '%s': expected a numeric type, but got '%s'.\n",
                                 i + 1, name, string->buffer);
                     hlsl_release_string_buffer(ctx, string);
-                    free_parse_initializer(params);
-                    return NULL;
+                    goto fail;
                 }
             }
         }
 
-        if (!intrinsic->handler(ctx, params, loc))
-        {
-            free_parse_initializer(params);
-            return NULL;
-        }
+        if (!intrinsic->handler(ctx, args, loc))
+            goto fail;
     }
     else
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Function \"%s\" is not defined.", name);
-        free_parse_initializer(params);
-        return NULL;
+        goto fail;
     }
-    vkd3d_free(params->args);
-    return params->instrs;
+    vkd3d_free(args->args);
+    return args->instrs;
+
+fail:
+    free_parse_initializer(args);
+    return NULL;
 }
 
 static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,

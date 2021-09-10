@@ -677,6 +677,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
             break;
         }
 
+        case HLSL_IR_CALL:
         case HLSL_IR_IF:
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
@@ -744,6 +745,10 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
     {
         switch (instr->type)
         {
+        case HLSL_IR_CALL:
+            FIXME("We should have inlined all calls before computing liveness.\n");
+            break;
+
         case HLSL_IR_STORE:
         {
             struct hlsl_ir_store *store = hlsl_ir_store(instr);
