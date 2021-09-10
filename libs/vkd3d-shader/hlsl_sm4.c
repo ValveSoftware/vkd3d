@@ -764,7 +764,7 @@ struct sm4_instruction
     {
         struct sm4_register reg;
         unsigned int writemask;
-    } dsts[1];
+    } dsts[2];
     unsigned int dst_count;
 
     struct
