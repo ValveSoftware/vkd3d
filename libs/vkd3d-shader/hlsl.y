@@ -1597,6 +1597,61 @@ static struct list *add_binary_shift_expr_merge(struct hlsl_ctx *ctx, struct lis
     return list1;
 }
 
+static struct hlsl_ir_expr *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2, const struct vkd3d_shader_location *loc)
+{
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *common_type, *ret_type;
+    enum hlsl_ir_expr_op op;
+    unsigned dim;
+
+    if (arg1->data_type->type == HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, arg1->data_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Invalid type %s.\n", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return NULL;
+    }
+
+    if (arg2->data_type->type == HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, arg2->data_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Invalid type %s.\n", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return NULL;
+    }
+
+    if (arg1->data_type->type == HLSL_CLASS_SCALAR)
+        dim = arg2->data_type->dimx;
+    else if (arg1->data_type->type == HLSL_CLASS_SCALAR)
+        dim = arg1->data_type->dimx;
+    else
+        dim = min(arg1->data_type->dimx, arg2->data_type->dimx);
+
+    if (dim == 1)
+        op = HLSL_OP2_MUL;
+    else
+        op = HLSL_OP2_DOT;
+
+    common_type = hlsl_get_vector_type(ctx, base, dim);
+    ret_type = hlsl_get_scalar_type(ctx, base);
+
+    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
+        return NULL;
+
+    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
+        return NULL;
+
+    return add_expr(ctx, instrs, op, args, ret_type, loc);
+}
+
 static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
 {
     static const enum hlsl_ir_expr_op ops[] =
@@ -2162,6 +2217,12 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, mul2, mul1_neg, loc);
 }
 
+static bool intrinsic_dot(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return !!add_binary_dot_expr(ctx, params->instrs, params->args[0], params->args[1], loc);
+}
+
 static bool intrinsic_floor(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2452,6 +2513,7 @@ intrinsic_functions[] =
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cross",                               2, true,  intrinsic_cross},
+    {"dot",                                 2, true,  intrinsic_dot},
     {"floor",                               1, true,  intrinsic_floor},
     {"ldexp",                               2, true,  intrinsic_ldexp},
     {"lerp",                                3, true,  intrinsic_lerp},
