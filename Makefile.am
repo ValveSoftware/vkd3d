@@ -139,6 +139,7 @@ vkd3d_shader_tests = \
 	tests/trigonometry.shader_test \
 	tests/uav.shader_test \
 	tests/uav-load.shader_test \
+	tests/uav-out-param.shader_test \
 	tests/writemask-assignop-0.shader_test \
 	tests/writemask-assignop-1.shader_test \
 	tests/writemask-assignop-2.shader_test \
