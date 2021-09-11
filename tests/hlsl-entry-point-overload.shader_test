@@ -1,0 +1,108 @@
+% The last function to be declared is the one that's used.
+
+[pixel shader]
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+float4 main(float4 v : sv_position) : sv_target
+{
+    return float4(v.xy, 0, 0);
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.5, 0.5, 0.0, 0.0)
+
+[pixel shader]
+
+float4 main(float4 v : sv_position) : sv_target
+{
+    return float4(v.xy, 0, 0);
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.1, 0.1, 0.1, 0.1)
+
+% Subsequent declarations don't matter.
+
+[pixel shader]
+
+float4 main(float4 v : sv_position) : sv_target
+{
+    return float4(v.xy, 0, 0);
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+float4 main(float4 v : sv_position) : sv_target;
+
+[test]
+draw quad
+probe rgba (0, 0) (0.1, 0.1, 0.1, 0.1)
+
+% Rather, it's the last function to be declared, whether it's defined at the time or not.
+
+[pixel shader]
+
+float4 main() : sv_target;
+
+float4 main(float4 v : sv_position) : sv_target
+{
+    return float4(v.xy, 0, 0);
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.5, 0.5, 0.0, 0.0)
+
+[pixel shader]
+
+float4 main();
+float4 main(float4 v : sv_position);
+
+float4 main(float4 v : sv_position) : sv_target
+{
+    return float4(v.xy, 0, 0);
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.5, 0.5, 0.0, 0.0)
+
+% Functions that are never defined are ignored.
+
+[pixel shader]
+
+float4 main();
+float4 main(float4 v : sv_position) : sv_target;
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.1, 0.1, 0.1, 0.1)
