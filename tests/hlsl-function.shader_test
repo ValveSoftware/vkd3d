@@ -162,3 +162,41 @@ float4 main() : sv_target
 [test]
 draw quad
 todo probe all rgba (0.6, 0.1, 0.5, 0)
+
+% Recursion is forbidden.
+
+[pixel shader notimpl]
+
+void bar();
+
+void foo()
+{
+    bar();
+}
+
+void bar()
+{
+    foo();
+}
+
+float4 main() : sv_target
+{
+    foo();
+    return 0;
+}
+
+[pixel shader notimpl todo]
+
+% Even trivially finite recursion is forbidden.
+
+void func(bool x)
+{
+    if (x)
+        func(false);
+}
+
+float4 main() : sv_target
+{
+    func(true);
+    return 0;
+}

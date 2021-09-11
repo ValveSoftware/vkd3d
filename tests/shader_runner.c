@@ -893,6 +893,16 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 state = STATE_SHADER_PIXEL_TODO;
                 expect_hr = E_FAIL;
             }
+            else if (!strcmp(line, "[pixel shader notimpl]\n"))
+            {
+                state = STATE_SHADER_PIXEL;
+                expect_hr = E_NOTIMPL;
+            }
+            else if (!strcmp(line, "[pixel shader notimpl todo]\n"))
+            {
+                state = STATE_SHADER_PIXEL_TODO;
+                expect_hr = E_NOTIMPL;
+            }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
                 state = STATE_SAMPLER;
