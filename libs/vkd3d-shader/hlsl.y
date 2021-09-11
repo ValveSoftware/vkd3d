@@ -2694,7 +2694,8 @@ selection_statement:
             if (!(instr = hlsl_new_if(ctx, condition, @1)))
                 YYABORT;
             list_move_tail(&instr->then_instrs, $5.then_instrs);
-            list_move_tail(&instr->else_instrs, $5.else_instrs);
+            if ($5.else_instrs)
+                list_move_tail(&instr->else_instrs, $5.else_instrs);
             vkd3d_free($5.then_instrs);
             vkd3d_free($5.else_instrs);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
