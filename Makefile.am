@@ -62,6 +62,7 @@ vkd3d_shader_tests = \
 	tests/exp.shader_test \
 	tests/floor.shader_test \
 	tests/frac.shader_test \
+	tests/function-return.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
