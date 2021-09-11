@@ -303,6 +303,32 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     return false;
 }
 
+/* Remove HLSL_IR_CALL instructions by inlining them. */
+static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_call *call;
+    struct hlsl_block block;
+
+    if (instr->type != HLSL_IR_CALL)
+        return false;
+    call = hlsl_ir_call(instr);
+    decl = call->decl;
+
+    if (!decl->has_body)
+        hlsl_error(ctx, call->node.loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+                "Function \"%s\" is not defined.", decl->func->name);
+
+    list_init(&block.instrs);
+    if (!hlsl_clone_block(ctx, &block, &decl->body))
+        return false;
+    list_move_before(&call->node.entry, &block.instrs);
+
+    list_remove(&call->node.entry);
+    hlsl_free_instr(&call->node);
+    return true;
+}
+
 /* Lower casts from vec1 to vecN to swizzles. */
 static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -842,7 +868,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         switch (instr->type)
         {
         case HLSL_IR_CALL:
-            FIXME("We should have inlined all calls before computing liveness.\n");
+            /* We should have inlined all calls before computing liveness. */
+            assert(0);
             break;
 
         case HLSL_IR_STORE:
@@ -1820,6 +1847,13 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
     transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
+    vkd3d_free(recursive_call_ctx.backtrace);
+
+    /* Avoid going into an infinite loop when expanding them. */
+    if (ctx->result)
+        return ctx->result;
+
+    while (transform_ir(ctx, lower_calls, body, NULL));
 
     if (profile->major_version < 4)
         transform_ir(ctx, lower_separate_samples, body, NULL);

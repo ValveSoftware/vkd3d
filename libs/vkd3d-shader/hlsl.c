@@ -755,6 +755,247 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
     return loop;
 }
 
+struct clone_instr_map
+{
+    struct
+    {
+        const struct hlsl_ir_node *src;
+        struct hlsl_ir_node *dst;
+    } *instrs;
+    size_t count, capacity;
+};
+
+static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, const struct hlsl_ir_node *instr);
+
+static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
+        const struct hlsl_block *src_block, struct clone_instr_map *map)
+{
+    const struct hlsl_ir_node *src;
+    struct hlsl_ir_node *dst;
+
+    LIST_FOR_EACH_ENTRY(src, &src_block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (!(dst = clone_instr(ctx, map, src)))
+        {
+            hlsl_free_instr_list(&dst_block->instrs);
+            return false;
+        }
+        list_add_tail(&dst_block->instrs, &dst->entry);
+
+        if (!list_empty(&src->uses))
+        {
+            if (!vkd3d_array_reserve((void **)&map->instrs, &map->capacity, map->count + 1, sizeof(*map->instrs)))
+            {
+                hlsl_free_instr_list(&dst_block->instrs);
+                return false;
+            }
+
+            map->instrs[map->count].dst = dst;
+            map->instrs[map->count].src = src;
+            ++map->count;
+        }
+    }
+    return true;
+}
+
+static struct hlsl_ir_node *map_instr(const struct clone_instr_map *map, struct hlsl_ir_node *src)
+{
+    size_t i;
+
+    if (!src)
+        return NULL;
+
+    for (i = 0; i < map->count; ++i)
+    {
+        if (map->instrs[i].src == src)
+            return map->instrs[i].dst;
+    }
+    /* The block passed to hlsl_clone_block() should have been free of external
+     * references. */
+    assert(0);
+    return NULL;
+}
+
+static struct hlsl_ir_node *clone_call(struct hlsl_ctx *ctx, struct hlsl_ir_call *src)
+{
+    struct hlsl_ir_call *dst;
+
+    if (!(dst = hlsl_new_call(ctx, src->decl, src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_constant(struct hlsl_ctx *ctx, struct hlsl_ir_constant *src)
+{
+    struct hlsl_ir_constant *dst;
+
+    if (!(dst = hlsl_alloc(ctx, sizeof(*dst))))
+        return NULL;
+    init_node(&dst->node, HLSL_IR_CONSTANT, src->node.data_type, src->node.loc);
+    memcpy(dst->value, src->value, sizeof(src->value));
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_expr(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_expr *src)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(operands); ++i)
+        operands[i] = map_instr(map, src->operands[i].node);
+
+    return hlsl_new_expr(ctx, src->op, src->node.data_type, operands, src->node.loc);
+}
+
+static struct hlsl_ir_node *clone_if(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_if *src)
+{
+    struct hlsl_ir_if *dst;
+
+    if (!(dst = hlsl_new_if(ctx, map_instr(map, src->condition.node), src->node.loc)))
+        return NULL;
+
+    if (!clone_block(ctx, &dst->then_instrs, &src->then_instrs, map)
+            || !clone_block(ctx, &dst->else_instrs, &src->else_instrs, map))
+    {
+        hlsl_free_instr(&dst->node);
+        return NULL;
+    }
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_jump(struct hlsl_ctx *ctx, struct hlsl_ir_jump *src)
+{
+    struct hlsl_ir_jump *dst;
+
+    if (!(dst = hlsl_new_jump(ctx, src->type, src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_load(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_load *src)
+{
+    struct hlsl_ir_load *dst;
+
+    if (!(dst = hlsl_new_load(ctx, src->src.var, map_instr(map, src->src.offset.node),
+            src->node.data_type, src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_loop(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_loop *src)
+{
+    struct hlsl_ir_loop *dst;
+
+    if (!(dst = hlsl_new_loop(ctx, src->node.loc)))
+        return NULL;
+    if (!clone_block(ctx, &dst->body, &src->body, map))
+    {
+        hlsl_free_instr(&dst->node);
+        return NULL;
+    }
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_resource_load *src)
+{
+    struct hlsl_ir_resource_load *dst;
+
+    if (!(dst = hlsl_new_resource_load(ctx, src->node.data_type, src->load_type,
+            src->resource.var, map_instr(map, src->resource.offset.node),
+            src->sampler.var, map_instr(map, src->sampler.offset.node),
+            map_instr(map, src->coords.node), src->node.loc)))
+        return NULL;
+    hlsl_src_from_node(&dst->lod, map_instr(map, src->lod.node));
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_resource_store(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_resource_store *src)
+{
+    struct hlsl_ir_resource_store *dst;
+
+    if (!(dst = hlsl_new_resource_store(ctx, src->resource.var, map_instr(map, src->resource.offset.node),
+            map_instr(map, src->coords.node), map_instr(map, src->value.node), src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_store(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_store *src)
+{
+    struct hlsl_ir_store *dst;
+
+    if (!(dst = hlsl_new_store(ctx, src->lhs.var, map_instr(map, src->lhs.offset.node),
+            map_instr(map, src->rhs.node), src->writemask, src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_swizzle(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_swizzle *src)
+{
+    struct hlsl_ir_swizzle *dst;
+
+    if (!(dst = hlsl_new_swizzle(ctx, src->swizzle, src->node.data_type->dimx,
+            map_instr(map, src->val.node), &src->node.loc)))
+        return NULL;
+    return &dst->node;
+}
+
+static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, const struct hlsl_ir_node *instr)
+{
+    switch (instr->type)
+    {
+        case HLSL_IR_CALL:
+            return clone_call(ctx, hlsl_ir_call(instr));
+
+        case HLSL_IR_CONSTANT:
+            return clone_constant(ctx, hlsl_ir_constant(instr));
+
+        case HLSL_IR_EXPR:
+            return clone_expr(ctx, map, hlsl_ir_expr(instr));
+
+        case HLSL_IR_IF:
+            return clone_if(ctx, map, hlsl_ir_if(instr));
+
+        case HLSL_IR_JUMP:
+            return clone_jump(ctx, hlsl_ir_jump(instr));
+
+        case HLSL_IR_LOAD:
+            return clone_load(ctx, map, hlsl_ir_load(instr));
+
+        case HLSL_IR_LOOP:
+            return clone_loop(ctx, map, hlsl_ir_loop(instr));
+
+        case HLSL_IR_RESOURCE_LOAD:
+            return clone_resource_load(ctx, map, hlsl_ir_resource_load(instr));
+
+        case HLSL_IR_RESOURCE_STORE:
+            return clone_resource_store(ctx, map, hlsl_ir_resource_store(instr));
+
+        case HLSL_IR_STORE:
+            return clone_store(ctx, map, hlsl_ir_store(instr));
+
+        case HLSL_IR_SWIZZLE:
+            return clone_swizzle(ctx, map, hlsl_ir_swizzle(instr));
+    }
+
+    assert(0);
+    return NULL;
+}
+
+bool hlsl_clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block, const struct hlsl_block *src_block)
+{
+    struct clone_instr_map map = {0};
+    bool ret;
+
+    ret = clone_block(ctx, dst_block, src_block, &map);
+    vkd3d_free(map.instrs);
+    return ret;
+}
+
 bool hlsl_type_is_void(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;
