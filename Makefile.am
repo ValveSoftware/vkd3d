@@ -71,6 +71,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-function.shader_test \
 	tests/hlsl-function-cast.shader_test \
 	tests/hlsl-function-overload.shader_test \
+	tests/hlsl-function-return.shader_test \
 	tests/hlsl-intrinsic-override.shader_test \
 	tests/hlsl-invalid.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
@@ -301,6 +302,7 @@ XFAIL_TESTS = \
 	tests/hlsl-function.shader_test \
 	tests/hlsl-function-cast.shader_test \
 	tests/hlsl-function-overload.shader_test \
+	tests/hlsl-function-return.shader_test \
 	tests/hlsl-intrinsic-override.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \

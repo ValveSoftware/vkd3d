@@ -1,0 +1,320 @@
+% Test early return from a user-defined function.
+
+[pixel shader]
+
+float func(out float o)
+{
+    o = 0.1;
+    return 0.2;
+    o = 0.3;
+    return 0.4;
+}
+
+void func2(out float o)
+{
+    o = 0.5;
+    return;
+    o = 0.6;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.z = 0.7;
+    ret.x = func(ret.y);
+    func2(ret.w);
+    ret.z = 0.8;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.2, 0.1, 0.8, 0.5);
+
+[pixel shader]
+
+uniform float f;
+
+float func(out float o)
+{
+    o = 0.1;
+    if (f < 0.3)
+    {
+        return 0.2;
+        o = 0.3;
+    }
+    else if (f < 0.7)
+    {
+        o = 0.4;
+        return 0.5;
+    }
+    o = 0.6;
+    return 0.7;
+}
+
+float func2(out float o)
+{
+    o = 0.1;
+    if (f < 0.5)
+    {
+        o = 0.2;
+    }
+    else
+    {
+        o = 0.4;
+        return 0.3;
+    }
+    return 0.5;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.x = func(ret.y);
+    ret.z = func2(ret.w);
+    ret += 0.1;
+    return ret;
+}
+
+[test]
+uniform 0 float 0.1
+draw quad
+probe all rgba (0.3, 0.2, 0.6, 0.3) 1
+uniform 0 float 0.4
+draw quad
+probe all rgba (0.6, 0.5, 0.6, 0.3) 1
+uniform 0 float 0.6
+draw quad
+probe all rgba (0.6, 0.5, 0.4, 0.5) 1
+uniform 0 float 0.8
+draw quad
+probe all rgba (0.8, 0.7, 0.4, 0.5) 1
+
+[pixel shader]
+
+uniform float f;
+
+float func(out float o)
+{
+    o = 0.1;
+    if (f < 0.3)
+    {
+        return 0.2;
+    }
+    o += 0.3;
+    if (f < 0.7)
+    {
+        return 0.5;
+    }
+    o += 0.5;
+    return 1.0;
+}
+
+float func2(out float o)
+{
+    o = 0.1;
+    if (f < 0.7)
+    {
+        if (f < 0.3)
+            return 0.2;
+        o += 0.3;
+    }
+    o += 0.5;
+    return 1.0;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.x = func(ret.y);
+    ret.z = func2(ret.w);
+    return ret;
+}
+
+[test]
+uniform 0 float 0.1
+draw quad
+probe all rgba (0.2, 0.1, 0.2, 0.1) 1
+uniform 0 float 0.5
+draw quad
+probe all rgba (0.5, 0.4, 1.0, 0.9) 1
+uniform 0 float 0.9
+draw quad
+probe all rgba (1.0, 0.9, 1.0, 0.6) 1
+
+[pixel shader]
+
+float func(out float o)
+{
+    o = 0.1;
+    for (;;)
+    {
+        o *= 2;
+        return 0.3;
+        o *= 3;
+    }
+    o = 0;
+    return 0.4;
+}
+
+float func2(out float o)
+{
+    o = 0.1;
+    for (;;)
+    {
+        if (o > 0.5)
+            return 0.2;
+        o *= 2;
+    }
+    o = 0;
+    return 0.3;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.x = func(ret.y);
+    ret.z = func2(ret.w);
+    ret += 0.1;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.4, 0.3, 0.3, 0.9) 1
+
+[pixel shader]
+
+uniform float f;
+
+float func(out float o)
+{
+    int i;
+
+    o = 0.1;
+    for (i = 0; i < 4; ++i)
+    {
+        if (o > f)
+            return 0.2;
+        o *= 2;
+    }
+    o = 0;
+    return 0.3;
+}
+
+float func2(out float o)
+{
+    if (f < 0.5)
+    {
+        o = 0.1;
+        for (;;)
+        {
+            o *= 2;
+            return 0.2;
+        }
+        o *= 3;
+        return 0.3;
+    }
+    else
+    {
+        o = 0.4;
+    }
+    o = 0.5;
+    return 0.6;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.x = func(ret.y);
+    ret.z = func2(ret.w);
+    ret += 0.1;
+    return ret;
+}
+
+[test]
+uniform 0 float 0.0
+draw quad
+probe all rgba (0.3, 0.2, 0.3, 0.3) 1
+
+uniform 0 float 0.1
+draw quad
+probe all rgba (0.3, 0.3, 0.3, 0.3) 1
+
+uniform 0 float 0.3
+draw quad
+probe all rgba (0.3, 0.5, 0.3, 0.3) 1
+
+uniform 0 float 0.7
+draw quad
+probe all rgba (0.3, 0.9, 0.7, 0.6) 1
+
+uniform 0 float 0.9
+draw quad
+probe all rgba (0.4, 0.1, 0.7, 0.6) 1
+
+[pixel shader]
+
+uniform float4 f[4];
+
+float func(out float o)
+{
+    int i, j;
+
+    o = 0.1;
+    for (i = 0; i < 4; ++i)
+    {
+        for (j = 0; j < 4; ++j)
+        {
+            if (o > f[j].x)
+                return 0.2;
+        }
+        o *= 2;
+    }
+    o = 0;
+    return 0.3;
+}
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    ret.x = func(ret.y);
+    ret.zw = 0.5;
+    ret += 0.1;
+    return ret;
+}
+
+[test]
+
+uniform  0 float4 0.3 0.0 0.0 0.0
+uniform  4 float4 0.0 0.0 0.0 0.0
+uniform  8 float4 0.1 0.0 0.0 0.0
+uniform 12 float4 0.7 0.0 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.2, 0.6, 0.6) 1
+
+uniform  4 float4 0.5 0.0 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.3, 0.6, 0.6) 1
+
+uniform  8 float4 0.9 0.0 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.5, 0.6, 0.6) 1
+
+uniform  0 float4 1.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.9, 0.6, 0.6) 1
+
+uniform  4 float4 1.1 0.0 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.9, 0.6, 0.6) 1
+
+uniform 12 float4 2.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.4, 0.1, 0.6, 0.6) 1
