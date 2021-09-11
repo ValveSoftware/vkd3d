@@ -263,6 +263,46 @@ static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
     }
 }
 
+struct recursive_call_ctx
+{
+    const struct hlsl_ir_function_decl **backtrace;
+    size_t count, capacity;
+};
+
+static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct recursive_call_ctx *call_ctx = context;
+    struct hlsl_ir_function_decl *decl;
+    const struct hlsl_ir_call *call;
+    size_t i;
+
+    if (instr->type != HLSL_IR_CALL)
+        return false;
+    call = hlsl_ir_call(instr);
+    decl = call->decl;
+
+    for (i = 0; i < call_ctx->count; ++i)
+    {
+        if (call_ctx->backtrace[i] == decl)
+        {
+            hlsl_error(ctx, call->node.loc, VKD3D_SHADER_ERROR_HLSL_RECURSIVE_CALL,
+                    "Recursive call to \"%s\".", decl->func->name);
+            return false;
+        }
+    }
+
+    if (!hlsl_array_reserve(ctx, (void **)&call_ctx->backtrace, &call_ctx->capacity,
+            call_ctx->count + 1, sizeof(*call_ctx->backtrace)))
+        return false;
+    call_ctx->backtrace[call_ctx->count++] = decl;
+
+    transform_ir(ctx, find_recursive_calls, &decl->body, call_ctx);
+
+    --call_ctx->count;
+
+    return false;
+}
+
 /* Lower casts from vec1 to vecN to swizzles. */
 static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -1771,11 +1811,15 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct hlsl_block *const body = &entry_func->body;
+    struct recursive_call_ctx recursive_call_ctx;
     struct hlsl_ir_var *var;
     unsigned int i;
     bool progress;
 
     list_move_head(&body->instrs, &ctx->static_initializers);
+
+    memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
+    transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
 
     if (profile->major_version < 4)
         transform_ir(ctx, lower_separate_samples, body, NULL);
