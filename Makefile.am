@@ -99,7 +99,6 @@ vkd3d_shader_tests = \
 	tests/hlsl-numeric-types.shader_test \
 	tests/hlsl-numthreads.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
-	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
 	tests/hlsl-single-numeric-initializer.shader_test \
 	tests/hlsl-state-block-syntax.shader_test \
@@ -122,6 +121,7 @@ vkd3d_shader_tests = \
 	tests/preproc-invalid.shader_test \
 	tests/preproc-macro.shader_test \
 	tests/preproc-misc.shader_test \
+	tests/return.shader_test \
 	tests/round.shader_test \
 	tests/sampler.shader_test \
 	tests/sampler-offset.shader_test \
