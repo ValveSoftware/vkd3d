@@ -301,9 +301,13 @@ struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool
     return NULL;
 }
 
-bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name)
+struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *name)
 {
-    return rb_get(&ctx->functions, name) != NULL;
+    struct rb_entry *entry;
+
+    if ((entry = rb_get(&ctx->functions, name)))
+        return RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
+    return NULL;
 }
 
 struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name)
@@ -2074,8 +2078,9 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
-    struct hlsl_ir_function_decl *entry_func;
+    struct hlsl_ir_function_decl *decl, *entry_func = NULL;
     const struct hlsl_profile_info *profile;
+    struct hlsl_ir_function *func;
     const char *entry_point;
     struct hlsl_ctx ctx;
     int ret;
@@ -2118,7 +2123,18 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
-    if (!(entry_func = hlsl_get_func_decl(&ctx, entry_point)))
+    if ((func = hlsl_get_function(&ctx, entry_point)))
+    {
+        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+        {
+            if (!decl->has_body)
+                continue;
+            entry_func = decl;
+            break;
+        }
+    }
+
+    if (!entry_func)
     {
         const struct vkd3d_shader_location loc = {.source_name = compile_info->source_name};
 

@@ -706,7 +706,7 @@ void hlsl_free_instr_list(struct list *list);
 void hlsl_free_type(struct hlsl_type *type);
 void hlsl_free_var(struct hlsl_ir_var *decl);
 
-bool hlsl_get_function(struct hlsl_ctx *ctx, const char *name);
+struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *name);
 struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name);
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
