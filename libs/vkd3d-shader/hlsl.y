@@ -2462,7 +2462,7 @@ hlsl_prog:
             const struct hlsl_ir_function_decl *decl;
 
             decl = get_func_decl(&ctx->functions, $2.name, $2.decl->parameters);
-            if (decl && !decl->func->intrinsic)
+            if (decl)
             {
                 if (decl->has_body && $2.decl->has_body)
                 {

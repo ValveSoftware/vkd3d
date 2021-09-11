@@ -1696,17 +1696,6 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     if (func_entry)
     {
         func = RB_ENTRY_VALUE(func_entry, struct hlsl_ir_function, entry);
-        if (intrinsic != func->intrinsic)
-        {
-            if (intrinsic)
-            {
-                ERR("Redeclaring a user defined function as an intrinsic.\n");
-                return;
-            }
-            func->intrinsic = intrinsic;
-            rb_destroy(&func->overloads, free_function_decl_rb, NULL);
-            rb_init(&func->overloads, compare_function_decl_rb);
-        }
         decl->func = func;
         if ((old_entry = rb_get(&func->overloads, decl->parameters)))
         {
@@ -1741,7 +1730,6 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     rb_init(&func->overloads, compare_function_decl_rb);
     decl->func = func;
     rb_put(&func->overloads, decl->parameters, &decl->entry);
-    func->intrinsic = intrinsic;
     rb_put(&ctx->functions, func->name, &func->entry);
 }
 

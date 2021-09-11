@@ -269,7 +269,6 @@ struct hlsl_ir_function
     struct rb_entry entry;
     const char *name;
     struct rb_tree overloads;
-    bool intrinsic;
 };
 
 struct hlsl_ir_function_decl
