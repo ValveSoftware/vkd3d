@@ -678,6 +678,32 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     }
 }
 
+/* Remove HLSL_IR_CALL instructions by inlining them. */
+static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_call *call;
+    struct hlsl_block block;
+
+    if (instr->type != HLSL_IR_CALL)
+        return false;
+    call = hlsl_ir_call(instr);
+    decl = call->decl;
+
+    if (!decl->has_body)
+        hlsl_error(ctx, &call->node.loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+                "Function \"%s\" is not defined.", decl->func->name);
+
+    list_init(&block.instrs);
+    if (!hlsl_clone_block(ctx, &block, &decl->body))
+        return false;
+    list_move_before(&call->node.entry, &block.instrs);
+
+    list_remove(&call->node.entry);
+    hlsl_free_instr(&call->node);
+    return true;
+}
+
 /* Lower casts from vec1 to vecN to swizzles. */
 static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -2198,8 +2224,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         switch (instr->type)
         {
         case HLSL_IR_CALL:
-            FIXME("We should have inlined all calls before computing liveness.\n");
-            break;
+            /* We should have inlined all calls before computing liveness. */
+            vkd3d_unreachable();
 
         case HLSL_IR_STORE:
         {
@@ -3136,6 +3162,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         return ctx->result;
 
     lower_return(ctx, entry_func, body, false);
+
+    while (transform_ir(ctx, lower_calls, body, NULL));
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {

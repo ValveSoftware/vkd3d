@@ -1,4 +1,4 @@
-[pixel shader fail todo]
+[pixel shader fail]
 
 float4 func();
 
@@ -121,7 +121,7 @@ void func()
 {
 }
 
-[pixel shader todo]
+[pixel shader]
 
 void func();
 
@@ -179,7 +179,7 @@ float4 main() : sv_target
 todo draw quad
 todo probe all rgba (0.1, 0.2, 0.3, 0.4)
 
-[pixel shader todo]
+[pixel shader]
 
 float func(in float a, out float b, inout float c)
 {
@@ -200,10 +200,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.5, 0.6, 0.7, 0)
+draw quad
+probe all rgba (0.5, 0.6, 0.7, 0)
 
-[pixel shader todo]
+[pixel shader]
 
 void func(in float a, inout float2 b)
 {
@@ -221,8 +221,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.6, 0.1, 0.5, 0)
+draw quad
+probe all rgba (0.6, 0.1, 0.5, 0)
 
 % Recursion is forbidden.
 

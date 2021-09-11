@@ -895,8 +895,7 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         switch (instr->type)
         {
             case HLSL_IR_CALL:
-                hlsl_fixme(ctx, &instr->loc, "Inline call instructions.\n");
-                break;
+                vkd3d_unreachable();
 
             case HLSL_IR_CONSTANT:
                 write_sm1_constant(ctx, buffer, instr);

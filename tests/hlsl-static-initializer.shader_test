@@ -1,4 +1,4 @@
-[pixel shader todo]
+[pixel shader]
 float myfunc()
 {
     return 0.6;
@@ -12,8 +12,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.8, 0.0, 0.0, 0.0)
+draw quad
+probe all rgba (0.8, 0.0, 0.0, 0.0)
 
 
 [pixel shader fail]
