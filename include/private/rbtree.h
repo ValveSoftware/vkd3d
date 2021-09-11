@@ -133,7 +133,7 @@ static inline struct rb_entry *rb_postorder_next(struct rb_entry *iter)
 /* iterate through the tree using a tree entry */
 #define RB_FOR_EACH_ENTRY(elem, tree, type, field) \
     for ((elem) = RB_ENTRY_VALUE(rb_head((tree)->root), type, field); \
-         &(elem)->field; \
+         (elem) != RB_ENTRY_VALUE(0, type, field); \
          (elem) = RB_ENTRY_VALUE(rb_next(&elem->field), type, field))
 
 /* iterate through the tree using using postorder, making it safe to free the entry */
@@ -145,7 +145,7 @@ static inline struct rb_entry *rb_postorder_next(struct rb_entry *iter)
 /* iterate through the tree using a tree entry and postorder, making it safe to free the entry */
 #define RB_FOR_EACH_ENTRY_DESTRUCTOR(elem, elem2, tree, type, field) \
     for ((elem) = RB_ENTRY_VALUE(rb_postorder_head((tree)->root), type, field); \
-         &(elem)->field \
+         (elem) != WINE_RB_ENTRY_VALUE(0, type, field) \
              && (((elem2) = RB_ENTRY_VALUE(rb_postorder_next(&(elem)->field), type, field)) || 1); \
          (elem) = (elem2))
 
