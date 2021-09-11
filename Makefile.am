@@ -78,8 +78,8 @@ vkd3d_shader_tests = \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numthreads.shader_test \
+	tests/hlsl-return.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
-	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
 	tests/hlsl-state-block-syntax.shader_test \
 	tests/hlsl-static-initializer.shader_test \
@@ -308,8 +308,8 @@ XFAIL_TESTS = \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numthreads.shader_test \
+	tests/hlsl-return.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
-	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
