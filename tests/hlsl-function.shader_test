@@ -1,4 +1,4 @@
-[pixel shader fail todo]
+[pixel shader fail]
 
 float4 func();
 
@@ -140,7 +140,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (0.5, 0.6, 0.7, 0)
+probe all rgba (0.5, 0.6, 0.7, 0)
 
 [pixel shader]
 
@@ -161,7 +161,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (0.6, 0.1, 0.5, 0)
+probe all rgba (0.6, 0.1, 0.5, 0)
 
 % Recursion is forbidden.
 
