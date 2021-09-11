@@ -1705,7 +1705,6 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
         {
             struct hlsl_ir_function_decl *old_decl =
                     RB_ENTRY_VALUE(old_entry, struct hlsl_ir_function_decl, entry);
-            unsigned int i;
 
             if (!decl->has_body)
             {
@@ -1714,19 +1713,24 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
                 return;
             }
 
-            for (i = 0; i < decl->attr_count; ++i)
-                hlsl_free_attribute((void *)decl->attrs[i]);
-            vkd3d_free((void *)decl->attrs);
-            decl->attr_count = old_decl->attr_count;
-            decl->attrs = old_decl->attrs;
-            old_decl->attr_count = 0;
-            old_decl->attrs = NULL;
+            assert(!old_decl->has_body);
+            list_move_tail(&old_decl->body.instrs, &decl->body.instrs);
+            old_decl->has_body = true;
 
-            rb_remove(&func->overloads, old_entry);
-            free_function_decl(old_decl);
+            old_decl->return_var = decl->return_var;
+            decl->return_var = NULL;
+
+            vkd3d_free(old_decl->parameters);
+            old_decl->parameters = decl->parameters;
+            decl->parameters = NULL;
+
+            free_function_decl(decl);
         }
-        rb_put(&func->overloads, decl->parameters, &decl->entry);
-        vkd3d_free(name);
+        else
+        {
+            rb_put(&func->overloads, decl->parameters, &decl->entry);
+            vkd3d_free(name);
+        }
         return;
     }
     func = hlsl_alloc(ctx, sizeof(*func));
