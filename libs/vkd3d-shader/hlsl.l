@@ -27,6 +27,8 @@
 #define YYSTYPE HLSL_YYSTYPE
 #define YYLTYPE HLSL_YYLTYPE
 
+#define YY_DECL static int hlsl_lexer_lex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, yyscan_t yyscanner)
+
 static void update_location(struct hlsl_ctx *ctx, YYLTYPE *loc);
 
 #define YY_USER_ACTION update_location(yyget_extra(yyscanner), yyget_lloc(yyscanner));
@@ -289,6 +291,15 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *lloc)
 {
     *lloc = ctx->location;
     ctx->location.column += yyget_leng(ctx->scanner);
+}
+
+int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
+{
+    int token = hlsl_lexer_lex(lval, lloc, scanner);
+
+    TRACE("Parsing token %d, at line %d, column %d, string %s.\n",
+            token, lloc->line, lloc->column, debugstr_a(yyget_text(scanner)));
+    return token;
 }
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl)
