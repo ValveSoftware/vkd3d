@@ -19,7 +19,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-draw quad
+todo draw quad
 todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 [pixel shader]
@@ -35,7 +35,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo draw quad
 probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)
 
 % Subsequent declarations don't matter.
@@ -55,7 +55,7 @@ float4 main() : sv_target
 float4 main(float tex : texcoord) : sv_target;
 
 [test]
-draw quad
+todo draw quad
 probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)
 
 % Rather, it's the last function to be declared, whether it's defined at the time or not.
@@ -75,7 +75,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo draw quad
 todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 [pixel shader]
@@ -94,7 +94,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo draw quad
 todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 % Functions that are never defined are ignored.

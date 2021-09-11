@@ -2297,8 +2297,12 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         {
             if (!decl->has_body)
                 continue;
+            if (entry_func)
+            {
+                hlsl_fixme(&ctx, &decl->loc, "Overloaded entry point.");
+                break;
+            }
             entry_func = decl;
-            break;
         }
     }
 
