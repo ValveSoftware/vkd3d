@@ -1,0 +1,114 @@
+% The last function to be declared is the one that's used.
+
+[vertex shader]
+void main(out float tex : texcoord, inout float4 pos : sv_position)
+{
+    tex = 0.2;
+}
+
+[pixel shader]
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+float4 main(float tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+[test]
+draw quad
+todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
+
+[pixel shader]
+
+float4 main(float tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)
+
+% Subsequent declarations don't matter.
+
+[pixel shader]
+
+float4 main(float tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+float4 main(float tex : texcoord) : sv_target;
+
+[test]
+draw quad
+probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)
+
+% Rather, it's the last function to be declared, whether it's defined at the time or not.
+
+[pixel shader]
+
+float4 main() : sv_target;
+
+float4 main(float tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
+
+[pixel shader]
+
+float4 main();
+float4 main(float tex : texcoord);
+
+float4 main(float tex : texcoord) : sv_target
+{
+    return tex;
+}
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+todo probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
+
+% Functions that are never defined are ignored.
+
+[pixel shader]
+
+float4 main();
+float4 main(float tex : texcoord) : sv_target;
+
+float4 main() : sv_target
+{
+    return 0.1;
+}
+
+[test]
+draw quad
+probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)
