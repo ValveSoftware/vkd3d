@@ -64,6 +64,7 @@ vkd3d_shader_tests = \
 	tests/compute.shader_test \
 	tests/conditional.shader_test \
 	tests/entry-point-overload.shader_test \
+	tests/entry-point-semantics.shader_test \
 	tests/floor.shader_test \
 	tests/function-return.shader_test \
 	tests/hlsl-array-dimension.shader_test \
