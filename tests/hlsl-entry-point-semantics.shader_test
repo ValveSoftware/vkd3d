@@ -1,0 +1,46 @@
+% Test how semantics are determined when spread across the entry point's
+% definition and its declarations.
+
+[pixel shader fail]
+
+float4 main(float4 pos : sv_position) : sv_target;
+
+float4 main(float4 pos)
+{
+    return float4(pos.xy, 0, 1);
+}
+
+[pixel shader fail]
+
+float4 main(float4 pos)
+{
+    return float4(pos.xy, 0, 1);
+}
+
+float4 main(float4 pos : sv_position) : sv_target;
+
+[pixel shader]
+
+float4 main(float4 pos : bogus) : bogus;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return float4(pos.xy, 0, 1);
+}
+
+[test]
+draw quad
+probe rgba (0, 0) (0.5, 0.5, 0.0, 1.0)
+
+[pixel shader]
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return float4(pos.xy, 0, 1);
+}
+
+float4 main(float4 pos : bogus) : bogus;
+
+[test]
+draw quad
+probe rgba (0, 0) (0.5, 0.5, 0.0, 1.0)
