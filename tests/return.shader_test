@@ -215,7 +215,7 @@ todo draw quad
 todo probe all rgba (0.2, 0.2, 0.2, 0.2)
 uniform 0 float 0.8
 todo draw quad
-todo probe all rgba (0.5, 0.5, 0.5, 0.5)
+probe all rgba (0.5, 0.5, 0.5, 0.5)
 
 [pixel shader todo]
 
