@@ -165,7 +165,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         {
             unsigned int element_size = type->e.array.type->reg_size;
 
-            assert(element_size);
             if (is_sm4)
                 type->reg_size = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
             else
