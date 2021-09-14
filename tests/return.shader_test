@@ -162,7 +162,7 @@ void main(out float4 ret : sv_target)
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (0.2, 0.4, 0.6, 0.8)
 
 [pixel shader]
@@ -230,11 +230,11 @@ void main(out float4 ret : sv_target)
 
 [test]
 uniform 0 float 0.2
-todo draw quad
+draw quad
 todo probe all rgba (0.2, 0.2, 0.2, 0.2)
 uniform 0 float 0.8
-todo draw quad
-todo probe all rgba (0.5, 0.5, 0.5, 0.5)
+draw quad
+probe all rgba (0.5, 0.5, 0.5, 0.5)
 
 [pixel shader]
 
