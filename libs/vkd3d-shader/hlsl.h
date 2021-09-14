@@ -429,6 +429,11 @@ struct hlsl_ir_function_decl
      * Not to be confused with the function parameters! */
     unsigned int attr_count;
     const struct hlsl_attribute *const *attrs;
+
+    /* Synthetic boolean variable marking whether a return statement has been
+     * executed. Needed to deal with return statements in non-uniform control
+     * flow, since some backends can't handle them. */
+    struct hlsl_ir_var *early_return_var;
 };
 
 struct hlsl_ir_call

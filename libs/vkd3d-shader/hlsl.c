@@ -1209,6 +1209,8 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
         const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_constant *constant;
+    struct hlsl_ir_store *store;
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
         return NULL;
@@ -1226,6 +1228,18 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
         }
         decl->return_var->semantic = *semantic;
     }
+
+    if (!(decl->early_return_var = hlsl_new_synthetic_var(ctx, "early_return",
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), loc)))
+        return decl;
+
+    if (!(constant = hlsl_new_bool_constant(ctx, false, loc)))
+        return decl;
+    list_add_tail(&decl->body.instrs, &constant->node.entry);
+
+    if (!(store = hlsl_new_simple_store(ctx, decl->early_return_var, &constant->node)))
+        return decl;
+    list_add_tail(&decl->body.instrs, &store->node.entry);
 
     return decl;
 }
