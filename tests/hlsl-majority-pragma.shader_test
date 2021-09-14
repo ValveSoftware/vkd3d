@@ -19,3 +19,31 @@ uniform  8 float4 0.1 0.3 0.0 0.0
 uniform 12 float4 0.2 0.4 0.0 0.0
 draw quad
 probe all rgba (0.17, 0.39, 0.17, 0.39) 1
+
+% The documentation claims these strings are subject to macro expansion.
+% They are not.
+
+[pixel shader]
+
+#define KEY pack_matrix
+#pragma KEY(row_major)
+#define VALUE row_major
+#pragma pack_matrix(VALUE)
+#define PRAGMA pack_matrix(row_major)
+#pragma PRAGMA
+
+uniform float2x2 r;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = mul(r, float2(0.5, 0.6));
+    ret.zw = 0.5;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+draw quad
+probe all rgba (0.23, 0.34, 0.5, 0.5) 1
