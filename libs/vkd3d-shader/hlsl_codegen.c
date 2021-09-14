@@ -324,11 +324,12 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 }
 
 /* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
-static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_block *block, bool in_loop)
 {
     struct hlsl_ir_node *return_instr = NULL, *cf_instr = NULL;
     struct hlsl_ir_node *instr, *next;
+    bool has_early_return = false;
 
     /* SM1 has no function calls. SM4 does, but native d3dcompiler inlines
      * everything anyway. We are safest following suit.
@@ -381,10 +382,10 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            lower_return(ctx, func, &iff->then_instrs, in_loop);
-            lower_return(ctx, func, &iff->else_instrs, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->then_instrs, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->else_instrs, in_loop);
 
-            if (func->early_return_var)
+            if (has_early_return)
             {
                 /* If we're in a loop, we actually don't need to emit a break
                  * instruction. The return itself will be translated into a
@@ -399,10 +400,9 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         }
         else if (instr->type == HLSL_IR_LOOP)
         {
-            lower_return(ctx, func, &hlsl_ir_loop(instr)->body, true);
-
-            if (func->early_return_var)
+            if (lower_return(ctx, func, &hlsl_ir_loop(instr)->body, true))
             {
+                has_early_return = true;
                 if (in_loop)
                 {
                     insert_early_return_break(ctx, func, instr);
@@ -427,20 +427,21 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
                     struct vkd3d_string_buffer *string;
 
                     if (!(string = hlsl_get_string_buffer(ctx)))
-                        return;
+                        return false;
                     vkd3d_string_buffer_printf(string, "<early_return-%s>", func->func->name);
                     if (!(func->early_return_var = hlsl_new_synthetic_var(ctx, string->buffer,
                             ctx->builtin_types.scalar[HLSL_TYPE_BOOL], jump->node.loc)))
-                        return;
+                        return false;
                 }
                 if (!(constant = hlsl_new_bool_constant(ctx, true, jump->node.loc)))
-                    return;
+                    return false;
                 list_add_before(&jump->node.entry, &constant->node.entry);
 
                 if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, &constant->node)))
-                    return;
+                    return false;
                 list_add_after(&constant->node.entry, &store->node.entry);
 
+                has_early_return = true;
                 if (in_loop)
                 {
                     jump->type = HLSL_IR_JUMP_BREAK;
@@ -482,24 +483,26 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         assert(!in_loop);
 
         if (tail == &cf_instr->entry)
-            return;
+            return has_early_return;
 
         if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &load->node.entry);
 
         if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &not->entry);
 
         if (!(iff = hlsl_new_if(ctx, not, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &iff->node.entry);
 
         list_move_slice_tail(&iff->then_instrs.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
 
         lower_return(ctx, func, &iff->then_instrs, in_loop);
     }
+
+    return has_early_return;
 }
 
 /* Remove HLSL_IR_CALL instructions by inlining them. */
