@@ -820,7 +820,7 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
                 break;
 
             default:
-                FIXME("Unhandled instruction type %s.\n", hlsl_node_type_to_string(instr->type));
+                hlsl_fixme(ctx, instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
         }
     }
 }

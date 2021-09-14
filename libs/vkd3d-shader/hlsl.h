@@ -283,6 +283,7 @@ struct hlsl_ir_function_decl
     bool has_body;
     unsigned int attr_count;
     const struct hlsl_attribute *const *attrs;
+    struct hlsl_ir_var *early_return_var;
 };
 
 struct hlsl_ir_call
@@ -716,6 +717,7 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size);
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2);
+struct hlsl_ir_constant *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location loc);
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
         const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc);
 struct hlsl_ir_call *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *decl,

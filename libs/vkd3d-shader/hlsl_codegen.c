@@ -303,6 +303,205 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     return false;
 }
 
+static void insert_early_return_break(struct hlsl_ctx *ctx,
+        struct hlsl_ir_function_decl *func, struct hlsl_ir_node *cf_instr)
+{
+    struct hlsl_ir_jump *jump;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_if *iff;
+
+    if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
+        return;
+    list_add_after(&cf_instr->entry, &load->node.entry);
+
+    if (!(iff = hlsl_new_if(ctx, &load->node, cf_instr->loc)))
+        return;
+    list_add_after(&load->node.entry, &iff->node.entry);
+
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, cf_instr->loc)))
+        return;
+    list_add_tail(&iff->then_instrs.instrs, &jump->node.entry);
+}
+
+/* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
+static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        struct hlsl_block *block, bool in_loop)
+{
+    struct hlsl_ir_node *return_instr = NULL, *cf_instr = NULL;
+    struct hlsl_ir_node *instr, *next;
+
+    /* SM1 has no function calls. SM4 does, but native d3dcompiler inlines
+     * everything anyway. We are safest following suit.
+     *
+     * The basic idea is to keep track of whether the function has executed an
+     * early return in a synthesized boolean variable (func->early_return_var)
+     * and guard all code after the return on that variable being false. In the
+     * case of loops we also replace the return with a break.
+     *
+     * The following algorithm loops over instructions until it hits either a
+     * return statement, or a CF block which might contain a return statement.
+     *
+     * In the former case, we remove everything after the return statement in
+     * this block. We have to stop and do this in a separate loop, because we
+     * have to remove statements in reverse.
+     *
+     * In the latter case, we stop, pull out everything after the CF
+     * instruction, shove it into an if block, and then call lower_return() on
+     * that if block. We have to do it this way to make the following case work:
+     *
+     *     if (...)
+     *         return;
+     *     foo();
+     *     if (...)
+     *         return;
+     *     bar();
+     *
+     * Both foo() and bar() need to be separately guarded out, and we can't
+     * really do that without breaking out of this loop.
+     *
+     * (We could return a "did we make progress" like transform_ir(), but we
+     * already know the only block that still needs addressing, so there's not
+     * much point.)
+     *
+     * If we're inside of a loop, on the other hand, we do things a little
+     * differently. "break" offers similar enough semantics that we can use it
+     * instead of "return" and just keep going. (Moreover we kind of have to
+     * break; if we've returned we don't want to execute *any* of the loop.)
+     */
+
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_CALL)
+        {
+            struct hlsl_ir_call *call = hlsl_ir_call(instr);
+
+            lower_return(ctx, call->decl, &call->decl->body, false);
+        }
+        else if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            lower_return(ctx, func, &iff->then_instrs, in_loop);
+            lower_return(ctx, func, &iff->else_instrs, in_loop);
+
+            if (func->early_return_var)
+            {
+                /* If we're in a loop, we actually don't need to emit a break
+                 * instruction. The return itself will be translated into a
+                 * break, and we'll emit a break after any loop instructions
+                 * containing it. */
+                if (!in_loop)
+                {
+                    cf_instr = instr;
+                    break;
+                }
+            }
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            lower_return(ctx, func, &hlsl_ir_loop(instr)->body, true);
+
+            if (func->early_return_var)
+            {
+                if (in_loop)
+                {
+                    insert_early_return_break(ctx, func, instr);
+                }
+                else
+                {
+                    cf_instr = instr;
+                    break;
+                }
+            }
+        }
+        else if (instr->type == HLSL_IR_JUMP)
+        {
+            struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
+            struct hlsl_ir_constant *constant;
+            struct hlsl_ir_store *store;
+
+            if (jump->type == HLSL_IR_JUMP_RETURN)
+            {
+                if (!func->early_return_var)
+                {
+                    struct vkd3d_string_buffer *string;
+
+                    if (!(string = hlsl_get_string_buffer(ctx)))
+                        return;
+                    vkd3d_string_buffer_printf(string, "<early_return-%s>", func->func->name);
+                    if (!(func->early_return_var = hlsl_new_synthetic_var(ctx, string->buffer,
+                            ctx->builtin_types.scalar[HLSL_TYPE_BOOL], jump->node.loc)))
+                        return;
+                }
+                if (!(constant = hlsl_new_bool_constant(ctx, true, jump->node.loc)))
+                    return;
+                list_add_before(&jump->node.entry, &constant->node.entry);
+
+                if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, &constant->node)))
+                    return;
+                list_add_after(&constant->node.entry, &store->node.entry);
+
+                if (in_loop)
+                {
+                    jump->type = HLSL_IR_JUMP_BREAK;
+                }
+                else
+                {
+                    return_instr = instr;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (return_instr)
+    {
+        /* If we're in a loop, we should have used "break" instead. */
+        assert(!in_loop);
+
+        /* Iterate in reverse, to avoid use-after-free when unlinking sources from
+         * the "uses" list. */
+        LIST_FOR_EACH_ENTRY_SAFE_REV(instr, next, &block->instrs, struct hlsl_ir_node, entry)
+        {
+            list_remove(&instr->entry);
+            hlsl_free_instr(instr);
+
+            /* Yes, we just freed it, but we're comparing pointers. */
+            if (instr == return_instr)
+                break;
+        }
+    }
+    else if (cf_instr)
+    {
+        struct list *tail = list_tail(&block->instrs);
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_node *not;
+        struct hlsl_ir_if *iff;
+
+        /* If we're in a loop, we should have used "break" instead. */
+        assert(!in_loop);
+
+        if (tail == &cf_instr->entry)
+            return;
+
+        if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
+            return;
+        list_add_tail(&block->instrs, &load->node.entry);
+
+        if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, cf_instr->loc)))
+            return;
+        list_add_tail(&block->instrs, &not->entry);
+
+        if (!(iff = hlsl_new_if(ctx, not, cf_instr->loc)))
+            return;
+        list_add_tail(&block->instrs, &iff->node.entry);
+
+        list_move_slice_tail(&iff->then_instrs.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
+
+        lower_return(ctx, func, &iff->then_instrs, in_loop);
+    }
+}
+
 /* Remove HLSL_IR_CALL instructions by inlining them. */
 static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -1852,6 +2051,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     /* Avoid going into an infinite loop when expanding them. */
     if (ctx->result)
         return ctx->result;
+
+    lower_return(ctx, entry_func, body, false);
 
     while (transform_ir(ctx, lower_calls, body, NULL));
 
