@@ -2762,6 +2762,23 @@ static enum VkPrimitiveTopology vk_topology_from_d3d12_topology(D3D12_PRIMITIVE_
     }
 }
 
+static bool vk_topology_can_restart(VkPrimitiveTopology topology)
+{
+    switch (topology)
+    {
+        case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+        case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+        case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+        case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+        case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+        case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+            return false;
+
+        default:
+            return true;
+    }
+}
+
 static VkPipeline d3d12_pipeline_state_find_compiled_pipeline(const struct d3d12_pipeline_state *state,
         const struct vkd3d_pipeline_key *key, VkRenderPass *vk_render_pass)
 {
@@ -2938,7 +2955,8 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
     ia_desc.pNext = NULL;
     ia_desc.flags = 0;
     ia_desc.topology = vk_topology_from_d3d12_topology(topology);
-    ia_desc.primitiveRestartEnable = !!graphics->index_buffer_strip_cut_value;
+    ia_desc.primitiveRestartEnable = graphics->index_buffer_strip_cut_value
+            && vk_topology_can_restart(ia_desc.topology);
 
     if (ia_desc.topology == VK_PRIMITIVE_TOPOLOGY_MAX_ENUM)
     {
