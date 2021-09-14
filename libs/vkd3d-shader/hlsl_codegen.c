@@ -520,11 +520,12 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 }
 
 /* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
-static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
         struct hlsl_block *block, bool in_loop)
 {
     struct hlsl_ir_node *return_instr = NULL, *cf_instr = NULL;
     struct hlsl_ir_node *instr, *next;
+    bool has_early_return = false;
 
     /* SM1 has no function calls. SM4 does, but native d3dcompiler inlines
      * everything anyway. We are safest following suit.
@@ -546,7 +547,7 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
      *   return into a break, which offers the right semantics—except that it
      *   won't break out of nested loops.
      *
-     * - A CF block which might contain a return statement. After calling
+     * - A CF block which contains a return statement. After calling
      *   lower_return() on the CF block body, we stop, pull out everything after
      *   the CF instruction, shove it into an if block, and then lower that if
      *   block.
@@ -559,6 +560,9 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
      *   already turned any returns into breaks. If the block we just processed
      *   was conditional, then "break" did our work for us. If it was a loop,
      *   we need to propagate that break to the outer loop.
+     *
+     * We return true if there was an early return anywhere in the block we just
+     * processed (including CF contained inside that block).
      */
 
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
@@ -573,32 +577,38 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            lower_return(ctx, func, &iff->then_instrs, in_loop);
-            lower_return(ctx, func, &iff->else_instrs, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->then_instrs, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->else_instrs, in_loop);
 
-            /* If we're in a loop, we don't need to do anything here. We
-             * turned the return into a break, and that will already skip
-             * anything that comes after this "if" block. */
-            if (!in_loop)
+            if (has_early_return)
             {
-                cf_instr = instr;
-                break;
+                /* If we're in a loop, we don't need to do anything here. We
+                 * turned the return into a break, and that will already skip
+                 * anything that comes after this "if" block. */
+                if (!in_loop)
+                {
+                    cf_instr = instr;
+                    break;
+                }
             }
         }
         else if (instr->type == HLSL_IR_LOOP)
         {
-            lower_return(ctx, func, &hlsl_ir_loop(instr)->body, true);
+            has_early_return |= lower_return(ctx, func, &hlsl_ir_loop(instr)->body, true);
 
-            if (in_loop)
+            if (has_early_return)
             {
-                /* "instr" is a nested loop. "return" breaks out of all
-                 * loops, so break out of this one too now. */
-                insert_early_return_break(ctx, func, instr);
-            }
-            else
-            {
-                cf_instr = instr;
-                break;
+                if (in_loop)
+                {
+                    /* "instr" is a nested loop. "return" breaks out of all
+                     * loops, so break out of this one too now. */
+                    insert_early_return_break(ctx, func, instr);
+                }
+                else
+                {
+                    cf_instr = instr;
+                    break;
+                }
             }
         }
         else if (instr->type == HLSL_IR_JUMP)
@@ -610,13 +620,14 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
             if (jump->type == HLSL_IR_JUMP_RETURN)
             {
                 if (!(constant = hlsl_new_bool_constant(ctx, true, &jump->node.loc)))
-                    return;
+                    return false;
                 list_add_before(&jump->node.entry, &constant->node.entry);
 
                 if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, &constant->node)))
-                    return;
+                    return false;
                 list_add_after(&constant->node.entry, &store->node.entry);
 
+                has_early_return = true;
                 if (in_loop)
                 {
                     jump->type = HLSL_IR_JUMP_BREAK;
@@ -658,24 +669,26 @@ static void lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         assert(!in_loop);
 
         if (tail == &cf_instr->entry)
-            return;
+            return has_early_return;
 
         if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &load->node.entry);
 
         if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &not->entry);
 
         if (!(iff = hlsl_new_if(ctx, not, cf_instr->loc)))
-            return;
+            return false;
         list_add_tail(&block->instrs, &iff->node.entry);
 
         list_move_slice_tail(&iff->then_instrs.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
 
         lower_return(ctx, func, &iff->then_instrs, in_loop);
     }
+
+    return has_early_return;
 }
 
 /* Remove HLSL_IR_CALL instructions by inlining them. */
