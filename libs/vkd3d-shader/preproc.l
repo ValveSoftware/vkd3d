@@ -575,7 +575,10 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                 if (ctx->current_directive)
                     return return_token(token, lval, text);
 
-                vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
+                if (token == T_NEWLINE)
+                    vkd3d_string_buffer_printf(&ctx->buffer, "\n");
+                else
+                    vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
                 break;
             }
 
