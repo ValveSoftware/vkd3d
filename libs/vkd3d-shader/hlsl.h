@@ -300,6 +300,7 @@ struct hlsl_ir_function_decl
     bool has_body;
     unsigned int attr_count;
     const struct hlsl_attribute *const *attrs;
+    struct hlsl_ir_var *early_return_var;
 };
 
 struct hlsl_ir_call
