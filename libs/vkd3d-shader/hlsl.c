@@ -722,12 +722,18 @@ struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct h
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, struct vkd3d_shader_location *loc)
 {
+    enum hlsl_base_type base_type = val->data_type->base_type;
     struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_type *type;
+
+    if (components == 1)
+        type = ctx->builtin_types.scalar[base_type];
+    else
+        type = ctx->builtin_types.vector[base_type][components - 1];
 
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
-    init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            ctx->builtin_types.vector[val->data_type->base_type][components - 1], *loc);
+    init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, *loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;
