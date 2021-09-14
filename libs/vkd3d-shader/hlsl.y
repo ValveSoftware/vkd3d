@@ -2375,6 +2375,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <list> declaration_statement
 %type <list> equality_expr
 %type <list> expr
+%type <list> expr_optional
 %type <list> expr_statement
 %type <list> field
 %type <list> fields_list
@@ -3482,24 +3483,27 @@ loop_statement:
         {
             $$ = create_loop(ctx, LOOP_DO_WHILE, NULL, $5, NULL, $2, @1);
         }
-    | KW_FOR '(' scope_start expr_statement expr_statement expr ')' statement
+    | KW_FOR '(' scope_start expr_statement expr_statement expr_optional ')' statement
         {
             $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
             hlsl_pop_scope(ctx);
         }
-    | KW_FOR '(' scope_start declaration expr_statement expr ')' statement
+    | KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
         {
             $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
             hlsl_pop_scope(ctx);
         }
 
-expr_statement:
-      ';'
+expr_optional:
+      %empty
         {
             if (!($$ = make_empty_list(ctx)))
                 YYABORT;
         }
-    | expr ';'
+    | expr
+
+expr_statement:
+      expr_optional ';'
         {
             $$ = $1;
         }
