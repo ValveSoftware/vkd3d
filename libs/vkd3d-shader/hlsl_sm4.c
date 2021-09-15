@@ -515,7 +515,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
                     flags |= D3D_SVF_USED;
 
                 put_u32(&buffer, 0); /* name */
-                put_u32(&buffer, var->buffer_offset);
+                put_u32(&buffer, var->buffer_offset * sizeof(float));
                 put_u32(&buffer, var->data_type->reg_size * sizeof(float));
                 put_u32(&buffer, flags);
                 put_u32(&buffer, 0); /* type */
