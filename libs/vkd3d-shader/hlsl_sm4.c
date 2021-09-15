@@ -613,6 +613,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
     if (var->is_uniform)
     {
         reg->type = VKD3D_SM4_RT_CONSTBUFFER;
+        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
         reg->idx[0] = var->buffer->reg.id;
         reg->idx[1] = var->buffer_offset / 4;
         reg->idx_count = 2;
