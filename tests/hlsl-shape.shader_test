@@ -1,0 +1,355 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    float x = 1.0;
+    float y = 2.0;
+    return float4(x + y, 0.0, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (3.0, 0.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1 x = float1(1.0);
+    float2 y = float2(1.0, 2.0);
+    return float4(x + y, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1 x = float1(1.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2 x = float2(1.0, 2.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return float4(x + y, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float x = 1.0;
+    float1 y = float1(1.0);
+    return float4(x + y, y + x, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 2.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float x = 1.0;
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float y = 1.0;
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x2 x = float2x2(1.0, 2.0,
+                          3.0, 4.0);
+    float2x3 y = float2x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 7.0, 9.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x3 x = float2x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0);
+    float2x2 y = float2x2(1.0, 2.0,
+                          3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 7.0, 9.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 x = float1x4(1.0, 2.0, 3.0, 4.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float1x4 y = float1x4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x1 x = float4x1(1.0, 2.0, 3.0, 4.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 7.0, 12.0, 17.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float4x1 y = float4x1(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 7.0, 12.0, 17.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float2x3 y = float2x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0);
+    return float4((x + y)[0], 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x3 x = float2x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    return float4((x + y)[1], 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (9.0, 11.0, 13.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float1x4 y = float1x4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 x = float1x4(1.0, 2.0, 3.0, 4.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float4x1 y = float4x1(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x1 x = float4x1(1.0, 2.0, 3.0, 4.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float2x2 y = float2x2(1.0, 2.0,
+                          3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x2 x = float2x2(1.0, 2.0,
+                          3.0, 4.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1 x = float1(1.0);
+    float1x4 y = float1x4(1.0, 2.0, 3.0, 4.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 x = float1x4(1.0, 2.0, 3.0, 4.0);
+    float1 y = float1(1.0);
+    return x + y;
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2 x = float2(1.0, 2.0);
+    float4x1 y = float4x1(1.0, 2.0, 3.0, 4.0);
+    return float4(x + y, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x1 x = float4x1(1.0, 2.0, 3.0, 4.0);
+    float2 y = float2(1.0, 2.0);
+    return float4(x + y, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float x = 1.0;
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    return (x + y)[0];
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 3.0, 4.0, 5.0)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float y = 1.0;
+    return (x + y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (6.0, 7.0, 8.0, 9.0)

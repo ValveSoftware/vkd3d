@@ -71,6 +71,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
+	tests/hlsl-shape.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
@@ -286,6 +287,7 @@ XFAIL_TESTS = \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
+	tests/hlsl-shape.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
