@@ -28,15 +28,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern const char *vkd3d_test_name;
-extern const char *vkd3d_test_platform;
+static void vkd3d_test_main(int argc, char **argv);
+static const char *vkd3d_test_name;
+static const char *vkd3d_test_platform = "other";
 
 static void vkd3d_test_start_todo(bool is_todo);
 static int vkd3d_test_loop_todo(void);
 static void vkd3d_test_end_todo(void);
 
 #define START_TEST(name) \
-        const char *vkd3d_test_name = #name; \
+        static const char *vkd3d_test_name = #name; \
         static void vkd3d_test_main(int argc, char **argv)
 
 /*
@@ -99,7 +100,7 @@ static void vkd3d_test_end_todo(void);
 
 #define todo todo_if(true)
 
-struct vkd3d_test_state
+static struct
 {
     LONG success_count;
     LONG failure_count;
@@ -119,8 +120,7 @@ struct vkd3d_test_state
 
     const char *test_name_filter;
     char context[1024];
-};
-extern struct vkd3d_test_state vkd3d_test_state;
+} vkd3d_test_state;
 
 static bool
 vkd3d_test_platform_is_windows(void)
@@ -253,34 +253,6 @@ vkd3d_test_debug(const char *fmt, ...)
         printf("%s\n", buffer);
 }
 
-#ifdef _WIN32
-static char *vkd3d_test_strdupWtoA(WCHAR *str)
-{
-    char *out;
-    int len;
-
-    if (!(len = WideCharToMultiByte(CP_ACP, 0, str, -1, NULL, 0, NULL, NULL)))
-        return NULL;
-    if (!(out = malloc(len)))
-        return NULL;
-    WideCharToMultiByte(CP_ACP, 0, str, -1, out, len, NULL, NULL);
-
-    return out;
-}
-
-static bool running_under_wine(void)
-{
-    HMODULE module = GetModuleHandleA("ntdll.dll");
-    return module && GetProcAddress(module, "wine_server_call");
-}
-#endif /* _WIN32 */
-
-#ifndef VKD3D_TEST_NO_DEFS
-const char *vkd3d_test_platform = "other";
-struct vkd3d_test_state vkd3d_test_state;
-
-static void vkd3d_test_main(int argc, char **argv);
-
 int main(int argc, char **argv)
 {
     const char *test_filter = getenv("VKD3D_TEST_FILTER");
@@ -322,6 +294,26 @@ int main(int argc, char **argv)
 }
 
 #ifdef _WIN32
+static char *vkd3d_test_strdupWtoA(WCHAR *str)
+{
+    char *out;
+    int len;
+
+    if (!(len = WideCharToMultiByte(CP_ACP, 0, str, -1, NULL, 0, NULL, NULL)))
+        return NULL;
+    if (!(out = malloc(len)))
+        return NULL;
+    WideCharToMultiByte(CP_ACP, 0, str, -1, out, len, NULL, NULL);
+
+    return out;
+}
+
+static bool running_under_wine(void)
+{
+    HMODULE module = GetModuleHandleA("ntdll.dll");
+    return module && GetProcAddress(module, "wine_server_call");
+}
+
 int wmain(int argc, WCHAR **wargv)
 {
     char **argv;
@@ -347,7 +339,6 @@ int wmain(int argc, WCHAR **wargv)
     return ret;
 }
 #endif  /* _WIN32 */
-#endif /* VKD3D_TEST_NO_DEFS */
 
 typedef void (*vkd3d_test_pfn)(void);
 
