@@ -38,6 +38,7 @@ struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shad
 
     memset(generator, 0, sizeof(*generator));
     generator->version = *version;
+    vkd3d_string_buffer_init(&generator->buffer);
     generator->location.source_name = compile_info->source_name;
     generator->location.line = 2; /* Line 1 is the version token. */
     generator->message_context = message_context;
