@@ -1319,8 +1319,6 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 
     instr.srcs[0].reg.dim = (dimx > 1) ? VKD3D_SM4_DIMENSION_VEC4 : VKD3D_SM4_DIMENSION_SCALAR;
     instr.srcs[0].reg.type = VKD3D_SM4_RT_IMMCONST;
-    instr.srcs[0].reg.idx[0] = constant->reg.id;
-    instr.srcs[0].reg.idx_count = 1;
     for (i = 0; i < dimx; ++i)
         instr.srcs[0].reg.immconst_uint[i] = constant->value[i].u;
     instr.src_count = 1,
