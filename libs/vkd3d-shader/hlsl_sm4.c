@@ -862,23 +862,25 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else
         {
-            assert(data_type->type <= HLSL_CLASS_VECTOR);
+            unsigned int offset = hlsl_offset_from_deref(deref) + var->buffer_offset;
+
             reg->type = VKD3D_SM4_RT_CONSTBUFFER;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+
             if (shader_is_sm_5_1(ctx))
             {
                 reg->idx[0] = var->buffer->reg.id;
                 reg->idx[1] = var->buffer->reg.index; /* FIXME: array index */
-                reg->idx[2] = var->buffer_offset / 4;
+                reg->idx[2] = offset / 4;
                 reg->idx_count = 3;
             }
             else
             {
                 reg->idx[0] = var->buffer->reg.id;
-                reg->idx[1] = var->buffer_offset / 4;
+                reg->idx[1] = offset / 4;
                 reg->idx_count = 2;
             }
-            *writemask = ((1u << data_type->dimx) - 1) << (var->buffer_offset & 3);
+            *writemask = ((1u << data_type->dimx) - 1) << (offset & 3);
         }
     }
     else if (var->is_input_semantic)

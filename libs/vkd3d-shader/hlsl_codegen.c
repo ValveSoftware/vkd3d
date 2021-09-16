@@ -1954,12 +1954,9 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
-    const struct hlsl_ir_var *var = deref->var;
-    struct hlsl_reg ret = {0};
-    unsigned int offset = 0;
 
     /* We should always have generated a cast to UINT. */
     if (offset_node)
@@ -1972,12 +1969,17 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
         offset_node = NULL;
     }
 
-    ret = var->reg;
-
-    ret.allocated = var->reg.allocated;
-    ret.id = var->reg.id;
     if (offset_node)
-        offset = hlsl_ir_constant(offset_node)->value[0].u;
+        return hlsl_ir_constant(offset_node)->value[0].u;
+    return 0;
+}
+
+struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+{
+    const struct hlsl_ir_var *var = deref->var;
+    struct hlsl_reg ret = var->reg;
+    unsigned int offset = hlsl_offset_from_deref(deref);
+
     ret.id += offset / 4;
 
     if (type_is_single_reg(var->data_type))
