@@ -1577,6 +1577,14 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc);
 }
 
+static bool intrinsic_saturate(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *args[3] = {params->args[0]};
+
+    return !!add_expr(ctx, params->instrs, HLSL_OP1_SAT, args, &loc);
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -1588,6 +1596,7 @@ intrinsic_functions[] =
 {
     {"clamp",                               3, true,  intrinsic_clamp},
     {"max",                                 2, true,  intrinsic_max},
+    {"saturate",                            1, true,  intrinsic_saturate},
 };
 
 static int intrinsic_function_name_compare(const void *a, const void *b)
