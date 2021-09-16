@@ -544,7 +544,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     return jump;
 }
 
-static bool add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
+static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
         struct hlsl_ir_node *offset, struct hlsl_type *data_type, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *add = NULL;
@@ -571,18 +571,18 @@ static bool add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_n
 
         sprintf(name, "<deref-%p>", var_node);
         if (!(var = hlsl_new_synthetic_var(ctx, name, var_node->data_type, var_node->loc)))
-            return false;
+            return NULL;
 
         if (!(store = hlsl_new_simple_store(ctx, var, var_node)))
-            return false;
+            return NULL;
 
         list_add_tail(instrs, &store->node.entry);
     }
 
     if (!(load = hlsl_new_load(ctx, var, offset, data_type, loc)))
-        return false;
+        return NULL;
     list_add_tail(instrs, &load->node.entry);
-    return true;
+    return load;
 }
 
 static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
@@ -594,7 +594,7 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         return false;
     list_add_tail(instrs, &c->node.entry);
 
-    return add_load(ctx, instrs, record, &c->node, field->type, loc);
+    return !!add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
 static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
@@ -721,7 +721,7 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     list_add_tail(instrs, &mul->entry);
     index = mul;
 
-    return add_load(ctx, instrs, array, index, data_type, loc);
+    return !!add_load(ctx, instrs, array, index, data_type, loc);
 }
 
 static struct hlsl_struct_field *get_struct_field(struct list *fields, const char *name)
