@@ -355,7 +355,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     const struct hlsl_profile_info *profile = ctx->profile;
     unsigned int field_count = 0, array_size = 0;
     size_t fields_offset = 0, name_offset = 0;
-    struct hlsl_struct_field *field;
+    size_t i;
 
     if (type->bytecode_offset)
         return;
@@ -368,20 +368,25 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     if (array_type->type == HLSL_CLASS_STRUCT)
     {
-        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        field_count = array_type->e.record.field_count;
+
+        for (i = 0; i < field_count; ++i)
         {
+            struct hlsl_struct_field *field = &array_type->e.record.fields[i];
+
             field->name_bytecode_offset = put_string(buffer, field->name);
             write_sm4_type(ctx, buffer, field->type);
         }
 
         fields_offset = bytecode_get_size(buffer);
 
-        LIST_FOR_EACH_ENTRY(field, array_type->e.elements, struct hlsl_struct_field, entry)
+        for (i = 0; i < field_count; ++i)
         {
+            struct hlsl_struct_field *field = &array_type->e.record.fields[i];
+
             put_u32(buffer, field->name_bytecode_offset);
             put_u32(buffer, field->type->bytecode_offset);
             put_u32(buffer, field->reg_offset);
-            ++field_count;
         }
     }
 
