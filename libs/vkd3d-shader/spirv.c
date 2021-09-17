@@ -127,13 +127,7 @@ static void vkd3d_spirv_dump(const struct vkd3d_shader_code *spirv,
 
     if (!vkd3d_spirv_binary_to_text(spirv, environment, options, &text))
     {
-        const char *str, *current = text.code;
-        while ((str = strchr(current, '\n')))
-        {
-            TRACE("%.*s\n", (int)(str - current), current);
-            current = str + 1;
-        }
-
+        vkd3d_shader_trace_text(text.code, text.size);
         vkd3d_shader_free_shader_code(&text);
     }
 }

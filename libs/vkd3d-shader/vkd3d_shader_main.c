@@ -98,12 +98,17 @@ int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *f
 
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
 {
-    const char *p, *q, *end = buffer->buffer + buffer->content_size;
+    vkd3d_shader_trace_text_(buffer->buffer, buffer->content_size, function);
+}
+
+void vkd3d_shader_trace_text_(const char *text, size_t size, const char *function)
+{
+    const char *p, *q, *end = text + size;
 
     if (!TRACE_ON())
         return;
 
-    for (p = buffer->buffer; p < end; p = q)
+    for (p = text; p < end; p = q)
     {
         if (!(q = memchr(p, '\n', end - p)))
             q = end;

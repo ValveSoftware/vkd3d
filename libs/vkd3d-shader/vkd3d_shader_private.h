@@ -984,6 +984,9 @@ void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const s
 
 void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
         enum vkd3d_shader_type shader_type, const struct vkd3d_shader_code *shader);
+void vkd3d_shader_trace_text_(const char *text, size_t size, const char *function);
+#define vkd3d_shader_trace_text(text, size) \
+        vkd3d_shader_trace_text_(text, size, __FUNCTION__)
 
 int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);
