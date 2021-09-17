@@ -982,6 +982,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
         {
             switch (expr->op)
             {
+                case HLSL_OP1_ABS:
+                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_ABS);
+                    break;
+
                 case HLSL_OP1_CAST:
                 {
                     const struct hlsl_type *src_type = arg1->data_type;
