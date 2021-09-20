@@ -828,20 +828,21 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
         case HLSL_IR_CONSTANT:
         {
             struct hlsl_ir_constant *constant = hlsl_ir_constant(node);
+            const union hlsl_constant_value *value = &constant->value[0];
 
             switch (constant->node.data_type->base_type)
             {
                 case HLSL_TYPE_UINT:
-                    return constant->value.u[0];
+                    return value->u;
                 case HLSL_TYPE_INT:
-                    return constant->value.i[0];
+                    return value->i;
                 case HLSL_TYPE_FLOAT:
                 case HLSL_TYPE_HALF:
-                    return constant->value.f[0];
+                    return value->f;
                 case HLSL_TYPE_DOUBLE:
-                    return constant->value.d[0];
+                    return value->d;
                 case HLSL_TYPE_BOOL:
-                    return constant->value.b[0];
+                    return value->b;
                 default:
                     assert(0);
                     return 0;
@@ -2770,7 +2771,7 @@ primary_expr:
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_FLOAT], @1);
-            c->value.f[0] = $1;
+            c->value[0].f = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
@@ -2781,7 +2782,7 @@ primary_expr:
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_INT], @1);
-            c->value.i[0] = $1;
+            c->value[0].i = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
@@ -2792,7 +2793,7 @@ primary_expr:
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
             init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], @1);
-            c->value.b[0] = $1;
+            c->value[0].b = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }

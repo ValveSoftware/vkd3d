@@ -413,12 +413,12 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
                     {
                         case HLSL_TYPE_INT:
                             for (i = 0; i < dimx; ++i)
-                                res->value.f[i] = arg1->value.i[i];
+                                res->value[i].f = arg1->value[i].i;
                             break;
 
                         case HLSL_TYPE_UINT:
                             for (i = 0; i < dimx; ++i)
-                                res->value.f[i] = arg1->value.u[i];
+                                res->value[i].f = arg1->value[i].u;
                             break;
 
                         default:
@@ -443,17 +443,17 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
             {
                 case HLSL_OP1_NEG:
                     for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value.u[i] = -arg1->value.u[i];
+                        res->value[i].u = -arg1->value[i].u;
                     break;
 
                 case HLSL_OP2_ADD:
                     for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value.u[i] = arg1->value.u[i] + arg2->value.u[i];
+                        res->value[i].u = arg1->value[i].u + arg2->value[i].u;
                     break;
 
                 case HLSL_OP2_MUL:
                     for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value.u[i] = arg1->value.u[i] * arg2->value.u[i];
+                        res->value[i].u = arg1->value[i].u * arg2->value[i].u;
                     break;
 
                 default:
@@ -920,28 +920,30 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *
                 {
                     for (x = 0, i = 0; x < 4; ++x)
                     {
+                        const union hlsl_constant_value *value;
                         float f;
 
                         if (!(writemask & (1u << x)))
                             continue;
+                        value = &constant->value[i++];
 
                         switch (type->base_type)
                         {
                             case HLSL_TYPE_BOOL:
-                                f = constant->value.b[i++];
+                                f = value->b;
                                 break;
 
                             case HLSL_TYPE_FLOAT:
                             case HLSL_TYPE_HALF:
-                                f = constant->value.f[i++];
+                                f = value->f;
                                 break;
 
                             case HLSL_TYPE_INT:
-                                f = constant->value.i[i++];
+                                f = value->i;
                                 break;
 
                             case HLSL_TYPE_UINT:
-                                f = constant->value.u[i++];
+                                f = value->u;
                                 break;
 
                             case HLSL_TYPE_DOUBLE:
@@ -1208,7 +1210,7 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
     ret.allocated = var->reg.allocated;
     ret.id = var->reg.id;
     if (offset_node)
-        offset = hlsl_ir_constant(offset_node)->value.u[0];
+        offset = hlsl_ir_constant(offset_node)->value[0].u;
     ret.id += offset / 4;
 
     if (type_is_single_reg(var->data_type))
