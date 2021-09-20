@@ -1700,6 +1700,66 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
     return params->instrs;
 }
 
+static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
+        struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    unsigned int i, writemask_offset = 0;
+    struct hlsl_ir_store *store;
+    static unsigned int counter;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_var *var;
+    char name[23];
+
+    if (type->type == HLSL_CLASS_MATRIX)
+        hlsl_fixme(ctx, loc, "Matrix constructor.");
+
+    sprintf(name, "<constructor-%x>", counter++);
+    if (!(var = hlsl_new_synthetic_var(ctx, name, type, loc)))
+        return NULL;
+
+    for (i = 0; i < params->args_count; ++i)
+    {
+        struct hlsl_ir_node *arg = params->args[i];
+        unsigned int width;
+
+        if (arg->data_type->type == HLSL_CLASS_OBJECT)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, arg->data_type)))
+                hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Invalid type %s for constructor argument.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            continue;
+        }
+        width = hlsl_type_component_count(arg->data_type);
+
+        if (width > 4)
+        {
+            FIXME("Constructor argument with %u components.\n", width);
+            continue;
+        }
+
+        if (!(arg = add_implicit_conversion(ctx, params->instrs, arg,
+                ctx->builtin_types.vector[type->base_type][width - 1], &arg->loc)))
+            continue;
+
+        if (!(store = hlsl_new_store(ctx, var, NULL, arg,
+                ((1u << width) - 1) << writemask_offset, arg->loc)))
+            return NULL;
+        list_add_tail(params->instrs, &store->node.entry);
+
+        writemask_offset += width;
+    }
+
+    if (!(load = hlsl_new_var_load(ctx, var, loc)))
+        return NULL;
+    list_add_tail(params->instrs, &load->node.entry);
+
+    vkd3d_free(params->args);
+    return params->instrs;
+}
+
 }
 
 %locations
@@ -2915,13 +2975,6 @@ postfix_expr:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | var_modifiers type '(' initializer_expr_list ')'
         {
-            unsigned int i, writemask_offset = 0;
-            struct hlsl_ir_store *store;
-            static unsigned int counter;
-            struct hlsl_ir_load *load;
-            struct hlsl_ir_var *var;
-            char name[23];
-
             if ($1)
             {
                 hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
@@ -2946,49 +2999,11 @@ postfix_expr:
                 YYABORT;
             }
 
-            if ($2->type == HLSL_CLASS_MATRIX)
-                hlsl_fixme(ctx, @2, "Matrix constructor.");
-
-            sprintf(name, "<constructor-%x>", counter++);
-            if (!(var = hlsl_new_synthetic_var(ctx, name, $2, @2)))
-                YYABORT;
-            for (i = 0; i < $4.args_count; ++i)
+            if (!($$ = add_constructor(ctx, $2, &$4, @2)))
             {
-                struct hlsl_ir_node *arg = $4.args[i];
-                unsigned int width;
-
-                if (arg->data_type->type == HLSL_CLASS_OBJECT)
-                {
-                    struct vkd3d_string_buffer *string;
-
-                    if ((string = hlsl_type_to_string(ctx, arg->data_type)))
-                        hlsl_error(ctx, arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                "Invalid type %s for constructor argument.", string->buffer);
-                    hlsl_release_string_buffer(ctx, string);
-                    continue;
-                }
-                width = hlsl_type_component_count(arg->data_type);
-
-                if (width > 4)
-                {
-                    FIXME("Constructor argument with %u components.\n", width);
-                    continue;
-                }
-
-                if (!(arg = add_implicit_conversion(ctx, $4.instrs, arg,
-                        ctx->builtin_types.vector[$2->base_type][width - 1], &arg->loc)))
-                    continue;
-
-                if (!(store = hlsl_new_store(ctx, var, NULL, arg,
-                        ((1 << width) - 1) << writemask_offset, arg->loc)))
-                    YYABORT;
-                writemask_offset += width;
-                list_add_tail($4.instrs, &store->node.entry);
-            }
-            vkd3d_free($4.args);
-            if (!(load = hlsl_new_var_load(ctx, var, @2)))
+                free_parse_initializer(&$4);
                 YYABORT;
-            $$ = append_unop($4.instrs, &load->node);
+            }
         }
 
 unary_expr:
