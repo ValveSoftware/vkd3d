@@ -1997,7 +1997,7 @@ preproc_directive:
 
             ctx->location.line = $1;
             if (strcmp($2, ctx->location.source_name))
-                new_array = vkd3d_realloc(ctx->source_files,
+                new_array = hlsl_realloc(ctx, ctx->source_files,
                         sizeof(*ctx->source_files) * (ctx->source_files_count + 1));
 
             if (new_array)
@@ -2544,7 +2544,7 @@ arrays:
                 YYABORT;
             }
 
-            if (!(new_array = vkd3d_realloc($$.sizes, ($$.count + 1) * sizeof(*new_array))))
+            if (!(new_array = hlsl_realloc(ctx, $$.sizes, ($$.count + 1) * sizeof(*new_array))))
             {
                 vkd3d_free($$.sizes);
                 YYABORT;
@@ -2636,7 +2636,7 @@ initializer_expr_list:
     | initializer_expr_list ',' initializer_expr
         {
             $$ = $1;
-            if (!($$.args = vkd3d_realloc($$.args, ($$.args_count + 1) * sizeof(*$$.args))))
+            if (!($$.args = hlsl_realloc(ctx, $$.args, ($$.args_count + 1) * sizeof(*$$.args))))
                 YYABORT;
             $$.args[$$.args_count++] = node_from_list($3);
             list_move_tail($$.instrs, $3);
