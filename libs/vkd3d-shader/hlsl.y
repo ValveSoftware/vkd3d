@@ -158,6 +158,14 @@ static struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_
         return ctx->builtin_types.matrix[base_type][dimx - 1][dimy - 1];
 }
 
+/* Find the type corresponding to the given source type, with the same
+ * dimensions but a different base type. */
+static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
+        const struct hlsl_type *type, enum hlsl_base_type base_type)
+{
+    return get_numeric_type(ctx, type->type, base_type, type->dimx, type->dimy);
+}
+
 static bool convertible_data_type(struct hlsl_type *type)
 {
     return type->type != HLSL_CLASS_OBJECT;
@@ -1238,6 +1246,23 @@ static struct list *add_unary_bitwise_expr_last(struct hlsl_ctx *ctx, struct lis
     return instrs;
 }
 
+static struct hlsl_ir_expr *add_unary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
+    struct hlsl_type *cast_types[HLSL_MAX_OPERANDS] = {convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_BOOL)};
+
+    return add_expr(ctx, instrs, op, args, cast_types, cast_types[0], loc);
+}
+
+static struct list *add_unary_logical_expr_last(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct vkd3d_shader_location *loc)
+{
+    add_unary_logical_expr(ctx, instrs, op, node_from_list(instrs), loc);
+
+    return instrs;
+}
+
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         struct vkd3d_shader_location *loc)
@@ -1926,14 +1951,6 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], &loc);
-}
-
-/* Find the type corresponding to the given source type, with the same
- * dimensions but a different base type. */
-static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
-        const struct hlsl_type *type, enum hlsl_base_type base_type)
-{
-    return get_numeric_type(ctx, type->type, base_type, type->dimx, type->dimy);
 }
 
 static bool intrinsic_asuint(struct hlsl_ctx *ctx,
@@ -4065,7 +4082,7 @@ unary_expr:
         }
     | '!' unary_expr
         {
-            $$ = add_unary_arithmetic_expr_last(ctx, $2, HLSL_OP1_LOGIC_NOT, &@1);
+            $$ = add_unary_logical_expr_last(ctx, $2, HLSL_OP1_LOGIC_NOT, &@1);
         }
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | '(' var_modifiers type arrays ')' unary_expr
