@@ -1282,6 +1282,41 @@ static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     return add_expr(ctx, instrs, op, args, cast_types, cast_types[0], loc);
 }
 
+static struct hlsl_ir_expr *add_ternary_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        struct hlsl_ir_node *arg3, struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *cast_types[HLSL_MAX_OPERANDS];
+    enum hlsl_base_type base = expr_common_base_type(arg2->data_type->base_type, arg3->data_type->base_type);
+    enum hlsl_type_class type;
+    unsigned int dimx, dimy;
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg1, arg2};
+
+    /* FIXME: use the shape of the first parameter */
+    if (!expr_common_shape(ctx, arg2->data_type, arg3->data_type, loc, &type, &dimx, &dimy))
+        return NULL;
+
+    cast_types[0] = get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
+    cast_types[1] = get_numeric_type(ctx, type, base, dimx, dimy);
+    cast_types[2] = cast_types[1];
+
+    return add_expr(ctx, instrs, op, args, cast_types, cast_types[1], loc);
+}
+
+static struct list *add_ternary_expr_last(struct hlsl_ctx *ctx, struct list *instrs1, struct list *instrs2,
+        struct list *instrs3, enum hlsl_ir_expr_op op, struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = node_from_list(instrs1), *arg2 = node_from_list(instrs2), *arg3 = node_from_list(instrs3);
+
+    list_move_tail(instrs1, instrs2);
+    list_move_tail(instrs1, instrs3);
+    vkd3d_free(instrs2);
+    vkd3d_free(instrs3);
+    add_ternary_expr(ctx, instrs1, op, arg1, arg2, arg3, loc);
+
+    return instrs1;
+}
+
 static struct list *add_binary_arithmetic_expr_last(struct hlsl_ctx *ctx, struct list *instrs1, struct list *instrs2,
         enum hlsl_ir_expr_op op, struct vkd3d_shader_location *loc)
 {
@@ -4237,7 +4272,7 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            hlsl_fixme(ctx, @$, "Ternary operator.");
+            $$ = add_ternary_expr_last(ctx, $1, $3, $5, HLSL_OP3_MOVC, &@2);
         }
 
 assignment_expr:

@@ -358,6 +358,7 @@ enum hlsl_ir_expr_op
     HLSL_OP2_SAMPLE,
 
     HLSL_OP3_LERP,
+    HLSL_OP3_MOVC,
 };
 
 #define HLSL_MAX_OPERANDS 3
