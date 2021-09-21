@@ -1308,6 +1308,38 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_conditional_op(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *dst,
+        const struct hlsl_ir_node *src, uint32_t value_true, uint32_t value_false)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_MOVC;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+
+    instr.srcs[1].reg.type = VKD3D_SM4_RT_IMMCONST;
+    instr.srcs[1].reg.idx_count = 0;
+    instr.srcs[1].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+    instr.srcs[1].reg.immconst_uint[0] = value_true;
+    instr.srcs[1].swizzle = 0;
+
+    instr.srcs[2].reg.type = VKD3D_SM4_RT_IMMCONST;
+    instr.srcs[2].reg.idx_count = 0;
+    instr.srcs[2].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+    instr.srcs[2].reg.immconst_uint[0] = value_false;
+    instr.srcs[2].swizzle = 0;
+
+    instr.src_count = 3;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 /* dp# instructions don't map the swizzle. */
 static void write_sm4_binary_op_dot(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
@@ -1543,7 +1575,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case HLSL_TYPE_BOOL:
-                            hlsl_fixme(ctx, expr->node.loc, "Casts from bool to float are not implemented.\n");
+                            write_sm4_conditional_op(buffer, &expr->node, arg1, 0x3f800000, 0);
                             break;
 
                         case HLSL_TYPE_DOUBLE:
