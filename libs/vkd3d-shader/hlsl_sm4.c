@@ -1695,6 +1695,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
                     break;
 
+                case HLSL_OP2_RSHIFT:
+                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_ISHR, &expr->node, arg1, arg2);
+                    break;
+
                 case HLSL_OP2_MAX:
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_IMAX, &expr->node, arg1, arg2);
                     break;
