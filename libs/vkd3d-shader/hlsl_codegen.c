@@ -1048,6 +1048,33 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     return true;
 }
 
+static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_type *type = instr->data_type;
+    struct hlsl_ir_node *arg, *neg;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    arg = expr->operands[0].node;
+    if (expr->op != HLSL_OP1_ABS)
+        return false;
+    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+        return false;
+    if (type->base_type != HLSL_TYPE_INT)
+        return false;
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &neg->entry);
+
+    expr->op = HLSL_OP2_MAX;
+    hlsl_src_from_node(&expr->operands[1], neg);
+
+    return true;
+}
+
 static bool lower_cast_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_expr *expr;
@@ -2236,6 +2263,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     transform_ir(ctx, lower_cast_to_bool, body, NULL);
     transform_ir(ctx, lower_int_division, body, NULL);
+    transform_ir(ctx, lower_int_abs, body, NULL);
     transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
