@@ -4098,7 +4098,7 @@ bitxor_expr:
       bitand_expr
     | bitxor_expr '^' bitand_expr
         {
-            hlsl_fixme(ctx, @$, "Bitwise XOR.");
+            $$ = add_binary_bitwise_expr_last(ctx, $1, $3, HLSL_OP2_BIT_XOR, &@2);
         }
 
 bitor_expr:
