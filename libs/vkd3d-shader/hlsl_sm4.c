@@ -1331,7 +1331,8 @@ static void write_sm4_binary_op_dot(struct vkd3d_bytecode_buffer *buffer, enum v
 }
 
 static void write_sm4_binary_op_with_null(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2,
+        unsigned int result_idx)
 {
     struct sm4_instruction instr;
     unsigned int writemask;
@@ -1339,10 +1340,10 @@ static void write_sm4_binary_op_with_null(struct vkd3d_bytecode_buffer *buffer, 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = opcode;
 
-    instr.dsts[0].reg.type = VKD3D_SM4_RT_NULL;
-    instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_NONE;
-    instr.dsts[0].reg.idx_count = 0;
-    sm4_register_from_node(&instr.dsts[1].reg, &instr.dsts[1].writemask, dst);
+    instr.dsts[1 - result_idx].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[1 - result_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[1 - result_idx].reg.idx_count = 0;
+    sm4_register_from_node(&instr.dsts[result_idx].reg, &instr.dsts[result_idx].writemask, dst);
     instr.dst_count = 2;
 
     sm4_register_from_node(&instr.srcs[0].reg, &writemask, src1);
@@ -1667,7 +1668,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_OP2_MUL:
-                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_IMUL, &expr->node, arg1, arg2);
+                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_IMUL, &expr->node, arg1, arg2, 1);
                     break;
 
                 case HLSL_OP1_NEG:
@@ -1730,7 +1731,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 case HLSL_OP2_MUL:
                     /* Using IMUL instead of UMUL because we're taking
                      * the low bits, and native generates IMUL. */
-                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_IMUL, &expr->node, arg1, arg2);
+                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_IMUL, &expr->node, arg1, arg2, 1);
+                    break;
+
+                case HLSL_OP2_DIV:
+                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_UDIV, &expr->node, arg1, arg2, 0);
                     break;
 
                 case HLSL_OP1_NEG:
