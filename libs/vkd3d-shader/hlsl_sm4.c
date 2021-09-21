@@ -1793,6 +1793,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
                     break;
 
+                case HLSL_OP2_LOGIC_AND:
+                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
+                    break;
+
                 case HLSL_OP2_EQUAL:
                 {
                     const struct hlsl_type *src_type = arg1->data_type;
