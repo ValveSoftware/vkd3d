@@ -1837,6 +1837,40 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
         {
             switch (expr->op)
             {
+                case HLSL_OP1_CAST:
+                {
+                    const struct hlsl_type *src_type = arg1->data_type;
+
+                    /* Narrowing casts need to be lowered. */
+                    if (src_type->dimx != expr->node.data_type->dimx)
+                        hlsl_fixme(ctx, expr->node.loc, "Narrowing cast.\n");
+
+                    switch (src_type->base_type)
+                    {
+                        case HLSL_TYPE_HALF:
+                        case HLSL_TYPE_FLOAT:
+                            hlsl_fixme(ctx, expr->node.loc, "Casts from float/half to bool are not implemented.\n");
+                            break;
+
+                        case HLSL_TYPE_INT:
+                        case HLSL_TYPE_UINT:
+                            write_sm4_conditional_op(buffer, &expr->node, arg1, 0xffffffff, 0);
+                            break;
+
+                        case HLSL_TYPE_BOOL:
+                            write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+                            break;
+
+                        case HLSL_TYPE_DOUBLE:
+                            hlsl_fixme(ctx, expr->node.loc, "Casts from double to bool are not implemented.\n");
+                            break;
+
+                        default:
+                            break;
+                    }
+                    break;
+                }
+
                 case HLSL_OP1_LOGIC_NOT:
                     write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
                     break;
