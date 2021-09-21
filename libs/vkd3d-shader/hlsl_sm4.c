@@ -1767,7 +1767,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case HLSL_TYPE_BOOL:
-                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from bool to uint.\n");
+                            write_sm4_conditional_op(buffer, &expr->node, arg1, 1, 0);
                             break;
 
                         case HLSL_TYPE_DOUBLE:
