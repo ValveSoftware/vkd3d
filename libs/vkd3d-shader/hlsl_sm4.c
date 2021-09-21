@@ -1308,6 +1308,30 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_ternary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2,
+        const struct hlsl_ir_node *src3)
+{
+    struct sm4_instruction instr;
+    unsigned int writemask;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, dst);
+    instr.dst_count = 1;
+
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, src1);
+    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+    sm4_register_from_node(&instr.srcs[1].reg, &writemask, src2);
+    instr.srcs[1].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+    sm4_register_from_node(&instr.srcs[2].reg, &writemask, src3);
+    instr.srcs[2].swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), instr.dsts[0].writemask);
+    instr.src_count = 3;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_conditional_op(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *dst,
         const struct hlsl_ir_node *src, uint32_t value_true, uint32_t value_false)
 {
@@ -1538,6 +1562,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
+    const struct hlsl_ir_node *arg3 = expr->operands[2].node;
 
     assert(expr->node.reg.allocated);
 
@@ -1733,6 +1758,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 
                 case HLSL_OP2_MAX:
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_IMAX, &expr->node, arg1, arg2);
+                    break;
+
+                case HLSL_OP3_MOVC:
+                    write_sm4_ternary_op(buffer, VKD3D_SM4_OP_MOVC, &expr->node, arg1, arg2, arg3);
                     break;
 
                 default:
