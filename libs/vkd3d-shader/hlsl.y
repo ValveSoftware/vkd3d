@@ -1342,6 +1342,49 @@ static struct list *add_binary_logical_expr_last(struct hlsl_ctx *ctx, struct li
     return instrs1;
 }
 
+static struct hlsl_ir_expr *add_binary_shift_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *cast_types[HLSL_MAX_OPERANDS];
+    enum hlsl_base_type base = arg1->data_type->base_type;
+    enum hlsl_type_class type;
+    unsigned int dimx, dimy;
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg1, arg2};
+
+    if (arg1->data_type->base_type == HLSL_TYPE_HALF)
+        return NULL;
+    if (arg1->data_type->base_type == HLSL_TYPE_FLOAT)
+        return NULL;
+    if (arg2->data_type->base_type == HLSL_TYPE_HALF)
+        return NULL;
+    if (arg2->data_type->base_type == HLSL_TYPE_FLOAT)
+        return NULL;
+
+    if (base == HLSL_TYPE_BOOL)
+        base = HLSL_TYPE_INT;
+
+    if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
+        return NULL;
+
+    cast_types[0] = get_numeric_type(ctx, type, base, dimx, dimy);
+    cast_types[1] = get_numeric_type(ctx, type, HLSL_TYPE_INT, dimx, dimy);
+
+    return add_expr(ctx, instrs, op, args, cast_types, cast_types[0], loc);
+}
+
+static struct list *add_binary_shift_expr_last(struct hlsl_ctx *ctx, struct list *instrs1, struct list *instrs2,
+        enum hlsl_ir_expr_op op, struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = node_from_list(instrs1), *arg2 = node_from_list(instrs2);
+
+    list_move_tail(instrs1, instrs2);
+    vkd3d_free(instrs2);
+    add_binary_shift_expr(ctx, instrs1, op, arg1, arg2, loc);
+
+    return instrs1;
+}
+
 static struct hlsl_ir_expr *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         struct vkd3d_shader_location *loc)
@@ -4082,7 +4125,7 @@ shift_expr:
       add_expr
     | shift_expr OP_LEFTSHIFT add_expr
         {
-            hlsl_fixme(ctx, @$, "Left shift.");
+            $$ = add_binary_shift_expr_last(ctx, $1, $3, HLSL_OP2_LSHIFT, &@2);
         }
     | shift_expr OP_RIGHTSHIFT add_expr
         {
