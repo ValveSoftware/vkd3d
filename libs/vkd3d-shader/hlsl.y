@@ -1219,6 +1219,25 @@ static struct list *add_unary_arithmetic_expr_last(struct hlsl_ctx *ctx, struct 
     return instrs;
 }
 
+static struct hlsl_ir_expr *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, struct vkd3d_shader_location *loc)
+{
+    if (arg->data_type->base_type == HLSL_TYPE_HALF)
+        return NULL;
+    if (arg->data_type->base_type == HLSL_TYPE_FLOAT)
+        return NULL;
+
+    return add_unary_arithmetic_expr(ctx, instrs, op, arg, loc);
+}
+
+static struct list *add_unary_bitwise_expr_last(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct vkd3d_shader_location *loc)
+{
+    add_unary_bitwise_expr(ctx, instrs, op, node_from_list(instrs), loc);
+
+    return instrs;
+}
+
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         struct vkd3d_shader_location *loc)
@@ -4042,7 +4061,7 @@ unary_expr:
         }
     | '~' unary_expr
         {
-            $$ = add_unary_arithmetic_expr_last(ctx, $2, HLSL_OP1_BIT_NOT, &@1);
+            $$ = add_unary_bitwise_expr_last(ctx, $2, HLSL_OP1_BIT_NOT, &@1);
         }
     | '!' unary_expr
         {
