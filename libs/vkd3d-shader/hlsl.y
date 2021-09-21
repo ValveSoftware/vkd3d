@@ -4151,7 +4151,7 @@ logicor_expr:
       logicand_expr
     | logicor_expr OP_OR logicand_expr
         {
-            hlsl_fixme(ctx, @$, "Logical OR.");
+            $$ = add_binary_logical_expr_last(ctx, $1, $3, HLSL_OP2_LOGIC_OR, &@2);
         }
 
 conditional_expr:
