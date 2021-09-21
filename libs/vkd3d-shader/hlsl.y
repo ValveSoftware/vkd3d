@@ -147,7 +147,7 @@ static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers
                 "'row_major' and 'column_major' modifiers are only allowed for matrices.");
 }
 
-static struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_class type,
+struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_class type,
         enum hlsl_base_type base_type, unsigned int dimx, unsigned int dimy)
 {
     if (type == HLSL_CLASS_SCALAR)
@@ -160,7 +160,7 @@ static struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_
 
 /* Find the type corresponding to the given source type, with the same
  * dimensions but a different base type. */
-static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
+struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
         const struct hlsl_type *type, enum hlsl_base_type base_type)
 {
     return get_numeric_type(ctx, type->type, base_type, type->dimx, type->dimy);

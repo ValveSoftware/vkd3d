@@ -299,7 +299,6 @@ XFAIL_TESTS = \
 	tests/cast-to-uint.shader_test \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-attributes.shader_test \
-	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-entry-point-overload.shader_test \
 	tests/hlsl-for.shader_test \

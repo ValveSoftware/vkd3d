@@ -813,4 +813,9 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
 
+struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_class type,
+        enum hlsl_base_type base_type, unsigned int dimx, unsigned int dimy);
+struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
+        const struct hlsl_type *type, enum hlsl_base_type base_type);
+
 #endif
