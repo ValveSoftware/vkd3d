@@ -589,7 +589,7 @@ struct hlsl_ir_constant *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, co
     if (!(c = hlsl_alloc(ctx, sizeof(*c))))
         return NULL;
     init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], loc);
-    c->value[0].i = b;
+    c->value[0].u = b ? 0xffffffff : 0;
     return c;
 }
 
