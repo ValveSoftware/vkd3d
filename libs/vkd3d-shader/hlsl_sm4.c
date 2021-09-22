@@ -1714,7 +1714,9 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 }
 
                 case HLSL_OP2_MUL:
-                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_UMUL, &expr->node, arg1, arg2);
+                    /* Using IMUL instead of UMUL because we're taking
+                     * the low bits, and native generates IMUL. */
+                    write_sm4_binary_op_with_null(buffer, VKD3D_SM4_OP_IMUL, &expr->node, arg1, arg2);
                     break;
 
                 default:
