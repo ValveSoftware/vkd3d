@@ -2234,11 +2234,6 @@ static void allocate_uavs(struct hlsl_ctx *ctx)
     }
 }
 
-static bool type_is_single_reg(const struct hlsl_type *type)
-{
-    return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
-}
-
 unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
@@ -2259,7 +2254,7 @@ unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
     return 0;
 }
 
-struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref)
 {
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_reg ret = var->reg;
@@ -2267,16 +2262,10 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
 
     ret.id += offset / 4;
 
-    if (type_is_single_reg(var->data_type))
-    {
-        assert(!offset);
-        ret.writemask = var->reg.writemask;
-    }
-    else
-    {
-        assert(type_is_single_reg(type));
-        ret.writemask = ((1 << type->dimx) - 1) << (offset & 3);
-    }
+    ret.writemask = 0xf & (0xf << (offset & 3));
+    if (var->reg.writemask)
+        ret.writemask = hlsl_combine_writemasks(var->reg.writemask, ret.writemask);
+
     return ret;
 }
 

@@ -889,6 +889,8 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
         if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, false, &reg->type, &has_idx))
         {
+            unsigned int offset = hlsl_offset_from_deref(deref);
+
             if (has_idx)
             {
                 reg->idx[0] = var->semantic.index;
@@ -896,11 +898,11 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             }
 
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
-            *writemask = (1u << data_type->dimx) - 1;
+            *writemask = ((1u << data_type->dimx) - 1) << (offset % 4);
         }
         else
         {
-            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref);
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3D_SM4_RT_INPUT;
@@ -916,6 +918,8 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
         if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, true, &reg->type, &has_idx))
         {
+            unsigned int offset = hlsl_offset_from_deref(deref);
+
             if (has_idx)
             {
                 reg->idx[0] = var->semantic.index;
@@ -926,11 +930,11 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
             else
                 reg->dim = VKD3D_SM4_DIMENSION_VEC4;
-            *writemask = (1u << data_type->dimx) - 1;
+            *writemask = ((1u << data_type->dimx) - 1) << (offset % 4);
         }
         else
         {
-            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref);
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3D_SM4_RT_OUTPUT;
@@ -942,7 +946,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
     }
     else
     {
-        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref);
 
         assert(hlsl_reg.allocated);
         reg->type = VKD3D_SM4_RT_TEMP;
