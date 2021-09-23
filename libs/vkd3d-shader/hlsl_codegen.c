@@ -1201,7 +1201,7 @@ unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
     if (offset_node->type != HLSL_IR_CONSTANT)
     {
         FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
-        offset_node = NULL;
+        return 0;
     }
 
     return hlsl_ir_constant(offset_node)->value[0].u;
