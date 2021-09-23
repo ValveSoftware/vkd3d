@@ -1187,30 +1187,32 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
-    const struct hlsl_ir_var *var = deref->var;
-    struct hlsl_reg ret = {0};
-    unsigned int offset = 0;
+
+    if (!offset_node)
+        return 0;
 
     /* We should always have generated a cast to UINT. */
-    if (offset_node)
-        assert(offset_node->data_type->type == HLSL_CLASS_SCALAR
-                && offset_node->data_type->base_type == HLSL_TYPE_UINT);
+    assert(offset_node->data_type->type == HLSL_CLASS_SCALAR
+            && offset_node->data_type->base_type == HLSL_TYPE_UINT);
 
-    if (offset_node && offset_node->type != HLSL_IR_CONSTANT)
+    if (offset_node->type != HLSL_IR_CONSTANT)
     {
         FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
         offset_node = NULL;
     }
 
-    ret = var->reg;
+    return hlsl_ir_constant(offset_node)->value[0].u;
+}
 
-    ret.allocated = var->reg.allocated;
-    ret.id = var->reg.id;
-    if (offset_node)
-        offset = hlsl_ir_constant(offset_node)->value[0].u;
+struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+{
+    const struct hlsl_ir_var *var = deref->var;
+    struct hlsl_reg ret = var->reg;
+    unsigned int offset = hlsl_offset_from_deref(deref);
+
     ret.id += offset / 4;
 
     if (type_is_single_reg(var->data_type))
@@ -1221,7 +1223,7 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
     else
     {
         assert(type_is_single_reg(type));
-        ret.writemask = ((1 << type->dimx) - 1) << (offset & 3);
+        ret.writemask = ((1 << type->dimx) - 1) << (offset % 4);
     }
     return ret;
 }
