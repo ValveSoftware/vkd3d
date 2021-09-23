@@ -2432,15 +2432,11 @@ fail:
 static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
         struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    unsigned int i, writemask_offset = 0;
-    struct hlsl_ir_store *store;
+    unsigned int i, j, idx = 0;
     static unsigned int counter;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
     char name[23];
-
-    if (type->type == HLSL_CLASS_MATRIX)
-        hlsl_fixme(ctx, loc, "Matrix constructor.");
 
     sprintf(name, "<constructor-%x>", counter++);
     if (!(var = hlsl_new_synthetic_var(ctx, name, type, loc)))
@@ -2463,22 +2459,19 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
         }
         width = hlsl_type_component_count(arg->data_type);
 
-        if (width > 4)
+        for (j = 0; j < width; ++j)
         {
-            FIXME("Constructor argument with %u components.\n", width);
-            continue;
+            struct hlsl_ir_node *component = select_component(ctx, params->instrs, arg, j, loc);
+
+            if  (!(component = add_implicit_conversion(ctx, params->instrs, component,
+                    ctx->builtin_types.scalar[type->base_type], &arg->loc)))
+                return NULL;
+
+            if (!store_component(ctx, params->instrs, var, component, idx, loc))
+                return NULL;
+
+            ++idx;
         }
-
-        if (!(arg = add_implicit_conversion(ctx, params->instrs, arg,
-                ctx->builtin_types.vector[type->base_type][width - 1], &arg->loc)))
-            continue;
-
-        if (!(store = hlsl_new_store(ctx, var, NULL, arg,
-                ((1u << width) - 1) << writemask_offset, arg->loc)))
-            return NULL;
-        list_add_tail(params->instrs, &store->node.entry);
-
-        writemask_offset += width;
     }
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
