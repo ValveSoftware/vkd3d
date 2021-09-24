@@ -622,12 +622,53 @@ static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
     }
 }
 
+static unsigned int component_idx(struct hlsl_type *type, unsigned int x, unsigned int y);
+static struct hlsl_ir_node *select_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *instr,
+        unsigned int idx, struct vkd3d_shader_location loc);
+static struct hlsl_ir_node *store_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
+        struct hlsl_ir_node *rhs, unsigned int idx, struct vkd3d_shader_location loc);
+
+static bool add_matrix_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *matrix,
+        struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
+{
+    struct hlsl_type *mat_type = matrix->data_type, *ret_type;
+    struct hlsl_ir_var *var;
+    struct hlsl_ir_load *load;
+    static unsigned int counter = 0;
+    unsigned int i;
+    char name[32];
+
+    ret_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, mat_type->base_type, mat_type->dimx, 1);
+
+    sprintf(name, "<load-%x>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name, ret_type, loc);
+    if (!var)
+        return false;
+
+    for (i = 0; i < mat_type->dimx; ++i)
+    {
+        struct hlsl_ir_node *node;
+
+        if (!(node = select_component(ctx, instrs, matrix, component_idx(mat_type, i, 0 /*index*/), loc)))
+            return false;
+
+        if (!store_component(ctx, instrs, var, node, i, loc))
+            return false;
+    }
+
+    if (!(load = hlsl_new_load(ctx, var, NULL, ret_type, loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+
+    return true;
+}
+
 static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
 {
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
     struct hlsl_type *data_type;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_constant *c = NULL;
     struct hlsl_ir_expr *cast;
     struct hlsl_ir_node *mul;
 
@@ -706,11 +747,13 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     {
         data_type = expr_type->e.array.type;
     }
-    else if (expr_type->type == HLSL_CLASS_MATRIX || expr_type->type == HLSL_CLASS_VECTOR)
+    else if (expr_type->type == HLSL_CLASS_MATRIX)
+        /* Matrices are a special case, because data is not
+         * (necessarily) contiguous in memory. */
+        return add_matrix_load(ctx, instrs, array, index, loc);
+    else if (expr_type->type == HLSL_CLASS_VECTOR)
     {
-        /* This needs to be lowered now, while we still have type information. */
-        FIXME("Index of matrix or vector type.\n");
-        return false;
+        data_type = get_numeric_type(ctx, HLSL_CLASS_SCALAR, expr_type->base_type, 1, 1);
     }
     else
     {
@@ -721,9 +764,12 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
         return false;
     }
 
-    if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
-        return false;
-    list_add_tail(instrs, &c->node.entry);
+    if (!c)
+    {
+        if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
+            return false;
+        list_add_tail(instrs, &c->node.entry);
+    }
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
         return false;
     list_add_tail(instrs, &mul->entry);
