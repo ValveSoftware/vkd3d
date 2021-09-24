@@ -622,14 +622,15 @@ static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
     }
 }
 
-static unsigned int component_idx(struct hlsl_type *type, unsigned int x, unsigned int y);
+static struct hlsl_ir_node *component_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *x, struct hlsl_ir_node *y, struct vkd3d_shader_location *loc);
 static struct hlsl_ir_node *select_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *instr,
-        unsigned int idx, struct vkd3d_shader_location loc);
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
 static struct hlsl_ir_node *store_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_ir_node *rhs, unsigned int idx, struct vkd3d_shader_location loc);
+        struct hlsl_ir_node *rhs, struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
 
 static bool add_matrix_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *matrix,
-        struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *index, struct vkd3d_shader_location loc)
 {
     struct hlsl_type *mat_type = matrix->data_type, *ret_type;
     struct hlsl_ir_var *var;
@@ -647,12 +648,19 @@ static bool add_matrix_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
     for (i = 0; i < mat_type->dimx; ++i)
     {
-        struct hlsl_ir_node *node;
+        struct hlsl_ir_node *node, *component;
+        struct hlsl_ir_constant *i_node;
 
-        if (!(node = select_component(ctx, instrs, matrix, component_idx(mat_type, i, 0 /*index*/), loc)))
+        if (!(i_node = hlsl_new_uint_constant(ctx, i, loc)))
             return false;
 
-        if (!store_component(ctx, instrs, var, node, i, loc))
+        if (!(component = component_idx(ctx, instrs, mat_type, &i_node->node, index, &loc)))
+            return false;
+
+        if (!(node = select_component(ctx, instrs, matrix, component, &loc)))
+            return false;
+
+        if (!store_component(ctx, instrs, var, node, &i_node->node, &loc))
             return false;
     }
 
@@ -2069,63 +2077,108 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], &loc);
 }
 
-static unsigned int component_offset(struct hlsl_type *type, unsigned int x, unsigned int y)
+static struct hlsl_ir_node *component_offset(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *x, struct hlsl_ir_node *y, struct vkd3d_shader_location *loc)
 {
+    struct hlsl_ir_node *minor, *major;
+    struct hlsl_ir_constant *four;
+    struct hlsl_ir_expr *mul, *add;
+
     if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return 4 * y + x;
+    {
+        minor = x;
+        major = y;
+    }
     else
-        return 4 * x + y;
+    {
+        minor = y;
+        major = x;
+    }
+
+    if (!(four = hlsl_new_uint_constant(ctx, 4, *loc)))
+        return NULL;
+    list_add_tail(instrs, &four->node.entry);
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MUL, &four->node, major, loc)))
+        return NULL;
+
+    if (!(add = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_ADD, &mul->node, minor, loc)))
+        return NULL;
+
+    return &add->node;
 }
 
-static unsigned int component_offset_idx(struct hlsl_type *type, unsigned int idx)
+static struct hlsl_ir_node *component_offset_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc)
 {
-    unsigned int x, y;
+    struct hlsl_ir_constant *dimx;
+    struct hlsl_ir_expr *mod, *div;
 
     assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
-    assert(idx < type->dimx * type->dimy);
 
     if (type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR)
         return idx;
 
-    x = idx % type->dimx;
-    y = idx / type->dimx;
+    if (!(dimx = hlsl_new_uint_constant(ctx, type->dimx, *loc)))
+        return NULL;
+    list_add_tail(instrs, &dimx->node.entry);
 
-    return component_offset(type, x, y);
+    if (!(mod = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MOD, idx, &dimx->node, loc)))
+        return NULL;
+
+    if (!(div = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_DIV, idx, &dimx->node, loc)))
+        return NULL;
+
+    return component_offset(ctx, instrs, type, &mod->node, &div->node, loc);
 }
 
-static unsigned int component_idx(struct hlsl_type *type, unsigned int x, unsigned int y)
+static struct hlsl_ir_node *component_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *x, struct hlsl_ir_node *y, struct vkd3d_shader_location *loc)
 {
-    return type->dimx * y + x;
+    struct hlsl_ir_constant *dimx;
+    struct hlsl_ir_expr *mul, *add;
+
+    assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
+
+    if (!(dimx = hlsl_new_uint_constant(ctx, type->dimx, *loc)))
+        return NULL;
+    list_add_tail(instrs, &dimx->node.entry);
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MUL, &dimx->node, y, loc)))
+        return NULL;
+
+    if (!(add = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_ADD, &mul->node, x, loc)))
+        return NULL;
+
+    return &add->node;
 }
 
 static struct hlsl_ir_node *select_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *instr,
-        unsigned int idx, struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *scal_type = get_numeric_type(ctx, HLSL_CLASS_SCALAR, instr->data_type->base_type, 1, 1);
-    struct hlsl_ir_constant *offset;
     struct hlsl_ir_load *load;
+    struct hlsl_ir_node *offset;
 
-    if (!(offset = hlsl_new_uint_constant(ctx, component_offset_idx(instr->data_type, idx), loc)))
+    if (!(offset = component_offset_idx(ctx, instrs, instr->data_type, idx, loc)))
         return NULL;
-    list_add_tail(instrs, &offset->node.entry);
 
-    if (!(load = add_load(ctx, instrs, instr, &offset->node, scal_type, loc)))
+    if (!(load = add_load(ctx, instrs, instr, offset, scal_type, *loc)))
         return NULL;
 
     return &load->node;
 }
 
 static struct hlsl_ir_node *store_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_ir_node *rhs, unsigned int idx, struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *rhs, struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_constant *offset;
+    struct hlsl_ir_node *offset;
     struct hlsl_ir_store *store;
 
-    if (!(offset = hlsl_new_uint_constant(ctx, component_offset_idx(var->data_type, idx), loc)))
+    if (!(offset = component_offset_idx(ctx, instrs, var->data_type, idx, loc)))
         return NULL;
-    list_add_tail(instrs, &offset->node.entry);
 
-    if (!(store = hlsl_new_store(ctx, var, &offset->node, rhs, 0, loc)))
+    if (!(store = hlsl_new_store(ctx, var, offset, rhs, 0, *loc)))
         return NULL;
     list_add_tail(instrs, &store->node.entry);
 
@@ -2189,10 +2242,22 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         return false;
 
     for (i = 0; i < mat_type->dimx; ++i)
+    {
+        struct hlsl_ir_constant *i_node;
+        struct hlsl_ir_node *idx;
+
+        if (!(i_node = hlsl_new_uint_constant(ctx, i, loc)))
+            return false;
+        list_add_tail(params->instrs, &i_node->node.entry);
+
         for (j = 0; j < mat_type->dimy; ++j)
         {
-            struct hlsl_ir_constant *zero;
+            struct hlsl_ir_constant *zero, *j_node;
             struct hlsl_ir_node *node;
+
+            if (!(j_node = hlsl_new_uint_constant(ctx, j, loc)))
+                return false;
+            list_add_tail(params->instrs, &j_node->node.entry);
 
             if (!(zero = hlsl_new_constant(ctx, get_numeric_type(ctx, HLSL_CLASS_SCALAR, base, 1, 1), loc)))
                 return false;
@@ -2201,13 +2266,24 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
 
             for (k = 0; k < cast_type1->dimx && k < cast_type2->dimy; ++k)
             {
-                struct hlsl_ir_node *n1, *n2;
+                struct hlsl_ir_node *n1, *n2, *idx1, *idx2;
                 struct hlsl_ir_expr *mul, *add;
+                struct hlsl_ir_constant *k_node;
 
-                if (!(n1 = select_component(ctx, params->instrs, &cast1->node, component_idx(cast_type1, k, j), loc)))
+                if (!(k_node = hlsl_new_uint_constant(ctx, k, loc)))
+                    return false;
+                list_add_tail(params->instrs, &k_node->node.entry);
+
+                if (!(idx1 = component_idx(ctx, params->instrs, cast_type1, &k_node->node, &j_node->node, &loc)))
                     return false;
 
-                if (!(n2 = select_component(ctx, params->instrs, &cast2->node, component_idx(cast_type2, i, k), loc)))
+                if (!(n1 = select_component(ctx, params->instrs, &cast1->node, idx1, &loc)))
+                    return false;
+
+                if (!(idx2 = component_idx(ctx, params->instrs, cast_type2, &i_node->node, &k_node->node, &loc)))
+                    return false;
+
+                if (!(n2 = select_component(ctx, params->instrs, &cast2->node, idx2, &loc)))
                     return false;
 
                 if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, n1, n2, &loc)))
@@ -2219,9 +2295,13 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
                 node = &add->node;
             }
 
-            if (!store_component(ctx, params->instrs, var, node, component_idx(mat_type, i, j), loc))
+            if (!(idx = component_idx(ctx, params->instrs, mat_type, &i_node->node, &j_node->node, &loc)))
+                return false;
+
+            if (!store_component(ctx, params->instrs, var, node, idx, &loc))
                 return false;
         }
+    }
 
     if (!(load = hlsl_new_load(ctx, var, NULL, mat_type, loc)))
         return false;
@@ -2507,16 +2587,26 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
 
         for (j = 0; j < width; ++j)
         {
-            struct hlsl_ir_node *component = select_component(ctx, params->instrs, arg, j, loc);
+            struct hlsl_ir_node *component;
+            struct hlsl_ir_constant *j_node, *idx_node;
+
+            if (!(j_node = hlsl_new_uint_constant(ctx, j, loc)))
+                return false;
+            list_add_tail(params->instrs, &j_node->node.entry);
+
+            if (!(idx_node = hlsl_new_uint_constant(ctx, idx++, loc)))
+                return false;
+            list_add_tail(params->instrs, &idx_node->node.entry);
+
+            if (!(component = select_component(ctx, params->instrs, arg, &j_node->node, &loc)))
+                return false;
 
             if  (!(component = add_implicit_conversion(ctx, params->instrs, component,
                     ctx->builtin_types.scalar[type->base_type], &arg->loc)))
                 return NULL;
 
-            if (!store_component(ctx, params->instrs, var, component, idx, loc))
+            if (!store_component(ctx, params->instrs, var, component, &idx_node->node, &loc))
                 return NULL;
-
-            ++idx;
         }
     }
 
