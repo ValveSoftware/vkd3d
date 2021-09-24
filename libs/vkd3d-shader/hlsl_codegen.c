@@ -927,6 +927,11 @@ static bool fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
                         res->value[i].u = arg1->value[i].u * arg2->value[i].u;
                     break;
 
+                case HLSL_OP2_DIV:
+                    for (i = 0; i < instr->data_type->dimx; ++i)
+                        res->value[i].u = arg1->value[i].u / arg2->value[i].u;
+                    break;
+
                 default:
                     FIXME("Fold uint op %#x.\n", expr->op);
                     vkd3d_free(res);
