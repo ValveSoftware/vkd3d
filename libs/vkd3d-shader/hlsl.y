@@ -605,34 +605,6 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     return !!add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
-static unsigned int matrix_minor_size(struct hlsl_type *type)
-{
-    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return type->dimx;
-    else
-        return type->dimy;
-}
-
-static struct hlsl_ir_node *add_matrix_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *matrix,
-        unsigned int offset, const struct vkd3d_shader_location loc)
-{
-    struct hlsl_ir_constant *c;
-    struct hlsl_type *mat_type = matrix->data_type, *vec_type;
-    struct hlsl_ir_load *load;
-
-    assert(mat_type->type == HLSL_CLASS_MATRIX);
-    vec_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, mat_type->base_type, matrix_minor_size(mat_type), 1);
-
-    if (!(c = hlsl_new_uint_constant(ctx, offset * sizeof(float), loc)))
-        return NULL;
-    list_add_tail(instrs, &c->node.entry);
-
-    if (!(load = add_load(ctx, instrs, matrix, &c->node, vec_type, loc)))
-        return NULL;
-
-    return &load->node;
-}
-
 static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
 {
     switch (dim)
@@ -2051,62 +2023,167 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], &loc);
 }
 
+static unsigned int component_offset(struct hlsl_type *type, unsigned int x, unsigned int y)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return 4 * y + x;
+    else
+        return 4 * x + y;
+}
+
+static unsigned int component_offset_idx(struct hlsl_type *type, unsigned int idx)
+{
+    unsigned int x, y;
+
+    assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
+    assert(idx < type->dimx * type->dimy);
+
+    if (type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR)
+        return idx;
+
+    x = idx % type->dimx;
+    y = idx / type->dimx;
+
+    return component_offset(type, x, y);
+}
+
+static unsigned int component_idx(struct hlsl_type *type, unsigned int x, unsigned int y)
+{
+    return type->dimx * y + x;
+}
+
+static struct hlsl_ir_node *select_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *instr,
+        unsigned int idx, struct vkd3d_shader_location loc)
+{
+    struct hlsl_type *scal_type = get_numeric_type(ctx, HLSL_CLASS_SCALAR, instr->data_type->base_type, 1, 1);
+    struct hlsl_ir_constant *offset;
+    struct hlsl_ir_load *load;
+
+    if (!(offset = hlsl_new_uint_constant(ctx, component_offset_idx(instr->data_type, idx), loc)))
+        return NULL;
+    list_add_tail(instrs, &offset->node.entry);
+
+    if (!(load = add_load(ctx, instrs, instr, &offset->node, scal_type, loc)))
+        return NULL;
+
+    return &load->node;
+}
+
+static struct hlsl_ir_node *store_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
+        struct hlsl_ir_node *rhs, unsigned int idx, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_constant *offset;
+    struct hlsl_ir_store *store;
+
+    if (!(offset = hlsl_new_uint_constant(ctx, component_offset_idx(var->data_type, idx), loc)))
+        return NULL;
+    list_add_tail(instrs, &offset->node.entry);
+
+    if (!(store = hlsl_new_store(ctx, var, &offset->node, rhs, 0, loc)))
+        return NULL;
+    list_add_tail(instrs, &store->node.entry);
+
+    return &store->node;
+}
+
 static bool intrinsic_mul(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1];
-    struct hlsl_type *t1 = arg1->data_type, *t2 = arg2->data_type, *ret_type;
+    struct hlsl_ir_expr *cast1, *cast2, *cast3;
+    struct hlsl_type *t1 = arg1->data_type, *t2 = arg2->data_type, *cast_type1 = t1, *cast_type2 = t2, *mat_type, *ret_type;
     struct hlsl_ir_var *var;
     struct hlsl_ir_load *load;
     enum hlsl_base_type base = expr_common_base_type(t1->base_type, t2->base_type);
     char name[32];
     static unsigned int counter = 0;
-    unsigned int i;
+    unsigned int i, j, k, vect_count = 0;
 
-    if (t1->type != HLSL_CLASS_VECTOR || t2->type != HLSL_CLASS_MATRIX)
+    if (t1->type == HLSL_CLASS_SCALAR || t2->type == HLSL_CLASS_SCALAR)
+        return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL,
+                params->args[0], params->args[1], &loc);
+
+    if (t1->type == HLSL_CLASS_VECTOR)
     {
-        hlsl_fixme(ctx, loc, "Unimplemented matrix multiplication.");
-        return false;
+        vect_count++;
+        cast_type1 = get_numeric_type(ctx, HLSL_CLASS_MATRIX, base, t1->dimx, 1);
     }
-    if (t1->dimx != t2->dimy)
+    if (t2->type == HLSL_CLASS_VECTOR)
     {
-        hlsl_fixme(ctx, loc, "Matrix multiplication with incompatible shape.");
-        return false;
-    }
-    if (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-    {
-        hlsl_fixme(ctx, loc, "Unimplemented multiplication of a row-major matrix.");
-        return false;
+        vect_count++;
+        cast_type2 = get_numeric_type(ctx, HLSL_CLASS_MATRIX, base, 1, t2->dimx);
     }
 
-    ret_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, base, t2->dimx, 1);
+    mat_type = get_numeric_type(ctx, HLSL_CLASS_MATRIX, base, cast_type2->dimx, cast_type1->dimy);
+
+    if (vect_count == 0)
+        ret_type = mat_type;
+    else if (vect_count == 1)
+    {
+        assert(mat_type->dimx == 1 || mat_type->dimy == 1);
+        ret_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, base, mat_type->dimx * mat_type->dimy, 1);
+    }
+    else
+    {
+        assert(mat_type->dimx == 1 && mat_type->dimy == 1);
+        ret_type = get_numeric_type(ctx, HLSL_CLASS_SCALAR, base, 1, 1);
+    }
+
+    if (!(cast1 = hlsl_new_cast(ctx, arg1, cast_type1, &loc)))
+        return false;
+    list_add_tail(params->instrs, &cast1->node.entry);
+
+    if (!(cast2 = hlsl_new_cast(ctx, arg2, cast_type2, &loc)))
+        return false;
+    list_add_tail(params->instrs, &cast2->node.entry);
 
     sprintf(name, "<mul-%x>", counter++);
-    var = hlsl_new_synthetic_var(ctx, name, ret_type, loc);
+    var = hlsl_new_synthetic_var(ctx, name, mat_type, loc);
     if (!var)
         return false;
 
-    for (i = 0; i < t2->dimx; ++i)
-    {
-        struct hlsl_ir_node *load;
-        struct hlsl_ir_expr *expr;
-        struct hlsl_ir_store *store;
+    for (i = 0; i < mat_type->dimx; ++i)
+        for (j = 0; j < mat_type->dimy; ++j)
+        {
+            struct hlsl_ir_constant *zero;
+            struct hlsl_ir_node *node;
 
-        if (!(load = add_matrix_load(ctx, params->instrs, arg2, i, loc)))
-            return false;
+            if (!(zero = hlsl_new_constant(ctx, get_numeric_type(ctx, HLSL_CLASS_SCALAR, base, 1, 1), loc)))
+                return false;
+            node = &zero->node;
+            list_add_tail(params->instrs, &node->entry);
 
-        if (!(expr = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DOT, arg1, load, &loc)))
-            return false;
+            for (k = 0; k < cast_type1->dimx && k < cast_type2->dimy; ++k)
+            {
+                struct hlsl_ir_node *n1, *n2;
+                struct hlsl_ir_expr *mul, *add;
 
-        if (!(store = hlsl_new_store(ctx, var, NULL, &expr->node, 1u << i, loc)))
-            return false;
-        list_add_before(params->instrs, &store->node.entry);
-    }
+                if (!(n1 = select_component(ctx, params->instrs, &cast1->node, component_idx(cast_type1, k, j), loc)))
+                    return false;
 
-    load = hlsl_new_load(ctx, var, NULL, ret_type, loc);
-    if (!load)
+                if (!(n2 = select_component(ctx, params->instrs, &cast2->node, component_idx(cast_type2, i, k), loc)))
+                    return false;
+
+                if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, n1, n2, &loc)))
+                    return false;
+
+                if (!(add = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, node, &mul->node, &loc)))
+                    return false;
+
+                node = &add->node;
+            }
+
+            if (!store_component(ctx, params->instrs, var, node, component_idx(mat_type, i, j), loc))
+                return false;
+        }
+
+    if (!(load = hlsl_new_load(ctx, var, NULL, mat_type, loc)))
         return false;
-    list_add_before(params->instrs, &load->node.entry);
+    list_add_tail(params->instrs, &load->node.entry);
+
+    if (!(cast3 = hlsl_new_cast(ctx, &load->node, ret_type, &loc)))
+        return false;
+    list_add_tail(params->instrs, &cast3->node.entry);
 
     return true;
 }
