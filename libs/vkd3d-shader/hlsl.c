@@ -369,8 +369,8 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
                 && !hlsl_types_are_equal(t1->e.resource_format, t2->e.resource_format))
             return false;
     }
-    if ((t1->modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
-            != (t2->modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
+    if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+            != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
         return false;
     if (t1->dimx != t2->dimx)
         return false;
