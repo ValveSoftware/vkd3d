@@ -2238,12 +2238,6 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
     struct sm4_instruction instr;
     unsigned int writemask;
 
-    if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
-    {
-        hlsl_fixme(ctx, store->node.loc, "Store to a matrix variable.\n");
-        return;
-    }
-
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
 
