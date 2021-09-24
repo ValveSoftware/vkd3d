@@ -1655,13 +1655,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     {
         struct hlsl_ir_store *store;
 
-        if (!(store = hlsl_alloc(ctx, sizeof(*store))))
+        if (!(store = hlsl_new_store(ctx, hlsl_ir_load(lhs)->src.var, hlsl_ir_load(lhs)->src.offset.node, rhs, writemask, lhs->loc)))
             return NULL;
-        init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
-        store->writemask = writemask;
-        store->lhs.var = hlsl_ir_load(lhs)->src.var;
-        hlsl_src_from_node(&store->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
-        hlsl_src_from_node(&store->rhs, rhs);
         list_add_tail(instrs, &store->node.entry);
     }
 
