@@ -699,6 +699,60 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static unsigned int minor_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+static unsigned int major_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimy;
+    else
+        return type->dimx;
+}
+
+static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_ir_node *rhs;
+    struct hlsl_type *element_type;
+    const struct hlsl_type *type;
+    unsigned int i;
+    struct hlsl_ir_store *store;
+
+    if (instr->type != HLSL_IR_STORE)
+        return false;
+
+    store = hlsl_ir_store(instr);
+    rhs = store->rhs.node;
+    type = rhs->data_type;
+    if (type->type != HLSL_CLASS_MATRIX)
+        return false;
+    element_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, type->base_type, minor_size(type), 1);
+
+    if (rhs->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, instr->loc, "Copying from unsupported node type.\n");
+        return false;
+    }
+
+    for (i = 0; i < major_size(type); ++i)
+    {
+        if (!split_copy(ctx, store, hlsl_ir_load(rhs), 4 * i, element_type))
+            return false;
+    }
+
+    /* Remove the store instruction, so that we can split structs which contain
+     * other structs. Although assignments produce a value, we don't allow
+     * HLSL_IR_STORE to be used as a source. */
+    list_remove(&store->node.entry);
+    hlsl_free_instr(&store->node);
+    return true;
+}
+
 /* Lower samples from separate texture and sampler variables to samples from
  * synthesized combined samplers. That is, translate SM4-style samples in the
  * source to SM1-style samples in the bytecode. */
@@ -2417,6 +2471,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
+    transform_ir(ctx, split_matrix_copies, body, NULL);
     do
     {
         progress = transform_ir(ctx, fold_constant_exprs, body, NULL);
