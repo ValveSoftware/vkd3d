@@ -3702,6 +3702,7 @@ postfix_expr:
             {
                 hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on constructors.");
+                free_parse_initializer(&$4);
                 YYABORT;
             }
             if ($2->type > HLSL_CLASS_LAST_NUMERIC)
@@ -3712,6 +3713,7 @@ postfix_expr:
                     hlsl_error(ctx, @2, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Constructor data type %s is not numeric.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
+                free_parse_initializer(&$4);
                 YYABORT;
             }
             if ($2->dimx * $2->dimy != initializer_size(&$4))
@@ -3719,6 +3721,7 @@ postfix_expr:
                 hlsl_error(ctx, @4, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                         "Expected %u components in constructor, but got %u.",
                         $2->dimx * $2->dimy, initializer_size(&$4));
+                free_parse_initializer(&$4);
                 YYABORT;
             }
 
