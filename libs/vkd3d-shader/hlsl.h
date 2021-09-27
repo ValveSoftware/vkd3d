@@ -822,4 +822,17 @@ struct hlsl_type *get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_cl
 struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
         const struct hlsl_type *type, enum hlsl_base_type base_type);
 
+struct hlsl_ir_node *component_x_from_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *component_y_from_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *component_offset_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *component_idx(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_type *type,
+        struct hlsl_ir_node *x, struct hlsl_ir_node *y, struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *select_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *instr,
+        struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *store_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
+        struct hlsl_ir_node *rhs, struct hlsl_ir_node *idx, struct vkd3d_shader_location *loc);
+
 #endif

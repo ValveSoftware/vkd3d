@@ -753,6 +753,108 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static bool lower_numeric_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *source;
+    struct hlsl_ir_load *load;
+    struct hlsl_type *src_type, *dst_type = instr->data_type, *dst_stype;
+    struct hlsl_ir_var *var;
+    bool broadcast;
+    char name[32];
+    static unsigned int counter = 0;
+    unsigned int dst_idx;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP1_CAST)
+        return false;
+    source = expr->operands[0].node;
+    src_type = source->data_type;
+    if (dst_type->type > HLSL_CLASS_LAST_NUMERIC)
+        return false;
+    if (src_type->type > HLSL_CLASS_LAST_NUMERIC)
+        return false;
+
+    broadcast = src_type->dimx == 1 && src_type->dimy == 1;
+    assert(dst_type->dimx * dst_type->dimy <= src_type->dimx * src_type->dimy || broadcast);
+    if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX && !broadcast)
+    {
+        assert(dst_type->dimx <= src_type->dimx);
+        assert(dst_type->dimy <= src_type->dimy);
+    }
+
+    dst_stype = get_numeric_type(ctx, HLSL_CLASS_SCALAR, dst_type->base_type, 1, 1);
+
+    sprintf(name, "<cast-%x>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name, dst_type, instr->loc);
+    if (!var)
+        return false;
+
+    for (dst_idx = 0; dst_idx < dst_type->dimx * dst_type->dimy; ++dst_idx)
+    {
+        struct hlsl_ir_node *component, *src_idx_node;
+        struct hlsl_ir_constant *dst_idx_node;
+        struct hlsl_ir_expr *cast;
+
+        if (!(dst_idx_node = hlsl_new_uint_constant(ctx, dst_idx, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &dst_idx_node->node.entry);
+
+        if (broadcast)
+        {
+            struct hlsl_ir_constant *c;
+
+            if (!(c = hlsl_new_uint_constant(ctx, 0, instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &c->node.entry);
+
+            src_idx_node = &c->node;
+        }
+        else if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX)
+        {
+            struct hlsl_ir_node *x, *y;
+
+            if (!(x = component_x_from_idx(ctx, &instr->entry, dst_type, &dst_idx_node->node, &instr->loc)))
+                return false;
+
+            if (!(y = component_y_from_idx(ctx, &instr->entry, dst_type, &dst_idx_node->node, &instr->loc)))
+                return false;
+
+            if (!(src_idx_node = component_idx(ctx, &instr->entry, src_type, x, y, &instr->loc)))
+                return false;
+        }
+        else
+        {
+            struct hlsl_ir_constant *c;
+
+            if (!(c = hlsl_new_uint_constant(ctx, dst_idx, instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &c->node.entry);
+
+            src_idx_node = &c->node;
+        }
+
+        if (!(component = select_component(ctx, &instr->entry, source, src_idx_node, &instr->loc)))
+            return false;
+
+        if (!(cast = hlsl_new_cast(ctx, component, dst_stype, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &cast->node.entry);
+
+        if (!store_component(ctx, &instr->entry, var, &cast->node, &dst_idx_node->node, &instr->loc))
+            return false;
+    }
+
+    if (!(load = hlsl_new_load(ctx, var, NULL, dst_type, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &load->node.entry);
+    replace_node(instr, &load->node);
+
+    return true;
+}
+
 /* Lower samples from separate texture and sampler variables to samples from
  * synthesized combined samplers. That is, translate SM4-style samples in the
  * source to SM1-style samples in the bytecode. */
@@ -2471,6 +2573,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
+    transform_ir(ctx, lower_numeric_casts, body, NULL);
     transform_ir(ctx, split_matrix_copies, body, NULL);
     do
     {
