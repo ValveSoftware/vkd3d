@@ -1523,6 +1523,7 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
     struct liveness liveness = {0};
     allocate_temp_registers_recurse(ctx, &entry_func->body, &liveness);
     ctx->temp_count = liveness.reg_count;
+    vkd3d_free(liveness.regs);
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
