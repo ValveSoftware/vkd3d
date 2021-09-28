@@ -1022,15 +1022,15 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
     return hlsl_new_type(ctx, NULL, type, base, dimx, dimy);
 }
 
-static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
-        enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[3], struct vkd3d_shader_location *loc)
+static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_expr *expr;
     struct hlsl_type *type;
     unsigned int i;
 
     type = operands[0]->data_type;
-    for (i = 1; i <= 2; ++i)
+    for (i = 1; i < HLSL_MAX_OPERANDS; ++i)
     {
         if (!operands[i])
             break;
@@ -1038,7 +1038,7 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         if (!type)
             return NULL;
     }
-    for (i = 0; i <= 2; ++i)
+    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
     {
         struct hlsl_ir_expr *cast;
 
@@ -1062,7 +1062,7 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         return NULL;
     init_node(&expr->node, HLSL_IR_EXPR, type, *loc);
     expr->op = op;
-    for (i = 0; i <= 2; ++i)
+    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
         hlsl_src_from_node(&expr->operands[i], operands[i]);
     list_add_tail(instrs, &expr->node.entry);
 
@@ -1083,7 +1083,7 @@ static struct list *add_unary_expr(struct hlsl_ctx *ctx, struct list *instrs,
 static struct list *add_binary_expr(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
         enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {node_from_list(list1), node_from_list(list2)};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {node_from_list(list1), node_from_list(list2)};
 
     list_move_tail(list1, list2);
     vkd3d_free(list2);
@@ -1157,7 +1157,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     if (assign_op == ASSIGN_OP_SUB)
     {
-        struct hlsl_ir_node *args[3] = {rhs};
+        struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {rhs};
         struct hlsl_ir_expr *expr;
 
         if (!(expr = add_expr(ctx, instrs, HLSL_OP1_NEG, args, &rhs->loc)))
@@ -1167,8 +1167,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     }
     if (assign_op != ASSIGN_OP_ASSIGN)
     {
+        struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {lhs, rhs};
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
-        struct hlsl_ir_node *args[3] = {lhs, rhs};
         struct hlsl_ir_expr *expr;
 
         assert(op);
@@ -1556,7 +1556,7 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {params->args[0]};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0]};
 
     return !!add_expr(ctx, params->instrs, HLSL_OP1_ABS, args, &loc);
 }
@@ -1564,7 +1564,7 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {params->args[0], params->args[1]};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0], params->args[1]};
     struct hlsl_ir_expr *max;
 
     if (!(max = add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc)))
@@ -1578,7 +1578,7 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {params->args[0], params->args[1]};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0], params->args[1]};
 
     return !!add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc);
 }
@@ -1586,7 +1586,7 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {0};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_ir_node *log, *exp;
     struct hlsl_ir_expr *mul;
 
@@ -1608,7 +1608,7 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[3] = {params->args[0]};
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0]};
 
     return !!add_expr(ctx, params->instrs, HLSL_OP1_SAT, args, &loc);
 }

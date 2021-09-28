@@ -323,11 +323,13 @@ enum hlsl_ir_expr_op
     HLSL_OP3_LERP,
 };
 
+#define HLSL_MAX_OPERANDS 3
+
 struct hlsl_ir_expr
 {
     struct hlsl_ir_node node;
     enum hlsl_ir_expr_op op;
-    struct hlsl_src operands[3];
+    struct hlsl_src operands[HLSL_MAX_OPERANDS];
 };
 
 enum hlsl_ir_jump_type

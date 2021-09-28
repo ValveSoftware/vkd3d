@@ -1108,7 +1108,7 @@ static void dump_ir_expr(struct vkd3d_string_buffer *buffer, const struct hlsl_i
     unsigned int i;
 
     vkd3d_string_buffer_printf(buffer, "%s (", debug_hlsl_expr_op(expr->op));
-    for (i = 0; i < 3 && expr->operands[i].node; ++i)
+    for (i = 0; i < HLSL_MAX_OPERANDS && expr->operands[i].node; ++i)
     {
         dump_src(buffer, &expr->operands[i]);
         vkd3d_string_buffer_printf(buffer, " ");
