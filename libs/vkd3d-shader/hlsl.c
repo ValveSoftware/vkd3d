@@ -207,7 +207,11 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
-    type->name = name;
+    if (!(type->name = hlsl_strdup(ctx, name)))
+    {
+        vkd3d_free(type);
+        return NULL;
+    }
     type->type = type_class;
     type->base_type = base_type;
     type->dimx = dimx;
@@ -1656,21 +1660,21 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
             for (x = 1; x <= 4; ++x)
             {
                 sprintf(name, "%s%ux%u", names[bt], y, x);
-                type = hlsl_new_type(ctx, hlsl_strdup(ctx, name), HLSL_CLASS_MATRIX, bt, x, y);
+                type = hlsl_new_type(ctx, name, HLSL_CLASS_MATRIX, bt, x, y);
                 hlsl_scope_add_type(ctx->globals, type);
                 ctx->builtin_types.matrix[bt][x - 1][y - 1] = type;
 
                 if (y == 1)
                 {
                     sprintf(name, "%s%u", names[bt], x);
-                    type = hlsl_new_type(ctx, hlsl_strdup(ctx, name), HLSL_CLASS_VECTOR, bt, x, y);
+                    type = hlsl_new_type(ctx, name, HLSL_CLASS_VECTOR, bt, x, y);
                     hlsl_scope_add_type(ctx->globals, type);
                     ctx->builtin_types.vector[bt][x - 1] = type;
 
                     if (x == 1)
                     {
                         sprintf(name, "%s", names[bt]);
-                        type = hlsl_new_type(ctx, hlsl_strdup(ctx, name), HLSL_CLASS_SCALAR, bt, x, y);
+                        type = hlsl_new_type(ctx, name, HLSL_CLASS_SCALAR, bt, x, y);
                         hlsl_scope_add_type(ctx->globals, type);
                         ctx->builtin_types.scalar[bt] = type;
                     }
@@ -1681,16 +1685,16 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     for (bt = 0; bt <= HLSL_SAMPLER_DIM_MAX; ++bt)
     {
-        type = hlsl_new_type(ctx, hlsl_strdup(ctx, sampler_names[bt]), HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
+        type = hlsl_new_type(ctx, sampler_names[bt], HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
         type->sampler_dim = bt;
         ctx->builtin_types.sampler[bt] = type;
     }
 
-    ctx->builtin_types.Void = hlsl_new_type(ctx, hlsl_strdup(ctx, "void"), HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
+    ctx->builtin_types.Void = hlsl_new_type(ctx, "void", HLSL_CLASS_OBJECT, HLSL_TYPE_VOID, 1, 1);
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {
-        type = hlsl_new_type(ctx, hlsl_strdup(ctx, effect_types[i].name), effect_types[i].class,
+        type = hlsl_new_type(ctx, effect_types[i].name, effect_types[i].class,
                 effect_types[i].base_type, effect_types[i].dimx, effect_types[i].dimy);
         hlsl_scope_add_type(ctx->globals, type);
     }
