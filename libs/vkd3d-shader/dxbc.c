@@ -1213,6 +1213,12 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
         }
         extended = *(*ptr)++;
 
+        if (extended & VKD3D_SM4_EXTENDED_OPERAND)
+        {
+            FIXME("Skipping second-order extended operand.\n");
+            *ptr += *ptr < end;
+        }
+
         type = extended & VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK;
         if (type == VKD3D_SM4_EXTENDED_OPERAND_MODIFIER)
         {
@@ -1254,7 +1260,8 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
                 param->non_uniform = true;
 
             extended &= ~(VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK | VKD3D_SM4_REGISTER_MODIFIER_MASK
-                    | VKD3D_SM4_REGISTER_PRECISION_MASK | VKD3D_SM4_REGISTER_NON_UNIFORM_MASK);
+                    | VKD3D_SM4_REGISTER_PRECISION_MASK | VKD3D_SM4_REGISTER_NON_UNIFORM_MASK
+                    | VKD3D_SM4_EXTENDED_OPERAND);
             if (extended)
                 FIXME("Skipping unhandled extended operand bits 0x%08x.\n", extended);
         }
