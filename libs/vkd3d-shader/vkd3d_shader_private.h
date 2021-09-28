@@ -441,6 +441,17 @@ enum vkd3d_shader_register_type
     VKD3DSPR_INVALID = ~0u,
 };
 
+enum vkd3d_shader_register_precision
+{
+    VKD3D_SHADER_REGISTER_PRECISION_DEFAULT,
+    VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_16,
+    VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_10,
+    VKD3D_SHADER_REGISTER_PRECISION_MIN_INT_16,
+    VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16,
+
+    VKD3D_SHADER_REGISTER_PRECISION_INVALID = ~0u,
+};
+
 enum vkd3d_data_type
 {
     VKD3D_DATA_FLOAT,
@@ -621,6 +632,7 @@ struct vkd3d_shader_register_index
 struct vkd3d_shader_register
 {
     enum vkd3d_shader_register_type type;
+    enum vkd3d_shader_register_precision precision;
     enum vkd3d_data_type data_type;
     struct vkd3d_shader_register_index idx[3];
     enum vkd3d_immconst_type immconst_type;

@@ -925,6 +925,16 @@ static const enum vkd3d_shader_register_type register_type_table[] =
     /* VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL */     VKD3DSPR_DEPTHOUTLE,
 };
 
+static const enum vkd3d_shader_register_precision register_precision_table[] =
+{
+    /* VKD3D_SM4_REGISTER_PRECISION_DEFAULT */      VKD3D_SHADER_REGISTER_PRECISION_DEFAULT,
+    /* VKD3D_SM4_REGISTER_PRECISION_MIN_FLOAT_16 */ VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_16,
+    /* VKD3D_SM4_REGISTER_PRECISION_MIN_FLOAT_10 */ VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_10,
+    /* UNKNOWN */                                   VKD3D_SHADER_REGISTER_PRECISION_INVALID,
+    /* VKD3D_SM4_REGISTER_PRECISION_MIN_INT_16 */   VKD3D_SHADER_REGISTER_PRECISION_MIN_INT_16,
+    /* VKD3D_SM4_REGISTER_PRECISION_MIN_UINT_16 */  VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16,
+};
+
 static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode opcode)
 {
     unsigned int i;
@@ -1165,6 +1175,7 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
         enum vkd3d_data_type data_type, struct vkd3d_shader_register *param,
         enum vkd3d_shader_src_modifier *modifier)
 {
+    enum vkd3d_sm4_register_precision precision;
     enum vkd3d_sm4_register_type register_type;
     enum vkd3d_sm4_extended_operand_type type;
     enum vkd3d_sm4_register_modifier m;
@@ -1188,6 +1199,7 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
     {
         param->type = register_type_table[register_type];
     }
+    param->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     param->data_type = data_type;
 
     *modifier = VKD3DSPSM_NONE;
@@ -1225,7 +1237,20 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
                     break;
             }
 
-            extended &= ~(VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK | VKD3D_SM4_REGISTER_MODIFIER_MASK);
+            precision = (extended & VKD3D_SM4_REGISTER_PRECISION_MASK) >> VKD3D_SM4_REGISTER_PRECISION_SHIFT;
+            if (precision >= ARRAY_SIZE(register_precision_table)
+                    || register_precision_table[precision] == VKD3D_SHADER_REGISTER_PRECISION_INVALID)
+            {
+                FIXME("Unhandled register precision %#x.\n", precision);
+                param->precision = VKD3D_SHADER_REGISTER_PRECISION_INVALID;
+            }
+            else
+            {
+                param->precision = register_precision_table[precision];
+            }
+
+            extended &= ~(VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK | VKD3D_SM4_REGISTER_MODIFIER_MASK
+                    | VKD3D_SM4_REGISTER_PRECISION_MASK);
             if (extended)
                 FIXME("Skipping unhandled extended operand bits 0x%08x.\n", extended);
         }

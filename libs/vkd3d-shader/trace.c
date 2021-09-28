@@ -323,7 +323,9 @@ shader_input_sysval_semantic_names[] =
 struct vkd3d_d3d_asm_colours
 {
     const char *reset;
+    const char *error;
     const char *literal;
+    const char *modifier;
     const char *opcode;
     const char *reg;
     const char *swizzle;
@@ -1166,6 +1168,40 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     }
 }
 
+static void shader_print_precision(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg)
+{
+    struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *precision;
+
+    if (reg->precision == VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+        return;
+
+    switch (reg->precision)
+    {
+        case VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_16:
+            precision = "min16f";
+            break;
+
+        case VKD3D_SHADER_REGISTER_PRECISION_MIN_FLOAT_10:
+            precision = "min2_8f";
+            break;
+
+        case VKD3D_SHADER_REGISTER_PRECISION_MIN_INT_16:
+            precision = "min16i";
+            break;
+
+        case VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16:
+            precision = "min16u";
+            break;
+
+        default:
+            vkd3d_string_buffer_printf(buffer, " {%s<unhandled precision %#x>%s}",
+                    compiler->colours.error, reg->precision, compiler->colours.reset);
+            return;
+    }
+    vkd3d_string_buffer_printf(buffer, " {%s%s%s}", compiler->colours.modifier, precision, compiler->colours.reset);
+}
+
 static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_dst_param *param, bool is_declaration)
 {
@@ -1192,6 +1228,8 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
             shader_addline(buffer, "%c", write_mask_chars[3]);
         shader_addline(buffer, "%s", compiler->colours.reset);
     }
+
+    shader_print_precision(compiler, &param->reg);
 }
 
 static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1262,6 +1300,8 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     }
     if (src_modifier == VKD3DSPSM_ABS || src_modifier == VKD3DSPSM_ABSNEG)
         shader_addline(buffer, "|");
+
+    shader_print_precision(compiler, &param->reg);
 }
 
 static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1786,7 +1826,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     static const struct vkd3d_d3d_asm_colours no_colours =
     {
         .reset = "",
+        .error = "",
         .literal = "",
+        .modifier = "",
         .opcode = "",
         .reg = "",
         .swizzle = "",
@@ -1796,7 +1838,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     static const struct vkd3d_d3d_asm_colours colours =
     {
         .reset = "\x1b[m",
+        .error = "\x1b[97;41m",
         .literal = "\x1b[95m",
+        .modifier = "\x1b[36m",
         .opcode = "\x1b[96;1m",
         .reg = "\x1b[96m",
         .swizzle = "\x1b[93m",
