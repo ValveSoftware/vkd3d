@@ -1200,6 +1200,7 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
         param->type = register_type_table[register_type];
     }
     param->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
+    param->non_uniform = false;
     param->data_type = data_type;
 
     *modifier = VKD3DSPSM_NONE;
@@ -1249,8 +1250,11 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
                 param->precision = register_precision_table[precision];
             }
 
+            if (extended & VKD3D_SM4_REGISTER_NON_UNIFORM_MASK)
+                param->non_uniform = true;
+
             extended &= ~(VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK | VKD3D_SM4_REGISTER_MODIFIER_MASK
-                    | VKD3D_SM4_REGISTER_PRECISION_MASK);
+                    | VKD3D_SM4_REGISTER_PRECISION_MASK | VKD3D_SM4_REGISTER_NON_UNIFORM_MASK);
             if (extended)
                 FIXME("Skipping unhandled extended operand bits 0x%08x.\n", extended);
         }

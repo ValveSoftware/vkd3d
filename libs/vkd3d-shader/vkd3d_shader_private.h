@@ -633,6 +633,7 @@ struct vkd3d_shader_register
 {
     enum vkd3d_shader_register_type type;
     enum vkd3d_shader_register_precision precision;
+    bool non_uniform;
     enum vkd3d_data_type data_type;
     struct vkd3d_shader_register_index idx[3];
     enum vkd3d_immconst_type immconst_type;

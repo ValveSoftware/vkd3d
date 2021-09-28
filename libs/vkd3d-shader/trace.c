@@ -1202,6 +1202,13 @@ static void shader_print_precision(struct vkd3d_d3d_asm_compiler *compiler, cons
     vkd3d_string_buffer_printf(buffer, " {%s%s%s}", compiler->colours.modifier, precision, compiler->colours.reset);
 }
 
+static void shader_print_non_uniform(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg)
+{
+    if (reg->non_uniform)
+        vkd3d_string_buffer_printf(&compiler->buffer, " {%snonuniform%s}",
+                compiler->colours.modifier, compiler->colours.reset);
+}
+
 static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_dst_param *param, bool is_declaration)
 {
@@ -1230,6 +1237,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
     }
 
     shader_print_precision(compiler, &param->reg);
+    shader_print_non_uniform(compiler, &param->reg);
 }
 
 static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1302,6 +1310,7 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
         shader_addline(buffer, "|");
 
     shader_print_precision(compiler, &param->reg);
+    shader_print_non_uniform(compiler, &param->reg);
 }
 
 static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
