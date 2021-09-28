@@ -469,6 +469,8 @@ struct hlsl_ctx
         size_t count, size;
     } constant_defs;
     uint32_t temp_count;
+
+    uint32_t in_state_block : 1;
 };
 
 enum hlsl_error_level

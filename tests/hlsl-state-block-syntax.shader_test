@@ -1,0 +1,173 @@
+[pixel shader fail]
+sampler s
+{
+    foo = float;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s = sampler_state
+{
+    foo = float;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s
+{
+    2 = 3;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s
+{
+    2;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s
+{
+    foo;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s
+{
+    foo = bar
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s {}
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f {} = 1;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f = 1 {};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+sampler s = sampler_state;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f {} : register(c1);
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f
+{
+    foo = (sampler)2;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f
+{
+    foo = (faketype)2;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f
+{
+    foo = (sampler)bar;
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+float f
+{
+    foo = bar();
+};
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader]
+float u : register(c1) {};
+float4 main() : sv_target
+{
+    float zero = 0;
+    float a {};
+    float b
+    {
+        foo = bar;
+        foo = bar;
+        foo = (int)2;
+        foo = (int)bar;
+        foo = float4(bar, baz, qux, xyzzy);
+        foo = zero++;
+    };
+    float c {}, d = 1, e;
+    struct {int a;} s {foo = bar;};
+    return float4(0, 1, zero, 1);
+}
+
+[test]
+draw quad
+probe all rgba (0, 1, 0, 1)
