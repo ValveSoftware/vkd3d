@@ -3610,6 +3610,10 @@ type:
 
             $$ = ctx->builtin_types.vector[$3->base_type][$5 - 1];
         }
+    | KW_VECTOR
+        {
+            $$ = ctx->builtin_types.vector[HLSL_TYPE_FLOAT][4 - 1];
+        }
     | KW_MATRIX '<' type ',' C_INTEGER ',' C_INTEGER '>'
         {
             if ($3->type != HLSL_CLASS_SCALAR)
@@ -3637,6 +3641,10 @@ type:
             }
 
             $$ = ctx->builtin_types.matrix[$3->base_type][$7 - 1][$5 - 1];
+        }
+    | KW_MATRIX
+        {
+            $$ = ctx->builtin_types.matrix[HLSL_TYPE_FLOAT][4 - 1][4 - 1];
         }
     | KW_VOID
         {
