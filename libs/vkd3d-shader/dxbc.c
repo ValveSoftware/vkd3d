@@ -1166,7 +1166,9 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
         enum vkd3d_shader_src_modifier *modifier)
 {
     enum vkd3d_sm4_register_type register_type;
-    DWORD token, order;
+    enum vkd3d_sm4_extended_operand_type type;
+    enum vkd3d_sm4_register_modifier m;
+    uint32_t token, order, extended;
 
     if (*ptr >= end)
     {
@@ -1188,42 +1190,49 @@ static bool shader_sm4_read_param(struct vkd3d_sm4_data *priv, const DWORD **ptr
     }
     param->data_type = data_type;
 
-    if (token & VKD3D_SM4_REGISTER_MODIFIER)
+    *modifier = VKD3DSPSM_NONE;
+    if (token & VKD3D_SM4_EXTENDED_OPERAND)
     {
-        DWORD m;
-
         if (*ptr >= end)
         {
             WARN("Invalid ptr %p >= end %p.\n", *ptr, end);
             return false;
         }
-        m = *(*ptr)++;
+        extended = *(*ptr)++;
 
-        switch (m)
+        type = extended & VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK;
+        if (type == VKD3D_SM4_EXTENDED_OPERAND_MODIFIER)
         {
-            case VKD3D_SM4_REGISTER_MODIFIER_NEGATE:
-                *modifier = VKD3DSPSM_NEG;
-                break;
+            m = (extended & VKD3D_SM4_REGISTER_MODIFIER_MASK) >> VKD3D_SM4_REGISTER_MODIFIER_SHIFT;
+            switch (m)
+            {
+                case VKD3D_SM4_REGISTER_MODIFIER_NEGATE:
+                    *modifier = VKD3DSPSM_NEG;
+                    break;
 
-            case VKD3D_SM4_REGISTER_MODIFIER_ABS:
-                *modifier = VKD3DSPSM_ABS;
-                break;
+                case VKD3D_SM4_REGISTER_MODIFIER_ABS:
+                    *modifier = VKD3DSPSM_ABS;
+                    break;
 
-            case VKD3D_SM4_REGISTER_MODIFIER_ABS_NEGATE:
-                *modifier = VKD3DSPSM_ABSNEG;
-                break;
+                case VKD3D_SM4_REGISTER_MODIFIER_ABS_NEGATE:
+                    *modifier = VKD3DSPSM_ABSNEG;
+                    break;
 
-            default:
-                FIXME("Skipping modifier 0x%08x.\n", m);
-                /* fall-through */
-            case VKD3D_SM4_REGISTER_MODIFIER_NONE:
-                *modifier = VKD3DSPSM_NONE;
-                break;
+                default:
+                    FIXME("Unhandled register modifier %#x.\n", m);
+                    /* fall-through */
+                case VKD3D_SM4_REGISTER_MODIFIER_NONE:
+                    break;
+            }
+
+            extended &= ~(VKD3D_SM4_EXTENDED_OPERAND_TYPE_MASK | VKD3D_SM4_REGISTER_MODIFIER_MASK);
+            if (extended)
+                FIXME("Skipping unhandled extended operand bits 0x%08x.\n", extended);
         }
-    }
-    else
-    {
-        *modifier = VKD3DSPSM_NONE;
+        else if (type)
+        {
+            FIXME("Skipping unhandled extended operand token 0x%08x (type %#x).\n", extended, type);
+        }
     }
 
     order = (token & VKD3D_SM4_REGISTER_ORDER_MASK) >> VKD3D_SM4_REGISTER_ORDER_SHIFT;

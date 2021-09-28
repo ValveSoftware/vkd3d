@@ -750,11 +750,12 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         token |= sm4_swizzle_type(instr->srcs[i].reg.type) << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= instr->srcs[i].swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
         if (instr->srcs[i].reg.mod)
-            token |= VKD3D_SM4_REGISTER_MODIFIER;
+            token |= VKD3D_SM4_EXTENDED_OPERAND;
         put_u32(buffer, token);
 
         if (instr->srcs[i].reg.mod)
-            put_u32(buffer, instr->srcs[i].reg.mod);
+            put_u32(buffer, (instr->srcs[i].reg.mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+                    | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER);
 
         for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
             put_u32(buffer, instr->srcs[i].reg.idx[j]);
