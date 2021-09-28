@@ -200,7 +200,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
     }
 }
 
-struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
+static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
     struct hlsl_type *type;
@@ -1658,6 +1658,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
                 sprintf(name, "%s%ux%u", names[bt], y, x);
                 type = hlsl_new_type(ctx, hlsl_strdup(ctx, name), HLSL_CLASS_MATRIX, bt, x, y);
                 hlsl_scope_add_type(ctx->globals, type);
+                ctx->builtin_types.matrix[bt][x - 1][y - 1] = type;
 
                 if (y == 1)
                 {
