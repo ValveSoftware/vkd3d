@@ -232,7 +232,7 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
         struct hlsl_block *block, void *context)
 {
     struct hlsl_ir_node *instr, *next;
-    bool progress = 0;
+    bool progress = false;
 
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
@@ -248,6 +248,292 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
 
         progress |= func(ctx, instr, context);
     }
+
+    return progress;
+}
+
+enum ir_block
+{
+    NO_BLOCK,
+    ENTER,
+    ELSE,
+    LEAVE,
+};
+
+static bool transform_ir_blocks(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, enum ir_block, void *),
+                                struct hlsl_block *block, void *context)
+{
+    struct hlsl_ir_node *instr, *next;
+    bool progress = false;
+
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            progress |= func(ctx, instr, ENTER, context);
+            progress |= transform_ir_blocks(ctx, func, &iff->then_instrs, context);
+            progress |= func(ctx, instr, ELSE, context);
+            progress |= transform_ir_blocks(ctx, func, &iff->else_instrs, context);
+            progress |= func(ctx, instr, LEAVE, context);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            progress |= func(ctx, instr, ENTER, context);
+            progress |= transform_ir_blocks(ctx, func, &hlsl_ir_loop(instr)->body, context);
+            progress |= func(ctx, instr, LEAVE, context);
+        }
+        else
+            progress |= func(ctx, instr, NO_BLOCK, context);
+    }
+
+    return progress;
+}
+
+struct copy_propagation_value
+{
+    struct hlsl_ir_node *node;
+    unsigned int index;
+};
+
+struct copy_propagation_variable
+{
+    struct rb_entry entry;
+    struct hlsl_ir_var *var;
+    struct copy_propagation_value *values;
+};
+
+struct copy_propagation_state
+{
+    struct rb_tree variables;
+    unsigned int level;
+};
+
+static struct copy_propagation_variable *copy_propagation_get_var(struct hlsl_ctx *ctx, struct copy_propagation_state *state, struct hlsl_ir_var *var)
+{
+    struct rb_entry *entry = rb_get(&state->variables, var);
+    struct copy_propagation_variable *variable;
+    int res;
+
+    if (entry)
+        return RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+
+    variable = hlsl_alloc(ctx, sizeof(*variable));
+    if (!variable)
+        return NULL;
+
+    variable->var = var;
+    variable->values = hlsl_alloc(ctx, sizeof(*variable->values) * var->data_type->reg_size);
+    if (!variable->values)
+    {
+        vkd3d_free(variable);
+        return NULL;
+    }
+
+    res = rb_put(&state->variables, var, &variable->entry);
+    assert(!res);
+
+    return variable;
+}
+
+static void invalidate_whole_variable(struct copy_propagation_variable *variable)
+{
+    TRACE("invalidate variable %s\n", variable->var->name);
+    memset(variable->values, 0, sizeof(*variable->values) * variable->var->data_type->reg_size);
+}
+
+static void set_variable(struct copy_propagation_variable *variable, unsigned int offset, unsigned char writemask, struct hlsl_ir_node *node)
+{
+    unsigned int index;
+
+    for (index = 0; index < 4; ++index)
+    {
+        if (writemask & (1u << index))
+        {
+            if (TRACE_ON())
+            {
+                char buf[32];
+                if (node && node->index)
+                    sprintf(buf, "@%u", node->index);
+                else
+                    sprintf(buf, "%p", node);
+                TRACE("set variable %s[%d] to %p[%d]\n", variable->var->name, offset + index, node, index);
+            }
+            variable->values[offset + index].node = node;
+            variable->values[offset + index].index = index;
+        }
+    }
+}
+
+static struct hlsl_ir_node *reconstruct_node(struct copy_propagation_variable *variable, unsigned int offset, unsigned int count,
+        unsigned int indices[4])
+{
+    struct hlsl_ir_node *node = NULL;
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+    {
+        if (offset + i >= variable->var->data_type->reg_size)
+            return NULL;
+
+        if (!node)
+            node = variable->values[offset + i].node;
+        else
+            if (node != variable->values[offset + i].node)
+                return NULL;
+        indices[i] = variable->values[offset + i].index;
+    }
+
+    return node;
+}
+
+static bool recover_offset(struct hlsl_ir_node *instr, unsigned int *offset)
+{
+    if (!instr)
+    {
+        *offset = 0;
+        return true;
+    }
+
+    assert(instr->data_type->type == HLSL_CLASS_SCALAR
+            && instr->data_type->base_type == HLSL_TYPE_UINT);
+
+    if (instr->type != HLSL_IR_CONSTANT)
+        return false;
+
+    *offset = hlsl_ir_constant(instr)->value[0].u;
+    return true;
+}
+
+static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
+
+static bool copy_propagation_func(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, enum ir_block phase, void *context)
+{
+    struct copy_propagation_state *state = context;
+
+    switch (instr->type)
+    {
+        case HLSL_IR_LOAD:
+        {
+            struct hlsl_ir_load *load = hlsl_ir_load(instr);
+            struct hlsl_deref *src = &load->src;
+            struct hlsl_ir_var *var = src->var;
+            struct copy_propagation_variable *variable;
+            struct hlsl_ir_node *new_node;
+            struct hlsl_ir_swizzle *swizzle;
+            DWORD s;
+            unsigned int i, offset, indices[4] = {};
+
+            if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
+                break;
+
+            if (instr->data_type->type != HLSL_CLASS_SCALAR && instr->data_type->type != HLSL_CLASS_VECTOR)
+                break;
+
+            if (!recover_offset(src->offset.node, &offset))
+                break;
+
+            variable = copy_propagation_get_var(ctx, state, var);
+            new_node = reconstruct_node(variable, offset, instr->data_type->dimx, indices);
+
+            if (TRACE_ON())
+            {
+                char buf[32];
+                if (new_node && new_node->index)
+                    sprintf(buf, "@%u", new_node->index);
+                else
+                    sprintf(buf, "%p", new_node);
+                TRACE("load from %s[%d-%d] reconstructed to %s[%d %d %d %d]\n", var->name, offset, offset + instr->data_type->dimx, buf,
+                        indices[0], indices[1], indices[2], indices[3]);
+            }
+
+            if (!new_node)
+                break;
+
+            for (i = 0; i < instr->data_type->dimx; ++i)
+                if (i != indices[i])
+                    break;
+
+            if (i != instr->data_type->dimx)
+                break;
+
+            TRACE("ready %s -> %s\n", debug_hlsl_type(ctx, new_node->data_type), debug_hlsl_type(ctx, instr->data_type));
+
+            s = indices[0] | indices[1] << 2 | indices[2] << 4 | indices[3] << 6;
+            if (!(swizzle = hlsl_new_swizzle(ctx, s, instr->data_type->dimx, new_node, &instr->loc)))
+                break;
+            list_add_before(&instr->entry, &swizzle->node.entry);
+
+            replace_node(instr, &swizzle->node);
+            list_remove(&instr->entry);
+            hlsl_free_instr(instr);
+
+            break;
+        }
+
+        case HLSL_IR_STORE:
+        {
+            struct hlsl_ir_store *store = hlsl_ir_store(instr);
+            struct hlsl_deref *lhs = &store->lhs;
+            struct hlsl_ir_var *var = lhs->var;
+            struct copy_propagation_variable *variable;
+            unsigned int offset;
+
+            if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
+                break;
+
+            variable = copy_propagation_get_var(ctx, state, var);
+
+            if (!store->writemask)
+                FIXME("Invalid writemask, probably store should be lowered.\n");
+            if (!recover_offset(lhs->offset.node, &offset))
+                invalidate_whole_variable(variable);
+            else
+                set_variable(variable, offset, store->writemask, store->rhs.node);
+
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
+static int copy_propagation_compare(const void *key, const struct rb_entry *entry)
+{
+    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+    uintptr_t key_int = (uintptr_t)key, entry_int = (uintptr_t)variable->var;
+
+    if (key_int < entry_int)
+        return -1;
+    else if (key_int > entry_int)
+        return 1;
+    else
+        return 0;
+}
+
+static void copy_propagation_destroy(struct rb_entry *entry, void *context)
+{
+    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+
+    vkd3d_free(variable);
+}
+
+static bool copy_propagation_pass(struct hlsl_ctx *ctx, struct hlsl_block *block)
+{
+    struct copy_propagation_state state;
+    bool progress;
+
+    rb_init(&state.variables, copy_propagation_compare);
+    state.level = 0;
+
+    progress = transform_ir_blocks(ctx, copy_propagation_func, block, (void*)&state);
+
+    assert(state.level == 0);
+    rb_destroy(&state.variables, copy_propagation_destroy, NULL);
 
     return progress;
 }
@@ -2729,6 +3015,8 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     {
         progress = transform_ir(ctx, fold_constant_exprs, body, NULL);
         progress |= transform_ir(ctx, fold_constant_swizzles, body, NULL);
+        progress |= copy_propagation_pass(ctx, body);
+        progress |= transform_ir(ctx, fold_redundant_casts, body, NULL);
     }
     while (progress);
 
