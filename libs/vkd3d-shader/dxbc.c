@@ -1544,7 +1544,7 @@ void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3
         WARN("End of byte-code, failed to read opcode.\n");
         goto fail;
     }
-    remaining = sm4->end - *ptr;
+    remaining = sm4->end - (const DWORD*)*ptr;
 
     opcode_token = *(*ptr)++;
     opcode = opcode_token & VKD3D_SM4_OPCODE_MASK;
