@@ -753,6 +753,155 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static bool split_matrix_operations(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_type *type = instr->data_type, *op_type, *element_type, *element_op_type;
+    struct hlsl_ir_var *var;
+    struct hlsl_ir_load *load, *arg1, *arg2 = NULL;
+    unsigned int i;
+    static unsigned int counter = 0;
+    char name[32];
+    bool binary;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    if (type->type != HLSL_CLASS_MATRIX)
+        return false;
+    expr = hlsl_ir_expr(instr);
+
+    switch (expr->op)
+    {
+        case HLSL_OP1_ABS:
+        case HLSL_OP1_BIT_NOT:
+        case HLSL_OP1_COS:
+        case HLSL_OP1_COS_REDUCED:
+        case HLSL_OP1_EXP2:
+        case HLSL_OP1_FRACT:
+        case HLSL_OP1_LOG2:
+        case HLSL_OP1_LOGIC_NOT:
+        case HLSL_OP1_NEG:
+        case HLSL_OP1_RCP:
+        case HLSL_OP1_REINTERPRET:
+        case HLSL_OP1_SAT:
+        case HLSL_OP1_SIGN:
+        case HLSL_OP1_SIN:
+        case HLSL_OP1_SIN_REDUCED:
+        case HLSL_OP1_SQRT:
+        case HLSL_OP2_ADD:
+        case HLSL_OP2_BIT_AND:
+        case HLSL_OP2_BIT_OR:
+        case HLSL_OP2_BIT_XOR:
+        case HLSL_OP2_DIV:
+        case HLSL_OP2_EQUAL:
+        case HLSL_OP2_GEQUAL:
+        case HLSL_OP2_GREATER:
+        case HLSL_OP2_LEQUAL:
+        case HLSL_OP2_LESS:
+        case HLSL_OP2_LOGIC_AND:
+        case HLSL_OP2_LOGIC_OR:
+        case HLSL_OP2_MAX:
+        case HLSL_OP2_MIN:
+        case HLSL_OP2_MOD:
+        case HLSL_OP2_MUL:
+        case HLSL_OP2_NEQUAL:
+            break;
+
+        default:
+            return false;
+    }
+
+    op_type = expr->operands[0].node->data_type;
+    assert(op_type->type == HLSL_CLASS_MATRIX);
+    assert(major_size(type) == major_size(op_type));
+    assert(minor_size(type) == minor_size(op_type));
+
+    binary = !!expr->operands[1].node;
+    if (expr->operands[0].node->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, instr->loc, "Splitting from unsupported node type.\n");
+        return false;
+    }
+    arg1 = hlsl_ir_load(expr->operands[0].node);
+    if (binary)
+    {
+        assert(hlsl_types_are_equal(expr->operands[0].node->data_type, expr->operands[1].node->data_type));
+        if (expr->operands[1].node->type != HLSL_IR_LOAD)
+        {
+            hlsl_fixme(ctx, instr->loc, "Splitting from unsupported node type.\n");
+            return false;
+        }
+        arg2 = hlsl_ir_load(expr->operands[1].node);
+    }
+
+    element_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, type->base_type, minor_size(type), 1);
+    element_op_type = get_numeric_type(ctx, HLSL_CLASS_VECTOR, op_type->base_type, minor_size(type), 1);
+
+    sprintf(name, "<split-op-%x>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name, type, instr->loc);
+    if (!var)
+        return false;
+
+    for (i = 0; i < major_size(type); ++i)
+    {
+        struct hlsl_ir_constant *c;
+        struct hlsl_ir_node *offset1, *offset2, *operands[HLSL_MAX_OPERANDS] = {}, *new_expr;
+        struct hlsl_ir_load *load1, *load2;
+        struct hlsl_ir_store *store;
+
+        if (!(c = hlsl_new_uint_constant(ctx, 4 * i, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &c->node.entry);
+        offset1 = &c->node;
+        offset2 = &c->node;
+
+        if (arg1->src.offset.node)
+        {
+            if (!(offset1 = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg1->src.offset.node, offset1)))
+                return false;
+            list_add_before(&instr->entry, &offset1->entry);
+        }
+
+        if (binary && arg2->src.offset.node)
+        {
+            if (!(offset2 = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg2->src.offset.node, offset2)))
+                return false;
+            list_add_before(&instr->entry, &offset2->entry);
+        }
+
+        if (!(load1 = hlsl_new_load(ctx, arg1->src.var, offset1, element_op_type, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &load1->node.entry);
+        operands[0] = &load1->node;
+
+        if (binary)
+        {
+            if (!(load2 = hlsl_new_load(ctx, arg2->src.var, offset2, element_op_type, instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &load2->node.entry);
+            operands[1] = &load2->node;
+        }
+
+        if (!(new_expr = hlsl_new_expr(ctx, expr->op, element_type, operands, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &new_expr->entry);
+
+        if (!(store = hlsl_new_store(ctx, var, &c->node, new_expr, 0, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &store->node.entry);
+    }
+
+    if (!(load = hlsl_new_load(ctx, var, NULL, type, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &load->node.entry);
+
+    replace_node(instr, &load->node);
+    list_remove(&instr->entry);
+    hlsl_free_instr(instr);
+
+    return true;
+}
+
 static bool lower_numeric_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_expr *expr;
@@ -2574,6 +2723,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     }
     while (progress);
     transform_ir(ctx, lower_numeric_casts, body, NULL);
+    transform_ir(ctx, split_matrix_operations, body, NULL);
     transform_ir(ctx, split_matrix_copies, body, NULL);
     do
     {
