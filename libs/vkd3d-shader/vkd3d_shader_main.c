@@ -41,7 +41,7 @@ static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
 {
-    unsigned int new_buffer_size = buffer->buffer_size * 2;
+    unsigned int new_buffer_size = buffer->buffer_size;
     char *new_buffer;
 
     new_buffer_size = max(new_buffer_size, 32);
