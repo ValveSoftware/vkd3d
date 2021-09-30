@@ -306,42 +306,10 @@ struct copy_propagation_variable
 
 struct copy_propagation_state
 {
-    struct rb_tree variables;
+    struct rb_tree *variables;
     unsigned int level;
+    unsigned int capacity;
 };
-
-static struct copy_propagation_variable *copy_propagation_get_var(struct hlsl_ctx *ctx, struct copy_propagation_state *state, struct hlsl_ir_var *var)
-{
-    struct rb_entry *entry = rb_get(&state->variables, var);
-    struct copy_propagation_variable *variable;
-    int res;
-
-    if (entry)
-        return RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
-
-    variable = hlsl_alloc(ctx, sizeof(*variable));
-    if (!variable)
-        return NULL;
-
-    variable->var = var;
-    variable->values = hlsl_alloc(ctx, sizeof(*variable->values) * var->data_type->reg_size);
-    if (!variable->values)
-    {
-        vkd3d_free(variable);
-        return NULL;
-    }
-
-    res = rb_put(&state->variables, var, &variable->entry);
-    assert(!res);
-
-    return variable;
-}
-
-static void invalidate_whole_variable(struct copy_propagation_variable *variable)
-{
-    TRACE("invalidate variable %s\n", variable->var->name);
-    memset(variable->values, 0, sizeof(*variable->values) * variable->var->data_type->reg_size);
-}
 
 static void set_variable(struct copy_propagation_variable *variable, unsigned int offset, unsigned char writemask, struct hlsl_ir_node *node)
 {
@@ -406,7 +374,126 @@ static bool recover_offset(struct hlsl_ir_node *instr, unsigned int *offset)
     return true;
 }
 
+static struct copy_propagation_variable *copy_propagation_get_var(struct hlsl_ctx *ctx, struct copy_propagation_state *state, struct hlsl_ir_var *var)
+{
+    struct rb_entry *entry = rb_get(&state->variables[state->level], var);
+    struct copy_propagation_variable *variable;
+    int res;
+
+    if (entry)
+        return RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+
+    variable = hlsl_alloc(ctx, sizeof(*variable));
+    if (!variable)
+        return NULL;
+
+    variable->var = var;
+    variable->values = hlsl_alloc(ctx, sizeof(*variable->values) * var->data_type->reg_size);
+    if (!variable->values)
+    {
+        vkd3d_free(variable);
+        return NULL;
+    }
+
+    res = rb_put(&state->variables[state->level], var, &variable->entry);
+    assert(!res);
+
+    return variable;
+}
+
+static void invalidate_whole_variable(struct copy_propagation_variable *variable)
+{
+    TRACE("invalidate variable %s\n", variable->var->name);
+    memset(variable->values, 0, sizeof(*variable->values) * variable->var->data_type->reg_size);
+}
+
+static void invalidate_from_block(struct hlsl_ctx *ctx, struct copy_propagation_state *state, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_STORE)
+        {
+            struct hlsl_ir_store *store = hlsl_ir_store(instr);
+            struct hlsl_deref *lhs = &store->lhs;
+            struct hlsl_ir_var *var = lhs->var;
+            struct copy_propagation_variable *variable;
+            unsigned int offset;
+
+            if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
+                break;
+
+            variable = copy_propagation_get_var(ctx, state, var);
+
+            if (!store->writemask)
+                FIXME("Invalid writemask, probably store should be lowered.\n");
+            if (!recover_offset(lhs->offset.node, &offset))
+                invalidate_whole_variable(variable);
+            else
+                set_variable(variable, offset, store->writemask, NULL);
+        }
+    }
+}
+
 static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
+
+static int copy_propagation_compare(const void *key, const struct rb_entry *entry)
+{
+    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+    uintptr_t key_int = (uintptr_t)key, entry_int = (uintptr_t)variable->var;
+
+    if (key_int < entry_int)
+        return -1;
+    else if (key_int > entry_int)
+        return 1;
+    else
+        return 0;
+}
+
+static void copy_propagation_destroy(struct rb_entry *entry, void *context)
+{
+    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
+
+    vkd3d_free(variable);
+}
+
+static void copy_propagation_pop(struct copy_propagation_state *state)
+{
+    assert(state->level > 0);
+    rb_destroy(&state->variables[state->level], copy_propagation_destroy, NULL);
+    --state->level;
+}
+
+static bool copy_propagation_duplicate(struct hlsl_ctx *ctx, struct copy_propagation_state *state)
+{
+    struct copy_propagation_variable *var;
+
+    ++state->level;
+    if (state->level == state->capacity)
+    {
+        struct rb_tree *new_vars;
+        state->capacity *= 2;
+        new_vars = hlsl_realloc(ctx, state->variables, sizeof(*state->variables) * state->capacity);
+        if (!new_vars)
+            return false;
+        state->variables = new_vars;
+    }
+
+    rb_init(&state->variables[state->level], copy_propagation_compare);
+
+    RB_FOR_EACH_ENTRY(var, &state->variables[state->level - 1], struct copy_propagation_variable, entry)
+    {
+        struct copy_propagation_variable *new_var = copy_propagation_get_var(ctx, state, var->var);
+
+        if (!new_var)
+            return false;
+
+        memcpy(new_var->values, var->values, sizeof(*var->values) * var->var->data_type->reg_size);
+    }
+
+    return true;
+}
 
 static bool copy_propagation_func(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, enum ir_block phase, void *context)
 {
@@ -469,7 +556,7 @@ static bool copy_propagation_func(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
             list_remove(&instr->entry);
             hlsl_free_instr(instr);
 
-            break;
+            return true;
         }
 
         case HLSL_IR_STORE:
@@ -495,6 +582,65 @@ static bool copy_propagation_func(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
             break;
         }
 
+        /* Both branches can inherit the variable state available when
+         * entering the "if". After the "if", all variables that might
+         * have been written in either branch must be invalidated,
+         * because we don't know which branch has executed. */
+        case HLSL_IR_IF:
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            switch (phase)
+            {
+                case ENTER:
+                    copy_propagation_duplicate(ctx, state);
+                    break;
+
+                case ELSE:
+                    copy_propagation_pop(state);
+                    copy_propagation_duplicate(ctx, state);
+                    break;
+
+                case LEAVE:
+                    copy_propagation_pop(state);
+                    invalidate_from_block(ctx, state, &iff->then_instrs);
+                    invalidate_from_block(ctx, state, &iff->else_instrs);
+                    break;
+
+                default:
+                    assert(0);
+            }
+            break;
+        }
+
+        /* The loop body can inherit the variable state avaiable when
+         * entering the "loop", except that all variables that are
+         * written in the body must be invalidated (because at the
+         * beginning of each execution we don't know whether the body
+         * has already executed or not). The same is valid for after
+         * the "loop", because we don't know whether the body has
+         * executed or not. */
+        case HLSL_IR_LOOP:
+        {
+            struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+
+            switch (phase)
+            {
+                case ENTER:
+                    invalidate_from_block(ctx, state, &loop->body);
+                    copy_propagation_duplicate(ctx, state);
+                    break;
+
+                case LEAVE:
+                    copy_propagation_pop(state);
+                    break;
+
+                default:
+                    assert(0);
+            }
+            break;
+        }
+
         default:
             break;
     }
@@ -502,38 +648,22 @@ static bool copy_propagation_func(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     return false;
 }
 
-static int copy_propagation_compare(const void *key, const struct rb_entry *entry)
-{
-    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
-    uintptr_t key_int = (uintptr_t)key, entry_int = (uintptr_t)variable->var;
-
-    if (key_int < entry_int)
-        return -1;
-    else if (key_int > entry_int)
-        return 1;
-    else
-        return 0;
-}
-
-static void copy_propagation_destroy(struct rb_entry *entry, void *context)
-{
-    struct copy_propagation_variable *variable = RB_ENTRY_VALUE(entry, struct copy_propagation_variable, entry);
-
-    vkd3d_free(variable);
-}
-
 static bool copy_propagation_pass(struct hlsl_ctx *ctx, struct hlsl_block *block)
 {
     struct copy_propagation_state state;
     bool progress;
 
-    rb_init(&state.variables, copy_propagation_compare);
     state.level = 0;
+    state.capacity = 1;
+    state.variables = hlsl_alloc(ctx, sizeof(*state.variables) * state.capacity);
+    if (!state.variables)
+        return false;
+    rb_init(&state.variables[state.level], copy_propagation_compare);
 
     progress = transform_ir_blocks(ctx, copy_propagation_func, block, (void*)&state);
 
     assert(state.level == 0);
-    rb_destroy(&state.variables, copy_propagation_destroy, NULL);
+    rb_destroy(&state.variables[state.level], copy_propagation_destroy, NULL);
 
     return progress;
 }
