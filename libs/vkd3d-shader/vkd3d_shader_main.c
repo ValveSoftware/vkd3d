@@ -41,20 +41,14 @@ static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
 {
-    unsigned int new_buffer_size = buffer->buffer_size * 2;
-    char *new_buffer;
+    unsigned int new_buffer_size = rc >= 0 ? buffer->content_size + rc + 1 : max(buffer->buffer_size * 2, 32);
 
-    new_buffer_size = max(new_buffer_size, 32);
-    while (rc > 0 && (unsigned int)rc >= new_buffer_size - buffer->content_size)
-        new_buffer_size *= 2;
-    if (!(new_buffer = vkd3d_realloc(buffer->buffer, new_buffer_size)))
+    if (!vkd3d_array_reserve((void **)&buffer->buffer, &buffer->buffer_size, new_buffer_size, 1))
     {
         ERR("Failed to grow buffer.\n");
         buffer->buffer[buffer->content_size] = '\0';
         return false;
     }
-    buffer->buffer = new_buffer;
-    buffer->buffer_size = new_buffer_size;
     return true;
 }
 

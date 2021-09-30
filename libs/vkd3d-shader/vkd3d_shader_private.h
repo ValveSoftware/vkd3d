@@ -912,8 +912,7 @@ void shader_sm4_reset(struct vkd3d_shader_parser *parser);
 struct vkd3d_string_buffer
 {
     char *buffer;
-    unsigned int buffer_size;
-    unsigned int content_size;
+    size_t buffer_size, content_size;
 };
 
 struct vkd3d_string_buffer_cache
