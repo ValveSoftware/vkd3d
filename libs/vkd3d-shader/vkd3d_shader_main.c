@@ -25,7 +25,11 @@ VKD3D_DEBUG_ENV_NAME("VKD3D_SHADER_DEBUG");
 
 void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer)
 {
-    memset(buffer, 0, sizeof(*buffer));
+    buffer->buffer_size = 16;
+    buffer->content_size = 0;
+    buffer->buffer = vkd3d_malloc(buffer->buffer_size);
+    assert(buffer->buffer);
+    memset(buffer->buffer, 0, buffer->buffer_size);
 }
 
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer)
@@ -41,7 +45,7 @@ static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
 {
-    unsigned int new_buffer_size = rc >= 0 ? buffer->content_size + rc + 1 : max(buffer->buffer_size * 2, 32);
+    unsigned int new_buffer_size = rc >= 0 ? buffer->content_size + rc + 1 : buffer->buffer_size * 2;
 
     if (!vkd3d_array_reserve((void **)&buffer->buffer, &buffer->buffer_size, new_buffer_size, 1))
     {
@@ -57,9 +61,6 @@ int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *
     unsigned int rem;
     va_list a;
     int rc;
-
-    if (!buffer->content_size && !vkd3d_string_buffer_resize(buffer, 32))
-        return -1;
 
     for (;;)
     {
@@ -144,11 +145,6 @@ struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_c
         if (!(buffer = vkd3d_malloc(sizeof(*buffer))))
             return NULL;
         vkd3d_string_buffer_init(buffer);
-        if (!vkd3d_string_buffer_resize(buffer, 1))
-        {
-            vkd3d_free(buffer);
-            return NULL;
-        }
     }
     else
     {
