@@ -362,6 +362,13 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
             shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
+void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_version *version)
+{
+    parser->message_context = message_context;
+    parser->shader_version = *version;
+}
+
 static void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     shader_sm4_free(parser);

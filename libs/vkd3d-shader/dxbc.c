@@ -97,7 +97,6 @@ struct vkd3d_shader_sm4_parser
     struct list src;
     struct vkd3d_shader_immediate_constant_buffer icb;
 
-    struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_parser p;
 };
 
@@ -176,13 +175,13 @@ static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
     return version->major >= 5 && version->minor >= 1;
 }
 
-static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_shader_sm4_parser *priv,
+static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_shader_sm4_parser *sm4,
         enum vkd3d_shader_error error, const char *format, ...)
 {
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(priv->message_context, NULL, error, format, args);
+    vkd3d_shader_verror(sm4->p.message_context, NULL, error, format, args);
     va_end(args);
 }
 
@@ -974,6 +973,7 @@ static enum vkd3d_data_type map_data_type(char t)
 static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code, size_t byte_code_size,
         const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context)
 {
+    struct vkd3d_shader_version version;
     uint32_t version_token, token_count;
     unsigned int i;
 
@@ -1000,34 +1000,36 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     switch (version_token >> 16)
     {
         case VKD3D_SM4_PS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_PIXEL;
+            version.type = VKD3D_SHADER_TYPE_PIXEL;
             break;
 
         case VKD3D_SM4_VS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_VERTEX;
+            version.type = VKD3D_SHADER_TYPE_VERTEX;
             break;
 
         case VKD3D_SM4_GS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_GEOMETRY;
+            version.type = VKD3D_SHADER_TYPE_GEOMETRY;
             break;
 
         case VKD3D_SM5_HS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_HULL;
+            version.type = VKD3D_SHADER_TYPE_HULL;
             break;
 
         case VKD3D_SM5_DS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_DOMAIN;
+            version.type = VKD3D_SHADER_TYPE_DOMAIN;
             break;
 
         case VKD3D_SM5_CS:
-            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_COMPUTE;
+            version.type = VKD3D_SHADER_TYPE_COMPUTE;
             break;
 
         default:
             FIXME("Unrecognised shader type %#x.\n", version_token >> 16);
     }
-    sm4->p.shader_version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
-    sm4->p.shader_version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+    version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
+    version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+
+    vkd3d_shader_parser_init(&sm4->p, message_context, &version);
     sm4->p.ptr = sm4->start;
 
     memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
@@ -1046,8 +1048,6 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 
     list_init(&sm4->src_free);
     list_init(&sm4->src);
-
-    sm4->message_context = message_context;
 
     return true;
 }

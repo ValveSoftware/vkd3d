@@ -889,10 +889,15 @@ static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_reg
 
 struct vkd3d_shader_parser
 {
+    struct vkd3d_shader_message_context *message_context;
+
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;
     const uint32_t *ptr;
 };
+
+void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_version *version);
 
 void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);
 
