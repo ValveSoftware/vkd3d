@@ -2047,6 +2047,28 @@ static bool intrinsic_dot(struct hlsl_ctx *ctx,
     return !!add_binary_dot_expr(ctx, params->instrs, HLSL_OP2_DOT, params->args[0], params->args[1], &loc);
 }
 
+static bool intrinsic_length(struct hlsl_ctx *ctx,
+                             const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_expr *dot;
+    struct hlsl_ir_node *arg = params->args[0];
+
+    if (arg->data_type->base_type != HLSL_TYPE_HALF && arg->data_type->base_type != HLSL_TYPE_FLOAT)
+    {
+        struct hlsl_ir_expr *cast;
+
+        if (!(cast = hlsl_new_cast(ctx, arg, convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_FLOAT), &loc)))
+            return false;
+        arg = &cast->node;
+        list_add_tail(params->instrs, &arg->entry);
+    }
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, HLSL_OP2_DOT, arg, arg, &loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SQRT, &dot->node, &loc);
+}
+
 static bool intrinsic_lerp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -2437,6 +2459,7 @@ intrinsic_functions[] =
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"dot",                                 2, true,  intrinsic_dot},
+    {"length",                              1, true,  intrinsic_length},
     {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
     {"mul",                                 2, true,  intrinsic_mul},
