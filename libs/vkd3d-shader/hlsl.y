@@ -2360,6 +2360,31 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_normalize(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_expr *dot, *rsq;
+    struct hlsl_ir_node *arg = params->args[0];
+
+    if (arg->data_type->base_type != HLSL_TYPE_HALF && arg->data_type->base_type != HLSL_TYPE_FLOAT)
+    {
+        struct hlsl_ir_expr *cast;
+
+        if (!(cast = hlsl_new_cast(ctx, arg, convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_FLOAT), &loc)))
+            return false;
+        arg = &cast->node;
+        list_add_tail(params->instrs, &arg->entry);
+    }
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, HLSL_OP2_DOT, arg, arg, &loc)))
+        return false;
+
+    if (!(rsq = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_RSQ, &dot->node, &loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &rsq->node, arg, &loc);
+}
+
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -2463,6 +2488,7 @@ intrinsic_functions[] =
     {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
     {"mul",                                 2, true,  intrinsic_mul},
+    {"normalize",                           1, true,  intrinsic_normalize},
     {"pow",                                 2, true,  intrinsic_pow},
     {"saturate",                            1, true,  intrinsic_saturate},
     {"tex2D",                              -1, false, intrinsic_tex2D},
