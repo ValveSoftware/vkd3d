@@ -87,7 +87,6 @@ struct vkd3d_shader_src_param_entry
 
 struct vkd3d_shader_sm4_parser
 {
-    struct vkd3d_shader_version shader_version;
     const DWORD *start, *end;
 
     unsigned int output_map[MAX_REG_OUTPUT];
@@ -170,9 +169,10 @@ static struct vkd3d_shader_sm4_parser *vkd3d_shader_sm4_parser(struct vkd3d_shad
     return CONTAINING_RECORD(parser, struct vkd3d_shader_sm4_parser, p);
 }
 
-static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *priv)
+static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
 {
-    const struct vkd3d_shader_version *version = &priv->shader_version;
+    const struct vkd3d_shader_version *version = &sm4->p.shader_version;
+
     return version->major >= 5 && version->minor >= 1;
 }
 
@@ -920,23 +920,23 @@ static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode
     return NULL;
 }
 
-static void map_register(const struct vkd3d_shader_sm4_parser *priv, struct vkd3d_shader_register *reg)
+static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_register *reg)
 {
-    switch (priv->shader_version.type)
+    switch (sm4->p.shader_version.type)
     {
         case VKD3D_SHADER_TYPE_PIXEL:
             if (reg->type == VKD3DSPR_OUTPUT)
             {
                 unsigned int reg_idx = reg->idx[0].offset;
 
-                if (reg_idx >= ARRAY_SIZE(priv->output_map))
+                if (reg_idx >= ARRAY_SIZE(sm4->output_map))
                 {
                     ERR("Invalid output index %u.\n", reg_idx);
                     break;
                 }
 
                 reg->type = VKD3DSPR_COLOROUT;
-                reg->idx[0].offset = priv->output_map[reg_idx];
+                reg->idx[0].offset = sm4->output_map[reg_idx];
             }
             break;
 
@@ -1000,34 +1000,35 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     switch (version_token >> 16)
     {
         case VKD3D_SM4_PS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_PIXEL;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_PIXEL;
             break;
 
         case VKD3D_SM4_VS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_VERTEX;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_VERTEX;
             break;
 
         case VKD3D_SM4_GS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_GEOMETRY;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_GEOMETRY;
             break;
 
         case VKD3D_SM5_HS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_HULL;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_HULL;
             break;
 
         case VKD3D_SM5_DS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_DOMAIN;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_DOMAIN;
             break;
 
         case VKD3D_SM5_CS:
-            sm4->shader_version.type = VKD3D_SHADER_TYPE_COMPUTE;
+            sm4->p.shader_version.type = VKD3D_SHADER_TYPE_COMPUTE;
             break;
 
         default:
             FIXME("Unrecognised shader type %#x.\n", version_token >> 16);
     }
-    sm4->shader_version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
-    sm4->shader_version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+    sm4->p.shader_version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
+    sm4->p.shader_version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+    sm4->p.ptr = sm4->start;
 
     memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
     for (i = 0; i < output_signature->element_count; ++i)
@@ -1085,14 +1086,6 @@ static struct vkd3d_shader_src_param *get_src_param(struct vkd3d_shader_sm4_pars
     list_add_tail(&priv->src, elem);
     e = LIST_ENTRY(elem, struct vkd3d_shader_src_param_entry, entry);
     return &e->param;
-}
-
-void shader_sm4_read_header(struct vkd3d_shader_parser *parser, struct vkd3d_shader_version *shader_version)
-{
-    struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
-
-    parser->ptr = sm4->start;
-    *shader_version = sm4->shader_version;
 }
 
 static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
@@ -1702,7 +1695,6 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    shader_sm4_read_header(&sm4->p, &sm4->p.shader_version);
     *parser = &sm4->p;
 
     return VKD3D_OK;

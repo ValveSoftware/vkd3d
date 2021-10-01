@@ -1883,12 +1883,13 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     vkd3d_string_buffer_init(buffer);
 
     shader_version = &compiler.shader_version;
-    shader_sm4_read_header(parser, shader_version);
+    *shader_version = parser->shader_version;
     vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
+    shader_sm4_reset(parser);
     while (!shader_sm4_is_end(parser))
     {
         struct vkd3d_shader_instruction ins;
