@@ -2208,7 +2208,7 @@ struct vkd3d_dxbc_compiler
     struct vkd3d_spirv_builder spirv_builder;
 
     struct vkd3d_shader_message_context *message_context;
-    struct vkd3d_shader_location location;
+    const struct vkd3d_shader_location *location;
     bool failed;
 
     bool strip_debug;
@@ -2286,7 +2286,7 @@ static const char *vkd3d_dxbc_compiler_get_entry_point_name(const struct vkd3d_d
 struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader_version *shader_version,
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
-        struct vkd3d_shader_message_context *message_context)
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
 {
     const struct vkd3d_shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
     const struct vkd3d_shader_signature *output_signature = &shader_desc->output_signature;
@@ -2301,8 +2301,7 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
 
     memset(compiler, 0, sizeof(*compiler));
     compiler->message_context = message_context;
-    compiler->location.source_name = compile_info->source_name;
-    compiler->location.line = 2; /* Line 1 is the version token. */
+    compiler->location = location;
 
     if ((target_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)))
     {
@@ -2518,7 +2517,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_dxbc_compiler_error(struct vkd3d_dxbc_
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(compiler->message_context, &compiler->location, error, format, args);
+    vkd3d_shader_verror(compiler->message_context, compiler->location, error, format, args);
     va_end(args);
     compiler->failed = true;
 }
@@ -9747,7 +9746,6 @@ int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
             FIXME("Unhandled instruction %#x.\n", instruction->handler_idx);
     }
 
-    ++compiler->location.line;
     return ret;
 }
 

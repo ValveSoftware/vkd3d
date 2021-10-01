@@ -363,9 +363,13 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
 }
 
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
-        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_version *version)
+        struct vkd3d_shader_message_context *message_context, const char *source_name,
+        const struct vkd3d_shader_version *version)
 {
     parser->message_context = message_context;
+    parser->location.source_name = source_name;
+    parser->location.line = 1;
+    parser->location.column = 0;
     parser->shader_version = *version;
 }
 
@@ -1039,7 +1043,8 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     {
         struct vkd3d_glsl_generator *glsl_generator;
 
-        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version, compile_info, message_context)))
+        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version,
+                message_context, &parser->location)))
         {
             ERR("Failed to create GLSL generator.\n");
             vkd3d_shader_parser_destroy(parser);
@@ -1055,8 +1060,8 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return ret;
     }
 
-    if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser->shader_version,
-            &parser->shader_desc, compile_info, &scan_descriptor_info, message_context)))
+    if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser->shader_version, &parser->shader_desc,
+            compile_info, &scan_descriptor_info, message_context, &parser->location)))
     {
         ERR("Failed to create DXBC compiler.\n");
         vkd3d_shader_parser_destroy(parser);

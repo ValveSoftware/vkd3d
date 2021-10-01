@@ -887,9 +887,16 @@ static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_reg
     return reg->type == VKD3DSPR_OUTPUT || reg->type == VKD3DSPR_COLOROUT;
 }
 
+struct vkd3d_shader_location
+{
+    const char *source_name;
+    unsigned int line, column;
+};
+
 struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_shader_location location;
 
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;
@@ -897,7 +904,8 @@ struct vkd3d_shader_parser
 };
 
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
-        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_version *version);
+        struct vkd3d_shader_message_context *message_context, const char *source_name,
+        const struct vkd3d_shader_version *version);
 
 void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);
 
@@ -966,12 +974,6 @@ static inline size_t bytecode_get_size(struct vkd3d_bytecode_buffer *buffer)
     return buffer->size;
 }
 
-struct vkd3d_shader_location
-{
-    const char *source_name;
-    unsigned int line, column;
-};
-
 struct vkd3d_shader_message_context
 {
     enum vkd3d_shader_log_level log_level;
@@ -1014,8 +1016,7 @@ int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
 struct vkd3d_glsl_generator;
 
 struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
-        const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context);
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location);
 int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out);
 void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
@@ -1025,7 +1026,7 @@ struct vkd3d_dxbc_compiler;
 struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader_version *shader_version,
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
-        struct vkd3d_shader_message_context *message_context);
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location);
 int vkd3d_dxbc_compiler_handle_instruction(struct vkd3d_dxbc_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction);
 int vkd3d_dxbc_compiler_generate_spirv(struct vkd3d_dxbc_compiler *compiler,

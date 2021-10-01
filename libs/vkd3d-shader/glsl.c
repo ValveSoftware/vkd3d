@@ -22,14 +22,13 @@ struct vkd3d_glsl_generator
 {
     struct vkd3d_shader_version version;
     struct vkd3d_string_buffer buffer;
-    struct vkd3d_shader_location location;
+    const struct vkd3d_shader_location *location;
     struct vkd3d_shader_message_context *message_context;
     bool failed;
 };
 
 struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
-        const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context)
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
 {
     struct vkd3d_glsl_generator *generator;
 
@@ -39,8 +38,7 @@ struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shad
     memset(generator, 0, sizeof(*generator));
     generator->version = *version;
     vkd3d_string_buffer_init(&generator->buffer);
-    generator->location.source_name = compile_info->source_name;
-    generator->location.line = 2; /* Line 1 is the version token. */
+    generator->location = location;
     generator->message_context = message_context;
     return generator;
 }
@@ -52,10 +50,9 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_shader_verror(generator->message_context, &generator->location, error, fmt, args);
+    vkd3d_shader_verror(generator->message_context, generator->location, error, fmt, args);
     va_end(args);
     generator->failed = true;
-    return;
 }
 
 static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
@@ -91,9 +88,6 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
                     "Unhandled instruction %#x", instruction->handler_idx);
             break;
     }
-
-    ++generator->location.line;
-    return;
 }
 
 int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
