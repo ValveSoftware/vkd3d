@@ -2188,6 +2188,31 @@ static bool intrinsic_ldexp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[0], arg, loc);
 }
 
+static bool intrinsic_length(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *type = params->args[0]->data_type;
+    struct hlsl_ir_node *arg, *dot;
+
+    if (type->type == HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Invalid type %s.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SQRT, dot, loc);
+}
+
 static bool intrinsic_lerp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2407,6 +2432,7 @@ intrinsic_functions[] =
     {"dot",                                 2, true,  intrinsic_dot},
     {"floor",                               1, true,  intrinsic_floor},
     {"ldexp",                               2, true,  intrinsic_ldexp},
+    {"length",                              1, true,  intrinsic_length},
     {"lerp",                                3, true,  intrinsic_lerp},
     {"max",                                 2, true,  intrinsic_max},
     {"min",                                 2, true,  intrinsic_min},
