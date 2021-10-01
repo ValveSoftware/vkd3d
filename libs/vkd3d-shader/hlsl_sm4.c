@@ -1420,7 +1420,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 {
     const unsigned int dimx = constant->node.data_type->dimx;
     struct sm4_instruction instr;
-    unsigned int i;
+    unsigned int i, j = 0;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
@@ -1431,7 +1431,11 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     instr.srcs[0].reg.dim = (dimx > 1) ? VKD3D_SM4_DIMENSION_VEC4 : VKD3D_SM4_DIMENSION_SCALAR;
     instr.srcs[0].reg.type = VKD3D_SM4_RT_IMMCONST;
     for (i = 0; i < dimx; ++i)
-        instr.srcs[0].reg.immconst_uint[i] = constant->value[i].u;
+    {
+        while (dimx != 1 && !(instr.dsts[0].writemask & (1u << j)))
+            j++;
+        instr.srcs[0].reg.immconst_uint[j++] = constant->value[i].u;
+    }
     instr.src_count = 1,
 
     write_sm4_instruction(buffer, &instr);
