@@ -772,7 +772,6 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
             hlsl_release_string_buffer(ctx, name);
             return false;
         }
-        list_add_tail(&ctx->globals->vars, &var->scope_entry);
     }
     hlsl_release_string_buffer(ctx, name);
 
