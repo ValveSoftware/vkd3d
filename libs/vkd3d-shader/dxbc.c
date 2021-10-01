@@ -99,6 +99,7 @@ struct vkd3d_sm4_data
     struct vkd3d_shader_immediate_constant_buffer icb;
 
     struct vkd3d_shader_message_context *message_context;
+    struct vkd3d_shader_parser p;
 };
 
 struct vkd3d_sm4_opcode_info
@@ -164,6 +165,11 @@ static const enum vkd3d_data_type data_type_table[] =
     /* VKD3D_SM4_DATA_CONTINUED */  VKD3D_DATA_CONTINUED,
     /* VKD3D_SM4_DATA_UNUSED */     VKD3D_DATA_UNUSED,
 };
+
+static struct vkd3d_sm4_data *vkd3d_sm4_data(struct vkd3d_shader_parser *parser)
+{
+    return CONTAINING_RECORD(parser, struct vkd3d_sm4_data, p);
+}
 
 static bool shader_is_sm_5_1(const struct vkd3d_sm4_data *priv)
 {
@@ -998,17 +1004,16 @@ static enum vkd3d_data_type map_data_type(char t)
     }
 }
 
-void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
+static bool shader_sm4_init(struct vkd3d_sm4_data *sm4, const uint32_t *byte_code, size_t byte_code_size,
         const struct vkd3d_shader_signature *output_signature, struct vkd3d_shader_message_context *message_context)
 {
-    DWORD version_token, token_count;
-    struct vkd3d_sm4_data *priv;
+    uint32_t version_token, token_count;
     unsigned int i;
 
     if (byte_code_size / sizeof(*byte_code) < 2)
     {
         WARN("Invalid byte code size %lu.\n", (long)byte_code_size);
-        return NULL;
+        return false;
     }
 
     version_token = byte_code[0];
@@ -1019,82 +1024,77 @@ void *shader_sm4_init(const DWORD *byte_code, size_t byte_code_size,
     if (token_count < 2 || byte_code_size / sizeof(*byte_code) < token_count)
     {
         WARN("Invalid token count %u.\n", token_count);
-        return NULL;
+        return false;
     }
 
-    if (!(priv = vkd3d_malloc(sizeof(*priv))))
-    {
-        ERR("Failed to allocate private data\n");
-        return NULL;
-    }
-
-    priv->start = &byte_code[2];
-    priv->end = &byte_code[token_count];
+    sm4->start = &byte_code[2];
+    sm4->end = &byte_code[token_count];
 
     switch (version_token >> 16)
     {
         case VKD3D_SM4_PS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_PIXEL;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_PIXEL;
             break;
 
         case VKD3D_SM4_VS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_VERTEX;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_VERTEX;
             break;
 
         case VKD3D_SM4_GS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_GEOMETRY;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_GEOMETRY;
             break;
 
         case VKD3D_SM5_HS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_HULL;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_HULL;
             break;
 
         case VKD3D_SM5_DS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_DOMAIN;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_DOMAIN;
             break;
 
         case VKD3D_SM5_CS:
-            priv->shader_version.type = VKD3D_SHADER_TYPE_COMPUTE;
+            sm4->shader_version.type = VKD3D_SHADER_TYPE_COMPUTE;
             break;
 
         default:
             FIXME("Unrecognised shader type %#x.\n", version_token >> 16);
     }
-    priv->shader_version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
-    priv->shader_version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+    sm4->shader_version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
+    sm4->shader_version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
-    memset(priv->output_map, 0xff, sizeof(priv->output_map));
+    memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
     for (i = 0; i < output_signature->element_count; ++i)
     {
         struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
 
-        if (e->register_index >= ARRAY_SIZE(priv->output_map))
+        if (e->register_index >= ARRAY_SIZE(sm4->output_map))
         {
             WARN("Invalid output index %u.\n", e->register_index);
             continue;
         }
 
-        priv->output_map[e->register_index] = e->semantic_index;
+        sm4->output_map[e->register_index] = e->semantic_index;
     }
 
-    list_init(&priv->src_free);
-    list_init(&priv->src);
+    list_init(&sm4->src_free);
+    list_init(&sm4->src);
 
-    priv->message_context = message_context;
+    sm4->message_context = message_context;
 
-    return priv;
+    return true;
 }
 
 void shader_sm4_free(struct vkd3d_shader_parser *parser)
 {
+    struct vkd3d_sm4_data *sm4 = vkd3d_sm4_data(parser);
     struct vkd3d_shader_src_param_entry *e1, *e2;
-    struct vkd3d_sm4_data *sm4 = parser->data;
 
     list_move_head(&sm4->src_free, &sm4->src);
     LIST_FOR_EACH_ENTRY_SAFE(e1, e2, &sm4->src_free, struct vkd3d_shader_src_param_entry, entry)
     {
         vkd3d_free(e1);
     }
+    free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm4);
 }
 
@@ -1122,7 +1122,7 @@ static struct vkd3d_shader_src_param *get_src_param(struct vkd3d_sm4_data *priv)
 
 void shader_sm4_read_header(struct vkd3d_shader_parser *parser, struct vkd3d_shader_version *shader_version)
 {
-    struct vkd3d_sm4_data *sm4 = parser->data;
+    struct vkd3d_sm4_data *sm4 = vkd3d_sm4_data(parser);
 
     parser->ptr = sm4->start;
     *shader_version = sm4->shader_version;
@@ -1573,9 +1573,9 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
 
 void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
 {
+    struct vkd3d_sm4_data *sm4 = vkd3d_sm4_data(parser);
     const struct vkd3d_sm4_opcode_info *opcode_info;
     uint32_t opcode_token, opcode, previous_token;
-    struct vkd3d_sm4_data *sm4 = parser->data;
     const uint32_t **ptr = &parser->ptr;
     unsigned int i, len;
     size_t remaining;
@@ -1693,16 +1693,53 @@ fail:
 
 bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
 {
-    struct vkd3d_sm4_data *sm4 = parser->data;
+    struct vkd3d_sm4_data *sm4 = vkd3d_sm4_data(parser);
 
     return parser->ptr == sm4->end;
 }
 
 void shader_sm4_reset(struct vkd3d_shader_parser *parser)
 {
-    struct vkd3d_sm4_data *sm4 = parser->data;
+    struct vkd3d_sm4_data *sm4 = vkd3d_sm4_data(parser);
 
     parser->ptr = sm4->start;
+}
+
+int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
+{
+    struct vkd3d_shader_desc *shader_desc;
+    struct vkd3d_sm4_data *sm4;
+    int ret;
+
+    if (!(sm4 = vkd3d_calloc(1, sizeof(*sm4))))
+    {
+        ERR("Failed to allocate parser.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    shader_desc = &sm4->p.shader_desc;
+    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
+            message_context, compile_info->source_name, shader_desc)) < 0)
+    {
+        WARN("Failed to extract shader, vkd3d result %d.\n", ret);
+        vkd3d_free(sm4);
+        return ret;
+    }
+
+    if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
+            &shader_desc->output_signature, message_context))
+    {
+        WARN("Failed to initialise shader parser.\n");
+        free_shader_desc(shader_desc);
+        vkd3d_free(sm4);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    shader_sm4_read_header(&sm4->p, &sm4->p.shader_version);
+    *parser = &sm4->p;
+
+    return VKD3D_OK;
 }
 
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)

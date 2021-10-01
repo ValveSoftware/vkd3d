@@ -362,35 +362,9 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
             shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
-static int vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
-{
-    struct vkd3d_shader_desc *shader_desc = &parser->shader_desc;
-    int ret;
-
-    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
-            message_context, compile_info->source_name, shader_desc)) < 0)
-    {
-        WARN("Failed to extract shader, vkd3d result %d.\n", ret);
-        return ret;
-    }
-
-    if (!(parser->data = shader_sm4_init(shader_desc->byte_code,
-            shader_desc->byte_code_size, &shader_desc->output_signature, message_context)))
-    {
-        WARN("Failed to initialize shader parser.\n");
-        free_shader_desc(shader_desc);
-        return VKD3D_ERROR_INVALID_ARGUMENT;
-    }
-
-    shader_sm4_read_header(parser, &parser->shader_version);
-    return VKD3D_OK;
-}
-
 static void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     shader_sm4_free(parser);
-    free_shader_desc(&parser->shader_desc);
 }
 
 static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info,
@@ -929,7 +903,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
     struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_scan_context context;
-    struct vkd3d_shader_parser parser;
+    struct vkd3d_shader_parser *parser;
     int ret;
 
     if ((scan_descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO)))
@@ -940,7 +914,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
 
     vkd3d_shader_scan_context_init(&context, compile_info, scan_descriptor_info, message_context);
 
-    if ((ret = vkd3d_shader_parser_init(&parser, compile_info, message_context)) < 0)
+    if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
     {
         vkd3d_shader_scan_context_cleanup(&context);
         return ret;
@@ -948,13 +922,13 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
 
     if (TRACE_ON())
     {
-        vkd3d_shader_trace(&parser);
-        shader_sm4_reset(&parser);
+        vkd3d_shader_trace(parser);
+        shader_sm4_reset(parser);
     }
 
-    while (!shader_sm4_is_end(&parser))
+    while (!shader_sm4_is_end(parser))
     {
-        shader_sm4_read_instruction(&parser, &instruction);
+        shader_sm4_read_instruction(parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {
@@ -977,7 +951,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
 
 done:
     vkd3d_shader_scan_context_cleanup(&context);
-    vkd3d_shader_parser_destroy(&parser);
+    vkd3d_shader_parser_destroy(parser);
     return ret;
 }
 
@@ -1027,7 +1001,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_compile_info scan_info;
     struct vkd3d_dxbc_compiler *spirv_compiler;
-    struct vkd3d_shader_parser parser;
+    struct vkd3d_shader_parser *parser;
     int ret;
 
     scan_info = *compile_info;
@@ -1038,19 +1012,19 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     if ((ret = scan_dxbc(&scan_info, message_context)) < 0)
         return ret;
 
-    if ((ret = vkd3d_shader_parser_init(&parser, compile_info, message_context)) < 0)
+    if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
     {
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
     }
 
-    vkd3d_shader_dump_shader(compile_info->source_type, parser.shader_version.type, &compile_info->source);
+    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        ret = vkd3d_dxbc_binary_to_text(&parser, compile_info, out);
-        vkd3d_shader_parser_destroy(&parser);
+        ret = vkd3d_dxbc_binary_to_text(parser, compile_info, out);
+        vkd3d_shader_parser_destroy(parser);
         return ret;
     }
 
@@ -1058,34 +1032,34 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     {
         struct vkd3d_glsl_generator *glsl_generator;
 
-        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser.shader_version, compile_info, message_context)))
+        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version, compile_info, message_context)))
         {
             ERR("Failed to create GLSL generator.\n");
-            vkd3d_shader_parser_destroy(&parser);
+            vkd3d_shader_parser_destroy(parser);
             vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
             return VKD3D_ERROR;
         }
 
-        ret = vkd3d_glsl_generator_generate(glsl_generator, &parser, out);
+        ret = vkd3d_glsl_generator_generate(glsl_generator, parser, out);
 
         vkd3d_glsl_generator_destroy(glsl_generator);
-        vkd3d_shader_parser_destroy(&parser);
+        vkd3d_shader_parser_destroy(parser);
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
     }
 
-    if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser.shader_version,
-            &parser.shader_desc, compile_info, &scan_descriptor_info, message_context)))
+    if (!(spirv_compiler = vkd3d_dxbc_compiler_create(&parser->shader_version,
+            &parser->shader_desc, compile_info, &scan_descriptor_info, message_context)))
     {
         ERR("Failed to create DXBC compiler.\n");
-        vkd3d_shader_parser_destroy(&parser);
+        vkd3d_shader_parser_destroy(parser);
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return VKD3D_ERROR;
     }
 
-    while (!shader_sm4_is_end(&parser))
+    while (!shader_sm4_is_end(parser))
     {
-        shader_sm4_read_instruction(&parser, &instruction);
+        shader_sm4_read_instruction(parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {
@@ -1102,7 +1076,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         ret = vkd3d_dxbc_compiler_generate_spirv(spirv_compiler, compile_info, out);
 
     vkd3d_dxbc_compiler_destroy(spirv_compiler);
-    vkd3d_shader_parser_destroy(&parser);
+    vkd3d_shader_parser_destroy(parser);
     vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
     return ret;
 }
