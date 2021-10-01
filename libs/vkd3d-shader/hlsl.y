@@ -2278,6 +2278,34 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     return !!add_implicit_conversion(ctx, params->instrs, &load->node, ret_type, loc);
 }
 
+static bool intrinsic_normalize(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *type = params->args[0]->data_type;
+    struct hlsl_ir_node *dot, *rsq, *arg;
+
+    if (type->type == HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Invalid type %s.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
+        return false;
+
+    if (!(rsq = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_RSQ, dot, loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, rsq, arg, loc);
+}
+
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2342,6 +2370,7 @@ intrinsic_functions[] =
     {"max",                                 2, true,  intrinsic_max},
     {"min",                                 2, true,  intrinsic_min},
     {"mul",                                 2, true,  intrinsic_mul},
+    {"normalize",                           1, true,  intrinsic_normalize},
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
