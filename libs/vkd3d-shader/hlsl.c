@@ -640,11 +640,6 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
     return loop;
 }
 
-bool hlsl_type_is_void(const struct hlsl_type *type)
-{
-    return type->type == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_VOID;
-}
-
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
         struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc)
 {
@@ -656,7 +651,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
     decl->parameters = parameters;
     decl->loc = loc;
 
-    if (!hlsl_type_is_void(return_type))
+    if (!hlsl_types_are_equal(return_type, ctx->builtin_types.Void))
     {
         struct hlsl_ir_var *return_var;
         char name[28];

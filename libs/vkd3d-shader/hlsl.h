@@ -683,7 +683,6 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, unsigned int modifiers);
 unsigned int hlsl_type_component_count(struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
-bool hlsl_type_is_void(const struct hlsl_type *type);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 
 unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsigned int dim);

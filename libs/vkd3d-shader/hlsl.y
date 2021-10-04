@@ -506,7 +506,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
             return NULL;
         list_add_after(&return_value->entry, &store->node.entry);
     }
-    else if (!hlsl_type_is_void(return_type))
+    else if (ctx->cur_function->return_var)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void function must return a value.");
         return NULL;
@@ -2210,7 +2210,7 @@ func_prototype:
                         "\"%s\" was previously declared here.", $3);
                 YYABORT;
             }
-            if (hlsl_type_is_void($2) && $7.semantic.name)
+            if (hlsl_types_are_equal($2, ctx->builtin_types.Void) && $7.semantic.name)
             {
                 hlsl_error(ctx, @7, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                         "Semantics are not allowed on void functions.");
