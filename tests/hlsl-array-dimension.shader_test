@@ -1,4 +1,5 @@
-# Test what kinds of expressions are valid array dimensions.
+% Test what kinds of expressions are valid array dimensions.
+
 [pixel shader]
 float4 main() : sv_target
 {

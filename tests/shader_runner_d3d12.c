@@ -452,13 +452,12 @@ START_TEST(shader_runner_d3d12)
 
             vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
-        else if (line[0] != '\n')
+        else if (line[0] != '%' && line[0] != '\n')
         {
             switch (state)
             {
                 case STATE_NONE:
-                    if (line[0] != '#')
-                        fprintf(stderr, "Ignoring line '%s' in %s.\n", line, argv[1]);
+                    fprintf(stderr, "Ignoring line '%s' in %s.\n", line, argv[1]);
                     break;
 
                 case STATE_PREPROC:
@@ -475,8 +474,7 @@ START_TEST(shader_runner_d3d12)
                 }
 
                 case STATE_TEST:
-                    if (line[0] != '#')
-                        parse_test_directive(&context, line);
+                    parse_test_directive(&context, line);
                     break;
             }
         }
