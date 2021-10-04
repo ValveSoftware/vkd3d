@@ -73,10 +73,20 @@ static bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t elemen
     return true;
 }
 
+enum texture_data_type
+{
+    TEXTURE_DATA_FLOAT,
+    TEXTURE_DATA_SINT,
+    TEXTURE_DATA_UINT,
+};
+
 struct texture
 {
     unsigned int slot;
 
+    DXGI_FORMAT format;
+    enum texture_data_type data_type;
+    unsigned int texel_size;
     unsigned int width, height;
     uint8_t *data;
     size_t data_size, data_capacity;
@@ -150,12 +160,51 @@ static bool match_string(const char *line, const char *token, const char **const
     return true;
 }
 
+static void parse_texture_format(struct texture *texture, const char *line)
+{
+    static const struct
+    {
+        const char *string;
+        enum texture_data_type data_type;
+        unsigned int texel_size;
+        DXGI_FORMAT format;
+    }
+    formats[] =
+    {
+        {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
+        {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
+        {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
+    };
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(formats); ++i)
+    {
+        if (match_string(line, formats[i].string, &line))
+        {
+            texture->format = formats[i].format;
+            texture->data_type = formats[i].data_type;
+            texture->texel_size = formats[i].texel_size;
+            return;
+        }
+    }
+
+    fprintf(stderr, "Unknown format '%s'.\n", line);
+    texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    texture->data_type = TEXTURE_DATA_FLOAT;
+    texture->texel_size = 16;
+}
+
 static void parse_texture_directive(struct texture *texture, const char *line)
 {
     const char *const orig_line = line;
     int ret;
 
-    if (match_string(line, "size", &line))
+    if (match_string(line, "format", &line))
+    {
+        parse_texture_format(texture, line);
+    }
+    else if (match_string(line, "size", &line))
     {
         ret = sscanf(line, "( %u , %u )", &texture->width, &texture->height);
         if (ret < 2)
@@ -163,14 +212,39 @@ static void parse_texture_directive(struct texture *texture, const char *line)
     }
     else
     {
-        char *rest;
-        float f;
-
-        while ((f = strtof(line, &rest)) || rest != line)
+        union
         {
-            vkd3d_array_reserve((void **)&texture->data, &texture->data_capacity, texture->data_size + sizeof(f), 1);
-            memcpy(texture->data + texture->data_size, &f, sizeof(f));
-            texture->data_size += sizeof(f);
+            float f;
+            int32_t i;
+            uint32_t u;
+        } u;
+        char *rest;
+
+        u.u = 0;
+
+        for (;;)
+        {
+            switch (texture->data_type)
+            {
+                case TEXTURE_DATA_FLOAT:
+                    u.f = strtof(line, &rest);
+                    break;
+
+                case TEXTURE_DATA_SINT:
+                    u.i = strtol(line, &rest, 10);
+                    break;
+
+                case TEXTURE_DATA_UINT:
+                    u.u = strtoul(line, &rest, 10);
+                    break;
+            }
+
+            if (rest == line)
+                break;
+
+            vkd3d_array_reserve((void **)&texture->data, &texture->data_capacity, texture->data_size + sizeof(u), 1);
+            memcpy(texture->data + texture->data_size, &u, sizeof(u));
+            texture->data_size += sizeof(u);
             line = rest;
         }
     }
@@ -191,7 +265,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
                 = {ID3D10Blob_GetBufferPointer(context->ps_code), ID3D10Blob_GetBufferSize(context->ps_code)};
         ID3D12GraphicsCommandList *command_list = context->c.list;
         D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
-        D3D12_ROOT_PARAMETER root_params[2], *root_param;
+        D3D12_ROOT_PARAMETER root_params[3], *root_param;
         static const float clear_color[4];
         unsigned int uniform_index;
         ID3D12PipelineState *pso;
@@ -233,9 +307,9 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             texture->heap = create_gpu_descriptor_heap(context->c.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
             texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                    DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+                    texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
             resource_data.pData = texture->data;
-            resource_data.SlicePitch = resource_data.RowPitch = texture->width * sizeof(struct vec4);
+            resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
             upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
             reset_command_list(command_list, context->c.allocator);
             transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
@@ -597,6 +671,9 @@ START_TEST(shader_runner_d3d12)
                     memset(current_texture, 0, sizeof(*current_texture));
                 }
                 current_texture->slot = index;
+                current_texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_texture->data_type = TEXTURE_DATA_FLOAT;
+                current_texture->texel_size = 16;
             }
             else if (!strcmp(line, "[test]\n"))
             {
