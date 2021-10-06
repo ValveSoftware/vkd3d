@@ -897,6 +897,7 @@ struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
     struct vkd3d_shader_location location;
+    bool failed;
 
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;

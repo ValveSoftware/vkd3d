@@ -958,7 +958,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
         }
     }
 
-    ret = VKD3D_OK;
+    ret = parser->failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 
 done:
     vkd3d_shader_scan_context_cleanup(&context);
@@ -1083,6 +1083,9 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         if ((ret = vkd3d_dxbc_compiler_handle_instruction(spirv_compiler, &instruction)) < 0)
             break;
     }
+
+    if (parser->failed)
+        ret = VKD3D_ERROR_INVALID_SHADER;
 
     if (ret >= 0)
         ret = vkd3d_dxbc_compiler_generate_spirv(spirv_compiler, compile_info, out);

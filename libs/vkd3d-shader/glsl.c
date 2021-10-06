@@ -114,8 +114,8 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         vkd3d_glsl_handle_instruction(generator, &ins);
     }
 
-    if (generator->failed)
-        return VKD3D_ERROR;
+    if (parser->failed || generator->failed)
+        return VKD3D_ERROR_INVALID_SHADER;
 
     vkd3d_string_buffer_printf(&generator->buffer, "}\n");
 

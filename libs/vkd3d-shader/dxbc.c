@@ -183,6 +183,8 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_shader_sm4_par
     va_start(args, format);
     vkd3d_shader_verror(sm4->p.message_context, &sm4->p.location, error, format, args);
     va_end(args);
+
+    sm4->p.failed = true;
 }
 
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
@@ -1665,6 +1667,7 @@ void shader_sm4_reset(struct vkd3d_shader_parser *parser)
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
     parser->ptr = sm4->start;
+    parser->failed = false;
 }
 
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,

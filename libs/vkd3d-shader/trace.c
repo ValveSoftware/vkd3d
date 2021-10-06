@@ -1937,6 +1937,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
         }
     }
 
+    if (parser->failed)
+        result = VKD3D_ERROR_INVALID_SHADER;
+
     if ((code = vkd3d_malloc(buffer->content_size)))
     {
         memcpy(code, buffer->buffer, buffer->content_size);
