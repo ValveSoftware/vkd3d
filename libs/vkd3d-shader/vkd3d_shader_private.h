@@ -902,24 +902,47 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;
     const uint32_t *ptr;
+    const struct vkd3d_shader_parser_ops *ops;
+};
+
+struct vkd3d_shader_parser_ops
+{
+    void (*parser_reset)(struct vkd3d_shader_parser *parser);
+    void (*parser_destroy)(struct vkd3d_shader_parser *parser);
+    void (*parser_read_instruction)(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *instruction);
+    bool (*parser_is_end)(struct vkd3d_shader_parser *parser);
 };
 
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_version *version);
+        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops);
+
+static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
+{
+    parser->ops->parser_destroy(parser);
+}
+
+static inline bool vkd3d_shader_parser_is_end(struct vkd3d_shader_parser *parser)
+{
+    return parser->ops->parser_is_end(parser);
+}
+
+static inline void vkd3d_shader_parser_read_instruction(struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_instruction *instruction)
+{
+    parser->ops->parser_read_instruction(parser, instruction);
+}
+
+static inline void vkd3d_shader_parser_reset(struct vkd3d_shader_parser *parser)
+{
+    parser->ops->parser_reset(parser);
+}
 
 void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
-
-struct vkd3d_shader_message_context;
-
-void shader_sm4_free(struct vkd3d_shader_parser *parser);
-void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins);
-bool shader_sm4_is_end(struct vkd3d_shader_parser *parser);
-void shader_sm4_reset(struct vkd3d_shader_parser *parser);
 
 struct vkd3d_string_buffer
 {

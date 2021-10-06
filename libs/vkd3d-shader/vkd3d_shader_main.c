@@ -364,18 +364,14 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
 
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_version *version)
+        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops)
 {
     parser->message_context = message_context;
     parser->location.source_name = source_name;
     parser->location.line = 1;
     parser->location.column = 0;
     parser->shader_version = *version;
-}
-
-static void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
-{
-    shader_sm4_free(parser);
+    parser->ops = ops;
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
@@ -946,12 +942,12 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     if (TRACE_ON())
     {
         vkd3d_shader_trace(parser);
-        shader_sm4_reset(parser);
+        vkd3d_shader_parser_reset(parser);
     }
 
-    while (!shader_sm4_is_end(parser))
+    while (!vkd3d_shader_parser_is_end(parser))
     {
-        shader_sm4_read_instruction(parser, &instruction);
+        vkd3d_shader_parser_read_instruction(parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {
@@ -1081,9 +1077,9 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    while (!shader_sm4_is_end(parser))
+    while (!vkd3d_shader_parser_is_end(parser))
     {
-        shader_sm4_read_instruction(parser, &instruction);
+        vkd3d_shader_parser_read_instruction(parser, &instruction);
 
         if (instruction.handler_idx == VKD3DSIH_INVALID)
         {

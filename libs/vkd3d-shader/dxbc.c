@@ -960,90 +960,7 @@ static enum vkd3d_data_type map_data_type(char t)
     }
 }
 
-static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code,
-        size_t byte_code_size, const char *source_name, const struct vkd3d_shader_signature *output_signature,
-        struct vkd3d_shader_message_context *message_context)
-{
-    struct vkd3d_shader_version version;
-    uint32_t version_token, token_count;
-    unsigned int i;
-
-    if (byte_code_size / sizeof(*byte_code) < 2)
-    {
-        WARN("Invalid byte code size %lu.\n", (long)byte_code_size);
-        return false;
-    }
-
-    version_token = byte_code[0];
-    TRACE("Version: 0x%08x.\n", version_token);
-    token_count = byte_code[1];
-    TRACE("Token count: %u.\n", token_count);
-
-    if (token_count < 2 || byte_code_size / sizeof(*byte_code) < token_count)
-    {
-        WARN("Invalid token count %u.\n", token_count);
-        return false;
-    }
-
-    sm4->start = &byte_code[2];
-    sm4->end = &byte_code[token_count];
-
-    switch (version_token >> 16)
-    {
-        case VKD3D_SM4_PS:
-            version.type = VKD3D_SHADER_TYPE_PIXEL;
-            break;
-
-        case VKD3D_SM4_VS:
-            version.type = VKD3D_SHADER_TYPE_VERTEX;
-            break;
-
-        case VKD3D_SM4_GS:
-            version.type = VKD3D_SHADER_TYPE_GEOMETRY;
-            break;
-
-        case VKD3D_SM5_HS:
-            version.type = VKD3D_SHADER_TYPE_HULL;
-            break;
-
-        case VKD3D_SM5_DS:
-            version.type = VKD3D_SHADER_TYPE_DOMAIN;
-            break;
-
-        case VKD3D_SM5_CS:
-            version.type = VKD3D_SHADER_TYPE_COMPUTE;
-            break;
-
-        default:
-            FIXME("Unrecognised shader type %#x.\n", version_token >> 16);
-    }
-    version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
-    version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
-
-    vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version);
-    sm4->p.ptr = sm4->start;
-
-    memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
-    for (i = 0; i < output_signature->element_count; ++i)
-    {
-        struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
-
-        if (e->register_index >= ARRAY_SIZE(sm4->output_map))
-        {
-            WARN("Invalid output index %u.\n", e->register_index);
-            continue;
-        }
-
-        sm4->output_map[e->register_index] = e->semantic_index;
-    }
-
-    list_init(&sm4->src_free);
-    list_init(&sm4->src);
-
-    return true;
-}
-
-void shader_sm4_free(struct vkd3d_shader_parser *parser)
+static void shader_sm4_destroy(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
     struct vkd3d_shader_src_param_entry *e1, *e2;
@@ -1521,7 +1438,7 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
     }
 }
 
-void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
+static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
     const struct vkd3d_sm4_opcode_info *opcode_info;
@@ -1643,19 +1560,110 @@ fail:
     return;
 }
 
-bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
+static bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
     return parser->ptr == sm4->end;
 }
 
-void shader_sm4_reset(struct vkd3d_shader_parser *parser)
+static void shader_sm4_reset(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
     parser->ptr = sm4->start;
     parser->failed = false;
+}
+
+static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
+{
+    .parser_reset = shader_sm4_reset,
+    .parser_destroy = shader_sm4_destroy,
+    .parser_read_instruction = shader_sm4_read_instruction,
+    .parser_is_end = shader_sm4_is_end,
+};
+
+static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code,
+        size_t byte_code_size, const char *source_name, const struct vkd3d_shader_signature *output_signature,
+        struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_shader_version version;
+    uint32_t version_token, token_count;
+    unsigned int i;
+
+    if (byte_code_size / sizeof(*byte_code) < 2)
+    {
+        WARN("Invalid byte code size %lu.\n", (long)byte_code_size);
+        return false;
+    }
+
+    version_token = byte_code[0];
+    TRACE("Version: 0x%08x.\n", version_token);
+    token_count = byte_code[1];
+    TRACE("Token count: %u.\n", token_count);
+
+    if (token_count < 2 || byte_code_size / sizeof(*byte_code) < token_count)
+    {
+        WARN("Invalid token count %u.\n", token_count);
+        return false;
+    }
+
+    sm4->start = &byte_code[2];
+    sm4->end = &byte_code[token_count];
+
+    switch (version_token >> 16)
+    {
+        case VKD3D_SM4_PS:
+            version.type = VKD3D_SHADER_TYPE_PIXEL;
+            break;
+
+        case VKD3D_SM4_VS:
+            version.type = VKD3D_SHADER_TYPE_VERTEX;
+            break;
+
+        case VKD3D_SM4_GS:
+            version.type = VKD3D_SHADER_TYPE_GEOMETRY;
+            break;
+
+        case VKD3D_SM5_HS:
+            version.type = VKD3D_SHADER_TYPE_HULL;
+            break;
+
+        case VKD3D_SM5_DS:
+            version.type = VKD3D_SHADER_TYPE_DOMAIN;
+            break;
+
+        case VKD3D_SM5_CS:
+            version.type = VKD3D_SHADER_TYPE_COMPUTE;
+            break;
+
+        default:
+            FIXME("Unrecognised shader type %#x.\n", version_token >> 16);
+    }
+    version.major = VKD3D_SM4_VERSION_MAJOR(version_token);
+    version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
+
+    vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version, &shader_sm4_parser_ops);
+    sm4->p.ptr = sm4->start;
+
+    memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
+    for (i = 0; i < output_signature->element_count; ++i)
+    {
+        struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
+
+        if (e->register_index >= ARRAY_SIZE(sm4->output_map))
+        {
+            WARN("Invalid output index %u.\n", e->register_index);
+            continue;
+        }
+
+        sm4->output_map[e->register_index] = e->semantic_index;
+    }
+
+    list_init(&sm4->src_free);
+    list_init(&sm4->src);
+
+    return true;
 }
 
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
