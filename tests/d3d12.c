@@ -2777,6 +2777,83 @@ static void test_create_root_signature(void)
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
 
+    /* Unbounded descriptor ranges. */
+
+    /* A bounded range overlapping an unbounded one, mapped to a different
+     * register space of the same type. */
+    descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_ranges[0].NumDescriptors = UINT_MAX;
+    descriptor_ranges[0].BaseShaderRegister = 0;
+    descriptor_ranges[0].RegisterSpace = 0;
+    descriptor_ranges[0].OffsetInDescriptorsFromTableStart = 0;
+    descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_ranges[1].NumDescriptors = 1;
+    descriptor_ranges[1].BaseShaderRegister = 16;
+    descriptor_ranges[1].RegisterSpace = 1;
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 16;
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    root_parameters[0].DescriptorTable.NumDescriptorRanges = 2;
+    root_parameters[0].DescriptorTable.pDescriptorRanges = descriptor_ranges;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    root_signature_desc.NumParameters = 1;
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == S_OK || (binding_tier == D3D12_RESOURCE_BINDING_TIER_1 && (hr == E_FAIL || hr == E_INVALIDARG)),
+            "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+    {
+        refcount = ID3D12RootSignature_Release(root_signature);
+        ok(!refcount, "Got unexpected refcount %u.\n", (unsigned int)refcount);
+    }
+
+    /* A bounded range overlapping an unbounded one, mapped to a different
+     * register space of the same type. Using
+     * D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND. */
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* A bounded range overlapping an unbounded one, mapped to the same
+     * register space and type. */
+    descriptor_ranges[1].RegisterSpace = 0;
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 16;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+
+    /* A bounded range overlapping an unbounded one, mapped to the same
+     * register space, but a different type. */
+    descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == S_OK || (binding_tier <= D3D12_RESOURCE_BINDING_TIER_2 && (hr == E_FAIL || hr == E_INVALIDARG)),
+            "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+    {
+        refcount = ID3D12RootSignature_Release(root_signature);
+        ok(!refcount, "Got unexpected refcount %u.\n", (unsigned int)refcount);
+    }
+
+    /* An unbounded range overlapping another unbounded range, mapped to the
+     * same register space and type. */
+    descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_ranges[1].NumDescriptors = UINT_MAX;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
+    /* And unbounded range overlapping a bounded one, mapped to the same
+     * register space and type. */
+    descriptor_ranges[0].NumDescriptors = 16;
+    descriptor_ranges[1].BaseShaderRegister = 0;
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 15;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
 }
