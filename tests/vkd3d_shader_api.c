@@ -274,6 +274,9 @@ static void test_d3dbc(void)
             (int)d3d_asm.size, (char *)d3d_asm.code);
     vkd3d_shader_free_shader_code(&d3d_asm);
 
+    rc = vkd3d_shader_scan(&info, NULL);
+    ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+
     info.source.size = sizeof(vs_minimal) + 1;
     rc = vkd3d_shader_compile(&info, &d3d_asm, NULL);
     ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);

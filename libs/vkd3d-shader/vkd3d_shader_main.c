@@ -928,13 +928,12 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     return VKD3D_OK;
 }
 
-static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context)
+static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
     struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_scan_context context;
-    struct vkd3d_shader_parser *parser;
     int ret;
 
     if ((scan_descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO)))
@@ -944,12 +943,6 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
     }
 
     vkd3d_shader_scan_context_init(&context, compile_info, scan_descriptor_info, message_context);
-
-    if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
-    {
-        vkd3d_shader_scan_context_cleanup(&context);
-        return ret;
-    }
 
     if (TRACE_ON())
     {
@@ -982,7 +975,42 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
 
 done:
     vkd3d_shader_scan_context_cleanup(&context);
+    return ret;
+}
+
+static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_shader_parser *parser;
+    int ret;
+
+    if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
+    {
+        WARN("Failed to initialise shader parser.\n");
+        return ret;
+    }
+
+    ret = scan_with_parser(compile_info, message_context, parser);
     vkd3d_shader_parser_destroy(parser);
+
+    return ret;
+}
+
+static int scan_d3dbc(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_shader_parser *parser;
+    int ret;
+
+    if ((ret = vkd3d_shader_sm1_parser_create(compile_info, message_context, &parser)) < 0)
+    {
+        WARN("Failed to initialise shader parser.\n");
+        return ret;
+    }
+
+    ret = scan_with_parser(compile_info, message_context, parser);
+    vkd3d_shader_parser_destroy(parser);
+
     return ret;
 }
 
@@ -1010,6 +1038,10 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
         case VKD3D_SHADER_SOURCE_HLSL:
             FIXME("HLSL support not implemented.\n");
             ret = VKD3D_ERROR_NOT_IMPLEMENTED;
+            break;
+
+        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+            ret = scan_d3dbc(compile_info, &message_context);
             break;
 
         default:
@@ -1045,6 +1077,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 
     if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
     {
+        WARN("Failed to initialise shader parser.\n");
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
     }
