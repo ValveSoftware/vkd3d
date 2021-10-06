@@ -584,6 +584,21 @@ static bool is_shader_float64_supported(ID3D12Device *device)
     return options.DoublePrecisionFloatShaderOps;
 }
 
+static D3D12_RESOURCE_BINDING_TIER get_resource_binding_tier(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return D3D12_RESOURCE_BINDING_TIER_1;
+    }
+
+    return options.ResourceBindingTier;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -2590,6 +2605,7 @@ static void test_create_root_signature(void)
 {
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_DESCRIPTOR_RANGE descriptor_ranges[2];
+    D3D12_RESOURCE_BINDING_TIER binding_tier;
     D3D12_ROOT_PARAMETER root_parameters[3];
     ID3D12RootSignature *root_signature;
     ID3D12Device *device, *tmp_device;
@@ -2601,6 +2617,11 @@ static void test_create_root_signature(void)
         skip("Failed to create device.\n");
         return;
     }
+
+    /* Tier 2 is required for unbounded SRVs and Tier > 2 for unbounded CBVs and UAVs
+     * due to the need for partial binding support. It is also required for overlapping
+     * ranges of different types. */
+    binding_tier = get_resource_binding_tier(device);
 
     /* descriptor table */
     descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -2636,6 +2657,35 @@ static void test_create_root_signature(void)
 
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+
+    /* Overlapping ranges but unique register indices. */
+    descriptor_ranges[0].NumDescriptors = 8;
+    descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    descriptor_ranges[1].NumDescriptors = 2;
+    descriptor_ranges[1].BaseShaderRegister = 8;
+    descriptor_ranges[1].RegisterSpace = 0;
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 7;
+    root_parameters[0].DescriptorTable.NumDescriptorRanges = 2;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    ID3D12RootSignature_Release(root_signature);
+
+    /* Separate ranges with ambiguous register indices. */
+    descriptor_ranges[1].BaseShaderRegister = 7;
+    descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 8;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
+
+    /* Identical ranges and register indices but different type. */
+    descriptor_ranges[1] = descriptor_ranges[0];
+    descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK || (binding_tier <= D3D12_RESOURCE_BINDING_TIER_2 && (hr == E_FAIL || hr == E_INVALIDARG)),
+            "Got unexpected hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D12RootSignature_Release(root_signature);
 
     /* sampler and SRV in the same descriptor table */
     descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
