@@ -2799,7 +2799,7 @@ static void test_create_root_signature(void)
     root_signature_desc.pStaticSamplers = NULL;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == S_OK || (binding_tier == D3D12_RESOURCE_BINDING_TIER_1 && (hr == E_FAIL || hr == E_INVALIDARG)),
+    ok(hr == S_OK || (binding_tier == D3D12_RESOURCE_BINDING_TIER_1 && (hr == E_FAIL || hr == E_INVALIDARG)),
             "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
     {
@@ -2819,13 +2819,13 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].RegisterSpace = 0;
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 16;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     /* A bounded range overlapping an unbounded one, mapped to the same
      * register space, but a different type. */
     descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == S_OK || (binding_tier <= D3D12_RESOURCE_BINDING_TIER_2 && (hr == E_FAIL || hr == E_INVALIDARG)),
+    ok(hr == S_OK || (binding_tier <= D3D12_RESOURCE_BINDING_TIER_2 && (hr == E_FAIL || hr == E_INVALIDARG)),
             "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
     {
@@ -2838,9 +2838,7 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     descriptor_ranges[1].NumDescriptors = UINT_MAX;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12RootSignature_Release(root_signature);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     /* And unbounded range overlapping a bounded one, mapped to the same
      * register space and type. */
@@ -2848,9 +2846,7 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].BaseShaderRegister = 0;
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 15;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12RootSignature_Release(root_signature);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
@@ -34925,7 +34921,6 @@ static void test_unbounded_resource_arrays(void)
     root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
     root_signature_desc.pParameters = root_parameters;
     hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
-    todo
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
     if (FAILED(hr))
         goto done;
@@ -34999,6 +34994,7 @@ static void test_unbounded_resource_arrays(void)
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         /* Buffers at index >= 64 are aliased. */
+        todo_if(i != 10 && i != 74)
         check_readback_data_uint(&rb, NULL, (i < 64 ? 63 - i : 127 - i) ^ 0x35, 0);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
@@ -35088,7 +35084,6 @@ static void test_unbounded_samplers(void)
     root_signature_desc.pParameters = root_parameters;
 
     hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
-    todo
     ok(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
     if (FAILED(hr))
         goto done;
@@ -35146,6 +35141,7 @@ static void test_unbounded_samplers(void)
     {
         unsigned int value = get_readback_uint(&rb, i, 0, 0);
         unsigned int expected = (i & 1) ? 100 : 10;
+        todo_if(i & 1)
         ok(value == expected, "Got %u, expected %u at %u.\n", value, expected, i);
     }
     release_resource_readback(&rb);

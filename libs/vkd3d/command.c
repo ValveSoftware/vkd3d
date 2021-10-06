@@ -1,6 +1,7 @@
 /*
  * Copyright 2016 Józef Kucia for CodeWeavers
  * Copyright 2016 Henri Verbeet for CodeWeavers
+ * Copyright 2021 Conor McCarthy for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -1363,10 +1364,12 @@ static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
 }
 
 static VkDescriptorSet d3d12_command_allocator_allocate_descriptor_set(
-        struct d3d12_command_allocator *allocator, VkDescriptorSetLayout vk_set_layout)
+        struct d3d12_command_allocator *allocator, VkDescriptorSetLayout vk_set_layout,
+        unsigned int variable_binding_size, bool unbounded)
 {
     struct d3d12_device *device = allocator->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+    VkDescriptorSetVariableDescriptorCountAllocateInfoEXT set_size;
     struct VkDescriptorSetAllocateInfo set_desc;
     VkDevice vk_device = device->vk_device;
     VkDescriptorSet vk_descriptor_set;
@@ -1382,6 +1385,14 @@ static VkDescriptorSet d3d12_command_allocator_allocate_descriptor_set(
     set_desc.descriptorPool = allocator->vk_descriptor_pool;
     set_desc.descriptorSetCount = 1;
     set_desc.pSetLayouts = &vk_set_layout;
+    if (unbounded)
+    {
+        set_desc.pNext = &set_size;
+        set_size.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT;
+        set_size.pNext = NULL;
+        set_size.descriptorSetCount = 1;
+        set_size.pDescriptorCounts = &variable_binding_size;
+    }
     if ((vr = VK_CALL(vkAllocateDescriptorSets(vk_device, &set_desc, &vk_descriptor_set))) >= 0)
         return vk_descriptor_set;
 
@@ -2562,7 +2573,12 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
         enum vkd3d_pipeline_bind_point bind_point)
 {
     struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
+    unsigned int variable_binding_size, unbounded_offset, table_index, heap_size, i;
     const struct d3d12_root_signature *root_signature = bindings->root_signature;
+    const struct d3d12_descriptor_set_layout *layout;
+    struct d3d12_device *device = list->device;
+    const struct d3d12_desc *base_descriptor;
+    VkDescriptorSet vk_descriptor_set;
 
     if (bindings->descriptor_set_count && !bindings->in_use)
         return;
@@ -2579,9 +2595,33 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
      *   by an update command, or freed) between when the command is recorded
      *   and when the command completes executing on the queue."
      */
-    bindings->descriptor_sets[0] = d3d12_command_allocator_allocate_descriptor_set(list->allocator,
-            root_signature->vk_set_layouts[root_signature->main_set]);
-    bindings->descriptor_set_count = 1;
+    bindings->descriptor_set_count = 0;
+    for (i = root_signature->main_set; i < root_signature->vk_set_count; ++i)
+    {
+        layout = &root_signature->descriptor_set_layouts[i];
+        unbounded_offset = layout->unbounded_offset;
+        table_index = layout->table_index;
+        variable_binding_size = 0;
+
+        if (unbounded_offset != UINT_MAX
+                /* Descriptors may not be set, eg. WoW. */
+                && (base_descriptor = d3d12_desc_from_gpu_handle(bindings->descriptor_tables[table_index])))
+        {
+            heap_size = vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
+                    &device->gpu_descriptor_allocator, base_descriptor);
+
+            if (heap_size < unbounded_offset)
+                WARN("Descriptor heap size %u is less than the offset %u of an unbounded range in table %u, "
+                        "vk set %u.\n", heap_size, unbounded_offset, table_index, i);
+            else
+                variable_binding_size = heap_size - unbounded_offset;
+        }
+
+        vk_descriptor_set = d3d12_command_allocator_allocate_descriptor_set(list->allocator,
+                layout->vk_layout, variable_binding_size, unbounded_offset != UINT_MAX);
+        bindings->descriptor_sets[bindings->descriptor_set_count++] = vk_descriptor_set;
+    }
+
     bindings->in_use = false;
 
     bindings->descriptor_table_dirty_mask |= bindings->descriptor_table_active_mask & root_signature->descriptor_table_mask;
@@ -2596,13 +2636,14 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
     uint32_t descriptor_range_magic = range->descriptor_magic;
     const struct vkd3d_view *view = descriptor->u.view;
     uint32_t vk_binding = range->binding;
+    uint32_t set = range->set;
 
     if (descriptor->magic != descriptor_range_magic)
         return false;
 
     vk_descriptor_write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_descriptor_write->pNext = NULL;
-    vk_descriptor_write->dstSet = vk_descriptor_sets[0];
+    vk_descriptor_write->dstSet = vk_descriptor_sets[set];
     vk_descriptor_write->dstBinding = use_array ? vk_binding : vk_binding + index;
     vk_descriptor_write->dstArrayElement = use_array ? index : 0;
     vk_descriptor_write->descriptorCount = 1;
@@ -2620,12 +2661,26 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
         case VKD3D_DESCRIPTOR_MAGIC_SRV:
         case VKD3D_DESCRIPTOR_MAGIC_UAV:
             /* We use separate bindings for buffer and texture SRVs/UAVs.
-             * See d3d12_root_signature_init(). */
-            if (!use_array)
-                vk_descriptor_write->dstBinding = vk_binding + 2 * index;
-            if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                    && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
-                ++vk_descriptor_write->dstBinding;
+             * See d3d12_root_signature_init(). For unbounded ranges the
+             * descriptors exist in two consecutive sets, otherwise they occur
+             * in pairs in one set. */
+            if (range->descriptor_count == UINT_MAX)
+            {
+                if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                {
+                    vk_descriptor_write->dstSet = vk_descriptor_sets[set + 1];
+                    vk_descriptor_write->dstBinding = 0;
+                }
+            }
+            else
+            {
+                if (!use_array)
+                    vk_descriptor_write->dstBinding = vk_binding + 2 * index;
+                if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                    ++vk_descriptor_write->dstBinding;
+            }
 
             if (descriptor->vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
                     || descriptor->vk_descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
@@ -2673,19 +2728,38 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
     VkDevice vk_device = list->device->vk_device;
     unsigned int i, j, k, descriptor_count;
     struct d3d12_desc *descriptor;
+    unsigned int write_count = 0;
+    bool unbounded = false;
 
     descriptor_table = root_signature_get_descriptor_table(root_signature, index);
 
-    descriptor_count = 0;
     current_descriptor_write = descriptor_writes;
     current_image_info = image_infos;
     for (i = 0; i < descriptor_table->range_count; ++i)
     {
         range = &descriptor_table->ranges[i];
 
+        /* The first unbounded range of each type is written until the heap end is reached. Do not repeat. */
+        if (unbounded && i && range->type == descriptor_table->ranges[i - 1].type)
+            continue;
+
         descriptor = base_descriptor + range->offset;
 
-        for (j = 0; j < range->descriptor_count; ++j, ++descriptor)
+        descriptor_count = range->descriptor_count;
+        if ((unbounded = descriptor_count == UINT_MAX))
+        {
+            descriptor_count = vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
+                    &list->device->gpu_descriptor_allocator, descriptor);
+
+            if (descriptor_count > range->vk_binding_count)
+            {
+                ERR("Heap descriptor count %u exceeds maximum Vulkan count %u. Reducing to the Vulkan maximum.\n",
+                        descriptor_count, range->vk_binding_count);
+                descriptor_count = range->vk_binding_count;
+            }
+        }
+
+        for (j = 0; j < descriptor_count; ++j, ++descriptor)
         {
             unsigned int register_idx = range->base_register_idx + j;
 
@@ -2707,25 +2781,29 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
                 }
             }
 
+            /* Not all descriptors are necessarily populated if the range is unbounded. */
+            if (descriptor->magic == VKD3D_DESCRIPTOR_MAGIC_FREE)
+                continue;
+
             if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write, current_image_info,
                     descriptor, range, bindings->descriptor_sets, j, root_signature->use_descriptor_arrays))
                 continue;
 
-            ++descriptor_count;
+            ++write_count;
             ++current_descriptor_write;
             ++current_image_info;
 
-            if (descriptor_count == ARRAY_SIZE(descriptor_writes))
+            if (write_count == ARRAY_SIZE(descriptor_writes))
             {
-                VK_CALL(vkUpdateDescriptorSets(vk_device, descriptor_count, descriptor_writes, 0, NULL));
-                descriptor_count = 0;
+                VK_CALL(vkUpdateDescriptorSets(vk_device, write_count, descriptor_writes, 0, NULL));
+                write_count = 0;
                 current_descriptor_write = descriptor_writes;
                 current_image_info = image_infos;
             }
         }
     }
 
-    VK_CALL(vkUpdateDescriptorSets(vk_device, descriptor_count, descriptor_writes, 0, NULL));
+    VK_CALL(vkUpdateDescriptorSets(vk_device, write_count, descriptor_writes, 0, NULL));
 }
 
 static bool vk_write_descriptor_set_from_root_descriptor(VkWriteDescriptorSet *vk_descriptor_write,
@@ -2850,8 +2928,8 @@ static void d3d12_command_list_update_uav_counter_descriptors(struct d3d12_comma
     uav_counter_count = state->uav_counters.binding_count;
     if (!(vk_descriptor_writes = vkd3d_calloc(uav_counter_count, sizeof(*vk_descriptor_writes))))
         return;
-    if (!(vk_descriptor_set = d3d12_command_allocator_allocate_descriptor_set(list->allocator,
-            state->uav_counters.vk_set_layout)))
+    if (!(vk_descriptor_set = d3d12_command_allocator_allocate_descriptor_set(
+            list->allocator, state->uav_counters.vk_set_layout, 0, false)))
         goto done;
 
     for (i = 0; i < uav_counter_count; ++i)
@@ -4946,7 +5024,7 @@ static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
     }
 
     if (!(write_set.dstSet = d3d12_command_allocator_allocate_descriptor_set(
-            list->allocator, pipeline.vk_set_layout)))
+            list->allocator, pipeline.vk_set_layout, 0, false)))
     {
         ERR("Failed to allocate descriptor set.\n");
         return;

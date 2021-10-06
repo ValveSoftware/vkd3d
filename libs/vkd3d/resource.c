@@ -3351,6 +3351,10 @@ static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_Release(ID3D12DescriptorHea
                 {
                     d3d12_desc_destroy(&descriptors[i], device);
                 }
+
+                if (device->vk_info.EXT_descriptor_indexing && !vkd3d_gpu_descriptor_allocator_unregister_range(
+                        &device->gpu_descriptor_allocator, descriptors))
+                    ERR("Failed to unregister descriptor range.\n");
                 break;
             }
 
@@ -3546,6 +3550,11 @@ HRESULT d3d12_descriptor_heap_create(struct d3d12_device *device,
     }
 
     memset(object->descriptors, 0, descriptor_size * desc->NumDescriptors);
+
+    if ((desc->Type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || desc->Type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
+            && device->vk_info.EXT_descriptor_indexing && !vkd3d_gpu_descriptor_allocator_register_range(
+                    &device->gpu_descriptor_allocator, (struct d3d12_desc *)object->descriptors, desc->NumDescriptors))
+        ERR("Failed to register descriptor range.\n");
 
     TRACE("Created descriptor heap %p.\n", object);
 

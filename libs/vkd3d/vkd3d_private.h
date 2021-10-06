@@ -54,7 +54,7 @@
 #define VKD3D_MAX_SHADER_EXTENSIONS       2u
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
-#define VKD3D_MAX_DESCRIPTOR_SETS         2u
+#define VKD3D_MAX_DESCRIPTOR_SETS        64u
 
 struct d3d12_command_list;
 struct d3d12_device;
@@ -233,6 +233,28 @@ D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_al
         size_t alignment, size_t size, void *ptr);
 void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
 void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
+
+struct vkd3d_gpu_descriptor_allocation
+{
+    const struct d3d12_desc *base;
+    size_t count;
+};
+
+struct vkd3d_gpu_descriptor_allocator
+{
+    pthread_mutex_t mutex;
+
+    struct vkd3d_gpu_descriptor_allocation *allocations;
+    size_t allocations_size;
+    size_t allocation_count;
+};
+
+size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
+        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc);
+bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_allocator *allocator,
+        const struct d3d12_desc *base, size_t count);
+bool vkd3d_gpu_descriptor_allocator_unregister_range(
+        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *base);
 
 struct vkd3d_render_pass_key
 {
@@ -647,6 +669,8 @@ struct d3d12_root_descriptor_table_range
 {
     unsigned int offset;
     unsigned int descriptor_count;
+    unsigned int vk_binding_count;
+    uint32_t set;
     uint32_t binding;
 
     enum vkd3d_shader_descriptor_type type;
@@ -683,6 +707,13 @@ struct d3d12_root_parameter
     } u;
 };
 
+struct d3d12_descriptor_set_layout
+{
+    VkDescriptorSetLayout vk_layout;
+    unsigned int unbounded_offset;
+    unsigned int table_index;
+};
+
 /* ID3D12RootSignature */
 struct d3d12_root_signature
 {
@@ -690,8 +721,8 @@ struct d3d12_root_signature
     LONG refcount;
 
     VkPipelineLayout vk_pipeline_layout;
+    struct d3d12_descriptor_set_layout descriptor_set_layouts[VKD3D_MAX_DESCRIPTOR_SETS];
     uint32_t vk_set_count;
-    VkDescriptorSetLayout vk_set_layouts[VKD3D_MAX_DESCRIPTOR_SETS];
     bool use_descriptor_arrays;
 
     struct d3d12_root_parameter *parameters;
@@ -912,8 +943,10 @@ struct vkd3d_pipeline_bindings
     const struct d3d12_root_signature *root_signature;
 
     VkPipelineBindPoint vk_bind_point;
+    /* All descriptor sets at index > 1 are for unbounded d3d12 ranges. Set
+     * 0 or 1 may be unbounded too. */
     size_t descriptor_set_count;
-    VkDescriptorSet descriptor_sets[VKD3D_MAX_DESCRIPTOR_SETS - 1];
+    VkDescriptorSet descriptor_sets[VKD3D_MAX_DESCRIPTOR_SETS];
     bool in_use;
 
     D3D12_GPU_DESCRIPTOR_HANDLE descriptor_tables[D3D12_MAX_ROOT_COST];
@@ -1126,6 +1159,7 @@ struct d3d12_device
     PFN_vkd3d_signal_event signal_event;
     size_t wchar_size;
 
+    struct vkd3d_gpu_descriptor_allocator gpu_descriptor_allocator;
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
     struct vkd3d_fence_worker fence_worker;
 
