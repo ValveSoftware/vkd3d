@@ -181,7 +181,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_shader_sm4_par
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(sm4->p.message_context, NULL, error, format, args);
+    vkd3d_shader_verror(sm4->p.message_context, &sm4->p.location, error, format, args);
     va_end(args);
 }
 
