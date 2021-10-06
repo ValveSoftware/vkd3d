@@ -325,6 +325,7 @@ struct d3d12_root_signature_info
 static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_signature_info *info,
         const D3D12_ROOT_DESCRIPTOR_TABLE *table, bool use_array)
 {
+    bool unbounded = false;
     unsigned int i;
 
     for (i = 0; i < table->NumDescriptorRanges; ++i)
@@ -332,11 +333,15 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
         const D3D12_DESCRIPTOR_RANGE *range = &table->pDescriptorRanges[i];
         unsigned int binding_count;
 
-        if (range->NumDescriptors == 0xffffffff)
+        if (unbounded && range->OffsetInDescriptorsFromTableStart == D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
         {
-            FIXME("Unhandled unbound descriptor range.\n");
-            return E_NOTIMPL;
+            WARN("An unbounded range with offset D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND occurs after "
+                    "another unbounded range.\n");
+            return E_INVALIDARG;
         }
+
+        if (range->NumDescriptors == UINT_MAX)
+            unbounded = true;
 
         binding_count = use_array ? 1 : range->NumDescriptors;
 
@@ -363,6 +368,12 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
         }
 
         info->binding_count += binding_count;
+    }
+
+    if (unbounded)
+    {
+        FIXME("Unhandled unbounded descriptor range.\n");
+        return E_NOTIMPL;
     }
 
     return S_OK;

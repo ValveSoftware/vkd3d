@@ -2814,7 +2814,7 @@ static void test_create_root_signature(void)
      * D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND. */
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     /* A bounded range overlapping an unbounded one, mapped to the same
      * register space and type. */
