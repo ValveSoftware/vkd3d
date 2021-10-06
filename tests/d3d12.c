@@ -2674,9 +2674,7 @@ static void test_create_root_signature(void)
     descriptor_ranges[1].BaseShaderRegister = 7;
     descriptor_ranges[1].OffsetInDescriptorsFromTableStart = 8;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12RootSignature_Release(root_signature);
+    ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
     /* Identical ranges and register indices but different type. */
     descriptor_ranges[1] = descriptor_ranges[0];

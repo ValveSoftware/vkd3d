@@ -662,6 +662,39 @@ static HRESULT d3d12_root_signature_init_descriptor_array_binding(struct d3d12_r
     return S_OK;
 }
 
+static int compare_register_range(const void *a, const void *b)
+{
+    const struct d3d12_root_descriptor_table_range *range_a = a, *range_b = b;
+    int ret;
+
+    if ((ret = range_a->type - range_b->type))
+        return ret;
+
+    if ((ret = range_a->register_space - range_b->register_space))
+        return ret;
+
+    return range_a->base_register_idx - range_b->base_register_idx;
+}
+
+static HRESULT validate_descriptor_register_ranges(const struct d3d12_root_descriptor_table_range *ranges,
+        unsigned int count)
+{
+    const struct d3d12_root_descriptor_table_range *range, *prev;
+    unsigned int i;
+
+    for (i = 1; i < count; ++i)
+    {
+        range = &ranges[i];
+        prev = &ranges[i - 1];
+
+        if (range->type == prev->type && range->register_space == prev->register_space
+                && range->base_register_idx - prev->base_register_idx < prev->descriptor_count)
+            return E_INVALIDARG;
+    }
+
+    return S_OK;
+}
+
 static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_root_signature *root_signature,
         const D3D12_ROOT_SIGNATURE_DESC *desc, struct vkd3d_descriptor_set_context *context)
 {
@@ -714,6 +747,10 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
 
             offset += range->NumDescriptors;
         }
+
+        qsort(table->ranges, range_count, sizeof(*table->ranges), compare_register_range);
+        if (FAILED(hr = validate_descriptor_register_ranges(table->ranges, range_count)))
+            return hr;
 
         for (j = 0; j < range_count; ++j)
         {
