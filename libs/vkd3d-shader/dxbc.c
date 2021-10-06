@@ -175,18 +175,6 @@ static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
     return version->major >= 5 && version->minor >= 1;
 }
 
-static void VKD3D_PRINTF_FUNC(3, 4) shader_sm4_error(struct vkd3d_shader_sm4_parser *sm4,
-        enum vkd3d_shader_error error, const char *format, ...)
-{
-    va_list args;
-
-    va_start(args, format);
-    vkd3d_shader_verror(sm4->p.message_context, &sm4->p.location, error, format, args);
-    va_end(args);
-
-    sm4->p.failed = true;
-}
-
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param);
 static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
@@ -246,15 +234,15 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     ins->declaration.icb = &priv->icb;
 }
 
-static void shader_sm4_set_descriptor_register_range(struct vkd3d_shader_sm4_parser *priv,
+static void shader_sm4_set_descriptor_register_range(struct vkd3d_shader_sm4_parser *sm4,
         struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
 {
     range->first = reg->idx[1].offset;
-    range->last = reg->idx[shader_is_sm_5_1(priv) ? 2 : 1].offset;
+    range->last = reg->idx[shader_is_sm_5_1(sm4) ? 2 : 1].offset;
     if (range->last < range->first)
     {
         FIXME("Invalid register range [%u:%u].\n", range->first, range->last);
-        shader_sm4_error(priv, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE,
+        vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE,
                 "Last register %u must not be less than first register %u in range.\n", range->last, range->first);
     }
 }

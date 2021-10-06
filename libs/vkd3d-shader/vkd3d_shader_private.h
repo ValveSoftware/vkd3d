@@ -904,6 +904,8 @@ struct vkd3d_shader_parser
     const uint32_t *ptr;
 };
 
+void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
+        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
         const struct vkd3d_shader_version *version);
