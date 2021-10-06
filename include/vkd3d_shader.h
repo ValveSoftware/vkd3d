@@ -467,6 +467,11 @@ enum vkd3d_shader_source_type
     VKD3D_SHADER_SOURCE_DXBC_TPF,
     /** High-Level Shader Language source code. */
     VKD3D_SHADER_SOURCE_HLSL,
+    /**
+     * Legacy Direct3D byte-code. This is the format used for Direct3D shader
+     * model 1, 2, and 3 shaders.
+     */
+    VKD3D_SHADER_SOURCE_D3D_BYTECODE,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SOURCE_TYPE),
 };

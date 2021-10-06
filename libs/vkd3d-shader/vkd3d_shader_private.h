@@ -117,6 +117,13 @@ enum vkd3d_shader_error
     VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION       = 5300,
 
     VKD3D_SHADER_ERROR_GLSL_INTERNAL                    = 6000,
+
+    VKD3D_SHADER_ERROR_D3DBC_UNEXPECTED_EOF             = 7000,
+    VKD3D_SHADER_ERROR_D3DBC_INVALID_VERSION_TOKEN      = 7001,
+    VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE             = 7002,
+    VKD3D_SHADER_ERROR_D3DBC_INVALID_RESOURCE_TYPE      = 7003,
+
+    VKD3D_SHADER_WARNING_D3DBC_IGNORED_INSTRUCTION_FLAGS= 7300,
 };
 
 enum vkd3d_shader_opcode
@@ -918,6 +925,8 @@ void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
 void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
         const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops);
+void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
+        enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
 
 static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
@@ -1029,6 +1038,8 @@ void vkd3d_shader_trace_text_(const char *text, size_t size, const char *functio
 #define vkd3d_shader_trace_text(text, size) \
         vkd3d_shader_trace_text_(text, size, __FUNCTION__)
 
+int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
@@ -1217,6 +1228,7 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define TAG_RTS0 MAKE_TAG('R', 'T', 'S', '0')
 #define TAG_SHDR MAKE_TAG('S', 'H', 'D', 'R')
 #define TAG_SHEX MAKE_TAG('S', 'H', 'E', 'X')
+#define TAG_TEXT MAKE_TAG('T', 'E', 'X', 'T')
 
 struct dxbc_writer_section
 {

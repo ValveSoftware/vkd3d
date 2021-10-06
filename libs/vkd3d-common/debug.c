@@ -132,22 +132,25 @@ static int get_escape_char(int c)
     }
 }
 
-const char *debugstr_a(const char *str)
+const char *debugstr_an(const char *str, size_t n)
 {
     char *buffer, *ptr;
+    int escape_char;
     char c;
 
     if (!str)
         return "(null)";
+    if (n == SIZE_MAX)
+        n = strlen(str);
 
     ptr = buffer = get_buffer();
 
     *ptr++ = '"';
-    while ((c = *str++) && ptr <= buffer + VKD3D_DEBUG_BUFFER_SIZE - 8)
+    while (n-- && ptr <= buffer + VKD3D_DEBUG_BUFFER_SIZE - 8)
     {
-        int escape_char = get_escape_char(c);
+        c = *str++;
 
-        if (escape_char)
+        if ((escape_char = get_escape_char(c)))
         {
             *ptr++ = '\\';
             *ptr++ = escape_char;
@@ -167,7 +170,7 @@ const char *debugstr_a(const char *str)
     }
     *ptr++ = '"';
 
-    if (c)
+    if (++n)
     {
         *ptr++ = '.';
         *ptr++ = '.';
@@ -176,6 +179,11 @@ const char *debugstr_a(const char *str)
     *ptr = '\0';
 
     return buffer;
+}
+
+const char *debugstr_a(const char *str)
+{
+    return debugstr_an(str, SIZE_MAX);
 }
 
 static const char *debugstr_w16(const uint16_t *wstr)

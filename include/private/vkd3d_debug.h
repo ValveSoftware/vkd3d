@@ -51,6 +51,7 @@ void vkd3d_dbg_printf(enum vkd3d_dbg_level level, const char *function, const ch
 const char *vkd3d_dbg_sprintf(const char *fmt, ...) VKD3D_PRINTF_FUNC(1, 2);
 const char *vkd3d_dbg_vsprintf(const char *fmt, va_list args);
 const char *debugstr_a(const char *str);
+const char *debugstr_an(const char *str, size_t n);
 const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
 
 #define VKD3D_DBG_LOG(level) \

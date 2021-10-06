@@ -65,6 +65,10 @@ source_type_info[] =
     {VKD3D_SHADER_SOURCE_HLSL,
         "hlsl",         "High Level Shader Language source code.\n",
         false},
+    {VKD3D_SHADER_SOURCE_D3D_BYTECODE,
+        "d3dbc",        "Legacy Direct3D byte-code.\n"
+        "                This is the format used for Direct3D shader model 1, 2, and 3 shaders.\n",
+        true},
 };
 
 static const struct target_type_info

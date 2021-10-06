@@ -337,6 +337,8 @@ static const char *shader_get_source_type_suffix(enum vkd3d_shader_source_type t
             return "dxbc";
         case VKD3D_SHADER_SOURCE_HLSL:
             return "hlsl";
+        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+            return "d3dbc";
         default:
             FIXME("Unhandled source type %#x.\n", type);
             return "bin";
@@ -384,6 +386,16 @@ void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parse
     va_end(args);
 
     parser->failed = true;
+}
+
+void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(parser->message_context, &parser->location, error, format, args);
+    va_end(args);
 }
 
 static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info,
@@ -1119,6 +1131,30 @@ static int compile_hlsl(const struct vkd3d_shader_compile_info *compile_info,
     return ret;
 }
 
+static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_shader_parser *parser;
+    int ret;
+
+    if ((ret = vkd3d_shader_sm1_parser_create(compile_info, message_context, &parser)) < 0)
+    {
+        WARN("Failed to initialise shader parser.\n");
+        return ret;
+    }
+
+    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
+
+    if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
+    {
+        ret = vkd3d_dxbc_binary_to_text(parser, compile_info, out);
+        vkd3d_shader_parser_destroy(parser);
+        return ret;
+    }
+
+    return VKD3D_ERROR;
+}
+
 int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages)
 {
@@ -1143,6 +1179,10 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
         case VKD3D_SHADER_SOURCE_HLSL:
             ret = compile_hlsl(compile_info, out, &message_context);
+            break;
+
+        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+            ret = compile_d3d_bytecode(compile_info, out, &message_context);
             break;
 
         default:
@@ -1301,6 +1341,7 @@ const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(uns
     {
         VKD3D_SHADER_SOURCE_DXBC_TPF,
         VKD3D_SHADER_SOURCE_HLSL,
+        VKD3D_SHADER_SOURCE_D3D_BYTECODE,
     };
 
     TRACE("count %p.\n", count);
@@ -1327,6 +1368,11 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         VKD3D_SHADER_TARGET_DXBC_TPF,
     };
 
+    static const enum vkd3d_shader_target_type d3dbc_types[] =
+    {
+        VKD3D_SHADER_TARGET_D3D_ASM,
+    };
+
     TRACE("source_type %#x, count %p.\n", source_type, count);
 
     switch (source_type)
@@ -1338,6 +1384,10 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
         case VKD3D_SHADER_SOURCE_HLSL:
             *count = ARRAY_SIZE(hlsl_types);
             return hlsl_types;
+
+        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+            *count = ARRAY_SIZE(d3dbc_types);
+            return d3dbc_types;
 
         default:
             *count = 0;
