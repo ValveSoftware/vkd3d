@@ -261,7 +261,7 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, s
     return type;
 }
 
-struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim)
+struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format)
 {
     struct hlsl_type *type;
 
@@ -272,6 +272,7 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     type->dimx = 4;
     type->dimy = 1;
     type->sampler_dim = dim;
+    type->e.resource_format = format;
     list_add_tail(&ctx->types, &type->entry);
     return type;
 }
@@ -344,9 +345,14 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         return false;
     if (t1->base_type != t2->base_type)
         return false;
-    if ((t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
-            && t1->sampler_dim != t2->sampler_dim)
-        return false;
+    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
+    {
+        if (t1->sampler_dim != t2->sampler_dim)
+            return false;
+        if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
+                && !hlsl_types_are_equal(t1->e.resource_format, t2->e.resource_format))
+            return false;
+    }
     if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
             != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
         return false;
@@ -742,6 +748,8 @@ void hlsl_pop_scope(struct hlsl_ctx *ctx)
 
 static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hlsl_type *t2)
 {
+    int r;
+
     if (t1->type != t2->type)
     {
         if (!((t1->type == HLSL_CLASS_SCALAR && t2->type == HLSL_CLASS_VECTOR)
@@ -752,7 +760,13 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
         return t1->base_type - t2->base_type;
     if ((t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
             && t1->sampler_dim != t2->sampler_dim)
-        return t1->sampler_dim - t2->sampler_dim;
+    {
+        if (t1->sampler_dim != t2->sampler_dim)
+            return t1->sampler_dim - t2->sampler_dim;
+        if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
+                && (r = compare_param_hlsl_types(t1->e.resource_format, t2->e.resource_format)))
+            return r;
+    }
     if (t1->dimx != t2->dimx)
         return t1->dimx - t2->dimx;
     if (t1->dimy != t2->dimy)
@@ -761,7 +775,6 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     {
         struct list *t1cur, *t2cur;
         struct hlsl_struct_field *t1field, *t2field;
-        int r;
 
         t1cur = list_head(t1->e.elements);
         t2cur = list_head(t2->e.elements);

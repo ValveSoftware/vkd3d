@@ -1789,6 +1789,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
     struct parse_colon_attribute colon_attribute;
     struct hlsl_semantic semantic;
     enum hlsl_buffer_type buffer_type;
+    enum hlsl_sampler_dim sampler_dim;
 }
 
 %token KW_BLENDSTATE
@@ -1962,6 +1963,8 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
 %type <parameter> parameter
 
 %type <reg_reservation> register_opt
+
+%type <sampler_dim> texture_type
 
 %type <semantic> semantic
 
@@ -2376,6 +2379,24 @@ input_mod:
             $$ = HLSL_STORAGE_IN | HLSL_STORAGE_OUT;
         }
 
+texture_type:
+      KW_TEXTURE1D
+        {
+            $$ = HLSL_SAMPLER_DIM_1D;
+        }
+    | KW_TEXTURE2D
+        {
+            $$ = HLSL_SAMPLER_DIM_2D;
+        }
+    | KW_TEXTURE3D
+        {
+            $$ = HLSL_SAMPLER_DIM_3D;
+        }
+    | KW_TEXTURECUBE
+        {
+            $$ = HLSL_SAMPLER_DIM_CUBE;
+        }
+
 type:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
@@ -2453,23 +2474,25 @@ type:
         }
     | KW_TEXTURE
         {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_GENERIC);
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_GENERIC, NULL);
         }
-    | KW_TEXTURE1D
+    | texture_type
         {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_1D);
+            $$ = hlsl_new_texture_type(ctx, $1, ctx->builtin_types.vector[HLSL_TYPE_FLOAT][4 - 1]);
         }
-    | KW_TEXTURE2D
+    | texture_type '<' type '>'
         {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_2D);
-        }
-    | KW_TEXTURE3D
-        {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_3D);
-        }
-    | KW_TEXTURECUBE
-        {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_CUBE);
+            if ($3->type > HLSL_CLASS_VECTOR)
+            {
+                struct vkd3d_string_buffer *string;
+
+                string = hlsl_type_to_string(ctx, $3);
+                if (string)
+                    hlsl_error(ctx, @3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Texture data type %s is not scalar or vector.\n", string->buffer);
+                hlsl_release_string_buffer(ctx, string);
+            }
+            $$ = hlsl_new_texture_type(ctx, $1, $3);
         }
     | TYPE_IDENTIFIER
         {
