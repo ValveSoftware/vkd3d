@@ -478,7 +478,7 @@ bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type)
 }
 
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
-        struct vkd3d_shader_location *loc)
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *cast;
 
@@ -624,6 +624,22 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         const struct vkd3d_shader_location loc)
 {
     return hlsl_new_load(ctx, var, NULL, var->data_type, loc);
+}
+
+struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
+        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *offset,
+        struct hlsl_ir_node *coords, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_resource_load *load;
+
+    if (!(load = hlsl_alloc(ctx, sizeof(*load))))
+        return NULL;
+    init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, *loc);
+    load->load_type = type;
+    load->resource.var = resource;
+    hlsl_src_from_node(&load->resource.offset, offset);
+    hlsl_src_from_node(&load->coords, coords);
+    return load;
 }
 
 struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
@@ -994,6 +1010,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
         "HLSL_IR_LOAD",
         "HLSL_IR_LOOP",
         "HLSL_IR_JUMP",
+        "HLSL_IR_RESOURCE_LOAD",
         "HLSL_IR_STORE",
         "HLSL_IR_SWIZZLE",
     };
@@ -1216,6 +1233,20 @@ static void dump_ir_loop(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffe
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
+static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_resource_load *load)
+{
+    static const char *const type_names[] =
+    {
+        [HLSL_RESOURCE_LOAD] = "load_resource",
+    };
+
+    vkd3d_string_buffer_printf(buffer, "%s(resource = ", type_names[load->load_type]);
+    dump_deref(buffer, &load->resource);
+    vkd3d_string_buffer_printf(buffer, ", coords = ");
+    dump_src(buffer, &load->coords);
+    vkd3d_string_buffer_printf(buffer, ")");
+}
+
 static void dump_ir_store(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_store *store)
 {
     vkd3d_string_buffer_printf(buffer, "= (");
@@ -1280,6 +1311,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_LOOP:
             dump_ir_loop(ctx, buffer, hlsl_ir_loop(instr));
+            break;
+
+        case HLSL_IR_RESOURCE_LOAD:
+            dump_ir_resource_load(buffer, hlsl_ir_resource_load(instr));
             break;
 
         case HLSL_IR_STORE:
@@ -1380,6 +1415,13 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
     vkd3d_free(loop);
 }
 
+static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
+{
+    hlsl_src_remove(&load->coords);
+    hlsl_src_remove(&load->resource.offset);
+    vkd3d_free(load);
+}
+
 static void free_ir_store(struct hlsl_ir_store *store)
 {
     hlsl_src_remove(&store->rhs);
@@ -1421,6 +1463,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_LOOP:
             free_ir_loop(hlsl_ir_loop(node));
+            break;
+
+        case HLSL_IR_RESOURCE_LOAD:
+            free_ir_resource_load(hlsl_ir_resource_load(node));
             break;
 
         case HLSL_IR_STORE:

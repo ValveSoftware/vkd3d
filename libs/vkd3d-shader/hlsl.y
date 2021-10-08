@@ -258,7 +258,7 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
 }
 
 static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *node, struct hlsl_type *dst_type, struct vkd3d_shader_location *loc)
+        struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
     struct hlsl_ir_expr *cast;
@@ -843,15 +843,21 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
 
         case HLSL_IR_EXPR:
         case HLSL_IR_LOAD:
+        case HLSL_IR_RESOURCE_LOAD:
         case HLSL_IR_SWIZZLE:
             FIXME("Unhandled type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
 
+        case HLSL_IR_IF:
+        case HLSL_IR_JUMP:
+        case HLSL_IR_LOOP:
         case HLSL_IR_STORE:
-        default:
             WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
     }
+
+    assert(0);
+    return 0;
 }
 
 static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
@@ -1513,6 +1519,23 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     return statements_list;
 }
 
+static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
+{
+    switch (dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            return 1;
+        case HLSL_SAMPLER_DIM_2D:
+            return 2;
+        case HLSL_SAMPLER_DIM_3D:
+        case HLSL_SAMPLER_DIM_CUBE:
+            return 3;
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 struct find_function_call_args
 {
     const struct parse_initializer *params;
@@ -1755,6 +1778,65 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
 
     vkd3d_free(params->args);
     return params->instrs;
+}
+
+static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    struct hlsl_ir_load *object_load;
+
+    if (object_type->type != HLSL_CLASS_OBJECT || object_type->base_type != HLSL_TYPE_TEXTURE
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, object_type)))
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Type '%s' does not have methods.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    /* Only HLSL_IR_LOAD can return an object. */
+    object_load = hlsl_ir_load(object);
+
+    if (!strcmp(name, "Load"))
+    {
+        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        struct hlsl_ir_resource_load *load;
+        struct hlsl_ir_node *coords;
+
+        if (params->args_count < 1 || params->args_count > 3)
+        {
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to method 'Load': expected 1, 2, or 3, but got %u.", params->args_count);
+            return false;
+        }
+        if (params->args_count >= 2)
+            FIXME("Ignoring index and/or offset parameter(s).\n");
+
+        /* -1 for zero-indexing; +1 for the mipmap level */
+        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[0],
+                ctx->builtin_types.vector[HLSL_TYPE_INT][sampler_dim - 1 + 1], loc)))
+            return false;
+
+        if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
+                object_load->src.var, object_load->src.offset.node, coords, loc)))
+            return false;
+        list_add_tail(instrs, &load->node.entry);
+        return true;
+    }
+    else
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, object_type)))
+            hlsl_error(ctx, *loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+                    "Method '%s' is not defined on type '%s'.", name, string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
 }
 
 }
@@ -3084,6 +3166,22 @@ postfix_expr:
                 free_parse_initializer(&$4);
                 YYABORT;
             }
+        }
+    | postfix_expr '.' any_identifier '(' func_arguments ')'
+        {
+            struct hlsl_ir_node *object = node_from_list($1);
+
+            list_move_tail($1, $5.instrs);
+            vkd3d_free($5.instrs);
+
+            if (!add_method_call(ctx, $1, object, $3, &$5, &@3))
+            {
+                hlsl_free_instr_list($1);
+                vkd3d_free($5.args);
+                YYABORT;
+            }
+            vkd3d_free($5.args);
+            $$ = $1;
         }
 
 unary_expr:
