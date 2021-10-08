@@ -893,6 +893,37 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             vkd3d_string_buffer_printf(string, "<anonymous struct>");
             return string;
 
+        case HLSL_CLASS_OBJECT:
+        {
+            static const char dimensions[5][HLSL_SAMPLER_DIM_MAX + 1] =
+            {
+                [HLSL_SAMPLER_DIM_1D] = "1D",
+                [HLSL_SAMPLER_DIM_2D] = "2D",
+                [HLSL_SAMPLER_DIM_3D] = "3D",
+                [HLSL_SAMPLER_DIM_CUBE] = "Cube"
+            };
+
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_TEXTURE:
+                    if (type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+                    {
+                        vkd3d_string_buffer_printf(string, "Texture");
+                        return string;
+                    }
+
+                    assert(type->sampler_dim < ARRAY_SIZE(dimensions));
+                    assert(type->e.resource_format->base_type < ARRAY_SIZE(base_types));
+                    vkd3d_string_buffer_printf(string, "Texture%s<%s%u>", dimensions[type->sampler_dim],
+                            base_types[type->e.resource_format->base_type], type->e.resource_format->dimx);
+                    return string;
+
+                default:
+                    vkd3d_string_buffer_printf(string, "<unexpected type>");
+                    return string;
+            }
+        }
+
         default:
             vkd3d_string_buffer_printf(string, "<unexpected type>");
             return string;
