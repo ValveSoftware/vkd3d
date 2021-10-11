@@ -34855,7 +34855,7 @@ static void test_unbounded_resource_arrays(void)
         {D3D12_DESCRIPTOR_RANGE_TYPE_CBV, UINT_MAX, 2, 1, 0},
         {D3D12_DESCRIPTOR_RANGE_TYPE_SRV, UINT_MAX, 2, 1, 64},
         {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 1, 128},
-        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 2, 127},
+        {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 65, 1, 2, 127},
         {D3D12_DESCRIPTOR_RANGE_TYPE_UAV, UINT_MAX, 1, 3, 192},
     };
 
@@ -34999,7 +34999,7 @@ static void test_unbounded_resource_arrays(void)
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         /* Buffers at index >= 64 are aliased. */
-        todo_if(i != 74)
+        todo_if(i != 74 && i > 63)
         check_readback_data_uint(&rb, NULL, (i < 64 ? 63 - i : 127 - i) ^ 0x35, 0);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
