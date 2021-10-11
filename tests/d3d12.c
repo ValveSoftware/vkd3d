@@ -34940,7 +34940,7 @@ static void test_unbounded_resource_arrays(void)
         upload_buffer_data(constant_buffers[i], 0, sizeof(cb_data), &cb_data, queue, command_list);
         reset_command_list(command_list, context.allocator);
         transition_resource_state(command_list, constant_buffers[i],
-                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
         cbv_desc.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(constant_buffers[i]);
         cbv_desc.SizeInBytes = align(sizeof(cb_data), D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
