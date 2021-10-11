@@ -1838,7 +1838,8 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilitySampledImageArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageBufferArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageTexelBufferArrayDynamicIndexingEXT)
-            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageImageArrayDynamicIndexing))
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageImageArrayDynamicIndexing)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityShaderNonUniformEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_descriptor_indexing");
 
     if (builder->ext_instr_set_glsl_450)
@@ -2670,6 +2671,15 @@ static void vkd3d_dxbc_compiler_emit_descriptor_binding_for_reg(struct vkd3d_dxb
     vkd3d_dxbc_compiler_emit_descriptor_binding(compiler, variable_id, &binding);
 }
 
+static void vkd3d_dxbc_compiler_decorate_nonuniform(struct vkd3d_dxbc_compiler *compiler,
+        uint32_t expression_id)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    vkd3d_spirv_enable_capability(builder, SpvCapabilityShaderNonUniformEXT);
+    vkd3d_spirv_build_op_decorate(builder, expression_id, SpvDecorationNonUniformEXT, NULL, 0);
+}
+
 static const struct vkd3d_symbol *vkd3d_dxbc_compiler_put_symbol(struct vkd3d_dxbc_compiler *compiler,
         const struct vkd3d_symbol *symbol)
 {
@@ -3314,6 +3324,8 @@ static void vkd3d_dxbc_compiler_emit_dereference_register(struct vkd3d_dxbc_comp
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, register_info->storage_class, type_id);
         register_info->id = vkd3d_spirv_build_op_access_chain(builder, ptr_type_id,
                 register_info->id, indexes, index_count);
+        if (reg->non_uniform)
+            vkd3d_dxbc_compiler_decorate_nonuniform(compiler, register_info->id);
     }
 }
 
@@ -7993,8 +8005,16 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
         return;
     }
 
-    image->image_id = load ? vkd3d_spirv_build_op_load(builder,
-            image->image_type_id, image->id, SpvMemoryAccessMaskNone) : 0;
+    if (load)
+    {
+        image->image_id = vkd3d_spirv_build_op_load(builder, image->image_type_id, image->id, SpvMemoryAccessMaskNone);
+        if (resource_reg->non_uniform)
+            vkd3d_dxbc_compiler_decorate_nonuniform(compiler, image->image_id);
+    }
+    else
+    {
+        image->image_id = 0;
+    }
 
     image->image_type_id = vkd3d_dxbc_compiler_get_image_type_id(compiler, resource_reg,
             &symbol->info.resource.range, image->resource_type_info,
@@ -8023,9 +8043,14 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
 
         sampler_id = vkd3d_spirv_build_op_load(builder,
                 vkd3d_spirv_get_op_type_sampler(builder), sampler_var_id, SpvMemoryAccessMaskNone);
+        if (sampler_reg->non_uniform)
+            vkd3d_dxbc_compiler_decorate_nonuniform(compiler, sampler_id);
+
         sampled_image_type_id = vkd3d_spirv_get_op_type_sampled_image(builder, image->image_type_id);
         image->sampled_image_id = vkd3d_spirv_build_op_sampled_image(builder,
                 sampled_image_type_id, image->image_id, sampler_id);
+        if (resource_reg->non_uniform)
+            vkd3d_dxbc_compiler_decorate_nonuniform(compiler, image->sampled_image_id);
     }
     else
     {
