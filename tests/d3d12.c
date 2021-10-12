@@ -2715,10 +2715,7 @@ static void test_create_root_signature(void)
     descriptor_ranges[0].BaseShaderRegister = 0xfffff001;
     root_parameters[0].DescriptorTable.NumDescriptorRanges = 1;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    todo
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12RootSignature_Release(root_signature);
 
     /* empty root signature */
     root_signature_desc.NumParameters = 0;

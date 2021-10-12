@@ -350,6 +350,13 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
             return E_INVALIDARG;
         }
 
+        if (range->NumDescriptors != UINT_MAX && !vkd3d_bound_range(range->BaseShaderRegister,
+                range->NumDescriptors, UINT_MAX))
+        {
+            WARN("A descriptor range overflows.\n");
+            return E_INVALIDARG;
+        }
+
         if (unbounded && range->OffsetInDescriptorsFromTableStart == D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
         {
             WARN("An unbounded range with offset D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND occurs after "
