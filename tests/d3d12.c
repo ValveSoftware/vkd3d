@@ -4485,6 +4485,17 @@ static void test_clear_depth_stencil_view(void)
         reset_command_list(command_list, context.allocator);
     }
 
+    transition_resource_state(command_list, ds.texture,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    dsv_desc.Texture2DArray.ArraySize = UINT_MAX;
+    ID3D12Device_CreateDepthStencilView(device, ds.texture, &dsv_desc, ds.dsv_handle);
+    ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds.dsv_handle,
+            D3D12_CLEAR_FLAG_DEPTH, expected_values[4], 0, 0, NULL);
+
+    transition_resource_state(command_list, ds.texture,
+            D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    check_sub_resource_float(ds.texture, 5, queue, command_list, expected_values[4], 1);
+
     destroy_depth_stencil(&ds);
     destroy_test_context(&context);
 }
