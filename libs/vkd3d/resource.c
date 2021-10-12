@@ -2753,6 +2753,7 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
                     FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
                 if (desc->u.Texture2DArray.ResourceMinLODClamp)
                     FIXME("Unhandled min LOD clamp %.8e.\n", desc->u.Texture2DArray.ResourceMinLODClamp);
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_SRV_DIMENSION_TEXTURE2DMS:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
@@ -2761,6 +2762,7 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
                 vkd3d_desc.layer_idx = desc->u.Texture2DMSArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DMSArray.ArraySize;
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_SRV_DIMENSION_TEXTURE3D:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_3D;
@@ -2783,10 +2785,11 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
                 vkd3d_desc.miplevel_count = desc->u.TextureCubeArray.MipLevels;
                 vkd3d_desc.layer_idx = desc->u.TextureCubeArray.First2DArrayFace;
                 vkd3d_desc.layer_count = desc->u.TextureCubeArray.NumCubes;
-                if (vkd3d_desc.layer_count != VK_REMAINING_ARRAY_LAYERS)
+                if (vkd3d_desc.layer_count != UINT_MAX)
                     vkd3d_desc.layer_count *= 6;
                 if (desc->u.TextureCubeArray.ResourceMinLODClamp)
                     FIXME("Unhandled min LOD clamp %.8e.\n", desc->u.TextureCubeArray.ResourceMinLODClamp);
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             default:
                 FIXME("Unhandled view dimension %#x.\n", desc->ViewDimension);
