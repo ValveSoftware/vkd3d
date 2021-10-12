@@ -3296,6 +3296,7 @@ void d3d12_dsv_desc_create_dsv(struct d3d12_dsv_desc *dsv_desc, struct d3d12_dev
                 vkd3d_desc.miplevel_idx = desc->u.Texture2DArray.MipSlice;
                 vkd3d_desc.layer_idx = desc->u.Texture2DArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_DSV_DIMENSION_TEXTURE2DMS:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
@@ -3304,6 +3305,7 @@ void d3d12_dsv_desc_create_dsv(struct d3d12_dsv_desc *dsv_desc, struct d3d12_dev
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
                 vkd3d_desc.layer_idx = desc->u.Texture2DMSArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DMSArray.ArraySize;
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             default:
                 FIXME("Unhandled view dimension %#x.\n", desc->ViewDimension);
