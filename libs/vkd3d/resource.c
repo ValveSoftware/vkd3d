@@ -2480,7 +2480,19 @@ static bool init_default_texture_view_desc(struct vkd3d_texture_view_desc *desc,
 static void vkd3d_texture_view_desc_normalise(struct vkd3d_texture_view_desc *desc,
         const D3D12_RESOURCE_DESC *resource_desc)
 {
-    unsigned int max_layer_count = resource_desc->DepthOrArraySize;
+    unsigned int max_layer_count;
+
+    if (resource_desc->Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D)
+    {
+        if (desc->view_type == VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+            max_layer_count = max(1, resource_desc->DepthOrArraySize >> desc->miplevel_idx);
+        else
+            max_layer_count = 1;
+    }
+    else
+    {
+        max_layer_count = resource_desc->DepthOrArraySize;
+    }
 
     if (desc->layer_idx >= max_layer_count)
     {
@@ -3186,6 +3198,7 @@ void d3d12_rtv_desc_create_rtv(struct d3d12_rtv_desc *rtv_desc, struct d3d12_dev
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
                 if (desc->u.Texture2DArray.PlaneSlice)
                     FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_RTV_DIMENSION_TEXTURE2DMS:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
@@ -3194,12 +3207,14 @@ void d3d12_rtv_desc_create_rtv(struct d3d12_rtv_desc *rtv_desc, struct d3d12_dev
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
                 vkd3d_desc.layer_idx = desc->u.Texture2DMSArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DMSArray.ArraySize;
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_RTV_DIMENSION_TEXTURE3D:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
                 vkd3d_desc.miplevel_idx = desc->u.Texture3D.MipSlice;
                 vkd3d_desc.layer_idx = desc->u.Texture3D.FirstWSlice;
                 vkd3d_desc.layer_count = desc->u.Texture3D.WSize;
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             default:
                 FIXME("Unhandled view dimension %#x.\n", desc->ViewDimension);
