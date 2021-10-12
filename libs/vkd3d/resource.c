@@ -2477,6 +2477,27 @@ static bool init_default_texture_view_desc(struct vkd3d_texture_view_desc *desc,
     return true;
 }
 
+static void vkd3d_texture_view_desc_normalise(struct vkd3d_texture_view_desc *desc,
+        const D3D12_RESOURCE_DESC *resource_desc)
+{
+    unsigned int max_layer_count = resource_desc->DepthOrArraySize;
+
+    if (desc->layer_idx >= max_layer_count)
+    {
+        WARN("Layer index %u exceeds maximum available layer %u.\n", desc->layer_idx, max_layer_count - 1);
+        desc->layer_count = 1;
+        return;
+    }
+
+    max_layer_count -= desc->layer_idx;
+    if (desc->layer_count <= max_layer_count)
+        return;
+
+    if (desc->layer_count != UINT_MAX)
+        WARN("Layer count %u exceeds maximum %u.\n", desc->layer_count, max_layer_count);
+    desc->layer_count = max_layer_count;
+}
+
 bool vkd3d_create_texture_view(struct d3d12_device *device, VkImage vk_image,
         const struct vkd3d_texture_view_desc *desc, struct vkd3d_view **view)
 {
@@ -2920,6 +2941,7 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
                 if (desc->u.Texture2DArray.PlaneSlice)
                     FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
+                vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_UAV_DIMENSION_TEXTURE3D:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_3D;
