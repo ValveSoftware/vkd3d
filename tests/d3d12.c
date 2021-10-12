@@ -5014,6 +5014,8 @@ static void test_clear_unordered_access_view_image(void)
                 {0x3f000000, 0, 0, 0}, 0x3f000000, true},
         {DXGI_FORMAT_R32_FLOAT,       1, IMAGE_SIZE, 0, 3, 2,          0, {},
                 {0x3f000000, 0, 0, 0}, 0x3f000000, true},
+        /* Test clearing a UINT_MAX layer count. */
+        {DXGI_FORMAT_R32_FLOAT,       1, IMAGE_SIZE, 0, 0, UINT_MAX, 0, {}, {1, 0, 0, 0}, 1},
         /* Test a single clear rect. */
         {DXGI_FORMAT_R32_FLOAT,       1, 1, 0, 0, 1, 1, {{1, 2, IMAGE_SIZE - 4, IMAGE_SIZE - 2}},
                 {1,          0, 0, 0}, 1},
