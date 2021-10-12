@@ -704,6 +704,24 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     dxbc_writer_add_section(dxbc, TAG_RDEF, buffer.data, buffer.size);
 }
 
+static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_type *type)
+{
+    switch (type->sampler_dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            return VKD3D_SM4_RESOURCE_TEXTURE_1D;
+        case HLSL_SAMPLER_DIM_2D:
+            return VKD3D_SM4_RESOURCE_TEXTURE_2D;
+        case HLSL_SAMPLER_DIM_3D:
+            return VKD3D_SM4_RESOURCE_TEXTURE_3D;
+        case HLSL_SAMPLER_DIM_CUBE:
+            return VKD3D_SM4_RESOURCE_TEXTURE_CUBE;
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 struct sm4_register
 {
     enum vkd3d_sm4_register_type type;
@@ -937,6 +955,24 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
         .srcs[0].reg.idx_count = 2,
         .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
         .src_count = 1,
+    };
+    write_sm4_instruction(buffer, &instr);
+}
+
+static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+{
+    const struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_RESOURCE
+                | (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
+
+        .dsts[0].reg.type = VKD3D_SM4_RT_RESOURCE,
+        .dsts[0].reg.idx = {var->reg.id},
+        .dsts[0].reg.idx_count = 1,
+        .dst_count = 1,
+
+        .idx[0] = sm4_resource_format(var->data_type) * 0x1111,
+        .idx_count = 1,
     };
     write_sm4_instruction(buffer, &instr);
 }
@@ -1416,6 +1452,15 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     {
         if (cbuffer->reg.allocated)
             write_sm4_dcl_constant_buffer(&buffer, cbuffer);
+    }
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
+            continue;
+
+        if (var->data_type->base_type == HLSL_TYPE_TEXTURE)
+            write_sm4_dcl_texture(&buffer, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
