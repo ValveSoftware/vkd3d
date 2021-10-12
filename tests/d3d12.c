@@ -4672,7 +4672,7 @@ static void test_clear_render_target_view(void)
         rtv_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DARRAY;
         rtv_desc.Texture2DArray.FirstArraySlice = i;
-        rtv_desc.Texture2DArray.ArraySize = 1;
+        rtv_desc.Texture2DArray.ArraySize = (i == ARRAY_SIZE(array_colors) - 1) ? UINT_MAX : 1;
 
         ID3D12Device_CreateRenderTargetView(device, resource, &rtv_desc, rtv_handle);
 
@@ -4703,7 +4703,7 @@ static void test_clear_render_target_view(void)
         rtv_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2DMSARRAY;
         rtv_desc.Texture2DMSArray.FirstArraySlice = i;
-        rtv_desc.Texture2DMSArray.ArraySize = 1;
+        rtv_desc.Texture2DMSArray.ArraySize = (i == ARRAY_SIZE(array_colors) - 1) ? UINT_MAX : 1;
 
         ID3D12Device_CreateRenderTargetView(device, resource, &rtv_desc, rtv_handle);
 
@@ -4757,6 +4757,23 @@ static void test_clear_render_target_view(void)
     check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
     set_box(&box, 0, 0, 4, 32, 32, 32);
     check_readback_data_uint(&rb, &box, 0xbf4c7f19, 1);
+    release_resource_readback(&rb);
+
+    rtv_desc.Texture3D.FirstWSlice = 30;
+    rtv_desc.Texture3D.WSize = UINT_MAX;
+    ID3D12Device_CreateRenderTargetView(device, resource, &rtv_desc, rtv_handle);
+
+    reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, resource,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, green, 0, NULL);
+    transition_resource_state(command_list, resource,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
+    set_box(&box, 0, 0, 4, 32, 32, 30);
+    check_readback_data_uint(&rb, &box, 0xbf4c7f19, 1);
+    set_box(&box, 0, 0, 30, 32, 32, 32);
+    check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(resource);
