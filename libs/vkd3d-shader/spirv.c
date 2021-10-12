@@ -6840,6 +6840,21 @@ static void vkd3d_dxbc_compiler_emit_alu_instruction(struct vkd3d_dxbc_compiler 
     for (i = 0; i < instruction->src_count; ++i)
         src_ids[i] = vkd3d_dxbc_compiler_emit_load_src(compiler, &src[i], dst->write_mask);
 
+    /* The SPIR-V specification states, "The resulting value is undefined if
+     * Shift is greater than or equal to the bit width of the components of
+     * Base." Direct3D applies only the lowest 5 bits of the shift.
+     *
+     * Microsoft fxc will compile immediate constants larger than 5 bits.
+     * Fixing up the constants would be more elegant, but the simplest way is
+     * to let this handle constants too. */
+    if (instruction->handler_idx == VKD3DSIH_ISHL || instruction->handler_idx == VKD3DSIH_ISHR
+            || instruction->handler_idx == VKD3DSIH_USHR)
+    {
+        uint32_t mask_id = vkd3d_dxbc_compiler_get_constant_vector(compiler,
+                VKD3D_SHADER_COMPONENT_UINT, vkd3d_write_mask_component_count(dst->write_mask), 0x1f);
+        src_ids[1] = vkd3d_spirv_build_op_and(builder, type_id, src_ids[1], mask_id);
+    }
+
     val_id = vkd3d_spirv_build_op_trv(builder, &builder->function_stream, op, type_id,
             src_ids, instruction->src_count);
     if (instruction->flags & VKD3DSI_PRECISE_XYZW)
