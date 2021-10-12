@@ -344,6 +344,12 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
         const D3D12_DESCRIPTOR_RANGE *range = &table->pDescriptorRanges[i];
         unsigned int binding_count;
 
+        if (!range->NumDescriptors)
+        {
+            WARN("A descriptor range is empty.\n");
+            return E_INVALIDARG;
+        }
+
         if (unbounded && range->OffsetInDescriptorsFromTableStart == D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND)
         {
             WARN("An unbounded range with offset D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND occurs after "
