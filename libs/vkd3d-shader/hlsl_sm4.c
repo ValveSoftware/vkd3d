@@ -378,6 +378,63 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     }
 }
 
+static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
+{
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_SAMPLER:
+            return D3D_SIT_SAMPLER;
+        case HLSL_TYPE_TEXTURE:
+            return D3D_SIT_TEXTURE;
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
+static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type)
+{
+    switch (type->e.resource_format->base_type)
+    {
+        case HLSL_TYPE_DOUBLE:
+            return D3D_RETURN_TYPE_DOUBLE;
+
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_HALF:
+            return D3D_RETURN_TYPE_FLOAT;
+
+        case HLSL_TYPE_INT:
+            return D3D_RETURN_TYPE_SINT;
+            break;
+
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_UINT:
+            return D3D_RETURN_TYPE_UINT;
+
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
+static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *type)
+{
+    switch (type->sampler_dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            return D3D_SRV_DIMENSION_TEXTURE1D;
+        case HLSL_SAMPLER_DIM_2D:
+            return D3D_SRV_DIMENSION_TEXTURE2D;
+        case HLSL_SAMPLER_DIM_3D:
+            return D3D_SRV_DIMENSION_TEXTURE3D;
+        case HLSL_SAMPLER_DIM_CUBE:
+            return D3D_SRV_DIMENSION_TEXTURECUBE;
+        default:
+            assert(0);
+            return D3D_SRV_DIMENSION_UNKNOWN;
+    }
+}
+
 static int sm4_compare_externs(const struct hlsl_ir_var *a, const struct hlsl_ir_var *b)
 {
     if (a->data_type->base_type != b->data_type->base_type)
@@ -422,10 +479,11 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
     size_t cbuffer_position, resource_position, creator_position;
+    unsigned int cbuffer_count = 0, resource_count = 0, i, j;
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
-    unsigned int cbuffer_count = 0, i, j;
     const struct hlsl_buffer *cbuffer;
+    const struct hlsl_ir_var *var;
 
     static const uint16_t target_types[] =
     {
@@ -439,15 +497,24 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     sm4_sort_externs(ctx);
 
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->reg.allocated && var->data_type->type == HLSL_CLASS_OBJECT)
+            ++resource_count;
+    }
+
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
+        {
             ++cbuffer_count;
+            ++resource_count;
+        }
     }
 
     put_u32(&buffer, cbuffer_count);
     cbuffer_position = put_u32(&buffer, 0);
-    put_u32(&buffer, cbuffer_count); /* bound resource count */
+    put_u32(&buffer, resource_count);
     resource_position = put_u32(&buffer, 0);
     put_u32(&buffer, vkd3d_make_u32(vkd3d_make_u16(profile->minor_version, profile->major_version),
             target_types[profile->type]));
@@ -470,6 +537,37 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     resources_offset = bytecode_get_size(&buffer);
     set_u32(&buffer, resource_position, resources_offset);
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        uint32_t flags = 0;
+
+        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
+            continue;
+
+        if (var->reg_reservation.type)
+            flags |= D3D_SIF_USERPACKED;
+
+        put_u32(&buffer, 0); /* name */
+        put_u32(&buffer, sm4_resource_type(var->data_type));
+        if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
+        {
+            put_u32(&buffer, 0);
+            put_u32(&buffer, 0);
+            put_u32(&buffer, 0);
+        }
+        else
+        {
+            put_u32(&buffer, sm4_resource_format(var->data_type));
+            put_u32(&buffer, sm4_rdef_resource_dimension(var->data_type));
+            put_u32(&buffer, ~0u); /* FIXME: multisample count */
+            flags |= (var->data_type->e.resource_format->dimx - 1) << 2;
+        }
+        put_u32(&buffer, var->reg.id);
+        put_u32(&buffer, 1); /* bind count */
+        put_u32(&buffer, flags);
+    }
+
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         uint32_t flags = 0;
@@ -491,6 +589,16 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     }
 
     i = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
+            continue;
+
+        string_offset = put_string(&buffer, var->name);
+        set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
+    }
+
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (!cbuffer->reg.allocated)
@@ -500,13 +608,14 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
     }
 
+    assert(i == resource_count);
+
     /* Buffers. */
 
     cbuffers_offset = bytecode_get_size(&buffer);
     set_u32(&buffer, cbuffer_position, cbuffers_offset);
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
-        const struct hlsl_ir_var *var;
         unsigned int var_count = 0;
 
         if (!cbuffer->reg.allocated)
@@ -540,7 +649,6 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         size_t vars_start = bytecode_get_size(&buffer);
-        const struct hlsl_ir_var *var;
 
         if (!cbuffer->reg.allocated)
             continue;
