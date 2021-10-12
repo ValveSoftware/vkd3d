@@ -378,6 +378,46 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     }
 }
 
+static int sm4_compare_externs(const struct hlsl_ir_var *a, const struct hlsl_ir_var *b)
+{
+    if (a->data_type->base_type != b->data_type->base_type)
+        return a->data_type->base_type - b->data_type->base_type;
+    if (a->reg.allocated && b->reg.allocated)
+        return a->reg.id - b->reg.id;
+    return strcmp(a->name, b->name);
+}
+
+static void sm4_sort_extern(struct list *sorted, struct hlsl_ir_var *to_sort)
+{
+    struct hlsl_ir_var *var;
+
+    list_remove(&to_sort->extern_entry);
+
+    LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
+    {
+        if (sm4_compare_externs(to_sort, var) < 0)
+        {
+            list_add_before(&var->extern_entry, &to_sort->extern_entry);
+            return;
+        }
+    }
+
+    list_add_tail(sorted, &to_sort->extern_entry);
+}
+
+static void sm4_sort_externs(struct hlsl_ctx *ctx)
+{
+    struct list sorted = LIST_INIT(sorted);
+    struct hlsl_ir_var *var, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->data_type->type == HLSL_CLASS_OBJECT)
+            sm4_sort_extern(&sorted, var);
+    }
+    list_move_tail(&ctx->extern_vars, &sorted);
+}
+
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
@@ -396,6 +436,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         0x4453, /* DOMAIN */
         0x4353, /* COMPUTE */
     };
+
+    sm4_sort_externs(ctx);
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
