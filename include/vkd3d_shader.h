@@ -64,6 +64,11 @@ enum vkd3d_shader_structure_type
      * \since 1.3
      */
     VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO,
+    /**
+     * The structure is a vkd3d_shader_descriptor_offset_info structure.
+     * \since 1.3
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -208,8 +213,9 @@ struct vkd3d_shader_descriptor_binding
     /** The binding index of the descriptor. */
     unsigned int binding;
     /**
-     * The size of this descriptor array. Descriptor arrays are not supported in
-     * this version of vkd3d-shader, and therefore this value must be 1.
+     * The size of this descriptor array. If an offset is specified for this
+     * binding by the vkd3d_shader_descriptor_offset_info structure, counting
+     * starts at that offset.
      */
     unsigned int count;
 };
@@ -450,6 +456,68 @@ struct vkd3d_shader_transform_feedback_info
     unsigned int element_count;
     const unsigned int *buffer_strides;
     unsigned int buffer_stride_count;
+};
+
+/**
+ * A chained structure containing descriptor offsets.
+ *
+ * This structure is optional.
+ *
+ * This structure extends vkd3d_shader_interface_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.3
+ */
+struct vkd3d_shader_descriptor_offset_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /**
+     * Pointer to an array of offsets into the descriptor arrays referenced by
+     * the 'bindings' array in struct vkd3d_shader_interface_info. This allows
+     * mapping multiple shader resource arrays to a single binding point in
+     * the target environment.
+     *
+     * For example, to map Direct3D constant buffer registers 'cb0[0:3]' and
+     * 'cb1[6:7]' to descriptors 8-12 and 4-5 in the Vulkan descriptor array in
+     * descriptor set 3 and with binding 2, set the following values in the
+     * 'bindings' array in struct vkd3d_shader_interface_info:
+     *
+     * \code
+     * type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV
+     * register_space = 0
+     * register_index = 0
+     * binding.set = 3
+     * binding.binding = 2
+     * binding.count = 4
+     *
+     * type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV
+     * register_space = 0
+     * register_index = 6
+     * binding.set = 3
+     * binding.binding = 2
+     * binding.count = 2
+     * \endcode
+     *
+     * and then pass \c {8, \c 4} as \a binding_offsets here.
+     *
+     * This field may be NULL, in which case the corresponding offsets are
+     * specified to be 0.
+     */
+    const unsigned int *binding_offsets;
+
+    /**
+     * Pointer to an array of offsets into the descriptor arrays referenced by
+     * the 'uav_counters' array in struct vkd3d_shader_interface_info. This
+     * works the same way as \ref binding_offsets above. UAV counter arrays are
+     * not supported in this version of vkd3d-shader, and therefore this field
+     * must either be NULL or specify 0 offsets.
+     */
+    const unsigned int *uav_counter_offsets;
 };
 
 /** The format of a shader to be compiled or scanned. */

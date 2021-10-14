@@ -2231,6 +2231,7 @@ struct vkd3d_dxbc_compiler
     size_t control_flow_info_size;
 
     struct vkd3d_shader_interface_info shader_interface;
+    struct vkd3d_shader_descriptor_offset_info offset_info;
     struct vkd3d_push_constant_buffer_binding *push_constants;
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
 
@@ -2292,6 +2293,7 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
     const struct vkd3d_shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
     const struct vkd3d_shader_signature *output_signature = &shader_desc->output_signature;
     const struct vkd3d_shader_interface_info *shader_interface;
+    const struct vkd3d_shader_descriptor_offset_info *offset_info;
     const struct vkd3d_shader_spirv_target_info *target_info;
     struct vkd3d_dxbc_compiler *compiler;
     unsigned int max_element_count;
@@ -2384,6 +2386,13 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
             }
             for (i = 0; i < shader_interface->push_constant_buffer_count; ++i)
                 compiler->push_constants[i].pc = shader_interface->push_constant_buffers[i];
+        }
+
+        if ((offset_info = vkd3d_find_struct(shader_interface->next, DESCRIPTOR_OFFSET_INFO)))
+        {
+            compiler->offset_info = *offset_info;
+            if (offset_info->uav_counter_offsets)
+                WARN("Ignoring UAV counter offsets %p.\n", offset_info->uav_counter_offsets);
         }
     }
 
@@ -2546,6 +2555,7 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
 {
     const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
     unsigned int register_last = (range->last == ~0u) ? range->first : range->last;
+    const unsigned int *binding_offsets = compiler->offset_info.binding_offsets;
     enum vkd3d_shader_descriptor_type descriptor_type;
     enum vkd3d_shader_binding_flag resource_type_flag;
     struct vkd3d_shader_descriptor_binding binding;
@@ -2626,7 +2636,7 @@ static struct vkd3d_shader_descriptor_binding vkd3d_dxbc_compiler_get_descriptor
                     || current->binding.count <= register_last - current->register_index)
                 continue;
 
-            *binding_base_idx = current->register_index;
+            *binding_base_idx = current->register_index - (binding_offsets ? binding_offsets[i] : 0);
             return current->binding;
         }
         if (shader_interface->binding_count)
