@@ -14784,8 +14784,7 @@ static void test_sample_c_lz(void)
             transition_resource_state(command_list, context.render_target,
                     D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-            todo_if(j && tests[i].d_ref > 0.0f)
-                check_sub_resource_float(context.render_target, 0, queue, command_list, tests[i].expected, 2);
+            check_sub_resource_float(context.render_target, 0, queue, command_list, tests[i].expected, 2);
 
             reset_command_list(command_list, context.allocator);
             transition_resource_state(command_list, context.render_target,
