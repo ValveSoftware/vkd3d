@@ -14502,11 +14502,11 @@ static void test_gather_c(void)
 
 static void test_sample_c_lz(void)
 {
+    struct depth_stencil_resource ds, ds_offset;
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     ID3D12GraphicsCommandList *command_list;
     D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
-    struct depth_stencil_resource ds;
     struct test_context_desc desc;
     struct resource_readback rb;
     struct test_context context;
@@ -14514,7 +14514,7 @@ static void test_sample_c_lz(void)
     ID3D12CommandQueue *queue;
     struct vec4 ps_constant;
     ID3D12Device *device;
-    unsigned int i;
+    unsigned int i, j;
     RECT rect;
 
     static const D3D12_STATIC_SAMPLER_DESC sampler_desc =
@@ -14557,6 +14557,36 @@ static void test_sample_c_lz(void)
         0x00000000, 0x00000000, 0x05000036, 0x001020f2, 0x00000000, 0x00100006, 0x00000000, 0x0100003e,
     };
     static const D3D12_SHADER_BYTECODE ps_array = {ps_array_code, sizeof(ps_array_code)};
+    static const DWORD ps_array_offset_code[] =
+    {
+#if 0
+        Texture2DArray t;
+        SamplerComparisonState s;
+
+        float ref;
+        float layer;
+
+        float4 main(float4 position : SV_Position) : SV_Target
+        {
+            return t.SampleCmpLevelZero(s, float3(position.x / 5120.0f, position.y / 3840.0f, layer), ref,
+                    int2(4, 4));
+        }
+#endif
+        0x43425844, 0xdf99ade1, 0x420d8d11, 0x3abe4b31, 0x116badd9, 0x00000001, 0x0000018c, 0x00000003,
+        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000030f, 0x505f5653, 0x7469736f, 0x006e6f69,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000f0, 0x00000050,
+        0x0000003c, 0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x0300085a, 0x00106000,
+        0x00000000, 0x04004058, 0x00107000, 0x00000000, 0x00005555, 0x04002064, 0x00101032, 0x00000000,
+        0x00000001, 0x03000065, 0x001020f2, 0x00000000, 0x02000068, 0x00000001, 0x0a000038, 0x00100032,
+        0x00000000, 0x00101046, 0x00000000, 0x00004002, 0x394ccccd, 0x39888889, 0x00000000, 0x00000000,
+        0x06000036, 0x00100042, 0x00000000, 0x0020801a, 0x00000000, 0x00000000, 0x8f000047, 0x80008801,
+        0x80000202, 0x00155543, 0x00100012, 0x00000000, 0x00100246, 0x00000000, 0x00107006, 0x00000000,
+        0x00106000, 0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x05000036, 0x001020f2, 0x00000000,
+        0x00100006, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps_array_offset = {ps_array_offset_code, sizeof(ps_array_offset_code)};
     static const DWORD ps_cube_code[] =
     {
 #if 0
@@ -14657,6 +14687,11 @@ static void test_sample_c_lz(void)
         {4, 1.0f, 1.0f},
         {5, 1.0f, 1.0f},
     };
+    static const D3D12_SHADER_BYTECODE * const shaders_2d_array[] =
+    {
+        &ps_array,
+        &ps_array_offset,
+    };
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_width = 640;
@@ -14675,15 +14710,15 @@ static void test_sample_c_lz(void)
     heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 6);
     cpu_handle = ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap);
 
-    /* 2D array texture */
-    context.pipeline_state = create_pipeline_state(context.device,
-            context.root_signature, context.render_target_desc.Format, NULL, &ps_array, NULL);
-
     init_depth_stencil(&ds, device, 32, 32, ARRAY_SIZE(depth_values), 2,
+            DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_D32_FLOAT, NULL);
+    init_depth_stencil(&ds_offset, device, 32, 32, ARRAY_SIZE(depth_values), 2,
             DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_D32_FLOAT, NULL);
 
     for (i = 0; i < ARRAY_SIZE(depth_values); ++i)
     {
+        static const D3D12_RECT rects[] = {{0, 0, 3, 3}, {3, 3, 32, 32}};
+
         memset(&dsv_desc, 0, sizeof(dsv_desc));
         dsv_desc.Format = DXGI_FORMAT_D32_FLOAT;
         dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DARRAY;
@@ -14692,6 +14727,11 @@ static void test_sample_c_lz(void)
         ID3D12Device_CreateDepthStencilView(device, ds.texture, &dsv_desc, ds.dsv_handle);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds.dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, depth_values[i], 0, 0, NULL);
+        ID3D12Device_CreateDepthStencilView(device, ds_offset.texture, &dsv_desc, ds_offset.dsv_handle);
+        ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds_offset.dsv_handle,
+                D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 1, &rects[0]);
+        ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds_offset.dsv_handle,
+                D3D12_CLEAR_FLAG_DEPTH, depth_values[i], 0, 1, &rects[1]);
 
         dsv_desc.Texture2DArray.MipSlice = 1;
         ID3D12Device_CreateDepthStencilView(device, ds.texture, &dsv_desc, ds.dsv_handle);
@@ -14699,6 +14739,7 @@ static void test_sample_c_lz(void)
                 D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
     }
 
+    /* 2D array texture */
     memset(&srv_desc, 0, sizeof(srv_desc));
     srv_desc.Format = DXGI_FORMAT_R32_FLOAT;
     srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -14708,43 +14749,51 @@ static void test_sample_c_lz(void)
     srv_desc.Texture2DArray.FirstArraySlice = 0;
     srv_desc.Texture2DArray.ArraySize = ARRAY_SIZE(depth_values);
     ID3D12Device_CreateShaderResourceView(context.device, ds.texture, &srv_desc, cpu_handle);
+    ID3D12Device_CreateShaderResourceView(context.device, ds_offset.texture, &srv_desc,
+            get_cpu_descriptor_handle(&context, heap, 1));
 
     transition_resource_state(command_list, ds.texture,
             D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
     memset(&ps_constant, 0, sizeof(ps_constant));
-    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    for (j = 0; j < ARRAY_SIZE(shaders_2d_array); ++j)
     {
-        vkd3d_test_set_context("test %u", i);
+        context.pipeline_state = create_pipeline_state(context.device, context.root_signature,
+                context.render_target_desc.Format, NULL, shaders_2d_array[j], NULL);
 
-        ps_constant.x = tests[i].d_ref;
-        ps_constant.y = tests[i].layer;
+        for (i = 0; i < ARRAY_SIZE(tests); ++i)
+        {
+            vkd3d_test_set_context("test %u%s", i, j ? " offset" : "");
 
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, clear_color, 0, NULL);
-        ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
-        ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
-        ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
-        ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
-        ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 0,
-                    get_gpu_descriptor_handle(&context, heap, 0));
-        ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 1, 4, &ps_constant.x, 0);
-        ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
-        ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
-        ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+            ps_constant.x = tests[i].d_ref;
+            ps_constant.y = tests[i].layer;
 
-        transition_resource_state(command_list, context.render_target,
-                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, clear_color, 0, NULL);
+            ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+            ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+            ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+            ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
+            ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list,
+                    0, get_gpu_descriptor_handle(&context, heap, j));
+            ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 1, 4, &ps_constant.x, 0);
+            ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+            ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+            ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
 
-        check_sub_resource_float(context.render_target, 0, queue, command_list, tests[i].expected, 2);
+            transition_resource_state(command_list, context.render_target,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        reset_command_list(command_list, context.allocator);
-        transition_resource_state(command_list, context.render_target,
-                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            todo_if(j && tests[i].d_ref > 0.0f)
+                check_sub_resource_float(context.render_target, 0, queue, command_list, tests[i].expected, 2);
+
+            reset_command_list(command_list, context.allocator);
+            transition_resource_state(command_list, context.render_target,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        }
+        ID3D12PipelineState_Release(context.pipeline_state);
     }
     vkd3d_test_set_context(NULL);
-
-    ID3D12PipelineState_Release(context.pipeline_state);
 
     /* cube texture */
     context.pipeline_state = create_pipeline_state(context.device,
@@ -14793,6 +14842,7 @@ static void test_sample_c_lz(void)
     }
     vkd3d_test_set_context(NULL);
 
+    destroy_depth_stencil(&ds_offset);
     destroy_depth_stencil(&ds);
     ID3D12DescriptorHeap_Release(heap);
     destroy_test_context(&context);
