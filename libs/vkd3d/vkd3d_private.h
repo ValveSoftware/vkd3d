@@ -1395,4 +1395,17 @@ static inline void vk_prepend_struct(void *header, void *structure)
     vk_header->pNext = vk_structure;
 }
 
+static inline void vkd3d_prepend_struct(void *header, void *structure)
+{
+    struct
+    {
+        unsigned int type;
+        const void *next;
+    } *vkd3d_header = header, *vkd3d_structure = structure;
+
+    assert(!vkd3d_structure->next);
+    vkd3d_structure->next = vkd3d_header->next;
+    vkd3d_header->next = vkd3d_structure;
+}
+
 #endif  /* __VKD3D_PRIVATE_H */

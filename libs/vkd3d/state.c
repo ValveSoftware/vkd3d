@@ -2689,12 +2689,11 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
                 goto fail;
         }
 
-        shader_interface.next = shader_stages[i].stage == xfb_stage ? &xfb_info : NULL;
+        shader_interface.next = NULL;
+        if (shader_stages[i].stage == xfb_stage)
+            vkd3d_prepend_struct(&shader_interface, &xfb_info);
         if (target_info)
-        {
-            target_info->next = shader_interface.next;
-            shader_interface.next = target_info;
-        }
+            vkd3d_prepend_struct(&shader_interface, target_info);
 
         if (FAILED(hr = create_shader_stage(device, &graphics->stages[graphics->stage_count],
                 shader_stages[i].stage, b, &shader_interface)))
