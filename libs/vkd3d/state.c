@@ -2403,6 +2403,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     struct vkd3d_shader_transform_feedback_info xfb_info;
     struct vkd3d_shader_spirv_target_info ps_target_info;
     struct vkd3d_shader_interface_info shader_interface;
+    struct vkd3d_shader_descriptor_offset_info offset_info;
     struct vkd3d_shader_spirv_target_info *target_info;
     const struct d3d12_root_signature *root_signature;
     struct vkd3d_shader_signature input_signature;
@@ -2642,6 +2643,15 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     shader_interface.push_constant_buffer_count = root_signature->root_constant_count;
     shader_interface.combined_samplers = NULL;
     shader_interface.combined_sampler_count = 0;
+
+    if (root_signature->descriptor_offsets)
+    {
+        offset_info.type = VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO;
+        offset_info.next = NULL;
+        offset_info.binding_offsets = root_signature->descriptor_offsets;
+        offset_info.uav_counter_offsets = NULL;
+        vkd3d_prepend_struct(&shader_interface, &offset_info);
+    }
 
     for (i = 0; i < ARRAY_SIZE(shader_stages); ++i)
     {
