@@ -240,7 +240,6 @@ struct hlsl_ir_var
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
-    uint32_t has_resource_access : 1;
 };
 
 struct hlsl_ir_function

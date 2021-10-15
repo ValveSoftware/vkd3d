@@ -591,6 +591,8 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
 
     LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
     {
+        const unsigned int var_last_read = loop_last ? max(instr->index, loop_last) : instr->index;
+
         switch (instr->type)
         {
         case HLSL_IR_STORE:
@@ -628,7 +630,7 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
             struct hlsl_ir_load *load = hlsl_ir_load(instr);
 
             var = load->src.var;
-            var->last_read = max(var->last_read, loop_last ? max(instr->index, loop_last) : instr->index);
+            var->last_read = max(var->last_read, var_last_read);
             if (load->src.offset.node)
                 load->src.offset.node->last_read = instr->index;
             break;
@@ -645,7 +647,8 @@ static void compute_liveness_recurse(struct list *instrs, unsigned int loop_firs
         {
             struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
 
-            load->resource.var->has_resource_access = 1;
+            var = load->resource.var;
+            var->last_read = max(var->last_read, var_last_read);
             if (load->resource.offset.node)
                 load->resource.offset.node->last_read = instr->index;
             load->coords.node->last_read = instr->index;
@@ -676,10 +679,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
     {
         LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
-        {
             var->first_write = var->last_read = 0;
-            var->has_resource_access = 0;
-        }
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
@@ -1203,7 +1203,7 @@ static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->has_resource_access && var->reg_reservation.type == 't' && var->reg_reservation.index == index)
+        if (var->last_read && var->reg_reservation.type == 't' && var->reg_reservation.index == index)
             return var;
     }
     return NULL;
@@ -1216,7 +1216,7 @@ static void allocate_textures(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->has_resource_access || var->data_type->type != HLSL_CLASS_OBJECT
+        if (!var->last_read || var->data_type->type != HLSL_CLASS_OBJECT
                 || var->data_type->base_type != HLSL_TYPE_TEXTURE)
             continue;
 
