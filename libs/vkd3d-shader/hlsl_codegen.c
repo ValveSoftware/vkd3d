@@ -690,9 +690,6 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
             var->last_read = UINT_MAX;
     }
 
-    if (entry_func->return_var)
-        entry_func->return_var->last_read = UINT_MAX;
-
     compute_liveness_recurse(&entry_func->body, 0, 0);
 }
 
