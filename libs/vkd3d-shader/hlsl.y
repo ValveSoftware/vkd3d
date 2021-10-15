@@ -1058,15 +1058,12 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs, 
     return expr;
 }
 
-static struct list *add_unary_expr(struct hlsl_ctx *ctx, struct list *instrs,
-        enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
+static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *expr;
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
 
-    if (!(expr = hlsl_new_unary_expr(ctx, op, node_from_list(instrs), loc)))
-        return NULL;
-    list_add_tail(instrs, &expr->entry);
-    return instrs;
+    return add_expr(ctx, instrs, op, args, loc);
 }
 
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
@@ -1170,10 +1167,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     if (assign_op == ASSIGN_OP_SUB)
     {
-        struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {rhs};
         struct hlsl_ir_expr *expr;
 
-        if (!(expr = add_expr(ctx, instrs, HLSL_OP1_NEG, args, &rhs->loc)))
+        if (!(expr = add_unary_arithmetic_expr(ctx, instrs, HLSL_OP1_NEG, rhs, &rhs->loc)))
             return NULL;
         rhs = &expr->node;
         assign_op = ASSIGN_OP_ADD;
@@ -1585,9 +1581,7 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0]};
-
-    return !!add_expr(ctx, params->instrs, HLSL_OP1_ABS, args, &loc);
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], &loc);
 }
 
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
@@ -1629,9 +1623,7 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0]};
-
-    return !!add_expr(ctx, params->instrs, HLSL_OP1_SAT, args, &loc);
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, params->args[0], &loc);
 }
 
 static const struct intrinsic_function
@@ -3208,15 +3200,18 @@ unary_expr:
         }
     | '-' unary_expr
         {
-            $$ = add_unary_expr(ctx, $2, HLSL_OP1_NEG, @1);
+            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_NEG, node_from_list($2), &@1);
+            $$ = $2;
         }
     | '~' unary_expr
         {
-            $$ = add_unary_expr(ctx, $2, HLSL_OP1_BIT_NOT, @1);
+            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_BIT_NOT, node_from_list($2), &@1);
+            $$ = $2;
         }
     | '!' unary_expr
         {
-            $$ = add_unary_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, @1);
+            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, node_from_list($2), &@1);
+            $$ = $2;
         }
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | '(' var_modifiers type arrays ')' unary_expr
