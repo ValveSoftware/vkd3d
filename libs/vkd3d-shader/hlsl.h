@@ -258,7 +258,8 @@ struct hlsl_ir_function_decl
     struct rb_entry entry;
     struct hlsl_ir_function *func;
     struct list *parameters;
-    struct list *body;
+    struct list body;
+    bool has_body;
 };
 
 struct hlsl_ir_if

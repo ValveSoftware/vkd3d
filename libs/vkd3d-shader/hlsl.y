@@ -2053,7 +2053,7 @@ hlsl_prog:
             decl = get_func_decl(&ctx->functions, $2.name, $2.decl->parameters);
             if (decl && !decl->func->intrinsic)
             {
-                if (decl->body && $2.decl->body)
+                if (decl->has_body && $2.decl->has_body)
                 {
                     hlsl_error(ctx, $2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Function \"%s\" is already defined.", $2.name);
@@ -2247,7 +2247,9 @@ func_declaration:
       func_prototype compound_statement
         {
             $$ = $1;
-            $$.decl->body = $2;
+            $$.decl->has_body = true;
+            list_move_tail(&$$.decl->body, $2);
+            vkd3d_free($2);
             hlsl_pop_scope(ctx);
         }
     | func_prototype ';'

@@ -685,6 +685,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
         return NULL;
+    list_init(&decl->body);
     decl->return_type = return_type;
     decl->parameters = parameters;
     decl->loc = loc;
@@ -1340,8 +1341,8 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
         dump_ir_var(ctx, &buffer, param);
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
-    if (func->body)
-        dump_instr_list(ctx, &buffer, func->body);
+    if (func->has_body)
+        dump_instr_list(ctx, &buffer, &func->body);
 
     vkd3d_string_buffer_trace(&buffer);
     vkd3d_string_buffer_cleanup(&buffer);
@@ -1482,8 +1483,7 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 static void free_function_decl(struct hlsl_ir_function_decl *decl)
 {
     vkd3d_free(decl->parameters);
-    hlsl_free_instr_list(decl->body);
-    vkd3d_free(decl->body);
+    hlsl_free_instr_list(&decl->body);
     vkd3d_free(decl);
 }
 
@@ -1530,7 +1530,7 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
             struct hlsl_ir_function_decl *old_decl =
                     RB_ENTRY_VALUE(old_entry, struct hlsl_ir_function_decl, entry);
 
-            if (!decl->body)
+            if (!decl->has_body)
             {
                 free_function_decl(decl);
                 vkd3d_free(name);

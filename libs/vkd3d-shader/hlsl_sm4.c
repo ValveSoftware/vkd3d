@@ -1472,7 +1472,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     if (ctx->temp_count)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);
 
-    LIST_FOR_EACH_ENTRY(instr, entry_func->body, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &entry_func->body, struct hlsl_ir_node, entry)
     {
         if (instr->data_type)
         {
