@@ -996,56 +996,11 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
     return true;
 }
 
-static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
-        struct vkd3d_shader_location *loc)
-{
-    enum hlsl_type_class type;
-    enum hlsl_base_type base;
-    unsigned int dimx, dimy;
-
-    if (!expr_common_shape(ctx, t1, t2, loc, &type, &dimx, &dimy))
-        return NULL;
-
-    base = expr_common_base_type(t1->base_type, t2->base_type);
-
-    return hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
-}
-
 static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs, enum hlsl_ir_expr_op op,
-        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], struct vkd3d_shader_location *loc)
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], struct hlsl_type *type, struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_expr *expr;
-    struct hlsl_type *type;
     unsigned int i;
-
-    type = operands[0]->data_type;
-    for (i = 1; i < HLSL_MAX_OPERANDS; ++i)
-    {
-        if (!operands[i])
-            break;
-        type = expr_common_type(ctx, type, operands[i]->data_type, loc);
-        if (!type)
-            return NULL;
-    }
-    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
-    {
-        struct hlsl_ir_expr *cast;
-
-        if (!operands[i])
-            break;
-        if (hlsl_types_are_equal(operands[i]->data_type, type))
-            continue;
-        if (operands[i]->data_type->dimx * operands[i]->data_type->dimy != 1
-                && operands[i]->data_type->dimx * operands[i]->data_type->dimy != type->dimx * type->dimy)
-            hlsl_warning(ctx, operands[i]->loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION,
-                    "Implicit truncation of %s type.",
-                    operands[i]->data_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
-
-        if (!(cast = hlsl_new_cast(ctx, operands[i], type, &operands[i]->loc)))
-            return NULL;
-        list_add_after(&operands[i]->entry, &cast->node.entry);
-        operands[i] = &cast->node;
-    }
 
     if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;
@@ -1063,7 +1018,7 @@ static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
 
-    return add_expr(ctx, instrs, op, args, loc);
+    return add_expr(ctx, instrs, op, args, arg->data_type, loc);
 }
 
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
@@ -1087,7 +1042,7 @@ static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, instrs, op, args, loc);
+    return add_expr(ctx, instrs, op, args, common_type, loc);
 }
 
 static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
