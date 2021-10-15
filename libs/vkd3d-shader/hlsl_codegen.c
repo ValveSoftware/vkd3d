@@ -201,12 +201,12 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 }
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
-        struct list *instrs, void *context)
+        struct hlsl_block *block, void *context)
 {
     struct hlsl_ir_node *instr, *next;
     bool progress = 0;
 
-    LIST_FOR_EACH_ENTRY_SAFE(instr, next, instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
         if (instr->type == HLSL_IR_IF)
         {
@@ -538,11 +538,11 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 
 /* Allocate a unique, ordered index to each instruction, which will be used for
  * computing liveness ranges. */
-static unsigned int index_instructions(struct list *instrs, unsigned int index)
+static unsigned int index_instructions(struct hlsl_block *block, unsigned int index)
 {
     struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         instr->index = index++;
 
@@ -584,12 +584,12 @@ static void dump_function(struct rb_entry *entry, void *context)
  * to at least the range of the entire loop. Note that we don't need to do this
  * for anonymous nodes, since there's currently no way to use a node which was
  * calculated in an earlier iteration of the loop. */
-static void compute_liveness_recurse(struct list *instrs, unsigned int loop_first, unsigned int loop_last)
+static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop_first, unsigned int loop_last)
 {
     struct hlsl_ir_node *instr;
     struct hlsl_ir_var *var;
 
-    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         const unsigned int var_last_read = loop_last ? max(instr->index, loop_last) : instr->index;
 
@@ -836,11 +836,11 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
     }
 }
 
-static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct liveness *liveness)
+static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct liveness *liveness)
 {
     struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         if (!instr->reg.allocated && instr->last_read)
         {
@@ -893,12 +893,12 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct list *i
     }
 }
 
-static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct liveness *liveness)
+static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct liveness *liveness)
 {
     struct hlsl_constant_defs *defs = &ctx->constant_defs;
     struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, instrs, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         switch (instr->type)
         {
@@ -1303,23 +1303,23 @@ struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct
 
 int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
-    struct list *const body = &entry_func->body;
+    struct hlsl_block *const body = &entry_func->body;
     struct hlsl_ir_var *var;
     bool progress;
 
-    list_move_head(body, &ctx->static_initializers);
+    list_move_head(&body->instrs, &ctx->static_initializers);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
         if (var->modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, body, var);
+            prepend_uniform_copy(ctx, &body->instrs, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
         if (var->data_type->type == HLSL_CLASS_OBJECT || (var->modifiers & HLSL_STORAGE_UNIFORM))
         {
-            prepend_uniform_copy(ctx, body, var);
+            prepend_uniform_copy(ctx, &body->instrs, var);
         }
         else
         {
@@ -1328,9 +1328,9 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
                         "Parameter \"%s\" is missing a semantic.", var->name);
 
             if (var->modifiers & HLSL_STORAGE_IN)
-                prepend_input_var_copy(ctx, body, var);
+                prepend_input_var_copy(ctx, &body->instrs, var);
             if (var->modifiers & HLSL_STORAGE_OUT)
-                append_output_var_copy(ctx, body, var);
+                append_output_var_copy(ctx, &body->instrs, var);
         }
     }
     if (entry_func->return_var)
@@ -1339,7 +1339,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
             hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
-        append_output_var_copy(ctx, body, entry_func->return_var);
+        append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
     }
 
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));

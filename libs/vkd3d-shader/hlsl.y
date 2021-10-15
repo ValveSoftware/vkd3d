@@ -340,7 +340,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, condition->loc)))
         return false;
-    list_add_head(&iff->then_instrs, &jump->node.entry);
+    list_add_head(&iff->then_instrs.instrs, &jump->node.entry);
     return true;
 }
 
@@ -372,15 +372,15 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struc
         goto oom;
 
     if (type != LOOP_DO_WHILE)
-        list_move_tail(&loop->body, cond);
+        list_move_tail(&loop->body.instrs, cond);
 
-    list_move_tail(&loop->body, body);
+    list_move_tail(&loop->body.instrs, body);
 
     if (iter)
-        list_move_tail(&loop->body, iter);
+        list_move_tail(&loop->body.instrs, iter);
 
     if (type == LOOP_DO_WHILE)
-        list_move_tail(&loop->body, cond);
+        list_move_tail(&loop->body.instrs, cond);
 
     vkd3d_free(init);
     vkd3d_free(cond);
@@ -2248,7 +2248,7 @@ func_declaration:
         {
             $$ = $1;
             $$.decl->has_body = true;
-            list_move_tail(&$$.decl->body, $2);
+            list_move_tail(&$$.decl->body.instrs, $2);
             vkd3d_free($2);
             hlsl_pop_scope(ctx);
         }
@@ -2876,9 +2876,9 @@ selection_statement:
 
             if (!(instr = hlsl_new_if(ctx, condition, @1)))
                 YYABORT;
-            list_move_tail(&instr->then_instrs, $5.then_instrs);
+            list_move_tail(&instr->then_instrs.instrs, $5.then_instrs);
             if ($5.else_instrs)
-                list_move_tail(&instr->else_instrs, $5.else_instrs);
+                list_move_tail(&instr->else_instrs.instrs, $5.else_instrs);
             vkd3d_free($5.then_instrs);
             vkd3d_free($5.else_instrs);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)

@@ -602,8 +602,8 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condit
         return NULL;
     init_node(&iff->node, HLSL_IR_IF, NULL, loc);
     hlsl_src_from_node(&iff->condition, condition);
-    list_init(&iff->then_instrs);
-    list_init(&iff->else_instrs);
+    list_init(&iff->then_instrs.instrs);
+    list_init(&iff->else_instrs.instrs);
     return iff;
 }
 
@@ -674,7 +674,7 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
     if (!(loop = hlsl_alloc(ctx, sizeof(*loop))))
         return NULL;
     init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
-    list_init(&loop->body);
+    list_init(&loop->body.instrs);
     return loop;
 }
 
@@ -685,7 +685,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
         return NULL;
-    list_init(&decl->body);
+    list_init(&decl->body.instrs);
     decl->return_type = return_type;
     decl->parameters = parameters;
     decl->loc = loc;
@@ -1199,9 +1199,9 @@ static void dump_ir_if(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
     vkd3d_string_buffer_printf(buffer, "if (");
     dump_src(buffer, &if_node->condition);
     vkd3d_string_buffer_printf(buffer, ")\n{\n");
-    dump_instr_list(ctx, buffer, &if_node->then_instrs);
+    dump_instr_list(ctx, buffer, &if_node->then_instrs.instrs);
     vkd3d_string_buffer_printf(buffer, "}\nelse\n{\n");
-    dump_instr_list(ctx, buffer, &if_node->else_instrs);
+    dump_instr_list(ctx, buffer, &if_node->else_instrs.instrs);
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
@@ -1230,7 +1230,7 @@ static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_i
 static void dump_ir_loop(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_loop *loop)
 {
     vkd3d_string_buffer_printf(buffer, "for (;;)\n{\n");
-    dump_instr_list(ctx, buffer, &loop->body);
+    dump_instr_list(ctx, buffer, &loop->body.instrs);
     vkd3d_string_buffer_printf(buffer, "}\n");
 }
 
@@ -1342,7 +1342,7 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
     if (func->has_body)
-        dump_instr_list(ctx, &buffer, &func->body);
+        dump_instr_list(ctx, &buffer, &func->body.instrs);
 
     vkd3d_string_buffer_trace(&buffer);
     vkd3d_string_buffer_cleanup(&buffer);
@@ -1393,8 +1393,8 @@ static void free_ir_expr(struct hlsl_ir_expr *expr)
 
 static void free_ir_if(struct hlsl_ir_if *if_node)
 {
-    hlsl_free_instr_list(&if_node->then_instrs);
-    hlsl_free_instr_list(&if_node->else_instrs);
+    hlsl_free_instr_list(&if_node->then_instrs.instrs);
+    hlsl_free_instr_list(&if_node->else_instrs.instrs);
     hlsl_src_remove(&if_node->condition);
     vkd3d_free(if_node);
 }
@@ -1412,7 +1412,7 @@ static void free_ir_load(struct hlsl_ir_load *load)
 
 static void free_ir_loop(struct hlsl_ir_loop *loop)
 {
-    hlsl_free_instr_list(&loop->body);
+    hlsl_free_instr_list(&loop->body.instrs);
     vkd3d_free(loop);
 }
 
@@ -1483,7 +1483,7 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 static void free_function_decl(struct hlsl_ir_function_decl *decl)
 {
     vkd3d_free(decl->parameters);
-    hlsl_free_instr_list(&decl->body);
+    hlsl_free_instr_list(&decl->body.instrs);
     vkd3d_free(decl);
 }
 
