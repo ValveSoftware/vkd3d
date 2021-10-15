@@ -1069,14 +1069,38 @@ static struct list *add_unary_expr(struct hlsl_ctx *ctx, struct list *instrs,
     return instrs;
 }
 
-static struct list *add_binary_expr(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
+static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *common_type;
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    enum hlsl_type_class type;
+    unsigned int dimx, dimy;
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+
+    if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
+        return NULL;
+
+    common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
+
+    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
+        return NULL;
+
+    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
+        return NULL;
+
+    return add_expr(ctx, instrs, op, args, loc);
+}
+
+static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
         enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {node_from_list(list1), node_from_list(list2)};
+    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
 
     list_move_tail(list1, list2);
     vkd3d_free(list2);
-    add_expr(ctx, list1, op, args, &loc);
+    add_binary_arithmetic_expr(ctx, list1, op, arg1, arg2, &loc);
     return list1;
 }
 
@@ -1156,12 +1180,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     }
     if (assign_op != ASSIGN_OP_ASSIGN)
     {
-        struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {lhs, rhs};
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
         struct hlsl_ir_expr *expr;
 
         assert(op);
-        if (!(expr = add_expr(ctx, instrs, op, args, &rhs->loc)))
+        if (!(expr = add_binary_arithmetic_expr(ctx, instrs, op, lhs, rhs, &rhs->loc)))
             return NULL;
         rhs = &expr->node;
     }
@@ -1570,29 +1593,23 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0], params->args[1]};
     struct hlsl_ir_expr *max;
 
-    if (!(max = add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc)))
+    if (!(max = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], &loc)))
         return false;
 
-    args[0] = &max->node;
-    args[1] = params->args[2];
-    return !!add_expr(ctx, params->instrs, HLSL_OP2_MIN, args, &loc);
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, &max->node, params->args[2], &loc);
 }
 
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {params->args[0], params->args[1]};
-
-    return !!add_expr(ctx, params->instrs, HLSL_OP2_MAX, args, &loc);
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], &loc);
 }
 
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_ir_node *log, *exp;
     struct hlsl_ir_expr *mul;
 
@@ -1600,9 +1617,7 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
         return false;
     list_add_tail(params->instrs, &log->entry);
 
-    args[0] = params->args[1];
-    args[1] = log;
-    if (!(mul = add_expr(ctx, params->instrs, HLSL_OP2_MUL, args, &loc)))
+    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[1], log, &loc)))
         return false;
 
     if (!(exp = hlsl_new_unary_expr(ctx, HLSL_OP1_EXP2, &mul->node, loc)))
@@ -3249,22 +3264,22 @@ mul_expr:
       unary_expr
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_MUL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, @2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_DIV, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, @2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_MOD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, @2);
         }
 
 add_expr:
       mul_expr
     | add_expr '+' mul_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_ADD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, @2);
         }
     | add_expr '-' mul_expr
         {
@@ -3273,7 +3288,7 @@ add_expr:
             if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), @2)))
                 YYABORT;
             list_add_tail($3, &neg->entry);
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_ADD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, @2);
         }
 
 shift_expr:
@@ -3291,30 +3306,30 @@ relational_expr:
       shift_expr
     | relational_expr '<' shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_LESS, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_LESS, @2);
         }
     | relational_expr '>' shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_GREATER, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_GREATER, @2);
         }
     | relational_expr OP_LE shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_LEQUAL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_LEQUAL, @2);
         }
     | relational_expr OP_GE shift_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_GEQUAL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_GEQUAL, @2);
         }
 
 equality_expr:
       relational_expr
     | equality_expr OP_EQ relational_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_EQUAL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_EQUAL, @2);
         }
     | equality_expr OP_NE relational_expr
         {
-            $$ = add_binary_expr(ctx, $1, $3, HLSL_OP2_NEQUAL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_NEQUAL, @2);
         }
 
 bitand_expr:
