@@ -51,7 +51,7 @@
 
 #define VKD3D_MAX_COMPATIBLE_FORMAT_COUNT 6u
 #define VKD3D_MAX_QUEUE_FAMILY_COUNT      3u
-#define VKD3D_MAX_SHADER_EXTENSIONS       2u
+#define VKD3D_MAX_SHADER_EXTENSIONS       3u
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
 #define VKD3D_MAX_DESCRIPTOR_SETS        64u
@@ -108,6 +108,7 @@ struct vkd3d_vulkan_info
     bool EXT_depth_clip_enable;
     bool EXT_descriptor_indexing;
     bool EXT_shader_demote_to_helper_invocation;
+    bool EXT_shader_stencil_export;
     bool EXT_texel_buffer_alignment;
     bool EXT_transform_feedback;
     bool EXT_vertex_attribute_divisor;

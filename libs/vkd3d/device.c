@@ -134,6 +134,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(EXT_DEPTH_CLIP_ENABLE, EXT_depth_clip_enable),
     VK_EXTENSION(EXT_DESCRIPTOR_INDEXING, EXT_descriptor_indexing),
     VK_EXTENSION(EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION, EXT_shader_demote_to_helper_invocation),
+    VK_EXTENSION(EXT_SHADER_STENCIL_EXPORT, EXT_shader_stencil_export),
     VK_EXTENSION(EXT_TEXEL_BUFFER_ALIGNMENT, EXT_texel_buffer_alignment),
     VK_EXTENSION(EXT_TRANSFORM_FEEDBACK, EXT_transform_feedback),
     VK_EXTENSION(EXT_VERTEX_ATTRIBUTE_DIVISOR, EXT_vertex_attribute_divisor),
@@ -1329,7 +1330,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     else
         device->feature_options.ResourceBindingTier = D3D12_RESOURCE_BINDING_TIER_3;
 
-    device->feature_options.PSSpecifiedStencilRefSupported = FALSE;
     device->feature_options.TypedUAVLoadAdditionalFormats = features->shaderStorageImageExtendedFormats;
     /* GL_INTEL_fragment_shader_ordering, no Vulkan equivalent. */
     device->feature_options.ROVsSupported = FALSE;
@@ -1441,6 +1441,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     vkd3d_free(vk_extensions);
 
+    device->feature_options.PSSpecifiedStencilRefSupported = vulkan_info->EXT_shader_stencil_export;
+
     vkd3d_init_feature_level(vulkan_info, features, &device->feature_options);
     if (vulkan_info->max_feature_level < create_info->minimum_feature_level)
     {
@@ -1460,6 +1462,10 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     if (vulkan_info->EXT_descriptor_indexing)
         vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
                 = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING;
+
+    if (vulkan_info->EXT_shader_stencil_export)
+        vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
+                = VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT;
 
     /* Disable unused Vulkan features. */
     features->shaderTessellationAndGeometryPointSize = VK_FALSE;
