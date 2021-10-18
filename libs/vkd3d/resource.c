@@ -2967,8 +2967,9 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
             case D3D12_UAV_DIMENSION_TEXTURE3D:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_3D;
                 vkd3d_desc.miplevel_idx = desc->u.Texture3D.MipSlice;
-                if (desc->u.Texture3D.FirstWSlice || (desc->u.Texture3D.WSize != resource->desc.DepthOrArraySize
-                        && desc->u.Texture3D.WSize != UINT_MAX))
+                if (desc->u.Texture3D.FirstWSlice || (desc->u.Texture3D.WSize != UINT_MAX
+                        && desc->u.Texture3D.WSize != max(1u,
+                        resource->desc.DepthOrArraySize >> desc->u.Texture3D.MipSlice)))
                     FIXME("Unhandled depth view %u-%u.\n",
                             desc->u.Texture3D.FirstWSlice, desc->u.Texture3D.WSize);
                 break;
