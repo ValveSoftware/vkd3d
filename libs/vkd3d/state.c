@@ -2276,9 +2276,6 @@ static void blend_attachment_from_d3d12(struct VkPipelineColorBlendAttachmentSta
         vk_desc->colorWriteMask |= VK_COLOR_COMPONENT_B_BIT;
     if (d3d12_desc->RenderTargetWriteMask & D3D12_COLOR_WRITE_ENABLE_ALPHA)
         vk_desc->colorWriteMask |= VK_COLOR_COMPONENT_A_BIT;
-
-    if (d3d12_desc->LogicOpEnable)
-        FIXME("Ignoring LogicOpEnable %#x.\n", d3d12_desc->LogicOpEnable);
 }
 
 static bool is_dual_source_blending_blend(D3D12_BLEND b)
@@ -2388,6 +2385,48 @@ static HRESULT d3d12_graphics_pipeline_state_create_render_pass(
     return vkd3d_render_pass_cache_find(&device->render_pass_cache, device, &key, vk_render_pass);
 }
 
+static VkLogicOp vk_logic_op_from_d3d12(D3D12_LOGIC_OP op)
+{
+    switch (op)
+    {
+        case D3D12_LOGIC_OP_CLEAR:
+            return VK_LOGIC_OP_CLEAR;
+        case D3D12_LOGIC_OP_SET:
+            return VK_LOGIC_OP_SET;
+        case D3D12_LOGIC_OP_COPY:
+            return VK_LOGIC_OP_COPY;
+        case D3D12_LOGIC_OP_COPY_INVERTED:
+            return VK_LOGIC_OP_COPY_INVERTED;
+        case D3D12_LOGIC_OP_NOOP:
+            return VK_LOGIC_OP_NO_OP;
+        case D3D12_LOGIC_OP_INVERT:
+            return VK_LOGIC_OP_INVERT;
+        case D3D12_LOGIC_OP_AND:
+            return VK_LOGIC_OP_AND;
+        case D3D12_LOGIC_OP_NAND:
+            return VK_LOGIC_OP_NAND;
+        case D3D12_LOGIC_OP_OR:
+            return VK_LOGIC_OP_OR;
+        case D3D12_LOGIC_OP_NOR:
+            return VK_LOGIC_OP_NOR;
+        case D3D12_LOGIC_OP_XOR:
+            return VK_LOGIC_OP_XOR;
+        case D3D12_LOGIC_OP_EQUIV:
+            return VK_LOGIC_OP_EQUIVALENT;
+        case D3D12_LOGIC_OP_AND_REVERSE:
+            return VK_LOGIC_OP_AND_REVERSE;
+        case D3D12_LOGIC_OP_AND_INVERTED:
+            return VK_LOGIC_OP_AND_INVERTED;
+        case D3D12_LOGIC_OP_OR_REVERSE:
+            return VK_LOGIC_OP_OR_REVERSE;
+        case D3D12_LOGIC_OP_OR_INVERTED:
+            return VK_LOGIC_OP_OR_INVERTED;
+        default:
+            FIXME("Unhandled logic op %#x.\n", op);
+            return VK_LOGIC_OP_NO_OP;
+    }
+}
+
 static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *state,
         struct d3d12_device *device, const D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc)
 {
@@ -2478,6 +2517,15 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
                 rt_count, ARRAY_SIZE(graphics->blend_attachments));
         rt_count = ARRAY_SIZE(graphics->blend_attachments);
     }
+
+    graphics->om_logic_op_enable = desc->BlendState.RenderTarget[0].LogicOpEnable
+            && device->feature_options.OutputMergerLogicOp;
+    graphics->om_logic_op = graphics->om_logic_op_enable
+            ? vk_logic_op_from_d3d12(desc->BlendState.RenderTarget[0].LogicOp)
+            : VK_LOGIC_OP_COPY;
+    if (desc->BlendState.RenderTarget[0].LogicOpEnable && !graphics->om_logic_op_enable)
+        WARN("The device does not support output merger logic ops. Ignoring logic op %#x.\n",
+                desc->BlendState.RenderTarget[0].LogicOp);
 
     graphics->null_attachment_mask = 0;
     for (i = 0; i < rt_count; ++i)
@@ -3196,8 +3244,8 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
     blend_desc.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     blend_desc.pNext = NULL;
     blend_desc.flags = 0;
-    blend_desc.logicOpEnable = VK_FALSE;
-    blend_desc.logicOp = VK_LOGIC_OP_COPY;
+    blend_desc.logicOpEnable = graphics->om_logic_op_enable;
+    blend_desc.logicOp = graphics->om_logic_op;
     blend_desc.attachmentCount = graphics->rt_count;
     blend_desc.pAttachments = graphics->blend_attachments;
     blend_desc.blendConstants[0] = D3D12_DEFAULT_BLEND_FACTOR_RED;

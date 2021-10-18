@@ -773,6 +773,8 @@ struct d3d12_graphics_pipeline_state
     size_t instance_divisor_count;
     size_t attribute_count;
 
+    bool om_logic_op_enable;
+    VkLogicOp om_logic_op;
     VkPipelineColorBlendAttachmentState blend_attachments[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT];
     unsigned int rt_count;
     unsigned int null_attachment_mask;

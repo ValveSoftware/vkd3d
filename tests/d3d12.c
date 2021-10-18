@@ -31155,7 +31155,6 @@ static void test_output_merger_logic_op(void)
 
             transition_resource_state(command_list, context.render_target,
                     D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-            todo_if(do_test && tests[i].logic_op != D3D12_LOGIC_OP_COPY)
             check_sub_resource_uint(context.render_target, 0, queue, command_list,
                     do_test ? tests[i].expected_colour : 0x00ff00ff, 1);
             reset_command_list(command_list, context.allocator);
