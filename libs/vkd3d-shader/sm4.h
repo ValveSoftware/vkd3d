@@ -397,6 +397,7 @@ enum vkd3d_sm4_register_type
     VKD3D_SM5_RT_GS_INSTANCE_ID          = 0x25,
     VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL  = 0x26,
     VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL     = 0x27,
+    VKD3D_SM5_RT_OUTPUT_STENCIL_REF      = 0x29,
 };
 
 enum vkd3d_sm4_extended_operand_type

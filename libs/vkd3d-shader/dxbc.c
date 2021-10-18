@@ -885,6 +885,8 @@ static const enum vkd3d_shader_register_type register_type_table[] =
     /* VKD3D_SM5_RT_GS_INSTANCE_ID */          VKD3DSPR_GSINSTID,
     /* VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL */  VKD3DSPR_DEPTHOUTGE,
     /* VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL */     VKD3DSPR_DEPTHOUTLE,
+    /* VKD3D_SM5_RT_CYCLE_COUNTER */           ~0u,
+    /* VKD3D_SM5_RT_OUTPUT_STENCIL_REF */      VKD3DSPR_OUTSTENCILREF,
 };
 
 static const enum vkd3d_shader_register_precision register_precision_table[] =
@@ -1252,6 +1254,7 @@ static bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *re
         case VKD3DSPR_OUTPOINTID:
         case VKD3DSPR_PRIMID:
         case VKD3DSPR_SAMPLEMASK:
+        case VKD3DSPR_OUTSTENCILREF:
             return true;
         default:
             return false;

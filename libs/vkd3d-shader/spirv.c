@@ -1841,6 +1841,8 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageImageArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityShaderNonUniformEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_descriptor_indexing");
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStencilExportEXT))
+        vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_shader_stencil_export");
 
     if (builder->ext_instr_set_glsl_450)
         vkd3d_spirv_build_op_ext_inst_import(&stream, builder->ext_instr_set_glsl_450, "GLSL.std.450");
@@ -2903,6 +2905,9 @@ static bool vkd3d_dxbc_compiler_get_register_name(char *buffer, unsigned int buf
         case VKD3DSPR_PRIMID:
             /* SPIRV-Tools disassembler generates names for SPIR-V built-ins. */
             return false;
+        case VKD3DSPR_OUTSTENCILREF:
+            snprintf(buffer, buffer_size, "oStencilRef");
+            break;
         default:
             FIXME("Unhandled register %#x.\n", reg->type);
             snprintf(buffer, buffer_size, "unrecognized_%#x", reg->type);
@@ -4111,6 +4116,8 @@ vkd3d_register_builtins[] =
     {VKD3DSPR_DEPTHOUT,         {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInFragDepth}},
     {VKD3DSPR_DEPTHOUTGE,       {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInFragDepth}},
     {VKD3DSPR_DEPTHOUTLE,       {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInFragDepth}},
+
+    {VKD3DSPR_OUTSTENCILREF,    {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInFragStencilRefEXT}},
 };
 
 static void vkd3d_dxbc_compiler_emit_register_execution_mode(struct vkd3d_dxbc_compiler *compiler,
@@ -4123,6 +4130,18 @@ static void vkd3d_dxbc_compiler_emit_register_execution_mode(struct vkd3d_dxbc_c
             break;
         case VKD3DSPR_DEPTHOUTLE:
             vkd3d_dxbc_compiler_emit_execution_mode(compiler, SpvExecutionModeDepthLess, NULL, 0);
+            break;
+        case VKD3DSPR_OUTSTENCILREF:
+            if (!vkd3d_dxbc_compiler_is_target_extension_supported(compiler,
+                    VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT))
+            {
+                FIXME("The target environment does not support stencil export.\n");
+                vkd3d_dxbc_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_STENCIL_EXPORT_UNSUPPORTED,
+                        "Cannot export stencil reference value for register id %u. "
+                        "The target environment does not support stencil export.", reg->idx[0].offset);
+            }
+            vkd3d_spirv_enable_capability(&compiler->spirv_builder, SpvCapabilityStencilExportEXT);
+            vkd3d_dxbc_compiler_emit_execution_mode(compiler, SpvExecutionModeStencilRefReplacingEXT, NULL, 0);
             break;
         default:
             return;
@@ -4885,6 +4904,7 @@ static void vkd3d_dxbc_compiler_emit_output_register(struct vkd3d_dxbc_compiler 
     reg_symbol.info.reg.dcl_mask = write_mask;
     reg_symbol.info.reg.is_aggregate = builtin->spirv_array_size;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
+    vkd3d_dxbc_compiler_emit_register_execution_mode(compiler, reg);
     vkd3d_dxbc_compiler_emit_register_debug_name(builder, output_id, reg);
 }
 
