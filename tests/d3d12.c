@@ -599,6 +599,21 @@ static D3D12_RESOURCE_BINDING_TIER get_resource_binding_tier(ID3D12Device *devic
     return options.ResourceBindingTier;
 }
 
+static bool is_output_merger_logic_op_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return false;
+    }
+
+    return options.OutputMergerLogicOp;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -31033,6 +31048,128 @@ static void test_dual_source_blending(void)
     destroy_test_context(&context);
 }
 
+static void test_output_merger_logic_op(void)
+{
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
+    ID3D12GraphicsCommandList *command_list;
+    ID3D12PipelineState *logic_pso;
+    struct test_context_desc desc;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    unsigned int i, do_test;
+    HRESULT hr;
+
+    static const DWORD ps_code[] =
+    {
+#if 0
+        uint4 c0;
+
+        void main(const in float4 position : SV_Position, out uint4 target : SV_Target0)
+        {
+            target = c0;
+        }
+#endif
+        0x43425844, 0xb1d5d133, 0xbd9958bf, 0xe4a12856, 0x0197481b, 0x00000001, 0x000000e0, 0x00000003,
+        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x505f5653, 0x7469736f, 0x006e6f69,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
+        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000044, 0x00000050,
+        0x00000011, 0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000000, 0x06000036, 0x001020f2, 0x00000000, 0x00208e46, 0x00000000, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const uint32_t clear_values[] = {0xffffffff, 0x00000000, 0xffffffff, 0x00000000};
+    static const uint32_t test_values[] = {0xffffffff, 0xffffffff, 0x00000000, 0x00000000};
+    static const struct
+    {
+        D3D12_LOGIC_OP logic_op;
+        unsigned int expected_colour;
+    }
+    tests[] =
+    {
+        {D3D12_LOGIC_OP_CLEAR,         0x00000000},
+        {D3D12_LOGIC_OP_SET,           0xffffffff},
+        {D3D12_LOGIC_OP_COPY,          0x0000ffff},
+        {D3D12_LOGIC_OP_COPY_INVERTED, 0xffff0000},
+        {D3D12_LOGIC_OP_NOOP,          0x00ff00ff},
+        {D3D12_LOGIC_OP_INVERT,        0xff00ff00},
+        {D3D12_LOGIC_OP_AND,           0x000000ff},
+        {D3D12_LOGIC_OP_NAND,          0xffffff00},
+        {D3D12_LOGIC_OP_OR,            0x00ffffff},
+        {D3D12_LOGIC_OP_NOR,           0xff000000},
+        {D3D12_LOGIC_OP_XOR,           0x00ffff00},
+        {D3D12_LOGIC_OP_EQUIV,         0xff0000ff},
+        {D3D12_LOGIC_OP_AND_REVERSE,   0x0000ff00},
+        {D3D12_LOGIC_OP_AND_INVERTED,  0x00ff0000},
+        {D3D12_LOGIC_OP_OR_REVERSE,    0xff00ffff},
+        {D3D12_LOGIC_OP_OR_INVERTED,   0xffff00ff},
+    };
+
+    memset(&desc, 0, sizeof(desc));
+    desc.no_root_signature = true;
+    desc.ps = &ps;
+    desc.rt_format = DXGI_FORMAT_R8G8B8A8_UINT;
+    if (!init_test_context(&context, &desc))
+        return;
+    command_list = context.list;
+    queue = context.queue;
+
+    if (!is_output_merger_logic_op_supported(context.device))
+    {
+        skip("The device does not support output merger logic ops.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
+    context.root_signature = create_32bit_constants_root_signature(context.device,
+            0, ARRAY_SIZE(clear_values), D3D12_SHADER_VISIBILITY_PIXEL);
+
+    init_pipeline_state_desc(&pso_desc, context.root_signature,
+            context.render_target_desc.Format, NULL, &ps, NULL);
+    hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    pso_desc.BlendState.RenderTarget[0].LogicOpEnable = true;
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        pso_desc.BlendState.RenderTarget[0].LogicOp = tests[i].logic_op;
+        hr = ID3D12Device_CreateGraphicsPipelineState(context.device,
+                &pso_desc, &IID_ID3D12PipelineState, (void **)&logic_pso);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+        for (do_test = 0; do_test < 2; ++do_test)
+        {
+            vkd3d_test_set_context(do_test ? "Test %u" : "Clear %u", i);
+
+            ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+            ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+            ID3D12GraphicsCommandList_SetPipelineState(command_list, do_test ? logic_pso : context.pipeline_state);
+            ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list,
+                    0, 4, do_test ? test_values : clear_values, 0);
+            ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+            ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+            ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+
+            transition_resource_state(command_list, context.render_target,
+                    D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            todo_if(do_test && tests[i].logic_op != D3D12_LOGIC_OP_COPY)
+            check_sub_resource_uint(context.render_target, 0, queue, command_list,
+                    do_test ? tests[i].expected_colour : 0x00ff00ff, 1);
+            reset_command_list(command_list, context.allocator);
+            transition_resource_state(command_list, context.render_target,
+                    D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        }
+
+        ID3D12PipelineState_Release(logic_pso);
+    }
+    vkd3d_test_set_context(NULL);
+
+    destroy_test_context(&context);
+}
+
 static void test_multisample_rendering(void)
 {
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -35414,6 +35551,7 @@ START_TEST(d3d12)
     run_test(test_command_list_initial_pipeline_state);
     run_test(test_blend_factor);
     run_test(test_dual_source_blending);
+    run_test(test_output_merger_logic_op);
     run_test(test_multisample_rendering);
     run_test(test_sample_mask);
     run_test(test_coverage);
