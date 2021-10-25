@@ -985,30 +985,14 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
         else if (max_dim_1 <= max_dim_2)
         {
             *type = t1->type;
-            if (*type == HLSL_CLASS_VECTOR)
-            {
-                *dimx = max_dim_1;
-                *dimy = 1;
-            }
-            else
-            {
-                *dimx = t1->dimx;
-                *dimy = t1->dimy;
-            }
+            *dimx = t1->dimx;
+            *dimy = t1->dimy;
         }
         else
         {
             *type = t2->type;
-            if (*type == HLSL_CLASS_VECTOR)
-            {
-                *dimx = max_dim_2;
-                *dimy = 1;
-            }
-            else
-            {
-                *dimx = t2->dimx;
-                *dimy = t2->dimy;
-            }
+            *dimx = t2->dimx;
+            *dimy = t2->dimy;
         }
     }
 
