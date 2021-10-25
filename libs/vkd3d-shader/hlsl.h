@@ -629,6 +629,34 @@ static inline void hlsl_release_string_buffer(struct hlsl_ctx *ctx, struct vkd3d
     vkd3d_string_buffer_release(&ctx->string_buffers, buffer);
 }
 
+static inline struct hlsl_type *hlsl_get_scalar_type(const struct hlsl_ctx *ctx, enum hlsl_base_type base_type)
+{
+    return ctx->builtin_types.scalar[base_type];
+}
+
+static inline struct hlsl_type *hlsl_get_vector_type(const struct hlsl_ctx *ctx, enum hlsl_base_type base_type,
+        unsigned int dimx)
+{
+    return ctx->builtin_types.vector[base_type][dimx - 1];
+}
+
+static inline struct hlsl_type *hlsl_get_matrix_type(const struct hlsl_ctx *ctx, enum hlsl_base_type base_type,
+        unsigned int dimx, unsigned int dimy)
+{
+    return ctx->builtin_types.matrix[base_type][dimx - 1][dimy - 1];
+}
+
+static inline struct hlsl_type *hlsl_get_numeric_type(const struct hlsl_ctx *ctx, enum hlsl_type_class type,
+        enum hlsl_base_type base_type, unsigned int dimx, unsigned int dimy)
+{
+    if (type == HLSL_CLASS_SCALAR)
+        return hlsl_get_scalar_type(ctx, base_type);
+    else if (type == HLSL_CLASS_VECTOR)
+        return hlsl_get_vector_type(ctx, base_type, dimx);
+    else
+        return hlsl_get_matrix_type(ctx, base_type, dimx, dimy);
+}
+
 const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
 const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 const char *debug_hlsl_writemask(unsigned int writemask);

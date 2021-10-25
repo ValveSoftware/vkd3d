@@ -560,7 +560,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
 
     if (!(c = hlsl_alloc(ctx, sizeof(*c))))
         return NULL;
-    init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_UINT], loc);
+    init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
     c->value[0].u = n;
     return c;
 }
@@ -650,7 +650,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
     init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            ctx->builtin_types.vector[val->data_type->base_type][components - 1], *loc);
+            hlsl_get_vector_type(ctx, val->data_type->base_type, components), *loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;

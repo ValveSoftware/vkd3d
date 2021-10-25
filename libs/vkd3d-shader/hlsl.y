@@ -1021,11 +1021,7 @@ static struct hlsl_type *expr_common_type(struct hlsl_ctx *ctx, struct hlsl_type
         }
     }
 
-    if (type == HLSL_CLASS_SCALAR)
-        return ctx->builtin_types.scalar[base];
-    if (type == HLSL_CLASS_VECTOR)
-        return ctx->builtin_types.vector[base][dimx - 1];
-    return ctx->builtin_types.matrix[base][dimx - 1][dimy - 1];
+    return hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
 }
 
 static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs, enum hlsl_ir_expr_op op,
@@ -1761,7 +1757,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
         }
 
         if (!(arg = add_implicit_conversion(ctx, params->instrs, arg,
-                ctx->builtin_types.vector[type->base_type][width - 1], &arg->loc)))
+                hlsl_get_vector_type(ctx, type->base_type, width), &arg->loc)))
             continue;
 
         if (!(store = hlsl_new_store(ctx, var, NULL, arg,
@@ -1816,9 +1812,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         if (params->args_count >= 2)
             FIXME("Ignoring index and/or offset parameter(s).\n");
 
-        /* -1 for zero-indexing; +1 for the mipmap level */
+        /* +1 for the mipmap level */
         if (!(coords = add_implicit_conversion(ctx, instrs, params->args[0],
-                ctx->builtin_types.vector[HLSL_TYPE_INT][sampler_dim - 1 + 1], loc)))
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
             return false;
 
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
@@ -2500,7 +2496,7 @@ type:
                 YYABORT;
             }
 
-            $$ = ctx->builtin_types.vector[$3->base_type][$5 - 1];
+            $$ = hlsl_get_vector_type(ctx, $3->base_type, $5);
         }
     | KW_MATRIX '<' type ',' C_INTEGER ',' C_INTEGER '>'
         {
@@ -2528,7 +2524,7 @@ type:
                 YYABORT;
             }
 
-            $$ = ctx->builtin_types.matrix[$3->base_type][$7 - 1][$5 - 1];
+            $$ = hlsl_get_matrix_type(ctx, $3->base_type, $7, $5);
         }
     | KW_VOID
         {
@@ -2560,7 +2556,7 @@ type:
         }
     | texture_type
         {
-            $$ = hlsl_new_texture_type(ctx, $1, ctx->builtin_types.vector[HLSL_TYPE_FLOAT][4 - 1]);
+            $$ = hlsl_new_texture_type(ctx, $1, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4));
         }
     | texture_type '<' type '>'
         {
@@ -2971,7 +2967,7 @@ primary_expr:
 
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
-            init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_FLOAT], @1);
+            init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), @1);
             c->value[0].f = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
@@ -2982,7 +2978,7 @@ primary_expr:
 
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
-            init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_INT], @1);
+            init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), @1);
             c->value[0].i = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
@@ -2993,7 +2989,7 @@ primary_expr:
 
             if (!(c = hlsl_alloc(ctx, sizeof(*c))))
                 YYABORT;
-            init_node(&c->node, HLSL_IR_CONSTANT, ctx->builtin_types.scalar[HLSL_TYPE_BOOL], @1);
+            init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), @1);
             c->value[0].b = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
@@ -3030,7 +3026,7 @@ primary_expr:
                 struct hlsl_ir_var *var;
 
                 if (!(var = hlsl_new_synthetic_var(ctx, "<state-block-expr>",
-                        ctx->builtin_types.scalar[HLSL_TYPE_INT], @1)))
+                        hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), @1)))
                     YYABORT;
                 if (!(load = hlsl_new_var_load(ctx, var, @1)))
                     YYABORT;
@@ -3116,7 +3112,7 @@ postfix_expr:
                 YYABORT;
             }
 
-            if (!(cast = hlsl_new_cast(ctx, index, ctx->builtin_types.scalar[HLSL_TYPE_UINT], &index->loc)))
+            if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
             {
                 destroy_instr_list($1);
                 YYABORT;
