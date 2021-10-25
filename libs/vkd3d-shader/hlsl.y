@@ -240,14 +240,22 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
 
     if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
     {
-        if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX
-                && t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
-            return true;
+        if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX)
+            return t1->dimx >= t2->dimx && t1->dimy >= t2->dimy;
 
-        /* Matrix-vector conversion is apparently allowed if they have the same components count */
-        if ((t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
-                && hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
-            return true;
+        /* Matrix-vector conversion is apparently allowed if they have
+         * the same components count, or if the matrix is 1xN or Nx1
+         * and we are reducing the component count */
+        if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
+        {
+            if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
+                return true;
+
+            if ((t1->type == HLSL_CLASS_VECTOR || t1->dimx == 1 || t1->dimy == 1) &&
+                    (t2->type == HLSL_CLASS_VECTOR || t2->dimx == 1 || t2->dimy == 1))
+                return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
+        }
+
         return false;
     }
 
