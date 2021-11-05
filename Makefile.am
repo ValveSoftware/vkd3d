@@ -90,6 +90,7 @@ vkd3d_shader_tests = \
 	tests/preproc-invalid.shader_test \
 	tests/preproc-macro.shader_test \
 	tests/preproc-misc.shader_test \
+	tests/sampler.shader_test \
 	tests/saturate.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
@@ -302,6 +303,7 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
 	tests/max.shader_test \
+	tests/sampler.shader_test \
 	tests/texture-load.shader_test \
 	tests/texture-load-typed.shader_test \
 	tests/trigonometry.shader_test \
