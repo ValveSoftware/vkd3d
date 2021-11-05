@@ -651,6 +651,14 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             var->last_read = max(var->last_read, var_last_read);
             if (load->resource.offset.node)
                 load->resource.offset.node->last_read = instr->index;
+
+            if ((var = load->sampler.var))
+            {
+                var->last_read = max(var->last_read, var_last_read);
+                if (load->sampler.offset.node)
+                    load->sampler.offset.node->last_read = instr->index;
+            }
+
             load->coords.node->last_read = instr->index;
             break;
         }
