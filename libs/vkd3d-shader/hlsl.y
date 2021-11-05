@@ -2190,7 +2190,7 @@ struct_declaration:
                             "Anonymous struct type must declare a variable.");
                 if (modifiers)
                     hlsl_error(ctx, @1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                            "Modifiers are not allowed on struct type declataions.");
+                            "Modifiers are not allowed on struct type declarations.");
             }
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
