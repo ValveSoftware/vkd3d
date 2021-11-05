@@ -1208,11 +1208,11 @@ static void dump_ir_if(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 {
     vkd3d_string_buffer_printf(buffer, "if (");
     dump_src(buffer, &if_node->condition);
-    vkd3d_string_buffer_printf(buffer, ")\n{\n");
+    vkd3d_string_buffer_printf(buffer, ") {\n");
     dump_instr_list(ctx, buffer, &if_node->then_instrs.instrs);
-    vkd3d_string_buffer_printf(buffer, "}\nelse\n{\n");
+    vkd3d_string_buffer_printf(buffer, "      %10s   } else {\n", "");
     dump_instr_list(ctx, buffer, &if_node->else_instrs.instrs);
-    vkd3d_string_buffer_printf(buffer, "}\n");
+    vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
 }
 
 static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_jump *jump)
@@ -1239,9 +1239,9 @@ static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_i
 
 static void dump_ir_loop(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_loop *loop)
 {
-    vkd3d_string_buffer_printf(buffer, "for (;;)\n{\n");
+    vkd3d_string_buffer_printf(buffer, "for (;;) {\n");
     dump_instr_list(ctx, buffer, &loop->body.instrs);
-    vkd3d_string_buffer_printf(buffer, "}\n");
+    vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
 }
 
 static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_resource_load *load)
