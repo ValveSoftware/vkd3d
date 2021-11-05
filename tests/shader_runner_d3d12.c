@@ -305,17 +305,21 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             range->RegisterSpace = 0;
             range->OffsetInDescriptorsFromTableStart = 0;
 
-            texture->heap = create_gpu_descriptor_heap(context->c.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-            texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                    texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-            resource_data.pData = texture->data;
-            resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
-            upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
-            reset_command_list(command_list, context->c.allocator);
-            transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
-                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
-                    NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+            if (!texture->resource)
+            {
+                texture->heap = create_gpu_descriptor_heap(context->c.device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+                texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
+                        texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+                resource_data.pData = texture->data;
+                resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
+                upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
+                reset_command_list(command_list, context->c.allocator);
+                transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
+                        NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
+            }
         }
 
         assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
@@ -650,6 +654,10 @@ START_TEST(shader_runner_d3d12)
             if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
+
+                if (context.ps_code)
+                    ID3D10Blob_Release(context.ps_code);
+                context.ps_code = NULL;
             }
             else if (!strcmp(line, "[pixel shader fail]\n"))
             {
