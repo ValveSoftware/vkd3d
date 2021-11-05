@@ -45,6 +45,16 @@
 #include "d3d12_crosstest.h"
 #include <errno.h>
 
+static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    exit(1);
+}
+
 static bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size)
 {
     size_t new_capacity, max_capacity;
@@ -201,10 +211,7 @@ static void parse_texture_format(struct texture *texture, const char *line)
         }
     }
 
-    fprintf(stderr, "Unknown format '%s'.\n", line);
-    texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-    texture->data_type = TEXTURE_DATA_FLOAT;
-    texture->texel_size = 16;
+    fatal_error("Unknown format '%s'.\n", line);
 }
 
 static D3D12_TEXTURE_ADDRESS_MODE parse_sampler_address_mode(const char *line, const char **rest)
@@ -219,14 +226,12 @@ static D3D12_TEXTURE_ADDRESS_MODE parse_sampler_address_mode(const char *line, c
         return D3D12_TEXTURE_ADDRESS_MODE_MIRROR;
     if (match_string(line, "wrap", rest))
         return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-    fprintf(stderr, "Malformed address mode '%s'.\n", line);
-    return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+
+    fatal_error("Unknown sampler address mode '%s'.\n", line);
 }
 
 static void parse_sampler_directive(struct sampler *sampler, const char *line)
 {
-    const char *const orig_line = line;
-
     if (match_string(line, "address", &line))
     {
         sampler->u_address = parse_sampler_address_mode(line, &line);
@@ -258,26 +263,20 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
             if (match_string(line, filters[i].string, &line))
             {
                 sampler->filter = filters[i].filter;
-                break;
+                return;
             }
         }
-        if (i == ARRAY_SIZE(filters))
-            goto err;
+
+        fatal_error("Unknown sampler filter '%s'.\n", line);
     }
     else
     {
-        goto err;
+        fatal_error("Unknown sampler directive '%s'.\n", line);
     }
-
-    return;
-
-err:
-    fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
 static void parse_texture_directive(struct texture *texture, const char *line)
 {
-    const char *const orig_line = line;
     int ret;
 
     if (match_string(line, "format", &line))
@@ -288,7 +287,7 @@ static void parse_texture_directive(struct texture *texture, const char *line)
     {
         ret = sscanf(line, "( %u , %u )", &texture->width, &texture->height);
         if (ret < 2)
-            goto err;
+            fatal_error("Malformed texture size '%s'.\n", line);
     }
     else
     {
@@ -328,17 +327,10 @@ static void parse_texture_directive(struct texture *texture, const char *line)
             line = rest;
         }
     }
-
-    return;
-
-err:
-    fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
 static void parse_test_directive(struct shader_context *context, const char *line)
 {
-    const char *const orig_line = line;
-
     if (match_string(line, "draw quad", &line))
     {
         D3D12_SHADER_BYTECODE ps
@@ -459,7 +451,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
         ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 4)
-            goto err;
+            fatal_error("Malformed probe arguments '%s'.\n", line);
         if (ret < 5)
             ulps = 0;
         check_sub_resource_vec4(context->c.render_target, 0, context->c.queue, context->c.list, &v, ulps);
@@ -476,7 +468,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f ) %u",
                      &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 8)
-            goto err;
+            fatal_error("Malformed probe arguments '%s'.\n", line);
         if (ret < 9)
             ulps = 0;
 
@@ -499,7 +491,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
         ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 6)
-            goto err;
+            fatal_error("Malformed probe arguments '%s'.\n", line);
         if (ret < 7)
             ulps = 0;
 
@@ -517,7 +509,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         unsigned int offset;
 
         if (!sscanf(line, "%u", &offset))
-            goto err;
+            fatal_error("Unknown uniform type '%s'.\n", line);
         line = strchr(line, ' ') + 1;
 
         if (match_string(line, "float4", &line))
@@ -525,7 +517,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             struct vec4 v;
 
             if (sscanf(line, "%f %f %f %f", &v.x, &v.y, &v.z, &v.w) < 4)
-                goto err;
+                fatal_error("Malformed float4 constant '%s'.\n", line);
             if (offset + 4 > context->uniform_count)
             {
                 context->uniform_count = offset + 4;
@@ -538,7 +530,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             float f;
 
             if (sscanf(line, "%f", &f) < 1)
-                goto err;
+                fatal_error("Malformed float constant '%s'.\n", line);
             if (offset + 1 > context->uniform_count)
             {
                 context->uniform_count = offset + 1;
@@ -551,7 +543,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             int i;
 
             if (sscanf(line, "%i", &i) < 1)
-                goto err;
+                fatal_error("Malformed int constant '%s'.\n", line);
             if (offset + 1 > context->uniform_count)
             {
                 context->uniform_count = offset + 1;
@@ -564,7 +556,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             unsigned int u;
 
             if (sscanf(line, "%u", &u) < 1)
-                goto err;
+                fatal_error("Malformed uint constant '%s'.\n", line);
             if (offset + 1 > context->uniform_count)
             {
                 context->uniform_count = offset + 1;
@@ -575,13 +567,8 @@ static void parse_test_directive(struct shader_context *context, const char *lin
     }
     else
     {
-        goto err;
+        fatal_error("Unknown test directive '%s'.\n", line);
     }
-
-    return;
-
-err:
-    fprintf(stderr, "Ignoring malformed line '%s'.\n", orig_line);
 }
 
 static struct sampler *get_sampler(struct shader_context *context, unsigned int slot)
@@ -656,7 +643,7 @@ START_TEST(shader_runner_d3d12)
 
     if (!(f = fopen(filename, "r")))
     {
-        fprintf(stderr, "Unable to open '%s' for reading: %s\n", argv[1], strerror(errno));
+        fatal_error("Unable to open '%s' for reading: %s\n", argv[1], strerror(errno));
         return;
     }
 
@@ -840,7 +827,7 @@ START_TEST(shader_runner_d3d12)
             switch (state)
             {
                 case STATE_NONE:
-                    fprintf(stderr, "Ignoring line '%s' in %s.\n", line, argv[1]);
+                    fatal_error("Malformed line '%s'.\n", line);
                     break;
 
                 case STATE_PREPROC:

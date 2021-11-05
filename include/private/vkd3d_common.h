@@ -48,9 +48,11 @@ static inline size_t align(size_t addr, size_t alignment)
 }
 
 #ifdef __GNUC__
+# define VKD3D_NORETURN __attribute__((noreturn))
 # define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(printf, fmt, args)))
 # define VKD3D_UNUSED __attribute__((unused))
 #else
+# define VKD3D_NORETURN
 # define VKD3D_PRINTF_FUNC(fmt, args)
 # define VKD3D_UNUSED
 #endif  /* __GNUC__ */
