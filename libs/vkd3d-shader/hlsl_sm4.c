@@ -23,6 +23,8 @@
 #include "vkd3d_d3dcommon.h"
 #include "sm4.h"
 
+static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_block *block);
+
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, enum vkd3d_sm4_register_type *type, bool *has_idx)
 {
@@ -1432,6 +1434,22 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_loop(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_loop *loop)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_LOOP,
+    };
+
+    write_sm4_instruction(buffer, &instr);
+
+    write_sm4_block(ctx, buffer, &loop->body);
+
+    instr.opcode = VKD3D_SM4_OP_ENDLOOP;
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
 {
@@ -1542,6 +1560,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
             case HLSL_IR_RESOURCE_LOAD:
                 write_sm4_resource_load(ctx, buffer, hlsl_ir_resource_load(instr));
+                break;
+
+            case HLSL_IR_LOOP:
+                write_sm4_loop(ctx, buffer, hlsl_ir_loop(instr));
                 break;
 
             case HLSL_IR_STORE:
