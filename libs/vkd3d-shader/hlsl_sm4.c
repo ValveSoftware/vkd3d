@@ -1503,13 +1503,67 @@ static void write_sm4_swizzle(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_block *block)
+{
+    const struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->data_type)
+        {
+            if (instr->data_type->type == HLSL_CLASS_MATRIX)
+            {
+                FIXME("Matrix operations need to be lowered.\n");
+                break;
+            }
+            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
+            {
+                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
+                break;
+            }
+
+            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
+        }
+
+        switch (instr->type)
+        {
+            case HLSL_IR_CONSTANT:
+                write_sm4_constant(ctx, buffer, hlsl_ir_constant(instr));
+                break;
+
+            case HLSL_IR_EXPR:
+                write_sm4_expr(ctx, buffer, hlsl_ir_expr(instr));
+                break;
+
+            case HLSL_IR_LOAD:
+                write_sm4_load(ctx, buffer, hlsl_ir_load(instr));
+                break;
+
+            case HLSL_IR_RESOURCE_LOAD:
+                write_sm4_resource_load(ctx, buffer, hlsl_ir_resource_load(instr));
+                break;
+
+            case HLSL_IR_STORE:
+                write_sm4_store(ctx, buffer, hlsl_ir_store(instr));
+                break;
+
+            case HLSL_IR_SWIZZLE:
+                write_sm4_swizzle(ctx, buffer, hlsl_ir_swizzle(instr));
+                break;
+
+            default:
+                FIXME("Unhandled instruction type %s.\n", hlsl_node_type_to_string(instr->type));
+        }
+    }
+}
+
 static void write_sm4_shdr(struct hlsl_ctx *ctx,
         const struct hlsl_ir_function_decl *entry_func, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct hlsl_buffer *cbuffer;
-    const struct hlsl_ir_node *instr;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
 
@@ -1553,54 +1607,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     if (ctx->temp_count)
         write_sm4_dcl_temps(&buffer, ctx->temp_count);
 
-    LIST_FOR_EACH_ENTRY(instr, &entry_func->body.instrs, struct hlsl_ir_node, entry)
-    {
-        if (instr->data_type)
-        {
-            if (instr->data_type->type == HLSL_CLASS_MATRIX)
-            {
-                FIXME("Matrix operations need to be lowered.\n");
-                break;
-            }
-            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
-            {
-                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
-                break;
-            }
-
-            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
-        }
-
-        switch (instr->type)
-        {
-            case HLSL_IR_CONSTANT:
-                write_sm4_constant(ctx, &buffer, hlsl_ir_constant(instr));
-                break;
-
-            case HLSL_IR_EXPR:
-                write_sm4_expr(ctx, &buffer, hlsl_ir_expr(instr));
-                break;
-
-            case HLSL_IR_LOAD:
-                write_sm4_load(ctx, &buffer, hlsl_ir_load(instr));
-                break;
-
-            case HLSL_IR_RESOURCE_LOAD:
-                write_sm4_resource_load(ctx, &buffer, hlsl_ir_resource_load(instr));
-                break;
-
-            case HLSL_IR_STORE:
-                write_sm4_store(ctx, &buffer, hlsl_ir_store(instr));
-                break;
-
-            case HLSL_IR_SWIZZLE:
-                write_sm4_swizzle(ctx, &buffer, hlsl_ir_swizzle(instr));
-                break;
-
-            default:
-                FIXME("Unhandled instruction type %s.\n", hlsl_node_type_to_string(instr->type));
-        }
-    }
+    write_sm4_block(ctx, &buffer, &entry_func->body);
 
     write_sm4_ret(&buffer);
 
