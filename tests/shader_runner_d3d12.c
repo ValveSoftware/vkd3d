@@ -511,9 +511,9 @@ START_TEST(shader_runner_d3d12)
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
     size_t shader_source_size = 0, shader_source_len = 0;
+    struct texture *current_texture = NULL;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
-    struct texture *current_texture;
     struct shader_context context;
     const char *filename = NULL;
     char *shader_source = NULL;
