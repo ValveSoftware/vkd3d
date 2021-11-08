@@ -561,7 +561,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             put_u32(&buffer, sm4_resource_format(var->data_type));
             put_u32(&buffer, sm4_rdef_resource_dimension(var->data_type));
             put_u32(&buffer, ~0u); /* FIXME: multisample count */
-            flags |= (var->data_type->e.resource_format->dimx - 1) << 2;
+            flags |= (var->data_type->e.resource_format->dimx - 1) << VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT;
         }
         put_u32(&buffer, var->reg.id);
         put_u32(&buffer, 1); /* bind count */

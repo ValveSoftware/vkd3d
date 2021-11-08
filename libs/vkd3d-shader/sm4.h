@@ -146,6 +146,9 @@
 
 #define VKD3D_SM4_TYPE_COMPONENT(com, i)      (((com) >> (4 * (i))) & 0xfu)
 
+/* The shift that corresponds to the D3D_SIF_TEXTURE_COMPONENTS mask. */
+#define VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT 2
+
 enum vkd3d_sm4_opcode
 {
     VKD3D_SM4_OP_ADD                              = 0x00,
