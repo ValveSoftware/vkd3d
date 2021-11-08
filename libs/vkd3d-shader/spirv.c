@@ -7802,8 +7802,10 @@ static int vkd3d_dxbc_compiler_emit_control_flow_instruction(struct vkd3d_dxbc_c
             }
             else if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
             {
-                assert(breakable_cf_info->inside_block);
-                vkd3d_spirv_build_op_branch(builder, breakable_cf_info->u.switch_.merge_block_id);
+                /* The current case block may have already been ended by an
+                 * unconditional continue instruction. */
+                if (breakable_cf_info->inside_block)
+                    vkd3d_spirv_build_op_branch(builder, breakable_cf_info->u.switch_.merge_block_id);
             }
 
             cf_info->inside_block = false;
