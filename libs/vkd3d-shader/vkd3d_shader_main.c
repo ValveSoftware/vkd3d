@@ -814,6 +814,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_LOOP:
             cf_info = vkd3d_shader_scan_push_cf_info(context);
             cf_info->type = VKD3D_SHADER_BLOCK_LOOP;
+            cf_info->inside_block = true;
             break;
         case VKD3DSIH_ENDLOOP:
             if (!(cf_info = vkd3d_shader_scan_get_current_cf_info(context)) || cf_info->type != VKD3D_SHADER_BLOCK_LOOP)
