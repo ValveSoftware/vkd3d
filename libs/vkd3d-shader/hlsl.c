@@ -854,14 +854,14 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
 {
     struct vkd3d_string_buffer *string;
 
-    static const char base_types[HLSL_TYPE_LAST_SCALAR + 1][7] =
+    static const char *const base_types[] =
     {
-        "float",
-        "half",
-        "double",
-        "int",
-        "uint",
-        "bool",
+        [HLSL_TYPE_FLOAT] = "float",
+        [HLSL_TYPE_HALF] = "half",
+        [HLSL_TYPE_DOUBLE] = "double",
+        [HLSL_TYPE_INT] = "int",
+        [HLSL_TYPE_UINT] = "uint",
+        [HLSL_TYPE_BOOL] = "bool",
     };
 
     if (!(string = hlsl_get_string_buffer(ctx)))
@@ -915,7 +915,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
 
         case HLSL_CLASS_OBJECT:
         {
-            static const char dimensions[5][HLSL_SAMPLER_DIM_MAX + 1] =
+            static const char *const dimensions[] =
             {
                 [HLSL_SAMPLER_DIM_1D] = "1D",
                 [HLSL_SAMPLER_DIM_2D] = "2D",
