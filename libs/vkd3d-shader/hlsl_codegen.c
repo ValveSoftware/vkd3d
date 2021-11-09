@@ -1261,7 +1261,7 @@ static void allocate_textures(struct hlsl_ctx *ctx)
 
             var->reg.id = var->reg_reservation.index;
             var->reg.allocated = true;
-            TRACE("Allocated reserved %s to t%u.\n", var->name, index);
+            TRACE("Allocated reserved %s to t%u.\n", var->name, var->reg_reservation.index);
         }
         else if (!var->reg_reservation.type)
         {
