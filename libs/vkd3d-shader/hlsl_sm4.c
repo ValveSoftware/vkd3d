@@ -974,6 +974,20 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_dcl_sampler(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+{
+    const struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
+
+        .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
+        .dsts[0].reg.idx = {var->reg.id},
+        .dsts[0].reg.idx_count = 1,
+        .dst_count = 1,
+    };
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
 {
     const struct sm4_instruction instr =
@@ -1647,7 +1661,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
             continue;
 
-        if (var->data_type->base_type == HLSL_TYPE_TEXTURE)
+        if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
+            write_sm4_dcl_sampler(&buffer, var);
+        else if (var->data_type->base_type == HLSL_TYPE_TEXTURE)
             write_sm4_dcl_texture(&buffer, var);
     }
 
