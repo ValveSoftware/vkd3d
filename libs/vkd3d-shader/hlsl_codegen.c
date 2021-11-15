@@ -1103,7 +1103,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
                     "Invalid semantic '%s'.", var->semantic.name);
             return;
         }
-        if ((builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, &has_idx)))
+        if ((builtin = hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, NULL, &has_idx)))
             reg = has_idx ? var->semantic.index : 0;
     }
 
