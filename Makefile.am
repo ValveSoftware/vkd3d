@@ -71,6 +71,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
+	tests/hlsl-numeric-types.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
@@ -294,6 +295,7 @@ XFAIL_TESTS = \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
+	tests/hlsl-numeric-types.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
