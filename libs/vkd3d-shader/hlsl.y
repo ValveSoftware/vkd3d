@@ -2529,6 +2529,10 @@ type:
 
             $$ = hlsl_get_vector_type(ctx, $3->base_type, $5);
         }
+    | KW_VECTOR
+        {
+            $$ = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
+        }
     | KW_MATRIX '<' type ',' C_INTEGER ',' C_INTEGER '>'
         {
             if ($3->type != HLSL_CLASS_SCALAR)
@@ -2556,6 +2560,10 @@ type:
             }
 
             $$ = hlsl_get_matrix_type(ctx, $3->base_type, $7, $5);
+        }
+    | KW_MATRIX
+        {
+            $$ = hlsl_get_matrix_type(ctx, HLSL_TYPE_FLOAT, 4, 4);
         }
     | KW_VOID
         {
