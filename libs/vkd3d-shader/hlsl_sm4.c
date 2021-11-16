@@ -1446,11 +1446,14 @@ static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
     write_sm4_block(ctx, buffer, &iff->then_instrs);
 
-    instr.opcode = VKD3D_SM4_OP_ELSE;
-    instr.src_count = 0;
-    write_sm4_instruction(buffer, &instr);
+    if (!list_empty(&iff->else_instrs.instrs))
+    {
+        instr.opcode = VKD3D_SM4_OP_ELSE;
+        instr.src_count = 0;
+        write_sm4_instruction(buffer, &instr);
 
-    write_sm4_block(ctx, buffer, &iff->else_instrs);
+        write_sm4_block(ctx, buffer, &iff->else_instrs);
+    }
 
     instr.opcode = VKD3D_SM4_OP_ENDIF;
     write_sm4_instruction(buffer, &instr);
