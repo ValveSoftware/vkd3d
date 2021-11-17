@@ -663,7 +663,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 static void write_sm1_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_load *load = hlsl_ir_load(instr);
-    const struct hlsl_reg reg = hlsl_reg_from_deref(&load->src, instr->data_type);
+    const struct hlsl_reg reg = hlsl_reg_from_deref(ctx, &load->src, instr->data_type);
     struct sm1_instruction sm1_instr =
     {
         .opcode = D3DSIO_MOV,
@@ -707,7 +707,7 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 {
     const struct hlsl_ir_store *store = hlsl_ir_store(instr);
     const struct hlsl_ir_node *rhs = store->rhs.node;
-    const struct hlsl_reg reg = hlsl_reg_from_deref(&store->lhs, rhs->data_type);
+    const struct hlsl_reg reg = hlsl_reg_from_deref(ctx, &store->lhs, rhs->data_type);
     struct sm1_instruction sm1_instr =
     {
         .opcode = D3DSIO_MOV,

@@ -1286,31 +1286,46 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-unsigned int hlsl_offset_from_deref(const struct hlsl_deref *deref)
+bool hlsl_offset_from_deref(const struct hlsl_deref *deref, unsigned int *offset)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
 
     if (!offset_node)
-        return 0;
+    {
+        *offset = 0;
+        return true;
+    }
 
     /* We should always have generated a cast to UINT. */
     assert(offset_node->data_type->type == HLSL_CLASS_SCALAR
             && offset_node->data_type->base_type == HLSL_TYPE_UINT);
 
     if (offset_node->type != HLSL_IR_CONSTANT)
-    {
-        FIXME("Dereference with non-constant offset of type %s.\n", hlsl_node_type_to_string(offset_node->type));
-        return 0;
-    }
+        return false;
 
-    return hlsl_ir_constant(offset_node)->value[0].u;
+    *offset = hlsl_ir_constant(offset_node)->value[0].u;
+    return true;
 }
 
-struct hlsl_reg hlsl_reg_from_deref(const struct hlsl_deref *deref, const struct hlsl_type *type)
+unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
+{
+    unsigned int offset;
+
+    if (hlsl_offset_from_deref(deref, &offset))
+        return offset;
+
+    hlsl_fixme(ctx, deref->offset.node->loc, "Dereference with non-constant offset of type %s.",
+            hlsl_node_type_to_string(deref->offset.node->type));
+
+    return 0;
+}
+
+struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        const struct hlsl_type *type)
 {
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_reg ret = var->reg;
-    unsigned int offset = hlsl_offset_from_deref(deref);
+    unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
     ret.id += offset / 4;
 

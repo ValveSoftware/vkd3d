@@ -792,7 +792,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else
         {
-            unsigned int offset = hlsl_offset_from_deref(deref) + var->buffer_offset;
+            unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref) + var->buffer_offset;
 
             assert(data_type->type <= HLSL_CLASS_VECTOR);
             reg->type = VKD3D_SM4_RT_CONSTBUFFER;
@@ -820,7 +820,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else
         {
-            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref, data_type);
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3D_SM4_RT_INPUT;
@@ -850,7 +850,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else
         {
-            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+            struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref, data_type);
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3D_SM4_RT_OUTPUT;
@@ -862,7 +862,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
     }
     else
     {
-        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(deref, data_type);
+        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref, data_type);
 
         assert(hlsl_reg.allocated);
         reg->type = VKD3D_SM4_RT_TEMP;
