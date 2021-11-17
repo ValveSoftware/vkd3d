@@ -29506,7 +29506,7 @@ static void test_domain_shader_inputs(void)
         {1.0f, 2.0f, 0.0f, 0.5f, 2.5f, 8.0f, 2.0f, 1.0f},
         {1.0f, 2.0f, 1.0f, 0.5f, 2.5f, 8.0f, 2.0f, 1.0f},
     };
-    static const unsigned int is_todo[] = {0x00110000, 0x00110100, 0x00111100, 0x00111000};
+    static const unsigned int is_todo[] = {0x00110000, 0x00110000, 0x00110000, 0x00110000};
     static const unsigned int stride = sizeof(*reference);
 
     memset(&desc, 0, sizeof(desc));
