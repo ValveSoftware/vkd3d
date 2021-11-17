@@ -204,7 +204,7 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
         struct hlsl_block *block, void *context)
 {
     struct hlsl_ir_node *instr, *next;
-    bool progress = 0;
+    bool progress = false;
 
     LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
     {
