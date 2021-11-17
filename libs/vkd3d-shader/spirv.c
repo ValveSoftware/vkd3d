@@ -4416,6 +4416,13 @@ static bool needs_private_io_variable(const struct vkd3d_shader_signature *signa
     bool have_sysval = false;
     unsigned int i, count;
 
+    /* Always use private variables for arrayed builtins. These are generally
+     * scalars on the D3D side, so would need extra array indices when
+     * accessing them. It may be feasible to insert those indices at the point
+     * where the builtins are used, but it's not clear it's worth the effort. */
+    if (builtin && (builtin->spirv_array_size || builtin->fixup_pfn))
+        return true;
+
     if (*component_count == VKD3D_VEC4_SIZE)
         return false;
 
@@ -4519,8 +4526,7 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
         component_idx = vkd3d_write_mask_get_component_idx(signature_element->mask);
     }
 
-    if (!(use_private_var = builtin && builtin->fixup_pfn)
-            && needs_private_io_variable(shader_signature, reg_idx, builtin, &input_component_count, &write_mask)
+    if (needs_private_io_variable(shader_signature, reg_idx, builtin, &input_component_count, &write_mask)
             && (compiler->shader_type != VKD3D_SHADER_TYPE_HULL
             || (reg->type != VKD3DSPR_INCONTROLPOINT && reg->type != VKD3DSPR_PATCHCONST)))
         use_private_var = true;
@@ -4643,6 +4649,16 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
                 index = vkd3d_dxbc_compiler_get_constant_uint(compiler, i);
                 val_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, ptr_type_id, input_id, index);
                 dst_reg.idx[0].offset = i;
+            }
+            else if (builtin && builtin->spirv_array_size)
+            {
+                /* The D3D builtin is not an array, but the SPIR-V builtin is,
+                 * so we'll need to index into the SPIR-V builtin when loading
+                 * it. This happens when reading TessLevel in domain shaders. */
+                ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassInput, type_id);
+                index = vkd3d_dxbc_compiler_get_constant_uint(compiler, builtin->member_idx);
+                val_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, ptr_type_id, input_id, index);
+                dst_reg.idx[0].offset = reg_idx + i;
             }
             val_id = vkd3d_spirv_build_op_load(builder, type_id, val_id, SpvMemoryAccessMaskNone);
 
@@ -4947,11 +4963,11 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
     const struct vkd3d_spirv_builtin *builtin;
     const struct vkd3d_shader_phase *phase;
     struct vkd3d_symbol *symbol = NULL;
+    bool use_private_variable = false;
     struct vkd3d_symbol reg_symbol;
     SpvStorageClass storage_class;
     struct rb_entry *entry = NULL;
     unsigned int signature_idx;
-    bool use_private_variable;
     unsigned int write_mask;
     unsigned int array_size;
     bool is_patch_constant;
@@ -4991,11 +5007,10 @@ static void vkd3d_dxbc_compiler_emit_output(struct vkd3d_dxbc_compiler *compiler
 
     storage_class = SpvStorageClassOutput;
 
-    if (!(use_private_variable = builtin && builtin->spirv_array_size)
-            && (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
+    if (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
             || needs_private_io_variable(shader_signature, signature_element->register_index,
                     builtin, &output_component_count, &write_mask)
-            || is_patch_constant))
+            || is_patch_constant)
         use_private_variable = true;
     else
         component_idx = vkd3d_write_mask_get_component_idx(write_mask);
