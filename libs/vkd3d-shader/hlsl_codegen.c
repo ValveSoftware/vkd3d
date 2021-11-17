@@ -475,6 +475,27 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     return true;
 }
 
+static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_swizzle *swizzle;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+
+    if (instr->data_type->dimx != swizzle->val.node->data_type->dimx)
+        return false;
+
+    for (i = 0; i < instr->data_type->dimx; ++i)
+        if (((swizzle->swizzle >> (2 * i)) & 3) != i)
+            return false;
+
+    replace_node(instr, swizzle->val.node);
+
+    return true;
+}
+
 /* Lower DIV to RCP + MUL. */
 static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -1355,6 +1376,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     }
     while (progress);
     while (transform_ir(ctx, fold_constants, body, NULL));
+    transform_ir(ctx, remove_trivial_swizzles, body, NULL);
 
     if (ctx->profile->major_version < 4)
         transform_ir(ctx, lower_division, body, NULL);
