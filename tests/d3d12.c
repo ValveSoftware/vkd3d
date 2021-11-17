@@ -29506,7 +29506,6 @@ static void test_domain_shader_inputs(void)
         {1.0f, 2.0f, 0.0f, 0.5f, 2.5f, 8.0f, 2.0f, 1.0f},
         {1.0f, 2.0f, 1.0f, 0.5f, 2.5f, 8.0f, 2.0f, 1.0f},
     };
-    static const unsigned int is_todo[] = {0x00110000, 0x00110000, 0x00110000, 0x00110000};
     static const unsigned int stride = sizeof(*reference);
 
     memset(&desc, 0, sizeof(desc));
@@ -29556,9 +29555,8 @@ static void test_domain_shader_inputs(void)
         const float *elems = get_readback_data(&rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
-            todo_if(is_todo[y] & (1u << (x * 4)))
-                ok(compare_float(reference[y][x], elems[x], 0),
-                        "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
+            ok(compare_float(reference[y][x], elems[x], 0),
+                    "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
         }
     }
     release_resource_readback(&rb);

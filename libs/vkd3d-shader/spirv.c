@@ -4672,8 +4672,8 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
             }
 
             val_id = vkd3d_dxbc_compiler_emit_swizzle(compiler, val_id,
-                    vkd3d_write_mask_from_component_count(input_component_count) << component_idx,
-                    VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_SHADER_NO_SWIZZLE, dst->write_mask);
+                    vkd3d_write_mask_from_component_count(input_component_count),
+                    VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_SHADER_NO_SWIZZLE, dst->write_mask >> component_idx);
 
             vkd3d_dxbc_compiler_emit_store_reg(compiler, &dst_reg, dst->write_mask, val_id);
         }
