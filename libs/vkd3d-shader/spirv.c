@@ -4582,6 +4582,8 @@ static uint32_t vkd3d_dxbc_compiler_emit_input(struct vkd3d_dxbc_compiler *compi
         if (builtin)
         {
             input_id = vkd3d_dxbc_compiler_emit_builtin_variable(compiler, builtin, storage_class, array_size);
+            if (reg->type == VKD3DSPR_PATCHCONST)
+                vkd3d_spirv_build_op_decorate(builder, input_id, SpvDecorationPatch, NULL, 0);
         }
         else
         {
