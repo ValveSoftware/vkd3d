@@ -1162,7 +1162,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 {
     const unsigned int dimx = constant->node.data_type->dimx;
     struct sm4_instruction instr;
-    unsigned int i;
+    struct sm4_register *reg = &instr.srcs[0].reg;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
@@ -1170,12 +1170,24 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     sm4_register_from_node(&instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, &constant->node);
     instr.dst_count = 1;
 
-    instr.srcs[0].reg.dim = (dimx > 1) ? VKD3D_SM4_DIMENSION_VEC4 : VKD3D_SM4_DIMENSION_SCALAR;
-    instr.srcs[0].reg.type = VKD3D_SM4_RT_IMMCONST;
     instr.srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
+    reg->type = VKD3D_SM4_RT_IMMCONST;
+    if (dimx == 1)
+    {
+        reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
+        reg->immconst_uint[0] = constant->value[0].u;
+    }
+    else
+    {
+        unsigned int i, j = 0;
 
-    for (i = 0; i < dimx; ++i)
-        instr.srcs[0].reg.immconst_uint[i] = constant->value[i].u;
+        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+        for (i = 0; i < 4; ++i)
+        {
+            if (instr.dsts[0].writemask & (1u << i))
+                reg->immconst_uint[i] = constant->value[j++].u;
+        }
+    }
     instr.src_count = 1,
 
     write_sm4_instruction(buffer, &instr);
