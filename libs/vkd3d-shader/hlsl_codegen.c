@@ -1223,60 +1223,91 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_ir_var *get_reserved_texture(struct hlsl_ctx *ctx, uint32_t index)
+static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, char type, uint32_t index)
 {
     const struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->last_read && var->reg_reservation.type == 't' && var->reg_reservation.index == index)
+        if (var->last_read && var->reg_reservation.type == type && var->reg_reservation.index == index)
             return var;
     }
     return NULL;
 }
 
-static void allocate_textures(struct hlsl_ctx *ctx)
+static const struct object_type_info
 {
+    enum hlsl_base_type type;
+    char reg_name;
+}
+object_types[] =
+{
+    { HLSL_TYPE_SAMPLER, 's' },
+    { HLSL_TYPE_TEXTURE, 't' },
+};
+
+static const struct object_type_info *get_object_type_info(enum hlsl_base_type type)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(object_types); ++i)
+        if (type == object_types[i].type)
+            return &object_types[i];
+
+    WARN("No type info for object type %u.\n", type);
+    return NULL;
+}
+
+static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
+{
+    const struct object_type_info *type_info = get_object_type_info(type);
     struct hlsl_ir_var *var;
     uint32_t index = 0;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (!var->last_read || var->data_type->type != HLSL_CLASS_OBJECT
-                || var->data_type->base_type != HLSL_TYPE_TEXTURE)
+                || var->data_type->base_type != type)
             continue;
 
-        if (var->reg_reservation.type == 't')
+        if (var->reg_reservation.type == type_info->reg_name)
         {
-            const struct hlsl_ir_var *reserved_texture = get_reserved_texture(ctx, var->reg_reservation.index);
+            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, type_info->reg_name,
+                    var->reg_reservation.index);
 
-            if (reserved_texture && reserved_texture != var)
+            if (reserved_object && reserved_object != var)
             {
                 hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                        "Multiple textures bound to t%u.", var->reg_reservation.index);
-                hlsl_note(ctx, reserved_texture->loc, VKD3D_SHADER_LOG_ERROR,
-                        "Texture '%s' is already bound to t%u.", reserved_texture->name,
+                        "Multiple objects bound to %c%u.", type_info->reg_name,
                         var->reg_reservation.index);
+                hlsl_note(ctx, reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
+                        "Object '%s' is already bound to %c%u.", reserved_object->name,
+                        type_info->reg_name, var->reg_reservation.index);
             }
 
             var->reg.id = var->reg_reservation.index;
             var->reg.allocated = true;
-            TRACE("Allocated reserved %s to t%u.\n", var->name, var->reg_reservation.index);
+            TRACE("Allocated reserved %s to %c%u.\n", var->name, type_info->reg_name, var->reg_reservation.index);
         }
         else if (!var->reg_reservation.type)
         {
-            while (get_reserved_texture(ctx, index))
+            while (get_reserved_object(ctx, type_info->reg_name, index))
                 ++index;
 
             var->reg.id = index;
             var->reg.allocated = true;
-            TRACE("Allocated %s to t%u.\n", var->name, index);
+            TRACE("Allocated object to %c%u.\n", type_info->reg_name, index);
             ++index;
         }
         else
         {
+            struct vkd3d_string_buffer *type_string;
+
+            type_string = hlsl_type_to_string(ctx, var->data_type);
             hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                    "Textures must be bound to register type 't'.");
+                    "Object of type '%s' must be bound to register type '%c'.",
+                    type_string->buffer, type_info->reg_name);
+            hlsl_release_string_buffer(ctx, type_string);
         }
     }
 }
@@ -1413,9 +1444,10 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     else
     {
         allocate_buffers(ctx);
-        allocate_textures(ctx);
+        allocate_objects(ctx, HLSL_TYPE_TEXTURE);
     }
     allocate_semantic_registers(ctx);
+    allocate_objects(ctx, HLSL_TYPE_SAMPLER);
 
     if (ctx->result)
         return ctx->result;
