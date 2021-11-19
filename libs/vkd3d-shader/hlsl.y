@@ -1586,6 +1586,60 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, &max->node, params->args[2], &loc);
 }
 
+static bool intrinsic_cross(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_swizzle *arg1_swzl1, *arg1_swzl2, *arg2_swzl1, *arg2_swzl2;
+    struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1];
+    struct hlsl_ir_node *arg1_cast, *arg2_cast, *mul1_neg;
+    struct hlsl_ir_expr *mul1, *mul2;
+    struct hlsl_type *cast_type;
+    enum hlsl_base_type base;
+
+    if (arg1->data_type->base_type == HLSL_TYPE_HALF && arg2->data_type->base_type == HLSL_TYPE_HALF)
+        base = HLSL_TYPE_HALF;
+    else
+        base = HLSL_TYPE_FLOAT;
+
+    cast_type = hlsl_get_vector_type(ctx, base, 3);
+
+    if (!(arg1_cast = add_implicit_conversion(ctx, params->instrs, arg1, cast_type, &loc)))
+        return false;
+
+    if (!(arg2_cast = add_implicit_conversion(ctx, params->instrs, arg2, cast_type, &loc)))
+        return false;
+
+    if (!(arg1_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg1_cast, &loc)))
+        return false;
+    list_add_tail(params->instrs, &arg1_swzl1->node.entry);
+
+    if (!(arg2_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg2_cast, &loc)))
+        return false;
+    list_add_tail(params->instrs, &arg2_swzl1->node.entry);
+
+    if (!(mul1 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL,
+            &arg1_swzl1->node, &arg2_swzl1->node, &loc)))
+        return false;
+
+    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, &mul1->node, loc)))
+        return false;
+    list_add_tail(params->instrs, &mul1_neg->entry);
+
+    if (!(arg1_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg1_cast, &loc)))
+        return false;
+    list_add_tail(params->instrs, &arg1_swzl2->node.entry);
+
+    if (!(arg2_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg2_cast, &loc)))
+        return false;
+    list_add_tail(params->instrs, &arg2_swzl2->node.entry);
+
+    if (!(mul2 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL,
+            &arg1_swzl2->node, &arg2_swzl2->node, &loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, &mul2->node, mul1_neg, &loc);
+}
+
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1635,6 +1689,7 @@ intrinsic_functions[] =
     /* Note: these entries should be kept in alphabetical order. */
     {"abs",                                 1, true,  intrinsic_abs},
     {"clamp",                               3, true,  intrinsic_clamp},
+    {"cross",                               2, true,  intrinsic_cross},
     {"max",                                 2, true,  intrinsic_max},
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},

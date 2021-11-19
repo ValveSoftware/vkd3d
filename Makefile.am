@@ -64,6 +64,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-clamp.shader_test \
 	tests/hlsl-comma.shader_test \
+	tests/hlsl-cross.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-for.shader_test \
 	tests/hlsl-function-overload.shader_test \
@@ -290,6 +291,7 @@ XFAIL_TESTS = \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-comma.shader_test \
+	tests/hlsl-cross.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-for.shader_test \
 	tests/hlsl-function-overload.shader_test \
