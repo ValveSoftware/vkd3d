@@ -1611,6 +1611,12 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_round(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct vkd3d_shader_location loc)
+{
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ROUND, params->args[0], &loc);
+}
+
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
@@ -1626,10 +1632,12 @@ static const struct intrinsic_function
 }
 intrinsic_functions[] =
 {
+    /* Note: these entries should be kept in alphabetical order. */
     {"abs",                                 1, true,  intrinsic_abs},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"max",                                 2, true,  intrinsic_max},
     {"pow",                                 2, true,  intrinsic_pow},
+    {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
 };
 

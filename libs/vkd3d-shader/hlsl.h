@@ -299,6 +299,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_NEG,
     HLSL_OP1_NRM,
     HLSL_OP1_RCP,
+    HLSL_OP1_ROUND,
     HLSL_OP1_RSQ,
     HLSL_OP1_SAT,
     HLSL_OP1_SIGN,

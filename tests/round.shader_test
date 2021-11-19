@@ -1,0 +1,26 @@
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    return round(u);
+}
+
+[test]
+uniform 0 float4 -0.5 6.5 7.5 3.4
+draw quad
+probe all rgba (0.0, 6.0, 8.0, 3.0) 4
+
+
+
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    float a = round(u.r);
+    int2 b = round(u.gb);
+    float4 res = float4(b, a, u.a);
+    return round(res);
+}
+
+[test]
+uniform 0 float4 -0.5 6.5 7.5 3.4
+draw quad
+probe all rgba (6.0, 8.0, 0.0, 3.0) 4

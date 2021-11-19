@@ -91,6 +91,7 @@ vkd3d_shader_tests = \
 	tests/preproc-invalid.shader_test \
 	tests/preproc-macro.shader_test \
 	tests/preproc-misc.shader_test \
+	tests/round.shader_test \
 	tests/sampler.shader_test \
 	tests/saturate.shader_test \
 	tests/swizzle-0.shader_test \
