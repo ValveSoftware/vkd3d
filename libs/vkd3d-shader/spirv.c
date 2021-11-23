@@ -1968,6 +1968,7 @@ struct vkd3d_symbol_register_data
     unsigned int write_mask;
     uint32_t dcl_mask;
     unsigned int structure_stride;
+    unsigned int binding_base_idx;
     bool is_aggregate; /* An aggregate, i.e. a structure or an array. */
     bool is_dynamically_indexed; /* If member_idx is a variable ID instead of a constant. */
 };
@@ -1980,6 +1981,7 @@ struct vkd3d_symbol_resource_data
     const struct vkd3d_spirv_resource_type *resource_type_info;
     unsigned int structure_stride;
     bool raw;
+    unsigned int binding_base_idx;
     uint32_t uav_counter_id;
 };
 
@@ -1992,7 +1994,6 @@ struct vkd3d_symbol_descriptor_array_data
 {
     SpvStorageClass storage_class;
     uint32_t contained_type_id;
-    unsigned int binding_base_idx;
 };
 
 struct vkd3d_symbol
@@ -2071,6 +2072,7 @@ static void vkd3d_symbol_set_register_info(struct vkd3d_symbol *symbol,
     symbol->info.reg.write_mask = write_mask;
     symbol->info.reg.dcl_mask = 0;
     symbol->info.reg.structure_stride = 0;
+    symbol->info.reg.binding_base_idx = 0;
     symbol->info.reg.is_aggregate = false;
     symbol->info.reg.is_dynamically_indexed = false;
 }
@@ -3141,6 +3143,7 @@ struct vkd3d_shader_register_info
     unsigned int write_mask;
     uint32_t member_idx;
     unsigned int structure_stride;
+    unsigned int binding_base_idx;
     bool is_aggregate;
     bool is_dynamically_indexed;
 };
@@ -3163,6 +3166,7 @@ static bool vkd3d_dxbc_compiler_get_register_info(const struct vkd3d_dxbc_compil
         register_info->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
         register_info->write_mask = VKD3DSP_WRITEMASK_ALL;
         register_info->structure_stride = 0;
+        register_info->binding_base_idx = 0;
         register_info->is_aggregate = false;
         register_info->is_dynamically_indexed = false;
         return true;
@@ -3184,6 +3188,7 @@ static bool vkd3d_dxbc_compiler_get_register_info(const struct vkd3d_dxbc_compil
     register_info->component_type = symbol->info.reg.component_type;
     register_info->write_mask = symbol->info.reg.write_mask;
     register_info->structure_stride = symbol->info.reg.structure_stride;
+    register_info->binding_base_idx = symbol->info.reg.binding_base_idx;
     register_info->is_aggregate = symbol->info.reg.is_aggregate;
     register_info->is_dynamically_indexed = symbol->info.reg.is_dynamically_indexed;
 
@@ -3279,8 +3284,7 @@ static void vkd3d_dxbc_compiler_emit_dereference_register(struct vkd3d_dxbc_comp
         assert(!reg->idx[0].rel_addr);
         if (register_info->descriptor_array)
             indexes[index_count++] = vkd3d_dxbc_compiler_get_descriptor_index(compiler, reg,
-                    register_info->descriptor_array->info.descriptor_array.binding_base_idx,
-                    VKD3D_SHADER_RESOURCE_BUFFER);
+                    register_info->binding_base_idx, VKD3D_SHADER_RESOURCE_BUFFER);
         indexes[index_count++] = vkd3d_dxbc_compiler_get_constant_uint(compiler, register_info->member_idx);
         indexes[index_count++] = vkd3d_dxbc_compiler_emit_register_addressing(compiler, &reg->idx[2]);
     }
@@ -5557,20 +5561,25 @@ static void vkd3d_dxbc_compiler_emit_push_constant_buffers(struct vkd3d_dxbc_com
     }
 }
 
+struct vkd3d_descriptor_variable_info
+{
+    const struct vkd3d_symbol *array_symbol;
+    unsigned int binding_base_idx;
+};
+
 static uint32_t vkd3d_dxbc_compiler_build_descriptor_variable(struct vkd3d_dxbc_compiler *compiler,
         SpvStorageClass storage_class, uint32_t type_id, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
-        const struct vkd3d_symbol **array_symbol)
+        struct vkd3d_descriptor_variable_info *var_info)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_shader_descriptor_binding binding;
     uint32_t array_type_id, ptr_type_id, var_id;
-    unsigned int binding_base_idx;
     struct vkd3d_symbol symbol;
     struct rb_entry *entry;
 
     binding = vkd3d_dxbc_compiler_get_descriptor_binding(compiler, reg, range,
-            resource_type, false, &binding_base_idx);
+            resource_type, false, &var_info->binding_base_idx);
 
     if (binding.count == 1 && range->last != ~0u)
     {
@@ -5581,12 +5590,12 @@ static uint32_t vkd3d_dxbc_compiler_build_descriptor_variable(struct vkd3d_dxbc_
         vkd3d_dxbc_compiler_emit_descriptor_binding(compiler, var_id, &binding);
         vkd3d_dxbc_compiler_emit_register_debug_name(builder, var_id, reg);
 
-        *array_symbol = NULL;
+        var_info->array_symbol = NULL;
         return var_id;
     }
 
-    array_type_id = vkd3d_spirv_get_op_type_array(builder, type_id,
-            vkd3d_dxbc_compiler_get_constant_uint(compiler, binding.count));
+    vkd3d_spirv_enable_capability(builder, SpvCapabilityRuntimeDescriptorArrayEXT);
+    array_type_id = vkd3d_spirv_get_op_type_runtime_array(builder, type_id);
     ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, array_type_id);
 
     /* Declare one array variable per Vulkan binding, and use it for
@@ -5598,8 +5607,8 @@ static uint32_t vkd3d_dxbc_compiler_build_descriptor_variable(struct vkd3d_dxbc_
     symbol.key.descriptor_array.binding = binding.binding;
     if ((entry = rb_get(&compiler->symbol_table, &symbol)))
     {
-        *array_symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
-        return (*array_symbol)->id;
+        var_info->array_symbol = RB_ENTRY_VALUE(entry, struct vkd3d_symbol, entry);
+        return var_info->array_symbol->id;
     }
 
     var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
@@ -5611,8 +5620,7 @@ static uint32_t vkd3d_dxbc_compiler_build_descriptor_variable(struct vkd3d_dxbc_
     symbol.descriptor_array = NULL;
     symbol.info.descriptor_array.storage_class = storage_class;
     symbol.info.descriptor_array.contained_type_id = type_id;
-    symbol.info.descriptor_array.binding_base_idx = binding_base_idx;
-    *array_symbol = vkd3d_dxbc_compiler_put_symbol(compiler, &symbol);
+    var_info->array_symbol = vkd3d_dxbc_compiler_put_symbol(compiler, &symbol);
 
     return var_id;
 }
@@ -5626,7 +5634,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_constant_buffer(struct vkd3d_dxbc_compi
     const SpvStorageClass storage_class = SpvStorageClassUniform;
     const struct vkd3d_shader_register *reg = &cb->src.reg;
     struct vkd3d_push_constant_buffer_binding *push_cb;
-    const struct vkd3d_symbol *array_symbol;
+    struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_symbol reg_symbol;
 
     assert(!(instruction->flags & ~VKD3DSI_INDEXED_DYNAMIC));
@@ -5658,12 +5666,13 @@ static void vkd3d_dxbc_compiler_emit_dcl_constant_buffer(struct vkd3d_dxbc_compi
     vkd3d_spirv_build_op_name(builder, struct_id, "cb%u_struct", cb->size);
 
     var_id = vkd3d_dxbc_compiler_build_descriptor_variable(compiler, storage_class, struct_id,
-            reg, &cb->range, VKD3D_SHADER_RESOURCE_BUFFER, &array_symbol);
+            reg, &cb->range, VKD3D_SHADER_RESOURCE_BUFFER, &var_info);
 
     vkd3d_symbol_make_register(&reg_symbol, reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
-    reg_symbol.descriptor_array = array_symbol;
+    reg_symbol.descriptor_array = var_info.array_symbol;
+    reg_symbol.info.reg.binding_base_idx = var_info.binding_base_idx;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 }
 
@@ -5707,7 +5716,7 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
     const SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &sampler->src.reg;
-    const struct vkd3d_symbol *array_symbol;
+    struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_symbol reg_symbol;
     uint32_t type_id, var_id;
 
@@ -5720,12 +5729,13 @@ static void vkd3d_dxbc_compiler_emit_dcl_sampler(struct vkd3d_dxbc_compiler *com
 
     type_id = vkd3d_spirv_get_op_type_sampler(builder);
     var_id = vkd3d_dxbc_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
-            &sampler->range, VKD3D_SHADER_RESOURCE_NONE, &array_symbol);
+            &sampler->range, VKD3D_SHADER_RESOURCE_NONE, &var_info);
 
     vkd3d_symbol_make_register(&reg_symbol, reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
-    reg_symbol.descriptor_array = array_symbol;
+    reg_symbol.descriptor_array = var_info.array_symbol;
+    reg_symbol.info.reg.binding_base_idx = var_info.binding_base_idx;
     vkd3d_dxbc_compiler_put_symbol(compiler, &reg_symbol);
 }
 
@@ -5904,8 +5914,8 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
     SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     const struct vkd3d_shader_register *reg = &resource->reg.reg;
     const struct vkd3d_spirv_resource_type *resource_type_info;
+    struct vkd3d_descriptor_variable_info var_info;
     enum vkd3d_shader_component_type sampled_type;
-    const struct vkd3d_symbol *array_symbol;
     struct vkd3d_symbol resource_symbol;
     bool is_uav;
 
@@ -5949,7 +5959,7 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
     }
 
     var_id = vkd3d_dxbc_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
-            &resource->range, resource_type, &array_symbol);
+            &resource->range, resource_type, &var_info);
 
     if (is_uav)
     {
@@ -6004,13 +6014,14 @@ static void vkd3d_dxbc_compiler_emit_resource_declaration(struct vkd3d_dxbc_comp
 
     vkd3d_symbol_make_resource(&resource_symbol, reg);
     resource_symbol.id = var_id;
-    resource_symbol.descriptor_array = array_symbol;
+    resource_symbol.descriptor_array = var_info.array_symbol;
     resource_symbol.info.resource.range = resource->range;
     resource_symbol.info.resource.sampled_type = sampled_type;
     resource_symbol.info.resource.type_id = type_id;
     resource_symbol.info.resource.resource_type_info = resource_type_info;
     resource_symbol.info.resource.structure_stride = structure_stride;
     resource_symbol.info.resource.raw = raw;
+    resource_symbol.info.resource.binding_base_idx = var_info.binding_base_idx;
     resource_symbol.info.resource.uav_counter_id = counter_var_id;
     vkd3d_dxbc_compiler_put_symbol(compiler, &resource_symbol);
 }
@@ -8045,7 +8056,7 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
         uint32_t ptr_type_id, index_id;
 
         index_id = vkd3d_dxbc_compiler_get_descriptor_index(compiler, resource_reg,
-                array_data->binding_base_idx, symbol->info.resource.resource_type_info->resource_type);
+                symbol->info.resource.binding_base_idx, symbol->info.resource.resource_type_info->resource_type);
 
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, array_data->storage_class,
                 array_data->contained_type_id);
@@ -8105,7 +8116,7 @@ static void vkd3d_dxbc_compiler_prepare_image(struct vkd3d_dxbc_compiler *compil
             uint32_t ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder,
                     register_info.storage_class, array_data->contained_type_id);
             uint32_t array_idx = vkd3d_dxbc_compiler_get_descriptor_index(compiler,
-                    sampler_reg, array_data->binding_base_idx, VKD3D_SHADER_RESOURCE_NONE);
+                    sampler_reg, register_info.binding_base_idx, VKD3D_SHADER_RESOURCE_NONE);
             sampler_var_id = vkd3d_spirv_build_op_access_chain(builder, ptr_type_id, register_info.id, &array_idx, 1);
         }
 
