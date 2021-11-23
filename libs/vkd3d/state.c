@@ -1170,8 +1170,8 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     if (!(root_signature->descriptor_mapping = vkd3d_calloc(root_signature->binding_count,
             sizeof(*root_signature->descriptor_mapping))))
         goto fail;
-    if (!(root_signature->descriptor_offsets = vkd3d_calloc(root_signature->binding_count,
-            sizeof(*root_signature->descriptor_offsets))))
+    if (root_signature->use_descriptor_arrays && !(root_signature->descriptor_offsets = vkd3d_calloc(
+            root_signature->binding_count, sizeof(*root_signature->descriptor_offsets))))
         goto fail;
     root_signature->root_constant_count = info.root_constant_count;
     if (!(root_signature->root_constants = vkd3d_calloc(root_signature->root_constant_count,
