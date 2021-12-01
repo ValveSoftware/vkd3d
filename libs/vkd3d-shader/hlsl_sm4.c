@@ -772,6 +772,8 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         {
             reg->type = VKD3D_SM4_RT_RESOURCE;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            if (swizzle_type)
+                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0] = var->reg.id;
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
