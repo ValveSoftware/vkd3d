@@ -113,7 +113,7 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         else if (field->semantic.name)
             prepend_input_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
         else
-            hlsl_error(ctx, field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+            hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
     }
 }
@@ -184,7 +184,7 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         else if (field->semantic.name)
             append_output_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
         else
-            hlsl_error(ctx, field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+            hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
     }
 }
@@ -1365,7 +1365,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         if (!hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
         {
-            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
             return;
         }
@@ -1382,7 +1382,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         if (!hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage))
         {
-            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
             return;
         }
@@ -1473,9 +1473,9 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
                 if (reserved_buffer && reserved_buffer != buffer)
                 {
-                    hlsl_error(ctx, buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                    hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                             "Multiple buffers bound to cb%u.", buffer->reservation.index);
-                    hlsl_note(ctx, reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
+                    hlsl_note(ctx, &reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
                             "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.index);
                 }
 
@@ -1495,7 +1495,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             }
             else
             {
-                hlsl_error(ctx, buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "Constant buffers must be allocated to register type 'b'.");
             }
         }
@@ -1560,10 +1560,10 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 
             if (reserved_object && reserved_object != var)
             {
-                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "Multiple objects bound to %c%u.", type_info->reg_name,
                         var->reg_reservation.index);
-                hlsl_note(ctx, reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
+                hlsl_note(ctx, &reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
                         "Object '%s' is already bound to %c%u.", reserved_object->name,
                         type_info->reg_name, var->reg_reservation.index);
             }
@@ -1587,7 +1587,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             struct vkd3d_string_buffer *type_string;
 
             type_string = hlsl_type_to_string(ctx, var->data_type);
-            hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                     "Object of type '%s' must be bound to register type '%c'.",
                     type_string->buffer, type_info->reg_name);
             hlsl_release_string_buffer(ctx, type_string);
@@ -1628,7 +1628,7 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
     if (hlsl_offset_from_deref(deref, &offset))
         return offset;
 
-    hlsl_fixme(ctx, deref->offset.node->loc, "Dereference with non-constant offset of type %s.",
+    hlsl_fixme(ctx, &deref->offset.node->loc, "Dereference with non-constant offset of type %s.",
             hlsl_node_type_to_string(deref->offset.node->type));
 
     return 0;
@@ -1679,7 +1679,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         else
         {
             if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic.name)
-                hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                         "Parameter \"%s\" is missing a semantic.", var->name);
 
             if (var->modifiers & HLSL_STORAGE_IN)
@@ -1691,7 +1691,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     if (entry_func->return_var)
     {
         if (entry_func->return_var->data_type->type != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic.name)
-            hlsl_error(ctx, entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+            hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
         append_output_var_copy(ctx, &body->instrs, entry_func->return_var);

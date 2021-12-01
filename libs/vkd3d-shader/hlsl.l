@@ -65,7 +65,7 @@ ANY                     (.)
 {RESERVED4}             {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
-                            hlsl_error(ctx, *yylloc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                            hlsl_error(ctx, yylloc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                                     "Reserved keyword \"%s\" used.", yytext);
                         }
 

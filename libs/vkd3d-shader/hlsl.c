@@ -22,40 +22,40 @@
 #include "hlsl.h"
 #include <stdio.h>
 
-void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_log_level level, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_shader_vnote(ctx->message_context, &loc, level, fmt, args);
+    vkd3d_shader_vnote(ctx->message_context, loc, level, fmt, args);
     va_end(args);
 }
 
-void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_shader_verror(ctx->message_context, &loc, error, fmt, args);
+    vkd3d_shader_verror(ctx->message_context, loc, error, fmt, args);
     va_end(args);
 
     if (!ctx->result)
         ctx->result = VKD3D_ERROR_INVALID_SHADER;
 }
 
-void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...)
 {
     va_list args;
 
     va_start(args, fmt);
-    vkd3d_shader_vwarning(ctx->message_context, &loc, error, fmt, args);
+    vkd3d_shader_vwarning(ctx->message_context, loc, error, fmt, args);
     va_end(args);
 }
 
-void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, const char *fmt, ...)
+void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc, const char *fmt, ...)
 {
     struct vkd3d_string_buffer *string;
     va_list args;
@@ -64,7 +64,7 @@ void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc, co
     string = hlsl_get_string_buffer(ctx);
     vkd3d_string_buffer_printf(string, "Aborting due to not yet implemented feature: ");
     vkd3d_string_buffer_vprintf(string, fmt, args);
-    vkd3d_shader_error(ctx->message_context, &loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "%s", string->buffer);
+    vkd3d_shader_error(ctx->message_context, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "%s", string->buffer);
     hlsl_release_string_buffer(ctx, string);
     va_end(args);
 
@@ -1960,7 +1960,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     {
         const struct vkd3d_shader_location loc = {.source_name = compile_info->source_name};
 
-        hlsl_error(&ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
+        hlsl_error(&ctx, &loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
                 "Entry point \"%s\" is not defined.", entry_point);
         hlsl_ctx_cleanup(&ctx);
         return VKD3D_ERROR_INVALID_SHADER;

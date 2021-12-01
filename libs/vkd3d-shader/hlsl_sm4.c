@@ -191,7 +191,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
 
             default:
                 if ((string = hlsl_type_to_string(ctx, var->data_type)))
-                    hlsl_error(ctx, var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "Invalid data type %s for semantic variable %s.", string->buffer, var->name);
                 hlsl_release_string_buffer(ctx, string);
                 put_u32(&buffer, D3D_REGISTER_COMPONENT_UNKNOWN);
@@ -1317,11 +1317,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case HLSL_TYPE_BOOL:
-                            hlsl_fixme(ctx, expr->node.loc, "Casts from bool to float are not implemented.\n");
+                            hlsl_fixme(ctx, &expr->node.loc, "Casts from bool to float are not implemented.\n");
                             break;
 
                         case HLSL_TYPE_DOUBLE:
-                            hlsl_fixme(ctx, expr->node.loc, "Casts from double to float are not implemented.\n");
+                            hlsl_fixme(ctx, &expr->node.loc, "Casts from double to float are not implemented.\n");
                             break;
 
                         default:
@@ -1373,7 +1373,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    hlsl_fixme(ctx, expr->node.loc, "SM4 float \"%s\" expression.", debug_hlsl_expr_op(expr->op));
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 float \"%s\" expression.", debug_hlsl_expr_op(expr->op));
                     break;
             }
             break;
@@ -1403,11 +1403,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case HLSL_TYPE_BOOL:
-                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from bool to int.");
+                            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to int.");
                             break;
 
                         case HLSL_TYPE_DOUBLE:
-                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from double to int.");
+                            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to int.");
                             break;
 
                         default:
@@ -1417,7 +1417,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 }
 
                 default:
-                    hlsl_fixme(ctx, expr->node.loc, "SM4 int \"%s\" expression.", debug_hlsl_expr_op(expr->op));
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 int \"%s\" expression.", debug_hlsl_expr_op(expr->op));
                     break;
             }
             break;
@@ -1447,11 +1447,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case HLSL_TYPE_BOOL:
-                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from bool to uint.\n");
+                            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to uint.\n");
                             break;
 
                         case HLSL_TYPE_DOUBLE:
-                            hlsl_fixme(ctx, expr->node.loc, "SM4 cast from double to uint.\n");
+                            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.\n");
                             break;
 
                         default:
@@ -1461,7 +1461,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 }
 
                 default:
-                    hlsl_fixme(ctx, expr->node.loc, "SM4 uint \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 uint \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
                     break;
             }
             break;
@@ -1472,7 +1472,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             struct vkd3d_string_buffer *string;
 
             if ((string = hlsl_type_to_string(ctx, expr->node.data_type)))
-                hlsl_fixme(ctx, expr->node.loc, "SM4 %s expression.", string->buffer);
+                hlsl_fixme(ctx, &expr->node.loc, "SM4 %s expression.", string->buffer);
             hlsl_release_string_buffer(ctx, string);
             break;
         }
@@ -1561,14 +1561,14 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
         if (!load->sampler.var->is_uniform)
         {
-            hlsl_fixme(ctx, load->node.loc, "Sample using non-uniform sampler variable.");
+            hlsl_fixme(ctx, &load->node.loc, "Sample using non-uniform sampler variable.");
             return;
         }
     }
 
     if (!load->resource.var->is_uniform)
     {
-        hlsl_fixme(ctx, load->node.loc, "Load from non-uniform resource variable.");
+        hlsl_fixme(ctx, &load->node.loc, "Load from non-uniform resource variable.");
         return;
     }
 
@@ -1580,7 +1580,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
         case HLSL_RESOURCE_SAMPLE:
             if (!load->sampler.var)
-                hlsl_fixme(ctx, load->node.loc, "SM4 combined sample expression.");
+                hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
             write_sm4_sample(ctx, buffer, resource_type, &load->node, &load->resource, &load->sampler, coords);
             break;
     }
@@ -1595,7 +1595,7 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
 
     if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
     {
-        hlsl_fixme(ctx, store->node.loc, "Store to a matrix variable.\n");
+        hlsl_fixme(ctx, &store->node.loc, "Store to a matrix variable.\n");
         return;
     }
 
@@ -1649,7 +1649,7 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
             }
             else if (instr->data_type->type == HLSL_CLASS_OBJECT)
             {
-                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
+                hlsl_fixme(ctx, &instr->loc, "Object copy.\n");
                 break;
             }
 

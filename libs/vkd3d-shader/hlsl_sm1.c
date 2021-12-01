@@ -617,7 +617,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     if (instr->data_type->base_type != HLSL_TYPE_FLOAT)
     {
         /* These need to be lowered. */
-        hlsl_fixme(ctx, instr->loc, "SM1 non-float expression.");
+        hlsl_fixme(ctx, &instr->loc, "SM1 non-float expression.");
         return;
     }
 
@@ -655,7 +655,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         default:
-            hlsl_fixme(ctx, instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
+            hlsl_fixme(ctx, &instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
             break;
     }
 }
@@ -785,12 +785,12 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             if (instr->data_type->type == HLSL_CLASS_MATRIX)
             {
                 /* These need to be lowered. */
-                hlsl_fixme(ctx, instr->loc, "SM1 matrix expression.");
+                hlsl_fixme(ctx, &instr->loc, "SM1 matrix expression.");
                 continue;
             }
             else if (instr->data_type->type == HLSL_CLASS_OBJECT)
             {
-                hlsl_fixme(ctx, instr->loc, "Object copy.\n");
+                hlsl_fixme(ctx, &instr->loc, "Object copy.\n");
                 break;
             }
 

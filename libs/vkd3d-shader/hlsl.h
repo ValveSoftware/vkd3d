@@ -728,13 +728,13 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         const struct vkd3d_shader_location loc);
 
-void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);
-void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         const char *fmt, ...) VKD3D_PRINTF_FUNC(3, 4);
-void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_warning(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);
-void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location loc,
+void hlsl_note(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_log_level level, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);
 
 void hlsl_push_scope(struct hlsl_ctx *ctx);
