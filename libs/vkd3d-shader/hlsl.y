@@ -1647,6 +1647,12 @@ static bool intrinsic_max(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_min(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, params->args[0], params->args[1], loc);
+}
+
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -1693,6 +1699,7 @@ intrinsic_functions[] =
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cross",                               2, true,  intrinsic_cross},
     {"max",                                 2, true,  intrinsic_max},
+    {"min",                                 2, true,  intrinsic_min},
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
