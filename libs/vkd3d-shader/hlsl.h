@@ -667,6 +667,7 @@ static inline struct hlsl_type *hlsl_get_numeric_type(const struct hlsl_ctx *ctx
 const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
 const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 const char *debug_hlsl_writemask(unsigned int writemask);
+const char *debug_hlsl_swizzle(unsigned int swizzle, unsigned int count);
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsigned int modifiers);

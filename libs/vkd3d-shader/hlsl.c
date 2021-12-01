@@ -1097,6 +1097,19 @@ const char *debug_hlsl_writemask(unsigned int writemask)
     return vkd3d_dbg_sprintf(".%s", string);
 }
 
+const char *debug_hlsl_swizzle(unsigned int swizzle, unsigned int size)
+{
+    static const char components[] = {'x', 'y', 'z', 'w'};
+    char string[5];
+    unsigned int i;
+
+    assert(size <= ARRAY_SIZE(components));
+    for (i = 0; i < size; ++i)
+        string[i] = components[(swizzle >> i * 2) & 3];
+    string[size] = 0;
+    return vkd3d_dbg_sprintf(".%s", string);
+}
+
 static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_constant *constant)
 {
     struct hlsl_type *type = constant->node.data_type;
@@ -1278,18 +1291,15 @@ static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hls
     unsigned int i;
 
     dump_src(buffer, &swizzle->val);
-    vkd3d_string_buffer_printf(buffer, ".");
     if (swizzle->val.node->data_type->dimy > 1)
     {
+        vkd3d_string_buffer_printf(buffer, ".");
         for (i = 0; i < swizzle->node.data_type->dimx; ++i)
             vkd3d_string_buffer_printf(buffer, "_m%u%u", (swizzle->swizzle >> i * 8) & 0xf, (swizzle->swizzle >> (i * 8 + 4)) & 0xf);
     }
     else
     {
-        static const char c[] = {'x', 'y', 'z', 'w'};
-
-        for (i = 0; i < swizzle->node.data_type->dimx; ++i)
-            vkd3d_string_buffer_printf(buffer, "%c", c[(swizzle->swizzle >> i * 2) & 0x3]);
+        vkd3d_string_buffer_printf(buffer, "%s", debug_hlsl_swizzle(swizzle->swizzle, swizzle->node.data_type->dimx));
     }
 }
 
