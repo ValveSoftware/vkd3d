@@ -1472,6 +1472,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
                 }
 
+                case HLSL_OP2_MAX:
+                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_UMAX, &expr->node, arg1, arg2);
+                    break;
+
                 default:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 uint \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
                     break;
