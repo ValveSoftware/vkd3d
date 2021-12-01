@@ -309,8 +309,7 @@ XFAIL_TESTS = \
 	tests/sampler.shader_test \
 	tests/texture-load.shader_test \
 	tests/texture-load-typed.shader_test \
-	tests/trigonometry.shader_test \
-	tests/writemask-assignop-1.shader_test
+	tests/trigonometry.shader_test
 endif
 
 if BUILD_DEMOS
