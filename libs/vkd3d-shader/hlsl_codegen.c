@@ -237,6 +237,43 @@ static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
     hlsl_free_instr(old);
 }
 
+/* Lower casts from vec1 to vecN to swizzles. */
+static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_type *src_type, *dst_type;
+    struct hlsl_type *dst_scalar_type;
+    struct hlsl_ir_expr *cast;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    cast = hlsl_ir_expr(instr);
+    src_type = cast->operands[0].node->data_type;
+    dst_type = cast->node.data_type;
+
+    if (cast->op == HLSL_OP1_CAST
+            && src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR
+            && src_type->dimx == 1)
+    {
+        struct hlsl_ir_swizzle *swizzle;
+        struct hlsl_ir_expr *new_cast;
+
+        dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->base_type);
+        /* We need to preserve the cast since it might be doing more than just
+         * turning the scalar into a vector. */
+        if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_scalar_type, &cast->node.loc)))
+            return false;
+        list_add_after(&cast->node.entry, &new_cast->node.entry);
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, &new_cast->node, &cast->node.loc)))
+            return false;
+        list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+
+        replace_node(&cast->node, &swizzle->node);
+        return true;
+    }
+
+    return false;
+}
+
 struct copy_propagation_value
 {
     struct hlsl_ir_node *node;
@@ -1624,6 +1661,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
     }
 
+    transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
     {
