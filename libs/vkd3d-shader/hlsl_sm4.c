@@ -1298,9 +1298,8 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 {
                     const struct hlsl_type *src_type = arg1->data_type;
 
-                    /* Narrowing casts need to be lowered. */
-                    if (src_type->dimx != expr->node.data_type->dimx)
-                        hlsl_fixme(ctx, expr->node.loc, "Narrowing cast.\n");
+                    /* Narrowing casts were already lowered. */
+                    assert(src_type->dimx == expr->node.data_type->dimx);
 
                     switch (src_type->base_type)
                     {
@@ -1388,9 +1387,8 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 {
                     const struct hlsl_type *src_type = arg1->data_type;
 
-                    /* Narrowing casts need to be lowered. */
-                    if (src_type->dimx != expr->node.data_type->dimx)
-                        hlsl_fixme(ctx, expr->node.loc, "Narrowing cast.");
+                    /* Narrowing casts were already lowered. */
+                    assert(src_type->dimx == expr->node.data_type->dimx);
 
                     switch (src_type->base_type)
                     {
@@ -1433,9 +1431,8 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 {
                     const struct hlsl_type *src_type = arg1->data_type;
 
-                    /* Narrowing casts need to be lowered. */
-                    if (src_type->dimx != expr->node.data_type->dimx)
-                        hlsl_fixme(ctx, expr->node.loc, "SM4 narrowing cast.\n");
+                    /* Narrowing casts were already lowered. */
+                    assert(src_type->dimx == expr->node.data_type->dimx);
 
                     switch (src_type->base_type)
                     {

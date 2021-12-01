@@ -616,6 +616,42 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_type *src_type, *dst_type;
+    struct hlsl_type *dst_vector_type;
+    struct hlsl_ir_expr *cast;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    cast = hlsl_ir_expr(instr);
+    src_type = cast->operands[0].node->data_type;
+    dst_type = cast->node.data_type;
+
+    if (cast->op == HLSL_OP1_CAST
+            && src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR
+            && dst_type->dimx < src_type->dimx)
+    {
+        struct hlsl_ir_swizzle *swizzle;
+        struct hlsl_ir_expr *new_cast;
+
+        dst_vector_type = hlsl_get_vector_type(ctx, dst_type->base_type, src_type->dimx);
+        /* We need to preserve the cast since it might be doing more than just
+         * narrowing the vector. */
+        if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_vector_type, &cast->node.loc)))
+            return false;
+        list_add_after(&cast->node.entry, &new_cast->node.entry);
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dst_type->dimx, &new_cast->node, &cast->node.loc)))
+            return false;
+        list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+
+        replace_node(&cast->node, &swizzle->node);
+        return true;
+    }
+
+    return false;
+}
+
 static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
@@ -1669,6 +1705,7 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
+    transform_ir(ctx, lower_narrowing_casts, body, NULL);
     do
     {
         progress = transform_ir(ctx, fold_constants, body, NULL);
