@@ -1141,6 +1141,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     root_signature->parameters = NULL;
     root_signature->flags = desc->Flags;
     root_signature->descriptor_mapping = NULL;
+    root_signature->descriptor_offsets = NULL;
     root_signature->static_sampler_count = 0;
     root_signature->static_samplers = NULL;
     root_signature->device = device;
