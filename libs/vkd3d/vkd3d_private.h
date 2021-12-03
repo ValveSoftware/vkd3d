@@ -737,7 +737,7 @@ struct d3d12_root_signature
 
     unsigned int binding_count;
     struct vkd3d_shader_resource_binding *descriptor_mapping;
-    unsigned int *descriptor_offsets;
+    struct vkd3d_shader_descriptor_offset *descriptor_offsets;
 
     unsigned int root_constant_count;
     struct vkd3d_shader_push_constant_buffer *root_constants;

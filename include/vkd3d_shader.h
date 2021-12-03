@@ -458,6 +458,12 @@ struct vkd3d_shader_transform_feedback_info
     unsigned int buffer_stride_count;
 };
 
+struct vkd3d_shader_descriptor_offset
+{
+    unsigned int static_offset;
+    unsigned int dynamic_offset_index;
+};
+
 /**
  * A chained structure containing descriptor offsets.
  *
@@ -477,10 +483,28 @@ struct vkd3d_shader_descriptor_offset_info
     const void *next;
 
     /**
-     * Pointer to an array of offsets into the descriptor arrays referenced by
-     * the 'bindings' array in struct vkd3d_shader_interface_info. This allows
-     * mapping multiple shader resource arrays to a single binding point in
-     * the target environment.
+     * Byte offset within the push constants of an array of 32-bit
+     * descriptor array offsets. See the description of 'binding_offsets'
+     * below.
+     */
+    unsigned int descriptor_table_offset;
+    /** Size, in elements, of the descriptor table push constant array. */
+    unsigned int descriptor_table_count;
+
+    /**
+     * Pointer to an array of struct vkd3d_shader_descriptor_offset objects.
+     * The 'static_offset' field contains an offset into the descriptor arrays
+     * referenced by the 'bindings' array in struct vkd3d_shader_interface_info.
+     * This allows mapping multiple shader resource arrays to a single binding
+     * point in the target environment.
+     *
+     * 'dynamic_offset_index' in struct vkd3d_shader_descriptor_offset allows
+     * offsets to be set at runtime. The 32-bit descriptor table push constant
+     * at this index will be added to 'static_offset' to calculate the final
+     * binding offset.
+     *
+     * If runtime offsets are not required, set all 'dynamic_offset_index'
+     * values to \c ~0u and 'descriptor_table_count' to zero.
      *
      * For example, to map Direct3D constant buffer registers 'cb0[0:3]' and
      * 'cb1[6:7]' to descriptors 8-12 and 4-5 in the Vulkan descriptor array in
@@ -508,7 +532,7 @@ struct vkd3d_shader_descriptor_offset_info
      * This field may be NULL, in which case the corresponding offsets are
      * specified to be 0.
      */
-    const unsigned int *binding_offsets;
+    const struct vkd3d_shader_descriptor_offset *binding_offsets;
 
     /**
      * Pointer to an array of offsets into the descriptor arrays referenced by
@@ -517,7 +541,7 @@ struct vkd3d_shader_descriptor_offset_info
      * not supported in this version of vkd3d-shader, and therefore this field
      * must either be NULL or specify 0 offsets.
      */
-    const unsigned int *uav_counter_offsets;
+    const struct vkd3d_shader_descriptor_offset *uav_counter_offsets;
 };
 
 /** The format of a shader to be compiled or scanned. */
