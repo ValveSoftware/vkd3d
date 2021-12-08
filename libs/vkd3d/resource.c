@@ -2121,10 +2121,8 @@ void vkd3d_view_decref(struct vkd3d_view *view, struct d3d12_device *device)
 void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *src,
         struct d3d12_device *device)
 {
-    struct d3d12_desc destroy_desc;
+    struct vkd3d_view *defunct_view = NULL;
     pthread_mutex_t *mutex;
-
-    destroy_desc.u.view = NULL;
 
     mutex = d3d12_device_get_descriptor_mutex(device, dst);
     pthread_mutex_lock(mutex);
@@ -2132,15 +2130,15 @@ void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *sr
     /* Nothing to do for VKD3D_DESCRIPTOR_MAGIC_CBV. */
     if ((dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
             && !InterlockedDecrement(&dst->u.view->refcount))
-        destroy_desc = *dst;
+        defunct_view = dst->u.view;
 
     *dst = *src;
 
     pthread_mutex_unlock(mutex);
 
     /* Destroy the view after unlocking to reduce wait time. */
-    if (destroy_desc.u.view)
-        vkd3d_view_destroy(destroy_desc.u.view, device);
+    if (defunct_view)
+        vkd3d_view_destroy(defunct_view, device);
 }
 
 static void d3d12_desc_destroy(struct d3d12_desc *descriptor, struct d3d12_device *device)
