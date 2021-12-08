@@ -2130,9 +2130,7 @@ void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *sr
     pthread_mutex_lock(mutex);
 
     /* Nothing to do for VKD3D_DESCRIPTOR_MAGIC_CBV. */
-    if ((dst->magic == VKD3D_DESCRIPTOR_MAGIC_SRV
-            || dst->magic == VKD3D_DESCRIPTOR_MAGIC_UAV
-            || dst->magic == VKD3D_DESCRIPTOR_MAGIC_SAMPLER)
+    if ((dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
             && !InterlockedDecrement(&dst->u.view->refcount))
         destroy_desc = *dst;
 
@@ -2165,12 +2163,8 @@ void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src,
     mutex = d3d12_device_get_descriptor_mutex(device, src);
     pthread_mutex_lock(mutex);
 
-    if (src->magic == VKD3D_DESCRIPTOR_MAGIC_SRV
-            || src->magic == VKD3D_DESCRIPTOR_MAGIC_UAV
-            || src->magic == VKD3D_DESCRIPTOR_MAGIC_SAMPLER)
-    {
+    if (src->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
         vkd3d_view_incref(src->u.view);
-    }
 
     tmp = *src;
 
