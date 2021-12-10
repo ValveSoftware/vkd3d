@@ -3070,7 +3070,7 @@ static void d3d12_command_list_check_index_buffer_strip_cut_value(struct d3d12_c
         case D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFF:
             if (list->index_buffer_format != DXGI_FORMAT_R16_UINT)
             {
-                FIXME("Strip cut value 0xffff is not supported with index buffer format %#x.\n",
+                FIXME_ONCE("Strip cut value 0xffff is not supported with index buffer format %#x.\n",
                         list->index_buffer_format);
             }
             break;
@@ -3078,7 +3078,7 @@ static void d3d12_command_list_check_index_buffer_strip_cut_value(struct d3d12_c
         case D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFFFFFF:
             if (list->index_buffer_format != DXGI_FORMAT_R32_UINT)
             {
-                FIXME("Strip cut value 0xffffffff is not supported with index buffer format %#x.\n",
+                FIXME_ONCE("Strip cut value 0xffffffff is not supported with index buffer format %#x.\n",
                         list->index_buffer_format);
             }
             break;
