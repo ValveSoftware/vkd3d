@@ -2605,7 +2605,7 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
 
         if (unbounded_offset != UINT_MAX
                 /* Descriptors may not be set, eg. WoW. */
-                && (base_descriptor = d3d12_desc_from_gpu_handle(bindings->descriptor_tables[table_index])))
+                && (base_descriptor = bindings->descriptor_tables[table_index]))
         {
             heap_size = vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
                     &device->gpu_descriptor_allocator, base_descriptor);
@@ -2981,7 +2981,7 @@ static void d3d12_command_list_update_descriptors(struct d3d12_command_list *lis
     {
         if (bindings->descriptor_table_dirty_mask & ((uint64_t)1 << i))
         {
-            if ((base_descriptor = d3d12_desc_from_gpu_handle(bindings->descriptor_tables[i])))
+            if ((base_descriptor = bindings->descriptor_tables[i]))
                 d3d12_command_list_update_descriptor_table(list, bind_point, i, base_descriptor);
             else
                 WARN("Descriptor table %u is not set.\n", i);
@@ -4182,7 +4182,7 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
     assert(root_signature_get_descriptor_table(root_signature, index));
 
     assert(index < ARRAY_SIZE(bindings->descriptor_tables));
-    bindings->descriptor_tables[index] = base_descriptor;
+    bindings->descriptor_tables[index] = d3d12_desc_from_gpu_handle(base_descriptor);
     bindings->descriptor_table_dirty_mask |= (uint64_t)1 << index;
     bindings->descriptor_table_active_mask |= (uint64_t)1 << index;
 }
