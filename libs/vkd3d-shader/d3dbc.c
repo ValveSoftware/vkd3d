@@ -878,8 +878,6 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     uint16_t shader_type;
     size_t token_count;
 
-    code = compile_info->source.code;
-    code_size = compile_info->source.size;
     token_count = code_size / sizeof(*sm1->start);
 
     if (token_count < 2)
