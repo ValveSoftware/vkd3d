@@ -956,6 +956,8 @@ struct test_context
     ID3D12CommandQueue *queue;
     ID3D12CommandAllocator *allocator;
     ID3D12GraphicsCommandList *list;
+    ID3D12PipelineState **pso;
+    size_t pso_count, pso_capacity;
 
     D3D12_RESOURCE_DESC render_target_desc;
     ID3D12Resource *render_target;
@@ -1074,6 +1076,15 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
     return true;
 }
 
+static inline void destroy_pipeline_state_objects(struct test_context *context)
+{
+    size_t i;
+
+    for (i = 0; i < context->pso_count; ++i)
+        ID3D12PipelineState_Release(context->pso[i]);
+    context->pso_count = 0;
+}
+
 #define destroy_test_context(context) destroy_test_context_(__LINE__, context)
 static inline void destroy_test_context_(unsigned int line, struct test_context *context)
 {
@@ -1092,6 +1103,8 @@ static inline void destroy_test_context_(unsigned int line, struct test_context 
     ID3D12CommandAllocator_Release(context->allocator);
     ID3D12CommandQueue_Release(context->queue);
     ID3D12GraphicsCommandList_Release(context->list);
+    destroy_pipeline_state_objects(context);
+    free(context->pso);
 
     refcount = ID3D12Device_Release(context->device);
     ok_(line)(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
