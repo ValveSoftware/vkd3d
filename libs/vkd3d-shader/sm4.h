@@ -354,6 +354,22 @@ enum vkd3d_sm4_opcode
     VKD3D_SM5_OP_DTOU                             = 0xd7,
     VKD3D_SM5_OP_ITOD                             = 0xd8,
     VKD3D_SM5_OP_UTOD                             = 0xd9,
+    VKD3D_SM5_OP_GATHER4_S                        = 0xdb,
+    VKD3D_SM5_OP_GATHER4_C_S                      = 0xdc,
+    VKD3D_SM5_OP_GATHER4_PO_S                     = 0xdd,
+    VKD3D_SM5_OP_GATHER4_PO_C_S                   = 0xde,
+    VKD3D_SM5_OP_LD_S                             = 0xdf,
+    VKD3D_SM5_OP_LD2DMS_S                         = 0xe0,
+    VKD3D_SM5_OP_LD_UAV_TYPED_S                   = 0xe1,
+    VKD3D_SM5_OP_LD_RAW_S                         = 0xe2,
+    VKD3D_SM5_OP_LD_STRUCTURED_S                  = 0xe3,
+    VKD3D_SM5_OP_SAMPLE_LOD_S                     = 0xe4,
+    VKD3D_SM5_OP_SAMPLE_C_LZ_S                    = 0xe5,
+    VKD3D_SM5_OP_SAMPLE_CL_S                      = 0xe6,
+    VKD3D_SM5_OP_SAMPLE_B_CL_S                    = 0xe7,
+    VKD3D_SM5_OP_SAMPLE_GRAD_CL_S                 = 0xe8,
+    VKD3D_SM5_OP_SAMPLE_C_CL_S                    = 0xe9,
+    VKD3D_SM5_OP_CHECK_ACCESS_FULLY_MAPPED        = 0xea,
 };
 
 enum vkd3d_sm4_instruction_modifier
