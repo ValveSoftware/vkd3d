@@ -502,23 +502,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     if (options->target_type == VKD3D_SHADER_TARGET_NONE && !options->preprocess_only)
         options->target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
 
-    if (options->print_target_types)
-        return true;
-
-    if (!options->preprocess_only && !validate_target_type(options->source_type, options->target_type))
-    {
-        fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
-                get_target_type_info(options->target_type)->name,
-                get_source_type_info(options->source_type)->name);
-        return false;
-    }
-
-    if (!options->preprocess_only && options->source_type == VKD3D_SHADER_SOURCE_HLSL && !options->profile)
-    {
-        fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
-        return false;
-    }
-
     if (optind < argc)
         options->filename = argv[argc - 1];
 
@@ -654,6 +637,20 @@ int main(int argc, char **argv)
     if (options.print_target_types)
     {
         print_target_types(options.source_type);
+        return 0;
+    }
+
+    if (!options.preprocess_only && !validate_target_type(options.source_type, options.target_type))
+    {
+        fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
+                get_target_type_info(options.target_type)->name,
+                get_source_type_info(options.source_type)->name);
+        return 0;
+    }
+
+    if (!options.preprocess_only && options.source_type == VKD3D_SHADER_SOURCE_HLSL && !options.profile)
+    {
+        fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
         return 0;
     }
 
