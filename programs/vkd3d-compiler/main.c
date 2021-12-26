@@ -209,6 +209,7 @@ struct options
     enum vkd3d_shader_source_type source_type;
     enum vkd3d_shader_target_type target_type;
     bool preprocess_only;
+    bool print_help;
     bool print_version;
     bool print_source_types;
     bool print_target_types;
@@ -446,6 +447,11 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 options->preprocess_only = true;
                 break;
 
+            case 'h':
+            case OPTION_HELP:
+                options->print_help = true;
+                return true;
+
             case OPTION_OUTPUT:
             case 'o':
                 options->output_filename = optarg;
@@ -623,9 +629,12 @@ int main(int argc, char **argv)
     int ret;
 
     if (!parse_command_line(argc, argv, &options))
+        return 1;
+
+    if (options.print_help)
     {
         print_usage(argv[0]);
-        return 1;
+        return 0;
     }
 
     if (options.print_version)
