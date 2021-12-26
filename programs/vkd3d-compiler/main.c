@@ -20,6 +20,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,26 +50,32 @@ enum
     OPTION_TEXT_FORMATTING,
 };
 
+#define MAKE_TAG(ch0, ch1, ch2, ch3) \
+    ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
+    ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
+#define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
+
 static const struct source_type_info
 {
     enum vkd3d_shader_source_type type;
     const char *name;
     const char *description;
     bool is_binary;
+    enum vkd3d_shader_target_type default_target_type;
 }
 source_type_info[] =
 {
     {VKD3D_SHADER_SOURCE_DXBC_TPF,
         "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
         "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",
-        true},
+        true, VKD3D_SHADER_TARGET_SPIRV_BINARY},
     {VKD3D_SHADER_SOURCE_HLSL,
         "hlsl",         "High Level Shader Language source code.\n",
-        false},
+        false, VKD3D_SHADER_TARGET_DXBC_TPF},
     {VKD3D_SHADER_SOURCE_D3D_BYTECODE,
         "d3dbc",        "Legacy Direct3D byte-code.\n"
         "                This is the format used for Direct3D shader model 1, 2, and 3 shaders.\n",
-        true},
+        true, VKD3D_SHADER_TARGET_SPIRV_BINARY},
 };
 
 static const struct target_type_info
@@ -166,8 +173,8 @@ static void print_usage(const char *program_name)
         "Options:\n"
         "  -h, --help            Display this information and exit.\n"
         "  -b <type>             Specify the target type. Use --print-target-types to\n"
-        "                        list valid target types for a given source type. The\n"
-        "                        default target type is 'spirv-binary'.\n"
+        "                        list the valid and default target types for a given\n"
+        "                        source type.\n"
         "  --buffer-uav=<type>   Specify the buffer type to use for buffer UAV bindings.\n"
         "                        Valid values are 'buffer-texture' (default) and\n"
         "                        'storage-buffer'.\n"
@@ -189,8 +196,7 @@ static void print_usage(const char *program_name)
         "  -V, --version         Display version information and exit.\n"
         "  -x <type>             Specify the type of the source. Use --print-source-types\n"
         "                        to list valid source types. The default source type is\n"
-        "                        'dxbc-tpf' for compile operations, and 'hlsl' for\n"
-        "                        preprocess operations.\n"
+        "                        automatically detected from the input shader.\n"
         "  --                    Stop option processing. Any subsequent argument is\n"
         "                        interpreted as a filename.\n"
         "\n"
@@ -497,11 +503,6 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         }
     }
 
-    if (options->source_type == VKD3D_SHADER_SOURCE_NONE)
-        options->source_type = options->preprocess_only ? VKD3D_SHADER_SOURCE_HLSL : VKD3D_SHADER_SOURCE_DXBC_TPF;
-    if (options->target_type == VKD3D_SHADER_TARGET_NONE && !options->preprocess_only)
-        options->target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
-
     if (optind < argc)
         options->filename = argv[argc - 1];
 
@@ -526,8 +527,9 @@ static void print_source_types(void)
 
 static void print_target_types(enum vkd3d_shader_source_type source_type)
 {
+    const struct source_type_info *source_info = get_source_type_info(source_type);
     const enum vkd3d_shader_target_type *target_types;
-    const char *source_type_name = get_source_type_info(source_type)->name;
+    const char *source_type_name = source_info->name;
     unsigned int count, i;
 
     target_types = vkd3d_shader_get_supported_target_types(source_type, &count);
@@ -538,6 +540,7 @@ static void print_target_types(enum vkd3d_shader_source_type source_type)
         if (type)
             fprintf(stdout, "  %-12s  %s", type->name, type->description);
     }
+    printf("The default target type is '%s'.\n", get_target_type_info(source_info->default_target_type)->name);
 }
 
 static FILE *open_input(const char *filename, bool *close)
@@ -636,9 +639,47 @@ int main(int argc, char **argv)
 
     if (options.print_target_types)
     {
+        if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
+        {
+            fprintf(stderr, "--print-target-types requires an explicitly specified source type.\n");
+            return 1;
+        }
+
         print_target_types(options.source_type);
         return 0;
     }
+
+    if (!(input = open_input(options.filename, &close_input)))
+        goto done;
+
+    if (!read_shader(&info.source, input))
+    {
+        fprintf(stderr, "Failed to read input shader.\n");
+        goto done;
+    }
+
+    if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
+    {
+        uint32_t token;
+
+        if (options.preprocess_only)
+        {
+            options.source_type = VKD3D_SHADER_SOURCE_HLSL;
+        }
+        else if (info.source.size >= sizeof(token))
+        {
+            memcpy(&token, info.source.code, sizeof(token));
+            if (token == TAG_DXBC)
+                options.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+            else if ((token & 0xfffe0000) == 0xfffe0000)
+                options.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+            else
+                options.source_type = VKD3D_SHADER_SOURCE_HLSL;
+        }
+    }
+
+    if (options.target_type == VKD3D_SHADER_TARGET_NONE && !options.preprocess_only)
+        options.target_type = get_source_type_info(options.source_type)->default_target_type;
 
     if (!options.preprocess_only && !validate_target_type(options.source_type, options.target_type))
     {
@@ -653,9 +694,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
         return 0;
     }
-
-    if (!(input = open_input(options.filename, &close_input)))
-        goto done;
 
     if (!options.filename && get_source_type_info(options.source_type)->is_binary && isatty(fileno(input)))
     {
@@ -705,12 +743,6 @@ int main(int argc, char **argv)
     spirv_target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
     spirv_target_info.entry_point = options.entry_point;
     spirv_target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
-
-    if (!read_shader(&info.source, input))
-    {
-        fprintf(stderr, "Failed to read input shader.\n");
-        goto done;
-    }
 
     if (options.preprocess_only)
         ret = vkd3d_shader_preprocess(&info, &output_code, &messages);
