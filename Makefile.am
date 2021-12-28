@@ -356,6 +356,7 @@ EXTRA_libvkd3d_la_DEPENDENCIES = $(srcdir)/libs/vkd3d/vkd3d.map
 endif
 
 libvkd3d_utils_la_SOURCES = \
+	libs/vkd3d-utils/reflection.c \
 	libs/vkd3d-utils/vkd3d_utils.map \
 	libs/vkd3d-utils/vkd3d_utils_main.c \
 	libs/vkd3d-utils/vkd3d_utils_private.h

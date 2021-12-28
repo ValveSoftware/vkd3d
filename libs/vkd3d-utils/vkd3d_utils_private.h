@@ -22,6 +22,7 @@
 #define COBJMACROS
 #define NONAMELESSUNION
 #define VK_NO_PROTOTYPES
+#define CONST_VTABLE
 
 #include <vkd3d.h>
 #include <vkd3d_shader.h>
