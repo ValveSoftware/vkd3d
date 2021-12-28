@@ -1045,8 +1045,6 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
-int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
-        struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);
 void free_shader_desc(struct vkd3d_shader_desc *desc);
 
 int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,

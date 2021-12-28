@@ -1669,42 +1669,6 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     return true;
 }
 
-int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
-{
-    struct vkd3d_shader_desc *shader_desc;
-    struct vkd3d_shader_sm4_parser *sm4;
-    int ret;
-
-    if (!(sm4 = vkd3d_calloc(1, sizeof(*sm4))))
-    {
-        ERR("Failed to allocate parser.\n");
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-    }
-
-    shader_desc = &sm4->p.shader_desc;
-    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
-            message_context, compile_info->source_name, shader_desc)) < 0)
-    {
-        WARN("Failed to extract shader, vkd3d result %d.\n", ret);
-        vkd3d_free(sm4);
-        return ret;
-    }
-
-    if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
-            compile_info->source_name, &shader_desc->output_signature, message_context))
-    {
-        WARN("Failed to initialise shader parser.\n");
-        free_shader_desc(shader_desc);
-        vkd3d_free(sm4);
-        return VKD3D_ERROR_INVALID_ARGUMENT;
-    }
-
-    *parser = &sm4->p;
-
-    return VKD3D_OK;
-}
-
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)
 {
     return !count || (data_size - offset) / count >= size;
@@ -2039,7 +2003,7 @@ void free_shader_desc(struct vkd3d_shader_desc *desc)
     vkd3d_shader_free_shader_signature(&desc->patch_constant_signature);
 }
 
-int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
+static int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc)
 {
     int ret;
@@ -2061,6 +2025,42 @@ int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
     }
 
     return ret;
+}
+
+int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
+{
+    struct vkd3d_shader_desc *shader_desc;
+    struct vkd3d_shader_sm4_parser *sm4;
+    int ret;
+
+    if (!(sm4 = vkd3d_calloc(1, sizeof(*sm4))))
+    {
+        ERR("Failed to allocate parser.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    shader_desc = &sm4->p.shader_desc;
+    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
+            message_context, compile_info->source_name, shader_desc)) < 0)
+    {
+        WARN("Failed to extract shader, vkd3d result %d.\n", ret);
+        vkd3d_free(sm4);
+        return ret;
+    }
+
+    if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
+            compile_info->source_name, &shader_desc->output_signature, message_context))
+    {
+        WARN("Failed to initialise shader parser.\n");
+        free_shader_desc(shader_desc);
+        vkd3d_free(sm4);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    *parser = &sm4->p;
+
+    return VKD3D_OK;
 }
 
 /* root signatures */
