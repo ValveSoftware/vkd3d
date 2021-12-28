@@ -1025,7 +1025,7 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     if (messages)
         *messages = NULL;
 
-    if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
+    if ((ret = vkd3d_shader_validate_compile_info(compile_info, false)) < 0)
         return ret;
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
