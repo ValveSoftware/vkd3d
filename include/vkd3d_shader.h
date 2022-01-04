@@ -537,9 +537,7 @@ struct vkd3d_shader_descriptor_offset_info
     /**
      * Pointer to an array of offsets into the descriptor arrays referenced by
      * the 'uav_counters' array in struct vkd3d_shader_interface_info. This
-     * works the same way as \ref binding_offsets above. UAV counter arrays are
-     * not supported in this version of vkd3d-shader, and therefore this field
-     * must either be NULL or specify 0 offsets.
+     * works the same way as \ref binding_offsets above.
      */
     const struct vkd3d_shader_descriptor_offset *uav_counter_offsets;
 };
