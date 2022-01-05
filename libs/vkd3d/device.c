@@ -2179,6 +2179,33 @@ static void vkd3d_gpu_va_allocator_cleanup(struct vkd3d_gpu_va_allocator *alloca
     pthread_mutex_destroy(&allocator->mutex);
 }
 
+/* We could use bsearch() or recursion here, but it probably helps to omit
+ * all the extra function calls. */
+static struct vkd3d_gpu_descriptor_allocation *vkd3d_gpu_descriptor_allocator_binary_search(
+        const struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc)
+{
+    struct vkd3d_gpu_descriptor_allocation *allocations = allocator->allocations;
+    const struct d3d12_desc *base;
+    size_t centre, count;
+
+    for (count = allocator->allocation_count; count > 1; )
+    {
+        centre = count >> 1;
+        base = allocations[centre].base;
+        if (base <= desc)
+        {
+            allocations += centre;
+            count -= centre;
+        }
+        else
+        {
+            count = centre;
+        }
+    }
+
+    return allocations;
+}
+
 bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_allocator *allocator,
         const struct d3d12_desc *base, size_t count)
 {
@@ -2198,7 +2225,14 @@ bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_a
         return false;
     }
 
-    allocation = &allocator->allocations[allocator->allocation_count++];
+    if (allocator->allocation_count > 1)
+        allocation = vkd3d_gpu_descriptor_allocator_binary_search(allocator, base);
+    else
+        allocation = allocator->allocations;
+    allocation += allocator->allocation_count && base > allocation->base;
+    memmove(&allocation[1], allocation, (allocator->allocation_count++ - (allocation - allocator->allocations))
+            * sizeof(*allocation));
+
     allocation->base = base;
     allocation->count = count;
 
@@ -2225,8 +2259,8 @@ bool vkd3d_gpu_descriptor_allocator_unregister_range(
         if (allocator->allocations[i].base != base)
             continue;
 
-        if (i != --allocator->allocation_count)
-            allocator->allocations[i] = allocator->allocations[allocator->allocation_count];
+        memmove(&allocator->allocations[i], &allocator->allocations[i + 1],
+                (--allocator->allocation_count - i) * sizeof(allocator->allocations[0]));
 
         found = true;
         break;
@@ -2237,13 +2271,24 @@ bool vkd3d_gpu_descriptor_allocator_unregister_range(
     return found;
 }
 
+static inline const struct vkd3d_gpu_descriptor_allocation *vkd3d_gpu_descriptor_allocator_allocation_from_descriptor(
+        const struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc)
+{
+    const struct vkd3d_gpu_descriptor_allocation *allocation;
+
+    allocation = vkd3d_gpu_descriptor_allocator_binary_search(allocator, desc);
+    return (desc >= allocation->base && desc - allocation->base < allocation->count) ? allocation : NULL;
+}
+
 /* Return the available size from the specified descriptor to the heap end. */
 size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
         struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc)
 {
-    struct vkd3d_gpu_descriptor_allocation *allocation;
-    size_t remaining, offset, i;
+    const struct vkd3d_gpu_descriptor_allocation *allocation;
+    size_t remaining;
     int rc;
+
+    assert(allocator->allocation_count);
 
     if ((rc = pthread_mutex_lock(&allocator->mutex)))
     {
@@ -2251,20 +2296,9 @@ size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
         return 0;
     }
 
-    for (i = 0, remaining = 0; i < allocator->allocation_count; ++i)
-    {
-        allocation = &allocator->allocations[i];
-
-        if (desc < allocation->base)
-            continue;
-
-        offset = desc - allocation->base;
-        if (offset >= allocation->count)
-            continue;
-
-        remaining = allocation->count - offset;
-        break;
-    }
+    remaining = 0;
+    if ((allocation = vkd3d_gpu_descriptor_allocator_allocation_from_descriptor(allocator, desc)))
+        remaining = allocation->count - (desc - allocation->base);
 
     pthread_mutex_unlock(&allocator->mutex);
 
