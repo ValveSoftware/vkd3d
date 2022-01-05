@@ -260,6 +260,8 @@ bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_a
         const struct d3d12_desc *base, size_t count);
 bool vkd3d_gpu_descriptor_allocator_unregister_range(
         struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *base);
+struct d3d12_descriptor_heap *vkd3d_gpu_descriptor_allocator_heap_from_descriptor(
+        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc);
 
 struct vkd3d_render_pass_key
 {

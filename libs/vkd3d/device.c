@@ -2305,6 +2305,29 @@ size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
     return remaining;
 }
 
+struct d3d12_descriptor_heap *vkd3d_gpu_descriptor_allocator_heap_from_descriptor(
+        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc)
+{
+    const struct vkd3d_gpu_descriptor_allocation *allocation;
+    int rc;
+
+    if (!allocator->allocation_count)
+        return NULL;
+
+    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    {
+        ERR("Failed to lock mutex, error %d.\n", rc);
+        return NULL;
+    }
+
+    allocation = vkd3d_gpu_descriptor_allocator_allocation_from_descriptor(allocator, desc);
+
+    pthread_mutex_unlock(&allocator->mutex);
+
+    return allocation ? CONTAINING_RECORD(allocation->base, struct d3d12_descriptor_heap, descriptors)
+            : NULL;
+}
+
 static bool vkd3d_gpu_descriptor_allocator_init(struct vkd3d_gpu_descriptor_allocator *allocator)
 {
     int rc;

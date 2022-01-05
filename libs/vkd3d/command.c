@@ -4178,11 +4178,24 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
 {
     struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
     const struct d3d12_root_signature *root_signature = bindings->root_signature;
+    struct d3d12_desc *desc;
 
     assert(root_signature_get_descriptor_table(root_signature, index));
 
     assert(index < ARRAY_SIZE(bindings->descriptor_tables));
-    bindings->descriptor_tables[index] = d3d12_desc_from_gpu_handle(base_descriptor);
+    desc = d3d12_desc_from_gpu_handle(base_descriptor);
+
+    if (desc && !vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&list->device->gpu_descriptor_allocator,
+            desc))
+    {
+        /* Failure to find a heap means the descriptor handle is from
+         * the wrong heap type or not a handle at all. */
+        ERR("Invalid heap for base descriptor %"PRIx64".\n", base_descriptor.ptr);
+        /* TODO: Mark list as invalid? */
+        return;
+    }
+
+    bindings->descriptor_tables[index] = desc;
     bindings->descriptor_table_dirty_mask |= (uint64_t)1 << index;
     bindings->descriptor_table_active_mask |= (uint64_t)1 << index;
 }
