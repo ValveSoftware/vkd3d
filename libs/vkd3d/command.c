@@ -4185,6 +4185,9 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
     assert(index < ARRAY_SIZE(bindings->descriptor_tables));
     desc = d3d12_desc_from_gpu_handle(base_descriptor);
 
+    if (bindings->descriptor_tables[index] == desc)
+        return;
+
     if (desc && !vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&list->device->gpu_descriptor_allocator,
             desc))
     {
