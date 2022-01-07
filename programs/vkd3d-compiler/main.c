@@ -686,13 +686,13 @@ int main(int argc, char **argv)
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
                 get_target_type_info(options.target_type)->name,
                 get_source_type_info(options.source_type)->name);
-        return 0;
+        return 1;
     }
 
     if (!options.preprocess_only && options.source_type == VKD3D_SHADER_SOURCE_HLSL && !options.profile)
     {
         fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
-        return 0;
+        return 1;
     }
 
     if (!options.filename && get_source_type_info(options.source_type)->is_binary && isatty(fileno(input)))
