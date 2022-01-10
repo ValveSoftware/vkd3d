@@ -19454,6 +19454,8 @@ static void test_get_copyable_footprints(void)
         {DXGI_FORMAT_BC6H_UF16, true},
         {DXGI_FORMAT_BC6H_SF16, true},
         {DXGI_FORMAT_BC7_UNORM, true},
+        {DXGI_FORMAT_D32_FLOAT, false},
+        {DXGI_FORMAT_D24_UNORM_S8_UINT, false},
     };
     static const uint64_t base_offsets[] =
     {
@@ -19499,6 +19501,14 @@ static void test_get_copyable_footprints(void)
             {D3D12_RESOURCE_DIMENSION_TEXTURE3D, 3, 2, 2, 2, 2, DXGI_FORMAT_BC1_UNORM,
                 {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_NONE}, 0, 1,
         },
+        {
+            {D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, 4, 4, 1, 1, DXGI_FORMAT_D32_FLOAT,
+                {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL}, 0, 2,
+        },
+        {
+            {D3D12_RESOURCE_DIMENSION_TEXTURE2D, 0, 4, 4, 1, 1, DXGI_FORMAT_D24_UNORM_S8_UINT,
+                {1, 0}, D3D12_TEXTURE_LAYOUT_UNKNOWN, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL}, 0, 3,
+        },
     };
 
     if (!(device = create_device()))
@@ -19538,6 +19548,15 @@ static void test_get_copyable_footprints(void)
             sub_resource_count = resource_desc.MipLevels;
             if (resources[i].dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D)
                 sub_resource_count *= resource_desc.DepthOrArraySize;
+            if (resource_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT)
+            {
+                if (!vkd3d_test_platform_is_windows())
+                {
+                    skip("Depth/stencil planes are not supported.\n");
+                    continue;
+                }
+                sub_resource_count *= 2;
+            }
             assert(sub_resource_count <= ARRAY_SIZE(layouts));
 
             for (k = 0; k < ARRAY_SIZE(base_offsets); ++k)
