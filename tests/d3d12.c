@@ -19550,11 +19550,9 @@ static void test_get_copyable_footprints(void)
                 sub_resource_count *= resource_desc.DepthOrArraySize;
             if (resource_desc.Format == DXGI_FORMAT_D24_UNORM_S8_UINT)
             {
+                /* FIXME: we require D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL here for DS formats but windows doesn't. */
                 if (!vkd3d_test_platform_is_windows())
-                {
-                    skip("Depth/stencil planes are not supported.\n");
-                    continue;
-                }
+                    resource_desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
                 sub_resource_count *= 2;
             }
             assert(sub_resource_count <= ARRAY_SIZE(layouts));

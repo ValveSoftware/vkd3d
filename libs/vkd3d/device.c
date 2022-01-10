@@ -3660,7 +3660,7 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
             = {DXGI_FORMAT_UNKNOWN, VK_FORMAT_UNDEFINED, 1, 1, 1, 1, 0};
 
     unsigned int i, sub_resource_idx, miplevel_idx, row_count, row_size, row_pitch;
-    unsigned int width, height, depth, array_size;
+    unsigned int width, height, depth, plane_count, sub_resources_per_plane;
     const struct vkd3d_format *format;
     uint64_t offset, size, total;
 
@@ -3694,9 +3694,11 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
         return;
     }
 
-    array_size = d3d12_resource_desc_get_layer_count(desc);
+    plane_count = ((format->vk_aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT)
+            && (format->vk_aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT)) ? 2 : 1;
+    sub_resources_per_plane = d3d12_resource_desc_get_sub_resource_count(desc);
 
-    if (!vkd3d_bound_range(first_sub_resource, sub_resource_count, desc->MipLevels * array_size))
+    if (!vkd3d_bound_range(first_sub_resource, sub_resource_count, sub_resources_per_plane * plane_count))
     {
         WARN("Invalid sub-resource range %u-%u for resource.\n", first_sub_resource, sub_resource_count);
         return;
@@ -3706,7 +3708,7 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
     total = 0;
     for (i = 0; i < sub_resource_count; ++i)
     {
-        sub_resource_idx = first_sub_resource + i;
+        sub_resource_idx = (first_sub_resource + i) % sub_resources_per_plane;
         miplevel_idx = sub_resource_idx % desc->MipLevels;
         width = align(d3d12_resource_desc_get_width(desc, miplevel_idx), format->block_width);
         height = align(d3d12_resource_desc_get_height(desc, miplevel_idx), format->block_height);
