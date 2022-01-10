@@ -1216,6 +1216,7 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
     ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
 #define TAG_AON9 MAKE_TAG('A', 'o', 'n', '9')
 #define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
+#define TAG_DXIL MAKE_TAG('D', 'X', 'I', 'L')
 #define TAG_ISG1 MAKE_TAG('I', 'S', 'G', '1')
 #define TAG_ISGN MAKE_TAG('I', 'S', 'G', 'N')
 #define TAG_OSG1 MAKE_TAG('O', 'S', 'G', '1')

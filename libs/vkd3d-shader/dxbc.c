@@ -1988,6 +1988,10 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
             TRACE("Skipping AON9 shader code chunk.\n");
             break;
 
+        case TAG_DXIL:
+            FIXME("Skipping DXIL shader model 6+ code chunk.\n");
+            break;
+
         default:
             TRACE("Skipping chunk %#x.\n", tag);
             break;
