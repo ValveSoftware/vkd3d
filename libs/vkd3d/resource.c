@@ -3044,7 +3044,8 @@ static VkSamplerMipmapMode vk_mipmap_mode_from_d3d12(D3D12_FILTER_TYPE type)
     }
 }
 
-static VkSamplerAddressMode vk_address_mode_from_d3d12(D3D12_TEXTURE_ADDRESS_MODE mode)
+static VkSamplerAddressMode vk_address_mode_from_d3d12(const struct d3d12_device *device,
+        D3D12_TEXTURE_ADDRESS_MODE mode)
 {
     switch (mode)
     {
@@ -3056,7 +3057,10 @@ static VkSamplerAddressMode vk_address_mode_from_d3d12(D3D12_TEXTURE_ADDRESS_MOD
             return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         case D3D12_TEXTURE_ADDRESS_MODE_BORDER:
             return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-            /* D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE requires VK_KHR_mirror_clamp_to_edge. */
+        case D3D12_TEXTURE_ADDRESS_MODE_MIRROR_ONCE:
+            if (device->vk_info.KHR_sampler_mirror_clamp_to_edge)
+                return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+            /* Fall through */
         default:
             FIXME("Unhandled address mode %#x.\n", mode);
             return VK_SAMPLER_ADDRESS_MODE_REPEAT;
@@ -3085,9 +3089,9 @@ static VkResult d3d12_create_sampler(struct d3d12_device *device, D3D12_FILTER f
     sampler_desc.magFilter = vk_filter_from_d3d12(D3D12_DECODE_MAG_FILTER(filter));
     sampler_desc.minFilter = vk_filter_from_d3d12(D3D12_DECODE_MIN_FILTER(filter));
     sampler_desc.mipmapMode = vk_mipmap_mode_from_d3d12(D3D12_DECODE_MIP_FILTER(filter));
-    sampler_desc.addressModeU = vk_address_mode_from_d3d12(address_u);
-    sampler_desc.addressModeV = vk_address_mode_from_d3d12(address_v);
-    sampler_desc.addressModeW = vk_address_mode_from_d3d12(address_w);
+    sampler_desc.addressModeU = vk_address_mode_from_d3d12(device, address_u);
+    sampler_desc.addressModeV = vk_address_mode_from_d3d12(device, address_v);
+    sampler_desc.addressModeW = vk_address_mode_from_d3d12(device, address_w);
     sampler_desc.mipLodBias = mip_lod_bias;
     sampler_desc.anisotropyEnable = D3D12_DECODE_IS_ANISOTROPIC_FILTER(filter);
     sampler_desc.maxAnisotropy = max_anisotropy;

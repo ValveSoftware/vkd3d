@@ -106,6 +106,7 @@ struct vkd3d_vulkan_info
     bool KHR_image_format_list;
     bool KHR_maintenance3;
     bool KHR_push_descriptor;
+    bool KHR_sampler_mirror_clamp_to_edge;
     /* EXT device extensions */
     bool EXT_conditional_rendering;
     bool EXT_debug_marker;
