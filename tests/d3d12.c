@@ -16067,7 +16067,7 @@ static void test_srv_component_mapping(void)
 
 static void test_descriptor_tables(void)
 {
-    ID3D12DescriptorHeap *heap, *sampler_heap, *heaps[2];
+    ID3D12DescriptorHeap *heap, *sampler_heap, *wrong_heap, *wrong_sampler_heap, *heaps[2];
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_DESCRIPTOR_RANGE descriptor_range[4];
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc;
@@ -16194,6 +16194,8 @@ static void test_descriptor_tables(void)
 
     heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 6);
     sampler_heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 1);
+    wrong_heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 6);
+    wrong_sampler_heap = create_gpu_descriptor_heap(context.device, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 1);
 
     descriptor_size = ID3D12Device_GetDescriptorHandleIncrementSize(context.device,
             D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -16237,7 +16239,7 @@ static void test_descriptor_tables(void)
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
-    heaps[0] = heap; heaps[1] = sampler_heap;
+    heaps[0] = wrong_heap; heaps[1] = wrong_sampler_heap;
     ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, ARRAY_SIZE(heaps), heaps);
     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 0, gpu_handle);
     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 1,
@@ -16258,6 +16260,8 @@ static void test_descriptor_tables(void)
         ID3D12Resource_Release(textures[i]);
     ID3D12DescriptorHeap_Release(heap);
     ID3D12DescriptorHeap_Release(sampler_heap);
+    ID3D12DescriptorHeap_Release(wrong_heap);
+    ID3D12DescriptorHeap_Release(wrong_sampler_heap);
     destroy_test_context(&context);
 }
 
