@@ -60,6 +60,7 @@ typedef int HRESULT;
 #else
 # define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_2
 # include <pthread.h>
+# include <unistd.h>
 # include "vkd3d.h"
 # include "vkd3d_utils.h"
 #endif
@@ -200,6 +201,19 @@ static inline bool join_thread(HANDLE untyped_thread)
     rc = pthread_join(*thread, NULL);
     free(thread);
     return !rc;
+}
+#endif
+
+#ifdef _WIN32
+static inline void vkd3d_sleep(unsigned int ms)
+{
+    Sleep(ms);
+}
+
+#else
+static inline void vkd3d_sleep(unsigned int ms)
+{
+    usleep(1000 * ms);
 }
 #endif
 

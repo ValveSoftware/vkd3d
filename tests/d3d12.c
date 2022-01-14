@@ -36013,6 +36013,35 @@ done:
     destroy_test_context(&context);
 }
 
+static void test_clock_calibration(void)
+{
+    uint64_t cpu_times[2] = {0}, gpu_times[2] = {0};
+    struct test_context context;
+    HRESULT hr;
+
+    if (!init_test_context(&context, NULL))
+        return;
+
+    hr = ID3D12CommandQueue_GetClockCalibration(context.queue, &gpu_times[0], &cpu_times[0]);
+    todo
+    ok(hr == S_OK, "Failed to retrieve calibrated timestamps, hr %#x.\n", hr);
+
+    vkd3d_sleep(100);
+
+    hr = ID3D12CommandQueue_GetClockCalibration(context.queue, &gpu_times[1], &cpu_times[1]);
+    todo
+    ok(hr == S_OK, "Failed to retrieve calibrated timestamps, hr %#x.\n", hr);
+
+    todo
+    ok(gpu_times[1] > gpu_times[0], "Inconsistent GPU timestamps %"PRIu64" and %"PRIu64".\n",
+            gpu_times[0], gpu_times[1]);
+    todo
+    ok(cpu_times[1] > cpu_times[0], "Inconsistent CPU timestamps %"PRIu64" and %"PRIu64".\n",
+            cpu_times[0], cpu_times[1]);
+
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -36190,4 +36219,5 @@ START_TEST(d3d12)
     run_test(test_resource_arrays);
     run_test(test_unbounded_resource_arrays);
     run_test(test_unbounded_samplers);
+    run_test(test_clock_calibration);
 }
