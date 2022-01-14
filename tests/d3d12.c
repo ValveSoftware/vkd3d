@@ -4737,7 +4737,7 @@ static void test_clear_render_target_view(void)
 
         ID3D12Device_CreateRenderTargetView(device, resource, &rtv_desc, rtv_handle);
 
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, &array_colors[i].x, 0, NULL);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, (const float *)&array_colors[i], 0, NULL);
     }
 
     transition_resource_state(command_list, resource,
@@ -4768,7 +4768,7 @@ static void test_clear_render_target_view(void)
 
         ID3D12Device_CreateRenderTargetView(device, resource, &rtv_desc, rtv_handle);
 
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, &array_colors[i].x, 0, NULL);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, (const float *)&array_colors[i], 0, NULL);
     }
 
     transition_resource_state(command_list, resource,
@@ -5703,7 +5703,7 @@ static void test_unknown_rtv_format(void)
     create_render_target(&context, &desc, &render_targets[1], &rtvs[2]);
 
     for (i = 0; i < ARRAY_SIZE(rtvs); ++i)
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtvs[i], &white.x, 0, NULL);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtvs[i], (const float *)&white, 0, NULL);
 
     /* NULL RTV */
     memset(&rtv_desc, 0, sizeof(rtv_desc));
@@ -14123,7 +14123,7 @@ static void test_gather(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14161,7 +14161,7 @@ static void test_gather(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4_offset, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14199,7 +14199,7 @@ static void test_gather(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4_green, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14237,7 +14237,7 @@ static void test_gather(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4_po, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14273,7 +14273,7 @@ static void test_gather(void)
     constants.offset_x = 0;
     constants.offset_y = 0;
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14463,7 +14463,7 @@ static void test_gather_c(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4_c, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14501,7 +14501,7 @@ static void test_gather_c(void)
     context.pipeline_state = create_pipeline_state(context.device,
             context.root_signature, desc.rt_format, NULL, &ps_gather4_po_c, NULL);
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -14537,7 +14537,7 @@ static void test_gather_c(void)
     constants.offset_x = 0;
     constants.offset_y = 0;
 
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, &white.x, 0, NULL);
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, (const float *)&white, 0, NULL);
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
@@ -15388,7 +15388,7 @@ static void test_multisample_array_texture(void)
         rtv_desc.Texture2DMSArray.ArraySize = 1;
         ID3D12Device_CreateRenderTargetView(device, texture, &rtv_desc, cpu_handle);
 
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, cpu_handle, &colors[i].x, 0, NULL);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, cpu_handle, (const float *)&colors[i], 0, NULL);
     }
 
     transition_resource_state(command_list, texture,
