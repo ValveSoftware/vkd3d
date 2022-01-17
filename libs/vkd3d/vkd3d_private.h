@@ -108,6 +108,7 @@ struct vkd3d_vulkan_info
     bool KHR_push_descriptor;
     bool KHR_sampler_mirror_clamp_to_edge;
     /* EXT device extensions */
+    bool EXT_calibrated_timestamps;
     bool EXT_conditional_rendering;
     bool EXT_debug_marker;
     bool EXT_depth_clip_enable;
@@ -158,6 +159,8 @@ struct vkd3d_instance
     enum vkd3d_api_version api_version;
 
     VkDebugReportCallbackEXT vk_debug_callback;
+
+    uint64_t host_ticks_per_second;
 
     LONG refcount;
 };
@@ -1195,6 +1198,7 @@ struct d3d12_device
     struct vkd3d_queue *copy_queue;
     uint32_t queue_family_indices[VKD3D_MAX_QUEUE_FAMILY_COUNT];
     unsigned int queue_family_count;
+    VkTimeDomainEXT vk_host_time_domain;
 
     struct vkd3d_instance *vkd3d_instance;
 

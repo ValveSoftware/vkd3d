@@ -55,6 +55,9 @@ VK_INSTANCE_EXT_PFN(vkGetPhysicalDeviceProperties2KHR)
 VK_INSTANCE_EXT_PFN(vkCreateDebugReportCallbackEXT)
 VK_INSTANCE_EXT_PFN(vkDestroyDebugReportCallbackEXT)
 
+/* VK_EXT_calibrated_timestamps */
+VK_INSTANCE_EXT_PFN(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT)
+
 /* Device functions (obtained by vkGetDeviceProcAddr). */
 VK_DEVICE_PFN(vkDestroyDevice) /* Load vkDestroyDevice() first. */
 VK_DEVICE_PFN(vkAllocateCommandBuffers)
@@ -191,6 +194,9 @@ VK_DEVICE_EXT_PFN(vkGetDescriptorSetLayoutSupportKHR)
 
 /* VK_KHR_push_descriptor */
 VK_DEVICE_EXT_PFN(vkCmdPushDescriptorSetKHR)
+
+/* VK_EXT_calibrated_timestamps */
+VK_DEVICE_EXT_PFN(vkGetCalibratedTimestampsEXT)
 
 /* VK_EXT_conditional_rendering */
 VK_DEVICE_EXT_PFN(vkCmdBeginConditionalRenderingEXT)

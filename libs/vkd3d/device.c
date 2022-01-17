@@ -130,6 +130,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(KHR_PUSH_DESCRIPTOR, KHR_push_descriptor),
     VK_EXTENSION(KHR_SAMPLER_MIRROR_CLAMP_TO_EDGE, KHR_sampler_mirror_clamp_to_edge),
     /* EXT extensions */
+    VK_EXTENSION(EXT_CALIBRATED_TIMESTAMPS, EXT_calibrated_timestamps),
     VK_EXTENSION(EXT_CONDITIONAL_RENDERING, EXT_conditional_rendering),
     VK_EXTENSION(EXT_DEBUG_MARKER, EXT_debug_marker),
     VK_EXTENSION(EXT_DEPTH_CLIP_ENABLE, EXT_depth_clip_enable),
@@ -447,12 +448,16 @@ static uint64_t vkd3d_init_config_flags(void)
     return config_flags;
 }
 
+/* TICKSPERSEC from Wine */
+#define VKD3D_DEFAULT_HOST_TICKS_PER_SECOND 10000000
+
 static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
         const struct vkd3d_instance_create_info *create_info)
 {
     const struct vkd3d_vk_global_procs *vk_global_procs = &instance->vk_global_procs;
     const struct vkd3d_optional_instance_extensions_info *optional_extensions;
     const struct vkd3d_application_info *vkd3d_application_info;
+    const struct vkd3d_host_time_domain_info *time_domain_info;
     bool *user_extension_supported = NULL;
     VkApplicationInfo application_info;
     VkInstanceCreateInfo instance_info;
@@ -577,6 +582,11 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
             vkd3d_dlclose(instance->libvulkan);
         return hr;
     }
+
+    if ((time_domain_info = vkd3d_find_struct(create_info->next, HOST_TIME_DOMAIN_INFO)))
+        instance->host_ticks_per_second = time_domain_info->ticks_per_second;
+    else
+        instance->host_ticks_per_second = VKD3D_DEFAULT_HOST_TICKS_PER_SECOND;
 
     instance->vk_instance = vk_instance;
 
@@ -2349,6 +2359,66 @@ static void vkd3d_gpu_descriptor_allocator_cleanup(struct vkd3d_gpu_descriptor_a
     pthread_mutex_destroy(&allocator->mutex);
 }
 
+static bool have_vk_time_domain(VkTimeDomainEXT *domains, unsigned int count, VkTimeDomainEXT domain)
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+        if (domains[i] == domain)
+            return true;
+
+    return false;
+}
+
+static void vkd3d_time_domains_init(struct d3d12_device *device)
+{
+    static const VkTimeDomainEXT host_time_domains[] =
+    {
+        /* In order of preference */
+        VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT,
+        VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT,
+        VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT,
+
+    };
+    const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
+    VkTimeDomainEXT domains[8];
+    unsigned int i;
+    uint32_t count;
+    VkResult vr;
+
+    device->vk_host_time_domain = -1;
+
+    if (!device->vk_info.EXT_calibrated_timestamps)
+        return;
+
+    count = ARRAY_SIZE(domains);
+    if ((vr = VK_CALL(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(device->vk_physical_device,
+            &count, domains))) != VK_SUCCESS && vr != VK_INCOMPLETE)
+    {
+        WARN("Failed to get calibrated time domains, vr %d.\n", vr);
+        return;
+    }
+
+    if (vr == VK_INCOMPLETE)
+        FIXME("Calibrated time domain list is incomplete.\n");
+
+    if (!have_vk_time_domain(domains, count, VK_TIME_DOMAIN_DEVICE_EXT))
+    {
+        WARN("Device time domain not found. Calibrated timestamps will not be available.\n");
+        return;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(host_time_domains); ++i)
+    {
+        if (!have_vk_time_domain(domains, count, host_time_domains[i]))
+            continue;
+        device->vk_host_time_domain = host_time_domains[i];
+        break;
+    }
+    if (device->vk_host_time_domain == -1)
+        WARN("Found no acceptable host time domain. Calibrated timestamps will not be available.\n");
+}
+
 /* ID3D12Device */
 static inline struct d3d12_device *impl_from_ID3D12Device(ID3D12Device *iface)
 {
@@ -3910,6 +3980,7 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     vkd3d_render_pass_cache_init(&device->render_pass_cache);
     vkd3d_gpu_descriptor_allocator_init(&device->gpu_descriptor_allocator);
     vkd3d_gpu_va_allocator_init(&device->gpu_va_allocator);
+    vkd3d_time_domains_init(device);
 
     for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
         pthread_mutex_init(&device->desc_mutex[i], NULL);

@@ -36023,19 +36023,15 @@ static void test_clock_calibration(void)
         return;
 
     hr = ID3D12CommandQueue_GetClockCalibration(context.queue, &gpu_times[0], &cpu_times[0]);
-    todo
     ok(hr == S_OK, "Failed to retrieve calibrated timestamps, hr %#x.\n", hr);
 
     vkd3d_sleep(100);
 
     hr = ID3D12CommandQueue_GetClockCalibration(context.queue, &gpu_times[1], &cpu_times[1]);
-    todo
     ok(hr == S_OK, "Failed to retrieve calibrated timestamps, hr %#x.\n", hr);
 
-    todo
     ok(gpu_times[1] > gpu_times[0], "Inconsistent GPU timestamps %"PRIu64" and %"PRIu64".\n",
             gpu_times[0], gpu_times[1]);
-    todo
     ok(cpu_times[1] > cpu_times[0], "Inconsistent CPU timestamps %"PRIu64" and %"PRIu64".\n",
             cpu_times[0], cpu_times[1]);
 

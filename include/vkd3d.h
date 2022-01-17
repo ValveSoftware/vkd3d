@@ -48,6 +48,9 @@ enum vkd3d_structure_type
     VKD3D_STRUCTURE_TYPE_OPTIONAL_DEVICE_EXTENSIONS_INFO,
     VKD3D_STRUCTURE_TYPE_APPLICATION_INFO,
 
+    /* 1.3 */
+    VKD3D_STRUCTURE_TYPE_HOST_TIME_DOMAIN_INFO,
+
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_STRUCTURE_TYPE),
 };
 
@@ -107,6 +110,15 @@ struct vkd3d_application_info
     uint32_t engine_version; /* vkd3d version if engine_name is NULL */
 
     enum vkd3d_api_version api_version;
+};
+
+/* Extends vkd3d_instance_create_info. Available since 1.3. */
+struct vkd3d_host_time_domain_info
+{
+    enum vkd3d_structure_type type;
+    const void *next;
+
+    uint64_t ticks_per_second;
 };
 
 struct vkd3d_device_create_info

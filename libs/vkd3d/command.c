@@ -6238,13 +6238,68 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_GetTimestampFrequency(ID3D1
     return S_OK;
 }
 
+#define NANOSECONDS_IN_A_SECOND 1000000000
+
 static HRESULT STDMETHODCALLTYPE d3d12_command_queue_GetClockCalibration(ID3D12CommandQueue *iface,
         UINT64 *gpu_timestamp, UINT64 *cpu_timestamp)
 {
-    FIXME("iface %p, gpu_timestamp %p, cpu_timestamp %p stub!\n",
+    struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
+    struct d3d12_device *device = command_queue->device;
+    const struct vkd3d_vk_device_procs *vk_procs;
+    VkCalibratedTimestampInfoEXT infos[2];
+    uint64_t timestamps[2];
+    uint64_t deviations[2];
+    VkResult vr;
+
+    TRACE("iface %p, gpu_timestamp %p, cpu_timestamp %p.\n",
             iface, gpu_timestamp, cpu_timestamp);
 
-    return E_NOTIMPL;
+    if (!command_queue->vkd3d_queue->timestamp_bits)
+    {
+        WARN("Timestamp queries not supported.\n");
+        return E_FAIL;
+    }
+
+    if (!gpu_timestamp || !cpu_timestamp)
+        return E_INVALIDARG;
+
+    if (!device->vk_info.EXT_calibrated_timestamps || device->vk_host_time_domain == -1)
+    {
+        WARN(!device->vk_info.EXT_calibrated_timestamps
+                ? "VK_EXT_calibrated_timestamps was not found. Setting timestamps to zero.\n"
+                : "Device and/or host time domain is not available. Setting timestamps to zero.\n");
+        *gpu_timestamp = 0;
+        *cpu_timestamp = 0;
+        return S_OK;
+    }
+
+    vk_procs = &device->vk_procs;
+
+    infos[0].sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT;
+    infos[0].pNext = NULL;
+    infos[0].timeDomain = VK_TIME_DOMAIN_DEVICE_EXT;
+    infos[1].sType = VK_STRUCTURE_TYPE_CALIBRATED_TIMESTAMP_INFO_EXT;
+    infos[1].pNext = NULL;
+    infos[1].timeDomain = device->vk_host_time_domain;
+
+    if ((vr = VK_CALL(vkGetCalibratedTimestampsEXT(command_queue->device->vk_device,
+            ARRAY_SIZE(infos), infos, timestamps, deviations))) < 0)
+    {
+        WARN("Failed to get calibrated timestamps, vr %d.\n", vr);
+        return E_FAIL;
+    }
+
+    if (infos[1].timeDomain == VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT
+            || infos[1].timeDomain == VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT)
+    {
+        /* Convert monotonic clock to match Wine's RtlQueryPerformanceFrequency(). */
+        timestamps[1] /= NANOSECONDS_IN_A_SECOND / device->vkd3d_instance->host_ticks_per_second;
+    }
+
+    *gpu_timestamp = timestamps[0];
+    *cpu_timestamp = timestamps[1];
+
+    return S_OK;
 }
 
 static D3D12_COMMAND_QUEUE_DESC * STDMETHODCALLTYPE d3d12_command_queue_GetDesc(ID3D12CommandQueue *iface,
