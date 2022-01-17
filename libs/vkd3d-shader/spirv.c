@@ -1833,7 +1833,8 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
         vkd3d_spirv_build_op_extension(&stream, "SPV_KHR_shader_draw_parameters");
     if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityDemoteToHelperInvocationEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_demote_to_helper_invocation");
-    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityUniformBufferArrayDynamicIndexing)
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityRuntimeDescriptorArrayEXT)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityUniformBufferArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityUniformTexelBufferArrayDynamicIndexingEXT)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilitySampledImageArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageBufferArrayDynamicIndexing)
