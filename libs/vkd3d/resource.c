@@ -1080,7 +1080,6 @@ static bool d3d12_resource_validate_box(const struct d3d12_resource *resource,
         unsigned int sub_resource_idx, const D3D12_BOX *box)
 {
     unsigned int mip_level = sub_resource_idx % resource->desc.MipLevels;
-    struct d3d12_device *device = resource->device;
     const struct vkd3d_format *vkd3d_format;
     uint32_t width_mask, height_mask;
     uint64_t width, height, depth;
@@ -1089,7 +1088,7 @@ static bool d3d12_resource_validate_box(const struct d3d12_resource *resource,
     height = d3d12_resource_desc_get_height(&resource->desc, mip_level);
     depth = d3d12_resource_desc_get_depth(&resource->desc, mip_level);
 
-    vkd3d_format = vkd3d_format_from_d3d12_resource_desc(device, &resource->desc, 0);
+    vkd3d_format = resource->format;
     assert(vkd3d_format);
     width_mask = vkd3d_format->block_width - 1;
     height_mask = vkd3d_format->block_height - 1;
