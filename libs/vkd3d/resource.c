@@ -855,7 +855,11 @@ static HRESULT vkd3d_create_image(struct d3d12_device *device,
     VkImageCreateInfo image_info;
     VkResult vr;
 
-    if (!(format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0)))
+    if (resource)
+    {
+        format = resource->format;
+    }
+    else if (!(format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0)))
     {
         WARN("Invalid DXGI format %#x.\n", desc->Format);
         return E_INVALIDARG;
