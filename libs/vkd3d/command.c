@@ -806,6 +806,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
 {
     struct d3d12_device *device = fence->device;
     struct vkd3d_signaled_semaphore *current;
+    bool signal_null_event_cond = false;
     unsigned int i, j;
     int rc;
 
@@ -823,7 +824,15 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
 
         if (current->value <= value)
         {
-            fence->device->signal_event(current->event);
+            if (current->event)
+            {
+                fence->device->signal_event(current->event);
+            }
+            else
+            {
+                current->latch = true;
+                signal_null_event_cond = true;
+            }
         }
         else
         {
@@ -833,6 +842,9 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
         }
     }
     fence->event_count = j;
+
+    if (signal_null_event_cond)
+        pthread_cond_broadcast(&fence->null_event_cond);
 
     if (vk_fence)
     {
@@ -916,6 +928,7 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence *iface)
         vkd3d_free(fence->events);
         if ((rc = pthread_mutex_destroy(&fence->mutex)))
             ERR("Failed to destroy mutex, error %d.\n", rc);
+        pthread_cond_destroy(&fence->null_event_cond);
         vkd3d_free(fence);
 
         d3d12_device_release(device);
@@ -997,6 +1010,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence(iface);
     unsigned int i;
+    bool *latch;
     int rc;
 
     TRACE("iface %p, value %#"PRIx64", event %p.\n", iface, value, event);
@@ -1009,7 +1023,8 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 
     if (value <= fence->value)
     {
-        fence->device->signal_event(event);
+        if (event)
+            fence->device->signal_event(event);
         pthread_mutex_unlock(&fence->mutex);
         return S_OK;
     }
@@ -1036,7 +1051,19 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 
     fence->events[fence->event_count].value = value;
     fence->events[fence->event_count].event = event;
+    fence->events[fence->event_count].latch = false;
+    latch = &fence->events[fence->event_count].latch;
     ++fence->event_count;
+
+    /* If event is NULL, we need to block until the fence value completes.
+     * Implement this in a uniform way where we pretend we have a dummy event.
+     * A NULL fence->events[].event means that we should set latch to true
+     * and signal a condition variable instead of calling external signal_event callback. */
+    if (!event)
+    {
+        while (!*latch)
+            pthread_cond_wait(&fence->null_event_cond, &fence->mutex);
+    }
 
     pthread_mutex_unlock(&fence->mutex);
     return S_OK;
@@ -1095,6 +1122,13 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
         return hresult_from_errno(rc);
     }
 
+    if ((rc = pthread_cond_init(&fence->null_event_cond, NULL)))
+    {
+        ERR("Failed to initialize cond variable, error %d.\n", rc);
+        pthread_mutex_destroy(&fence->mutex);
+        return hresult_from_errno(rc);
+    }
+
     if (flags)
         FIXME("Ignoring flags %#x.\n", flags);
 
@@ -1112,6 +1146,7 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
     if (FAILED(hr = vkd3d_private_store_init(&fence->private_store)))
     {
         pthread_mutex_destroy(&fence->mutex);
+        pthread_cond_destroy(&fence->null_event_cond);
         return hr;
     }
 
