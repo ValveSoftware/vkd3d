@@ -2328,6 +2328,8 @@ static HRESULT compute_input_layout_offsets(const struct d3d12_device *device,
             return E_INVALIDARG;
         }
 
+        /* TODO: DXGI_FORMAT_UNKNOWN will return a format with byte_count == 1,
+         * which may not match driver behaviour (return E_INVALIDARG?). */
         if (!(format = vkd3d_get_format(device, e->Format, false)))
         {
             WARN("Invalid input element format %#x.\n", e->Format);
@@ -2816,6 +2818,8 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         const D3D12_INPUT_ELEMENT_DESC *e = &desc->InputLayout.pInputElementDescs[i];
         const struct vkd3d_shader_signature_element *signature_element;
 
+        /* TODO: DXGI_FORMAT_UNKNOWN will succeed here, which may not match
+         * driver behaviour (return E_INVALIDARG?). */
         if (!(format = vkd3d_get_format(device, e->Format, false)))
         {
             WARN("Invalid input element format %#x.\n", e->Format);

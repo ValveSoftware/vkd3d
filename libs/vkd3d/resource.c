@@ -1589,6 +1589,12 @@ static void d3d12_validate_resource_flags(D3D12_RESOURCE_FLAGS flags)
 static bool d3d12_resource_validate_texture_format(const D3D12_RESOURCE_DESC *desc,
         const struct vkd3d_format *format)
 {
+    if (desc->Format == DXGI_FORMAT_UNKNOWN)
+    {
+        WARN("DXGI_FORMAT_UNKNOWN is invalid for textures.\n");
+        return false;
+    }
+
     if (!vkd3d_format_is_compressed(format))
         return true;
 
@@ -2273,6 +2279,8 @@ static bool vkd3d_create_buffer_view_for_resource(struct d3d12_device *device,
     }
     else if ((format = vkd3d_format_from_d3d12_resource_desc(device, &resource->desc, view_format)))
     {
+        /* TODO: if view_format is DXGI_FORMAT_UNKNOWN, this is always 1, which
+         * may not match driver behaviour (return false?). */
         element_size = format->byte_count;
     }
     else

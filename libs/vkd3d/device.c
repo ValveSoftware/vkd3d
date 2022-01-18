@@ -3726,8 +3726,6 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
         UINT *row_counts, UINT64 *row_sizes, UINT64 *total_bytes)
 {
     struct d3d12_device *device = impl_from_ID3D12Device(iface);
-    static const struct vkd3d_format vkd3d_format_unknown
-            = {DXGI_FORMAT_UNKNOWN, VK_FORMAT_UNDEFINED, 1, 1, 1, 1, 0};
 
     unsigned int i, sub_resource_idx, miplevel_idx, row_count, row_size, row_pitch;
     unsigned int width, height, depth, plane_count, sub_resources_per_plane;
@@ -3748,11 +3746,7 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device *i
     if (total_bytes)
         *total_bytes = ~(uint64_t)0;
 
-    if (desc->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-    {
-        format = &vkd3d_format_unknown;
-    }
-    else if (!(format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0)))
+    if (!(format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0)))
     {
         WARN("Invalid format %#x.\n", desc->Format);
         return;
