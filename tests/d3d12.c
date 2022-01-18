@@ -4418,11 +4418,14 @@ static void test_fence_values(void)
     value = ID3D12Fence_GetCompletedValue(fence);
     ok(value == next_value, "Got value %#"PRIx64", expected %#"PRIx64".\n", value, next_value);
 
-    for (i = 0; i < 100; ++i)
+    for (i = 0; i < 200; ++i)
     {
         ++next_value;
         queue_signal(queue, fence, next_value);
-        wait_queue_idle(device, queue);
+        if ((i * 11) & 8)
+            wait_queue_idle_no_event(device, queue);
+        else
+            wait_queue_idle(device, queue);
         value = ID3D12Fence_GetCompletedValue(fence);
         ok(value == next_value, "Got value %#"PRIx64", expected %#"PRIx64".\n", value, next_value);
     }
@@ -4457,6 +4460,11 @@ static void test_fence_values(void)
     next_value = (uint64_t)1 << 60;
     queue_signal(queue, fence, next_value);
     wait_queue_idle(device, queue);
+    value = ID3D12Fence_GetCompletedValue(fence);
+    ok(value == next_value, "Got value %#"PRIx64", expected %#"PRIx64".\n", value, next_value);
+    next_value <<= 1;
+    queue_signal(queue, fence, next_value);
+    wait_queue_idle_no_event(device, queue);
     value = ID3D12Fence_GetCompletedValue(fence);
     ok(value == next_value, "Got value %#"PRIx64", expected %#"PRIx64".\n", value, next_value);
     next_value = 0;
