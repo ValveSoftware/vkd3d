@@ -1353,11 +1353,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_WriteToSubresource(ID3D12Resourc
     device = resource->device;
     vk_procs = &device->vk_procs;
 
-    if (!(format = vkd3d_format_from_d3d12_resource_desc(device, &resource->desc, 0)))
-    {
-        ERR("Invalid DXGI format %#x.\n", resource->desc.Format);
-        return E_INVALIDARG;
-    }
+    format = resource->format;
     if (format->vk_aspect_mask != VK_IMAGE_ASPECT_COLOR_BIT)
     {
         FIXME("Not supported for format %#x.\n", format->dxgi_format);
