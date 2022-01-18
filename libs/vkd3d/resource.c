@@ -2439,7 +2439,11 @@ static bool init_default_texture_view_desc(struct vkd3d_texture_view_desc *desc,
 {
     const struct d3d12_device *device = resource->device;
 
-    if (!(desc->format = vkd3d_format_from_d3d12_resource_desc(device, &resource->desc, view_format)))
+    if (view_format == resource->desc.Format)
+    {
+        desc->format = resource->format;
+    }
+    else if (!(desc->format = vkd3d_format_from_d3d12_resource_desc(device, &resource->desc, view_format)))
     {
         FIXME("Failed to find format (resource format %#x, view format %#x).\n",
                 resource->desc.Format, view_format);
