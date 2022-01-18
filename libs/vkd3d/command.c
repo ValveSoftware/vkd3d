@@ -4057,14 +4057,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ResourceBarrier(ID3D12GraphicsC
         }
         else
         {
-            const struct vkd3d_format *format;
             VkImageMemoryBarrier vk_barrier;
-
-            if (!(format = vkd3d_format_from_d3d12_resource_desc(list->device, &resource->desc, 0)))
-            {
-                ERR("Resource %p has invalid format %#x.\n", resource, resource->desc.Format);
-                continue;
-            }
 
             vk_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             vk_barrier.pNext = NULL;
@@ -4076,7 +4069,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ResourceBarrier(ID3D12GraphicsC
             vk_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             vk_barrier.image = resource->u.vk_image;
 
-            vk_barrier.subresourceRange.aspectMask = format->vk_aspect_mask;
+            vk_barrier.subresourceRange.aspectMask = resource->format->vk_aspect_mask;
             if (sub_resource_idx == D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES)
             {
                 vk_barrier.subresourceRange.baseMipLevel = 0;
