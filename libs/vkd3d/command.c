@@ -2116,16 +2116,9 @@ static void d3d12_command_list_transition_resource_to_initial_state(struct d3d12
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     const struct vkd3d_vulkan_info *vk_info = &list->device->vk_info;
     VkPipelineStageFlags src_stage_mask, dst_stage_mask;
-    const struct vkd3d_format *format;
     VkImageMemoryBarrier barrier;
 
     assert(d3d12_resource_is_texture(resource));
-
-    if (!(format = vkd3d_format_from_d3d12_resource_desc(list->device, &resource->desc, 0)))
-    {
-        ERR("Resource %p has invalid format %#x.\n", resource, resource->desc.Format);
-        return;
-    }
 
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.pNext = NULL;
@@ -2146,7 +2139,7 @@ static void d3d12_command_list_transition_resource_to_initial_state(struct d3d12
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = resource->u.vk_image;
-    barrier.subresourceRange.aspectMask = format->vk_aspect_mask;
+    barrier.subresourceRange.aspectMask = resource->format->vk_aspect_mask;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;

@@ -1778,6 +1778,8 @@ static HRESULT d3d12_resource_init(struct d3d12_resource *resource, struct d3d12
     if (FAILED(hr = d3d12_resource_validate_desc(&resource->desc, device)))
         return hr;
 
+    resource->format = vkd3d_format_from_d3d12_resource_desc(device, desc, 0);
+
     switch (desc->Dimension)
     {
         case D3D12_RESOURCE_DIMENSION_BUFFER:
@@ -2030,6 +2032,7 @@ HRESULT vkd3d_create_image_resource(ID3D12Device *device,
     object->refcount = 1;
     object->internal_refcount = 1;
     object->desc = create_info->desc;
+    object->format = vkd3d_format_from_d3d12_resource_desc(d3d12_device, &create_info->desc, 0);
     object->u.vk_image = create_info->vk_image;
     object->flags = VKD3D_RESOURCE_EXTERNAL;
     object->flags |= create_info->flags & VKD3D_RESOURCE_PUBLIC_FLAGS;

@@ -430,6 +430,7 @@ struct d3d12_resource
     LONG internal_refcount;
 
     D3D12_RESOURCE_DESC desc;
+    const struct vkd3d_format *format;
 
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
     union
