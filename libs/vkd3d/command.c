@@ -3573,7 +3573,6 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyResource(ID3D12GraphicsComm
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList2(iface);
     struct d3d12_resource *dst_resource, *src_resource;
-    const struct vkd3d_format *src_format, *dst_format;
     const struct vkd3d_vk_device_procs *vk_procs;
     VkBufferCopy vk_buffer_copy;
     VkImageCopy vk_image_copy;
@@ -3605,19 +3604,6 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyResource(ID3D12GraphicsComm
     }
     else
     {
-        if (!(dst_format = vkd3d_format_from_d3d12_resource_desc(list->device,
-                &dst_resource->desc, DXGI_FORMAT_UNKNOWN)))
-        {
-            WARN("Invalid format %#x.\n", dst_resource->desc.Format);
-            return;
-        }
-        if (!(src_format = vkd3d_format_from_d3d12_resource_desc(list->device,
-                &src_resource->desc, DXGI_FORMAT_UNKNOWN)))
-        {
-            WARN("Invalid format %#x.\n", src_resource->desc.Format);
-            return;
-        }
-
         layer_count = d3d12_resource_desc_get_layer_count(&dst_resource->desc);
 
         assert(d3d12_resource_is_texture(dst_resource));
@@ -3627,8 +3613,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyResource(ID3D12GraphicsComm
 
         for (i = 0; i < dst_resource->desc.MipLevels; ++i)
         {
-            vk_image_copy_from_d3d12(&vk_image_copy, i, i,
-                    &src_resource->desc, &dst_resource->desc, src_format, dst_format, NULL, 0, 0, 0);
+            vk_image_copy_from_d3d12(&vk_image_copy, i, i, &src_resource->desc, &dst_resource->desc,
+                    src_resource->format, dst_resource->format, NULL, 0, 0, 0);
             vk_image_copy.dstSubresource.layerCount = layer_count;
             vk_image_copy.srcSubresource.layerCount = layer_count;
             VK_CALL(vkCmdCopyImage(list->vk_command_buffer, src_resource->u.vk_image,
