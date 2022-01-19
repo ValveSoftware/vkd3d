@@ -326,7 +326,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
     struct hlsl_ir_if *iff;
 
     /* E.g. "for (i = 0; ; ++i)". */
-    if (!list_count(cond_list))
+    if (list_empty(cond_list))
         return true;
 
     condition = node_from_list(cond_list);
