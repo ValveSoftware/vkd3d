@@ -1568,6 +1568,33 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
                 }
 
+                case HLSL_OP2_GEQUAL:
+                {
+                    const struct hlsl_type *src_type = arg1->data_type;
+
+                    switch (src_type->base_type)
+                    {
+                        case HLSL_TYPE_FLOAT:
+                            write_sm4_binary_op(buffer, VKD3D_SM4_OP_GE, &expr->node, arg1, arg2);
+                            break;
+
+                        case HLSL_TYPE_INT:
+                            write_sm4_binary_op(buffer, VKD3D_SM4_OP_IGE, &expr->node, arg1, arg2);
+                            break;
+
+                        case HLSL_TYPE_BOOL:
+                        case HLSL_TYPE_UINT:
+                            write_sm4_binary_op(buffer, VKD3D_SM4_OP_UGE, &expr->node, arg1, arg2);
+                            break;
+
+                        default:
+                            hlsl_fixme(ctx, &expr->node.loc, "SM4 greater-than-or-equal between \"%s\" operands.",
+                                    debug_hlsl_type(ctx, src_type));
+                            break;
+                    }
+                    break;
+                }
+
                 default:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 bool \"%s\" expression.", debug_hlsl_expr_op(expr->op));
                     break;
