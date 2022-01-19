@@ -1198,8 +1198,6 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
         [HLSL_OP2_DOT]         = "dot",
         [HLSL_OP2_EQUAL]       = "==",
         [HLSL_OP2_GEQUAL]      = ">=",
-        [HLSL_OP2_GREATER]     = ">",
-        [HLSL_OP2_LEQUAL]      = "<=",
         [HLSL_OP2_LESS]        = "<",
         [HLSL_OP2_LOGIC_AND]   = "&&",
         [HLSL_OP2_LOGIC_OR]    = "||",

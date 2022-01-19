@@ -3422,11 +3422,11 @@ relational_expr:
         }
     | relational_expr '>' shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_GREATER, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_LESS, @2);
         }
     | relational_expr OP_LE shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_LEQUAL, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_GEQUAL, @2);
         }
     | relational_expr OP_GE shift_expr
         {
