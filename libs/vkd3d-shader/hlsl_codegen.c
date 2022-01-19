@@ -724,6 +724,31 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
         {
             switch (expr->op)
             {
+                case HLSL_OP1_CAST:
+                    if (instr->data_type->dimx != arg1->node.data_type->dimx
+                            || instr->data_type->dimy != arg1->node.data_type->dimy)
+                    {
+                        FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
+                                debug_hlsl_type(ctx, instr->data_type));
+                        vkd3d_free(res);
+                        return false;
+                    }
+
+                    switch (arg1->node.data_type->base_type)
+                    {
+                        case HLSL_TYPE_INT:
+                            for (i = 0; i < dimx; ++i)
+                                res->value[i].i = arg1->value[i].u;
+                            break;
+
+                        default:
+                            FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
+                                    debug_hlsl_type(ctx, instr->data_type));
+                            vkd3d_free(res);
+                            return false;
+                    }
+                    break;
+
                 case HLSL_OP1_NEG:
                     for (i = 0; i < instr->data_type->dimx; ++i)
                         res->value[i].u = -arg1->value[i].u;
