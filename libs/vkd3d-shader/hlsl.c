@@ -196,6 +196,8 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         }
 
         case HLSL_CLASS_OBJECT:
+            /* For convenience when performing copy propagation. */
+            type->reg_size = 1;
             break;
     }
 }
@@ -273,6 +275,7 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     type->dimy = 1;
     type->sampler_dim = dim;
     type->e.resource_format = format;
+    hlsl_type_calculate_reg_size(ctx, type);
     list_add_tail(&ctx->types, &type->entry);
     return type;
 }

@@ -394,9 +394,26 @@ static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_l
     struct hlsl_deref *src = &load->src;
     struct hlsl_ir_var *var = src->var;
     unsigned int offset, swizzle;
+    unsigned int dimx = 0;
 
-    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
-        return false;
+    switch (type->type)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+            dimx = type->dimx;
+            break;
+
+        case HLSL_CLASS_OBJECT:
+            dimx = 1;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+        case HLSL_CLASS_ARRAY:
+        case HLSL_CLASS_STRUCT:
+            /* FIXME: Actually we shouldn't even get here, but we don't split
+             * matrices yet. */
+            return false;
+    }
 
     if (!hlsl_offset_from_deref(src, &offset))
         return false;
@@ -404,18 +421,22 @@ static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_l
     if (!(var_def = copy_propagation_get_var_def(state, var)))
         return false;
 
-    if (!(new_node = copy_propagation_compute_replacement(var_def, offset, type->dimx, &swizzle)))
+    if (!(new_node = copy_propagation_compute_replacement(var_def, offset, dimx, &swizzle)))
     {
-        TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, offset, offset + type->dimx);
+        TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, offset, offset + dimx);
         return false;
     }
 
     TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
-            var->name, offset, offset + type->dimx, new_node, debug_hlsl_swizzle(swizzle, 4));
-    if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, type->dimx, new_node, &node->loc)))
-        return false;
-    list_add_before(&node->entry, &swizzle_node->node.entry);
-    replace_node(node, &swizzle_node->node);
+            var->name, offset, offset + dimx, new_node, debug_hlsl_swizzle(swizzle, 4));
+    if (type->type != HLSL_CLASS_OBJECT)
+    {
+        if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, dimx, new_node, &node->loc)))
+            return false;
+        list_add_before(&node->entry, &swizzle_node->node.entry);
+        new_node = &swizzle_node->node;
+    }
+    replace_node(node, new_node);
     return true;
 }
 
@@ -431,9 +452,17 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
         return;
 
     if (hlsl_offset_from_deref(lhs, &offset))
-        copy_propagation_set_value(var_def, offset, store->writemask, store->rhs.node);
+    {
+        unsigned int writemask = store->writemask;
+
+        if (store->rhs.node->data_type->type == HLSL_CLASS_OBJECT)
+            writemask = VKD3DSP_WRITEMASK_0;
+        copy_propagation_set_value(var_def, offset, writemask, store->rhs.node);
+    }
     else
+    {
         copy_propagation_invalidate_whole_variable(var_def);
+    }
 }
 
 static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_block *block,
