@@ -265,7 +265,7 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
 {
     struct hlsl_type *type;
 
-    if (!(type = vkd3d_calloc(1, sizeof(*type))))
+    if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->type = HLSL_CLASS_OBJECT;
     type->base_type = HLSL_TYPE_TEXTURE;
