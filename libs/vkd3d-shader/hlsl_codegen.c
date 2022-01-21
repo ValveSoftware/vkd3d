@@ -307,8 +307,8 @@ static void copy_propagation_var_def_destroy(struct rb_entry *entry, void *conte
     vkd3d_free(var_def);
 }
 
-static struct copy_propagation_var_def *copy_propagation_get_var_def(struct copy_propagation_state *state,
-        struct hlsl_ir_var *var)
+static struct copy_propagation_var_def *copy_propagation_get_var_def(const struct copy_propagation_state *state,
+        const struct hlsl_ir_var *var)
 {
     struct rb_entry *entry = rb_get(&state->var_defs, var);
 
@@ -362,11 +362,19 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
     }
 }
 
-static struct hlsl_ir_node *copy_propagation_compute_replacement(struct copy_propagation_var_def *var_def,
-        unsigned int offset, unsigned int count, unsigned int *swizzle)
+static struct hlsl_ir_node *copy_propagation_compute_replacement(const struct copy_propagation_state *state,
+        const struct hlsl_deref *deref, unsigned int count, unsigned int *swizzle)
 {
+    const struct hlsl_ir_var *var = deref->var;
+    struct copy_propagation_var_def *var_def;
     struct hlsl_ir_node *node = NULL;
-    unsigned int i;
+    unsigned int offset, i;
+
+    if (!hlsl_offset_from_deref(deref, &offset))
+        return NULL;
+
+    if (!(var_def = copy_propagation_get_var_def(state, var)))
+        return NULL;
 
     assert(offset + count <= var_def->var->data_type->reg_size);
 
@@ -375,12 +383,19 @@ static struct hlsl_ir_node *copy_propagation_compute_replacement(struct copy_pro
     for (i = 0; i < count; ++i)
     {
         if (!node)
+        {
             node = var_def->values[offset + i].node;
+        }
         else if (node != var_def->values[offset + i].node)
+        {
+            TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, offset, offset + count);
             return NULL;
+        }
         *swizzle |= var_def->values[offset + i].component << i * 2;
     }
 
+    TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
+            var->name, offset, offset + count, node, debug_hlsl_swizzle(*swizzle, count));
     return node;
 }
 
@@ -388,13 +403,10 @@ static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_l
         struct copy_propagation_state *state)
 {
     struct hlsl_ir_node *node = &load->node, *new_node;
-    struct copy_propagation_var_def *var_def;
     struct hlsl_type *type = node->data_type;
     struct hlsl_ir_swizzle *swizzle_node;
-    struct hlsl_deref *src = &load->src;
-    struct hlsl_ir_var *var = src->var;
-    unsigned int offset, swizzle;
     unsigned int dimx = 0;
+    unsigned int swizzle;
 
     switch (type->type)
     {
@@ -415,20 +427,9 @@ static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_l
             return false;
     }
 
-    if (!hlsl_offset_from_deref(src, &offset))
+    if (!(new_node = copy_propagation_compute_replacement(state, &load->src, dimx, &swizzle)))
         return false;
 
-    if (!(var_def = copy_propagation_get_var_def(state, var)))
-        return false;
-
-    if (!(new_node = copy_propagation_compute_replacement(var_def, offset, dimx, &swizzle)))
-    {
-        TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, offset, offset + dimx);
-        return false;
-    }
-
-    TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
-            var->name, offset, offset + dimx, new_node, debug_hlsl_swizzle(swizzle, 4));
     if (type->type != HLSL_CLASS_OBJECT)
     {
         if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, dimx, new_node, &node->loc)))
