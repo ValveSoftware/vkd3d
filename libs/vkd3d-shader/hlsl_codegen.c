@@ -1506,7 +1506,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_uniform)
+        if (var->is_uniform && var->data_type->type != HLSL_CLASS_OBJECT)
         {
             if (var->is_param)
                 var->buffer = ctx->params_buffer;
