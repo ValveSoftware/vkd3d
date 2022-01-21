@@ -306,9 +306,6 @@ XFAIL_TESTS = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/max.shader_test \
-	tests/sampler.shader_test \
-	tests/texture-load.shader_test \
-	tests/texture-load-typed.shader_test \
 	tests/trigonometry.shader_test
 endif
 

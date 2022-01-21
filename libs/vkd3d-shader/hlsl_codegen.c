@@ -399,8 +399,8 @@ static struct hlsl_ir_node *copy_propagation_compute_replacement(const struct co
     return node;
 }
 
-static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_load *load,
-        struct copy_propagation_state *state)
+static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
+        struct hlsl_ir_load *load, struct copy_propagation_state *state)
 {
     struct hlsl_ir_node *node = &load->node, *new_node;
     struct hlsl_type *type = node->data_type;
@@ -441,6 +441,35 @@ static bool copy_propagation_analyze_load(struct hlsl_ctx *ctx, struct hlsl_ir_l
     return true;
 }
 
+static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
+        struct hlsl_deref *deref, struct copy_propagation_state *state)
+{
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *node;
+    unsigned int swizzle;
+
+    if (!(node = copy_propagation_compute_replacement(state, deref, 1, &swizzle)))
+        return false;
+
+    /* Only HLSL_IR_LOAD can produce an object. */
+    load = hlsl_ir_load(node);
+    deref->var = load->src.var;
+    hlsl_src_remove(&deref->offset);
+    hlsl_src_from_node(&deref->offset, load->src.offset.node);
+    return true;
+}
+
+static bool copy_propagation_transform_resource_load(struct hlsl_ctx *ctx,
+        struct hlsl_ir_resource_load *load, struct copy_propagation_state *state)
+{
+    bool progress = false;
+
+    progress |= copy_propagation_transform_object_load(ctx, &load->resource, state);
+    if (load->sampler.var)
+        progress |= copy_propagation_transform_object_load(ctx, &load->sampler, state);
+    return progress;
+}
+
 static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
         struct copy_propagation_state *state)
 {
@@ -477,7 +506,11 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
         switch (instr->type)
         {
             case HLSL_IR_LOAD:
-                progress |= copy_propagation_analyze_load(ctx, hlsl_ir_load(instr), state);
+                progress |= copy_propagation_transform_load(ctx, hlsl_ir_load(instr), state);
+                break;
+
+            case HLSL_IR_RESOURCE_LOAD:
+                progress |= copy_propagation_transform_resource_load(ctx, hlsl_ir_resource_load(instr), state);
                 break;
 
             case HLSL_IR_STORE:
