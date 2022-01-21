@@ -3562,18 +3562,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyTextureRegion(ID3D12Graphic
         assert(d3d12_resource_is_texture(dst_resource));
         assert(d3d12_resource_is_texture(src_resource));
 
-        if (!(dst_format = vkd3d_format_from_d3d12_resource_desc(list->device,
-                &dst_resource->desc, DXGI_FORMAT_UNKNOWN)))
-        {
-            WARN("Invalid format %#x.\n", dst_resource->desc.Format);
-            return;
-        }
-        if (!(src_format = vkd3d_format_from_d3d12_resource_desc(list->device,
-                &src_resource->desc, DXGI_FORMAT_UNKNOWN)))
-        {
-            WARN("Invalid format %#x.\n", src_resource->desc.Format);
-            return;
-        }
+        dst_format = dst_resource->format;
+        src_format = src_resource->format;
 
         if ((dst_format->vk_aspect_mask & VK_IMAGE_ASPECT_DEPTH_BIT)
                 && (dst_format->vk_aspect_mask & VK_IMAGE_ASPECT_STENCIL_BIT))
