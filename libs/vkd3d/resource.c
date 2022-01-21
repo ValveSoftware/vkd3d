@@ -2454,6 +2454,7 @@ static bool init_default_texture_view_desc(struct vkd3d_texture_view_desc *desc,
     desc->miplevel_count = 1;
     desc->layer_idx = 0;
     desc->layer_count = d3d12_resource_desc_get_layer_count(&resource->desc);
+    desc->vk_image_aspect = desc->format->vk_aspect_mask;
 
     switch (resource->desc.Dimension)
     {
@@ -2537,7 +2538,7 @@ bool vkd3d_create_texture_view(struct d3d12_device *device, VkImage vk_image,
     vkd3d_set_view_swizzle_for_format(&view_desc.components, format, desc->allowed_swizzle);
     if (desc->allowed_swizzle)
         vk_component_mapping_compose(&view_desc.components, &desc->components);
-    view_desc.subresourceRange.aspectMask = format->vk_aspect_mask;
+    view_desc.subresourceRange.aspectMask = desc->vk_image_aspect;
     view_desc.subresourceRange.baseMipLevel = desc->miplevel_idx;
     view_desc.subresourceRange.levelCount = desc->miplevel_count;
     view_desc.subresourceRange.baseArrayLayer = desc->layer_idx;
@@ -2705,6 +2706,27 @@ static void vkd3d_create_buffer_srv(struct d3d12_desc *descriptor,
     descriptor->u.view = view;
 }
 
+static VkImageAspectFlags vk_image_aspect_flags_from_d3d12_plane_slice(const struct vkd3d_format *format,
+        unsigned int plane_slice)
+{
+    VkImageAspectFlags aspect_flags = format->vk_aspect_mask;
+    unsigned int i;
+
+    /* For all formats we currently handle, the n-th aspect bit in Vulkan, if the lowest bit set is
+     * n = 0, corresponds to the n-th plane in D3D12, so clear the lowest bit for each slice skipped. */
+    for (i = 0; i < plane_slice; i++)
+        aspect_flags &= aspect_flags - 1;
+
+    if (!aspect_flags)
+    {
+        WARN("Invalid plane slice %u for format %#x.\n", plane_slice, format->vk_format);
+        aspect_flags = format->vk_aspect_mask;
+    }
+
+    /* The selected slice is now the lowest bit in the aspect flags, so clear the others. */
+    return aspect_flags & -aspect_flags;
+}
+
 void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
         struct d3d12_device *device, struct d3d12_resource *resource,
         const D3D12_SHADER_RESOURCE_VIEW_DESC *desc)
@@ -2747,7 +2769,8 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
                 vkd3d_desc.miplevel_idx = desc->u.Texture2D.MostDetailedMip;
                 vkd3d_desc.miplevel_count = desc->u.Texture2D.MipLevels;
                 if (desc->u.Texture2D.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2D.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2D.PlaneSlice);
                 if (desc->u.Texture2D.ResourceMinLODClamp)
                     FIXME("Unhandled min LOD clamp %.8e.\n", desc->u.Texture2D.ResourceMinLODClamp);
                 break;
@@ -2758,7 +2781,8 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
                 vkd3d_desc.layer_idx = desc->u.Texture2DArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
                 if (desc->u.Texture2DArray.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2DArray.PlaneSlice);
                 if (desc->u.Texture2DArray.ResourceMinLODClamp)
                     FIXME("Unhandled min LOD clamp %.8e.\n", desc->u.Texture2DArray.ResourceMinLODClamp);
                 vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
@@ -2955,7 +2979,8 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
             case D3D12_UAV_DIMENSION_TEXTURE2D:
                 vkd3d_desc.miplevel_idx = desc->u.Texture2D.MipSlice;
                 if (desc->u.Texture2D.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2D.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2D.PlaneSlice);
                 break;
             case D3D12_UAV_DIMENSION_TEXTURE2DARRAY:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -2963,7 +2988,8 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
                 vkd3d_desc.layer_idx = desc->u.Texture2DArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
                 if (desc->u.Texture2DArray.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2DArray.PlaneSlice);
                 vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_UAV_DIMENSION_TEXTURE3D:
@@ -3206,7 +3232,8 @@ void d3d12_rtv_desc_create_rtv(struct d3d12_rtv_desc *rtv_desc, struct d3d12_dev
             case D3D12_RTV_DIMENSION_TEXTURE2D:
                 vkd3d_desc.miplevel_idx = desc->u.Texture2D.MipSlice;
                 if (desc->u.Texture2D.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2D.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2D.PlaneSlice);
                 break;
             case D3D12_RTV_DIMENSION_TEXTURE2DARRAY:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
@@ -3214,7 +3241,8 @@ void d3d12_rtv_desc_create_rtv(struct d3d12_rtv_desc *rtv_desc, struct d3d12_dev
                 vkd3d_desc.layer_idx = desc->u.Texture2DArray.FirstArraySlice;
                 vkd3d_desc.layer_count = desc->u.Texture2DArray.ArraySize;
                 if (desc->u.Texture2DArray.PlaneSlice)
-                    FIXME("Ignoring plane slice %u.\n", desc->u.Texture2DArray.PlaneSlice);
+                    vkd3d_desc.vk_image_aspect = vk_image_aspect_flags_from_d3d12_plane_slice(resource->format,
+                            desc->u.Texture2DArray.PlaneSlice);
                 vkd3d_texture_view_desc_normalise(&vkd3d_desc, &resource->desc);
                 break;
             case D3D12_RTV_DIMENSION_TEXTURE2DMS:

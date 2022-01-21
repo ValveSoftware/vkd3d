@@ -536,6 +536,7 @@ struct vkd3d_texture_view_desc
     unsigned int miplevel_count;
     unsigned int layer_idx;
     unsigned int layer_count;
+    VkImageAspectFlags vk_image_aspect;
     VkComponentMapping components;
     bool allowed_swizzle;
 };
