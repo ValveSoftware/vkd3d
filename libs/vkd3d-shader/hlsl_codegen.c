@@ -1052,6 +1052,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             }
 
             load->coords.node->last_read = instr->index;
+            if (load->texel_offset.node)
+                load->texel_offset.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_SWIZZLE:
