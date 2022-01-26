@@ -1044,6 +1044,29 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         put_u32(buffer, instr->idx[j]);
 }
 
+static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
+        const struct hlsl_ir_node *texel_offset)
+{
+    struct sm4_instruction_modifier modif;
+    struct hlsl_ir_constant *offset;
+
+    if (!texel_offset || texel_offset->type != HLSL_IR_CONSTANT)
+        return false;
+    offset = hlsl_ir_constant(texel_offset);
+
+    modif.type = VKD3D_SM4_MODIFIER_AOFFIMMI;
+    modif.u.aoffimmi.u = offset->value[0].i;
+    modif.u.aoffimmi.v = offset->value[1].i;
+    modif.u.aoffimmi.w = offset->value[2].i;
+    if (modif.u.aoffimmi.u < -8 || modif.u.aoffimmi.u > 7
+            || modif.u.aoffimmi.v < -8 || modif.u.aoffimmi.v > 7
+            || modif.u.aoffimmi.w < -8 || modif.u.aoffimmi.w > 7)
+        return false;
+
+    instr->modifiers[instr->modifier_count++] = modif;
+    return true;
+}
+
 static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
 {
     const struct sm4_instruction instr =
@@ -1322,12 +1345,23 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
 static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
-        const struct hlsl_deref *resource, const struct hlsl_deref *sampler, const struct hlsl_ir_node *coords)
+        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
+        const struct hlsl_ir_node *coords, const struct hlsl_ir_node *texel_offset)
 {
     struct sm4_instruction instr;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_SAMPLE;
+
+    if (texel_offset)
+    {
+        if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
+        {
+            hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+                    "Offset must resolve to integer literal in the range -8 to 7.\n");
+            return;
+        }
+    }
 
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
@@ -1741,6 +1775,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_type *resource_type = load->resource.var->data_type;
+    const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
 
     if (load->sampler.var)
@@ -1773,7 +1808,8 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_SAMPLE:
             if (!load->sampler.var)
                 hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
-            write_sm4_sample(ctx, buffer, resource_type, &load->node, &load->resource, &load->sampler, coords);
+            write_sm4_sample(ctx, buffer, resource_type, &load->node,
+                    &load->resource, &load->sampler, coords, texel_offset);
             break;
     }
 }
