@@ -794,7 +794,7 @@ struct sm4_instruction
         struct sm4_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
         unsigned int swizzle;
-    } srcs[3];
+    } srcs[4];
     unsigned int src_count;
 
     uint32_t idx[2];
@@ -1771,6 +1771,41 @@ static void write_sm4_loop(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
+        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
+        const struct hlsl_ir_node *coords, unsigned int swizzle, const struct hlsl_ir_node *texel_offset)
+{
+    struct sm4_src_register *src;
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+
+    instr.opcode = VKD3D_SM4_OP_GATHER4;
+
+    sm4_dst_from_node(&instr.dsts[0], dst);
+    instr.dst_count = 1;
+
+    sm4_src_from_node(&instr.srcs[instr.src_count++], coords, VKD3DSP_WRITEMASK_ALL);
+
+    /* FIXME: Use an aoffimmi modifier if possible. */
+    if (texel_offset)
+    {
+        instr.opcode = VKD3D_SM5_OP_GATHER4_PO;
+        sm4_src_from_node(&instr.srcs[instr.src_count++], texel_offset, VKD3DSP_WRITEMASK_ALL);
+    }
+
+    sm4_src_from_deref(ctx, &instr.srcs[instr.src_count++], resource, resource_type, instr.dsts[0].writemask);
+
+    src = &instr.srcs[instr.src_count++];
+    sm4_src_from_deref(ctx, src, sampler, sampler->var->data_type, VKD3DSP_WRITEMASK_ALL);
+    src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+    src->swizzle_type = VKD3D_SM4_SWIZZLE_SCALAR;
+    src->swizzle = swizzle;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
 {
@@ -1810,6 +1845,26 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
                 hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
             write_sm4_sample(ctx, buffer, resource_type, &load->node,
                     &load->resource, &load->sampler, coords, texel_offset);
+            break;
+
+        case HLSL_RESOURCE_GATHER_RED:
+            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
+                    &load->sampler, coords, HLSL_SWIZZLE(X, X, X, X), texel_offset);
+            break;
+
+        case HLSL_RESOURCE_GATHER_GREEN:
+            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
+                    &load->sampler, coords, HLSL_SWIZZLE(Y, Y, Y, Y), texel_offset);
+            break;
+
+        case HLSL_RESOURCE_GATHER_BLUE:
+            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
+                    &load->sampler, coords, HLSL_SWIZZLE(Z, Z, Z, Z), texel_offset);
+            break;
+
+        case HLSL_RESOURCE_GATHER_ALPHA:
+            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
+                    &load->sampler, coords, HLSL_SWIZZLE(W, W, W, W), texel_offset);
             break;
     }
 }

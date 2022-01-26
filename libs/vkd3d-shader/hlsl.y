@@ -1930,6 +1930,106 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         list_add_tail(instrs, &load->node.entry);
         return true;
     }
+    else if (!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
+            || !strcmp(name, "GatherGreen") || !strcmp(name, "GatherAlpha"))
+    {
+        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        enum hlsl_resource_load_type load_type;
+        const struct hlsl_type *sampler_type;
+        struct hlsl_ir_resource_load *load;
+        struct hlsl_ir_node *offset = NULL;
+        struct hlsl_ir_load *sampler_load;
+        struct hlsl_type *result_type;
+        struct hlsl_ir_node *coords;
+        unsigned int read_channel;
+
+        if (!strcmp(name, "GatherGreen"))
+        {
+            load_type = HLSL_RESOURCE_GATHER_GREEN;
+            read_channel = 1;
+        }
+        else if (!strcmp(name, "GatherBlue"))
+        {
+            load_type = HLSL_RESOURCE_GATHER_BLUE;
+            read_channel = 2;
+        }
+        else if (!strcmp(name, "GatherAlpha"))
+        {
+            load_type = HLSL_RESOURCE_GATHER_ALPHA;
+            read_channel = 3;
+        }
+        else
+        {
+            load_type = HLSL_RESOURCE_GATHER_RED;
+            read_channel = 0;
+        }
+
+        if (!strcmp(name, "Gather"))
+        {
+            if (params->args_count != 2 && params->args_count != 3)
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Wrong number of arguments to method 'Gather': expected 2 or 3, but got %u.", params->args_count);
+                return false;
+            }
+        }
+        else if (params->args_count < 2 || params->args_count == 5 || params->args_count > 7)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to method '%s': expected 2, 3, 4, 6 or 7, but got %u.",
+                    name, params->args_count);
+            return false;
+        }
+
+        if (params->args_count == 4 || params->args_count == 7)
+            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+
+        if (params->args_count == 6 || params->args_count == 7)
+            hlsl_fixme(ctx, loc, "Multiple Gather() offset parameters.");
+
+        if (params->args_count == 3 || params->args_count == 4)
+        {
+            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
+                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim), loc)))
+                return false;
+        }
+
+        sampler_type = params->args[0]->data_type;
+        if (sampler_type->type != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+                || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_type_to_string(ctx, sampler_type)))
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Wrong type for argument 1 of %s(): expected 'sampler', but got '%s'.", name, string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            return false;
+        }
+
+        if (read_channel >= object_type->e.resource_format->dimx)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Method %s() requires at least %u channels.", name, read_channel + 1);
+            return false;
+        }
+
+        result_type = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
+
+        /* Only HLSL_IR_LOAD can return an object. */
+        sampler_load = hlsl_ir_load(params->args[0]);
+
+        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
+            return false;
+
+        if (!(load = hlsl_new_resource_load(ctx, result_type,
+                load_type, object_load->src.var, object_load->src.offset.node,
+                sampler_load->src.var, sampler_load->src.offset.node, coords, offset, loc)))
+            return false;
+        list_add_tail(instrs, &load->node.entry);
+        return true;
+    }
     else
     {
         struct vkd3d_string_buffer *string;

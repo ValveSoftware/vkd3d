@@ -376,6 +376,10 @@ enum hlsl_resource_load_type
 {
     HLSL_RESOURCE_LOAD,
     HLSL_RESOURCE_SAMPLE,
+    HLSL_RESOURCE_GATHER_RED,
+    HLSL_RESOURCE_GATHER_GREEN,
+    HLSL_RESOURCE_GATHER_BLUE,
+    HLSL_RESOURCE_GATHER_ALPHA,
 };
 
 struct hlsl_ir_resource_load
