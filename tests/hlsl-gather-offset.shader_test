@@ -1,0 +1,101 @@
+[require]
+shader model >= 4.1
+
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[texture 0]
+size (3, 3)
+0.0 0.0 0.0 0.4     0.1 0.0 0.5 0.0     0.2 0.0 0.0 0.4
+0.0 0.1 0.5 0.0     0.1 0.1 0.0 0.4     0.2 0.1 0.5 0.0
+0.0 0.2 0.0 0.4     0.1 0.2 0.5 0.0     0.2 0.2 0.0 0.4
+
+
+[pixel shader]
+sampler s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.Gather(s, float2(0.2, 0.2), int2(1, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.2, 0.2, 0.1)
+
+
+[pixel shader]
+sampler s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.GatherRed(s, float2(0.6, 0.6), int2(-1, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.1, 0.1, 0.0)
+
+
+[require]
+shader model >= 5.0
+
+
+[pixel shader]
+SamplerState s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.GatherGreen(s, float2(0.2, 0.2), int2(0, 1));
+}
+
+[test]
+draw quad
+probe all rgba (0.2, 0.2, 0.1, 0.1)
+
+
+[pixel shader]
+SamplerState s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.GatherGreen(s, float2(0.8, 0.8), int2(-1, -1));
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.1, 0.0, 0.0)
+
+
+[pixel shader]
+SamplerState s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.GatherBlue(s, float2(0.2, 0.8), int2(1, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0.5, 0.0, 0.5, 0.0)
+
+
+[pixel shader]
+SamplerState s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t.GatherAlpha(s, float2(0.2, 0.8), int2(0, -1));
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.4, 0.0, 0.4)

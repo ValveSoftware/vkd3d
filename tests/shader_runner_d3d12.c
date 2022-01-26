@@ -115,9 +115,18 @@ struct texture
     unsigned int root_index;
 };
 
+enum shader_model
+{
+    SHADER_MODEL_4_0 = 0,
+    SHADER_MODEL_4_1,
+    SHADER_MODEL_5_0,
+    SHADER_MODEL_5_1,
+};
+
 struct shader_context
 {
     struct test_context c;
+    enum shader_model minimum_shader_model;
 
     ID3D10Blob *ps_code;
 
@@ -160,6 +169,7 @@ enum parse_state
     STATE_NONE,
     STATE_PREPROC,
     STATE_PREPROC_INVALID,
+    STATE_REQUIRE,
     STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
@@ -180,6 +190,36 @@ static bool match_string(const char *line, const char *token, const char **const
             ++*rest;
     }
     return true;
+}
+
+static void parse_require_directive(struct shader_context *context, const char *line)
+{
+    if (match_string(line, "shader model >=", &line))
+    {
+        static const char *const model_strings[] =
+        {
+            [SHADER_MODEL_4_0] = "4.0",
+            [SHADER_MODEL_4_1] = "4.1",
+            [SHADER_MODEL_5_0] = "5.0",
+            [SHADER_MODEL_5_1] = "5.1",
+        };
+        unsigned int i;
+
+        for (i = 0; i < ARRAY_SIZE(model_strings); ++i)
+        {
+            if (match_string(line, model_strings[i], &line))
+            {
+                context->minimum_shader_model = i;
+                return;
+            }
+        }
+
+        fatal_error("Unknown shader model '%s'.\n", line);
+    }
+    else
+    {
+        fatal_error("Unknown require directive '%s'.\n", line);
+    }
 }
 
 static void parse_texture_format(struct texture *texture, const char *line)
@@ -662,16 +702,27 @@ START_TEST(shader_runner_d3d12)
             switch (state)
             {
                 case STATE_NONE:
+                case STATE_REQUIRE:
                 case STATE_SAMPLER:
                 case STATE_TEST:
                 case STATE_TEXTURE:
                     break;
 
                 case STATE_SHADER_PIXEL:
-                    if (!(context.ps_code = compile_shader(shader_source, "ps_4_0")))
+                {
+                    static const char *const shader_models[] =
+                    {
+                        [SHADER_MODEL_4_0] = "ps_4_0",
+                        [SHADER_MODEL_4_1] = "ps_4_1",
+                        [SHADER_MODEL_5_0] = "ps_5_0",
+                        [SHADER_MODEL_5_1] = "ps_5_1",
+                    };
+
+                    if (!(context.ps_code = compile_shader(shader_source, shader_models[context.minimum_shader_model])))
                         return;
                     shader_source_len = 0;
                     break;
+                }
 
                 case STATE_SHADER_INVALID_PIXEL:
                 {
@@ -755,7 +806,11 @@ START_TEST(shader_runner_d3d12)
         {
             unsigned int index;
 
-            if (!strcmp(line, "[pixel shader]\n"))
+            if (!strcmp(line, "[require]\n"))
+            {
+                state = STATE_REQUIRE;
+            }
+            else if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
 
@@ -843,6 +898,10 @@ START_TEST(shader_runner_d3d12)
                     shader_source_len += len;
                     break;
                 }
+
+                case STATE_REQUIRE:
+                    parse_require_directive(&context, line);
+                    break;
 
                 case STATE_SAMPLER:
                     parse_sampler_directive(current_sampler, line);
