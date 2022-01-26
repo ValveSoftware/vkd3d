@@ -727,6 +727,44 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
     }
 }
 
+struct sm4_instruction_modifier
+{
+    enum vkd3d_sm4_instruction_modifier type;
+
+    union
+    {
+        struct
+        {
+            int u, v, w;
+        } aoffimmi;
+    } u;
+};
+
+static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_modifier *imod)
+{
+    uint32_t word = 0;
+
+    word |= VKD3D_SM4_MODIFIER_MASK & imod->type;
+
+    switch (imod->type)
+    {
+        case VKD3D_SM4_MODIFIER_AOFFIMMI:
+            assert(-8 <= imod->u.aoffimmi.u && imod->u.aoffimmi.u <= 7);
+            assert(-8 <= imod->u.aoffimmi.v && imod->u.aoffimmi.v <= 7);
+            assert(-8 <= imod->u.aoffimmi.w && imod->u.aoffimmi.w <= 7);
+            word |= ((uint32_t)imod->u.aoffimmi.u & 0xf) << VKD3D_SM4_AOFFIMMI_U_SHIFT;
+            word |= ((uint32_t)imod->u.aoffimmi.v & 0xf) << VKD3D_SM4_AOFFIMMI_V_SHIFT;
+            word |= ((uint32_t)imod->u.aoffimmi.w & 0xf) << VKD3D_SM4_AOFFIMMI_W_SHIFT;
+            break;
+
+        default:
+            assert(0);
+            break;
+    }
+
+    return word;
+}
+
 struct sm4_register
 {
     enum vkd3d_sm4_register_type type;
@@ -740,6 +778,9 @@ struct sm4_register
 struct sm4_instruction
 {
     enum vkd3d_sm4_opcode opcode;
+
+    struct sm4_instruction_modifier modifiers[1];
+    unsigned int modifier_count;
 
     struct sm4_dst_register
     {
@@ -939,6 +980,7 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
     uint32_t token = instr->opcode;
     unsigned int size = 1, i, j;
 
+    size += instr->modifier_count;
     for (i = 0; i < instr->dst_count; ++i)
         size += sm4_register_order(&instr->dsts[i].reg);
     for (i = 0; i < instr->src_count; ++i)
@@ -946,7 +988,18 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
     size += instr->idx_count;
 
     token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
+
+    if (instr->modifier_count > 0)
+        token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
     put_u32(buffer, token);
+
+    for (i = 0; i < instr->modifier_count; ++i)
+    {
+        token = sm4_encode_instruction_modifier(&instr->modifiers[i]);
+        if (instr->modifier_count > i + 1)
+            token |= VKD3D_SM4_INSTRUCTION_MODIFIER;
+        put_u32(buffer, token);
+    }
 
     for (i = 0; i < instr->dst_count; ++i)
     {
