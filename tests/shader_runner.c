@@ -71,12 +71,6 @@ static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *forma
     exit(1);
 }
 
-static void free_texture(struct texture *texture)
-{
-    free(texture->data);
-    memset(texture, 0, sizeof(*texture));
-}
-
 enum parse_state
 {
     STATE_NONE,
@@ -135,7 +129,7 @@ static void parse_require_directive(struct shader_context *context, const char *
     }
 }
 
-static void parse_texture_format(struct texture *texture, const char *line)
+static void parse_texture_format(struct texture_params *texture, const char *line)
 {
     static const struct
     {
@@ -228,7 +222,7 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
     }
 }
 
-static void parse_texture_directive(struct texture *texture, const char *line)
+static void parse_texture_directive(struct texture_params *texture, const char *line)
 {
     int ret;
 
@@ -425,26 +419,29 @@ static struct sampler *get_sampler(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-static struct texture *get_texture(struct shader_context *context, unsigned int slot)
+static void set_texture(struct shader_context *context, struct texture *texture)
 {
-    struct texture *texture;
     size_t i;
 
     for (i = 0; i < context->texture_count; ++i)
     {
-        texture = &context->textures[i];
-        if (texture->slot == slot)
-            return texture;
+        if (context->textures[i]->slot == texture->slot)
+        {
+            context->ops->destroy_texture(context, context->textures[i]);
+            context->textures[i] = texture;
+            return;
+        }
     }
 
-    return NULL;
+    context->textures = realloc(context->textures, (context->texture_count + 1) * sizeof(*context->textures));
+    context->textures[context->texture_count++] = texture;
 }
 
 void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct sampler *current_sampler = NULL;
-    struct texture *current_texture = NULL;
+    struct texture_params current_texture;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
     const char *filename = NULL;
@@ -490,7 +487,11 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                 case STATE_REQUIRE:
                 case STATE_SAMPLER:
                 case STATE_TEST:
+                    break;
+
                 case STATE_TEXTURE:
+                    set_texture(context, context->ops->create_texture(context, &current_texture));
+                    free(current_texture.data);
                     break;
 
                 case STATE_SHADER_PIXEL:
@@ -623,21 +624,12 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
             {
                 state = STATE_TEXTURE;
 
-                if ((current_texture = get_texture(context, index)))
-                {
-                    free_texture(current_texture);
-                }
-                else
-                {
-                    context->textures = realloc(context->textures,
-                            ++context->texture_count * sizeof(*context->textures));
-                    current_texture = &context->textures[context->texture_count - 1];
-                    memset(current_texture, 0, sizeof(*current_texture));
-                }
-                current_texture->slot = index;
-                current_texture->format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_texture->data_type = TEXTURE_DATA_FLOAT;
-                current_texture->texel_size = 16;
+                memset(&current_texture, 0, sizeof(current_texture));
+
+                current_texture.slot = index;
+                current_texture.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_texture.data_type = TEXTURE_DATA_FLOAT;
+                current_texture.texel_size = 16;
             }
             else if (!strcmp(line, "[test]\n"))
             {
@@ -684,7 +676,7 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                     break;
 
                 case STATE_TEXTURE:
-                    parse_texture_directive(current_texture, line);
+                    parse_texture_directive(&current_texture, line);
                     break;
 
                 case STATE_TEST:
@@ -697,7 +689,11 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
     if (context->ps_code)
         ID3D10Blob_Release(context->ps_code);
     for (i = 0; i < context->texture_count; ++i)
-        free_texture(&context->textures[i]);
+    {
+        if (context->textures[i])
+            context->ops->destroy_texture(context, context->textures[i]);
+    }
+    free(context->textures);
 
     fclose(f);
 }

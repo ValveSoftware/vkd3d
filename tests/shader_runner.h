@@ -45,7 +45,7 @@ struct sampler
     D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
 };
 
-struct texture
+struct texture_params
 {
     unsigned int slot;
 
@@ -55,6 +55,11 @@ struct texture
     unsigned int width, height;
     uint8_t *data;
     size_t data_size, data_capacity;
+};
+
+struct texture
+{
+    unsigned int slot;
 
     D3D12_DESCRIPTOR_RANGE descriptor_range;
     ID3D12DescriptorHeap *heap;
@@ -72,7 +77,7 @@ struct shader_context
     uint32_t *uniforms;
     size_t uniform_count;
 
-    struct texture *textures;
+    struct texture **textures;
     size_t texture_count;
 
     struct sampler *samplers;
@@ -82,6 +87,8 @@ struct shader_context
 struct shader_runner_ops
 {
     ID3D10Blob *(*compile_shader)(struct shader_context *context, const char *source, enum shader_model minimum_shader_model);
+    struct texture *(*create_texture)(struct shader_context *context, const struct texture_params *params);
+    void (*destroy_texture)(struct shader_context *context, struct texture *texture);
     void (*draw_quad)(struct shader_context *context);
     void (*probe_vec4)(struct shader_context *context, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };

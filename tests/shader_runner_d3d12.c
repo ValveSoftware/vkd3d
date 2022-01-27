@@ -62,6 +62,40 @@ static ID3D10Blob *d3d12_runner_compile_shader(struct shader_context *c,
     return blob;
 }
 
+static struct texture *d3d12_runner_create_texture(struct shader_context *c, const struct texture_params *params)
+{
+    struct d3d12_shader_context *context = d3d12_shader_context(c);
+    struct test_context *test_context = &context->test_context;
+    ID3D12Device *device = test_context->device;
+    D3D12_SUBRESOURCE_DATA resource_data;
+    struct texture *texture;
+
+    texture = calloc(1, sizeof(*texture));
+
+    texture->slot = params->slot;
+
+    texture->heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+    texture->resource = create_default_texture(device, params->width, params->height,
+            params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+    resource_data.pData = params->data;
+    resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
+    upload_texture_data(texture->resource, &resource_data, 1, test_context->queue, test_context->list);
+    reset_command_list(test_context->list, test_context->allocator);
+    transition_resource_state(test_context->list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
+            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    ID3D12Device_CreateShaderResourceView(device, texture->resource,
+            NULL, get_cpu_descriptor_handle(test_context, texture->heap, 0));
+
+    return texture;
+}
+
+static void d3d12_runner_destroy_texture(struct shader_context *c, struct texture *texture)
+{
+    ID3D12DescriptorHeap_Release(texture->heap);
+    ID3D12Resource_Release(texture->resource);
+    free(texture);
+}
+
 static void d3d12_runner_draw_quad(struct shader_context *c)
 {
     struct d3d12_shader_context *context = d3d12_shader_context(c);
@@ -99,10 +133,8 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
 
     for (i = 0; i < context->c.texture_count; ++i)
     {
-        struct texture *texture = &context->c.textures[i];
-        D3D12_SUBRESOURCE_DATA resource_data;
+        struct texture *texture = context->c.textures[i];
         D3D12_DESCRIPTOR_RANGE *range;
-        ID3D12Resource *resource;
 
         range = &texture->descriptor_range;
 
@@ -118,20 +150,6 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
         range->BaseShaderRegister = texture->slot;
         range->RegisterSpace = 0;
         range->OffsetInDescriptorsFromTableStart = 0;
-
-        texture->heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-        resource = create_default_texture(device, texture->width, texture->height,
-                texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-        resource_data.pData = texture->data;
-        resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
-        upload_texture_data(resource, &resource_data, 1, queue, command_list);
-        reset_command_list(command_list, test_context->allocator);
-        transition_resource_state(command_list, resource, D3D12_RESOURCE_STATE_COPY_DEST,
-                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        ID3D12Device_CreateShaderResourceView(device, resource,
-                NULL, get_cpu_descriptor_handle(test_context, texture->heap, 0));
-
-        texture->resource = resource;
     }
 
     assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
@@ -170,7 +188,7 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
                 context->c.uniform_count, context->c.uniforms, 0);
     for (i = 0; i < context->c.texture_count; ++i)
     {
-        struct texture *texture = &context->c.textures[i];
+        struct texture *texture = context->c.textures[i];
 
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, texture->root_index,
                 get_gpu_descriptor_handle(test_context, texture->heap, 0));
@@ -192,15 +210,6 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
     reset_command_list(command_list, test_context->allocator);
-
-    for (i = 0; i < context->c.texture_count; ++i)
-    {
-        struct texture *texture = &context->c.textures[i];
-
-        ID3D12DescriptorHeap_Release(texture->heap);
-        ID3D12Resource_Release(texture->resource);
-        free(texture);
-    }
 }
 
 static void d3d12_runner_probe_vec4(struct shader_context *c,
@@ -220,6 +229,8 @@ static void d3d12_runner_probe_vec4(struct shader_context *c,
 static const struct shader_runner_ops d3d12_runner_ops =
 {
     .compile_shader = d3d12_runner_compile_shader,
+    .create_texture = d3d12_runner_create_texture,
+    .destroy_texture = d3d12_runner_destroy_texture,
     .draw_quad = d3d12_runner_draw_quad,
     .probe_vec4 = d3d12_runner_probe_vec4,
 };
