@@ -42,9 +42,24 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "d3d12_crosstest.h"
-#include "shader_runner.h"
+#ifdef __MINGW32__
+# define _HRESULT_DEFINED
+typedef int HRESULT;
+#endif
+
+#define COBJMACROS
+#define CONST_VTABLE
+#include "config.h"
+#include <ctype.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include "vkd3d_windows.h"
+#include "vkd3d_d3dcommon.h"
+#include "vkd3d_d3dcompiler.h"
+#include "vkd3d_common.h"
+#include "vkd3d_test.h"
+#include "shader_runner.h"
 
 static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *format, ...)
 {
@@ -56,89 +71,8 @@ static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *forma
     exit(1);
 }
 
-static bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size)
-{
-    size_t new_capacity, max_capacity;
-    void *new_elements;
-
-    if (element_count <= *capacity)
-        return true;
-
-    max_capacity = ~(size_t)0 / element_size;
-    if (max_capacity < element_count)
-        return false;
-
-    new_capacity = max(*capacity, 4);
-    while (new_capacity < element_count && new_capacity <= max_capacity / 2)
-        new_capacity *= 2;
-
-    if (new_capacity < element_count)
-        new_capacity = element_count;
-
-    if (!(new_elements = realloc(*elements, new_capacity * element_size)))
-        return false;
-
-    *elements = new_elements;
-    *capacity = new_capacity;
-
-    return true;
-}
-
-enum texture_data_type
-{
-    TEXTURE_DATA_FLOAT,
-    TEXTURE_DATA_SINT,
-    TEXTURE_DATA_UINT,
-};
-
-struct sampler
-{
-    unsigned int slot;
-
-    D3D12_FILTER filter;
-    D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
-};
-
-struct texture
-{
-    unsigned int slot;
-
-    DXGI_FORMAT format;
-    enum texture_data_type data_type;
-    unsigned int texel_size;
-    unsigned int width, height;
-    uint8_t *data;
-    size_t data_size, data_capacity;
-
-    D3D12_DESCRIPTOR_RANGE descriptor_range;
-    ID3D12DescriptorHeap *heap;
-    ID3D12Resource *resource;
-    unsigned int root_index;
-};
-
-struct shader_context
-{
-    const struct shader_runner_ops *ops;
-
-    struct test_context c;
-    enum shader_model minimum_shader_model;
-
-    ID3D10Blob *ps_code;
-
-    uint32_t *uniforms;
-    size_t uniform_count;
-
-    struct texture *textures;
-    size_t texture_count;
-
-    struct sampler *samplers;
-    size_t sampler_count;
-};
-
 static void free_texture(struct texture *texture)
 {
-    ID3D12DescriptorHeap_Release(texture->heap);
-    ID3D12Resource_Release(texture->resource);
     free(texture->data);
     memset(texture, 0, sizeof(*texture));
 }
@@ -352,119 +286,11 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 {
     if (match_string(line, "draw quad", &line))
     {
-        D3D12_SHADER_BYTECODE ps
-                = {ID3D10Blob_GetBufferPointer(context->ps_code), ID3D10Blob_GetBufferSize(context->ps_code)};
-        ID3D12GraphicsCommandList *command_list = context->c.list;
-        D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
-        D3D12_ROOT_PARAMETER root_params[3], *root_param;
-        D3D12_STATIC_SAMPLER_DESC static_samplers[1];
-        static const float clear_color[4];
-        unsigned int uniform_index;
-        ID3D12PipelineState *pso;
-        HRESULT hr;
-        size_t i;
-
-        root_signature_desc.NumParameters = 0;
-        root_signature_desc.pParameters = root_params;
-        root_signature_desc.NumStaticSamplers = 0;
-        root_signature_desc.pStaticSamplers = static_samplers;
-
-        if (context->uniform_count)
-        {
-            uniform_index = root_signature_desc.NumParameters++;
-            root_param = &root_params[uniform_index];
-            root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-            root_param->Constants.ShaderRegister = 0;
-            root_param->Constants.RegisterSpace = 0;
-            root_param->Constants.Num32BitValues = context->uniform_count;
-            root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        }
-
-        for (i = 0; i < context->texture_count; ++i)
-        {
-            struct texture *texture = &context->textures[i];
-            D3D12_DESCRIPTOR_RANGE *range = &texture->descriptor_range;
-            D3D12_SUBRESOURCE_DATA resource_data;
-
-            texture->root_index = root_signature_desc.NumParameters++;
-            root_param = &root_params[texture->root_index];
-            root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-            root_param->DescriptorTable.NumDescriptorRanges = 1;
-            root_param->DescriptorTable.pDescriptorRanges = range;
-            root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-
-            range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-            range->NumDescriptors = 1;
-            range->BaseShaderRegister = texture->slot;
-            range->RegisterSpace = 0;
-            range->OffsetInDescriptorsFromTableStart = 0;
-
-            if (!texture->resource)
-            {
-                texture->heap = create_gpu_descriptor_heap(context->c.device,
-                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-                texture->resource = create_default_texture(context->c.device, texture->width, texture->height,
-                        texture->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-                resource_data.pData = texture->data;
-                resource_data.SlicePitch = resource_data.RowPitch = texture->width * texture->texel_size;
-                upload_texture_data(texture->resource, &resource_data, 1, context->c.queue, command_list);
-                reset_command_list(command_list, context->c.allocator);
-                transition_resource_state(command_list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
-                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-                ID3D12Device_CreateShaderResourceView(context->c.device, texture->resource,
-                        NULL, get_cpu_descriptor_handle(&context->c, texture->heap, 0));
-            }
-        }
-
-        assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
-
-        for (i = 0; i < context->sampler_count; ++i)
-        {
-            D3D12_STATIC_SAMPLER_DESC *sampler_desc = &static_samplers[root_signature_desc.NumStaticSamplers++];
-            const struct sampler *sampler = &context->samplers[i];
-
-            memset(sampler_desc, 0, sizeof(*sampler_desc));
-            sampler_desc->Filter = sampler->filter;
-            sampler_desc->AddressU = sampler->u_address;
-            sampler_desc->AddressV = sampler->v_address;
-            sampler_desc->AddressW = sampler->w_address;
-            sampler_desc->ShaderRegister = sampler->slot;
-            sampler_desc->RegisterSpace = 0;
-            sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        }
-
-        if (context->c.root_signature)
-            ID3D12RootSignature_Release(context->c.root_signature);
-        hr = create_root_signature(context->c.device, &root_signature_desc, &context->c.root_signature);
-        ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
-
-        pso = create_pipeline_state(context->c.device, context->c.root_signature, context->c.render_target_desc.Format,
-                NULL, &ps, NULL);
-        if (!pso)
-            return;
-        vkd3d_array_reserve((void **)&context->c.pso, &context->c.pso_capacity, context->c.pso_count + 1, sizeof(*context->c.pso));
-        context->c.pso[context->c.pso_count++] = pso;
-
-        ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context->c.root_signature);
-        if (context->uniform_count)
-            ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
-                    context->uniform_count, context->uniforms, 0);
-        for (i = 0; i < context->texture_count; ++i)
-            ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, context->textures[i].root_index,
-                    get_gpu_descriptor_handle(&context->c, context->textures[i].heap, 0));
-
-        ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context->c.rtv, false, NULL);
-        ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context->c.scissor_rect);
-        ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context->c.viewport);
-        ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context->c.rtv, clear_color, 0, NULL);
-        ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-        ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
-        transition_resource_state(command_list, context->c.render_target,
-                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        context->ops->draw_quad(context);
     }
     else if (match_string(line, "probe all rgba", &line))
     {
+        static const RECT rect = {0, 0, 640, 480};
         unsigned int ulps;
         struct vec4 v;
         int ret;
@@ -474,13 +300,12 @@ static void parse_test_directive(struct shader_context *context, const char *lin
             fatal_error("Malformed probe arguments '%s'.\n", line);
         if (ret < 5)
             ulps = 0;
-        check_sub_resource_vec4(context->c.render_target, 0, context->c.queue, context->c.list, &v, ulps);
-        reset_command_list(context->c.list, context->c.allocator);
+
+        context->ops->probe_vec4(context, &rect, &v, ulps);
     }
     else if (match_string(line, "probe rect rgba", &line))
     {
         unsigned int x, y, w, h, ulps;
-        struct resource_readback rb;
         struct vec4 v;
         RECT rect;
         int ret;
@@ -492,18 +317,14 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         if (ret < 9)
             ulps = 0;
 
-        get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + w;
         rect.top = y;
         rect.bottom = y + h;
-        check_readback_data_vec4(&rb, &rect, &v, ulps);
-        release_resource_readback(&rb);
-        reset_command_list(context->c.list, context->c.allocator);
+        context->ops->probe_vec4(context, &rect, &v, ulps);
     }
     else if (match_string(line, "probe rgba", &line))
     {
-        struct resource_readback rb;
         unsigned int x, y, ulps;
         struct vec4 v;
         RECT rect;
@@ -515,14 +336,11 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         if (ret < 7)
             ulps = 0;
 
-        get_texture_readback_with_command_list(context->c.render_target, 0, &rb, context->c.queue, context->c.list);
         rect.left = x;
         rect.right = x + 1;
         rect.top = y;
         rect.bottom = y + 1;
-        check_readback_data_vec4(&rb, &rect, &v, ulps);
-        release_resource_readback(&rb);
-        reset_command_list(context->c.list, context->c.allocator);
+        context->ops->probe_vec4(context, &rect, &v, ulps);
     }
     else if (match_string(line, "uniform", &line))
     {
@@ -622,29 +440,17 @@ static struct texture *get_texture(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops)
+void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops)
 {
-    static const struct test_context_desc desc =
-    {
-        .rt_width = 640,
-        .rt_height = 480,
-        .no_root_signature = true,
-        .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
-    };
     size_t shader_source_size = 0, shader_source_len = 0;
     struct sampler *current_sampler = NULL;
     struct texture *current_texture = NULL;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
-    struct shader_context context;
     const char *filename = NULL;
     char *shader_source = NULL;
     char line[256];
     FILE *f;
-
-    parse_args(argc, argv);
-    enable_d3d12_debug_layer(argc, argv);
-    init_adapter_info();
 
     for (i = 1; i < argc; ++i)
     {
@@ -667,9 +473,8 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
         return;
     }
 
-    memset(&context, 0, sizeof(context));
-    context.ops = ops;
-    init_test_context(&context.c, &desc);
+    memset(context, 0, sizeof(*context));
+    context->ops = ops;
 
     for (;;)
     {
@@ -689,7 +494,8 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
                     break;
 
                 case STATE_SHADER_PIXEL:
-                    if (!(context.ps_code = context.ops->compile_shader(shader_source, context.minimum_shader_model)))
+                    if (!(context->ps_code = context->ops->compile_shader(context,
+                            shader_source, context->minimum_shader_model)))
                         return;
                     shader_source_len = 0;
                     break;
@@ -784,9 +590,9 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
             {
                 state = STATE_SHADER_PIXEL;
 
-                if (context.ps_code)
-                    ID3D10Blob_Release(context.ps_code);
-                context.ps_code = NULL;
+                if (context->ps_code)
+                    ID3D10Blob_Release(context->ps_code);
+                context->ps_code = NULL;
             }
             else if (!strcmp(line, "[pixel shader fail]\n"))
             {
@@ -796,15 +602,15 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
             {
                 state = STATE_SAMPLER;
 
-                if ((current_sampler = get_sampler(&context, index)))
+                if ((current_sampler = get_sampler(context, index)))
                 {
                     memset(current_sampler, 0, sizeof(*current_sampler));
                 }
                 else
                 {
-                    context.samplers = realloc(context.samplers,
-                            ++context.sampler_count * sizeof(*context.samplers));
-                    current_sampler = &context.samplers[context.sampler_count - 1];
+                    context->samplers = realloc(context->samplers,
+                            ++context->sampler_count * sizeof(*context->samplers));
+                    current_sampler = &context->samplers[context->sampler_count - 1];
                     memset(current_sampler, 0, sizeof(*current_sampler));
                 }
                 current_sampler->slot = index;
@@ -817,15 +623,15 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
             {
                 state = STATE_TEXTURE;
 
-                if ((current_texture = get_texture(&context, index)))
+                if ((current_texture = get_texture(context, index)))
                 {
                     free_texture(current_texture);
                 }
                 else
                 {
-                    context.textures = realloc(context.textures,
-                            ++context.texture_count * sizeof(*context.textures));
-                    current_texture = &context.textures[context.texture_count - 1];
+                    context->textures = realloc(context->textures,
+                            ++context->texture_count * sizeof(*context->textures));
+                    current_texture = &context->textures[context->texture_count - 1];
                     memset(current_texture, 0, sizeof(*current_texture));
                 }
                 current_texture->slot = index;
@@ -870,7 +676,7 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
                 }
 
                 case STATE_REQUIRE:
-                    parse_require_directive(&context, line);
+                    parse_require_directive(context, line);
                     break;
 
                 case STATE_SAMPLER:
@@ -882,17 +688,16 @@ void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops
                     break;
 
                 case STATE_TEST:
-                    parse_test_directive(&context, line);
+                    parse_test_directive(context, line);
                     break;
             }
         }
     }
 
-    if (context.ps_code)
-        ID3D10Blob_Release(context.ps_code);
-    for (i = 0; i < context.texture_count; ++i)
-        free_texture(&context.textures[i]);
-    destroy_test_context(&context.c);
+    if (context->ps_code)
+        ID3D10Blob_Release(context->ps_code);
+    for (i = 0; i < context->texture_count; ++i)
+        free_texture(&context->textures[i]);
 
     fclose(f);
 }
