@@ -794,8 +794,7 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     }
     if (t1->base_type != t2->base_type)
         return t1->base_type - t2->base_type;
-    if ((t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
-            && t1->sampler_dim != t2->sampler_dim)
+    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
     {
         if (t1->sampler_dim != t2->sampler_dim)
             return t1->sampler_dim - t2->sampler_dim;
