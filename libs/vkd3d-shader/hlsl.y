@@ -2171,7 +2171,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %token KW_TEXTURE2DMS
 %token KW_TEXTURE2DMSARRAY
 %token KW_TEXTURE3D
-%token KW_TEXTURE3DARRAY
 %token KW_TEXTURECUBE
 %token KW_TRUE
 %token KW_TYPEDEF

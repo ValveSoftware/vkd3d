@@ -131,7 +131,6 @@ Texture2DMS             {return KW_TEXTURE2DMS;         }
 Texture2DMSArray        {return KW_TEXTURE2DMSARRAY;    }
 texture3D               {return KW_TEXTURE3D;           }
 Texture3D               {return KW_TEXTURE3D;           }
-Texture3DArray          {return KW_TEXTURE3DARRAY;      }
 textureCUBE             {return KW_TEXTURECUBE;         }
 TextureCube             {return KW_TEXTURECUBE;         }
 true                    {return KW_TRUE;                }
