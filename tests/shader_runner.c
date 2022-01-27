@@ -643,7 +643,7 @@ static struct texture *get_texture(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-START_TEST(shader_runner_d3d12)
+START_TEST(shader_runner)
 {
     static const struct test_context_desc desc =
     {
