@@ -82,31 +82,6 @@ static void set_viewport(D3D12_VIEWPORT *vp, float x, float y,
     vp->MaxDepth = max_depth;
 }
 
-static bool compare_float(float f, float g, unsigned int ulps)
-{
-    int x, y;
-    union
-    {
-        float f;
-        int i;
-    } u;
-
-    u.f = f;
-    x = u.i;
-    u.f = g;
-    y = u.i;
-
-    if (x < 0)
-        x = INT_MIN - x;
-    if (y < 0)
-        y = INT_MIN - y;
-
-    if (abs(x - y) > ulps)
-        return false;
-
-    return true;
-}
-
 static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
 {
     unsigned int diff = x > y ? x - y : y - x;
@@ -120,14 +95,6 @@ static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
             && compare_uint((c1 >> 8) & 0xff, (c2 >> 8) & 0xff, max_diff)
             && compare_uint((c1 >> 16) & 0xff, (c2 >> 16) & 0xff, max_diff)
             && compare_uint((c1 >> 24) & 0xff, (c2 >> 24) & 0xff, max_diff);
-}
-
-static bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
-{
-    return compare_float(v1->x, v2->x, ulps)
-            && compare_float(v1->y, v2->y, ulps)
-            && compare_float(v1->z, v2->z, ulps)
-            && compare_float(v1->w, v2->w, ulps);
 }
 
 static D3D12_SHADER_BYTECODE shader_bytecode(const DWORD *code, size_t size)

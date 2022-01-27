@@ -395,6 +395,7 @@ EXTRA_DIST += $(cross_implibs:=.cross32.def) $(cross_implibs:=.cross64.def)
 
 shader_runner_cross_sources = \
 	$(srcdir)/tests/shader_runner.c \
+	$(srcdir)/tests/shader_runner_d3d11.c \
 	$(srcdir)/tests/shader_runner_d3d12.c
 
 if HAVE_CROSSTARGET32

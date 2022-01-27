@@ -278,7 +278,7 @@ static void parse_texture_directive(struct texture_params *texture, const char *
 
 static void set_uniforms(struct shader_context *context, size_t offset, size_t count, const void *uniforms)
 {
-    context->uniform_count = max(context->uniform_count, offset + count);
+    context->uniform_count = align(max(context->uniform_count, offset + count), 4);
     vkd3d_array_reserve((void **)&context->uniforms, &context->uniform_capacity,
             context->uniform_count, sizeof(*context->uniforms));
     memcpy(context->uniforms + offset, uniforms, count * sizeof(*context->uniforms));
@@ -680,9 +680,14 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
     free(context->textures);
 
     fclose(f);
+
+    vkd3d_test_set_context(NULL);
 }
 
 START_TEST(shader_runner)
 {
+#ifdef _WIN32
+    run_shader_tests_d3d11(argc, argv);
+#endif
     run_shader_tests_d3d12(argc, argv);
 }

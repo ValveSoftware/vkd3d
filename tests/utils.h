@@ -19,8 +19,14 @@
 #ifndef __VKD3D_TEST_UTILS_H
 #define __VKD3D_TEST_UTILS_H
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+struct vec2
+{
+    float x, y;
+};
 
 struct vec4
 {
@@ -53,6 +59,39 @@ static inline bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t
     *capacity = new_capacity;
 
     return true;
+}
+
+static bool compare_float(float f, float g, unsigned int ulps)
+{
+    int x, y;
+    union
+    {
+        float f;
+        int i;
+    } u;
+
+    u.f = f;
+    x = u.i;
+    u.f = g;
+    y = u.i;
+
+    if (x < 0)
+        x = INT_MIN - x;
+    if (y < 0)
+        y = INT_MIN - y;
+
+    if (abs(x - y) > ulps)
+        return false;
+
+    return true;
+}
+
+static inline bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, unsigned int ulps)
+{
+    return compare_float(v1->x, v2->x, ulps)
+            && compare_float(v1->y, v2->y, ulps)
+            && compare_float(v1->z, v2->z, ulps)
+            && compare_float(v1->w, v2->w, ulps);
 }
 
 #endif

@@ -26,11 +26,6 @@
 static PFN_D3D12_CREATE_VERSIONED_ROOT_SIGNATURE_DESERIALIZER pfn_D3D12CreateVersionedRootSignatureDeserializer;
 static PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE pfn_D3D12SerializeVersionedRootSignature;
 
-struct vec2
-{
-    float x, y;
-};
-
 struct uvec4
 {
     unsigned int x, y, z, w;

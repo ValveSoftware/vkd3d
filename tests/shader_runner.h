@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <stdint.h>
 #include "vkd3d_windows.h"
 #include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3d12.h"
@@ -89,4 +90,7 @@ struct shader_runner_ops
 
 void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops);
 
+#ifdef _WIN32
+void run_shader_tests_d3d11(int argc, char **argv);
+#endif
 void run_shader_tests_d3d12(int argc, char **argv);
