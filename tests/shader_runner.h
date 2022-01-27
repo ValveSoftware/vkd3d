@@ -60,11 +60,6 @@ struct texture_params
 struct texture
 {
     unsigned int slot;
-
-    D3D12_DESCRIPTOR_RANGE descriptor_range;
-    ID3D12DescriptorHeap *heap;
-    ID3D12Resource *resource;
-    unsigned int root_index;
 };
 
 struct shader_context

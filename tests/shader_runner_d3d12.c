@@ -24,6 +24,21 @@
 #include "d3d12_crosstest.h"
 #include "shader_runner.h"
 
+struct d3d12_texture
+{
+    struct texture t;
+
+    D3D12_DESCRIPTOR_RANGE descriptor_range;
+    ID3D12DescriptorHeap *heap;
+    ID3D12Resource *resource;
+    unsigned int root_index;
+};
+
+static struct d3d12_texture *d3d12_texture(struct texture *t)
+{
+    return CONTAINING_RECORD(t, struct d3d12_texture, t);
+}
+
 struct d3d12_shader_context
 {
     struct shader_context c;
@@ -68,11 +83,11 @@ static struct texture *d3d12_runner_create_texture(struct shader_context *c, con
     struct test_context *test_context = &context->test_context;
     ID3D12Device *device = test_context->device;
     D3D12_SUBRESOURCE_DATA resource_data;
-    struct texture *texture;
+    struct d3d12_texture *texture;
 
     texture = calloc(1, sizeof(*texture));
 
-    texture->slot = params->slot;
+    texture->t.slot = params->slot;
 
     texture->heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
     texture->resource = create_default_texture(device, params->width, params->height,
@@ -86,11 +101,13 @@ static struct texture *d3d12_runner_create_texture(struct shader_context *c, con
     ID3D12Device_CreateShaderResourceView(device, texture->resource,
             NULL, get_cpu_descriptor_handle(test_context, texture->heap, 0));
 
-    return texture;
+    return &texture->t;
 }
 
-static void d3d12_runner_destroy_texture(struct shader_context *c, struct texture *texture)
+static void d3d12_runner_destroy_texture(struct shader_context *c, struct texture *t)
 {
+    struct d3d12_texture *texture = d3d12_texture(t);
+
     ID3D12DescriptorHeap_Release(texture->heap);
     ID3D12Resource_Release(texture->resource);
     free(texture);
@@ -133,7 +150,7 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
 
     for (i = 0; i < context->c.texture_count; ++i)
     {
-        struct texture *texture = context->c.textures[i];
+        struct d3d12_texture *texture = d3d12_texture(context->c.textures[i]);
         D3D12_DESCRIPTOR_RANGE *range;
 
         range = &texture->descriptor_range;
@@ -147,7 +164,7 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
 
         range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
         range->NumDescriptors = 1;
-        range->BaseShaderRegister = texture->slot;
+        range->BaseShaderRegister = texture->t.slot;
         range->RegisterSpace = 0;
         range->OffsetInDescriptorsFromTableStart = 0;
     }
@@ -188,7 +205,7 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
                 context->c.uniform_count, context->c.uniforms, 0);
     for (i = 0; i < context->c.texture_count; ++i)
     {
-        struct texture *texture = context->c.textures[i];
+        struct d3d12_texture *texture = d3d12_texture(context->c.textures[i]);
 
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, texture->root_index,
                 get_gpu_descriptor_handle(test_context, texture->heap, 0));
