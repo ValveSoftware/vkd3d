@@ -495,10 +495,11 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                     break;
 
                 case STATE_SHADER_PIXEL:
-                    if (!(context->ps_code = context->ops->compile_shader(context,
-                            shader_source, context->minimum_shader_model)))
-                        return;
+                    free(context->ps_source);
+                    context->ps_source = shader_source;
+                    shader_source = NULL;
                     shader_source_len = 0;
+                    shader_source_size = 0;
                     break;
 
                 case STATE_SHADER_INVALID_PIXEL:
@@ -590,10 +591,6 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
             else if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
-
-                if (context->ps_code)
-                    ID3D10Blob_Release(context->ps_code);
-                context->ps_code = NULL;
             }
             else if (!strcmp(line, "[pixel shader fail]\n"))
             {
@@ -686,8 +683,7 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
         }
     }
 
-    if (context->ps_code)
-        ID3D10Blob_Release(context->ps_code);
+    free(context->ps_source);
     for (i = 0; i < context->texture_count; ++i)
     {
         if (context->textures[i])

@@ -66,7 +66,7 @@ struct shader_context
 {
     const struct shader_runner_ops *ops;
 
-    ID3D10Blob *ps_code;
+    char *ps_source;
     enum shader_model minimum_shader_model;
 
     uint32_t *uniforms;
@@ -81,7 +81,6 @@ struct shader_context
 
 struct shader_runner_ops
 {
-    ID3D10Blob *(*compile_shader)(struct shader_context *context, const char *source, enum shader_model minimum_shader_model);
     struct texture *(*create_texture)(struct shader_context *context, const struct texture_params *params);
     void (*destroy_texture)(struct shader_context *context, struct texture *texture);
     void (*draw_quad)(struct shader_context *context);

@@ -51,8 +51,7 @@ static struct d3d12_shader_context *d3d12_shader_context(struct shader_context *
     return CONTAINING_RECORD(c, struct d3d12_shader_context, c);
 }
 
-static ID3D10Blob *d3d12_runner_compile_shader(struct shader_context *c,
-        const char *source, enum shader_model shader_model)
+static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_model)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     HRESULT hr;
@@ -118,8 +117,6 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
     struct d3d12_shader_context *context = d3d12_shader_context(c);
     struct test_context *test_context = &context->test_context;
 
-    D3D12_SHADER_BYTECODE ps
-            = {ID3D10Blob_GetBufferPointer(context->c.ps_code), ID3D10Blob_GetBufferSize(context->c.ps_code)};
     ID3D12GraphicsCommandList *command_list = test_context->list;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
     D3D12_ROOT_PARAMETER root_params[3], *root_param;
@@ -128,9 +125,14 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
     ID3D12Device *device = test_context->device;
     static const float clear_color[4];
     unsigned int uniform_index;
+    D3D12_SHADER_BYTECODE ps;
     ID3D12PipelineState *pso;
+    ID3D10Blob *ps_code;
     HRESULT hr;
     size_t i;
+
+    if (!(ps_code = compile_shader(context->c.ps_source, context->c.minimum_shader_model)))
+        return;
 
     root_signature_desc.NumParameters = 0;
     root_signature_desc.pParameters = root_params;
@@ -191,8 +193,11 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
     hr = create_root_signature(device, &root_signature_desc, &test_context->root_signature);
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
 
+    ps.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
+    ps.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
     pso = create_pipeline_state(device, test_context->root_signature,
             test_context->render_target_desc.Format, NULL, &ps, NULL);
+    ID3D10Blob_Release(ps_code);
     if (!pso)
         return;
     vkd3d_array_reserve((void **)&test_context->pso, &test_context->pso_capacity,
@@ -245,7 +250,6 @@ static void d3d12_runner_probe_vec4(struct shader_context *c,
 
 static const struct shader_runner_ops d3d12_runner_ops =
 {
-    .compile_shader = d3d12_runner_compile_shader,
     .create_texture = d3d12_runner_create_texture,
     .destroy_texture = d3d12_runner_destroy_texture,
     .draw_quad = d3d12_runner_draw_quad,
