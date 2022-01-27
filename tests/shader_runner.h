@@ -70,7 +70,7 @@ struct shader_context
     enum shader_model minimum_shader_model;
 
     uint32_t *uniforms;
-    size_t uniform_count;
+    size_t uniform_count, uniform_capacity;
 
     struct texture **textures;
     size_t texture_count;

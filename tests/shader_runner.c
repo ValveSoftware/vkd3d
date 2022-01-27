@@ -276,6 +276,14 @@ static void parse_texture_directive(struct texture_params *texture, const char *
     }
 }
 
+static void set_uniforms(struct shader_context *context, size_t offset, size_t count, const void *uniforms)
+{
+    context->uniform_count = max(context->uniform_count, offset + count);
+    vkd3d_array_reserve((void **)&context->uniforms, &context->uniform_capacity,
+            context->uniform_count, sizeof(*context->uniforms));
+    memcpy(context->uniforms + offset, uniforms, count * sizeof(*context->uniforms));
+}
+
 static void parse_test_directive(struct shader_context *context, const char *line)
 {
     if (match_string(line, "draw quad", &line))
@@ -350,12 +358,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%f %f %f %f", &v.x, &v.y, &v.z, &v.w) < 4)
                 fatal_error("Malformed float4 constant '%s'.\n", line);
-            if (offset + 4 > context->uniform_count)
-            {
-                context->uniform_count = offset + 4;
-                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
-            }
-            memcpy(context->uniforms + offset, &v, sizeof(v));
+            set_uniforms(context, offset, 4, &v);
         }
         else if (match_string(line, "float", &line))
         {
@@ -363,12 +366,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%f", &f) < 1)
                 fatal_error("Malformed float constant '%s'.\n", line);
-            if (offset + 1 > context->uniform_count)
-            {
-                context->uniform_count = offset + 1;
-                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
-            }
-            memcpy(context->uniforms + offset, &f, sizeof(f));
+            set_uniforms(context, offset, 1, &f);
         }
         else if (match_string(line, "int", &line))
         {
@@ -376,12 +374,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%i", &i) < 1)
                 fatal_error("Malformed int constant '%s'.\n", line);
-            if (offset + 1 > context->uniform_count)
-            {
-                context->uniform_count = offset + 1;
-                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
-            }
-            memcpy(context->uniforms + offset, &i, sizeof(i));
+            set_uniforms(context, offset, 1, &i);
         }
         else if (match_string(line, "uint", &line))
         {
@@ -389,12 +382,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%u", &u) < 1)
                 fatal_error("Malformed uint constant '%s'.\n", line);
-            if (offset + 1 > context->uniform_count)
-            {
-                context->uniform_count = offset + 1;
-                context->uniforms = realloc(context->uniforms, context->uniform_count * sizeof(*context->uniforms));
-            }
-            memcpy(context->uniforms + offset, &u, sizeof(u));
+            set_uniforms(context, offset, 1, &u);
         }
     }
     else
