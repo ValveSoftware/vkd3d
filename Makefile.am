@@ -50,9 +50,6 @@ vkd3d_cross_tests = \
 	tests/d3d12_invalid_usage \
 	tests/hlsl_d3d12
 
-vkd3d_shader_runners = \
-	tests/shader_runner
-
 vkd3d_shader_tests = \
 	tests/abs.shader_test \
 	tests/cast-to-float.shader_test \
@@ -117,7 +114,8 @@ vkd3d_shader_tests = \
 
 vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
-	tests/d3d12_test_utils.h
+	tests/d3d12_test_utils.h \
+	tests/shader_runner.h
 
 vkd3d_demos = \
 	demos/vkd3d-gears \
@@ -277,12 +275,15 @@ AM_DEFAULT_SOURCE_EXT = .c
 TEST_EXTENSIONS = .shader_test
 
 if BUILD_TESTS
-check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_runners)
+check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) tests/shader_runner
 TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @VULKAN_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_LDADD = $(LDADD) @VULKAN_LIBS@
+tests_shader_runner_SOURCES = \
+	tests/shader_runner.c \
+	tests/shader_runner_d3d12.c
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
@@ -391,14 +392,17 @@ CROSS_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/i
 CROSS_CFLAGS = -g -O2 -Wall -municode ${CROSS_CPPFLAGS} -D__USE_MINGW_ANSI_STDIO=0
 EXTRA_DIST += $(cross_implibs:=.cross32.def) $(cross_implibs:=.cross64.def)
 
+shader_runner_cross_sources = \
+	$(srcdir)/tests/shader_runner.c \
+	$(srcdir)/tests/shader_runner_d3d12.c
+
 if HAVE_CROSSTARGET32
 CROSS32_CC = @CROSSCC32@
 CROSS32_DLLTOOL = @CROSSTARGET32@-dlltool
 CROSS32_IMPLIBS = $(cross_implibs:=.cross32.a)
 CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe) \
-	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe) \
-	$(vkd3d_shader_runners:=.cross32.exe)
-CROSS32_FILES = $(CROSS32_IMPLIBS) $(CROSS32_EXEFILES)
+	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
+CROSS32_FILES = $(CROSS32_IMPLIBS) $(CROSS32_EXEFILES) tests/shader_runner.cross32.exe
 
 CLEANFILES += $(CROSS32_FILES)
 crosstest32: $(CROSS32_FILES)
@@ -414,6 +418,12 @@ $(CROSS32_EXEFILES): %.cross32.exe: %.c $(CROSS32_IMPLIBS) $(widl_headers)
 	$(AM_V_CCLD)depbase=`echo $@ | $(SED) 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
 	$(CROSS32_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $< $(CROSS32_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
 	$(am__mv) $$depbase.Tpo $$depbase.Po
+
+tests/shader_runner.cross32.exe: $(shader_runner_cross_sources) $(CROSS32_IMPLIBS) $(widl_headers)
+	$(AM_V_CCLD)depbase=`echo $@ | sed 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
+	$(CROSS32_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(shader_runner_cross_sources) $(CROSS32_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
+	$(am__mv) $$depbase.Tpo $$depbase.Po
+
 else
 crosstest32:
 endif
@@ -423,9 +433,8 @@ CROSS64_CC = @CROSSCC64@
 CROSS64_DLLTOOL = @CROSSTARGET64@-dlltool
 CROSS64_IMPLIBS = $(cross_implibs:=.cross64.a)
 CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe) \
-	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe) \
-	$(vkd3d_shader_runners:=.cross64.exe)
-CROSS64_FILES = $(CROSS64_IMPLIBS) $(CROSS64_EXEFILES)
+	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
+CROSS64_FILES = $(CROSS64_IMPLIBS) $(CROSS64_EXEFILES) tests/shader_runner.cross64.exe
 
 CLEANFILES += $(CROSS64_FILES)
 crosstest64: $(CROSS64_FILES)
@@ -441,6 +450,12 @@ $(CROSS64_EXEFILES): %.cross64.exe: %.c $(CROSS64_IMPLIBS) $(widl_headers)
 	$(AM_V_CCLD)depbase=`echo $@ | sed 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
 	$(CROSS64_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $< $(CROSS64_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
 	$(am__mv) $$depbase.Tpo $$depbase.Po
+
+tests/shader_runner.cross64.exe: $(shader_runner_cross_sources) $(CROSS64_IMPLIBS) $(widl_headers)
+	$(AM_V_CCLD)depbase=`echo $@ | sed 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
+	$(CROSS64_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(shader_runner_cross_sources) $(CROSS64_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
+	$(am__mv) $$depbase.Tpo $$depbase.Po
+
 else
 crosstest64:
 endif

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Zebediah Figura for CodeWeavers
+ * Copyright 2020-2021 Zebediah Figura for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -43,6 +43,7 @@
  */
 
 #include "d3d12_crosstest.h"
+#include "shader_runner.h"
 #include <errno.h>
 
 static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *format, ...)
@@ -115,16 +116,10 @@ struct texture
     unsigned int root_index;
 };
 
-enum shader_model
-{
-    SHADER_MODEL_4_0 = 0,
-    SHADER_MODEL_4_1,
-    SHADER_MODEL_5_0,
-    SHADER_MODEL_5_1,
-};
-
 struct shader_context
 {
+    const struct shader_runner_ops *ops;
+
     struct test_context c;
     enum shader_model minimum_shader_model;
 
@@ -139,22 +134,6 @@ struct shader_context
     struct sampler *samplers;
     size_t sampler_count;
 };
-
-static ID3D10Blob *compile_shader(const char *source, const char *target)
-{
-    ID3D10Blob *blob = NULL, *errors = NULL;
-    HRESULT hr;
-
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", target, 0, 0, &blob, &errors);
-    ok(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
-    if (errors)
-    {
-        if (vkd3d_test_state.debug_level)
-            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-    return blob;
-}
 
 static void free_texture(struct texture *texture)
 {
@@ -643,7 +622,7 @@ static struct texture *get_texture(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-START_TEST(shader_runner)
+void run_shader_tests(int argc, char **argv, const struct shader_runner_ops *ops)
 {
     static const struct test_context_desc desc =
     {
@@ -689,6 +668,7 @@ START_TEST(shader_runner)
     }
 
     memset(&context, 0, sizeof(context));
+    context.ops = ops;
     init_test_context(&context.c, &desc);
 
     for (;;)
@@ -709,20 +689,10 @@ START_TEST(shader_runner)
                     break;
 
                 case STATE_SHADER_PIXEL:
-                {
-                    static const char *const shader_models[] =
-                    {
-                        [SHADER_MODEL_4_0] = "ps_4_0",
-                        [SHADER_MODEL_4_1] = "ps_4_1",
-                        [SHADER_MODEL_5_0] = "ps_5_0",
-                        [SHADER_MODEL_5_1] = "ps_5_1",
-                    };
-
-                    if (!(context.ps_code = compile_shader(shader_source, shader_models[context.minimum_shader_model])))
+                    if (!(context.ps_code = context.ops->compile_shader(shader_source, context.minimum_shader_model)))
                         return;
                     shader_source_len = 0;
                     break;
-                }
 
                 case STATE_SHADER_INVALID_PIXEL:
                 {
@@ -925,4 +895,9 @@ START_TEST(shader_runner)
     destroy_test_context(&context.c);
 
     fclose(f);
+}
+
+START_TEST(shader_runner)
+{
+    run_shader_tests_d3d12(argc, argv);
 }
