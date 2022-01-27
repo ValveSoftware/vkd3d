@@ -1871,11 +1871,20 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     /* Only HLSL_IR_LOAD can return an object. */
     object_load = hlsl_ir_load(object);
 
-    if (!strcmp(name, "Load"))
+    if (!strcmp(name, "Load")
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBE
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *coords;
+
+        if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+                || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
+        {
+            FIXME("'Load' method for multi-sample textures.\n");
+            return false;
+        }
 
         if (params->args_count < 1 || params->args_count > 3)
         {
@@ -1884,7 +1893,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
         if (params->args_count >= 2)
-            FIXME("Ignoring index and/or offset parameter(s).\n");
+            hlsl_fixme(ctx, loc, "Offset parameter.");
+        if (params->args_count == 3)
+            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         /* +1 for the mipmap level */
         if (!(coords = add_implicit_conversion(ctx, instrs, params->args[0],
@@ -1897,7 +1908,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         list_add_tail(instrs, &load->node.entry);
         return true;
     }
-    else if (!strcmp(name, "Sample"))
+    else if (!strcmp(name, "Sample")
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const struct hlsl_type *sampler_type;
@@ -1947,8 +1960,12 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         list_add_tail(instrs, &load->node.entry);
         return true;
     }
-    else if (!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
+    else if ((!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
             || !strcmp(name, "GatherGreen") || !strcmp(name, "GatherAlpha"))
+            && (object_type->sampler_dim == HLSL_SAMPLER_DIM_2D
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DARRAY
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBE
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY))
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         enum hlsl_resource_load_type load_type;
