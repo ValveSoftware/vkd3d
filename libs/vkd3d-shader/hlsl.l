@@ -133,6 +133,7 @@ texture3D               {return KW_TEXTURE3D;           }
 Texture3D               {return KW_TEXTURE3D;           }
 textureCUBE             {return KW_TEXTURECUBE;         }
 TextureCube             {return KW_TEXTURECUBE;         }
+TextureCubeArray        {return KW_TEXTURECUBEARRAY;    }
 true                    {return KW_TRUE;                }
 typedef                 {return KW_TYPEDEF;             }
 uniform                 {return KW_UNIFORM;             }

@@ -2172,6 +2172,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %token KW_TEXTURE2DMSARRAY
 %token KW_TEXTURE3D
 %token KW_TEXTURECUBE
+%token KW_TEXTURECUBEARRAY
 %token KW_TRUE
 %token KW_TYPEDEF
 %token KW_UNIFORM
@@ -2715,6 +2716,18 @@ texture_type:
     | KW_TEXTURECUBE
         {
             $$ = HLSL_SAMPLER_DIM_CUBE;
+        }
+    | KW_TEXTURE1DARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_1DARRAY;
+        }
+    | KW_TEXTURE2DARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_2DARRAY;
+        }
+    | KW_TEXTURECUBEARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_CUBEARRAY;
         }
 
 type:
