@@ -668,6 +668,23 @@ static inline struct hlsl_type *hlsl_get_numeric_type(const struct hlsl_ctx *ctx
         return hlsl_get_matrix_type(ctx, base_type, dimx, dimy);
 }
 
+static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
+{
+    switch (dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            return 1;
+        case HLSL_SAMPLER_DIM_2D:
+            return 2;
+        case HLSL_SAMPLER_DIM_3D:
+        case HLSL_SAMPLER_DIM_CUBE:
+            return 3;
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
 const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 const char *debug_hlsl_writemask(unsigned int writemask);

@@ -1513,23 +1513,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
     return statements_list;
 }
 
-static unsigned int sampler_dim_count(enum hlsl_sampler_dim dim)
-{
-    switch (dim)
-    {
-        case HLSL_SAMPLER_DIM_1D:
-            return 1;
-        case HLSL_SAMPLER_DIM_2D:
-            return 2;
-        case HLSL_SAMPLER_DIM_3D:
-        case HLSL_SAMPLER_DIM_CUBE:
-            return 3;
-        default:
-            assert(0);
-            return 0;
-    }
-}
-
 struct find_function_call_args
 {
     const struct parse_initializer *params;
@@ -1890,7 +1873,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
     if (!strcmp(name, "Load"))
     {
-        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *coords;
 
@@ -1916,7 +1899,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     }
     else if (!strcmp(name, "Sample"))
     {
-        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *offset = NULL;
@@ -1967,7 +1950,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     else if (!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
             || !strcmp(name, "GatherGreen") || !strcmp(name, "GatherAlpha"))
     {
-        const unsigned int sampler_dim = sampler_dim_count(object_type->sampler_dim);
+        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         enum hlsl_resource_load_type load_type;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
