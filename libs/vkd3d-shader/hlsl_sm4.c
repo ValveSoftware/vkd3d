@@ -434,6 +434,16 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
             return D3D_SRV_DIMENSION_TEXTURE3D;
         case HLSL_SAMPLER_DIM_CUBE:
             return D3D_SRV_DIMENSION_TEXTURECUBE;
+        case HLSL_SAMPLER_DIM_1DARRAY:
+            return D3D_SRV_DIMENSION_TEXTURE1DARRAY;
+        case HLSL_SAMPLER_DIM_2DARRAY:
+            return D3D_SRV_DIMENSION_TEXTURE2DARRAY;
+        case HLSL_SAMPLER_DIM_2DMS:
+            return D3D_SRV_DIMENSION_TEXTURE2DMS;
+        case HLSL_SAMPLER_DIM_2DMSARRAY:
+            return D3D_SRV_DIMENSION_TEXTURE2DMSARRAY;
+        case HLSL_SAMPLER_DIM_CUBEARRAY:
+            return D3D_SRV_DIMENSION_TEXTURECUBEARRAY;
         default:
             assert(0);
             return D3D_SRV_DIMENSION_UNKNOWN;
@@ -721,6 +731,16 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
             return VKD3D_SM4_RESOURCE_TEXTURE_3D;
         case HLSL_SAMPLER_DIM_CUBE:
             return VKD3D_SM4_RESOURCE_TEXTURE_CUBE;
+        case HLSL_SAMPLER_DIM_1DARRAY:
+            return VKD3D_SM4_RESOURCE_TEXTURE_1DARRAY;
+        case HLSL_SAMPLER_DIM_2DARRAY:
+            return VKD3D_SM4_RESOURCE_TEXTURE_2DARRAY;
+        case HLSL_SAMPLER_DIM_2DMS:
+            return VKD3D_SM4_RESOURCE_TEXTURE_2DMS;
+        case HLSL_SAMPLER_DIM_2DMSARRAY:
+            return VKD3D_SM4_RESOURCE_TEXTURE_2DMSARRAY;
+        case HLSL_SAMPLER_DIM_CUBEARRAY:
+            return VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY;
         default:
             assert(0);
             return 0;
@@ -1307,6 +1327,7 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords)
 {
     struct sm4_instruction instr;
+    unsigned int dim_count;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_LD;
@@ -1318,23 +1339,11 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
     /* Mipmap level is in the last component in the IR, but needs to be in the W
      * component in the instruction. */
-    switch (resource_type->sampler_dim)
-    {
-        case HLSL_SAMPLER_DIM_1D:
-            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, X, X, Y), 4);
-            break;
-
-        case HLSL_SAMPLER_DIM_2D:
-            instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, Y, X, Z), 4);
-            break;
-
-        case HLSL_SAMPLER_DIM_3D:
-        case HLSL_SAMPLER_DIM_CUBE:
-            break;
-
-        case HLSL_SAMPLER_DIM_GENERIC:
-            assert(0);
-    }
+    dim_count = hlsl_sampler_dim_count(resource_type->sampler_dim);
+    if (dim_count == 1)
+        instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, X, X, Y), 4);
+    if (dim_count == 2)
+        instr.srcs[0].swizzle = hlsl_combine_swizzles(instr.srcs[0].swizzle, HLSL_SWIZZLE(X, Y, X, Z), 4);
 
     sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
 

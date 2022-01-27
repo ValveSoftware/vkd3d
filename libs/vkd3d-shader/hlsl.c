@@ -932,10 +932,15 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         {
             static const char *const dimensions[] =
             {
-                [HLSL_SAMPLER_DIM_1D] = "1D",
-                [HLSL_SAMPLER_DIM_2D] = "2D",
-                [HLSL_SAMPLER_DIM_3D] = "3D",
-                [HLSL_SAMPLER_DIM_CUBE] = "Cube"
+                [HLSL_SAMPLER_DIM_1D]        = "1D",
+                [HLSL_SAMPLER_DIM_2D]        = "2D",
+                [HLSL_SAMPLER_DIM_3D]        = "3D",
+                [HLSL_SAMPLER_DIM_CUBE]      = "Cube",
+                [HLSL_SAMPLER_DIM_1DARRAY]   = "1DArray",
+                [HLSL_SAMPLER_DIM_2DARRAY]   = "2DArray",
+                [HLSL_SAMPLER_DIM_2DMS]      = "2DMS",
+                [HLSL_SAMPLER_DIM_2DMSARRAY] = "2DMSArray",
+                [HLSL_SAMPLER_DIM_CUBEARRAY] = "CubeArray",
             };
 
             switch (type->base_type)
@@ -1778,11 +1783,11 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const char *const sampler_names[] =
     {
-        "sampler",
-        "sampler1D",
-        "sampler2D",
-        "sampler3D",
-        "samplerCUBE"
+        [HLSL_SAMPLER_DIM_GENERIC] = "sampler",
+        [HLSL_SAMPLER_DIM_1D]      = "sampler1D",
+        [HLSL_SAMPLER_DIM_2D]      = "sampler2D",
+        [HLSL_SAMPLER_DIM_3D]      = "sampler3D",
+        [HLSL_SAMPLER_DIM_CUBE]    = "samplerCUBE",
     };
 
     static const struct
@@ -1834,7 +1839,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         }
     }
 
-    for (bt = 0; bt <= HLSL_SAMPLER_DIM_MAX; ++bt)
+    for (bt = 0; bt <= HLSL_SAMPLER_DIM_LAST_SAMPLER; ++bt)
     {
         type = hlsl_new_type(ctx, sampler_names[bt], HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
         type->sampler_dim = bt;

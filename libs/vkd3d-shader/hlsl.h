@@ -98,7 +98,13 @@ enum hlsl_sampler_dim
    HLSL_SAMPLER_DIM_2D,
    HLSL_SAMPLER_DIM_3D,
    HLSL_SAMPLER_DIM_CUBE,
-   HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_CUBE
+   HLSL_SAMPLER_DIM_LAST_SAMPLER = HLSL_SAMPLER_DIM_CUBE,
+   HLSL_SAMPLER_DIM_1DARRAY,
+   HLSL_SAMPLER_DIM_2DARRAY,
+   HLSL_SAMPLER_DIM_2DMS,
+   HLSL_SAMPLER_DIM_2DMSARRAY,
+   HLSL_SAMPLER_DIM_CUBEARRAY,
+   HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_CUBEARRAY,
 };
 
 enum hlsl_matrix_majority
@@ -488,7 +494,7 @@ struct hlsl_ctx
         struct hlsl_type *vector[HLSL_TYPE_LAST_SCALAR + 1][4];
         /* matrix[float][2][4] is a float4x2, i.e. dimx = 2, dimy = 4 */
         struct hlsl_type *matrix[HLSL_TYPE_LAST_SCALAR + 1][4][4];
-        struct hlsl_type *sampler[HLSL_SAMPLER_DIM_MAX + 1];
+        struct hlsl_type *sampler[HLSL_SAMPLER_DIM_LAST_SAMPLER + 1];
         struct hlsl_type *Void;
     } builtin_types;
 
@@ -674,11 +680,17 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
     {
         case HLSL_SAMPLER_DIM_1D:
             return 1;
+        case HLSL_SAMPLER_DIM_1DARRAY:
         case HLSL_SAMPLER_DIM_2D:
+        case HLSL_SAMPLER_DIM_2DMS:
             return 2;
+        case HLSL_SAMPLER_DIM_2DARRAY:
+        case HLSL_SAMPLER_DIM_2DMSARRAY:
         case HLSL_SAMPLER_DIM_3D:
         case HLSL_SAMPLER_DIM_CUBE:
             return 3;
+        case HLSL_SAMPLER_DIM_CUBEARRAY:
+            return 4;
         default:
             assert(0);
             return 0;
