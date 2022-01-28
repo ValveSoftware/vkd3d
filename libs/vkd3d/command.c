@@ -288,7 +288,7 @@ static void vkd3d_fence_worker_remove_fence(struct vkd3d_fence_worker *worker, s
     LONG count;
     int rc;
 
-    if (!(count = atomic_add_fetch(&fence->pending_worker_operation_count, 0)))
+    if (!(count = InterlockedAdd(&fence->pending_worker_operation_count, 0)))
         return;
 
     WARN("Waiting for %u pending fence operations (fence %p).\n", count, fence);
@@ -299,7 +299,7 @@ static void vkd3d_fence_worker_remove_fence(struct vkd3d_fence_worker *worker, s
         return;
     }
 
-    while ((count = atomic_add_fetch(&fence->pending_worker_operation_count, 0)))
+    while ((count = InterlockedAdd(&fence->pending_worker_operation_count, 0)))
     {
         TRACE("Still waiting for %u pending fence operations (fence %p).\n", count, fence);
 
@@ -410,7 +410,7 @@ static void *vkd3d_fence_worker_main(void *arg)
     {
         vkd3d_wait_for_gpu_fences(worker);
 
-        if (!worker->fence_count || atomic_add_fetch(&worker->enqueued_fence_count, 0))
+        if (!worker->fence_count || InterlockedAdd(&worker->enqueued_fence_count, 0))
         {
             if ((rc = pthread_mutex_lock(&worker->mutex)))
             {

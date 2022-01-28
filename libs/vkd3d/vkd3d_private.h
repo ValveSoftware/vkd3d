@@ -192,7 +192,7 @@ struct vkd3d_fence_worker
     bool should_exit;
     bool pending_fence_destruction;
 
-    size_t enqueued_fence_count;
+    LONG enqueued_fence_count;
     struct vkd3d_enqueued_fence
     {
         VkFence vk_fence;
