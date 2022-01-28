@@ -88,10 +88,10 @@ static inline bool vkd3d_bitmask_is_contiguous(unsigned int mask)
 /* Undefined for x == 0. */
 static inline unsigned int vkd3d_log2i(unsigned int x)
 {
-#ifdef _MSC_VER
+#ifdef _WIN32
     /* _BitScanReverse returns the index of the highest set bit,
      * unlike clz which is 31 - index. */
-    unsigned long result;
+    ULONG result;
     _BitScanReverse(&result, x);
     return (unsigned int)result;
 #elif defined(HAVE_BUILTIN_CLZ)
