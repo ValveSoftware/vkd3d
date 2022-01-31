@@ -308,7 +308,7 @@ void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value
 static void vkd3d_shader_dump_blob(const char *path, const char *prefix,
         const char *suffix, const void *data, size_t size)
 {
-    static int shader_id = 0;
+    static LONG shader_id = 0;
     char filename[1024];
     unsigned int id;
     FILE *f;
