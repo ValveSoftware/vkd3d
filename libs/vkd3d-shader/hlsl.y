@@ -1155,7 +1155,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     struct hlsl_type *lhs_type = lhs->data_type;
     struct hlsl_ir_store *store;
     struct hlsl_ir_expr *copy;
-    DWORD writemask = 0;
+    unsigned int writemask = 0;
 
     if (assign_op == ASSIGN_OP_SUB)
     {
@@ -2359,7 +2359,7 @@ struct_declaration:
       var_modifiers struct_spec variables_def_optional ';'
         {
             struct hlsl_type *type;
-            DWORD modifiers = $1;
+            unsigned int modifiers = $1;
 
             if (!$3)
             {
@@ -2449,7 +2449,7 @@ field:
       var_modifiers field_type variables_def ';'
         {
             struct hlsl_type *type;
-            DWORD modifiers = $1;
+            unsigned int modifiers = $1;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
@@ -2619,7 +2619,7 @@ parameter:
       input_mods var_modifiers type any_identifier colon_attribute
         {
             struct hlsl_type *type;
-            DWORD modifiers = $2;
+            unsigned int modifiers = $2;
 
             if (!(type = apply_type_modifiers(ctx, $3, &modifiers, @2)))
                 YYABORT;
@@ -2858,7 +2858,7 @@ declaration:
       var_modifiers type variables_def ';'
         {
             struct hlsl_type *type;
-            DWORD modifiers = $1;
+            unsigned int modifiers = $1;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
