@@ -87,7 +87,7 @@ struct vkd3d_shader_src_param_entry
 
 struct vkd3d_shader_sm4_parser
 {
-    const DWORD *start, *end;
+    const uint32_t *start, *end;
 
     unsigned int output_map[MAX_REG_OUTPUT];
 
@@ -252,7 +252,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
 {
     struct vkd3d_shader_semantic *semantic = &ins->declaration.semantic;
     enum vkd3d_sm4_resource_type resource_type;
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
     enum vkd3d_sm4_data_type data_type;
     enum vkd3d_data_type reg_data_type;
     DWORD components;
@@ -297,7 +297,7 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
 static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     shader_sm4_read_src_param(priv, &tokens, end, VKD3D_DATA_FLOAT, &ins->declaration.cb.src);
     shader_sm4_set_descriptor_register_range(priv, &ins->declaration.cb.src.reg, &ins->declaration.cb.range);
@@ -323,7 +323,7 @@ static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction 
 static void shader_sm4_read_dcl_sampler(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,
         const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     ins->flags = (opcode_token & VKD3D_SM4_SAMPLER_MODE_MASK) >> VKD3D_SM4_SAMPLER_MODE_SHIFT;
     if (ins->flags & ~VKD3D_SM4_SAMPLER_COMPARISON)
@@ -342,7 +342,7 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
 }
 
 static void shader_sm4_read_dcl_output_topology(struct vkd3d_shader_instruction *ins, uint32_t opcode,
-        uint32_t opcode_token, const DWORD *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
+        uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     enum vkd3d_sm4_output_primitive_type primitive_type;
 
@@ -495,7 +495,7 @@ static void shader_sm5_read_dcl_hs_max_tessfactor(struct vkd3d_shader_instructio
 }
 
 static void shader_sm5_read_dcl_thread_group(struct vkd3d_shader_instruction *ins, uint32_t opcode,
-        uint32_t opcode_token, const DWORD *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
+        uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     ins->declaration.thread_group_size.x = *tokens++;
     ins->declaration.thread_group_size.y = *tokens++;
@@ -506,7 +506,7 @@ static void shader_sm5_read_dcl_uav_raw(struct vkd3d_shader_instruction *ins, ui
         const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     struct vkd3d_shader_raw_resource *resource = &ins->declaration.raw_resource;
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UAV, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
@@ -518,7 +518,7 @@ static void shader_sm5_read_dcl_uav_structured(struct vkd3d_shader_instruction *
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     struct vkd3d_shader_structured_resource *resource = &ins->declaration.structured_resource;
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_UAV, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
@@ -553,7 +553,7 @@ static void shader_sm5_read_dcl_resource_structured(struct vkd3d_shader_instruct
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     struct vkd3d_shader_structured_resource *resource = &ins->declaration.structured_resource;
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_RESOURCE, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
@@ -567,7 +567,7 @@ static void shader_sm5_read_dcl_resource_raw(struct vkd3d_shader_instruction *in
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     struct vkd3d_shader_raw_resource *resource = &ins->declaration.raw_resource;
-    const DWORD *end = &tokens[token_count];
+    const uint32_t *end = &tokens[token_count];
 
     shader_sm4_read_dst_param(priv, &tokens, end, VKD3D_DATA_RESOURCE, &resource->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &resource->resource.reg.reg, &resource->resource.range);
@@ -1465,7 +1465,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
     const uint32_t **ptr = &parser->ptr;
     unsigned int i, len;
     size_t remaining;
-    const DWORD *p;
+    const uint32_t *p;
     DWORD precise;
 
     list_move_head(&sm4->src_free, &sm4->src);
@@ -1692,7 +1692,7 @@ static bool require_space(size_t offset, size_t count, size_t size, size_t data_
     return !count || (data_size - offset) / count >= size;
 }
 
-static void read_dword(const char **ptr, DWORD *d)
+static void read_dword(const char **ptr, uint32_t *d)
 {
     memcpy(d, *ptr, sizeof(*d));
     *ptr += sizeof(*d);
@@ -1700,14 +1700,14 @@ static void read_dword(const char **ptr, DWORD *d)
 
 static void read_float(const char **ptr, float *f)
 {
-    STATIC_ASSERT(sizeof(float) == sizeof(DWORD));
-    read_dword(ptr, (DWORD *)f);
+    STATIC_ASSERT(sizeof(float) == sizeof(uint32_t));
+    read_dword(ptr, (uint32_t *)f);
 }
 
 static void skip_dword_unknown(const char **ptr, unsigned int count)
 {
     unsigned int i;
-    DWORD d;
+    uint32_t d;
 
     WARN("Skipping %u unknown DWORDs:\n", count);
     for (i = 0; i < count; ++i)
@@ -1744,11 +1744,11 @@ static int parse_dxbc(const char *data, size_t data_size,
     uint32_t checksum[4], calculated_checksum[4];
     const char *ptr = data;
     int ret = VKD3D_OK;
-    DWORD chunk_count;
-    DWORD total_size;
+    uint32_t chunk_count;
+    uint32_t total_size;
     unsigned int i;
-    DWORD version;
-    DWORD tag;
+    uint32_t version;
+    uint32_t tag;
 
     if (data_size < VKD3D_DXBC_HEADER_SIZE)
     {
@@ -1803,9 +1803,9 @@ static int parse_dxbc(const char *data, size_t data_size,
 
     for (i = 0; i < chunk_count; ++i)
     {
-        DWORD chunk_tag, chunk_size;
+        uint32_t chunk_tag, chunk_size;
         const char *chunk_ptr;
-        DWORD chunk_offset;
+        uint32_t chunk_offset;
 
         read_dword(&ptr, &chunk_offset);
         TRACE("chunk %u at offset %#x\n", i, chunk_offset);
@@ -1847,7 +1847,7 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
     struct vkd3d_shader_signature_element *e;
     const char *ptr = data;
     unsigned int i;
-    DWORD count;
+    uint32_t count;
 
     if (!require_space(0, 2, sizeof(DWORD), data_size))
     {
@@ -1877,7 +1877,7 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
 
     for (i = 0; i < count; ++i)
     {
-        DWORD name_offset, mask;
+        uint32_t name_offset, mask;
 
         if (has_stream_index)
             read_dword(&ptr, &e[i].stream_index);
@@ -1998,7 +1998,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
         case TAG_SHEX:
             if (desc->byte_code)
                 FIXME("Multiple shader code chunks.\n");
-            desc->byte_code = (const DWORD *)data;
+            desc->byte_code = (const uint32_t *)data;
             desc->byte_code_size = data_size;
             break;
 
@@ -2355,7 +2355,7 @@ static int shader_parse_root_parameters(struct root_signature_parser_context *co
 }
 
 static int shader_parse_root_parameters1(struct root_signature_parser_context *context,
-        DWORD offset, DWORD count, struct vkd3d_shader_root_parameter1 *parameters)
+        uint32_t offset, DWORD count, struct vkd3d_shader_root_parameter1 *parameters)
 {
     const char *ptr;
     unsigned int i;

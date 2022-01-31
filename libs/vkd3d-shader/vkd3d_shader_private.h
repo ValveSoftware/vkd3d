@@ -638,7 +638,7 @@ struct vkd3d_shader_version
 struct vkd3d_shader_immediate_constant_buffer
 {
     unsigned int vec4_count;
-    DWORD data[MAX_IMMEDIATE_CONSTANT_BUFFER_SIZE];
+    uint32_t data[MAX_IMMEDIATE_CONSTANT_BUFFER_SIZE];
 };
 
 struct vkd3d_shader_indexable_temp
@@ -762,7 +762,7 @@ enum vkd3d_shader_input_sysval_semantic
 
 struct vkd3d_shader_desc
 {
-    const DWORD *byte_code;
+    const uint32_t *byte_code;
     size_t byte_code_size;
     struct vkd3d_shader_signature input_signature;
     struct vkd3d_shader_signature output_signature;
