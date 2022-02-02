@@ -1,0 +1,37 @@
+[pixel shader]
+static const float4 array_st[3] = {
+    11, 12, 13, 14,
+    21, 22, 23, 24,
+    31, 32, 33, 34
+};
+
+float4 main() : SV_TARGET
+{
+    return array_st[1];
+}
+
+[test]
+draw quad
+probe all rgba (21, 22, 23, 24)
+
+
+[pixel shader]
+static const float4 array_st[4][2] = {
+    11, 12, 13, 14,
+    21, 22, 23, 24,
+    31, 32, 33, 34,
+    41, 42, 43, 44,
+    51, 52, 53, 54,
+    61, 62, 63, 64,
+    71, 72, 73, 74,
+    81, 82, 83, 84,
+};
+
+float4 main() : SV_TARGET
+{
+    return array_st[2][1];
+}
+
+[test]
+draw quad
+probe all rgba (61, 62, 63, 64)

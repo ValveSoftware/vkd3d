@@ -1,0 +1,35 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 array_loc[3] = {
+        11, 12, 13, 14,
+        21, 22, 23, 24,
+        31, 32, 33, 34
+    };
+    return array_loc[1];
+}
+
+[test]
+draw quad
+probe all rgba (21, 22, 23, 24)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 array_loc[2][4] = {
+        11, 12, 13, 14,
+        21, 22, 23, 24,
+        31, 32, 33, 34,
+        41, 42, 43, 44,
+        51, 52, 53, 54,
+        61, 62, 63, 64,
+        71, 72, 73, 74,
+        81, 82, 83, 84,
+    };
+    return array_loc[1][2];
+}
+
+[test]
+draw quad
+probe all rgba (71, 72, 73, 74)

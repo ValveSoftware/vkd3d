@@ -68,6 +68,8 @@ vkd3d_shader_tests = \
 	tests/hlsl-function-overload.shader_test \
 	tests/hlsl-gather-offset.shader_test \
 	tests/hlsl-gather.shader_test \
+	tests/hlsl-initializer-local-array.shader_test \
+	tests/hlsl-initializer-static-array.shader_test \
 	tests/hlsl-intrinsic-override.shader_test \
 	tests/hlsl-invalid.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
@@ -295,6 +297,8 @@ XFAIL_TESTS = \
 	tests/cast-to-int.shader_test \
 	tests/cast-to-uint.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-initializer-local-array.shader_test \
+	tests/hlsl-initializer-static-array.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-for.shader_test \
