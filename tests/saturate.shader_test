@@ -8,3 +8,14 @@ float4 main(uniform float2 u) : sv_target
 uniform 0 float4 0.7 -0.1 0.0 0.0
 draw quad
 probe all rgba (0.7, 0.0, 1.0, 0.0)
+
+[pixel shader]
+float4 main(uniform int4 u) : sv_target
+{
+    return saturate(u);
+}
+
+[test]
+uniform 0 int4 -2 0 2 -1
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 0.0)

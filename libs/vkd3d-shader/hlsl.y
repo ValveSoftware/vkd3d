@@ -1698,7 +1698,12 @@ static bool intrinsic_round(struct hlsl_ctx *ctx,
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, params->args[0], loc);
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
 
 static const struct intrinsic_function
