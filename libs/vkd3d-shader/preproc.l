@@ -57,6 +57,7 @@ static void update_location(struct preproc_ctx *ctx);
 NEWLINE         \r?\n
 WS              [ \t]
 IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
+INT_SUFFIX      [uUlL]{0,2}
 
 %%
 
@@ -92,9 +93,9 @@ IDENTIFIER      [A-Za-z_][A-Za-z0-9_]*
 <INITIAL>[0-9]+\.([eE][+-]?[0-9]+)?[hHfF]?          {return T_TEXT;}
 <INITIAL>[0-9]+([eE][+-]?[0-9]+)?[hHfF]             {return T_TEXT;}
 <INITIAL>[0-9]+[eE][+-]?[0-9]+                      {return T_TEXT;}
-<INITIAL,LINE>0[xX][0-9a-fA-f]+[ul]{0,2}            {return T_INTEGER;}
-<INITIAL,LINE>0[0-7]*[ul]{0,2}                      {return T_INTEGER;}
-<INITIAL,LINE>[1-9][0-9]*[ul]{0,2}                  {return T_INTEGER;}
+<INITIAL,LINE>0[xX][0-9a-fA-f]+{INT_SUFFIX}         {return T_INTEGER;}
+<INITIAL,LINE>0[0-7]*{INT_SUFFIX}                   {return T_INTEGER;}
+<INITIAL,LINE>[1-9][0-9]*{INT_SUFFIX}               {return T_INTEGER;}
 
 <INITIAL>##                         {return T_CONCAT;}
 

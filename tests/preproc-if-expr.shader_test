@@ -100,6 +100,39 @@ pass
 #endif
 
 [preproc]
+#if 2u == 2
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 2l == 2
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 2Ul == 2
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 2uL == 2
+pass
+#else
+fail
+#endif
+
+[preproc]
+#if 012lu == 10
+pass
+#endif
+
+[preproc]
 /* All math is done using unsigned 32-bit integers. */
 #if 8 / -3 == 2
 fail
