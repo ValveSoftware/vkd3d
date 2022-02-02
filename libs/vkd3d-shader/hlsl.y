@@ -1570,6 +1570,18 @@ static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *c
     return args.decl;
 }
 
+static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *type = arg->data_type;
+
+    if (type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF)
+        return arg;
+
+    type = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+    return add_implicit_conversion(ctx, params->instrs, arg, type, loc);
+}
+
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -1675,7 +1687,12 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
 static bool intrinsic_round(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ROUND, params->args[0], loc);
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ROUND, arg, loc);
 }
 
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,

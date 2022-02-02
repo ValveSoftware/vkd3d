@@ -368,6 +368,14 @@ static void parse_test_directive(struct shader_context *context, const char *lin
                 fatal_error("Malformed float constant '%s'.\n", line);
             set_uniforms(context, offset, 1, &f);
         }
+        else if (match_string(line, "int4", &line))
+        {
+            int v[4];
+
+            if (sscanf(line, "%d %d %d %d", &v[0], &v[1], &v[2], &v[3]) < 4)
+                fatal_error("Malformed int4 constant '%s'.\n", line);
+            set_uniforms(context, offset, 4, v);
+        }
         else if (match_string(line, "int", &line))
         {
             int i;
