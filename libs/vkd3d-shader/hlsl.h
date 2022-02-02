@@ -293,6 +293,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_DSX,
     HLSL_OP1_DSY,
     HLSL_OP1_EXP2,
+    HLSL_OP1_FLOOR,
     HLSL_OP1_FRACT,
     HLSL_OP1_LOG2,
     HLSL_OP1_LOGIC_NOT,

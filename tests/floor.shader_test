@@ -1,0 +1,38 @@
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    return floor(u);
+}
+
+[test]
+uniform 0 float4 -0.5 6.5 7.5 3.4
+draw quad
+probe all rgba (-1.0, 6.0, 7.0, 3.0) 4
+
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    float a = floor(u.r);
+    int2 b = floor(u.gb);
+    float4 res = float4(b, a, u.a);
+    return floor(res);
+}
+
+[test]
+uniform 0 float4 -0.5 6.5 7.5 3.4
+draw quad
+probe all rgba (6.0, 7.0, -1.0, 3.0) 4
+
+[pixel shader]
+float4 main(uniform int4 u) : sv_target
+{
+    float a = floor(u.r);
+    int2 b = floor(u.gb);
+    float4 res = float4(b, a, u.a);
+    return floor(res);
+}
+
+[test]
+uniform 0 int4 -1 6 7 3
+draw quad
+probe all rgba (6.0, 7.0, -1.0, 3.0) 4
