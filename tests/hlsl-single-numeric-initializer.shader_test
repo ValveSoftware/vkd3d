@@ -1,0 +1,26 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 aa = 7;
+    return aa;
+}
+
+[test]
+draw quad
+probe all rgba (7.0, 7.0, 7.0, 7.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 bb;
+    float3 aa = 7;
+
+    bb.xyz = aa;
+    bb.w = 8.0;
+    return bb;
+}
+
+[test]
+draw quad
+probe all rgba (7.0, 7.0, 7.0, 8.0)

@@ -84,6 +84,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
+	tests/hlsl-single-numeric-initializer.shader_test \
 	tests/hlsl-state-block-syntax.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
