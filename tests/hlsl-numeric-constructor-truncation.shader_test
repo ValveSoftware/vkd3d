@@ -1,0 +1,33 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    float3 x = float4(71, 72, 73, 74);
+    return float4(x, 75);
+}
+
+[test]
+draw quad
+probe all rgba (71.0, 72.0, 73.0, 75.0)
+
+
+[pixel shader]
+struct stu
+{
+    float aa;
+    float2 bb;
+    float cc;
+};
+
+float4 main() : sv_target
+{
+    struct stu foo;
+    foo.cc = 5;
+    foo.bb = float3(2, 3, 4); // It shall not overflow to cc;
+    foo.aa = 1;
+
+    return float4(foo);
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 5.0)
