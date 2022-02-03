@@ -70,6 +70,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-gather.shader_test \
 	tests/hlsl-initializer-invalid-arg-count.shader_test \
 	tests/hlsl-initializer-local-array.shader_test \
+	tests/hlsl-initializer-numeric.shader_test \
 	tests/hlsl-initializer-static-array.shader_test \
 	tests/hlsl-initializer-struct.shader_test \
 	tests/hlsl-intrinsic-override.shader_test \
@@ -301,6 +302,7 @@ XFAIL_TESTS = \
 	tests/hlsl-array-dimension.shader_test \
 	tests/hlsl-initializer-invalid-arg-count.shader_test \
 	tests/hlsl-initializer-local-array.shader_test \
+	tests/hlsl-initializer-numeric.shader_test \
 	tests/hlsl-initializer-static-array.shader_test \
 	tests/hlsl-initializer-struct.shader_test \
 	tests/hlsl-bool-cast.shader_test \

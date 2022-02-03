@@ -1,0 +1,35 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    int4 aa = {1, 2, 3, 4};
+    return aa;
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0) 4
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 aa = {1, 2, 3, 4};
+    return aa;
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0) 4
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float3 aa = {1, 2, 3};
+    float4 bb = {aa.x, aa.y, aa.z, 4.0};
+    return bb;
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0) 4
