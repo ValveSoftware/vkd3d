@@ -1,0 +1,56 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 aaa = {1, {{{2, {3}}, 4}}};
+    return aaa;
+}
+
+[test]
+draw quad
+probe all rgba (1, 2, 3, 4)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 aaa[3] =
+    {
+        11, {{{12, {13}}, 14},
+        21, 22}, 23, {{24,
+        31, {32, 33}, 34}},
+    };
+    return aaa[1];
+}
+
+[test]
+draw quad
+probe all rgba (21, 22, 23, 24)
+
+
+[pixel shader]
+struct stu1
+{
+    float4 aaa;
+    float4 bbb;
+};
+
+struct stu2
+{
+    int3 ccc;
+    stu1 ddd;
+};
+
+float4 main() : sv_target
+{
+    struct stu2 val =
+    {
+        11, {12, 13,
+        21, {{{22}}}, 23}, {{24,
+        31, 32}}, 33, 34,
+    };
+    return val.ddd.aaa;
+}
+
+[test]
+draw quad
+probe all rgba (21, 22, 23, 24)
