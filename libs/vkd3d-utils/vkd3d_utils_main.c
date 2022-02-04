@@ -327,6 +327,41 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
 }
 
 /* Events */
+
+#ifdef _WIN32
+
+HANDLE vkd3d_create_event(void)
+{
+    return CreateEventA(NULL, FALSE, FALSE, NULL);
+}
+
+HRESULT vkd3d_signal_event(HANDLE event)
+{
+    SetEvent(event);
+    return S_OK;
+}
+
+unsigned int vkd3d_wait_event(HANDLE event, unsigned int milliseconds)
+{
+    return WaitForSingleObject(event, milliseconds);
+}
+
+void vkd3d_destroy_event(HANDLE event)
+{
+    CloseHandle(event);
+}
+
+#else  /* _WIN32 */
+
+#include <pthread.h>
+
+struct vkd3d_event
+{
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    BOOL is_signaled;
+};
+
 HANDLE vkd3d_create_event(void)
 {
     struct vkd3d_event *event;
@@ -433,6 +468,8 @@ void vkd3d_destroy_event(HANDLE event)
         ERR("Failed to destroy condition variable, error %d.\n", rc);
     vkd3d_free(impl);
 }
+
+#endif  /* _WIN32 */
 
 HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob)
 {
