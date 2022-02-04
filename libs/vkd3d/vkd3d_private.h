@@ -23,6 +23,10 @@
 #define NONAMELESSUNION
 #define VK_NO_PROTOTYPES
 
+#ifdef _WIN32
+# define _WIN32_WINNT 0x0600  /* for condition variables */
+#endif
+
 #include "vkd3d_common.h"
 #include "vkd3d_blob.h"
 #include "vkd3d_memory.h"
@@ -171,6 +175,72 @@ union vkd3d_thread_handle
     void *handle;
 };
 
+#ifdef _WIN32
+
+struct vkd3d_mutex
+{
+    CRITICAL_SECTION lock;
+};
+
+struct vkd3d_cond
+{
+    CONDITION_VARIABLE cond;
+};
+
+static inline int vkd3d_mutex_init(struct vkd3d_mutex *lock)
+{
+    InitializeCriticalSection(&lock->lock);
+    return 0;
+}
+
+static inline int vkd3d_mutex_lock(struct vkd3d_mutex *lock)
+{
+    EnterCriticalSection(&lock->lock);
+    return 0;
+}
+
+static inline int vkd3d_mutex_unlock(struct vkd3d_mutex *lock)
+{
+    LeaveCriticalSection(&lock->lock);
+    return 0;
+}
+
+static inline int vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
+{
+    DeleteCriticalSection(&lock->lock);
+    return 0;
+}
+
+static inline int vkd3d_cond_init(struct vkd3d_cond *cond)
+{
+    InitializeConditionVariable(&cond->cond);
+    return 0;
+}
+
+static inline int vkd3d_cond_signal(struct vkd3d_cond *cond)
+{
+    WakeConditionVariable(&cond->cond);
+    return 0;
+}
+
+static inline int vkd3d_cond_broadcast(struct vkd3d_cond *cond)
+{
+    WakeAllConditionVariable(&cond->cond);
+    return 0;
+}
+
+static inline int vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
+{
+    return !SleepConditionVariableCS(&cond->cond, &lock->lock, INFINITE);
+}
+
+static inline int vkd3d_cond_destroy(struct vkd3d_cond *cond)
+{
+    return 0;
+}
+
+#else  /* _WIN32 */
+
 struct vkd3d_mutex
 {
     pthread_mutex_t lock;
@@ -226,6 +296,8 @@ static inline int vkd3d_cond_destroy(struct vkd3d_cond *cond)
 {
     return pthread_cond_destroy(&cond->cond);
 }
+
+#endif  /* _WIN32 */
 
 HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
         PFN_vkd3d_thread thread_main, void *data, union vkd3d_thread_handle *thread);
