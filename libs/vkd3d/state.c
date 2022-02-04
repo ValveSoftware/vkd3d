@@ -2450,13 +2450,14 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     VkVertexInputBindingDivisorDescriptionEXT *binding_divisor;
     const struct vkd3d_vulkan_info *vk_info = &device->vk_info;
     uint32_t instance_divisors[D3D12_VS_INPUT_REGISTER_COUNT];
+    struct vkd3d_shader_spirv_target_info *stage_target_info;
     uint32_t aligned_offsets[D3D12_VS_INPUT_REGISTER_COUNT];
+    struct vkd3d_shader_descriptor_offset_info offset_info;
     struct vkd3d_shader_parameter ps_shader_parameters[1];
     struct vkd3d_shader_transform_feedback_info xfb_info;
     struct vkd3d_shader_spirv_target_info ps_target_info;
     struct vkd3d_shader_interface_info shader_interface;
-    struct vkd3d_shader_descriptor_offset_info offset_info;
-    struct vkd3d_shader_spirv_target_info *target_info;
+    struct vkd3d_shader_spirv_target_info target_info;
     const struct d3d12_root_signature *root_signature;
     struct vkd3d_shader_signature input_signature;
     bool have_attachment, is_dsv_format_unknown;
@@ -2661,6 +2662,12 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         }
     }
 
+    memset(&target_info, 0, sizeof(target_info));
+    target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
+    target_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    target_info.extensions = vk_info->shader_extensions;
+    target_info.extension_count = vk_info->shader_extension_count;
+
     graphics->xfb_enabled = false;
     if (so_desc->NumEntries)
     {
@@ -2713,7 +2720,6 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         offset_info.descriptor_table_count = 0;
         offset_info.binding_offsets = root_signature->descriptor_offsets;
         offset_info.uav_counter_offsets = NULL;
-        vkd3d_prepend_struct(&shader_interface, &offset_info);
     }
 
     for (i = 0; i < ARRAY_SIZE(shader_stages); ++i)
@@ -2745,7 +2751,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
 
         shader_interface.uav_counters = NULL;
         shader_interface.uav_counter_count = 0;
-        target_info = NULL;
+        stage_target_info = &target_info;
         switch (shader_stages[i].stage)
         {
             case VK_SHADER_STAGE_VERTEX_BIT:
@@ -2772,7 +2778,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
             case VK_SHADER_STAGE_FRAGMENT_BIT:
                 shader_interface.uav_counters = state->uav_counters.bindings;
                 shader_interface.uav_counter_count = state->uav_counters.binding_count;
-                target_info = &ps_target_info;
+                stage_target_info = &ps_target_info;
                 break;
 
             default:
@@ -2781,10 +2787,15 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         }
 
         shader_interface.next = NULL;
+        xfb_info.next = NULL;
+        ps_target_info.next = NULL;
+        target_info.next = NULL;
+        offset_info.next = NULL;
         if (shader_stages[i].stage == xfb_stage)
             vkd3d_prepend_struct(&shader_interface, &xfb_info);
-        if (target_info)
-            vkd3d_prepend_struct(&shader_interface, target_info);
+        vkd3d_prepend_struct(&shader_interface, stage_target_info);
+        if (root_signature->descriptor_offsets)
+            vkd3d_prepend_struct(&shader_interface, &offset_info);
 
         if (FAILED(hr = create_shader_stage(device, &graphics->stages[graphics->stage_count],
                 shader_stages[i].stage, b, &shader_interface)))
