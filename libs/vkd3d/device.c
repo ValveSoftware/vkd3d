@@ -1878,7 +1878,7 @@ static HRESULT d3d12_device_init_pipeline_cache(struct d3d12_device *device)
     VkResult vr;
     int rc;
 
-    if ((rc = pthread_mutex_init(&device->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&device->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
@@ -1906,7 +1906,7 @@ static void d3d12_device_destroy_pipeline_cache(struct d3d12_device *device)
     if (device->vk_pipeline_cache)
         VK_CALL(vkDestroyPipelineCache(device->vk_device, device->vk_pipeline_cache, NULL));
 
-    pthread_mutex_destroy(&device->mutex);
+    vkd3d_mutex_destroy(&device->mutex);
 }
 
 #define VKD3D_VA_FALLBACK_BASE      0x8000000000000000ull
@@ -1979,7 +1979,7 @@ D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_al
         return 0;
     size = align(size, alignment);
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return 0;
@@ -1990,7 +1990,7 @@ D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_al
     else
         address = vkd3d_gpu_va_allocator_allocate_fallback(allocator, alignment, size, ptr);
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return address;
 }
@@ -2061,7 +2061,7 @@ void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocato
         return vkd3d_gpu_va_allocator_dereference_slab(allocator, address);
 
     /* Slow fallback. */
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return NULL;
@@ -2069,7 +2069,7 @@ void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocato
 
     ret = vkd3d_gpu_va_allocator_dereference_fallback(allocator, address);
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return ret;
 }
@@ -2124,7 +2124,7 @@ void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12
 {
     int rc;
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -2133,13 +2133,13 @@ void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12
     if (address < VKD3D_VA_FALLBACK_BASE)
     {
         vkd3d_gpu_va_allocator_free_slab(allocator, address);
-        pthread_mutex_unlock(&allocator->mutex);
+        vkd3d_mutex_unlock(&allocator->mutex);
         return;
     }
 
     vkd3d_gpu_va_allocator_free_fallback(allocator, address);
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 }
 
 static bool vkd3d_gpu_va_allocator_init(struct vkd3d_gpu_va_allocator *allocator)
@@ -2165,7 +2165,7 @@ static bool vkd3d_gpu_va_allocator_init(struct vkd3d_gpu_va_allocator *allocator
         allocator->slabs[i].ptr = &allocator->slabs[i + 1];
     }
 
-    if ((rc = pthread_mutex_init(&allocator->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&allocator->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         vkd3d_free(allocator->slabs);
@@ -2179,15 +2179,15 @@ static void vkd3d_gpu_va_allocator_cleanup(struct vkd3d_gpu_va_allocator *alloca
 {
     int rc;
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
     }
     vkd3d_free(allocator->slabs);
     vkd3d_free(allocator->fallback_allocations);
-    pthread_mutex_unlock(&allocator->mutex);
-    pthread_mutex_destroy(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_destroy(&allocator->mutex);
 }
 
 /* We could use bsearch() or recursion here, but it probably helps to omit
@@ -2223,7 +2223,7 @@ bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_a
     struct vkd3d_gpu_descriptor_allocation *allocation;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return false;
@@ -2232,7 +2232,7 @@ bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_a
     if (!vkd3d_array_reserve((void **)&allocator->allocations, &allocator->allocations_size,
             allocator->allocation_count + 1, sizeof(*allocator->allocations)))
     {
-        pthread_mutex_unlock(&allocator->mutex);
+        vkd3d_mutex_unlock(&allocator->mutex);
         return false;
     }
 
@@ -2247,7 +2247,7 @@ bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_a
     allocation->base = base;
     allocation->count = count;
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return true;
 }
@@ -2259,7 +2259,7 @@ bool vkd3d_gpu_descriptor_allocator_unregister_range(
     size_t i;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return false;
@@ -2277,7 +2277,7 @@ bool vkd3d_gpu_descriptor_allocator_unregister_range(
         break;
     }
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return found;
 }
@@ -2301,7 +2301,7 @@ size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
 
     assert(allocator->allocation_count);
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return 0;
@@ -2311,7 +2311,7 @@ size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
     if ((allocation = vkd3d_gpu_descriptor_allocator_allocation_from_descriptor(allocator, desc)))
         remaining = allocation->count - (desc - allocation->base);
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return remaining;
 }
@@ -2325,7 +2325,7 @@ struct d3d12_descriptor_heap *vkd3d_gpu_descriptor_allocator_heap_from_descripto
     if (!allocator->allocation_count)
         return NULL;
 
-    if ((rc = pthread_mutex_lock(&allocator->mutex)))
+    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return NULL;
@@ -2333,7 +2333,7 @@ struct d3d12_descriptor_heap *vkd3d_gpu_descriptor_allocator_heap_from_descripto
 
     allocation = vkd3d_gpu_descriptor_allocator_allocation_from_descriptor(allocator, desc);
 
-    pthread_mutex_unlock(&allocator->mutex);
+    vkd3d_mutex_unlock(&allocator->mutex);
 
     return allocation ? CONTAINING_RECORD(allocation->base, struct d3d12_descriptor_heap, descriptors)
             : NULL;
@@ -2344,7 +2344,7 @@ static bool vkd3d_gpu_descriptor_allocator_init(struct vkd3d_gpu_descriptor_allo
     int rc;
 
     memset(allocator, 0, sizeof(*allocator));
-    if ((rc = pthread_mutex_init(&allocator->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&allocator->mutex)))
     {
         ERR("Failed to initialise mutex, error %d.\n", rc);
         return false;
@@ -2356,7 +2356,7 @@ static bool vkd3d_gpu_descriptor_allocator_init(struct vkd3d_gpu_descriptor_allo
 static void vkd3d_gpu_descriptor_allocator_cleanup(struct vkd3d_gpu_descriptor_allocator *allocator)
 {
     vkd3d_free(allocator->allocations);
-    pthread_mutex_destroy(&allocator->mutex);
+    vkd3d_mutex_destroy(&allocator->mutex);
 }
 
 static bool have_vk_time_domain(VkTimeDomainEXT *domains, unsigned int count, VkTimeDomainEXT domain)
@@ -2479,7 +2479,7 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device *iface)
         d3d12_device_destroy_pipeline_cache(device);
         d3d12_device_destroy_vkd3d_queues(device);
         for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
-            pthread_mutex_destroy(&device->desc_mutex[i]);
+            vkd3d_mutex_destroy(&device->desc_mutex[i]);
         VK_CALL(vkDestroyDevice(device->vk_device, NULL));
         if (device->parent)
             IUnknown_Release(device->parent);
@@ -3977,7 +3977,7 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     vkd3d_time_domains_init(device);
 
     for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
-        pthread_mutex_init(&device->desc_mutex[i], NULL);
+        vkd3d_mutex_init(&device->desc_mutex[i]);
 
     if ((device->parent = create_info->parent))
         IUnknown_AddRef(device->parent);

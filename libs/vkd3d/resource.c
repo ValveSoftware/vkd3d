@@ -326,7 +326,7 @@ static void d3d12_heap_destroy(struct d3d12_heap *heap)
 
     VK_CALL(vkFreeMemory(device->vk_device, heap->vk_memory, NULL));
 
-    pthread_mutex_destroy(&heap->mutex);
+    vkd3d_mutex_destroy(&heap->mutex);
 
     if (heap->is_private)
         device = NULL;
@@ -443,7 +443,7 @@ static HRESULT d3d12_heap_map(struct d3d12_heap *heap, uint64_t offset,
     VkResult vr;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&heap->mutex)))
+    if ((rc = vkd3d_mutex_lock(&heap->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         if (data)
@@ -491,7 +491,7 @@ static HRESULT d3d12_heap_map(struct d3d12_heap *heap, uint64_t offset,
             *data = NULL;
     }
 
-    pthread_mutex_unlock(&heap->mutex);
+    vkd3d_mutex_unlock(&heap->mutex);
 
     return hr;
 }
@@ -501,7 +501,7 @@ static void d3d12_heap_unmap(struct d3d12_heap *heap, struct d3d12_resource *res
     struct d3d12_device *device = heap->device;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&heap->mutex)))
+    if ((rc = vkd3d_mutex_lock(&heap->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -535,7 +535,7 @@ static void d3d12_heap_unmap(struct d3d12_heap *heap, struct d3d12_resource *res
     }
 
 done:
-    pthread_mutex_unlock(&heap->mutex);
+    vkd3d_mutex_unlock(&heap->mutex);
 }
 
 static HRESULT validate_heap_desc(const D3D12_HEAP_DESC *desc, const struct d3d12_resource *resource)
@@ -594,7 +594,7 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
     if (FAILED(hr = validate_heap_desc(&heap->desc, resource)))
         return hr;
 
-    if ((rc = pthread_mutex_init(&heap->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&heap->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
@@ -602,7 +602,7 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
 
     if (FAILED(hr = vkd3d_private_store_init(&heap->private_store)))
     {
-        pthread_mutex_destroy(&heap->mutex);
+        vkd3d_mutex_destroy(&heap->mutex);
         return hr;
     }
 
@@ -636,7 +636,7 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
     if (FAILED(hr))
     {
         vkd3d_private_store_destroy(&heap->private_store);
-        pthread_mutex_destroy(&heap->mutex);
+        vkd3d_mutex_destroy(&heap->mutex);
         return hr;
     }
 
@@ -2126,10 +2126,10 @@ void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *sr
         struct d3d12_device *device)
 {
     struct vkd3d_view *defunct_view = NULL;
-    pthread_mutex_t *mutex;
+    struct vkd3d_mutex *mutex;
 
     mutex = d3d12_device_get_descriptor_mutex(device, dst);
-    pthread_mutex_lock(mutex);
+    vkd3d_mutex_lock(mutex);
 
     /* Nothing to do for VKD3D_DESCRIPTOR_MAGIC_CBV. */
     if ((dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
@@ -2138,7 +2138,7 @@ void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *sr
 
     *dst = *src;
 
-    pthread_mutex_unlock(mutex);
+    vkd3d_mutex_unlock(mutex);
 
     /* Destroy the view after unlocking to reduce wait time. */
     if (defunct_view)
@@ -2156,21 +2156,21 @@ void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src,
         struct d3d12_device *device)
 {
     struct d3d12_desc tmp;
-    pthread_mutex_t *mutex;
+    struct vkd3d_mutex *mutex;
 
     assert(dst != src);
 
     /* Shadow of the Tomb Raider and possibly other titles sometimes destroy
      * and rewrite a descriptor in another thread while it is being copied. */
     mutex = d3d12_device_get_descriptor_mutex(device, src);
-    pthread_mutex_lock(mutex);
+    vkd3d_mutex_lock(mutex);
 
     if (src->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
         vkd3d_view_incref(src->u.view);
 
     tmp = *src;
 
-    pthread_mutex_unlock(mutex);
+    vkd3d_mutex_unlock(mutex);
 
     d3d12_desc_write_atomic(dst, &tmp, device);
 }

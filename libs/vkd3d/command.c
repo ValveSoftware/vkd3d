@@ -32,7 +32,7 @@ HRESULT vkd3d_queue_create(struct d3d12_device *device,
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
 
-    if ((rc = pthread_mutex_init(&object->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&object->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         vkd3d_free(object);
@@ -67,7 +67,7 @@ void vkd3d_queue_destroy(struct vkd3d_queue *queue, struct d3d12_device *device)
     unsigned int i;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&queue->mutex)))
+    if ((rc = vkd3d_mutex_lock(&queue->mutex)))
         ERR("Failed to lock mutex, error %d.\n", rc);
 
     for (i = 0; i < queue->semaphore_count; ++i)
@@ -82,9 +82,9 @@ void vkd3d_queue_destroy(struct vkd3d_queue *queue, struct d3d12_device *device)
     }
 
     if (!rc)
-        pthread_mutex_unlock(&queue->mutex);
+        vkd3d_mutex_unlock(&queue->mutex);
 
-    pthread_mutex_destroy(&queue->mutex);
+    vkd3d_mutex_destroy(&queue->mutex);
     vkd3d_free(queue);
 }
 
@@ -94,7 +94,7 @@ VkQueue vkd3d_queue_acquire(struct vkd3d_queue *queue)
 
     TRACE("queue %p.\n", queue);
 
-    if ((rc = pthread_mutex_lock(&queue->mutex)))
+    if ((rc = vkd3d_mutex_lock(&queue->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return VK_NULL_HANDLE;
@@ -108,7 +108,7 @@ void vkd3d_queue_release(struct vkd3d_queue *queue)
 {
     TRACE("queue %p.\n", queue);
 
-    pthread_mutex_unlock(&queue->mutex);
+    vkd3d_mutex_unlock(&queue->mutex);
 }
 
 static VkResult vkd3d_queue_wait_idle(struct vkd3d_queue *queue,
@@ -144,7 +144,7 @@ static void vkd3d_queue_update_sequence_number(struct vkd3d_queue *queue,
     unsigned int i, j;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&queue->mutex)))
+    if ((rc = vkd3d_mutex_lock(&queue->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -189,7 +189,7 @@ static void vkd3d_queue_update_sequence_number(struct vkd3d_queue *queue,
     if (destroyed_semaphore_count)
         TRACE("Destroyed %u Vulkan semaphores.\n", destroyed_semaphore_count);
 
-    pthread_mutex_unlock(&queue->mutex);
+    vkd3d_mutex_unlock(&queue->mutex);
 }
 
 static uint64_t vkd3d_queue_reset_sequence_number_locked(struct vkd3d_queue *queue)
@@ -253,7 +253,7 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
 
     TRACE("worker %p, fence %p, value %#"PRIx64".\n", worker, fence, value);
 
-    if ((rc = pthread_mutex_lock(&worker->mutex)))
+    if ((rc = vkd3d_mutex_lock(&worker->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
@@ -263,7 +263,7 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
             worker->enqueued_fence_count + 1, sizeof(*worker->enqueued_fences)))
     {
         ERR("Failed to add GPU fence.\n");
-        pthread_mutex_unlock(&worker->mutex);
+        vkd3d_mutex_unlock(&worker->mutex);
         return E_OUTOFMEMORY;
     }
 
@@ -277,8 +277,8 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
 
     InterlockedIncrement(&fence->pending_worker_operation_count);
 
-    pthread_cond_signal(&worker->cond);
-    pthread_mutex_unlock(&worker->mutex);
+    vkd3d_cond_signal(&worker->cond);
+    vkd3d_mutex_unlock(&worker->mutex);
 
     return S_OK;
 }
@@ -293,7 +293,7 @@ static void vkd3d_fence_worker_remove_fence(struct vkd3d_fence_worker *worker, s
 
     WARN("Waiting for %u pending fence operations (fence %p).\n", count, fence);
 
-    if ((rc = pthread_mutex_lock(&worker->mutex)))
+    if ((rc = vkd3d_mutex_lock(&worker->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -304,14 +304,14 @@ static void vkd3d_fence_worker_remove_fence(struct vkd3d_fence_worker *worker, s
         TRACE("Still waiting for %u pending fence operations (fence %p).\n", count, fence);
 
         worker->pending_fence_destruction = true;
-        pthread_cond_signal(&worker->cond);
+        vkd3d_cond_signal(&worker->cond);
 
-        pthread_cond_wait(&worker->fence_destruction_cond, &worker->mutex);
+        vkd3d_cond_wait(&worker->fence_destruction_cond, &worker->mutex);
     }
 
     TRACE("Removed fence %p.\n", fence);
 
-    pthread_mutex_unlock(&worker->mutex);
+    vkd3d_mutex_unlock(&worker->mutex);
 }
 
 static void vkd3d_fence_worker_move_enqueued_fences_locked(struct vkd3d_fence_worker *worker)
@@ -412,7 +412,7 @@ static void *vkd3d_fence_worker_main(void *arg)
 
         if (!worker->fence_count || InterlockedAdd(&worker->enqueued_fence_count, 0))
         {
-            if ((rc = pthread_mutex_lock(&worker->mutex)))
+            if ((rc = vkd3d_mutex_lock(&worker->mutex)))
             {
                 ERR("Failed to lock mutex, error %d.\n", rc);
                 break;
@@ -420,7 +420,7 @@ static void *vkd3d_fence_worker_main(void *arg)
 
             if (worker->pending_fence_destruction)
             {
-                pthread_cond_broadcast(&worker->fence_destruction_cond);
+                vkd3d_cond_broadcast(&worker->fence_destruction_cond);
                 worker->pending_fence_destruction = false;
             }
 
@@ -432,19 +432,19 @@ static void *vkd3d_fence_worker_main(void *arg)
             {
                 if (worker->should_exit)
                 {
-                    pthread_mutex_unlock(&worker->mutex);
+                    vkd3d_mutex_unlock(&worker->mutex);
                     break;
                 }
 
-                if ((rc = pthread_cond_wait(&worker->cond, &worker->mutex)))
+                if ((rc = vkd3d_cond_wait(&worker->cond, &worker->mutex)))
                 {
                     ERR("Failed to wait on condition variable, error %d.\n", rc);
-                    pthread_mutex_unlock(&worker->mutex);
+                    vkd3d_mutex_unlock(&worker->mutex);
                     break;
                 }
             }
 
-            pthread_mutex_unlock(&worker->mutex);
+            vkd3d_mutex_unlock(&worker->mutex);
         }
     }
 
@@ -474,33 +474,33 @@ HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
     worker->fences = NULL;
     worker->fences_size = 0;
 
-    if ((rc = pthread_mutex_init(&worker->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&worker->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
     }
 
-    if ((rc = pthread_cond_init(&worker->cond, NULL)))
+    if ((rc = vkd3d_cond_init(&worker->cond)))
     {
         ERR("Failed to initialize condition variable, error %d.\n", rc);
-        pthread_mutex_destroy(&worker->mutex);
+        vkd3d_mutex_destroy(&worker->mutex);
         return hresult_from_errno(rc);
     }
 
-    if ((rc = pthread_cond_init(&worker->fence_destruction_cond, NULL)))
+    if ((rc = vkd3d_cond_init(&worker->fence_destruction_cond)))
     {
         ERR("Failed to initialize condition variable, error %d.\n", rc);
-        pthread_mutex_destroy(&worker->mutex);
-        pthread_cond_destroy(&worker->cond);
+        vkd3d_mutex_destroy(&worker->mutex);
+        vkd3d_cond_destroy(&worker->cond);
         return hresult_from_errno(rc);
     }
 
     if (FAILED(hr = vkd3d_create_thread(device->vkd3d_instance,
             vkd3d_fence_worker_main, worker, &worker->thread)))
     {
-        pthread_mutex_destroy(&worker->mutex);
-        pthread_cond_destroy(&worker->cond);
-        pthread_cond_destroy(&worker->fence_destruction_cond);
+        vkd3d_mutex_destroy(&worker->mutex);
+        vkd3d_cond_destroy(&worker->cond);
+        vkd3d_cond_destroy(&worker->fence_destruction_cond);
     }
 
     return hr;
@@ -514,23 +514,23 @@ HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
 
     TRACE("worker %p.\n", worker);
 
-    if ((rc = pthread_mutex_lock(&worker->mutex)))
+    if ((rc = vkd3d_mutex_lock(&worker->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
     }
 
     worker->should_exit = true;
-    pthread_cond_signal(&worker->cond);
+    vkd3d_cond_signal(&worker->cond);
 
-    pthread_mutex_unlock(&worker->mutex);
+    vkd3d_mutex_unlock(&worker->mutex);
 
     if (FAILED(hr = vkd3d_join_thread(device->vkd3d_instance, &worker->thread)))
         return hr;
 
-    pthread_mutex_destroy(&worker->mutex);
-    pthread_cond_destroy(&worker->cond);
-    pthread_cond_destroy(&worker->fence_destruction_cond);
+    vkd3d_mutex_destroy(&worker->mutex);
+    vkd3d_cond_destroy(&worker->cond);
+    vkd3d_cond_destroy(&worker->fence_destruction_cond);
 
     vkd3d_free(worker->enqueued_fences);
     vkd3d_free(worker->vk_fences);
@@ -589,7 +589,7 @@ static VkResult d3d12_fence_create_vk_fence(struct d3d12_fence *fence, VkFence *
 
     *vk_fence = VK_NULL_HANDLE;
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         goto create_fence;
@@ -604,7 +604,7 @@ static VkResult d3d12_fence_create_vk_fence(struct d3d12_fence *fence, VkFence *
         }
     }
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 
     if (*vk_fence)
         return VK_SUCCESS;
@@ -668,7 +668,7 @@ static void d3d12_fence_destroy_vk_objects(struct d3d12_fence *fence)
     unsigned int i;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -685,7 +685,7 @@ static void d3d12_fence_destroy_vk_objects(struct d3d12_fence *fence)
 
     d3d12_fence_garbage_collect_vk_semaphores_locked(fence, true);
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 }
 
 static struct vkd3d_signaled_semaphore *d3d12_fence_acquire_vk_semaphore(struct d3d12_fence *fence,
@@ -698,7 +698,7 @@ static struct vkd3d_signaled_semaphore *d3d12_fence_acquire_vk_semaphore(struct 
 
     TRACE("fence %p, value %#"PRIx64".\n", fence, value);
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return VK_NULL_HANDLE;
@@ -724,7 +724,7 @@ static struct vkd3d_signaled_semaphore *d3d12_fence_acquire_vk_semaphore(struct 
 
     *completed_value = fence->value;
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 
     return semaphore;
 }
@@ -733,7 +733,7 @@ static void d3d12_fence_remove_vk_semaphore(struct d3d12_fence *fence, struct vk
 {
     int rc;
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -746,14 +746,14 @@ static void d3d12_fence_remove_vk_semaphore(struct d3d12_fence *fence, struct vk
 
     --fence->semaphore_count;
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 }
 
 static void d3d12_fence_release_vk_semaphore(struct d3d12_fence *fence, struct vkd3d_signaled_semaphore *semaphore)
 {
     int rc;
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return;
@@ -762,7 +762,7 @@ static void d3d12_fence_release_vk_semaphore(struct d3d12_fence *fence, struct v
     assert(semaphore->is_acquired);
     semaphore->is_acquired = false;
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 }
 
 static HRESULT d3d12_fence_add_vk_semaphore(struct d3d12_fence *fence,
@@ -780,7 +780,7 @@ static HRESULT d3d12_fence_add_vk_semaphore(struct d3d12_fence *fence,
         return E_OUTOFMEMORY;
     }
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         vkd3d_free(semaphore);
@@ -797,7 +797,7 @@ static HRESULT d3d12_fence_add_vk_semaphore(struct d3d12_fence *fence,
     list_add_tail(&fence->semaphores, &semaphore->entry);
     ++fence->semaphore_count;
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 
     return hr;
 }
@@ -810,7 +810,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
     unsigned int i, j;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
@@ -844,7 +844,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
     fence->event_count = j;
 
     if (signal_null_event_cond)
-        pthread_cond_broadcast(&fence->null_event_cond);
+        vkd3d_cond_broadcast(&fence->null_event_cond);
 
     if (vk_fence)
     {
@@ -870,7 +870,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
             VK_CALL(vkDestroyFence(device->vk_device, vk_fence, NULL));
     }
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
 
     return S_OK;
 }
@@ -926,9 +926,9 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence *iface)
         d3d12_fence_destroy_vk_objects(fence);
 
         vkd3d_free(fence->events);
-        if ((rc = pthread_mutex_destroy(&fence->mutex)))
+        if ((rc = vkd3d_mutex_destroy(&fence->mutex)))
             ERR("Failed to destroy mutex, error %d.\n", rc);
-        pthread_cond_destroy(&fence->null_event_cond);
+        vkd3d_cond_destroy(&fence->null_event_cond);
         vkd3d_free(fence);
 
         d3d12_device_release(device);
@@ -995,13 +995,13 @@ static UINT64 STDMETHODCALLTYPE d3d12_fence_GetCompletedValue(ID3D12Fence *iface
 
     TRACE("iface %p.\n", iface);
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return 0;
     }
     completed_value = fence->value;
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
     return completed_value;
 }
 
@@ -1015,7 +1015,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 
     TRACE("iface %p, value %#"PRIx64", event %p.\n", iface, value, event);
 
-    if ((rc = pthread_mutex_lock(&fence->mutex)))
+    if ((rc = vkd3d_mutex_lock(&fence->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
@@ -1025,7 +1025,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
     {
         if (event)
             fence->device->signal_event(event);
-        pthread_mutex_unlock(&fence->mutex);
+        vkd3d_mutex_unlock(&fence->mutex);
         return S_OK;
     }
 
@@ -1036,7 +1036,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
         {
             WARN("Event completion for (%p, %#"PRIx64") is already in the list.\n",
                     event, value);
-            pthread_mutex_unlock(&fence->mutex);
+            vkd3d_mutex_unlock(&fence->mutex);
             return S_OK;
         }
     }
@@ -1045,7 +1045,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
             fence->event_count + 1, sizeof(*fence->events)))
     {
         WARN("Failed to add event.\n");
-        pthread_mutex_unlock(&fence->mutex);
+        vkd3d_mutex_unlock(&fence->mutex);
         return E_OUTOFMEMORY;
     }
 
@@ -1062,10 +1062,10 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
     if (!event)
     {
         while (!*latch)
-            pthread_cond_wait(&fence->null_event_cond, &fence->mutex);
+            vkd3d_cond_wait(&fence->null_event_cond, &fence->mutex);
     }
 
-    pthread_mutex_unlock(&fence->mutex);
+    vkd3d_mutex_unlock(&fence->mutex);
     return S_OK;
 }
 
@@ -1116,16 +1116,16 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
 
     fence->value = initial_value;
 
-    if ((rc = pthread_mutex_init(&fence->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&fence->mutex)))
     {
         ERR("Failed to initialize mutex, error %d.\n", rc);
         return hresult_from_errno(rc);
     }
 
-    if ((rc = pthread_cond_init(&fence->null_event_cond, NULL)))
+    if ((rc = vkd3d_cond_init(&fence->null_event_cond)))
     {
         ERR("Failed to initialize cond variable, error %d.\n", rc);
-        pthread_mutex_destroy(&fence->mutex);
+        vkd3d_mutex_destroy(&fence->mutex);
         return hresult_from_errno(rc);
     }
 
@@ -1145,8 +1145,8 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
 
     if (FAILED(hr = vkd3d_private_store_init(&fence->private_store)))
     {
-        pthread_mutex_destroy(&fence->mutex);
-        pthread_cond_destroy(&fence->null_event_cond);
+        vkd3d_mutex_destroy(&fence->mutex);
+        vkd3d_cond_destroy(&fence->null_event_cond);
         return hr;
     }
 

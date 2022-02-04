@@ -1432,7 +1432,7 @@ HRESULT vkd3d_render_pass_cache_find(struct vkd3d_render_pass_cache *cache,
     unsigned int i;
     int rc;
 
-    if ((rc = pthread_mutex_lock(&device->mutex)))
+    if ((rc = vkd3d_mutex_lock(&device->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         *vk_render_pass = VK_NULL_HANDLE;
@@ -1454,7 +1454,7 @@ HRESULT vkd3d_render_pass_cache_find(struct vkd3d_render_pass_cache *cache,
     if (!found)
         hr = vkd3d_render_pass_cache_create_pass_locked(cache, device, key, vk_render_pass);
 
-    pthread_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->mutex);
 
     return hr;
 }
@@ -3078,7 +3078,7 @@ static VkPipeline d3d12_pipeline_state_find_compiled_pipeline(const struct d3d12
 
     *vk_render_pass = VK_NULL_HANDLE;
 
-    if (!(rc = pthread_mutex_lock(&device->mutex)))
+    if (!(rc = vkd3d_mutex_lock(&device->mutex)))
     {
         LIST_FOR_EACH_ENTRY(current, &graphics->compiled_pipelines, struct vkd3d_compiled_pipeline, entry)
         {
@@ -3089,7 +3089,7 @@ static VkPipeline d3d12_pipeline_state_find_compiled_pipeline(const struct d3d12
                 break;
             }
         }
-        pthread_mutex_unlock(&device->mutex);
+        vkd3d_mutex_unlock(&device->mutex);
     }
     else
     {
@@ -3114,7 +3114,7 @@ static bool d3d12_pipeline_state_put_pipeline_to_cache(struct d3d12_pipeline_sta
     compiled_pipeline->vk_pipeline = vk_pipeline;
     compiled_pipeline->vk_render_pass = vk_render_pass;
 
-    if ((rc = pthread_mutex_lock(&device->mutex)))
+    if ((rc = vkd3d_mutex_lock(&device->mutex)))
     {
         ERR("Failed to lock mutex, error %d.\n", rc);
         vkd3d_free(compiled_pipeline);
@@ -3134,7 +3134,7 @@ static bool d3d12_pipeline_state_put_pipeline_to_cache(struct d3d12_pipeline_sta
     if (compiled_pipeline)
         list_add_tail(&graphics->compiled_pipelines, &compiled_pipeline->entry);
 
-    pthread_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->mutex);
     return compiled_pipeline;
 }
 

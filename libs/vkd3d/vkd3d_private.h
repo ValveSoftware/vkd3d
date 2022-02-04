@@ -171,6 +171,62 @@ union vkd3d_thread_handle
     void *handle;
 };
 
+struct vkd3d_mutex
+{
+    pthread_mutex_t lock;
+};
+
+struct vkd3d_cond
+{
+    pthread_cond_t cond;
+};
+
+
+static inline int vkd3d_mutex_init(struct vkd3d_mutex *lock)
+{
+    return pthread_mutex_init(&lock->lock, NULL);
+}
+
+static inline int vkd3d_mutex_lock(struct vkd3d_mutex *lock)
+{
+    return pthread_mutex_lock(&lock->lock);
+}
+
+static inline int vkd3d_mutex_unlock(struct vkd3d_mutex *lock)
+{
+    return pthread_mutex_unlock(&lock->lock);
+}
+
+static inline int vkd3d_mutex_destroy(struct vkd3d_mutex *lock)
+{
+    return pthread_mutex_destroy(&lock->lock);
+}
+
+static inline int vkd3d_cond_init(struct vkd3d_cond *cond)
+{
+    return pthread_cond_init(&cond->cond, NULL);
+}
+
+static inline int vkd3d_cond_signal(struct vkd3d_cond *cond)
+{
+    return pthread_cond_signal(&cond->cond);
+}
+
+static inline int vkd3d_cond_broadcast(struct vkd3d_cond *cond)
+{
+    return pthread_cond_broadcast(&cond->cond);
+}
+
+static inline int vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
+{
+    return pthread_cond_wait(&cond->cond, &lock->lock);
+}
+
+static inline int vkd3d_cond_destroy(struct vkd3d_cond *cond)
+{
+    return pthread_cond_destroy(&cond->cond);
+}
+
 HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
         PFN_vkd3d_thread thread_main, void *data, union vkd3d_thread_handle *thread);
 HRESULT vkd3d_join_thread(struct vkd3d_instance *instance, union vkd3d_thread_handle *thread);
@@ -186,9 +242,9 @@ struct vkd3d_waiting_fence
 struct vkd3d_fence_worker
 {
     union vkd3d_thread_handle thread;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    pthread_cond_t fence_destruction_cond;
+    struct vkd3d_mutex mutex;
+    struct vkd3d_cond cond;
+    struct vkd3d_cond fence_destruction_cond;
     bool should_exit;
     bool pending_fence_destruction;
 
@@ -227,7 +283,7 @@ struct vkd3d_gpu_va_slab
 
 struct vkd3d_gpu_va_allocator
 {
-    pthread_mutex_t mutex;
+    struct vkd3d_mutex mutex;
 
     D3D12_GPU_VIRTUAL_ADDRESS fallback_floor;
     struct vkd3d_gpu_va_allocation *fallback_allocations;
@@ -251,7 +307,7 @@ struct vkd3d_gpu_descriptor_allocation
 
 struct vkd3d_gpu_descriptor_allocator
 {
-    pthread_mutex_t mutex;
+    struct vkd3d_mutex mutex;
 
     struct vkd3d_gpu_descriptor_allocation *allocations;
     size_t allocations_size;
@@ -294,7 +350,7 @@ void vkd3d_render_pass_cache_init(struct vkd3d_render_pass_cache *cache);
 
 struct vkd3d_private_store
 {
-    pthread_mutex_t mutex;
+    struct vkd3d_mutex mutex;
 
     struct list content;
 };
@@ -327,7 +383,7 @@ static inline HRESULT vkd3d_private_store_init(struct vkd3d_private_store *store
 
     list_init(&store->content);
 
-    if ((rc = pthread_mutex_init(&store->mutex, NULL)))
+    if ((rc = vkd3d_mutex_init(&store->mutex)))
         ERR("Failed to initialize mutex, error %d.\n", rc);
 
     return hresult_from_errno(rc);
@@ -342,7 +398,7 @@ static inline void vkd3d_private_store_destroy(struct vkd3d_private_store *store
         vkd3d_private_data_destroy(data);
     }
 
-    pthread_mutex_destroy(&store->mutex);
+    vkd3d_mutex_destroy(&store->mutex);
 }
 
 HRESULT vkd3d_get_private_data(struct vkd3d_private_store *store, const GUID *tag, unsigned int *out_size, void *out);
@@ -366,8 +422,8 @@ struct d3d12_fence
     LONG refcount;
 
     uint64_t value;
-    pthread_mutex_t mutex;
-    pthread_cond_t null_event_cond;
+    struct vkd3d_mutex mutex;
+    struct vkd3d_cond null_event_cond;
 
     struct vkd3d_waiting_event
     {
@@ -402,7 +458,7 @@ struct d3d12_heap
     bool is_private;
     D3D12_HEAP_DESC desc;
 
-    pthread_mutex_t mutex;
+    struct vkd3d_mutex mutex;
 
     VkDeviceMemory vk_memory;
     void *map_ptr;
@@ -1041,7 +1097,7 @@ HRESULT d3d12_command_list_create(struct d3d12_device *device,
 struct vkd3d_queue
 {
     /* Access to VkQueue must be externally synchronized. */
-    pthread_mutex_t mutex;
+    struct vkd3d_mutex mutex;
 
     VkQueue vk_queue;
 
@@ -1181,8 +1237,8 @@ struct d3d12_device
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
     struct vkd3d_fence_worker fence_worker;
 
-    pthread_mutex_t mutex;
-    pthread_mutex_t desc_mutex[8];
+    struct vkd3d_mutex mutex;
+    struct vkd3d_mutex desc_mutex[8];
     struct vkd3d_render_pass_cache render_pass_cache;
     VkPipelineCache vk_pipeline_cache;
 
@@ -1249,7 +1305,7 @@ static inline unsigned int d3d12_device_get_descriptor_handle_increment_size(str
     return ID3D12Device_GetDescriptorHandleIncrementSize(&device->ID3D12Device_iface, descriptor_type);
 }
 
-static inline pthread_mutex_t *d3d12_device_get_descriptor_mutex(struct d3d12_device *device,
+static inline struct vkd3d_mutex *d3d12_device_get_descriptor_mutex(struct d3d12_device *device,
         const struct d3d12_desc *descriptor)
 {
     STATIC_ASSERT(!(ARRAY_SIZE(device->desc_mutex) & (ARRAY_SIZE(device->desc_mutex) - 1)));
