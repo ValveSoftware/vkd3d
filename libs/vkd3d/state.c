@@ -1889,18 +1889,40 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
     return S_OK;
 }
 
+static HRESULT d3d12_pipeline_state_find_and_init_uav_counters(struct d3d12_pipeline_state *state,
+        struct d3d12_device *device, const struct d3d12_root_signature *root_signature,
+        const D3D12_SHADER_BYTECODE *code, VkShaderStageFlags stage_flags)
+{
+    struct vkd3d_shader_scan_descriptor_info shader_info;
+    HRESULT hr;
+    int ret;
+
+    shader_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
+    shader_info.next = NULL;
+    if ((ret = vkd3d_scan_dxbc(code, &shader_info)) < 0)
+    {
+        WARN("Failed to scan shader bytecode, stage %#x, vkd3d result %d.\n", stage_flags, ret);
+        return hresult_from_vkd3d_result(ret);
+    }
+
+    if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state, device, root_signature, &shader_info, stage_flags)))
+        WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
+
+    vkd3d_shader_free_scan_descriptor_info(&shader_info);
+
+    return hr;
+}
+
 static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *state,
         struct d3d12_device *device, const D3D12_COMPUTE_PIPELINE_STATE_DESC *desc)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    struct vkd3d_shader_scan_descriptor_info shader_info;
     struct vkd3d_shader_interface_info shader_interface;
     struct vkd3d_shader_descriptor_offset_info offset_info;
     const struct d3d12_root_signature *root_signature;
     struct vkd3d_shader_spirv_target_info target_info;
     VkPipelineLayout vk_pipeline_layout;
     HRESULT hr;
-    int ret;
 
     state->ID3D12PipelineState_iface.lpVtbl = &d3d12_pipeline_state_vtbl;
     state->refcount = 1;
@@ -1913,21 +1935,9 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
         return E_INVALIDARG;
     }
 
-    shader_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
-    shader_info.next = NULL;
-    if ((ret = vkd3d_scan_dxbc(&desc->CS, &shader_info)) < 0)
-    {
-        WARN("Failed to scan shader bytecode, vkd3d result %d.\n", ret);
-        return hresult_from_vkd3d_result(ret);
-    }
-
-    if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state,
-            device, root_signature, &shader_info, VK_SHADER_STAGE_COMPUTE_BIT)))
-    {
-        WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
+    if (FAILED(hr = d3d12_pipeline_state_find_and_init_uav_counters(state, device, root_signature,
+            &desc->CS, VK_SHADER_STAGE_COMPUTE_BIT)))
         return hr;
-    }
-    vkd3d_shader_free_scan_descriptor_info(&shader_info);
 
     memset(&target_info, 0, sizeof(target_info));
     target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
@@ -2724,30 +2734,15 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
 
     for (i = 0; i < ARRAY_SIZE(shader_stages); ++i)
     {
-        struct vkd3d_shader_scan_descriptor_info shader_info =
-        {
-            .type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO,
-        };
         const D3D12_SHADER_BYTECODE *b = (const void *)((uintptr_t)desc + shader_stages[i].offset);
         const struct vkd3d_shader_code dxbc = {b->pShaderBytecode, b->BytecodeLength};
 
         if (!b->pShaderBytecode)
             continue;
 
-        if ((ret = vkd3d_scan_dxbc(b, &shader_info)) < 0)
-        {
-            WARN("Failed to scan shader bytecode, stage %#x, vkd3d result %d.\n",
-                    shader_stages[i].stage, ret);
-            hr = hresult_from_vkd3d_result(ret);
+        if (FAILED(hr = d3d12_pipeline_state_find_and_init_uav_counters(state, device, root_signature,
+                b, shader_stages[i].stage)))
             goto fail;
-        }
-        if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state,
-                device, root_signature, &shader_info, shader_stages[i].stage)))
-        {
-            WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
-            goto fail;
-        }
-        vkd3d_shader_free_scan_descriptor_info(&shader_info);
 
         shader_interface.uav_counters = NULL;
         shader_interface.uav_counter_count = 0;
