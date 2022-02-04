@@ -1126,6 +1126,17 @@ static HRESULT vkd3d_create_pipeline_layout(struct d3d12_device *device,
     return S_OK;
 }
 
+static unsigned int d3d12_root_signature_copy_descriptor_set_layouts(const struct d3d12_root_signature *root_signature,
+        VkDescriptorSetLayout *vk_set_layouts)
+{
+    unsigned int i;
+
+    for (i = 0; i < root_signature->vk_set_count; ++i)
+        vk_set_layouts[i] = root_signature->descriptor_set_layouts[i].vk_layout;
+
+    return i;
+}
+
 static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signature,
         struct d3d12_device *device, const D3D12_ROOT_SIGNATURE_DESC *desc)
 {
@@ -1222,12 +1233,8 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
     vkd3d_free(binding_desc);
     binding_desc = NULL;
 
-    for (i = 0; i < root_signature->vk_set_count; ++i)
-    {
-        vk_layouts[i] = root_signature->descriptor_set_layouts[i].vk_layout;
-    }
-
-    if (FAILED(hr = vkd3d_create_pipeline_layout(device, root_signature->vk_set_count,
+    i = d3d12_root_signature_copy_descriptor_set_layouts(root_signature, vk_layouts);
+    if (FAILED(hr = vkd3d_create_pipeline_layout(device, i,
             vk_layouts, root_signature->push_constant_range_count,
             root_signature->push_constant_ranges, &root_signature->vk_pipeline_layout)))
         goto fail;
@@ -1833,8 +1840,7 @@ static HRESULT d3d12_pipeline_state_init_uav_counters(struct d3d12_pipeline_stat
     state->uav_counters.binding_count = uav_counter_count;
 
     descriptor_binding = 0;
-    for (set_index = 0; set_index < root_signature->vk_set_count; ++set_index)
-        set_layouts[set_index] = root_signature->descriptor_set_layouts[set_index].vk_layout;
+    set_index = d3d12_root_signature_copy_descriptor_set_layouts(root_signature, set_layouts);
 
     for (i = 0, j = 0; i < shader_info->descriptor_count; ++i)
     {
