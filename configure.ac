@@ -69,11 +69,10 @@ VKD3D_CHECK_MINGW32_PROG([CROSSCC32], [CROSSTARGET32], [no])
 VKD3D_CHECK_MINGW64_PROG([CROSSCC64], [CROSSTARGET64], [no])
 
 dnl Check for headers
-AC_CHECK_HEADERS([dlfcn.h pthread.h \
+AC_CHECK_HEADERS([dlfcn.h \
                   vulkan/vulkan.h \
                   vulkan/spirv.h vulkan/GLSL.std.450.h \
                   spirv/unified1/spirv.h spirv/unified1/GLSL.std.450.h])
-AS_IF([test "x$ac_cv_header_pthread_h" != "xyes"], [AC_MSG_ERROR([pthread.h not found.])])
 AS_IF([test "x$ac_cv_header_vulkan_vulkan_h" != "xyes"], [AC_MSG_ERROR([vulkan.h not found.])])
 AS_IF([test "x$ac_cv_header_spirv_unified1_spirv_h" != "xyes" \
        -a "x$ac_cv_header_vulkan_spirv_h" != "xyes"],
@@ -103,8 +102,15 @@ AC_CHECK_LIB([dl], [dlopen],
              [DL_LIBS="-ldl"],
              [AS_IF([test "$ac_cv_header_dlfnc_h" = "xyes"], [AC_MSG_ERROR([libdl not found.])])])
 
-AC_ARG_VAR([PTHREAD_LIBS], [linker flags for pthreads])
-VKD3D_CHECK_PTHREAD
+case $host_os in
+  mingw32*) ;;
+  *) AC_CHECK_HEADERS([pthread.h])
+     AS_IF([test "x$ac_cv_header_pthread_h" != "xyes"], [AC_MSG_ERROR([pthread.h not found.])])
+     AC_ARG_VAR([PTHREAD_LIBS], [linker flags for pthreads])
+     VKD3D_CHECK_PTHREAD
+     VKD3D_CHECK_PTHREAD_SETNAME_NP
+     ;;
+esac
 
 AC_ARG_VAR([VULKAN_LIBS], [linker flags for the Vulkan library])
 VKD3D_CHECK_VULKAN
@@ -131,8 +137,6 @@ VKD3D_CHECK_FUNC([HAVE_BUILTIN_POPCOUNT], [__builtin_popcount], [__builtin_popco
 VKD3D_CHECK_FUNC([HAVE_BUILTIN_ADD_OVERFLOW], [__builtin_add_overflow], [__builtin_add_overflow(0, 0, (int *)0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_ADD_AND_FETCH], [__sync_add_and_fetch], [__sync_add_and_fetch((int *)0, 0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_SUB_AND_FETCH], [__sync_sub_and_fetch], [__sync_sub_and_fetch((int *)0, 0)])
-
-VKD3D_CHECK_PTHREAD_SETNAME_NP
 
 dnl Makefiles
 AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],
