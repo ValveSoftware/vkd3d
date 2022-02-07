@@ -40,7 +40,6 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <pthread.h>
 #include <stdbool.h>
 
 #define VK_CALL(f) (vk_procs->f)
@@ -169,13 +168,12 @@ struct vkd3d_instance
     LONG refcount;
 };
 
+#ifdef _WIN32
+
 union vkd3d_thread_handle
 {
-    pthread_t pthread;
     void *handle;
 };
-
-#ifdef _WIN32
 
 struct vkd3d_mutex
 {
@@ -240,6 +238,14 @@ static inline int vkd3d_cond_destroy(struct vkd3d_cond *cond)
 }
 
 #else  /* _WIN32 */
+
+#include <pthread.h>
+
+union vkd3d_thread_handle
+{
+    pthread_t pthread;
+    void *handle;
+};
 
 struct vkd3d_mutex
 {

@@ -4037,6 +4037,23 @@ void d3d12_device_mark_as_removed(struct d3d12_device *device, HRESULT reason,
     device->removed_reason = reason;
 }
 
+
+#ifdef _WIN32
+struct thread_data
+{
+    PFN_vkd3d_thread main_pfn;
+    void *data;
+};
+
+static DWORD WINAPI call_thread_main(void *data)
+{
+    struct thread_data *thread_data = data;
+    thread_data->main_pfn(thread_data->data);
+    vkd3d_free(thread_data);
+    return 0;
+}
+#endif
+
 HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
         PFN_vkd3d_thread thread_main, void *data, union vkd3d_thread_handle *thread)
 {
@@ -4053,11 +4070,27 @@ HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
     }
     else
     {
+#ifdef _WIN32
+        struct thread_data *thread_data;
+
+        if (!(thread_data = vkd3d_malloc(sizeof(*thread_data))))
+            return E_OUTOFMEMORY;
+
+        thread_data->main_pfn = thread_main;
+        thread_data->data = data;
+        if (!(thread->handle = CreateThread(NULL, 0, call_thread_main, thread_data, 0, NULL)))
+        {
+            ERR("Failed to create thread, error %d.\n", GetLastError());
+            vkd3d_free(thread_data);
+            hr = E_FAIL;
+        }
+#else
         if ((rc = pthread_create(&thread->pthread, NULL, thread_main, data)))
         {
             ERR("Failed to create thread, error %d.\n", rc);
             hr = hresult_from_errno(rc);
         }
+#endif
     }
 
     return hr;
@@ -4075,11 +4108,20 @@ HRESULT vkd3d_join_thread(struct vkd3d_instance *instance, union vkd3d_thread_ha
     }
     else
     {
+#ifdef _WIN32
+        if ((rc = WaitForSingleObject(thread->handle, INFINITE)) != WAIT_OBJECT_0)
+        {
+            ERR("Failed to wait for thread, ret %#x.\n", rc);
+            hr = E_FAIL;
+        }
+        CloseHandle(thread->handle);
+#else
         if ((rc = pthread_join(thread->pthread, NULL)))
         {
             ERR("Failed to join thread, error %d.\n", rc);
             hr = hresult_from_errno(rc);
         }
+#endif
     }
 
     return hr;
