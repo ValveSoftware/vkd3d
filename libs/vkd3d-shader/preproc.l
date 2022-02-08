@@ -22,6 +22,8 @@
 
 #include "preproc.tab.h"
 
+#undef ERROR  /* defined in wingdi.h */
+
 #define YYSTYPE PREPROC_YYSTYPE
 #define YYLTYPE PREPROC_YYLTYPE
 
