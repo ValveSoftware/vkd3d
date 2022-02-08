@@ -48,6 +48,10 @@ int preproc_yylex(PREPROC_YYSTYPE *yylval_param, PREPROC_YYLTYPE *yylloc_param, 
 
 #define YYLLOC_DEFAULT(cur, rhs, n) (cur) = YYRHSLOC(rhs, !!n)
 
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+
 static void preproc_error(struct preproc_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *format, ...)
 {
