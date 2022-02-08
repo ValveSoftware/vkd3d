@@ -33,3 +33,16 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0) 4
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 aa = { 1e1, 1e-1,  1., 2.f };
+    float4 bb = {  .1, .1e1, .2f, 1.e-1f };
+    return aa + bb;
+}
+
+[test]
+draw quad
+probe all rgba (10.1, 1.1, 1.2, 2.1) 4

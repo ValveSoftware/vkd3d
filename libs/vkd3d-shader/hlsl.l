@@ -192,7 +192,7 @@ row_major               {return KW_ROW_MAJOR;           }
                             yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
-[0-9]+([eE][+-]?[0-9]+)?[h|H|f|F] {
+[0-9]+[eE][+-]?[0-9]+[h|H|f|F]? {
                             yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
