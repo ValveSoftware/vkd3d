@@ -1672,6 +1672,9 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     {
         struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
 
+        if (version.type == VKD3D_SHADER_TYPE_PIXEL
+                && ascii_strcasecmp(e->semantic_name, "SV_Target"))
+            continue;
         if (e->register_index >= ARRAY_SIZE(sm4->output_map))
         {
             WARN("Invalid output index %u.\n", e->register_index);
