@@ -795,6 +795,8 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
 struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         const struct hlsl_type *type);
 
+bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context);
+
 bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, D3DSHADER_PARAM_REGISTER_TYPE *type, unsigned int *reg);
 bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx);
