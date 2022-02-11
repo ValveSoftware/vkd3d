@@ -1057,6 +1057,49 @@ static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struc
     return list1;
 }
 
+static struct hlsl_ir_expr *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        const struct vkd3d_shader_location *loc)
+{
+    if (arg1->data_type->base_type != HLSL_TYPE_INT && arg1->data_type->base_type != HLSL_TYPE_UINT
+            && arg1->data_type->base_type != HLSL_TYPE_BOOL)
+    {
+        struct vkd3d_string_buffer *type_str = hlsl_type_to_string(ctx, arg1->data_type);
+
+        if (type_str)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "The first argument has type '%s', which is not integer.", type_str->buffer);
+        hlsl_release_string_buffer(ctx, type_str);
+        return NULL;
+    }
+
+    if (arg2->data_type->base_type != HLSL_TYPE_INT && arg2->data_type->base_type != HLSL_TYPE_UINT
+            && arg2->data_type->base_type != HLSL_TYPE_BOOL)
+    {
+        struct vkd3d_string_buffer *type_str = hlsl_type_to_string(ctx, arg2->data_type);
+
+        if (type_str)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "The second argument has type '%s', which is not integer.", type_str->buffer);
+        hlsl_release_string_buffer(ctx, type_str);
+        return NULL;
+    }
+
+    return add_binary_arithmetic_expr(ctx, instrs, op, arg1, arg2, loc);
+}
+
+static struct list *add_binary_bitwise_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
+
+    list_move_tail(list1, list2);
+    vkd3d_free(list2);
+    add_binary_bitwise_expr(ctx, list1, op, arg1, arg2, loc);
+
+    return list1;
+}
+
 static struct hlsl_ir_expr *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         struct vkd3d_shader_location *loc)
@@ -3600,7 +3643,7 @@ bitand_expr:
       equality_expr
     | bitand_expr '&' equality_expr
         {
-            hlsl_fixme(ctx, &@$, "Bitwise AND.");
+            $$ = add_binary_bitwise_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_AND, &@2);
         }
 
 bitxor_expr:
