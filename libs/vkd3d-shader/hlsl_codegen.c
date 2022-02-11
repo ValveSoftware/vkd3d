@@ -224,19 +224,6 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
     return progress;
 }
 
-static void replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
-{
-    struct hlsl_src *src, *next;
-
-    LIST_FOR_EACH_ENTRY_SAFE(src, next, &old->uses, struct hlsl_src, entry)
-    {
-        hlsl_src_remove(src);
-        hlsl_src_from_node(src, new);
-    }
-    list_remove(&old->entry);
-    hlsl_free_instr(old);
-}
-
 /* Lower casts from vec1 to vecN to swizzles. */
 static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -267,7 +254,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
             return false;
         list_add_after(&new_cast->node.entry, &swizzle->node.entry);
 
-        replace_node(&cast->node, &swizzle->node);
+        hlsl_replace_node(&cast->node, &swizzle->node);
         return true;
     }
 
@@ -437,7 +424,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         list_add_before(&node->entry, &swizzle_node->node.entry);
         new_node = &swizzle_node->node;
     }
-    replace_node(node, new_node);
+    hlsl_replace_node(node, new_node);
     return true;
 }
 
@@ -566,7 +553,7 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         if (hlsl_types_are_equal(src_type, dst_type)
                 || (src_type->base_type == dst_type->base_type && is_vec1(src_type) && is_vec1(dst_type)))
         {
-            replace_node(&expr->node, expr->operands[0].node);
+            hlsl_replace_node(&expr->node, expr->operands[0].node);
             return true;
         }
     }
@@ -708,7 +695,7 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
             return false;
         list_add_after(&new_cast->node.entry, &swizzle->node.entry);
 
-        replace_node(&cast->node, &swizzle->node);
+        hlsl_replace_node(&cast->node, &swizzle->node);
         return true;
     }
 
@@ -842,7 +829,7 @@ static bool fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     }
 
     list_add_before(&expr->node.entry, &res->node.entry);
-    replace_node(&expr->node, &res->node);
+    hlsl_replace_node(&expr->node, &res->node);
     return true;
 }
 
@@ -862,7 +849,7 @@ static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
         if (((swizzle->swizzle >> (2 * i)) & 3) != i)
             return false;
 
-    replace_node(instr, swizzle->val.node);
+    hlsl_replace_node(instr, swizzle->val.node);
 
     return true;
 }

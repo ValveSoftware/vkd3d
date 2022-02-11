@@ -1400,6 +1400,20 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
     vkd3d_string_buffer_cleanup(&buffer);
 }
 
+void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
+{
+    struct hlsl_src *src, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(src, next, &old->uses, struct hlsl_src, entry)
+    {
+        hlsl_src_remove(src);
+        hlsl_src_from_node(src, new);
+    }
+    list_remove(&old->entry);
+    hlsl_free_instr(old);
+}
+
+
 void hlsl_free_type(struct hlsl_type *type)
 {
     struct hlsl_struct_field *field, *next_field;
