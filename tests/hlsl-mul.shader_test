@@ -1,0 +1,290 @@
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (30.0, 70.0, 110.0, 150.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (90.0, 100.0, 110.0, 120.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float3 y = float3(1.0, 2.0, 3.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (14.0, 38.0, 62.0, 86.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float3 x = float3(1.0, 2.0, 3.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (38.0, 44.0, 50.0, 56.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float3x3 x = float3x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0);
+    float4 y = float4(1.0, 2.0, 3.0, 4.0);
+
+    return float4(mul(x, y), 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (14.0, 32.0, 50.0, 0.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4 x = float4(1.0, 2.0, 3.0, 4.0);
+    float3x3 y = float3x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0);
+
+    return float4(mul(x, y), 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (30.0, 36.0, 42.0, 0.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float x = 10.0;
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (50.0, 60.0, 70.0, 80.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float y = 10.0;
+
+    return mul(x, y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (50.0, 60.0, 70.0, 80.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float1 x = float1(10.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (10.0, 20.0, 30.0, 40.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float1 y = float1(10.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (10.0, 50.0, 90.0, 130.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float1x1 x = float1x1(10.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (10.0, 20.0, 30.0, 40.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float1x1 y = float1x1(10.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (10.0, 50.0, 90.0, 130.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float1x4 x = float1x4(1.0, 2.0, 3.0, 4.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (90.0, 100.0, 110.0, 120.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float1x4 y = float1x4(1.0, 2.0, 3.0, 4.0);
+
+    return mul(x, y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 10.0, 15.0, 20.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x1 x = float4x1(1.0, 2.0, 3.0, 4.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 4.0, 6.0, 8.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float4x1 y = float4x1(1.0, 2.0, 3.0, 4.0);
+
+    return mul(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (30.0, 70.0, 110.0, 150.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float3x3 x = float3x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0);
+    float4x4 y = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+
+    return mul(x, y)[1];
+}
+
+[test]
+draw quad
+probe all rgba (83.0, 98.0, 113.0, 128.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    float4x4 x = float4x4(1.0, 2.0, 3.0, 4.0,
+                          5.0, 6.0, 7.0, 8.0,
+                          9.0, 10.0, 11.0, 12.0,
+                          13.0, 14.0, 15.0, 16.0);
+    float3x3 y = float3x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0);
+
+    return float4(mul(x, y)[1], 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (78.0, 96.0, 114.0, 0.0)
