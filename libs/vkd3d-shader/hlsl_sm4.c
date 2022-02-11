@@ -806,7 +806,7 @@ struct sm4_instruction
     {
         struct sm4_register reg;
         unsigned int writemask;
-    } dsts[1];
+    } dsts[2];
     unsigned int dst_count;
 
     struct sm4_src_register
@@ -1286,6 +1286,30 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buffer *buffer,
+        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned dst_idx,
+        const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    assert(dst_idx < ARRAY_SIZE(instr.dsts));
+    sm4_dst_from_node(&instr.dsts[dst_idx], dst);
+    assert(1 - dst_idx >= 0);
+    instr.dsts[1 - dst_idx].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[1 - dst_idx].reg.idx_count = 0;
+    instr.dst_count = 2;
+
+    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[dst_idx].writemask);
+    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[dst_idx].writemask);
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_constant(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_constant *constant)
 {
@@ -1589,6 +1613,12 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 
                 case HLSL_OP2_MIN:
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_UMIN, &expr->node, arg1, arg2);
+                    break;
+
+                case HLSL_OP2_MUL:
+                    /* Using IMUL instead of UMUL because we're taking the low
+                     * bits, and the native compiler generates IMUL. */
+                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_IMUL, &expr->node, 1, arg1, arg2);
                     break;
 
                 default:
