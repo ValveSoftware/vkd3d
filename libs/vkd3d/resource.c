@@ -1941,10 +1941,16 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
         goto allocate_memory;
     }
 
+    /* Syncronisation is not required for binding, but vkMapMemory() may be called
+     * from another thread and it requires exclusive access. */
+    vkd3d_mutex_lock(&heap->mutex);
+
     if (d3d12_resource_is_buffer(resource))
         vr = VK_CALL(vkBindBufferMemory(vk_device, resource->u.vk_buffer, heap->vk_memory, heap_offset));
     else
         vr = VK_CALL(vkBindImageMemory(vk_device, resource->u.vk_image, heap->vk_memory, heap_offset));
+
+    vkd3d_mutex_unlock(&heap->mutex);
 
     if (vr == VK_SUCCESS)
     {
