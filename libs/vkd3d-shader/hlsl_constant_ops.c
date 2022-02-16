@@ -20,11 +20,216 @@
 
 #include "hlsl.h"
 
+static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
+{
+    unsigned int k;
+    uint32_t u;
+    int32_t i;
+    double d;
+    float f;
+    bool b;
+
+    if (dst->node.data_type->dimx != src->node.data_type->dimx
+            || dst->node.data_type->dimy != src->node.data_type->dimy)
+    {
+        FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
+                debug_hlsl_type(ctx, dst->node.data_type));
+        return false;
+    }
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (src->node.data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                u = src->value[k].f;
+                i = src->value[k].f;
+                f = src->value[k].f;
+                d = src->value[k].f;
+                b = src->value[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                u = src->value[k].d;
+                i = src->value[k].d;
+                f = src->value[k].d;
+                d = src->value[k].d;
+                b = src->value[k].d;
+                break;
+
+            case HLSL_TYPE_INT:
+                u = src->value[k].i;
+                i = src->value[k].i;
+                f = src->value[k].i;
+                d = src->value[k].i;
+                b = src->value[k].i;
+                break;
+
+            case HLSL_TYPE_UINT:
+                u = src->value[k].u;
+                i = src->value[k].u;
+                f = src->value[k].u;
+                d = src->value[k].u;
+                b = src->value[k].u;
+                break;
+
+            case HLSL_TYPE_BOOL:
+                u = src->value[k].b;
+                i = src->value[k].b;
+                f = src->value[k].b;
+                d = src->value[k].b;
+                b = src->value[k].b;
+                break;
+
+            default:
+                FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
+                        debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+
+        switch (dst->node.data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value[k].f = f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value[k].d = d;
+                break;
+
+            case HLSL_TYPE_INT:
+                dst->value[k].i = i;
+                break;
+
+            case HLSL_TYPE_UINT:
+                dst->value[k].u = u;
+                break;
+
+            case HLSL_TYPE_BOOL:
+                dst->value[k].b = b;
+                break;
+
+            default:
+                FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
+                        debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
+static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value[k].f = -src->value[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value[k].d = -src->value[k].d;
+                break;
+
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+                dst->value[k].u = -src->value[k].u;
+                break;
+
+            default:
+                FIXME("Fold negation for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
+static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src1,
+        struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value[k].f = src1->value[k].f + src2->value[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value[k].d = src1->value[k].d + src2->value[k].d;
+                break;
+
+            /* Handling HLSL_TYPE_INT through the unsigned field to avoid
+             * undefined behavior with signed integers in C. */
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+                dst->value[k].u = src1->value[k].u + src2->value[k].u;
+                break;
+
+            default:
+                FIXME("Fold addition for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
+static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
+        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+
+    for (int k = 0; k < 4; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value[k].f = src1->value[k].f * src2->value[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value[k].d = src1->value[k].d * src2->value[k].d;
+                break;
+
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+                dst->value[k].u = src1->value[k].u * src2->value[k].u;
+                break;
+
+            default:
+                FIXME("Fold multiplication for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
 bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
     struct hlsl_ir_expr *expr;
-    unsigned int i, dimx;
+    unsigned int i;
+    bool success;
 
     if (instr->type != HLSL_IR_EXPR)
         return false;
@@ -38,115 +243,43 @@ bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void 
     arg1 = hlsl_ir_constant(expr->operands[0].node);
     if (expr->operands[1].node)
         arg2 = hlsl_ir_constant(expr->operands[1].node);
-    dimx = instr->data_type->dimx;
 
     if (!(res = hlsl_alloc(ctx, sizeof(*res))))
         return false;
     init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
 
-    switch (instr->data_type->base_type)
+    switch (expr->op)
     {
-        case HLSL_TYPE_FLOAT:
-        {
-            switch (expr->op)
-            {
-                case HLSL_OP1_CAST:
-                    if (instr->data_type->dimx != arg1->node.data_type->dimx
-                            || instr->data_type->dimy != arg1->node.data_type->dimy)
-                    {
-                        FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
-                                debug_hlsl_type(ctx, instr->data_type));
-                        vkd3d_free(res);
-                        return false;
-                    }
-
-                    switch (arg1->node.data_type->base_type)
-                    {
-                        case HLSL_TYPE_INT:
-                            for (i = 0; i < dimx; ++i)
-                                res->value[i].f = arg1->value[i].i;
-                            break;
-
-                        case HLSL_TYPE_UINT:
-                            for (i = 0; i < dimx; ++i)
-                                res->value[i].f = arg1->value[i].u;
-                            break;
-
-                        default:
-                            FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
-                                    debug_hlsl_type(ctx, instr->data_type));
-                            vkd3d_free(res);
-                            return false;
-                    }
-                    break;
-
-                default:
-                    FIXME("Fold float op %#x.\n", expr->op);
-                    vkd3d_free(res);
-                    return false;
-            }
+        case HLSL_OP1_CAST:
+            success = fold_cast(ctx, res, arg1);
             break;
-        }
 
-        case HLSL_TYPE_UINT:
-        {
-            switch (expr->op)
-            {
-                case HLSL_OP1_CAST:
-                    if (instr->data_type->dimx != arg1->node.data_type->dimx
-                            || instr->data_type->dimy != arg1->node.data_type->dimy)
-                    {
-                        FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
-                                debug_hlsl_type(ctx, instr->data_type));
-                        vkd3d_free(res);
-                        return false;
-                    }
-
-                    switch (arg1->node.data_type->base_type)
-                    {
-                        case HLSL_TYPE_INT:
-                            for (i = 0; i < dimx; ++i)
-                                res->value[i].i = arg1->value[i].u;
-                            break;
-
-                        default:
-                            FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, arg1->node.data_type),
-                                    debug_hlsl_type(ctx, instr->data_type));
-                            vkd3d_free(res);
-                            return false;
-                    }
-                    break;
-
-                case HLSL_OP1_NEG:
-                    for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value[i].u = -arg1->value[i].u;
-                    break;
-
-                case HLSL_OP2_ADD:
-                    for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value[i].u = arg1->value[i].u + arg2->value[i].u;
-                    break;
-
-                case HLSL_OP2_MUL:
-                    for (i = 0; i < instr->data_type->dimx; ++i)
-                        res->value[i].u = arg1->value[i].u * arg2->value[i].u;
-                    break;
-
-                default:
-                    FIXME("Fold uint op %#x.\n", expr->op);
-                    vkd3d_free(res);
-                    return false;
-            }
+        case HLSL_OP1_NEG:
+            success = fold_neg(ctx, res, arg1);
             break;
-        }
+
+        case HLSL_OP2_ADD:
+            success = fold_add(ctx, res, arg1, arg2);
+            break;
+
+        case HLSL_OP2_MUL:
+            success = fold_mul(ctx, res, arg1, arg2);
+            break;
 
         default:
-            FIXME("Fold type %#x op %#x.\n", instr->data_type->base_type, expr->op);
-            vkd3d_free(res);
-            return false;
+            FIXME("Fold \"%s\" expression.\n", debug_hlsl_expr_op(expr->op));
+            success = false;
+            break;
     }
 
-    list_add_before(&expr->node.entry, &res->node.entry);
-    hlsl_replace_node(&expr->node, &res->node);
-    return true;
+    if (success)
+    {
+        list_add_before(&expr->node.entry, &res->node.entry);
+        hlsl_replace_node(&expr->node, &res->node);
+    }
+    else
+    {
+        vkd3d_free(res);
+    }
+    return success;
 }

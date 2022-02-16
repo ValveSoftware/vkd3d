@@ -96,7 +96,6 @@ vkd3d_shader_tests = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/math.shader_test \
-	tests/max.shader_test \
 	tests/pow.shader_test \
 	tests/preproc-if.shader_test \
 	tests/preproc-ifdef.shader_test \
