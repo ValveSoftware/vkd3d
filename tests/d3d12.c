@@ -16758,13 +16758,15 @@ static void test_update_descriptor_tables(void)
     destroy_test_context(&context);
 }
 
-/* This cannot be implemented reasonably in Vulkan. Vulkan doesn't allow
- * updating descriptor sets after the vkCmdBindDescriptorSets() command
- * is recorded.
+/* This requires the Vulkan descriptor indexing extension and Vulkan-backed
+ * descriptor heaps. Vulkan doesn't allow updating descriptor sets after the
+ * vkCmdBindDescriptorSets() command is recorded unless the update-after-bind
+ * feature of descriptor indexing is used.
  */
 static void test_update_descriptor_heap_after_closing_command_list(void)
 {
     ID3D12Resource *red_texture, *green_texture;
+    D3D12_RESOURCE_BINDING_TIER binding_tier;
     ID3D12GraphicsCommandList *command_list;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     ID3D12DescriptorHeap *cpu_heap, *heap;
@@ -16813,6 +16815,8 @@ static void test_update_descriptor_heap_after_closing_command_list(void)
         return;
     command_list = context.list;
     queue = context.queue;
+
+    binding_tier = get_resource_binding_tier(context.device);
 
     context.root_signature = create_texture_root_signature(context.device,
             D3D12_SHADER_VISIBILITY_PIXEL, 0, 0);
@@ -16875,7 +16879,8 @@ static void test_update_descriptor_heap_after_closing_command_list(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     value = get_readback_uint(&rb, 0, 0, 0);
-    todo ok(value == 0xff00ff00, "Got unexpected value %#x.\n", value);
+    todo_if(binding_tier < D3D12_RESOURCE_BINDING_TIER_3)
+    ok(value == 0xff00ff00, "Got unexpected value %#x.\n", value);
     release_resource_readback(&rb);
 
     ID3D12DescriptorHeap_Release(cpu_heap);

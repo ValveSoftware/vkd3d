@@ -156,6 +156,7 @@ struct vkd3d_vulkan_info
 enum vkd3d_config_flags
 {
     VKD3D_CONFIG_FLAG_VULKAN_DEBUG = 0x00000001,
+    VKD3D_CONFIG_FLAG_VIRTUAL_HEAPS = 0x00000002,
 };
 
 struct vkd3d_instance
@@ -772,17 +773,61 @@ static inline struct d3d12_dsv_desc *d3d12_dsv_desc_from_cpu_handle(D3D12_CPU_DE
 void d3d12_dsv_desc_create_dsv(struct d3d12_dsv_desc *dsv_desc, struct d3d12_device *device,
         struct d3d12_resource *resource, const D3D12_DEPTH_STENCIL_VIEW_DESC *desc);
 
+enum vkd3d_vk_descriptor_set_index
+{
+    VKD3D_SET_INDEX_UNIFORM_BUFFER = 0,
+    VKD3D_SET_INDEX_UNIFORM_TEXEL_BUFFER = 1,
+    VKD3D_SET_INDEX_SAMPLED_IMAGE = 2,
+    VKD3D_SET_INDEX_STORAGE_TEXEL_BUFFER = 3,
+    VKD3D_SET_INDEX_STORAGE_IMAGE = 4,
+    VKD3D_SET_INDEX_SAMPLER = 5,
+    VKD3D_SET_INDEX_UAV_COUNTER = 6,
+    VKD3D_SET_INDEX_COUNT = 7
+};
+
+extern const enum vkd3d_vk_descriptor_set_index vk_descriptor_set_index_table[];
+
+static inline enum vkd3d_vk_descriptor_set_index vkd3d_vk_descriptor_set_index_from_vk_descriptor_type(
+        VkDescriptorType type)
+{
+    assert(type <= VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    assert(vk_descriptor_set_index_table[type] < VKD3D_SET_INDEX_COUNT);
+
+    return vk_descriptor_set_index_table[type];
+}
+
+struct vkd3d_vk_descriptor_heap_layout
+{
+    VkDescriptorType type;
+    bool buffer_dimension;
+    D3D12_DESCRIPTOR_HEAP_TYPE applicable_heap_type;
+    unsigned int count;
+    VkDescriptorSetLayout vk_set_layout;
+};
+
+struct d3d12_descriptor_heap_vk_set
+{
+    VkDescriptorSet vk_set;
+    VkDescriptorImageInfo vk_image_info;
+    VkWriteDescriptorSet vk_descriptor_write;
+};
+
 /* ID3D12DescriptorHeap */
 struct d3d12_descriptor_heap
 {
     ID3D12DescriptorHeap ID3D12DescriptorHeap_iface;
     LONG refcount;
+    uint64_t serial_id;
 
     D3D12_DESCRIPTOR_HEAP_DESC desc;
 
     struct d3d12_device *device;
 
     struct vkd3d_private_store private_store;
+
+    VkDescriptorPool vk_descriptor_pool;
+    struct d3d12_descriptor_heap_vk_set vk_descriptor_sets[VKD3D_SET_INDEX_COUNT];
+    struct vkd3d_mutex vk_sets_mutex;
 
     BYTE descriptors[];
 };
@@ -898,8 +943,13 @@ struct d3d12_root_signature
     D3D12_ROOT_SIGNATURE_FLAGS flags;
 
     unsigned int binding_count;
+    unsigned int uav_mapping_count;
     struct vkd3d_shader_resource_binding *descriptor_mapping;
     struct vkd3d_shader_descriptor_offset *descriptor_offsets;
+    struct vkd3d_shader_uav_counter_binding *uav_counter_mapping;
+    struct vkd3d_shader_descriptor_offset *uav_counter_offsets;
+    unsigned int descriptor_table_offset;
+    unsigned int descriptor_table_count;
 
     unsigned int root_constant_count;
     struct vkd3d_shader_push_constant_buffer *root_constants;
@@ -1118,6 +1168,8 @@ struct vkd3d_pipeline_bindings
     struct d3d12_desc *descriptor_tables[D3D12_MAX_ROOT_COST];
     uint64_t descriptor_table_dirty_mask;
     uint64_t descriptor_table_active_mask;
+    uint64_t cbv_srv_uav_heap_id;
+    uint64_t sampler_heap_id;
 
     VkBufferView *vk_uav_counter_views;
     size_t vk_uav_counter_views_size;
@@ -1178,6 +1230,8 @@ struct d3d12_command_list
 
     VkBuffer so_counter_buffers[D3D12_SO_BUFFER_SLOT_COUNT];
     VkDeviceSize so_counter_buffer_offsets[D3D12_SO_BUFFER_SLOT_COUNT];
+
+    void (*update_descriptors)(struct d3d12_command_list *list, enum vkd3d_pipeline_bind_point bind_point);
 
     struct vkd3d_private_store private_store;
 };
@@ -1370,6 +1424,8 @@ struct d3d12_device
     struct vkd3d_uav_clear_state uav_clear_state;
 
     VkDescriptorPoolSize vk_pool_sizes[VKD3D_DESCRIPTOR_POOL_COUNT];
+    struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT];
+    bool use_vk_heaps;
 };
 
 HRESULT d3d12_device_create(struct vkd3d_instance *instance,

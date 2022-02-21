@@ -51,6 +51,9 @@ commas or semicolons.
    even when the output supports colour.
 
  * VKD3D_CONFIG - a list of options that change the behavior of libvkd3d.
+    * virtual_heaps - Create descriptors for each D3D12 root signature
+      descriptor range instead of entire descriptor heaps. Useful when push
+      constant or bound descriptor limits are exceeded.
     * vk_debug - enables Vulkan debug extensions.
 
  * VKD3D_DEBUG - controls the debug level for log messages produced by

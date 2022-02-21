@@ -1921,6 +1921,8 @@ static void d3d12_command_list_invalidate_root_parameters(struct d3d12_command_l
     bindings->descriptor_set_count = 0;
     bindings->descriptor_table_dirty_mask = bindings->descriptor_table_active_mask & bindings->root_signature->descriptor_table_mask;
     bindings->push_descriptor_dirty_mask = bindings->push_descriptor_active_mask & bindings->root_signature->push_descriptor_mask;
+    bindings->cbv_srv_uav_heap_id = 0;
+    bindings->sampler_heap_id = 0;
 }
 
 static bool vk_barrier_parameters_from_d3d12_resource_state(unsigned int state, unsigned int stencil_state,
@@ -3021,6 +3023,146 @@ static void d3d12_command_list_update_descriptors(struct d3d12_command_list *lis
     d3d12_command_list_update_uav_counter_descriptors(list, bind_point);
 }
 
+static unsigned int d3d12_command_list_bind_descriptor_table(struct d3d12_command_list *list,
+        struct vkd3d_pipeline_bindings *bindings, unsigned int index,
+        struct d3d12_descriptor_heap **cbv_srv_uav_heap, struct d3d12_descriptor_heap **sampler_heap)
+{
+    struct d3d12_descriptor_heap *heap;
+    const struct d3d12_desc *desc;
+    unsigned int offset;
+
+    if (!(desc = bindings->descriptor_tables[index]))
+        return 0;
+
+    /* AMD, Nvidia and Intel drivers on Windows work if SetDescriptorHeaps()
+     * is not called, so we bind heaps from the tables instead. No NULL check is
+     * needed here because it's checked when descriptor tables are set. */
+    heap = vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&list->device->gpu_descriptor_allocator, desc);
+    offset = desc - (const struct d3d12_desc *)heap->descriptors;
+
+    if (heap->desc.Type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
+    {
+        if (*cbv_srv_uav_heap)
+        {
+            if (heap == *cbv_srv_uav_heap)
+                return offset;
+            /* This occurs occasionally in Rise of the Tomb Raider apparently due to a race
+             * condition (one of several), but adding a mutex for table updates has no effect. */
+            WARN("List %p uses descriptors from more than one CBV/SRV/UAV heap.\n", list);
+        }
+        *cbv_srv_uav_heap = heap;
+    }
+    else
+    {
+        if (*sampler_heap)
+        {
+            if (heap == *sampler_heap)
+                return offset;
+            WARN("List %p uses descriptors from more than one sampler heap.\n", list);
+        }
+        *sampler_heap = heap;
+    }
+
+    return offset;
+}
+
+static void d3d12_command_list_update_descriptor_tables(struct d3d12_command_list *list,
+        struct vkd3d_pipeline_bindings *bindings, struct d3d12_descriptor_heap **cbv_srv_uav_heap,
+        struct d3d12_descriptor_heap **sampler_heap)
+{
+    const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
+    const struct d3d12_root_signature *rs = bindings->root_signature;
+    unsigned int offsets[D3D12_MAX_ROOT_COST];
+    unsigned int i, j;
+
+    for (i = 0, j = 0; i < ARRAY_SIZE(bindings->descriptor_tables); ++i)
+    {
+        if (!(rs->descriptor_table_mask & ((uint64_t)1 << i)))
+            continue;
+        offsets[j++] = d3d12_command_list_bind_descriptor_table(list, bindings, i,
+                cbv_srv_uav_heap, sampler_heap);
+    }
+    if (j)
+    {
+        VK_CALL(vkCmdPushConstants(list->vk_command_buffer, rs->vk_pipeline_layout, VK_SHADER_STAGE_ALL,
+                rs->descriptor_table_offset, j * sizeof(uint32_t), offsets));
+    }
+}
+
+static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *list,
+        enum vkd3d_pipeline_bind_point bind_point, struct d3d12_descriptor_heap *heap)
+{
+    struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
+    const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
+    const struct d3d12_root_signature *rs = bindings->root_signature;
+    enum vkd3d_vk_descriptor_set_index set;
+
+    if (!heap)
+        return;
+
+    if (heap->desc.Type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
+    {
+        if (heap->serial_id == bindings->cbv_srv_uav_heap_id)
+            return;
+        bindings->cbv_srv_uav_heap_id = heap->serial_id;
+    }
+    else
+    {
+        if (heap->serial_id == bindings->sampler_heap_id)
+            return;
+        bindings->sampler_heap_id = heap->serial_id;
+    }
+
+    /* These sets can be shared across multiple command lists, and therefore binding must
+     * be synchronised. On an experimental branch in which caching of Vk descriptor writes
+     * greatly increased the chance of multiple threads arriving here at the same time,
+     * GRID 2019 crashed without the mutex lock. */
+    vkd3d_mutex_lock(&heap->vk_sets_mutex);
+
+    for (set = 0; set < ARRAY_SIZE(heap->vk_descriptor_sets); ++set)
+    {
+        VkDescriptorSet vk_descriptor_set = heap->vk_descriptor_sets[set].vk_set;
+
+        if (!vk_descriptor_set)
+            continue;
+
+        VK_CALL(vkCmdBindDescriptorSets(list->vk_command_buffer, bindings->vk_bind_point, rs->vk_pipeline_layout,
+                rs->vk_set_count + set, 1, &vk_descriptor_set, 0, NULL));
+    }
+
+    vkd3d_mutex_unlock(&heap->vk_sets_mutex);
+}
+
+static void d3d12_command_list_update_heap_descriptors(struct d3d12_command_list *list,
+        enum vkd3d_pipeline_bind_point bind_point)
+{
+    struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
+    struct d3d12_descriptor_heap *cbv_srv_uav_heap = NULL, *sampler_heap = NULL;
+    const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
+    const struct d3d12_root_signature *rs = bindings->root_signature;
+
+    if (!rs)
+        return;
+
+    if (bindings->descriptor_table_dirty_mask || bindings->push_descriptor_dirty_mask)
+        d3d12_command_list_prepare_descriptors(list, bind_point);
+    if (bindings->descriptor_table_dirty_mask)
+        d3d12_command_list_update_descriptor_tables(list, bindings, &cbv_srv_uav_heap, &sampler_heap);
+    bindings->descriptor_table_dirty_mask = 0;
+
+    d3d12_command_list_update_push_descriptors(list, bind_point);
+
+    if (bindings->descriptor_set_count)
+    {
+        VK_CALL(vkCmdBindDescriptorSets(list->vk_command_buffer, bindings->vk_bind_point, rs->vk_pipeline_layout,
+                rs->main_set, bindings->descriptor_set_count, bindings->descriptor_sets, 0, NULL));
+        bindings->in_use = true;
+    }
+
+    d3d12_command_list_bind_descriptor_heap(list, bind_point, cbv_srv_uav_heap);
+    d3d12_command_list_bind_descriptor_heap(list, bind_point, sampler_heap);
+}
+
 static bool d3d12_command_list_update_compute_state(struct d3d12_command_list *list)
 {
     d3d12_command_list_end_current_render_pass(list);
@@ -3028,7 +3170,7 @@ static bool d3d12_command_list_update_compute_state(struct d3d12_command_list *l
     if (!d3d12_command_list_update_compute_pipeline(list))
         return false;
 
-    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
+    list->update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
 
     return true;
 }
@@ -3045,7 +3187,7 @@ static bool d3d12_command_list_begin_render_pass(struct d3d12_command_list *list
     if (!d3d12_command_list_update_current_framebuffer(list))
         return false;
 
-    d3d12_command_list_update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS);
+    list->update_descriptors(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS);
 
     if (list->current_render_pass != VK_NULL_HANDLE)
         return true;
@@ -4113,6 +4255,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetDescriptorHeaps(ID3D12Graphi
     TRACE("iface %p, heap_count %u, heaps %p.\n", iface, heap_count, heaps);
 
     /* Our current implementation does not need this method.
+     * In Windows it doesn't need to be called at all for correct operation, and
+     * at least on AMD the wrong heaps can be set here and tests still succeed.
      *
      * It could be used to validate descriptor tables but we do not have an
      * equivalent of the D3D12 Debug Layer. */
@@ -5705,6 +5849,9 @@ static HRESULT d3d12_command_list_init(struct d3d12_command_list *list, struct d
     d3d12_device_add_ref(list->device = device);
 
     list->allocator = allocator;
+
+    list->update_descriptors = device->use_vk_heaps ? d3d12_command_list_update_heap_descriptors
+            : d3d12_command_list_update_descriptors;
 
     if (SUCCEEDED(hr = d3d12_command_allocator_allocate_command_buffer(allocator, list)))
     {
