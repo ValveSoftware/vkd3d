@@ -331,14 +331,25 @@ struct d3d12_root_signature_info
     size_t root_constant_count;
     size_t root_descriptor_count;
 
+    unsigned int cbv_count;
+    unsigned int srv_count;
+    unsigned int uav_count;
+    unsigned int sampler_count;
+    unsigned int cbv_unbounded_range_count;
+    unsigned int srv_unbounded_range_count;
+    unsigned int uav_unbounded_range_count;
+    unsigned int sampler_unbounded_range_count;
+
     size_t cost;
 };
 
 static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_signature_info *info,
         const D3D12_ROOT_DESCRIPTOR_TABLE *table, bool use_array)
 {
+    bool cbv_unbounded_range = false, srv_unbounded_range = false, uav_unbounded_range = false;
+    bool sampler_unbounded_range = false;
     bool unbounded = false;
-    unsigned int i;
+    unsigned int i, count;
 
     for (i = 0; i < table->NumDescriptorRanges; ++i)
     {
@@ -365,8 +376,12 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
             return E_INVALIDARG;
         }
 
+        count = range->NumDescriptors;
         if (range->NumDescriptors == UINT_MAX)
+        {
             unbounded = true;
+            count = 0;
+        }
 
         binding_count = use_array ? 1 : range->NumDescriptors;
 
@@ -378,14 +393,22 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
                 * root signature, we create descriptor set layouts with two bindings for
                 * each SRV and UAV. */
                 info->binding_count += binding_count;
+                info->srv_count += count * 2u;
+                srv_unbounded_range |= unbounded;
                 break;
             case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
                 /* As above. */
                 info->binding_count += binding_count;
+                info->uav_count += count * 2u;
+                uav_unbounded_range |= unbounded;
                 break;
             case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+                info->cbv_count += count;
+                cbv_unbounded_range |= unbounded;
                 break;
             case D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER:
+                info->sampler_count += count;
+                sampler_unbounded_range |= unbounded;
                 break;
             default:
                 FIXME("Unhandled descriptor type %#x.\n", range->RangeType);
@@ -400,6 +423,11 @@ static HRESULT d3d12_root_signature_info_count_descriptors(struct d3d12_root_sig
         FIXME("The device does not support unbounded descriptor ranges.\n");
         return E_FAIL;
     }
+
+    info->srv_unbounded_range_count += srv_unbounded_range * 2u;
+    info->uav_unbounded_range_count += uav_unbounded_range * 2u;
+    info->cbv_unbounded_range_count += cbv_unbounded_range;
+    info->sampler_unbounded_range_count += sampler_unbounded_range;
 
     return S_OK;
 }
@@ -427,16 +455,19 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
 
             case D3D12_ROOT_PARAMETER_TYPE_CBV:
                 ++info->root_descriptor_count;
+                ++info->cbv_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
             case D3D12_ROOT_PARAMETER_TYPE_SRV:
                 ++info->root_descriptor_count;
+                ++info->srv_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
             case D3D12_ROOT_PARAMETER_TYPE_UAV:
                 ++info->root_descriptor_count;
+                ++info->uav_count;
                 ++info->binding_count;
                 info->cost += 2;
                 break;
@@ -453,6 +484,7 @@ static HRESULT d3d12_root_signature_info_from_desc(struct d3d12_root_signature_i
     }
 
     info->binding_count += desc->NumStaticSamplers;
+    info->sampler_count += desc->NumStaticSamplers;
 
     return S_OK;
 }
@@ -675,14 +707,44 @@ static uint32_t vkd3d_descriptor_magic_from_d3d12(D3D12_DESCRIPTOR_RANGE_TYPE ty
     }
 }
 
-static unsigned int vk_binding_count_from_descriptor_range(const struct d3d12_root_descriptor_table_range *range)
+static unsigned int vk_binding_count_from_descriptor_range(const struct d3d12_root_descriptor_table_range *range,
+        const struct d3d12_root_signature_info *info, const struct vkd3d_device_descriptor_limits *limits)
 {
+    unsigned int count, limit;
+
     if (range->descriptor_count != UINT_MAX)
         return range->descriptor_count;
 
-    /* TODO: Calculate an upper bound from unbounded set counts and Vulkan
-     * device limits. */
-    return 1024;
+    switch (range->type)
+    {
+        case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+            limit = limits->uniform_buffer_max_descriptors;
+            count = (limit - min(info->cbv_count, limit)) / info->cbv_unbounded_range_count;
+            break;
+        case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
+            limit = limits->sampled_image_max_descriptors;
+            count = (limit - min(info->srv_count, limit)) / info->srv_unbounded_range_count;
+            break;
+        case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+            limit = limits->storage_image_max_descriptors;
+            count = (limit - min(info->uav_count, limit)) / info->uav_unbounded_range_count;
+            break;
+        case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
+            limit = limits->sampler_max_descriptors;
+            count = (limit - min(info->sampler_count, limit)) / info->sampler_unbounded_range_count;
+            break;
+        default:
+            ERR("Unhandled type %#x.\n", range->type);
+            return 1;
+    }
+
+    if (!count)
+    {
+        WARN("Descriptor table exceeds type %#x limit of %u.\n", range->type, limit);
+        count = 1;
+    }
+
+    return min(count, VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
 }
 
 static HRESULT d3d12_root_signature_init_descriptor_array_binding(struct d3d12_root_signature *root_signature,
@@ -802,8 +864,10 @@ static HRESULT validate_descriptor_register_ranges(const struct d3d12_root_descr
 }
 
 static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_root_signature *root_signature,
-        const D3D12_ROOT_SIGNATURE_DESC *desc, struct vkd3d_descriptor_set_context *context)
+        const D3D12_ROOT_SIGNATURE_DESC *desc, const struct d3d12_root_signature_info *info,
+        struct vkd3d_descriptor_set_context *context)
 {
+    const struct d3d12_device *device = root_signature->device;
     struct d3d12_root_descriptor_table *table;
     unsigned int i, j, k, range_count;
     uint32_t vk_binding;
@@ -904,7 +968,8 @@ static HRESULT d3d12_root_signature_init_root_descriptor_tables(struct d3d12_roo
                 }
 
                 range->binding = context->descriptor_binding;
-                range->vk_binding_count = vk_binding_count_from_descriptor_range(range);
+                range->vk_binding_count = vk_binding_count_from_descriptor_range(range,
+                        info, &device->vk_info.descriptor_limits);
 
                 if (FAILED(hr = d3d12_root_signature_init_descriptor_array_binding(root_signature,
                         range, p->ShaderVisibility, context)))
@@ -1224,7 +1289,7 @@ static HRESULT d3d12_root_signature_init(struct d3d12_root_signature *root_signa
         goto fail;
     if (FAILED(hr = d3d12_root_signature_init_static_samplers(root_signature, device, desc, &context)))
         goto fail;
-    if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &context)))
+    if (FAILED(hr = d3d12_root_signature_init_root_descriptor_tables(root_signature, desc, &info, &context)))
         goto fail;
 
     if (FAILED(hr = d3d12_root_signature_append_descriptor_set_layout(root_signature, &context, 0)))
