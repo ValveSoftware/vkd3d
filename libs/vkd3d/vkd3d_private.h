@@ -62,6 +62,12 @@
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
 #define VKD3D_MAX_DESCRIPTOR_SETS        64u
+/* D3D12 binding tier 3 has a limit of 2048 samplers. */
+#define VKD3D_MAX_DESCRIPTOR_SET_SAMPLERS 2048u
+/* The main limitation here is the simple descriptor pool recycling scheme
+ * requiring each pool to contain all descriptor types used by vkd3d. Limit
+ * this number to prevent excessive pool memory use. */
+#define VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE (16 * 1024u)
 
 struct d3d12_command_list;
 struct d3d12_device;
@@ -94,6 +100,15 @@ struct vkd3d_vk_device_procs
 HRESULT hresult_from_errno(int rc);
 HRESULT hresult_from_vk_result(VkResult vr);
 HRESULT hresult_from_vkd3d_result(int vkd3d_result);
+
+struct vkd3d_device_descriptor_limits
+{
+    unsigned int uniform_buffer_max_descriptors;
+    unsigned int sampled_image_max_descriptors;
+    unsigned int storage_buffer_max_descriptors;
+    unsigned int storage_image_max_descriptors;
+    unsigned int sampler_max_descriptors;
+};
 
 struct vkd3d_vulkan_info
 {
@@ -130,6 +145,7 @@ struct vkd3d_vulkan_info
 
     VkPhysicalDeviceLimits device_limits;
     VkPhysicalDeviceSparseProperties sparse_properties;
+    struct vkd3d_device_descriptor_limits descriptor_limits;
 
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
 
@@ -1299,6 +1315,8 @@ struct vkd3d_uav_clear_state
 HRESULT vkd3d_uav_clear_state_init(struct vkd3d_uav_clear_state *state, struct d3d12_device *device);
 void vkd3d_uav_clear_state_cleanup(struct vkd3d_uav_clear_state *state, struct d3d12_device *device);
 
+#define VKD3D_DESCRIPTOR_POOL_COUNT 6
+
 /* ID3D12Device */
 struct d3d12_device
 {
@@ -1352,6 +1370,8 @@ struct d3d12_device
     const struct vkd3d_format_compatibility_list *format_compatibility_lists;
     struct vkd3d_null_resources null_resources;
     struct vkd3d_uav_clear_state uav_clear_state;
+
+    VkDescriptorPoolSize vk_pool_sizes[VKD3D_DESCRIPTOR_POOL_COUNT];
 };
 
 HRESULT d3d12_device_create(struct vkd3d_instance *instance,

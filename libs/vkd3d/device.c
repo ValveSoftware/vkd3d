@@ -1277,6 +1277,16 @@ static void vkd3d_init_feature_level(struct vkd3d_vulkan_info *vk_info,
     TRACE("Max feature level: %#x.\n", vk_info->max_feature_level);
 }
 
+static void vkd3d_device_descriptor_limits_init(struct vkd3d_device_descriptor_limits *limits,
+        const VkPhysicalDeviceLimits *device_limits)
+{
+    limits->uniform_buffer_max_descriptors = device_limits->maxDescriptorSetUniformBuffers;
+    limits->sampled_image_max_descriptors = device_limits->maxDescriptorSetSampledImages;
+    limits->storage_buffer_max_descriptors = device_limits->maxDescriptorSetStorageBuffers;
+    limits->storage_image_max_descriptors = device_limits->maxDescriptorSetStorageImages;
+    limits->sampler_max_descriptors = min(device_limits->maxDescriptorSetSamplers, VKD3D_MAX_DESCRIPTOR_SET_SAMPLERS);
+}
+
 static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         const struct vkd3d_device_create_info *create_info,
         struct vkd3d_physical_device_info *physical_device_info,
@@ -1503,6 +1513,9 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         WARN("Disabling robust buffer access for the update after bind feature.\n");
         features->robustBufferAccess = VK_FALSE;
     }
+
+    vkd3d_device_descriptor_limits_init(&vulkan_info->descriptor_limits,
+            &physical_device_info->properties2.properties.limits);
 
     return S_OK;
 }
@@ -2418,6 +2431,27 @@ static void vkd3d_time_domains_init(struct d3d12_device *device)
     if (device->vk_host_time_domain == -1)
         WARN("Found no acceptable host time domain. Calibrated timestamps will not be available.\n");
 }
+
+static void vkd3d_init_descriptor_pool_sizes(VkDescriptorPoolSize *pool_sizes,
+        const struct vkd3d_device_descriptor_limits *limits)
+{
+    pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_sizes[0].descriptorCount = min(limits->uniform_buffer_max_descriptors,
+            VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
+    pool_sizes[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+    pool_sizes[1].descriptorCount = min(limits->sampled_image_max_descriptors,
+            VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
+    pool_sizes[2].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    pool_sizes[2].descriptorCount = pool_sizes[1].descriptorCount;
+    pool_sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+    pool_sizes[3].descriptorCount = min(limits->storage_image_max_descriptors,
+            VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
+    pool_sizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    pool_sizes[4].descriptorCount = pool_sizes[3].descriptorCount;
+    pool_sizes[5].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+    pool_sizes[5].descriptorCount = min(limits->sampler_max_descriptors,
+            VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
+};
 
 /* ID3D12Device */
 static inline struct d3d12_device *impl_from_ID3D12Device(ID3D12Device *iface)
@@ -3978,6 +4012,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
 
     for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
         vkd3d_mutex_init(&device->desc_mutex[i]);
+
+    vkd3d_init_descriptor_pool_sizes(device->vk_pool_sizes, &device->vk_info.descriptor_limits);
 
     if ((device->parent = create_info->parent))
         IUnknown_AddRef(device->parent);

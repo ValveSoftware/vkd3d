@@ -1351,15 +1351,6 @@ static bool d3d12_command_allocator_add_transfer_buffer(struct d3d12_command_all
 static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
         struct d3d12_command_allocator *allocator)
 {
-    static const VkDescriptorPoolSize pool_sizes[] =
-    {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1024},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024},
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1024},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024},
-        {VK_DESCRIPTOR_TYPE_SAMPLER, 1024},
-    };
     struct d3d12_device *device = allocator->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     struct VkDescriptorPoolCreateInfo pool_desc;
@@ -1379,8 +1370,8 @@ static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
         pool_desc.pNext = NULL;
         pool_desc.flags = 0;
         pool_desc.maxSets = 512;
-        pool_desc.poolSizeCount = ARRAY_SIZE(pool_sizes);
-        pool_desc.pPoolSizes = pool_sizes;
+        pool_desc.poolSizeCount = ARRAY_SIZE(device->vk_pool_sizes);
+        pool_desc.pPoolSizes = device->vk_pool_sizes;
         if ((vr = VK_CALL(vkCreateDescriptorPool(vk_device, &pool_desc, NULL, &vk_pool))) < 0)
         {
             ERR("Failed to create descriptor pool, vr %d.\n", vr);
