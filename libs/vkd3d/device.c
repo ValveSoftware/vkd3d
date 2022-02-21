@@ -3556,6 +3556,127 @@ static void STDMETHODCALLTYPE d3d12_device_CreateSampler(ID3D12Device *iface,
     d3d12_desc_write_atomic(d3d12_desc_from_cpu_handle(descriptor), &tmp, device);
 }
 
+static void flush_desc_writes(struct d3d12_desc_copy_location locations[][VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE],
+        struct d3d12_desc_copy_info *infos, struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device)
+{
+    enum vkd3d_vk_descriptor_set_index set;
+    for (set = 0; set < VKD3D_SET_INDEX_COUNT; ++set)
+    {
+        if (!infos[set].count)
+            continue;
+        d3d12_desc_copy_vk_heap_range(locations[set], &infos[set], descriptor_heap, set, device);
+        infos[set].count = 0;
+        infos[set].uav_counter = false;
+    }
+}
+
+static void d3d12_desc_buffered_copy_atomic(struct d3d12_desc *dst, const struct d3d12_desc *src,
+        struct d3d12_desc_copy_location locations[][VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE],
+        struct d3d12_desc_copy_info *infos, struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device)
+{
+    struct d3d12_desc_copy_location *location;
+    enum vkd3d_vk_descriptor_set_index set;
+    struct vkd3d_mutex *mutex;
+
+    mutex = d3d12_device_get_descriptor_mutex(device, src);
+    vkd3d_mutex_lock(mutex);
+
+    if (src->magic == VKD3D_DESCRIPTOR_MAGIC_FREE)
+    {
+        /* Source must be unlocked first, and therefore can't be used as a null source. */
+        static const struct d3d12_desc null = {0};
+        vkd3d_mutex_unlock(mutex);
+        d3d12_desc_write_atomic(dst, &null, device);
+        return;
+    }
+
+    set = vkd3d_vk_descriptor_set_index_from_vk_descriptor_type(src->vk_descriptor_type);
+    location = &locations[set][infos[set].count++];
+
+    location->src = *src;
+
+    if (location->src.magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
+        vkd3d_view_incref(location->src.u.view);
+
+    vkd3d_mutex_unlock(mutex);
+
+    infos[set].uav_counter |= (location->src.magic == VKD3D_DESCRIPTOR_MAGIC_UAV)
+            & !!location->src.u.view->vk_counter_view;
+    location->dst = dst;
+
+    if (infos[set].count == ARRAY_SIZE(locations[0]))
+    {
+        d3d12_desc_copy_vk_heap_range(locations[set], &infos[set], descriptor_heap, set, device);
+        infos[set].count = 0;
+        infos[set].uav_counter = false;
+    }
+}
+
+/* Some games, e.g. Control, copy a large number of descriptors per frame, so the
+ * speed of this function is critical. */
+static void d3d12_device_vk_heaps_copy_descriptors(struct d3d12_device *device,
+        UINT dst_descriptor_range_count, const D3D12_CPU_DESCRIPTOR_HANDLE *dst_descriptor_range_offsets,
+        const UINT *dst_descriptor_range_sizes,
+        UINT src_descriptor_range_count, const D3D12_CPU_DESCRIPTOR_HANDLE *src_descriptor_range_offsets,
+        const UINT *src_descriptor_range_sizes)
+{
+    struct d3d12_desc_copy_location locations[VKD3D_SET_INDEX_COUNT][VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
+    unsigned int dst_range_idx, dst_idx, src_range_idx, src_idx;
+    /* The locations array is relatively large, and often mostly empty. Keeping these
+     * values together in a separate array will likely result in fewer cache misses. */
+    struct d3d12_desc_copy_info infos[VKD3D_SET_INDEX_COUNT];
+    struct d3d12_descriptor_heap *descriptor_heap = NULL;
+    const struct d3d12_desc *src, *heap_base, *heap_end;
+    unsigned int dst_range_size, src_range_size;
+    struct d3d12_desc *dst;
+
+    descriptor_heap = vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&device->gpu_descriptor_allocator,
+            d3d12_desc_from_cpu_handle(dst_descriptor_range_offsets[0]));
+    heap_base = (const struct d3d12_desc *)descriptor_heap->descriptors;
+    heap_end = heap_base + descriptor_heap->desc.NumDescriptors;
+
+    memset(infos, 0, sizeof(infos));
+    dst_range_idx = dst_idx = 0;
+    src_range_idx = src_idx = 0;
+    while (dst_range_idx < dst_descriptor_range_count && src_range_idx < src_descriptor_range_count)
+    {
+        dst_range_size = dst_descriptor_range_sizes ? dst_descriptor_range_sizes[dst_range_idx] : 1;
+        src_range_size = src_descriptor_range_sizes ? src_descriptor_range_sizes[src_range_idx] : 1;
+
+        dst = d3d12_desc_from_cpu_handle(dst_descriptor_range_offsets[dst_range_idx]);
+        src = d3d12_desc_from_cpu_handle(src_descriptor_range_offsets[src_range_idx]);
+
+        if (dst < heap_base || dst >= heap_end)
+        {
+            flush_desc_writes(locations, infos, descriptor_heap, device);
+            descriptor_heap = vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&device->gpu_descriptor_allocator,
+                    dst);
+            heap_base = (const struct d3d12_desc *)descriptor_heap->descriptors;
+            heap_end = heap_base + descriptor_heap->desc.NumDescriptors;
+        }
+
+        for (; dst_idx < dst_range_size && src_idx < src_range_size; src_idx++, dst_idx++)
+        {
+            d3d12_desc_buffered_copy_atomic(&dst[dst_idx], &src[src_idx], locations, infos, descriptor_heap, device);
+        }
+
+        if (dst_idx >= dst_range_size)
+        {
+            ++dst_range_idx;
+            dst_idx = 0;
+        }
+        if (src_idx >= src_range_size)
+        {
+            ++src_range_idx;
+            src_idx = 0;
+        }
+    }
+
+    flush_desc_writes(locations, infos, descriptor_heap, device);
+}
+
+#define VKD3D_DESCRIPTOR_OPTIMISED_COPY_MIN_COUNT 8
+
 static void STDMETHODCALLTYPE d3d12_device_CopyDescriptors(ID3D12Device *iface,
         UINT dst_descriptor_range_count, const D3D12_CPU_DESCRIPTOR_HANDLE *dst_descriptor_range_offsets,
         const UINT *dst_descriptor_range_sizes,
@@ -3581,6 +3702,18 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptors(ID3D12Device *iface,
             && descriptor_heap_type != D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
     {
         FIXME("Unhandled descriptor heap type %#x.\n", descriptor_heap_type);
+        return;
+    }
+
+    if (!dst_descriptor_range_count)
+        return;
+
+    if (device->use_vk_heaps && (dst_descriptor_range_count > 1 || (dst_descriptor_range_sizes
+            && dst_descriptor_range_sizes[0] >= VKD3D_DESCRIPTOR_OPTIMISED_COPY_MIN_COUNT)))
+    {
+        d3d12_device_vk_heaps_copy_descriptors(device, dst_descriptor_range_count, dst_descriptor_range_offsets,
+                dst_descriptor_range_sizes, src_descriptor_range_count, src_descriptor_range_offsets,
+                src_descriptor_range_sizes);
         return;
     }
 
@@ -3619,6 +3752,17 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device *i
             "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
             iface, descriptor_count, dst_descriptor_range_offset.ptr, src_descriptor_range_offset.ptr,
             descriptor_heap_type);
+
+    if (descriptor_count >= VKD3D_DESCRIPTOR_OPTIMISED_COPY_MIN_COUNT)
+    {
+        struct d3d12_device *device = impl_from_ID3D12Device(iface);
+        if (device->use_vk_heaps)
+        {
+            d3d12_device_vk_heaps_copy_descriptors(device, 1, &dst_descriptor_range_offset,
+                    &descriptor_count, 1, &src_descriptor_range_offset, &descriptor_count);
+            return;
+        }
+    }
 
     d3d12_device_CopyDescriptors(iface, 1, &dst_descriptor_range_offset, &descriptor_count,
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);

@@ -805,11 +805,15 @@ struct vkd3d_vk_descriptor_heap_layout
     VkDescriptorSetLayout vk_set_layout;
 };
 
+#define VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE 64
+
 struct d3d12_descriptor_heap_vk_set
 {
     VkDescriptorSet vk_set;
-    VkDescriptorImageInfo vk_image_info;
-    VkWriteDescriptorSet vk_descriptor_write;
+    VkDescriptorBufferInfo vk_buffer_infos[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
+    VkBufferView vk_buffer_views[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
+    VkDescriptorImageInfo vk_image_infos[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
+    VkWriteDescriptorSet vk_descriptor_writes[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
 };
 
 /* ID3D12DescriptorHeap */
@@ -834,6 +838,22 @@ struct d3d12_descriptor_heap
 
 HRESULT d3d12_descriptor_heap_create(struct d3d12_device *device,
         const D3D12_DESCRIPTOR_HEAP_DESC *desc, struct d3d12_descriptor_heap **descriptor_heap);
+
+struct d3d12_desc_copy_location
+{
+    struct d3d12_desc src;
+    struct d3d12_desc *dst;
+};
+
+struct d3d12_desc_copy_info
+{
+    unsigned int count;
+    bool uav_counter;
+};
+
+void d3d12_desc_copy_vk_heap_range(struct d3d12_desc_copy_location *locations, const struct d3d12_desc_copy_info *info,
+        struct d3d12_descriptor_heap *descriptor_heap, enum vkd3d_vk_descriptor_set_index set,
+        struct d3d12_device *device);
 
 /* ID3D12QueryHeap */
 struct d3d12_query_heap
