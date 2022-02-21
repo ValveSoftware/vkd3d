@@ -3596,12 +3596,12 @@ static void d3d12_desc_buffered_copy_atomic(struct d3d12_desc *dst, const struct
     location->src = *src;
 
     if (location->src.magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
-        vkd3d_view_incref(location->src.u.view);
+        vkd3d_view_incref(location->src.u.view_info.view);
 
     vkd3d_mutex_unlock(mutex);
 
     infos[set].uav_counter |= (location->src.magic == VKD3D_DESCRIPTOR_MAGIC_UAV)
-            & !!location->src.u.view->vk_counter_view;
+            & !!location->src.u.view_info.view->vk_counter_view;
     location->dst = dst;
 
     if (infos[set].count == ARRAY_SIZE(locations[0]))
@@ -3657,6 +3657,13 @@ static void d3d12_device_vk_heaps_copy_descriptors(struct d3d12_device *device,
 
         for (; dst_idx < dst_range_size && src_idx < src_range_size; src_idx++, dst_idx++)
         {
+            /* We don't need to lock either descriptor for the identity check. The descriptor
+             * mutex is only intended to prevent use-after-free of the vkd3d_view caused by a
+             * race condition in the calling app. It is unnecessary to protect this test as it's
+             * the app's race condition, not ours. */
+            if (dst[dst_idx].magic == src[src_idx].magic && (dst[dst_idx].magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
+                    && dst[dst_idx].u.view_info.written_serial_id == src[src_idx].u.view_info.view->serial_id)
+                continue;
             d3d12_desc_buffered_copy_atomic(&dst[dst_idx], &src[src_idx], locations, infos, descriptor_heap, device);
         }
 

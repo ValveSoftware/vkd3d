@@ -2655,7 +2655,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
         unsigned int index, bool use_array)
 {
     uint32_t descriptor_range_magic = range->descriptor_magic;
-    const struct vkd3d_view *view = descriptor->u.view;
+    const struct vkd3d_view *view = descriptor->u.view_info.view;
     uint32_t vk_binding = range->binding;
     uint32_t set = range->set;
 
@@ -2793,7 +2793,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
                             && state->uav_counters.bindings[k].register_index == register_idx)
                     {
                         VkBufferView vk_counter_view = descriptor->magic == VKD3D_DESCRIPTOR_MAGIC_UAV
-                                ? descriptor->u.view->vk_counter_view : VK_NULL_HANDLE;
+                                ? descriptor->u.view_info.view->vk_counter_view : VK_NULL_HANDLE;
                         if (bindings->vk_uav_counter_views[k] != vk_counter_view)
                             bindings->uav_counters_dirty = true;
                         bindings->vk_uav_counter_views[k] = vk_counter_view;
@@ -5252,7 +5252,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view;
+    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view_info.view;
     memcpy(colour.uint32, values, sizeof(colour.uint32));
 
     if (view->format->type != VKD3D_FORMAT_TYPE_UINT)
@@ -5311,7 +5311,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewFloat(I
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view;
+    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view_info.view;
     memcpy(colour.float32, values, sizeof(colour.float32));
 
     d3d12_command_list_clear_uav(list, resource_impl, view, &colour, rect_count, rects);

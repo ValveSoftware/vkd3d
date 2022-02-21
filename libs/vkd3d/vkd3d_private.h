@@ -67,6 +67,8 @@
  * this number to prevent excessive pool memory use. */
 #define VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE (16 * 1024u)
 
+extern LONG64 object_global_serial_id;
+
 struct d3d12_command_list;
 struct d3d12_device;
 struct d3d12_resource;
@@ -649,6 +651,7 @@ struct vkd3d_view
 {
     LONG refcount;
     enum vkd3d_view_type type;
+    uint64_t serial_id;
     union
     {
         VkBufferView vk_buffer_view;
@@ -695,6 +698,12 @@ bool vkd3d_create_buffer_view(struct d3d12_device *device, VkBuffer vk_buffer, c
 bool vkd3d_create_texture_view(struct d3d12_device *device, VkImage vk_image,
         const struct vkd3d_texture_view_desc *desc, struct vkd3d_view **view);
 
+struct vkd3d_view_info
+{
+    uint64_t written_serial_id;
+    struct vkd3d_view *view;
+};
+
 struct d3d12_desc
 {
     uint32_t magic;
@@ -702,7 +711,7 @@ struct d3d12_desc
     union
     {
         VkDescriptorBufferInfo vk_cbv_info;
-        struct vkd3d_view *view;
+        struct vkd3d_view_info view_info;
     } u;
 };
 

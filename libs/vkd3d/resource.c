@@ -22,6 +22,8 @@
 #define VKD3D_NULL_BUFFER_SIZE 16
 #define VKD3D_NULL_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
+LONG64 object_global_serial_id;
+
 static inline bool is_cpu_accessible_heap(const D3D12_HEAP_PROPERTIES *properties)
 {
     if (properties->Type == D3D12_HEAP_TYPE_DEFAULT)
@@ -2085,6 +2087,7 @@ static struct vkd3d_view *vkd3d_view_create(enum vkd3d_view_type type)
     {
         view->refcount = 1;
         view->type = type;
+        view->serial_id = InterlockedIncrement64(&object_global_serial_id);
         view->vk_counter_view = VK_NULL_HANDLE;
     }
     return view;
@@ -2149,7 +2152,7 @@ static void d3d12_descriptor_heap_write_vk_descriptor_range(struct d3d12_descrip
             {
                 descriptor_set->vk_descriptor_writes[write_index].pImageInfo = &descriptor_set->vk_image_infos[info_index];
                 for (i = 0; i < descriptor_set->vk_descriptor_writes[write_index].descriptorCount; ++i, ++info_index)
-                    descriptor_set->vk_image_infos[info_index].imageView = locations[info_index].src.u.view->u.vk_image_view;
+                    descriptor_set->vk_image_infos[info_index].imageView = locations[info_index].src.u.view_info.view->u.vk_image_view;
             }
             break;
         case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
@@ -2158,7 +2161,7 @@ static void d3d12_descriptor_heap_write_vk_descriptor_range(struct d3d12_descrip
             {
                 descriptor_set->vk_descriptor_writes[write_index].pTexelBufferView = &descriptor_set->vk_buffer_views[info_index];
                 for (i = 0; i < descriptor_set->vk_descriptor_writes[write_index].descriptorCount; ++i, ++info_index)
-                    descriptor_set->vk_buffer_views[info_index] = locations[info_index].src.u.view->u.vk_buffer_view;
+                    descriptor_set->vk_buffer_views[info_index] = locations[info_index].src.u.view_info.view->u.vk_buffer_view;
             }
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLER:
@@ -2166,7 +2169,7 @@ static void d3d12_descriptor_heap_write_vk_descriptor_range(struct d3d12_descrip
             {
                 descriptor_set->vk_descriptor_writes[write_index].pImageInfo = &descriptor_set->vk_image_infos[info_index];
                 for (i = 0; i < descriptor_set->vk_descriptor_writes[write_index].descriptorCount; ++i, ++info_index)
-                    descriptor_set->vk_image_infos[info_index].sampler = locations[info_index].src.u.view->u.vk_sampler;
+                    descriptor_set->vk_image_infos[info_index].sampler = locations[info_index].src.u.view_info.view->u.vk_sampler;
             }
             break;
         default:
@@ -2201,14 +2204,14 @@ static void d3d12_desc_write_vk_heap(const struct d3d12_desc *dst, const struct 
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
         case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-            descriptor_set->vk_image_infos[0].imageView = src->u.view->u.vk_image_view;
+            descriptor_set->vk_image_infos[0].imageView = src->u.view_info.view->u.vk_image_view;
             break;
         case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
         case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-            descriptor_set->vk_descriptor_writes[0].pTexelBufferView = &src->u.view->u.vk_buffer_view;
+            descriptor_set->vk_descriptor_writes[0].pTexelBufferView = &src->u.view_info.view->u.vk_buffer_view;
             break;
         case VK_DESCRIPTOR_TYPE_SAMPLER:
-            descriptor_set->vk_image_infos[0].sampler = src->u.view->u.vk_sampler;
+            descriptor_set->vk_image_infos[0].sampler = src->u.view_info.view->u.vk_sampler;
             break;
         default:
             ERR("Unhandled descriptor type %#x.\n", src->vk_descriptor_type);
@@ -2216,13 +2219,13 @@ static void d3d12_desc_write_vk_heap(const struct d3d12_desc *dst, const struct 
     }
     VK_CALL(vkUpdateDescriptorSets(device->vk_device, 1, descriptor_set->vk_descriptor_writes, 0, NULL));
 
-    if (src->magic == VKD3D_DESCRIPTOR_MAGIC_UAV && src->u.view->vk_counter_view)
+    if (src->magic == VKD3D_DESCRIPTOR_MAGIC_UAV && src->u.view_info.view->vk_counter_view)
     {
         descriptor_set = &descriptor_heap->vk_descriptor_sets[VKD3D_SET_INDEX_UAV_COUNTER];
         descriptor_set->vk_descriptor_writes[0].dstArrayElement = dst
             - (const struct d3d12_desc *)descriptor_heap->descriptors;
         descriptor_set->vk_descriptor_writes[0].descriptorCount = 1;
-        descriptor_set->vk_descriptor_writes[0].pTexelBufferView = &src->u.view->vk_counter_view;
+        descriptor_set->vk_descriptor_writes[0].pTexelBufferView = &src->u.view_info.view->vk_counter_view;
         VK_CALL(vkUpdateDescriptorSets(device->vk_device, 1, descriptor_set->vk_descriptor_writes, 0, NULL));
     }
 
@@ -2237,14 +2240,14 @@ static void d3d12_desc_write_atomic_d3d12_only(struct d3d12_desc *dst, const str
     mutex = d3d12_device_get_descriptor_mutex(device, dst);
     vkd3d_mutex_lock(mutex);
 
-    if (!(dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW) || InterlockedDecrement(&dst->u.view->refcount))
+    if (!(dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW) || InterlockedDecrement(&dst->u.view_info.view->refcount))
     {
         *dst = *src;
         vkd3d_mutex_unlock(mutex);
         return;
     }
 
-    defunct_view = dst->u.view;
+    defunct_view = dst->u.view_info.view;
     *dst = *src;
     vkd3d_mutex_unlock(mutex);
 
@@ -2263,8 +2266,8 @@ void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *sr
 
     /* Nothing to do for VKD3D_DESCRIPTOR_MAGIC_CBV. */
     if ((dst->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
-            && !InterlockedDecrement(&dst->u.view->refcount))
-        defunct_view = dst->u.view;
+            && !InterlockedDecrement(&dst->u.view_info.view->refcount))
+        defunct_view = dst->u.view_info.view;
 
     *dst = *src;
 
@@ -2321,9 +2324,9 @@ void d3d12_desc_copy_vk_heap_range(struct d3d12_desc_copy_location *locations, c
 
     for (i = 0, write_count = 0; i < info->count; ++i)
     {
-        if (!locations[i].src.u.view->vk_counter_view)
+        if (!locations[i].src.u.view_info.view->vk_counter_view)
             continue;
-        descriptor_set->vk_buffer_views[write_count] = locations[i].src.u.view->vk_counter_view;
+        descriptor_set->vk_buffer_views[write_count] = locations[i].src.u.view_info.view->vk_counter_view;
         descriptor_set->vk_descriptor_writes[write_count].pTexelBufferView = &descriptor_set->vk_buffer_views[write_count];
         descriptor_set->vk_descriptor_writes[write_count].dstArrayElement = locations[i].dst
                 - (const struct d3d12_desc *)descriptor_heap->descriptors;
@@ -2349,7 +2352,7 @@ void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src,
     vkd3d_mutex_lock(mutex);
 
     if (src->magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
-        vkd3d_view_incref(src->u.view);
+        vkd3d_view_incref(src->u.view_info.view);
 
     tmp = *src;
 
@@ -2820,7 +2823,8 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
             {
                 descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_SRV;
                 descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-                descriptor->u.view = view;
+                descriptor->u.view_info.view = view;
+                descriptor->u.view_info.written_serial_id = view->serial_id;
             }
             return;
 
@@ -2856,7 +2860,8 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_SRV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 }
 
 static void vkd3d_create_buffer_srv(struct d3d12_desc *descriptor,
@@ -2886,7 +2891,8 @@ static void vkd3d_create_buffer_srv(struct d3d12_desc *descriptor,
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_SRV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 }
 
 static VkImageAspectFlags vk_image_aspect_flags_from_d3d12_plane_slice(const struct vkd3d_format *format,
@@ -3016,7 +3022,8 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_SRV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 }
 
 static unsigned int vkd3d_view_flags_from_d3d12_buffer_uav_flags(D3D12_BUFFER_UAV_FLAGS flags)
@@ -3053,7 +3060,8 @@ static void vkd3d_create_null_uav(struct d3d12_desc *descriptor,
             {
                 descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_UAV;
                 descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-                descriptor->u.view = view;
+                descriptor->u.view_info.view = view;
+                descriptor->u.view_info.written_serial_id = view->serial_id;
             }
             return;
 
@@ -3089,7 +3097,8 @@ static void vkd3d_create_null_uav(struct d3d12_desc *descriptor,
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_UAV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 }
 
 static void vkd3d_create_buffer_uav(struct d3d12_desc *descriptor, struct d3d12_device *device,
@@ -3119,7 +3128,8 @@ static void vkd3d_create_buffer_uav(struct d3d12_desc *descriptor, struct d3d12_
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_UAV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 
     if (counter_resource)
     {
@@ -3194,7 +3204,8 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_UAV;
     descriptor->vk_descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descriptor->u.view = view;
+    descriptor->u.view_info.view = view;
+    descriptor->u.view_info.written_serial_id = view->serial_id;
 }
 
 void d3d12_desc_create_uav(struct d3d12_desc *descriptor, struct d3d12_device *device,
@@ -3356,7 +3367,8 @@ void d3d12_desc_create_sampler(struct d3d12_desc *sampler,
 
     sampler->magic = VKD3D_DESCRIPTOR_MAGIC_SAMPLER;
     sampler->vk_descriptor_type = VK_DESCRIPTOR_TYPE_SAMPLER;
-    sampler->u.view = view;
+    sampler->u.view_info.view = view;
+    sampler->u.view_info.written_serial_id = view->serial_id;
 }
 
 HRESULT vkd3d_create_static_sampler(struct d3d12_device *device,
@@ -3916,12 +3928,11 @@ static HRESULT d3d12_descriptor_heap_vk_descriptor_sets_init(struct d3d12_descri
 static HRESULT d3d12_descriptor_heap_init(struct d3d12_descriptor_heap *descriptor_heap,
         struct d3d12_device *device, const D3D12_DESCRIPTOR_HEAP_DESC *desc)
 {
-    static LONG64 serial_id;
     HRESULT hr;
 
     descriptor_heap->ID3D12DescriptorHeap_iface.lpVtbl = &d3d12_descriptor_heap_vtbl;
     descriptor_heap->refcount = 1;
-    descriptor_heap->serial_id = InterlockedIncrement64(&serial_id);
+    descriptor_heap->serial_id = InterlockedIncrement64(&object_global_serial_id);
 
     descriptor_heap->desc = *desc;
 
