@@ -142,7 +142,7 @@ dnl Makefiles
 case $host_os in
   mingw32*)
       AC_SUBST([DEMO_LIBS],["-ld3d12 -ldxgi -lgdi32"])
-      AC_SUBST([DEMO_CFLAGS],[""])
+      AC_SUBST([DEMO_CFLAGS],["-municode"])
       ;;
   *) AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],
       [AC_MSG_ERROR([libxcb is required for demos.])])
