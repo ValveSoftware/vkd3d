@@ -139,8 +139,17 @@ VKD3D_CHECK_FUNC([HAVE_SYNC_ADD_AND_FETCH], [__sync_add_and_fetch], [__sync_add_
 VKD3D_CHECK_FUNC([HAVE_SYNC_SUB_AND_FETCH], [__sync_sub_and_fetch], [__sync_sub_and_fetch((int *)0, 0)])
 
 dnl Makefiles
-AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],
+case $host_os in
+  mingw32*)
+      AC_SUBST([DEMO_LIBS],["-ld3d12 -ldxgi -lgdi32"])
+      AC_SUBST([DEMO_CFLAGS],[""])
+      ;;
+  *) AS_IF([test "x$enable_demos" = "xyes" -a "x$HAVE_XCB" != "xyes"],
       [AC_MSG_ERROR([libxcb is required for demos.])])
+      AC_SUBST([DEMO_LIBS],[$XCB_LIBS])
+      AC_SUBST([DEMO_CFLAGS],[$XCB_CFLAGS])
+      ;;
+esac
 AM_CONDITIONAL([BUILD_DEMOS], [test "x$enable_demos" = "xyes"])
 AM_CONDITIONAL([BUILD_DOC], [test $DX_FLAG_doc = 1])
 AM_CONDITIONAL([BUILD_TESTS], [test "x$enable_tests" != "xno"])

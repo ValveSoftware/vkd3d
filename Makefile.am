@@ -339,8 +339,8 @@ XFAIL_TESTS = \
 endif
 
 if BUILD_DEMOS
-DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @XCB_LIBS@ @VULKAN_LIBS@
-DEMOS_CFLAGS = $(AM_CFLAGS) @XCB_CFLAGS@
+DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @DEMO_LIBS@ @VULKAN_LIBS@
+DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@
 bin_PROGRAMS += $(vkd3d_demos)
 
 demos_vkd3d_gears_SOURCES = demos/gears.c
