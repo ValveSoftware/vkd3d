@@ -1014,6 +1014,27 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
     return expr;
 }
 
+static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_type *type = instr->data_type;
+    struct vkd3d_string_buffer *string;
+
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            break;
+
+        default:
+            if ((string = hlsl_type_to_string(ctx, type)))
+                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Expression type '%s' is not integer.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+            break;
+    }
+}
+
 static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
@@ -1061,29 +1082,8 @@ static struct hlsl_ir_expr *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
-    if (arg1->data_type->base_type != HLSL_TYPE_INT && arg1->data_type->base_type != HLSL_TYPE_UINT
-            && arg1->data_type->base_type != HLSL_TYPE_BOOL)
-    {
-        struct vkd3d_string_buffer *type_str = hlsl_type_to_string(ctx, arg1->data_type);
-
-        if (type_str)
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "The first argument has type '%s', which is not integer.", type_str->buffer);
-        hlsl_release_string_buffer(ctx, type_str);
-        return NULL;
-    }
-
-    if (arg2->data_type->base_type != HLSL_TYPE_INT && arg2->data_type->base_type != HLSL_TYPE_UINT
-            && arg2->data_type->base_type != HLSL_TYPE_BOOL)
-    {
-        struct vkd3d_string_buffer *type_str = hlsl_type_to_string(ctx, arg2->data_type);
-
-        if (type_str)
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "The second argument has type '%s', which is not integer.", type_str->buffer);
-        hlsl_release_string_buffer(ctx, type_str);
-        return NULL;
-    }
+    check_integer_type(ctx, arg1);
+    check_integer_type(ctx, arg2);
 
     return add_binary_arithmetic_expr(ctx, instrs, op, arg1, arg2, loc);
 }
