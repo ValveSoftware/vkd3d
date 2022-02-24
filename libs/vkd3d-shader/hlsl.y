@@ -1051,6 +1051,21 @@ static struct hlsl_ir_expr *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct 
     return add_unary_arithmetic_expr(ctx, instrs, op, arg, loc);
 }
 
+static struct hlsl_ir_expr *add_unary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *bool_type;
+
+    bool_type = hlsl_get_numeric_type(ctx, arg->data_type->type, HLSL_TYPE_BOOL,
+            arg->data_type->dimx, arg->data_type->dimy);
+
+    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg, bool_type, loc)))
+        return NULL;
+
+    return add_expr(ctx, instrs, op, args, bool_type, loc);
+}
+
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
@@ -3608,7 +3623,7 @@ unary_expr:
         }
     | '!' unary_expr
         {
-            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, node_from_list($2), &@1);
+            add_unary_logical_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, node_from_list($2), &@1);
             $$ = $2;
         }
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
