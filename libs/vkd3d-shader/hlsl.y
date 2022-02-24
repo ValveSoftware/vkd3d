@@ -1043,6 +1043,14 @@ static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
     return add_expr(ctx, instrs, op, args, arg->data_type, loc);
 }
 
+static struct hlsl_ir_expr *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
+{
+    check_integer_type(ctx, arg);
+
+    return add_unary_arithmetic_expr(ctx, instrs, op, arg, loc);
+}
+
 static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
@@ -3595,7 +3603,7 @@ unary_expr:
         }
     | '~' unary_expr
         {
-            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_BIT_NOT, node_from_list($2), &@1);
+            add_unary_bitwise_expr(ctx, $2, HLSL_OP1_BIT_NOT, node_from_list($2), &@1);
             $$ = $2;
         }
     | '!' unary_expr
