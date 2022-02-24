@@ -1136,6 +1136,41 @@ static struct list *add_binary_comparison_expr_merge(struct hlsl_ctx *ctx, struc
     return list1;
 }
 
+static struct hlsl_ir_expr *add_binary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *common_type;
+    enum hlsl_type_class type;
+    unsigned int dimx, dimy;
+
+    if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
+        return NULL;
+
+    common_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
+
+    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
+        return NULL;
+
+    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
+        return NULL;
+
+    return add_expr(ctx, instrs, op, args, common_type, loc);
+}
+
+static struct list *add_binary_logical_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
+
+    list_move_tail(list1, list2);
+    vkd3d_free(list2);
+    add_binary_logical_expr(ctx, list1, op, arg1, arg2, loc);
+
+    return list1;
+}
+
 static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
 {
     static const enum hlsl_ir_expr_op ops[] =
@@ -3664,7 +3699,7 @@ logicand_expr:
       bitor_expr
     | logicand_expr OP_AND bitor_expr
         {
-            hlsl_fixme(ctx, &@$, "Logical AND.");
+            $$ = add_binary_logical_expr_merge(ctx, $1, $3, HLSL_OP2_LOGIC_AND, &@2);
         }
 
 logicor_expr:
