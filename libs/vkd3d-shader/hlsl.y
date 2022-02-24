@@ -3684,7 +3684,7 @@ shift_expr:
         }
     | shift_expr OP_RIGHTSHIFT add_expr
         {
-            hlsl_fixme(ctx, &@$, "Right shift.");
+            $$ = add_binary_shift_expr_merge(ctx, $1, $3, HLSL_OP2_RSHIFT, &@2);
         }
 
 relational_expr:
