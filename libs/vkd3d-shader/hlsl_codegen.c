@@ -349,15 +349,16 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
     }
 }
 
-static struct hlsl_ir_node *copy_propagation_compute_replacement(const struct copy_propagation_state *state,
-        const struct hlsl_deref *deref, unsigned int count, unsigned int *swizzle)
+static struct hlsl_ir_node *copy_propagation_compute_replacement(struct hlsl_ctx *ctx,
+        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
+        unsigned int count, unsigned int *swizzle)
 {
     const struct hlsl_ir_var *var = deref->var;
     struct copy_propagation_var_def *var_def;
     struct hlsl_ir_node *node = NULL;
     unsigned int offset, i;
 
-    if (!hlsl_offset_from_deref(deref, &offset))
+    if (!hlsl_offset_from_deref(ctx, deref, &offset))
         return NULL;
 
     if (!(var_def = copy_propagation_get_var_def(state, var)))
@@ -414,7 +415,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             return false;
     }
 
-    if (!(new_node = copy_propagation_compute_replacement(state, &load->src, dimx, &swizzle)))
+    if (!(new_node = copy_propagation_compute_replacement(ctx, state, &load->src, dimx, &swizzle)))
         return false;
 
     if (type->type != HLSL_CLASS_OBJECT)
@@ -435,7 +436,7 @@ static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
     struct hlsl_ir_node *node;
     unsigned int swizzle;
 
-    if (!(node = copy_propagation_compute_replacement(state, deref, 1, &swizzle)))
+    if (!(node = copy_propagation_compute_replacement(ctx, state, deref, 1, &swizzle)))
         return false;
 
     /* Only HLSL_IR_LOAD can produce an object. */
@@ -468,7 +469,7 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
     if (!(var_def = copy_propagation_create_var_def(ctx, state, var)))
         return;
 
-    if (hlsl_offset_from_deref(lhs, &offset))
+    if (hlsl_offset_from_deref(ctx, lhs, &offset))
     {
         unsigned int writemask = store->writemask;
 
@@ -1546,7 +1547,7 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-bool hlsl_offset_from_deref(const struct hlsl_deref *deref, unsigned int *offset)
+bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
 
@@ -1564,6 +1565,14 @@ bool hlsl_offset_from_deref(const struct hlsl_deref *deref, unsigned int *offset
         return false;
 
     *offset = hlsl_ir_constant(offset_node)->value[0].u;
+
+    if (*offset >= deref->var->data_type->reg_size)
+    {
+        hlsl_error(ctx, &deref->offset.node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+                "Dereference is out of bounds.");
+        return false;
+    }
+
     return true;
 }
 
@@ -1571,7 +1580,7 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
 {
     unsigned int offset;
 
-    if (hlsl_offset_from_deref(deref, &offset))
+    if (hlsl_offset_from_deref(ctx, deref, &offset))
         return offset;
 
     hlsl_fixme(ctx, &deref->offset.node->loc, "Dereference with non-constant offset of type %s.",
