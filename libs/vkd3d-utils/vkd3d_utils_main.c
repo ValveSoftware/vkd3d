@@ -160,6 +160,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     struct vkd3d_shader_hlsl_source_info hlsl_info;
     struct vkd3d_shader_compile_option options[1];
     struct vkd3d_shader_compile_info compile_info;
+    struct vkd3d_shader_compile_option *option;
     struct vkd3d_shader_code byte_code;
     const D3D_SHADER_MACRO *macro;
     char *messages;
@@ -215,7 +216,11 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     hlsl_info.secondary_code.size = secondary_data_size;
 
     if (!(flags & D3DCOMPILE_DEBUG))
-        options[compile_info.option_count++].name = VKD3D_SHADER_COMPILE_OPTION_STRIP_DEBUG;
+    {
+        option = &options[compile_info.option_count++];
+        option->name = VKD3D_SHADER_COMPILE_OPTION_STRIP_DEBUG;
+        option->value = true;
+    }
 
     ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);
     if (messages)
