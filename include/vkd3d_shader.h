@@ -1477,7 +1477,8 @@ VKD3D_SHADER_API const char *vkd3d_shader_get_version(unsigned int *major, unsig
 VKD3D_SHADER_API const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(unsigned int *count);
 /**
  * Returns the target types supported, with the given source type, by
- * vkd3d_shader_compile().
+ * vkd3d_shader_compile(). Future versions of the library may introduce
+ * additional target types; callers should ignore unrecognised target types.
  *
  * \param source_type Source type for which to enumerate supported target types.
  *
