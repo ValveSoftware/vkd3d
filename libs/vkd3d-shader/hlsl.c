@@ -902,7 +902,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
 
         case HLSL_CLASS_MATRIX:
             assert(type->base_type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->base_type], type->dimx, type->dimy);
+            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->base_type], type->dimy, type->dimx);
             return string;
 
         case HLSL_CLASS_ARRAY:
