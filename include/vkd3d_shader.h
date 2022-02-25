@@ -1461,7 +1461,8 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
 VKD3D_SHADER_API const char *vkd3d_shader_get_version(unsigned int *major, unsigned int *minor);
 /**
  * Returns the source types supported, with any target type, by
- * vkd3d_shader_compile().
+ * vkd3d_shader_compile(). Future versions of the library may introduce
+ * additional source types; callers should ignore unrecognised source types.
  *
  * Use vkd3d_shader_get_supported_target_types() to determine which target types
  * are supported for each source type.
