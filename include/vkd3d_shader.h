@@ -1822,6 +1822,10 @@ typedef struct vkd3d_shader_signature_element * (*PFN_vkd3d_shader_find_signatur
 /** Type of vkd3d_shader_free_shader_signature(). */
 typedef void (*PFN_vkd3d_shader_free_shader_signature)(struct vkd3d_shader_signature *signature);
 
+/** Type of vkd3d_shader_preprocess(). \since 1.3 */
+typedef void (*PFN_vkd3d_shader_preprocess)(struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, char **messages);
+
 #ifdef __cplusplus
 }
 #endif  /* __cplusplus */
