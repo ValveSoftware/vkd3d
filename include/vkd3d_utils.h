@@ -70,7 +70,7 @@ VKD3D_UTILS_API HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, c
         const char *target, UINT flags, UINT effect_flags, UINT secondary_flags,
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
         ID3DBlob **error_messages);
-VKD3D_UTILS_API HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob);
+VKD3D_UTILS_API HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob);
 VKD3D_UTILS_API HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename,
         const D3D_SHADER_MACRO *defines, ID3DInclude *include,
         ID3DBlob **shader, ID3DBlob **error_messages);

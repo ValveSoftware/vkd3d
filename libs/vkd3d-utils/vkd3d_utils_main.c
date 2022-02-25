@@ -471,7 +471,7 @@ void vkd3d_destroy_event(HANDLE event)
 
 #endif  /* _WIN32 */
 
-HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3D10Blob **blob)
+HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
 {
     HRESULT hr;
     void *data;

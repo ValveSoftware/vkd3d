@@ -66,7 +66,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         const char *profile, UINT flags, UINT effect_flags, UINT secondary_flags,
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
         ID3DBlob **error_messages);
-HRESULT WINAPI D3DCreateBlob(SIZE_T size, ID3D10Blob **blob);
+HRESULT WINAPI D3DCreateBlob(SIZE_T size, ID3DBlob **blob);
 HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename, const D3D_SHADER_MACRO *macros,
         ID3DInclude *include, ID3DBlob **shader, ID3DBlob **error_messages);
 
