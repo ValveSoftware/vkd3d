@@ -786,26 +786,26 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
 {
     int r;
 
-    if (t1->type != t2->type)
+    if ((r = vkd3d_u32_compare(t1->type, t2->type)))
     {
         if (!((t1->type == HLSL_CLASS_SCALAR && t2->type == HLSL_CLASS_VECTOR)
                 || (t1->type == HLSL_CLASS_VECTOR && t2->type == HLSL_CLASS_SCALAR)))
-            return t1->type - t2->type;
+            return r;
     }
-    if (t1->base_type != t2->base_type)
-        return t1->base_type - t2->base_type;
+    if ((r = vkd3d_u32_compare(t1->base_type, t2->base_type)))
+        return r;
     if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
     {
-        if (t1->sampler_dim != t2->sampler_dim)
-            return t1->sampler_dim - t2->sampler_dim;
+        if ((r = vkd3d_u32_compare(t1->sampler_dim, t2->sampler_dim)))
+            return r;
         if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
                 && (r = compare_param_hlsl_types(t1->e.resource_format, t2->e.resource_format)))
             return r;
     }
-    if (t1->dimx != t2->dimx)
-        return t1->dimx - t2->dimx;
-    if (t1->dimy != t2->dimy)
-        return t1->dimx - t2->dimx;
+    if ((r = vkd3d_u32_compare(t1->dimx, t2->dimx)))
+        return r;
+    if ((r = vkd3d_u32_compare(t1->dimy, t2->dimy)))
+        return r;
     if (t1->type == HLSL_CLASS_STRUCT)
     {
         struct list *t1cur, *t2cur;
@@ -830,8 +830,8 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     }
     if (t1->type == HLSL_CLASS_ARRAY)
     {
-        if (t1->e.array.elements_count != t2->e.array.elements_count)
-            return t1->e.array.elements_count - t2->e.array.elements_count;
+        if ((r = vkd3d_u32_compare(t1->e.array.elements_count, t2->e.array.elements_count)))
+            return r;
         return compare_param_hlsl_types(t1->e.array.type, t2->e.array.type);
     }
 

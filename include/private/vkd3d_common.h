@@ -158,6 +158,11 @@ static inline uint32_t vkd3d_make_u32(uint16_t low, uint16_t high)
     return low | ((uint32_t)high << 16);
 }
 
+static inline int vkd3d_u32_compare(uint32_t x, uint32_t y)
+{
+    return (x > y) - (x < y);
+}
+
 static inline int ascii_isupper(int c)
 {
     return 'A' <= c && c <= 'Z';
