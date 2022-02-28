@@ -1768,6 +1768,11 @@ static HRESULT create_shader_stage(struct d3d12_device *device,
     VkResult vr;
     int ret;
 
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_3},
+    };
+
     stage_desc->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stage_desc->pNext = NULL;
     stage_desc->flags = 0;
@@ -1785,8 +1790,8 @@ static HRESULT create_shader_stage(struct d3d12_device *device,
     compile_info.source.size = code->BytecodeLength;
     compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     compile_info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
-    compile_info.options = NULL;
-    compile_info.option_count = 0;
+    compile_info.options = options;
+    compile_info.option_count = ARRAY_SIZE(options);
     compile_info.log_level = VKD3D_SHADER_LOG_NONE;
     compile_info.source_name = NULL;
 
@@ -1814,14 +1819,19 @@ static int vkd3d_scan_dxbc(const D3D12_SHADER_BYTECODE *code,
 {
     struct vkd3d_shader_compile_info compile_info;
 
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_3},
+    };
+
     compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     compile_info.next = descriptor_info;
     compile_info.source.code = code->pShaderBytecode;
     compile_info.source.size = code->BytecodeLength;
     compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     compile_info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
-    compile_info.options = NULL;
-    compile_info.option_count = 0;
+    compile_info.options = options;
+    compile_info.option_count = ARRAY_SIZE(options);
     compile_info.log_level = VKD3D_SHADER_LOG_NONE;
     compile_info.source_name = NULL;
 

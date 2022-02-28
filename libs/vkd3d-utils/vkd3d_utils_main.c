@@ -158,7 +158,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
 {
     struct vkd3d_shader_preprocess_info preprocess_info;
     struct vkd3d_shader_hlsl_source_info hlsl_info;
-    struct vkd3d_shader_compile_option options[1];
+    struct vkd3d_shader_compile_option options[2];
     struct vkd3d_shader_compile_info compile_info;
     struct vkd3d_shader_compile_option *option;
     struct vkd3d_shader_code byte_code;
@@ -208,6 +208,10 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     if (messages_blob)
         *messages_blob = NULL;
 
+    option = &options[0];
+    option->name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
+    option->value = VKD3D_SHADER_API_VERSION_1_3;
+
     compile_info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     compile_info.next = &preprocess_info;
     compile_info.source.code = data;
@@ -215,7 +219,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
     compile_info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
     compile_info.options = options;
-    compile_info.option_count = 0;
+    compile_info.option_count = 1;
     compile_info.log_level = VKD3D_SHADER_LOG_INFO;
     compile_info.source_name = filename;
 
@@ -310,6 +314,11 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
     HRESULT hr;
     int ret;
 
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_3},
+    };
+
     TRACE("data %p, size %lu, filename %s, macros %p, include %p, preprocessed_blob %p, messages_blob %p.\n",
             data, size, debugstr_a(filename), macros, include, preprocessed_blob, messages_blob);
 
@@ -322,8 +331,8 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
     compile_info.source.size = size;
     compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
     compile_info.target_type = VKD3D_SHADER_TARGET_NONE;
-    compile_info.options = NULL;
-    compile_info.option_count = 0;
+    compile_info.options = options;
+    compile_info.option_count = ARRAY_SIZE(options);
     compile_info.log_level = VKD3D_SHADER_LOG_INFO;
     compile_info.source_name = filename;
 

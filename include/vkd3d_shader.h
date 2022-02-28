@@ -38,6 +38,15 @@ extern "C" {
  * compilation, transformation, and reflection of GPU shaders.
  */
 
+/** \since 1.3 */
+enum vkd3d_shader_api_version
+{
+    VKD3D_SHADER_API_VERSION_1_0,
+    VKD3D_SHADER_API_VERSION_1_1,
+    VKD3D_SHADER_API_VERSION_1_2,
+    VKD3D_SHADER_API_VERSION_1_3,
+};
+
 /** The type of a chained structure. */
 enum vkd3d_shader_structure_type
 {
@@ -115,6 +124,8 @@ enum vkd3d_shader_compile_option_name
     VKD3D_SHADER_COMPILE_OPTION_BUFFER_UAV  = 0x00000002,
     /** \a value is a member of enum vkd3d_shader_compile_option_formatting_flags. */
     VKD3D_SHADER_COMPILE_OPTION_FORMATTING  = 0x00000003,
+    /** \a value is a member of enum vkd3d_shader_api_version. \since 1.3 */
+    VKD3D_SHADER_COMPILE_OPTION_API_VERSION = 0x00000004,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };
