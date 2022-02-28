@@ -757,6 +757,12 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
         case VKD3D_DATA_MIXED:
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_MIXED;
             break;
+        case VKD3D_DATA_DOUBLE:
+            resource_data_type = VKD3D_SHADER_RESOURCE_DATA_DOUBLE;
+            break;
+        case VKD3D_DATA_CONTINUED:
+            resource_data_type = VKD3D_SHADER_RESOURCE_DATA_CONTINUED;
+            break;
         default:
             ERR("Invalid resource data type %#x.\n", semantic->resource_data_type[0]);
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;

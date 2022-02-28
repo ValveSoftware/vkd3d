@@ -1208,6 +1208,14 @@ enum vkd3d_shader_resource_data_type
     VKD3D_SHADER_RESOURCE_DATA_FLOAT     = 0x5,
     /** Undefined/type-less. \since 1.3 */
     VKD3D_SHADER_RESOURCE_DATA_MIXED     = 0x6,
+    /** IEEE double-precision floating-point. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_DOUBLE    = 0x7,
+    /** Continuation of the previous component. For example, 64-bit
+     * double-precision floating-point data may be returned as two 32-bit
+     * components, with the first component (containing the LSB) specified as
+     * VKD3D_SHADER_RESOURCE_DATA_DOUBLE, and the second component specified
+     * as VKD3D_SHADER_RESOURCE_DATA_CONTINUED. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_CONTINUED = 0x8,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_RESOURCE_DATA_TYPE),
 };
