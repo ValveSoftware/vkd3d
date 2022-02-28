@@ -1197,15 +1197,17 @@ enum vkd3d_shader_resource_type
 enum vkd3d_shader_resource_data_type
 {
     /** Unsigned normalized integer. */
-    VKD3D_SHADER_RESOURCE_DATA_UNORM = 0x1,
+    VKD3D_SHADER_RESOURCE_DATA_UNORM     = 0x1,
     /** Signed normalized integer. */
-    VKD3D_SHADER_RESOURCE_DATA_SNORM = 0x2,
+    VKD3D_SHADER_RESOURCE_DATA_SNORM     = 0x2,
     /** Signed integer. */
-    VKD3D_SHADER_RESOURCE_DATA_INT   = 0x3,
+    VKD3D_SHADER_RESOURCE_DATA_INT       = 0x3,
     /** Unsigned integer. */
-    VKD3D_SHADER_RESOURCE_DATA_UINT  = 0x4,
-    /** IEEE floating-point. */
-    VKD3D_SHADER_RESOURCE_DATA_FLOAT = 0x5,
+    VKD3D_SHADER_RESOURCE_DATA_UINT      = 0x4,
+    /** IEEE single-precision floating-point. */
+    VKD3D_SHADER_RESOURCE_DATA_FLOAT     = 0x5,
+    /** Undefined/type-less. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_MIXED     = 0x6,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_RESOURCE_DATA_TYPE),
 };

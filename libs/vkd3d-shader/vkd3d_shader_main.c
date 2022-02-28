@@ -477,6 +477,8 @@ struct vkd3d_shader_scan_context
     } *uav_ranges;
     size_t uav_ranges_size;
     size_t uav_range_count;
+
+    enum vkd3d_shader_api_version api_version;
 };
 
 static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
@@ -484,11 +486,22 @@ static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *con
         struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context)
 {
+    unsigned int i;
+
     memset(context, 0, sizeof(*context));
     context->scan_descriptor_info = scan_descriptor_info;
     context->message_context = message_context;
     context->location.source_name = compile_info->source_name;
     context->location.line = 2; /* Line 1 is the version token. */
+    context->api_version = VKD3D_SHADER_API_VERSION_1_2;
+
+    for (i = 0; i < compile_info->option_count; ++i)
+    {
+        const struct vkd3d_shader_compile_option *option = &compile_info->options[i];
+
+        if (option->name == VKD3D_SHADER_COMPILE_OPTION_API_VERSION)
+            context->api_version = option->value;
+    }
 }
 
 static void vkd3d_shader_scan_context_cleanup(struct vkd3d_shader_scan_context *context)
@@ -741,11 +754,23 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
         case VKD3D_DATA_FLOAT:
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
             break;
+        case VKD3D_DATA_MIXED:
+            resource_data_type = VKD3D_SHADER_RESOURCE_DATA_MIXED;
+            break;
         default:
             ERR("Invalid resource data type %#x.\n", semantic->resource_data_type[0]);
             resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
             break;
     }
+
+    if (context->api_version < VKD3D_SHADER_API_VERSION_1_3
+            && resource_data_type >= VKD3D_SHADER_RESOURCE_DATA_MIXED)
+    {
+        ERR("Invalid resource data type %#x for API version %#x.\n",
+                semantic->resource_data_type[0], context->api_version);
+        resource_data_type = VKD3D_SHADER_RESOURCE_DATA_FLOAT;
+    }
+
     vkd3d_shader_scan_resource_declaration(context, &semantic->resource,
             semantic->resource_type, resource_data_type);
 }
