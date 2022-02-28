@@ -847,8 +847,8 @@ static int compare_function_decl_rb(const void *key, const struct rb_entry *entr
     struct list *p1cur, *p2cur;
     int r;
 
-    if (params_count != decl_params_count)
-        return params_count - decl_params_count;
+    if ((r = vkd3d_u32_compare(params_count, decl_params_count)))
+        return r;
 
     p1cur = params ? list_head(params) : NULL;
     p2cur = decl->parameters ? list_head(decl->parameters) : NULL;
