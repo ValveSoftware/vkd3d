@@ -2046,9 +2046,10 @@ static int vkd3d_symbol_compare(const void *key, const struct rb_entry *entry)
 {
     const struct vkd3d_symbol *a = key;
     const struct vkd3d_symbol *b = RB_ENTRY_VALUE(entry, const struct vkd3d_symbol, entry);
+    int ret;
 
-    if (a->type != b->type)
-        return a->type - b->type;
+    if ((ret = vkd3d_u32_compare(a->type, b->type)))
+        return ret;
     return memcmp(&a->key, &b->key, sizeof(a->key));
 }
 
