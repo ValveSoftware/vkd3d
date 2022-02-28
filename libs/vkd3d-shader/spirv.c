@@ -511,11 +511,12 @@ static int vkd3d_spirv_declaration_compare(const void *key, const struct rb_entr
 {
     const struct vkd3d_spirv_declaration *a = key;
     const struct vkd3d_spirv_declaration *b = RB_ENTRY_VALUE(e, const struct vkd3d_spirv_declaration, entry);
+    int ret;
 
-    if (a->op != b->op)
-        return a->op - b->op;
-    if (a->parameter_count != b->parameter_count)
-        return a->parameter_count - b->parameter_count;
+    if ((ret = vkd3d_u32_compare(a->op, b->op)))
+        return ret;
+    if ((ret = vkd3d_u32_compare(a->parameter_count, b->parameter_count)))
+        return ret;
     assert(a->parameter_count <= ARRAY_SIZE(a->parameters));
     return memcmp(&a->parameters, &b->parameters, a->parameter_count * sizeof(*a->parameters));
 }
