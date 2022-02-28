@@ -1399,6 +1399,7 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 
     static const enum vkd3d_shader_target_type hlsl_types[] =
     {
+        VKD3D_SHADER_TARGET_D3D_BYTECODE,
         VKD3D_SHADER_TARGET_DXBC_TPF,
     };
 

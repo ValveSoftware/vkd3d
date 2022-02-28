@@ -97,6 +97,10 @@ target_type_info[] =
     {VKD3D_SHADER_TARGET_D3D_ASM,
         "d3d-asm", "A shader in Direct3D assembly form.\n",
         false},
+    {VKD3D_SHADER_TARGET_D3D_BYTECODE,
+        "d3dbc",        "Legacy Direct3D byte-code.\n"
+        "                This is the format used for Direct3D shader model 1, 2, and 3 shaders.\n",
+        true},
     {VKD3D_SHADER_TARGET_DXBC_TPF,
         "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
         "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",

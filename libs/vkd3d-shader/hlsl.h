@@ -711,7 +711,8 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var
 
 void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func);
 
-int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out);
+int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
 
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
 

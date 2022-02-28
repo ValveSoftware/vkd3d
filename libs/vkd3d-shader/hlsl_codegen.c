@@ -1611,7 +1611,8 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     return ret;
 }
 
-int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
+int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
+        enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
     struct hlsl_block *const body = &entry_func->body;
     struct hlsl_ir_var *var;
@@ -1697,8 +1698,16 @@ int hlsl_emit_dxbc(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     if (ctx->result)
         return ctx->result;
 
-    if (ctx->profile->major_version < 4)
-        return hlsl_sm1_write(ctx, entry_func, out);
-    else
-        return hlsl_sm4_write(ctx, entry_func, out);
+    switch (target_type)
+    {
+        case VKD3D_SHADER_TARGET_D3D_BYTECODE:
+            return hlsl_sm1_write(ctx, entry_func, out);
+
+        case VKD3D_SHADER_TARGET_DXBC_TPF:
+            return hlsl_sm4_write(ctx, entry_func, out);
+
+        default:
+            ERR("Unsupported shader target type %#x.\n", target_type);
+            return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
 }

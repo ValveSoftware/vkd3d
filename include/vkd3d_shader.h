@@ -582,6 +582,11 @@ enum vkd3d_shader_target_type
     VKD3D_SHADER_TARGET_SPIRV_TEXT,
     VKD3D_SHADER_TARGET_D3D_ASM,
     /**
+     * Legacy Direct3D byte-code. This is the format used for Direct3D shader
+     * model 1, 2, and 3 shaders.
+     */
+    VKD3D_SHADER_TARGET_D3D_BYTECODE,
+    /**
      * A 'Tokenized Program Format' shader embedded in a DXBC container. This is
      * the format used for Direct3D shader model 4 and 5 shaders.
      */

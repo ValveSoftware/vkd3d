@@ -1952,7 +1952,7 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
 }
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context)
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
     struct hlsl_ir_function_decl *entry_func;
@@ -1975,6 +1975,19 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     }
 
     vkd3d_shader_dump_shader(compile_info->source_type, profile->type, &compile_info->source);
+
+    if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE && profile->major_version > 3)
+    {
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "The '%s' target profile is incompatible with the 'd3dbc' target type.", profile->name);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+    else if (compile_info->target_type == VKD3D_SHADER_TARGET_DXBC_TPF && profile->major_version < 4)
+    {
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_HLSL_INCOMPATIBLE_PROFILE,
+                "The '%s' target profile is incompatible with the 'dxbc-tpf' target type.", profile->name);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
 
     if (!hlsl_ctx_init(&ctx, compile_info->source_name, profile, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -2009,7 +2022,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    ret = hlsl_emit_dxbc(&ctx, entry_func, dxbc);
+    ret = hlsl_emit_bytecode(&ctx, entry_func, compile_info->target_type, out);
 
     hlsl_ctx_cleanup(&ctx);
     return ret;
