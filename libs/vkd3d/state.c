@@ -821,13 +821,13 @@ static int compare_register_range(const void *a, const void *b)
     const struct d3d12_root_descriptor_table_range *range_a = a, *range_b = b;
     int ret;
 
-    if ((ret = range_a->type - range_b->type))
+    if ((ret = vkd3d_u32_compare(range_a->type, range_b->type)))
         return ret;
 
-    if ((ret = range_a->register_space - range_b->register_space))
+    if ((ret = vkd3d_u32_compare(range_a->register_space, range_b->register_space)))
         return ret;
 
-    return range_a->base_register_idx - range_b->base_register_idx;
+    return vkd3d_u32_compare(range_a->base_register_idx, range_b->base_register_idx);
 }
 
 static int compare_descriptor_range(const void *a, const void *b)
