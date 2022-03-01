@@ -765,12 +765,17 @@ static void shader_print_float_literal(struct vkd3d_d3d_asm_compiler *compiler,
 static void shader_print_double_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, double d, const char *suffix)
 {
+    const char *sign = "";
+
     if (isfinite(d) && signbit(d))
-        vkd3d_string_buffer_printf(&compiler->buffer, "%s-%s%.15e%s%s",
-                prefix, compiler->colours.literal, -d, compiler->colours.reset, suffix);
-    else
-        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%.15e%s%s",
-                prefix, compiler->colours.literal, d, compiler->colours.reset, suffix);
+    {
+        sign = "-";
+        d = -d;
+    }
+
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s", prefix, sign, compiler->colours.literal);
+    vkd3d_string_buffer_print_f64(&compiler->buffer, d);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s", compiler->colours.reset, suffix);
 }
 
 static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,

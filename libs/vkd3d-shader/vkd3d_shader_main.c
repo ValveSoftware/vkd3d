@@ -107,6 +107,21 @@ int vkd3d_string_buffer_print_f32(struct vkd3d_string_buffer *buffer, float f)
     return ret;
 }
 
+int vkd3d_string_buffer_print_f64(struct vkd3d_string_buffer *buffer, double d)
+{
+    unsigned int idx = buffer->content_size + 1;
+    int ret;
+
+    if (!(ret = vkd3d_string_buffer_printf(buffer, "%.16e", d)) && isfinite(d))
+    {
+        if (signbit(d))
+            ++idx;
+        buffer->buffer[idx] = '.';
+    }
+
+    return ret;
+}
+
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function)
 {
     vkd3d_shader_trace_text_(buffer->buffer, buffer->content_size, function);
