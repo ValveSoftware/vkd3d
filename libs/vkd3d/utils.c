@@ -717,7 +717,7 @@ const char *debug_vk_memory_heap_flags(VkMemoryHeapFlags flags)
 
 const char *debug_vk_memory_property_flags(VkMemoryPropertyFlags flags)
 {
-    char buffer[200];
+    char buffer[320];
 
     buffer[0] = '\0';
 #define FLAG_TO_STR(f) if (flags & f) { strcat(buffer, " | "#f); flags &= ~f; }
@@ -726,6 +726,11 @@ const char *debug_vk_memory_property_flags(VkMemoryPropertyFlags flags)
     FLAG_TO_STR(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
     FLAG_TO_STR(VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
     FLAG_TO_STR(VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT)
+    FLAG_TO_STR(VK_MEMORY_PROPERTY_PROTECTED_BIT)
+#undef FLAG_TO_STR
+#define FLAG_TO_STR(f, n) if (flags & f) { strcat(buffer, " | "#n); flags &= ~f; }
+    FLAG_TO_STR(0x40, VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD)
+    FLAG_TO_STR(0x80, VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD)
 #undef FLAG_TO_STR
     if (flags)
         FIXME("Unrecognized flag(s) %#x.\n", flags);
