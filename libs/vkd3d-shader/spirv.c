@@ -81,7 +81,8 @@ static uint32_t get_binary_to_text_options(enum vkd3d_shader_compile_option_form
 }
 
 static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_code *spirv,
-        enum vkd3d_shader_spirv_environment environment, uint32_t options, struct vkd3d_shader_code *out)
+        enum vkd3d_shader_spirv_environment environment,
+        enum vkd3d_shader_compile_option_formatting_flags formatting, struct vkd3d_shader_code *out)
 {
     spv_diagnostic diagnostic = NULL;
     spv_text text = NULL;
@@ -92,7 +93,7 @@ static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_co
     context = spvContextCreate(spv_target_env_from_vkd3d(environment));
 
     if (!(spvret = spvBinaryToText(context, spirv->code, spirv->size / sizeof(uint32_t),
-            options, &text, &diagnostic)))
+            get_binary_to_text_options(formatting), &text, &diagnostic)))
     {
         void *code = vkd3d_malloc(text->length);
         if (code)
@@ -121,11 +122,11 @@ static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_co
 static void vkd3d_spirv_dump(const struct vkd3d_shader_code *spirv,
         enum vkd3d_shader_spirv_environment environment)
 {
-    const static uint32_t options
-        = SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_INDENT;
+    static const enum vkd3d_shader_compile_option_formatting_flags formatting
+            = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
     struct vkd3d_shader_code text;
 
-    if (!vkd3d_spirv_binary_to_text(spirv, environment, options, &text))
+    if (!vkd3d_spirv_binary_to_text(spirv, environment, formatting, &text))
     {
         vkd3d_shader_trace_text(text.code, text.size);
         vkd3d_shader_free_shader_code(&text);
@@ -154,12 +155,9 @@ static void vkd3d_spirv_validate(const struct vkd3d_shader_code *spirv,
 
 #else
 
-static uint32_t get_binary_to_text_options(enum vkd3d_shader_compile_option_formatting_flags formatting)
-{
-    return 0;
-}
 static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_code *spirv,
-        enum vkd3d_shader_spirv_environment environment, uint32_t options, struct vkd3d_shader_code *out)
+        enum vkd3d_shader_spirv_environment environment,
+        enum vkd3d_shader_compile_option_formatting_flags formatting, struct vkd3d_shader_code *out)
 {
     return VKD3D_ERROR;
 }
@@ -9978,8 +9976,7 @@ int vkd3d_dxbc_compiler_generate_spirv(struct vkd3d_dxbc_compiler *compiler,
     {
         struct vkd3d_shader_code text;
         enum vkd3d_shader_spirv_environment environment = vkd3d_dxbc_compiler_get_target_environment(compiler);
-        if (vkd3d_spirv_binary_to_text(spirv, environment,
-                    get_binary_to_text_options(compiler->formatting), &text) != VKD3D_OK)
+        if (vkd3d_spirv_binary_to_text(spirv, environment, compiler->formatting, &text) != VKD3D_OK)
             return VKD3D_ERROR;
         *spirv = text;
     }
