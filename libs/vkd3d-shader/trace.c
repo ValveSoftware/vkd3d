@@ -775,7 +775,7 @@ static void shader_print_double_literal(struct vkd3d_d3d_asm_compiler *compiler,
 
     vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s", prefix, sign, compiler->colours.literal);
     vkd3d_string_buffer_print_f64(&compiler->buffer, d);
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s", compiler->colours.reset, suffix);
+    vkd3d_string_buffer_printf(&compiler->buffer, "l%s%s", compiler->colours.reset, suffix);
 }
 
 static void shader_print_int_literal(struct vkd3d_d3d_asm_compiler *compiler,
