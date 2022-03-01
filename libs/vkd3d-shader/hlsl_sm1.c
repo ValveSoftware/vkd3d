@@ -335,7 +335,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     sm1_sort_externs(ctx);
 
     size_offset = put_u32(buffer, 0);
-    ctab_offset = put_u32(buffer, MAKEFOURCC('C','T','A','B'));
+    ctab_offset = put_u32(buffer, VKD3D_MAKE_TAG('C','T','A','B'));
 
     ctab_start = put_u32(buffer, sizeof(D3DXSHADER_CONSTANTTABLE));
     creator_offset = put_u32(buffer, 0);

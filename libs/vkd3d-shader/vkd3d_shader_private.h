@@ -1232,25 +1232,22 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define VKD3D_DXBC_MAX_SOURCE_COUNT 6
 #define VKD3D_DXBC_HEADER_SIZE (8 * sizeof(uint32_t))
 
-#define MAKE_TAG(ch0, ch1, ch2, ch3) \
-    ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
-    ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
-#define TAG_AON9 MAKE_TAG('A', 'o', 'n', '9')
-#define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
-#define TAG_DXIL MAKE_TAG('D', 'X', 'I', 'L')
-#define TAG_ISG1 MAKE_TAG('I', 'S', 'G', '1')
-#define TAG_ISGN MAKE_TAG('I', 'S', 'G', 'N')
-#define TAG_OSG1 MAKE_TAG('O', 'S', 'G', '1')
-#define TAG_OSG5 MAKE_TAG('O', 'S', 'G', '5')
-#define TAG_OSGN MAKE_TAG('O', 'S', 'G', 'N')
-#define TAG_PCSG MAKE_TAG('P', 'C', 'S', 'G')
-#define TAG_PSG1 MAKE_TAG('P', 'S', 'G', '1')
-#define TAG_RD11 MAKE_TAG('R', 'D', '1', '1')
-#define TAG_RDEF MAKE_TAG('R', 'D', 'E', 'F')
-#define TAG_RTS0 MAKE_TAG('R', 'T', 'S', '0')
-#define TAG_SHDR MAKE_TAG('S', 'H', 'D', 'R')
-#define TAG_SHEX MAKE_TAG('S', 'H', 'E', 'X')
-#define TAG_TEXT MAKE_TAG('T', 'E', 'X', 'T')
+#define TAG_AON9 VKD3D_MAKE_TAG('A', 'o', 'n', '9')
+#define TAG_DXBC VKD3D_MAKE_TAG('D', 'X', 'B', 'C')
+#define TAG_DXIL VKD3D_MAKE_TAG('D', 'X', 'I', 'L')
+#define TAG_ISG1 VKD3D_MAKE_TAG('I', 'S', 'G', '1')
+#define TAG_ISGN VKD3D_MAKE_TAG('I', 'S', 'G', 'N')
+#define TAG_OSG1 VKD3D_MAKE_TAG('O', 'S', 'G', '1')
+#define TAG_OSG5 VKD3D_MAKE_TAG('O', 'S', 'G', '5')
+#define TAG_OSGN VKD3D_MAKE_TAG('O', 'S', 'G', 'N')
+#define TAG_PCSG VKD3D_MAKE_TAG('P', 'C', 'S', 'G')
+#define TAG_PSG1 VKD3D_MAKE_TAG('P', 'S', 'G', '1')
+#define TAG_RD11 VKD3D_MAKE_TAG('R', 'D', '1', '1')
+#define TAG_RDEF VKD3D_MAKE_TAG('R', 'D', 'E', 'F')
+#define TAG_RTS0 VKD3D_MAKE_TAG('R', 'T', 'S', '0')
+#define TAG_SHDR VKD3D_MAKE_TAG('S', 'H', 'D', 'R')
+#define TAG_SHEX VKD3D_MAKE_TAG('S', 'H', 'E', 'X')
+#define TAG_TEXT VKD3D_MAKE_TAG('T', 'E', 'X', 'T')
 
 struct dxbc_writer_section
 {

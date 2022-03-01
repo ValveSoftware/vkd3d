@@ -50,10 +50,7 @@ enum
     OPTION_TEXT_FORMATTING,
 };
 
-#define MAKE_TAG(ch0, ch1, ch2, ch3) \
-    ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
-    ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
-#define TAG_DXBC MAKE_TAG('D', 'X', 'B', 'C')
+#define TAG_DXBC VKD3D_MAKE_TAG('D', 'X', 'B', 'C')
 
 static const struct source_type_info
 {

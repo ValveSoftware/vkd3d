@@ -42,6 +42,10 @@
 
 #define MEMBER_SIZE(t, m) sizeof(((t *)0)->m)
 
+#define VKD3D_MAKE_TAG(ch0, ch1, ch2, ch3) \
+        ((uint32_t)(ch0) | ((uint32_t)(ch1) << 8) \
+        | ((uint32_t)(ch2) << 16) | ((uint32_t)(ch3) << 24))
+
 static inline size_t align(size_t addr, size_t alignment)
 {
     return (addr + (alignment - 1)) & ~(alignment - 1);
