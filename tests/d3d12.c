@@ -22535,7 +22535,7 @@ static unsigned int read_uav_counter(const struct test_context *context,
 
 static int compare_id(const void *a, const void *b)
 {
-    return *(int *)a - *(int *)b;
+    return vkd3d_u32_compare(*(uint32_t *)a, *(uint32_t *)b);
 }
 
 static void test_uav_counters(void)
