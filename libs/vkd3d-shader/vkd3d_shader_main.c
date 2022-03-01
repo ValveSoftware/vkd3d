@@ -20,6 +20,7 @@
 #include "vkd3d_version.h"
 
 #include <stdio.h>
+#include <math.h>
 
 VKD3D_DEBUG_ENV_NAME("VKD3D_SHADER_DEBUG");
 
@@ -87,6 +88,21 @@ int vkd3d_string_buffer_printf(struct vkd3d_string_buffer *buffer, const char *f
     va_start(args, format);
     ret = vkd3d_string_buffer_vprintf(buffer, format, args);
     va_end(args);
+
+    return ret;
+}
+
+int vkd3d_string_buffer_print_f32(struct vkd3d_string_buffer *buffer, float f)
+{
+    unsigned int idx = buffer->content_size + 1;
+    int ret;
+
+    if (!(ret = vkd3d_string_buffer_printf(buffer, "%.8e", f)) && isfinite(f))
+    {
+        if (signbit(f))
+            ++idx;
+        buffer->buffer[idx] = '.';
+    }
 
     return ret;
 }
