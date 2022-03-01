@@ -835,10 +835,10 @@ static int compare_descriptor_range(const void *a, const void *b)
     const struct d3d12_root_descriptor_table_range *range_a = a, *range_b = b;
     int ret;
 
-    if ((ret = range_a->type - range_b->type))
+    if ((ret = vkd3d_u32_compare(range_a->type, range_b->type)))
         return ret;
 
-    if ((ret = range_a->offset - range_b->offset))
+    if ((ret = vkd3d_u32_compare(range_a->offset, range_b->offset)))
         return ret;
 
     return (range_a->descriptor_count == UINT_MAX) - (range_b->descriptor_count == UINT_MAX);
