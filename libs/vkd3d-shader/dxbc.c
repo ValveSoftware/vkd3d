@@ -235,7 +235,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
 }
 
 static void shader_sm4_set_descriptor_register_range(struct vkd3d_shader_sm4_parser *sm4,
-        struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
+        const struct vkd3d_shader_register *reg, struct vkd3d_shader_register_range *range)
 {
     range->first = reg->idx[1].offset;
     range->last = reg->idx[shader_is_sm_5_1(sm4) ? 2 : 1].offset;
