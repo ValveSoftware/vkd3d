@@ -228,6 +228,12 @@ libvkd3d_shader_la_LDFLAGS += -Wl,--version-script=$(srcdir)/libs/vkd3d-shader/v
 EXTRA_libvkd3d_shader_la_DEPENDENCIES = $(srcdir)/libs/vkd3d-shader/vkd3d_shader.map
 endif
 
+EXTRA_DIST = \
+	libs/vkd3d-shader/hlsl.l \
+	libs/vkd3d-shader/hlsl.y \
+	libs/vkd3d-shader/preproc.l \
+	libs/vkd3d-shader/preproc.y
+
 libvkd3d_la_SOURCES = \
 	include/private/vkd3d_blob.h \
 	include/private/vkd3d_common.h \
@@ -268,7 +274,7 @@ libvkd3d_utils_la_LDFLAGS += -Wl,--version-script=$(srcdir)/libs/vkd3d-utils/vkd
 EXTRA_libvkd3d_utils_la_DEPENDENCIES = $(srcdir)/libs/vkd3d-utils/vkd3d_utils.map
 endif
 
-EXTRA_DIST = ANNOUNCE LICENSE
+EXTRA_DIST += ANNOUNCE LICENSE
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkginclude_HEADERS = $(vkd3d_public_headers)
