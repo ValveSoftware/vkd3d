@@ -591,6 +591,9 @@ enum vkd3d_shader_target_type
      */
     VKD3D_SHADER_TARGET_SPIRV_BINARY,
     VKD3D_SHADER_TARGET_SPIRV_TEXT,
+    /**
+     * Direct3D shader assembly. \since 1.3
+     */
     VKD3D_SHADER_TARGET_D3D_ASM,
     /**
      * Legacy Direct3D byte-code. This is the format used for Direct3D shader
