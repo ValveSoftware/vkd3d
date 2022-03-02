@@ -538,7 +538,7 @@ struct vkd3d_shader_descriptor_offset_info
      * binding.count = 2
      * \endcode
      *
-     * and then pass \c {8, \c 4} as \a binding_offsets here.
+     * and then pass \c {8, \c 4} as static binding offsets here.
      *
      * This field may be NULL, in which case the corresponding offsets are
      * specified to be 0.
