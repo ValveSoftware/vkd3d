@@ -315,7 +315,6 @@ XFAIL_TESTS = \
 	tests/hlsl-initializer-numeric.shader_test \
 	tests/hlsl-initializer-static-array.shader_test \
 	tests/hlsl-initializer-struct.shader_test \
-	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-duplicate-modifiers.shader_test \
 	tests/hlsl-for.shader_test \
 	tests/hlsl-function.shader_test \
