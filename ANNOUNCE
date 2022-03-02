@@ -1,17 +1,16 @@
-The Wine team is proud to announce that release 1.2 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.3 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Availability of libvkd3d-shader as a public library.
-  - Support for tessellation shaders.
-  - Version 1.1 root signatures.
-  - Stream output support.
+  - Initial HLSL compilation support.
+  - Shader model 5.1 descriptor array support.
+  - Support for disassembling Direct3D shaders.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.2.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.3.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -22,171 +21,136 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.2
+What's new in vkd3d 1.3
 =======================
 
 
 *** libvkd3d
 
 - Newly implemented Direct3D 12 features:
-  - Multi-sampling.
-  - Reserved resources.
-  - Instance data step rates. This requires the
-    VK_EXT_vertex_attribute_divisor extension.
-  - `Private data' APIs for all interfaces.
-  - Shader-resource view component mappings.
-  - Indirect indexed draws.
-  - Indirect draws with a count buffer. This requires the
-    VK_KHR_draw_indirect_count extension.
-  - Stream output and stream output queries. This requires the
-    VK_EXT_transform_feedback extension.
-  - Predicated/conditional rendering.
-  - Primitive restart.
-  - Depth rendering without a pixel shader.
-  - Depth clipping. This requires the VK_EXT_depth_clip_enable extension.
-  - Rasteriser discard.
-  - Dual-source blending.
-  - Mapping placed resources.
-  - The ReadFromSubresource() and WriteToSubresource() ID3D12Resource methods.
-  - Simultaneous access to resources from multiple queues.
-  - Null-views. I.e., views without an underlying resource.
-  - Several more feature support queries.
+  - Root signature support for unbounded descriptor tables.
+  - Unordered-access view counters in pixel shaders. These were previously
+    only supported in compute shaders.
+  - Output merger logical operations.
+  - Retrieving CPU/GPU timestamp calibration values. This requires support for
+    the VK_EXT_calibrated_timestamps extension.
+  - The `mirror_once' texture addressing mode. This requires support for the
+    VK_KHR_sampler_mirror_clamp_to_edge extension.
 
 - New interfaces:
-  - vkd3d_serialize_versioned_root_signature() and
-    vkd3d_create_versioned_root_signature_deserializer() provide support for
-    versioned root signatures.
-  - The vkd3d_application_info structure extends the
-    vkd3d_instance_create_info structure, and can be used to pass information
-    about the application to libvkd3d. It is analogous to the
-    VkApplicationInfo structure in Vulkan. Its `api_version' field should be
-    set to the version of the libvkd3d API that the application targets.
-  - The vkd3d_optional_device_extensions_info structure extends the
-    vkd3d_device_create_info structure, and can be used to pass a list of
-    device extensions to enable only when available to libvkd3d. It is
-    analogous to the vkd3d_optional_instance_extensions_info structure for
-    instance extensions.
-
-- New environment variables:
-  - VKD3D_CONFIG can be used to set options that change the behaviour of
-    libvkd3d.
-  - VKD3D_TEST_BUG can be used to disable bug_if() conditions in the test
-    suite.
-  - VKD3D_TEST_FILTER can be used to control which tests are run.
-  - VKD3D_VULKAN_DEVICE can be used to override the Vulkan physical device
-    used by vkd3d.
-  See the README for more detailed descriptions and how to use these.
-
-- When the VK_KHR_dedicated_allocation extension is available, dedicated
-  allocations may be used for committed resources.
-
-- When the VK_KHR_image_format_list extension is available, it will be used to
-  inform the driver about the view formats that a particular mutable Vulkan
-  image can be used with. This improves performance on some Vulkan
-  implementations.
-
-- When the VK_EXT_debug_marker extension is available, object names set with
-  the ID3D12Object SetName() method will be propagated to the underlying
-  Vulkan objects.
-
-- Unordered-access view clears are supported on more formats. Previously these
-  were limited to integer formats for texture resources, and single component
-  integer formats for buffer resources.
-
-- When the D24_UNORM_S8_UINT format is not supported by the Vulkan
-  implementation, the D32_SFLOAT_S8_UINT format will be used instead to
-  implement the D24_UNORM_S8_UINT and related DXGI formats. This is required
-  because the DXGI D24_UNORM_S8_UINT format is mandatory, while the Vulkan
-  D24_UNORM_S8_UINT format is optional.
+  - The vkd3d_host_time_domain_info structure extends the
+    vkd3d_instance_create_info structure, and can be used to specify how to
+    convert between timestamps and tick counts. If left unspecified, a tick
+    is assumed to take 100 nanoseconds.
 
 - Various bug fixes.
 
 
 *** libvkd3d-shader
 
-- libvkd3d-shader is now available as a public instead of an internal library.
-
 - New features:
-  - Tessellation shaders.
-  - Root signature version 1.1 serialisation, deserialisation, and conversion.
-  - Multi-sample masks.
-  - Per-sample shading.
-  - Early depth/stencil test.
-  - Conservative depth output.
-  - Dual-source blending.
-  - Stream output.
-  - Viewport arrays.
+  - Initial support for HLSL compilation and preprocessing. This is an ongoing
+    effort; although support for many features is already implemented, support
+    for many more isn't yet.
+  - Support for disassembling Direct3D byte-code shaders to Direct3D assembly.
+  - Support for parsing the legacy Direct3D byte-code format used by Direct3D
+    shader model 1, 2, and 3 shaders. In the current vkd3d-shader release,
+    only Direct3D assembly is supported as a target for these; we intend to
+    support SPIR-V as a target in a future release.
 
-- Support for OpenGL SPIR-V target environments. This allows SPIR-V produced
-  by libvkd3d-shader to be used with GL_ARB_gl_spirv. This includes support
-  for OpenGL atomic counters and combined samplers.
+- New features for the SPIR-V target:
+  - Support for various aspects of Direct3D shader model 5.1 descriptor
+    arrays, including unbounded descriptor arrays, UAV counter arrays, dynamic
+    indexing of descriptor arrays, and non-uniform indexing of descriptor
+    arrays. With the exception of some special cases, this requires support
+    for the SPV_EXT_descriptor_indexing extension in the target environment.
+  - Support for double precision floating-point operations.
+  - Support for indirect addressing of tessellation control shader inputs.
+  - Stencil export. I.e., writing stencil values from shaders. This requires
+    support for the SPV_EXT_shader_stencil_export extension in the target
+    environment.
+  - Support for the Direct3D shader model 4+ `precise' modifier.
+  - Support for Direct3D shader model 4+ global resource memory barriers.
 
-- Preliminary support for shader model 5.1 shaders. This is still a work in
-  progress. Notably, support for resource arrays is not yet implemented.
+New interfaces:
+  - vkd3d_shader_preprocess() provides support for preprocessing shaders.
+  - The vkd3d_shader_preprocess_info structure extends the
+    vkd3d_shader_compile_info structure, and can be used to specify
+    preprocessing parameters like preprocessor macro definitions.
+  - The vkd3d_shader_hlsl_source_info structure extends the
+    vkd3d_shader_compile_info structure, and can be used to specify HLSL
+    compilation parameters like the target profile and entry point.
+  - The vkd3d_shader_descriptor_offset_info structure extends the
+    vkd3d_shader_interface_info structure, and can be used to specify offsets
+    into descriptor arrays referenced by shader interface bindings. This
+    allows mapping multiple descriptor arrays in a shader to a single binding
+    point in the target environment, and helps with mapping between the
+    Direct3D 12 and Vulkan binding models.
+  - The VKD3D_SHADER_COMPILE_OPTION_API_VERSION compile option can
+    be used to specify the version of the libvkd3d-shader API the
+    application is targetting. If left unspecified,
+    VKD3D_SHADER_API_VERSION_1_2 will be used.
 
-- When the SPV_EXT_demote_to_helper_invocation is available, it will be used
-  to implement the `discard' shader instruction instead of using SpvOpKill. In
-  particular, this ensures the `deriv_rtx' and `deriv_rty' instruction return
-  accurate results after a (conditional) `discard' instruction.
-
-- Support for using SPIR-V specialisation constants for shader parameters.
-
-- Support for more shader instructions:
-  - bufinfo,
-  - eval_centroid,
-  - eval_sample_index,
-  - ld2ms,
-  - sample_b,
-  - sample_d,
-  - sample_info,
-  - samplepos.
-
-- When built against SPIRV-Tools, libvkd3d-shader can produce SPIR-V shaders
-  in text form.
-
-- libvkd3d-shader now has its own environment variable (VKD3D_SHADER_DEBUG) to
-  control debug output.
-
-- Various shader translation fixes.
+- Various shader translation fixes, for tessellation shaders in particular.
 
 
 *** vkd3d-compiler
 
-- When supported by libvkd3d-shader, text form SPIR-V is available as a target
-  format, in addition to the existing binary form SPIR-V target format.
+- New source and target types:
+  - The `hlsl' source type specifies High Level Shader Language source code.
+  - The `d3d-asm' target type specifies Direct3D assembly shaders.
+  - The `d3dbc' format specifies legacy Direct3D byte-code, which is used for
+    Direct3D shader model 1, 2, and 3 shaders.
+  - The existing `dxbc-tpf' format can now also be used as a target format.
 
-- Input from standard input, and output to standard output is supported.
+- New command line options:
+  - `-E' can be used to specify the input should only be preprocessed.
+  - `-e'/`--entry' can be used to specify the entry point for HLSL and/or
+    SPIR-V shaders.
+  - `-p'/`--profile' can be used to specify the target profile for HLSL
+    shaders.
+
+- When no source type is explicitly specified, vkd3d-compiler will attempt to
+  determine the source type from the provided input. Note that this is
+  intended as a convenience for interactive usage only, and the heuristics
+  used are subject to future change. Non-interactive usage of vkd3d-compiler,
+  for example in build scripts, should always explicitly specify source and
+  target types.
+
+- When no target type is explicitly specified, a default will be chosen based
+  on the source type. Like the earlier mentioned source type detection, this
+  is intended for interactive usage only.
+
+- vkd3d-compiler will default to colour output if it can determine that the
+  output is a colour-capable teleprinter.
+
+- New environment variables:
+  - NO_COLOUR/NO_COLOR can be used to disable default colour output.
+  See the README for more detailed descriptions and how to use these.
 
 
 *** libvkd3d-utils
 
-- To specify the libvkd3d API version to use when creating vkd3d instances,
-  define VKD3D_UTILS_API_VERSION to the desired version before including
-  vkd3d_utils.h. If VKD3D_UTILS_API_VERSION is not explicitly defined,
-  VKD3D_API_VERSION_1_0 will be used.
-
-- Support for versioned root signatures is provided by the
-  D3D12SerializeVersionedRootSignature() and
-  D3D12CreateVersionedRootSignatureDeserializer() entry points.
+- New interfaces:
+  - D3DCreateBlob() provides support for creating ID3DBlob objects.
+  - D3DPreprocess() provides support for preprocessing HLSL source code.
+  - D3DCompile() and D3DCompile2() provide support for compiling HLSL source
+    code.
 
 
 *** build
 
-- The minimum required version of Vulkan-Headers and SPIRV-Headers for this
-  release is version 1.1.113.
+- The `gears' and `triangle' demo applications are installed as `vkd3d-gears'
+  and `vkd3d-triangle'. These were originally intended more as documentation
+  than as end-user executables, but there's some value in using them for
+  diagnostic purposes, much like e.g. `glxgears'.
 
-- The minimum required version of widl for this release is version 3.20.
+- The VULKAN_LIBS configure variable is used when detecting the Vulkan
+  library.
 
-- If doxygen is available, it will be used to build API documentation. By
-  default, documentation will be generated in HTML and PDF formats.
+- Builds for the Microsoft Windows target platform no longer require support
+  for POSIX threads. Windows synchronisation primitives are used instead.
 
-- If debug logs are not required or desired, defining VKD3D_NO_TRACE_MESSAGES
-  and VKD3D_NO_DEBUG_MESSAGES will prevent them from being included in the
-  build. For example, a release build may want to configure with
-  `CPPFLAGS="-DNDEBUG -DVKD3D_NO_TRACE_MESSAGES -DVKD3D_NO_DEBUG_MESSAGES"'.
-
-- Microsoft Windows is now a supported target platform. To create a build for
-  Windows, either cross-compile by configuring with an appropriate --host
-  option like for example `--host=x86_64-w64-mingw32', or build on Windows
-  itself using an environment like MSYS2 or Cygwin.
+- If ncurses is available, it will be use by vkd3d-compiler to determine the
+  capabilities of the connected teleprinter, if any.
 
