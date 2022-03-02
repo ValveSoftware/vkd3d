@@ -566,11 +566,11 @@ enum vkd3d_shader_source_type
      * the format used for Direct3D shader model 4 and 5 shaders.
      */
     VKD3D_SHADER_SOURCE_DXBC_TPF,
-    /** High-Level Shader Language source code. */
+    /** High-Level Shader Language source code. \since 1.3 */
     VKD3D_SHADER_SOURCE_HLSL,
     /**
      * Legacy Direct3D byte-code. This is the format used for Direct3D shader
-     * model 1, 2, and 3 shaders.
+     * model 1, 2, and 3 shaders. \since 1.3
      */
     VKD3D_SHADER_SOURCE_D3D_BYTECODE,
 
@@ -597,16 +597,16 @@ enum vkd3d_shader_target_type
     VKD3D_SHADER_TARGET_D3D_ASM,
     /**
      * Legacy Direct3D byte-code. This is the format used for Direct3D shader
-     * model 1, 2, and 3 shaders.
+     * model 1, 2, and 3 shaders. \since 1.3
      */
     VKD3D_SHADER_TARGET_D3D_BYTECODE,
     /**
      * A 'Tokenized Program Format' shader embedded in a DXBC container. This is
-     * the format used for Direct3D shader model 4 and 5 shaders.
+     * the format used for Direct3D shader model 4 and 5 shaders. \since 1.3
      */
     VKD3D_SHADER_TARGET_DXBC_TPF,
     /**
-     * An 'OpenGL Shading Language' shader.
+     * An 'OpenGL Shading Language' shader. \since 1.3
      */
     VKD3D_SHADER_TARGET_GLSL,
 
@@ -691,7 +691,9 @@ enum vkd3d_shader_spirv_extension
 {
     VKD3D_SHADER_SPIRV_EXTENSION_NONE,
     VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION,
+    /** \since 1.3 */
     VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING,
+    /** \since 1.3 */
     VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SPIRV_EXTENSION),
