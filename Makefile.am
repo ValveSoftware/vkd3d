@@ -347,6 +347,8 @@ XFAIL_TESTS = \
 	tests/trigonometry.shader_test
 endif
 
+EXTRA_DIST += $(vkd3d_shader_tests)
+
 if BUILD_DEMOS
 DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @DEMO_LIBS@ @VULKAN_LIBS@
 DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@
