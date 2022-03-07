@@ -88,7 +88,7 @@ New interfaces:
     Direct3D 12 and Vulkan binding models.
   - The VKD3D_SHADER_COMPILE_OPTION_API_VERSION compile option can
     be used to specify the version of the libvkd3d-shader API the
-    application is targetting. If left unspecified,
+    application is targeting. If left unspecified,
     VKD3D_SHADER_API_VERSION_1_2 will be used.
 
 - Various shader translation fixes, for tessellation shaders in particular.
