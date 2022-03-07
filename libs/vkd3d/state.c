@@ -1862,7 +1862,7 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_device *device,
     VK_CALL(vkDestroyShaderModule(device->vk_device, pipeline_info.stage.module, NULL));
     if (vr < 0)
     {
-        WARN("Failed to create Vulkan compute pipeline, hr %#x.", hr);
+        WARN("Failed to create Vulkan compute pipeline, hr %#x.\n", hr);
         return hresult_from_vk_result(vr);
     }
 
@@ -2664,7 +2664,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         }
         if (rt_desc->BlendEnable && rt_desc->LogicOpEnable)
         {
-            WARN("Only one of BlendEnable or LogicOpEnable can be set to TRUE.");
+            WARN("Only one of BlendEnable or LogicOpEnable can be set to TRUE.\n");
             hr = E_INVALIDARG;
             goto fail;
         }
