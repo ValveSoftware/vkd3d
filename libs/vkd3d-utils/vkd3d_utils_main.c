@@ -263,20 +263,18 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     }
 
     ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);
-    if (messages)
+
+    if (messages && messages_blob)
     {
-        if (messages_blob)
+        if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
         {
-            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
-            {
-                vkd3d_shader_free_messages(messages);
-                vkd3d_shader_free_shader_code(&byte_code);
-                return hr;
-            }
-        }
-        else
             vkd3d_shader_free_messages(messages);
+            vkd3d_shader_free_shader_code(&byte_code);
+            return hr;
+        }
+        messages = NULL;
     }
+    vkd3d_shader_free_messages(messages);
 
     if (!ret)
     {
@@ -351,20 +349,18 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
     preprocess_info.include_context = include;
 
     ret = vkd3d_shader_preprocess(&compile_info, &preprocessed_code, &messages);
-    if (messages)
+
+    if (messages && messages_blob)
     {
-        if (messages_blob)
+        if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
         {
-            if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
-            {
-                vkd3d_shader_free_messages(messages);
-                vkd3d_shader_free_shader_code(&preprocessed_code);
-                return hr;
-            }
-        }
-        else
             vkd3d_shader_free_messages(messages);
+            vkd3d_shader_free_shader_code(&preprocessed_code);
+            return hr;
+        }
+        messages = NULL;
     }
+    vkd3d_shader_free_messages(messages);
 
     if (!ret)
     {
