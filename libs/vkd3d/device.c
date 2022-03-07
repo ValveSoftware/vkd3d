@@ -3736,7 +3736,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateFence(ID3D12Device *iface,
     struct d3d12_fence *object;
     HRESULT hr;
 
-    TRACE("iface %p, intial_value %#"PRIx64", flags %#x, riid %s, fence %p.\n",
+    TRACE("iface %p, initial_value %#"PRIx64", flags %#x, riid %s, fence %p.\n",
             iface, initial_value, flags, debugstr_guid(riid), fence);
 
     if (FAILED(hr = d3d12_fence_create(device, initial_value, flags, &object)))

@@ -5982,7 +5982,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_SetMarker(ID3D12CommandQueue *
 static void STDMETHODCALLTYPE d3d12_command_queue_BeginEvent(ID3D12CommandQueue *iface,
         UINT metadata, const void *data, UINT size)
 {
-    FIXME("iface %p, metatdata %#x, data %p, size %u stub!\n",
+    FIXME("iface %p, metadata %#x, data %p, size %u stub!\n",
             iface, metadata, data, size);
 }
 
