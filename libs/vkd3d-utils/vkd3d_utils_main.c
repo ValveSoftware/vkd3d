@@ -269,6 +269,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         {
             if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
             {
+                vkd3d_shader_free_messages(messages);
                 vkd3d_shader_free_shader_code(&byte_code);
                 return hr;
             }
@@ -356,6 +357,7 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
         {
             if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), messages_blob)))
             {
+                vkd3d_shader_free_messages(messages);
                 vkd3d_shader_free_shader_code(&preprocessed_code);
                 return hr;
             }
