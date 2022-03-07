@@ -1,6 +1,6 @@
 /*
  * Copyright 2017 Józef Kucia for CodeWeavers
- * Copyright 2021 Conor McCarthy for Codeweavers
+ * Copyright 2021 Conor McCarthy for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -7425,7 +7425,7 @@ static void vkd3d_dxbc_compiler_emit_f16tof32(struct vkd3d_dxbc_compiler *compil
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, 2);
     scalar_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, 1);
 
-    /* FIXME: Consider a single UnpackHalf2x16 intruction per 2 components. */
+    /* FIXME: Consider a single UnpackHalf2x16 instruction per 2 components. */
     assert(dst->write_mask & VKD3DSP_WRITEMASK_ALL);
     for (i = 0, j = 0; i < VKD3D_VEC4_SIZE; ++i)
     {
@@ -7459,7 +7459,7 @@ static void vkd3d_dxbc_compiler_emit_f32tof16(struct vkd3d_dxbc_compiler *compil
     scalar_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
     zero_id = vkd3d_dxbc_compiler_get_constant_float(compiler, 0.0f);
 
-    /* FIXME: Consider a single PackHalf2x16 intruction per 2 components. */
+    /* FIXME: Consider a single PackHalf2x16 instruction per 2 components. */
     assert(dst->write_mask & VKD3DSP_WRITEMASK_ALL);
     for (i = 0, j = 0; i < VKD3D_VEC4_SIZE; ++i)
     {
@@ -7802,7 +7802,7 @@ static int vkd3d_dxbc_compiler_emit_control_flow_instruction(struct vkd3d_dxbc_c
 
             /* The OpSwitch instruction is inserted when the endswitch
              * instruction is processed because we do not know the number
-             * of case statments in advance.*/
+             * of case statements in advance.*/
             vkd3d_spirv_begin_function_stream_insertion(builder, cf_info->u.switch_.stream_location);
             vkd3d_spirv_build_op_switch(builder, cf_info->u.switch_.selector_id,
                     cf_info->u.switch_.default_block_id, cf_info->u.switch_.case_blocks,
