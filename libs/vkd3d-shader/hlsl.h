@@ -891,4 +891,7 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
 
+void hlsl_initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src);
+
 #endif

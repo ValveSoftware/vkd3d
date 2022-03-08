@@ -604,6 +604,62 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
     return false;
 }
 
+/* Lower broadcasts casts from vec1 to struct and array types. */
+static bool lower_complex_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_type *src_type, *dst_type;
+    struct hlsl_ir_expr *cast;
+    struct hlsl_ir_node *src;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    cast = hlsl_ir_expr(instr);
+    if (cast->op != HLSL_OP1_CAST)
+        return false;
+    src = cast->operands[0].node;
+    src_type = src->data_type;
+    dst_type = cast->node.data_type;
+
+    if (src_type->type > HLSL_CLASS_VECTOR || src_type->dimx != 1)
+        return false;
+
+    if (HLSL_CLASS_VECTOR < dst_type->type && dst_type->type < HLSL_CLASS_OBJECT)
+    {
+        unsigned int size = hlsl_type_component_count(dst_type);
+        struct vkd3d_string_buffer *string;
+        static unsigned int counter = 0;
+        struct list *broadcast_instrs;
+        unsigned int store_index = 0;
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_var *var;
+
+        if (!(string = hlsl_get_string_buffer(ctx)))
+            return false;
+        vkd3d_string_buffer_printf(string, "<broadcast-%x>", counter++);
+        if (!(var = hlsl_new_synthetic_var(ctx, string->buffer, dst_type, instr->loc)))
+            return false;
+        hlsl_release_string_buffer(ctx, string);
+
+        if (!(broadcast_instrs = hlsl_alloc(ctx, sizeof(*broadcast_instrs))))
+            return false;
+        list_init(broadcast_instrs);
+
+        while (store_index < size)
+            hlsl_initialize_var_components(ctx, broadcast_instrs, var, &store_index, src);
+
+        list_move_before(&cast->node.entry, broadcast_instrs);
+        vkd3d_free(broadcast_instrs);
+
+        load = hlsl_new_var_load(ctx, var, var->loc);
+        list_add_before(&cast->node.entry, &load->node.entry);
+        hlsl_replace_node(&cast->node, &load->node);
+
+        return true;
+    }
+
+    return false;
+}
+
 enum copy_propagation_value_state
 {
     VALUE_STATE_NOT_WRITTEN = 0,
@@ -1217,12 +1273,6 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     element_type = type->e.array.type;
     element_size = hlsl_type_get_array_element_reg_size(element_type);
 
-    if (rhs->type != HLSL_IR_LOAD)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Array store rhs is not HLSL_IR_LOAD. Broadcast may be missing.");
-        return false;
-    }
-
     for (i = 0; i < type->e.array.elements_count; ++i)
     {
         if (!split_copy(ctx, store, hlsl_ir_load(rhs), i * element_size, element_type))
@@ -1252,12 +1302,6 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     type = rhs->data_type;
     if (type->type != HLSL_CLASS_STRUCT)
         return false;
-
-    if (rhs->type != HLSL_IR_LOAD)
-    {
-        hlsl_fixme(ctx, &instr->loc, "Struct store rhs is not HLSL_IR_LOAD. Broadcast may be missing.");
-        return false;
-    }
 
     for (i = 0; i < type->e.record.field_count; ++i)
     {
@@ -2973,6 +3017,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
     transform_ir(ctx, lower_broadcasts, body, NULL);
+    transform_ir(ctx, lower_complex_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
     {

@@ -1866,7 +1866,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     return true;
 }
 
-static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
+void hlsl_initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src)
 {
     unsigned int src_comp_count = hlsl_type_component_count(src->data_type);
@@ -2032,7 +2032,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
                 for (k = 0; k < v->initializer.args_count; ++k)
                 {
-                    initialize_var_components(ctx, v->initializer.instrs, var,
+                    hlsl_initialize_var_components(ctx, v->initializer.instrs, var,
                             &store_index, v->initializer.args[k]);
                 }
             }
@@ -2745,7 +2745,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
             continue;
         }
 
-        initialize_var_components(ctx, params->instrs, var, &idx, arg);
+        hlsl_initialize_var_components(ctx, params->instrs, var, &idx, arg);
     }
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
