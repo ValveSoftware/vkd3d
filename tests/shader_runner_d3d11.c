@@ -62,9 +62,7 @@ struct d3d11_shader_context
     ID3D11RenderTargetView *rtv;
     ID3D11DeviceContext *immediate_context;
 
-    ID3D11InputLayout *input_layout;
     ID3D11VertexShader *vs;
-    ID3D11Buffer *vb;
 };
 
 static struct d3d11_shader_context *d3d11_shader_context(struct shader_context *c)
@@ -325,12 +323,8 @@ static void destroy_test_context(struct d3d11_shader_context *context)
 {
     ULONG ref;
 
-    if (context->input_layout)
-        ID3D11InputLayout_Release(context->input_layout);
     if (context->vs)
         ID3D11VertexShader_Release(context->vs);
-    if (context->vb)
-        ID3D11Buffer_Release(context->vb);
 
     ID3D11DeviceContext_Release(context->immediate_context);
     ID3D11RenderTargetView_Release(context->rtv);
@@ -411,28 +405,15 @@ static void d3d11_runner_destroy_texture(struct shader_context *c, struct textur
 
 static void d3d11_runner_draw_quad(struct shader_context *c)
 {
-    static const D3D11_INPUT_ELEMENT_DESC default_layout_desc[] =
-    {
-        {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-    };
-
     static const char vs_source[] =
-        "float4 main(float4 position : POSITION) : sv_position\n"
+        "void main(uint id : SV_VertexID, out float4 position : SV_Position)\n"
         "{\n"
-        "    return position;\n"
+        "    float2 coords = float2((id << 1) & 2, id & 2);\n"
+        "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
         "}";
-
-    static const struct vec2 quad[] =
-    {
-        {-1.0f, -1.0f},
-        {-1.0f,  1.0f},
-        { 1.0f, -1.0f},
-        { 1.0f,  1.0f},
-    };
 
     struct d3d11_shader_context *context = d3d11_shader_context(c);
     ID3D11Device *device = context->device;
-    unsigned int stride, offset;
     ID3D11Buffer *cb = NULL;
     ID3D11PixelShader *ps;
     ID3D10Blob *ps_code;
@@ -451,29 +432,15 @@ static void d3d11_runner_draw_quad(struct shader_context *c)
     if (!(ps_code = compile_shader(context->c.ps_source, ps_profiles[context->c.minimum_shader_model])))
         return;
 
-    if (!context->input_layout || !context->vs)
+    if (!context->vs)
     {
         ID3D10Blob *vs_code = compile_shader(vs_source, "vs_4_0");
 
-        if (!context->input_layout)
-        {
-            hr = ID3D11Device_CreateInputLayout(device, default_layout_desc, ARRAY_SIZE(default_layout_desc),
-                    ID3D10Blob_GetBufferPointer(vs_code), ID3D10Blob_GetBufferSize(vs_code), &context->input_layout);
-            ok(hr == S_OK, "Failed to create input layout, hr %#lx.\n", hr);
-        }
-
-        if (!context->vs)
-        {
-            hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
-                    ID3D10Blob_GetBufferSize(vs_code), NULL, &context->vs);
-            ok(hr == S_OK, "Failed to create vertex shader, hr %#lx.\n", hr);
-        }
-
+        hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
+                ID3D10Blob_GetBufferSize(vs_code), NULL, &context->vs);
+        ok(hr == S_OK, "Failed to create vertex shader, hr %#lx.\n", hr);
         ID3D10Blob_Release(vs_code);
     }
-
-    if (!context->vb)
-        context->vb = create_buffer(device, D3D11_BIND_VERTEX_BUFFER, sizeof(quad), quad);
 
     hr = ID3D11Device_CreatePixelShader(device, ID3D10Blob_GetBufferPointer(ps_code),
             ID3D10Blob_GetBufferSize(ps_code), NULL, &ps);
@@ -514,15 +481,11 @@ static void d3d11_runner_draw_quad(struct shader_context *c)
         ID3D11SamplerState_Release(d3d11_sampler);
     }
 
-    ID3D11DeviceContext_IASetInputLayout(context->immediate_context, context->input_layout);
-    ID3D11DeviceContext_IASetPrimitiveTopology(context->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    stride = sizeof(*quad);
-    offset = 0;
-    ID3D11DeviceContext_IASetVertexBuffers(context->immediate_context, 0, 1, &context->vb, &stride, &offset);
+    ID3D11DeviceContext_IASetPrimitiveTopology(context->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D11DeviceContext_VSSetShader(context->immediate_context, context->vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context->immediate_context, ps, NULL, 0);
 
-    ID3D11DeviceContext_Draw(context->immediate_context, 4, 0);
+    ID3D11DeviceContext_Draw(context->immediate_context, 3, 0);
 
     ID3D11PixelShader_Release(ps);
     if (cb)
