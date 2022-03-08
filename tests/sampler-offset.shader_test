@@ -1,3 +1,6 @@
+[require]
+shader model >= 4.0
+
 [sampler 0]
 filter point point point
 address clamp clamp clamp

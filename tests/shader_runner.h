@@ -25,7 +25,8 @@
 
 enum shader_model
 {
-    SHADER_MODEL_4_0 = 0,
+    SHADER_MODEL_2_0,
+    SHADER_MODEL_4_0,
     SHADER_MODEL_4_1,
     SHADER_MODEL_5_0,
     SHADER_MODEL_5_1,

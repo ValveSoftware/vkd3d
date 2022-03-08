@@ -58,6 +58,7 @@ static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_m
 
     static const char *const shader_models[] =
     {
+        [SHADER_MODEL_2_0] = "ps_4_0",
         [SHADER_MODEL_4_0] = "ps_4_0",
         [SHADER_MODEL_4_1] = "ps_4_1",
         [SHADER_MODEL_5_0] = "ps_5_0",

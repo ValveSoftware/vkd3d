@@ -441,6 +441,7 @@ static void d3d11_runner_draw_quad(struct shader_context *c)
 
     static const char *const ps_profiles[] =
     {
+        [SHADER_MODEL_2_0] = "ps_4_0",
         [SHADER_MODEL_4_0] = "ps_4_0",
         [SHADER_MODEL_4_1] = "ps_4_1",
         [SHADER_MODEL_5_0] = "ps_5_0",

@@ -1,3 +1,6 @@
+[require]
+shader model >= 4.0
+
 [pixel shader]
 
 float4 main(uniform float f, uniform int i, uniform bool b, uniform half h) : sv_target

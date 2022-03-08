@@ -105,6 +105,7 @@ static void parse_require_directive(struct shader_context *context, const char *
     {
         static const char *const model_strings[] =
         {
+            [SHADER_MODEL_2_0] = "2.0",
             [SHADER_MODEL_4_0] = "4.0",
             [SHADER_MODEL_4_1] = "4.1",
             [SHADER_MODEL_5_0] = "5.0",
@@ -444,6 +445,8 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
     char *shader_source = NULL;
     char line[256];
     FILE *f;
+
+    context->minimum_shader_model = SHADER_MODEL_2_0;
 
     for (i = 1; i < argc; ++i)
     {
