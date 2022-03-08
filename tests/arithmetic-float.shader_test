@@ -1,0 +1,25 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float x = 5.0;
+    float y = 15.0;
+
+    return float4(x + y, x - y, x * y, x / y);
+}
+
+[test]
+draw quad
+probe all rgba (20.0, -10.0, 75.0, 0.33333333)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float x = 5.0;
+    float y = 15.0;
+
+    return float4(x % y, +x, -x, y / x);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 5.0, -5.0, 3.0)

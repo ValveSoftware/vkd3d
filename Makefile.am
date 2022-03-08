@@ -52,6 +52,10 @@ vkd3d_cross_tests = \
 
 vkd3d_shader_tests = \
 	tests/abs.shader_test \
+	tests/arithmetic-float.shader_test \
+	tests/arithmetic-int.shader_test \
+	tests/arithmetic-uint.shader_test \
+	tests/bitwise.shader_test \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
@@ -85,7 +89,6 @@ vkd3d_shader_tests = \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
 	tests/hlsl-numeric-types.shader_test \
-	tests/hlsl-operations.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
@@ -97,6 +100,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-struct-semantics.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
+	tests/logic-operations.shader_test \
 	tests/math.shader_test \
 	tests/pow.shader_test \
 	tests/preproc-if.shader_test \
@@ -309,6 +313,10 @@ tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
 XFAIL_TESTS = \
+	tests/arithmetic-float.shader_test \
+	tests/arithmetic-int.shader_test \
+	tests/arithmetic-uint.shader_test \
+	tests/bitwise.shader_test \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
@@ -334,7 +342,6 @@ XFAIL_TESTS = \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
 	tests/hlsl-numeric-types.shader_test \
-	tests/hlsl-operations.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
 	tests/hlsl-return-void.shader_test \
 	tests/hlsl-shape.shader_test \
@@ -342,6 +349,7 @@ XFAIL_TESTS = \
 	tests/hlsl-storage-qualifiers.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
+	tests/logic-operations.shader_test \
 	tests/max.shader_test \
 	tests/sampler-offset.shader_test \
 	tests/trigonometry.shader_test

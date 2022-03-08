@@ -1,0 +1,129 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int x = 5;
+    int y = 15;
+
+    return float4(x >> y, y >> x, x << y, y << x);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 163840.0, 480.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int x = 5;
+    int y = 15;
+
+    return float4(x & y, x | y, x ^ y, ~x);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 15.0, 10.0, -6.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int zero = 0;
+    int one = 1;
+
+    return float4(zero & zero, zero & one, one & zero, one & one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 1.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int zero = 0;
+    int one = 1;
+
+    return float4(zero | zero, zero | one, one | zero, one | one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int zero = 0;
+    int one = 1;
+
+    return float4(zero ^ zero, zero ^ one, one ^ zero, one ^ one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 0.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    uint x = 5;
+    uint y = 15;
+
+    return float4(x >> y, y >> x, x << y, y << x);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 163840.0, 480.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    uint x = 5;
+    uint y = 15;
+
+    return float4(x & y, x | y, x ^ y, ~x);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 15.0, 10.0, 4294967296.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    uint zero = 0;
+    uint one = 1;
+
+    return float4(zero & zero, zero & one, one & zero, one & one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 1.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    uint zero = 0;
+    uint one = 1;
+
+    return float4(zero | zero, zero | one, one | zero, one | one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    uint zero = 0;
+    uint one = 1;
+
+    return float4(zero ^ zero, zero ^ one, one ^ zero, one ^ one);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 0.0)
