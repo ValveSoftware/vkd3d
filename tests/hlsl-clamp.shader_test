@@ -1,7 +1,7 @@
 [pixel shader]
-float4 main(uniform float u, uniform float v, uniform float w) : sv_target
+float4 main(uniform float3 u) : sv_target
 {
-    return float4(clamp(u, v, w), clamp(0.9, v, w), clamp(u, -0.5, w), clamp(0.6, -0.4, 0.3));
+    return float4(clamp(u.x, u.y, u.z), clamp(0.9, u.y, u.z), clamp(u.x, -0.5, u.z), clamp(0.6, -0.4, 0.3));
 }
 
 [test]

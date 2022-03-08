@@ -1,7 +1,7 @@
 [pixel shader]
-float4 main(uniform float u, uniform float v, uniform float w, uniform float x,
-            uniform float y, uniform float z) : SV_TARGET
+float4 main(uniform float4 a, uniform float2 b) : SV_TARGET
 {
+    float u = a.x, v = a.y, w = a.z, x = a.w, y = b.x, z = b.y;
     return float4(x * y - z / w + --u / -v,
             z * x / y + w / -v,
             u + v - w,

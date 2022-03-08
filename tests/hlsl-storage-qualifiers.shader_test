@@ -9,12 +9,13 @@ void sub(float a, uniform float b, in float c, uniform in float d, out float4 o)
     sub2(float4(a, b, c, d), o);
 }
 
-void main(in uniform float a, uniform float b, out float4 o : sv_target)
+void main(in uniform float4 a, uniform float4 b, out float4 o : sv_target)
 {
-    sub(a, b, 0.3, 0.4, o);
+    sub(a.x, b.x, 0.3, 0.4, o);
 }
 
 [test]
-uniform 0 float4 0.1 0.2 0.0 0.0
+uniform 0 float4 0.1 0.0 0.0 0.0
+uniform 4 float4 0.2 0.0 0.0 0.0
 draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
