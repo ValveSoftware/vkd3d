@@ -5,9 +5,9 @@ float4 main(uniform float4 u) : sv_target
 }
 
 [test]
-uniform 0 float4 -0.5 6.5 7.5 3.4
+uniform 0 float4 -0.4 -6.6 7.6 3.4
 draw quad
-probe all rgba (0.0, 6.0, 8.0, 3.0) 4
+probe all rgba (0.0, -7.0, 8.0, 3.0) 4
 
 
 
@@ -21,9 +21,9 @@ float4 main(uniform float4 u) : sv_target
 }
 
 [test]
-uniform 0 float4 -0.5 6.5 7.5 3.4
+uniform 0 float4 -0.4 -6.6 7.6 3.4
 draw quad
-probe all rgba (6.0, 8.0, 0.0, 3.0) 4
+probe all rgba (-7.0, 8.0, 0.0, 3.0) 4
 
 
 
