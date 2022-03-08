@@ -1412,6 +1412,20 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     write_sm4_instruction(buffer, &instr);
 }
 
+static bool type_is_integer(const struct hlsl_type *type)
+{
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 static bool type_is_float(const struct hlsl_type *type)
 {
     return type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF;
@@ -1611,6 +1625,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                 default:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 %s addition expression.", dst_type_string->buffer);
             }
+            break;
+
+        case HLSL_OP2_BIT_AND:
+            assert(type_is_integer(dst_type));
+            write_sm4_binary_op(buffer, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:
