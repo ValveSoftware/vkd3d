@@ -1728,6 +1728,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             break;
         }
 
+        case HLSL_OP2_LSHIFT:
+            assert(type_is_integer(dst_type));
+            write_sm4_binary_op(buffer, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
+            break;
+
         case HLSL_OP2_MAX:
             switch (dst_type->base_type)
             {
