@@ -1612,23 +1612,17 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 continue;
             }
 
-            if (type->type == HLSL_CLASS_STRUCT)
-            {
-                struct_var_initializer(ctx, statements_list, var, &v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
-            if (type->type > HLSL_CLASS_LAST_NUMERIC)
+            if (type->type > HLSL_CLASS_LAST_NUMERIC && type->type != HLSL_CLASS_STRUCT)
             {
                 FIXME("Initializers for non scalar/struct variables not supported yet.\n");
                 free_parse_initializer(&v->initializer);
                 vkd3d_free(v);
                 continue;
             }
-            if (v->arrays.count)
+
+            if (type->type == HLSL_CLASS_STRUCT)
             {
-                hlsl_fixme(ctx, &v->loc, "Array initializer.");
-                free_parse_initializer(&v->initializer);
+                struct_var_initializer(ctx, statements_list, var, &v->initializer);
                 vkd3d_free(v);
                 continue;
             }
