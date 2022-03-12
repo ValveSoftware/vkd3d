@@ -1626,14 +1626,10 @@ static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_
         return ret;
     }
 
-    if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
-    {
-        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
-        vkd3d_shader_parser_destroy(parser);
-        return ret;
-    }
+    ret = vkd3d_shader_parser_compile(parser, compile_info, out, message_context);
 
-    return VKD3D_ERROR;
+    vkd3d_shader_parser_destroy(parser);
+    return ret;
 }
 
 static int compile_dxbc_dxil(const struct vkd3d_shader_compile_info *compile_info,
@@ -1911,6 +1907,10 @@ const enum vkd3d_shader_target_type *vkd3d_shader_get_supported_target_types(
 
     static const enum vkd3d_shader_target_type d3dbc_types[] =
     {
+        VKD3D_SHADER_TARGET_SPIRV_BINARY,
+#ifdef HAVE_SPIRV_TOOLS
+        VKD3D_SHADER_TARGET_SPIRV_TEXT,
+#endif
         VKD3D_SHADER_TARGET_D3D_ASM,
     };
 
