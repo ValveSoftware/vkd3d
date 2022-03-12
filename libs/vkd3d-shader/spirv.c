@@ -6938,7 +6938,7 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t src_ids[VKD3D_DXBC_MAX_SOURCE_COUNT];
+    uint32_t src_ids[SPIRV_MAX_SRC_COUNT];
     uint32_t type_id, val_id;
     unsigned int i;
     SpvOp op;
@@ -6951,7 +6951,7 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
     }
 
     assert(instruction->dst_count == 1);
-    assert(instruction->src_count <= VKD3D_DXBC_MAX_SOURCE_COUNT);
+    assert(instruction->src_count <= SPIRV_MAX_SRC_COUNT);
 
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 
@@ -7031,7 +7031,7 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t src_id[VKD3D_DXBC_MAX_SOURCE_COUNT];
+    uint32_t src_id[SPIRV_MAX_SRC_COUNT];
     uint32_t instr_set_id, type_id, val_id;
     enum GLSLstd450 glsl_inst;
     unsigned int i;
@@ -7046,7 +7046,7 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     instr_set_id = vkd3d_spirv_get_glsl_std450_instr_set(builder);
 
     assert(instruction->dst_count == 1);
-    assert(instruction->src_count <= VKD3D_DXBC_MAX_SOURCE_COUNT);
+    assert(instruction->src_count <= SPIRV_MAX_SRC_COUNT);
 
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 

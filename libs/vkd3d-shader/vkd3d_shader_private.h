@@ -1085,6 +1085,8 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out);
 void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
 
+#define SPIRV_MAX_SRC_COUNT 6
+
 struct spirv_compiler;
 
 struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
@@ -1237,7 +1239,6 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
     return NULL;
 }
 
-#define VKD3D_DXBC_MAX_SOURCE_COUNT 6
 #define VKD3D_DXBC_HEADER_SIZE (8 * sizeof(uint32_t))
 
 #define TAG_AON9 VKD3D_MAKE_TAG('A', 'o', 'n', '9')
