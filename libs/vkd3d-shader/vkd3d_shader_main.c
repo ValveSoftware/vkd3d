@@ -1168,18 +1168,63 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
     return ret;
 }
 
-static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info,
+static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info scan_descriptor_info;
+    struct vkd3d_glsl_generator *glsl_generator;
     struct vkd3d_shader_compile_info scan_info;
-    struct vkd3d_shader_parser *parser;
     int ret;
+
+    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
 
     scan_info = *compile_info;
     scan_descriptor_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
     scan_descriptor_info.next = scan_info.next;
     scan_info.next = &scan_descriptor_info;
+
+    if ((ret = scan_with_parser(&scan_info, message_context, parser)) < 0)
+        return ret;
+
+    switch (compile_info->target_type)
+    {
+        case VKD3D_SHADER_TARGET_D3D_ASM:
+            ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
+            break;
+
+        case VKD3D_SHADER_TARGET_GLSL:
+            if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version,
+                    message_context, &parser->location)))
+            {
+                ERR("Failed to create GLSL generator.\n");
+                vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+                return VKD3D_ERROR;
+            }
+
+            ret = vkd3d_glsl_generator_generate(glsl_generator, parser, out);
+            vkd3d_glsl_generator_destroy(glsl_generator);
+            break;
+
+        case VKD3D_SHADER_TARGET_SPIRV_BINARY:
+        case VKD3D_SHADER_TARGET_SPIRV_TEXT:
+            ret = spirv_compile(parser, &scan_descriptor_info, compile_info, out, message_context);
+            break;
+
+        default:
+            /* Validation should prevent us from reaching this. */
+            assert(0);
+    }
+
+    vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+    return ret;
+}
+
+static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_shader_parser *parser;
+    int ret;
 
     if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
     {
@@ -1187,47 +1232,9 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return ret;
     }
 
-    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
-
-    if ((ret = scan_with_parser(&scan_info, message_context, parser)) < 0)
-    {
-        vkd3d_shader_parser_destroy(parser);
-        return ret;
-    }
-
-    if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
-    {
-        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
-        vkd3d_shader_parser_destroy(parser);
-        return ret;
-    }
-
-    if (compile_info->target_type == VKD3D_SHADER_TARGET_GLSL)
-    {
-        struct vkd3d_glsl_generator *glsl_generator;
-
-        if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version,
-                message_context, &parser->location)))
-        {
-            ERR("Failed to create GLSL generator.\n");
-            vkd3d_shader_parser_destroy(parser);
-            vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-            return VKD3D_ERROR;
-        }
-
-        ret = vkd3d_glsl_generator_generate(glsl_generator, parser, out);
-
-        vkd3d_glsl_generator_destroy(glsl_generator);
-        vkd3d_shader_parser_destroy(parser);
-        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        return ret;
-    }
-
-    ret = spirv_compile(parser, &scan_descriptor_info, compile_info, out, message_context);
+    ret = vkd3d_shader_parser_compile(parser, compile_info, out, message_context);
 
     vkd3d_shader_parser_destroy(parser);
-    vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
     return ret;
 }
 
