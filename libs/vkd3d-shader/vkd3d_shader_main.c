@@ -1181,17 +1181,19 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     scan_descriptor_info.next = scan_info.next;
     scan_info.next = &scan_descriptor_info;
 
-    if ((ret = scan_dxbc(&scan_info, message_context)) < 0)
-        return ret;
-
     if ((ret = vkd3d_shader_sm4_parser_create(compile_info, message_context, &parser)) < 0)
     {
         WARN("Failed to initialise shader parser.\n");
-        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
         return ret;
     }
 
     vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
+
+    if ((ret = scan_with_parser(&scan_info, message_context, parser)) < 0)
+    {
+        vkd3d_shader_parser_destroy(parser);
+        return ret;
+    }
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
