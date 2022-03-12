@@ -29,7 +29,6 @@ struct d3d12_texture
     struct texture t;
 
     D3D12_DESCRIPTOR_RANGE descriptor_range;
-    ID3D12DescriptorHeap *heap;
     ID3D12Resource *resource;
     unsigned int root_index;
 };
@@ -44,6 +43,8 @@ struct d3d12_shader_context
     struct shader_context c;
 
     struct test_context test_context;
+
+    ID3D12DescriptorHeap *heap;
 };
 
 static struct d3d12_shader_context *d3d12_shader_context(struct shader_context *c)
@@ -77,6 +78,8 @@ static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_m
     return blob;
 }
 
+#define MAX_RESOURCE_DESCRIPTORS 256
+
 static struct texture *d3d12_runner_create_texture(struct shader_context *c, const struct texture_params *params)
 {
     struct d3d12_shader_context *context = d3d12_shader_context(c);
@@ -85,11 +88,17 @@ static struct texture *d3d12_runner_create_texture(struct shader_context *c, con
     D3D12_SUBRESOURCE_DATA resource_data;
     struct d3d12_texture *texture;
 
+    if (!context->heap)
+        context->heap = create_gpu_descriptor_heap(device,
+                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
+
+    if (params->slot >= MAX_RESOURCE_DESCRIPTORS)
+        fatal_error("Resource slot %u is too high; please increase MAX_RESOURCE_DESCRIPTORS.\n", params->slot);
+
     texture = calloc(1, sizeof(*texture));
 
     texture->t.slot = params->slot;
 
-    texture->heap = create_gpu_descriptor_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
     texture->resource = create_default_texture(device, params->width, params->height,
             params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
     resource_data.pData = params->data;
@@ -99,7 +108,7 @@ static struct texture *d3d12_runner_create_texture(struct shader_context *c, con
     transition_resource_state(test_context->list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     ID3D12Device_CreateShaderResourceView(device, texture->resource,
-            NULL, get_cpu_descriptor_handle(test_context, texture->heap, 0));
+            NULL, get_cpu_descriptor_handle(test_context, context->heap, params->slot));
 
     return &texture->t;
 }
@@ -108,7 +117,6 @@ static void d3d12_runner_destroy_texture(struct shader_context *c, struct textur
 {
     struct d3d12_texture *texture = d3d12_texture(t);
 
-    ID3D12DescriptorHeap_Release(texture->heap);
     ID3D12Resource_Release(texture->resource);
     free(texture);
 }
@@ -214,7 +222,7 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
         struct d3d12_texture *texture = d3d12_texture(context->c.textures[i]);
 
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, texture->root_index,
-                get_gpu_descriptor_handle(test_context, texture->heap, 0));
+                get_gpu_descriptor_handle(test_context, context->heap, texture->t.slot));
     }
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &test_context->rtv, false, NULL);
@@ -266,12 +274,16 @@ void run_shader_tests_d3d12(int argc, char **argv)
         .no_root_signature = true,
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
-    struct d3d12_shader_context context;
+    struct d3d12_shader_context context = {0};
 
     parse_args(argc, argv);
     enable_d3d12_debug_layer(argc, argv);
     init_adapter_info();
     init_test_context(&context.test_context, &desc);
+
     run_shader_tests(&context.c, argc, argv, &d3d12_runner_ops);
+
+    if (context.heap)
+        ID3D12DescriptorHeap_Release(context.heap);
     destroy_test_context(&context.test_context);
 }

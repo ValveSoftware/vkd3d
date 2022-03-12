@@ -61,7 +61,7 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
-static void VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2) fatal_error(const char *format, ...)
+void fatal_error(const char *format, ...)
 {
     va_list args;
 

@@ -21,6 +21,7 @@
 #include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3d12.h"
 #include "vkd3d_dxgiformat.h"
+#include "vkd3d_common.h"
 #include "utils.h"
 
 enum shader_model
@@ -88,6 +89,8 @@ struct shader_runner_ops
     void (*draw_quad)(struct shader_context *context);
     void (*probe_vec4)(struct shader_context *context, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };
+
+void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2);
 
 void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops);
 
