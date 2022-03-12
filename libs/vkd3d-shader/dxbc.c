@@ -91,7 +91,7 @@ struct vkd3d_shader_sm4_parser
 
     unsigned int output_map[MAX_REG_OUTPUT];
 
-    struct vkd3d_shader_src_param src_param[6];
+    struct vkd3d_shader_src_param src_param[VKD3D_DXBC_MAX_SOURCE_COUNT];
     struct vkd3d_shader_dst_param dst_param[2];
     struct list src_free;
     struct list src;
