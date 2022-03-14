@@ -328,6 +328,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_MOV,
     VKD3DSIH_MOVA,
     VKD3DSIH_MOVC,
+    VKD3DSIH_MSAD,
     VKD3DSIH_MUL,
     VKD3DSIH_NE,
     VKD3DSIH_NOP,
