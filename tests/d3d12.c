@@ -4930,7 +4930,7 @@ static void test_clear_unordered_access_view_buffer(void)
         {DXGI_FORMAT_R16G16_UNORM, { 0, BUFFER_SIZE / sizeof(uint32_t), 0, 0, D3D12_BUFFER_UAV_FLAG_NONE},
                 {0x1234, 0xabcd, 0, 0}, 0xabcd1234},
         {DXGI_FORMAT_R16G16_UNORM, { 0, BUFFER_SIZE / sizeof(uint32_t), 0, 0, D3D12_BUFFER_UAV_FLAG_NONE},
-                {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff8000, true},
+                {0x3e800000 /* 0.25f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff4000, true},
         {DXGI_FORMAT_R16G16_UNORM, { 0, BUFFER_SIZE / sizeof(uint32_t), 0, 0, D3D12_BUFFER_UAV_FLAG_NONE},
                 {0x40000000 /* 2.0f */, 0 /* 0.0f */, 0, 0}, 0x0000ffff, true},
         {DXGI_FORMAT_R16G16_UNORM, { 0, BUFFER_SIZE / sizeof(uint32_t), 0, 0, D3D12_BUFFER_UAV_FLAG_NONE},
@@ -5124,7 +5124,7 @@ static void test_clear_unordered_access_view_image(void)
         {DXGI_FORMAT_R11G11B10_FLOAT, 1, 1, 0, 0, 1, 0, {}, {1,       2, 3, 4}, 0x00c01001},
         /* Test float clears with formats. */
         {DXGI_FORMAT_R16G16_UNORM,    1, 1, 0, 0, 1, 0, {},
-                {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff8000, true},
+                {0x3e800000 /* 0.25f */, 0x3f800000 /* 1.0f */, 0, 0}, 0xffff4000, true},
         {DXGI_FORMAT_R16G16_FLOAT,    1, 1, 0, 0, 1, 0, {},
                 {0x3f000000 /* 0.5f */, 0x3f800000 /* 1.0f */, 0, 0}, 0x3c003800, true},
         {DXGI_FORMAT_R8G8B8A8_UNORM,  1, 1, 0, 0, 1, 0, {},
@@ -34557,7 +34557,7 @@ static void test_bufinfo_instruction(void)
             uav_desc.Buffer.Flags = test->raw ? D3D12_BUFFER_UAV_FLAG_RAW : 0;
             uav_desc.Buffer.FirstElement = test->view_element_idx;
             uav_desc.Buffer.NumElements = test->view_element_count;
-            uav_desc.Buffer.StructureByteStride = test->buffer_structure_byte_stride;;
+            uav_desc.Buffer.StructureByteStride = test->buffer_structure_byte_stride;
             ID3D12Device_CreateUnorderedAccessView(device, buffer, NULL, &uav_desc, cpu_handle);
         }
         else
