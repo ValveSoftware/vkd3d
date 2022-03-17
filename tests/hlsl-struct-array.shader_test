@@ -1,0 +1,19 @@
+% In SM4, array elements are always aligned to the next vec4, although structs are not.
+
+[pixel shader]
+uniform struct
+{
+    float p, q;
+} colours[3];
+
+float4 main() : sv_target
+{
+    return float4(colours[0].q, colours[1].p, colours[2].q, colours[2].p);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.0 0.0
+uniform 4 float4 0.3 0.4 0.0 0.0
+uniform 8 float4 0.5 0.6 0.0 0.0
+draw quad
+probe all rgba (0.2, 0.3, 0.6, 0.5)

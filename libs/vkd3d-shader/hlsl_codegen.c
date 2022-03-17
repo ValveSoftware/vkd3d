@@ -621,7 +621,7 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     if (type->type != HLSL_CLASS_ARRAY)
         return false;
     element_type = type->e.array.type;
-    element_size = element_type->reg_size;
+    element_size = hlsl_type_get_array_element_reg_size(element_type);
 
     for (i = 0; i < type->e.array.elements_count; ++i)
     {

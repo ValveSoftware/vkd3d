@@ -607,7 +607,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
         return NULL;
     }
 
-    if (!(c = hlsl_new_uint_constant(ctx, data_type->reg_size, loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))

@@ -783,6 +783,7 @@ bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type);
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, unsigned int modifiers);
 unsigned int hlsl_type_component_count(struct hlsl_type *type);
+unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 

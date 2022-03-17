@@ -96,6 +96,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-state-block-syntax.shader_test \
 	tests/hlsl-static-initializer.shader_test \
 	tests/hlsl-storage-qualifiers.shader_test \
+	tests/hlsl-struct-array.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
 	tests/hlsl-struct-semantics.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
@@ -339,7 +340,6 @@ XFAIL_TESTS = \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-mul.shader_test \
-	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
 	tests/hlsl-numeric-types.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \

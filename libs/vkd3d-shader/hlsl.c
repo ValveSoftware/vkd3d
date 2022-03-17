@@ -202,6 +202,13 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
     }
 }
 
+/* Returns the size of a type, considered as part of an array of that type.
+ * As such it includes padding after the type. */
+unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type)
+{
+    return align(type->reg_size, 4);
+}
+
 static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,
         enum hlsl_base_type base_type, unsigned dimx, unsigned dimy)
 {
