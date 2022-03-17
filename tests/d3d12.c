@@ -9939,6 +9939,7 @@ static void test_shader_instructions(void)
         bool is_float64;
         bool is_todo;
         bool skip_on_warp;
+        bool todo_on_nvidia;
     }
     uint_tests[] =
     {
@@ -10187,8 +10188,8 @@ static void test_shader_instructions(void)
         {&ps_dge, {.d = {{1.5, 1.0}}}, {{0xffffffff}}, true},
         {&ps_dlt, {.d = {{0.0, 1.0}}}, {{0xffffffff}}, true},
         {&ps_dlt, {.d = {{1.0, 1.0}}}, {{0x00000000}}, true},
-        {&ps_dtou, {.d = {{     -NAN}}}, {{ 0,  0 }}, true},
-        {&ps_dtou, {.d = {{      NAN}}}, {{ 0,  0 }}, true},
+        {&ps_dtou, {.d = {{     -NAN}}}, {{ 0,  0 }}, true, false, false, true},
+        {&ps_dtou, {.d = {{      NAN}}}, {{ 0,  0 }}, true, false, false, true},
         {&ps_dtou, {.d = {{-INFINITY}}}, {{ 0, ~0u}}, true},
         {&ps_dtou, {.d = {{ INFINITY}}}, {{~0u, 0 }}, true},
         {&ps_dtou, {.d = {{     -1.0}}}, {{ 0,  1 }}, true},
@@ -10605,6 +10606,7 @@ static void test_shader_instructions(void)
 
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        todo_if(uint_tests[i].todo_on_nvidia && is_nvidia_device(context.device))
         check_sub_resource_uvec4(context.render_target, 0, queue, command_list, &uint_tests[i].output.u);
 
         reset_command_list(command_list, context.allocator);
