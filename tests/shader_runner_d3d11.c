@@ -494,8 +494,6 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
 
 struct resource_readback
 {
-    uint64_t width;
-    unsigned int height;
     ID3D11Resource *resource;
     D3D11_MAPPED_SUBRESOURCE map_desc;
 };
@@ -516,9 +514,6 @@ static void init_readback(struct d3d11_shader_runner *runner, struct resource_re
     ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, (ID3D11Resource *)runner->rt);
     hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &rb->map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
-
-    rb->width = texture_desc.Width;
-    rb->height = texture_desc.Height;
 }
 
 static void release_readback(struct d3d11_shader_runner *runner, struct resource_readback *rb)
@@ -535,17 +530,13 @@ static const struct vec4 *get_readback_vec4(struct resource_readback *rb, unsign
 static void check_readback_data_vec4(struct resource_readback *rb,
         const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
 {
-    RECT r = {0, 0, rb->width, rb->height};
     unsigned int x = 0, y = 0;
     struct vec4 got = {0};
     bool all_match = true;
 
-    if (rect)
-        r = *rect;
-
-    for (y = r.top; y < r.bottom; ++y)
+    for (y = rect->top; y < rect->bottom; ++y)
     {
-        for (x = r.left; x < r.right; ++x)
+        for (x = rect->left; x < rect->right; ++x)
         {
             got = *get_readback_vec4(rb, x, y);
             if (!compare_vec4(&got, expected, max_diff))
