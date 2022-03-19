@@ -24,6 +24,9 @@
 #include "vkd3d_common.h"
 #include "utils.h"
 
+#define RENDER_TARGET_WIDTH 640
+#define RENDER_TARGET_HEIGHT 480
+
 enum shader_model
 {
     SHADER_MODEL_2_0,

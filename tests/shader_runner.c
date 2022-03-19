@@ -293,7 +293,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
     else if (match_string(line, "probe all rgba", &line))
     {
-        static const RECT rect = {0, 0, 640, 480};
+        static const RECT rect = {0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT};
         unsigned int ulps;
         struct vec4 v;
         int ret;

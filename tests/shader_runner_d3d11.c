@@ -241,8 +241,8 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
     ok(hr == S_OK, "Failed to get factory, hr %#lx.\n", hr);
     IDXGIAdapter_Release(adapter);
 
-    dxgi_desc.BufferDesc.Width = 640;
-    dxgi_desc.BufferDesc.Height = 480;
+    dxgi_desc.BufferDesc.Width = RENDER_TARGET_WIDTH;
+    dxgi_desc.BufferDesc.Height = RENDER_TARGET_HEIGHT;
     dxgi_desc.BufferDesc.RefreshRate.Numerator = 60;
     dxgi_desc.BufferDesc.RefreshRate.Denominator = 1;
     dxgi_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -268,8 +268,8 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
     const D3D11_TEXTURE2D_DESC texture_desc =
     {
-        .Width = 640,
-        .Height = 480,
+        .Width = RENDER_TARGET_WIDTH,
+        .Height = RENDER_TARGET_HEIGHT,
         .MipLevels = 1,
         .ArraySize = 1,
         .Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
@@ -290,8 +290,8 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
         return FALSE;
     }
 
-    rt_width = 640;
-    rt_height = 480;
+    rt_width = RENDER_TARGET_WIDTH;
+    rt_height = RENDER_TARGET_HEIGHT;
     SetRect(&rect, 0, 0, rt_width, rt_height);
     AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
     runner->window = CreateWindowA("static", "d3dcompiler_test", WS_OVERLAPPEDWINDOW,

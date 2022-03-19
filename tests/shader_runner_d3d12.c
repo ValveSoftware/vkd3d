@@ -269,8 +269,8 @@ void run_shader_tests_d3d12(int argc, char **argv)
 {
     static const struct test_context_desc desc =
     {
-        .rt_width = 640,
-        .rt_height = 480,
+        .rt_width = RENDER_TARGET_WIDTH,
+        .rt_height = RENDER_TARGET_HEIGHT,
         .no_root_signature = true,
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
