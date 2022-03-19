@@ -40,16 +40,16 @@ static struct d3d12_texture *d3d12_texture(struct texture *t)
 
 struct d3d12_shader_context
 {
-    struct shader_context c;
+    struct shader_runner c;
 
     struct test_context test_context;
 
     ID3D12DescriptorHeap *heap;
 };
 
-static struct d3d12_shader_context *d3d12_shader_context(struct shader_context *c)
+static struct d3d12_shader_context *d3d12_shader_context(struct shader_runner *r)
 {
-    return CONTAINING_RECORD(c, struct d3d12_shader_context, c);
+    return CONTAINING_RECORD(r, struct d3d12_shader_context, c);
 }
 
 static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_model)
@@ -80,9 +80,9 @@ static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_m
 
 #define MAX_RESOURCE_DESCRIPTORS 256
 
-static struct texture *d3d12_runner_create_texture(struct shader_context *c, const struct texture_params *params)
+static struct texture *d3d12_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(c);
+    struct d3d12_shader_context *context = d3d12_shader_context(r);
     struct test_context *test_context = &context->test_context;
     ID3D12Device *device = test_context->device;
     D3D12_SUBRESOURCE_DATA resource_data;
@@ -113,7 +113,7 @@ static struct texture *d3d12_runner_create_texture(struct shader_context *c, con
     return &texture->t;
 }
 
-static void d3d12_runner_destroy_texture(struct shader_context *c, struct texture *t)
+static void d3d12_runner_destroy_texture(struct shader_runner *r, struct texture *t)
 {
     struct d3d12_texture *texture = d3d12_texture(t);
 
@@ -121,9 +121,9 @@ static void d3d12_runner_destroy_texture(struct shader_context *c, struct textur
     free(texture);
 }
 
-static void d3d12_runner_draw_quad(struct shader_context *c)
+static void d3d12_runner_draw_quad(struct shader_runner *r)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(c);
+    struct d3d12_shader_context *context = d3d12_shader_context(r);
     struct test_context *test_context = &context->test_context;
 
     ID3D12GraphicsCommandList *command_list = test_context->list;
@@ -243,10 +243,10 @@ static void d3d12_runner_draw_quad(struct shader_context *c)
     reset_command_list(command_list, test_context->allocator);
 }
 
-static void d3d12_runner_probe_vec4(struct shader_context *c,
+static void d3d12_runner_probe_vec4(struct shader_runner *r,
         const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(c);
+    struct d3d12_shader_context *context = d3d12_shader_context(r);
     struct test_context *test_context = &context->test_context;
     struct resource_readback rb;
 

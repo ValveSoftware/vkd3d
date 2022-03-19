@@ -53,7 +53,7 @@ static struct d3d11_texture *d3d11_texture(struct texture *t)
 
 struct d3d11_shader_context
 {
-    struct shader_context c;
+    struct shader_runner c;
 
     ID3D11Device *device;
     HWND window;
@@ -65,9 +65,9 @@ struct d3d11_shader_context
     ID3D11VertexShader *vs;
 };
 
-static struct d3d11_shader_context *d3d11_shader_context(struct shader_context *c)
+static struct d3d11_shader_context *d3d11_shader_context(struct shader_runner *r)
 {
-    return CONTAINING_RECORD(c, struct d3d11_shader_context, c);
+    return CONTAINING_RECORD(r, struct d3d11_shader_context, c);
 }
 
 static bool enable_debug_layer;
@@ -359,9 +359,9 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     return buffer;
 }
 
-static struct texture *d3d11_runner_create_texture(struct shader_context *c, const struct texture_params *params)
+static struct texture *d3d11_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
 {
-    struct d3d11_shader_context *context = d3d11_shader_context(c);
+    struct d3d11_shader_context *context = d3d11_shader_context(r);
     ID3D11Device *device = context->device;
     D3D11_SUBRESOURCE_DATA resource_data;
     D3D11_TEXTURE2D_DESC desc = {0};
@@ -394,7 +394,7 @@ static struct texture *d3d11_runner_create_texture(struct shader_context *c, con
     return &texture->t;
 }
 
-static void d3d11_runner_destroy_texture(struct shader_context *c, struct texture *t)
+static void d3d11_runner_destroy_texture(struct shader_runner *r, struct texture *t)
 {
     struct d3d11_texture *texture = d3d11_texture(t);
 
@@ -403,7 +403,7 @@ static void d3d11_runner_destroy_texture(struct shader_context *c, struct textur
     free(texture);
 }
 
-static void d3d11_runner_draw_quad(struct shader_context *c)
+static void d3d11_runner_draw_quad(struct shader_runner *r)
 {
     static const char vs_source[] =
         "void main(uint id : SV_VertexID, out float4 position : SV_Position)\n"
@@ -412,7 +412,7 @@ static void d3d11_runner_draw_quad(struct shader_context *c)
         "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
         "}";
 
-    struct d3d11_shader_context *context = d3d11_shader_context(c);
+    struct d3d11_shader_context *context = d3d11_shader_context(r);
     ID3D11Device *device = context->device;
     ID3D11Buffer *cb = NULL;
     ID3D11PixelShader *ps;
@@ -561,9 +561,9 @@ static void check_readback_data_vec4(struct resource_readback *rb,
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
-static void d3d11_runner_probe_vec4(struct shader_context *c, const RECT *rect, const struct vec4 *v, unsigned int ulps)
+static void d3d11_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
-    struct d3d11_shader_context *context = d3d11_shader_context(c);
+    struct d3d11_shader_context *context = d3d11_shader_context(r);
     struct resource_readback rb;
 
     init_readback(context, &rb);

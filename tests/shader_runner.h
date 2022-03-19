@@ -65,7 +65,7 @@ struct texture
     unsigned int slot;
 };
 
-struct shader_context
+struct shader_runner
 {
     const struct shader_runner_ops *ops;
 
@@ -84,15 +84,15 @@ struct shader_context
 
 struct shader_runner_ops
 {
-    struct texture *(*create_texture)(struct shader_context *context, const struct texture_params *params);
-    void (*destroy_texture)(struct shader_context *context, struct texture *texture);
-    void (*draw_quad)(struct shader_context *context);
-    void (*probe_vec4)(struct shader_context *context, const RECT *rect, const struct vec4 *v, unsigned int ulps);
+    struct texture *(*create_texture)(struct shader_runner *runner, const struct texture_params *params);
+    void (*destroy_texture)(struct shader_runner *runner, struct texture *texture);
+    void (*draw_quad)(struct shader_runner *runner);
+    void (*probe_vec4)(struct shader_runner *runner, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };
 
 void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2);
 
-void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops);
+void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops);
 
 #ifdef _WIN32
 void run_shader_tests_d3d11(int argc, char **argv);

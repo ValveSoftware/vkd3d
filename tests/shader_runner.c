@@ -99,7 +99,7 @@ static bool match_string(const char *line, const char *token, const char **const
     return true;
 }
 
-static void parse_require_directive(struct shader_context *context, const char *line)
+static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
     if (match_string(line, "shader model >=", &line))
     {
@@ -117,7 +117,7 @@ static void parse_require_directive(struct shader_context *context, const char *
         {
             if (match_string(line, model_strings[i], &line))
             {
-                context->minimum_shader_model = i;
+                runner->minimum_shader_model = i;
                 return;
             }
         }
@@ -277,19 +277,19 @@ static void parse_texture_directive(struct texture_params *texture, const char *
     }
 }
 
-static void set_uniforms(struct shader_context *context, size_t offset, size_t count, const void *uniforms)
+static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
-    context->uniform_count = align(max(context->uniform_count, offset + count), 4);
-    vkd3d_array_reserve((void **)&context->uniforms, &context->uniform_capacity,
-            context->uniform_count, sizeof(*context->uniforms));
-    memcpy(context->uniforms + offset, uniforms, count * sizeof(*context->uniforms));
+    runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
+    vkd3d_array_reserve((void **)&runner->uniforms, &runner->uniform_capacity,
+            runner->uniform_count, sizeof(*runner->uniforms));
+    memcpy(runner->uniforms + offset, uniforms, count * sizeof(*runner->uniforms));
 }
 
-static void parse_test_directive(struct shader_context *context, const char *line)
+static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     if (match_string(line, "draw quad", &line))
     {
-        context->ops->draw_quad(context);
+        runner->ops->draw_quad(runner);
     }
     else if (match_string(line, "probe all rgba", &line))
     {
@@ -304,7 +304,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         if (ret < 5)
             ulps = 0;
 
-        context->ops->probe_vec4(context, &rect, &v, ulps);
+        runner->ops->probe_vec4(runner, &rect, &v, ulps);
     }
     else if (match_string(line, "probe rect rgba", &line))
     {
@@ -324,7 +324,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         rect.right = x + w;
         rect.top = y;
         rect.bottom = y + h;
-        context->ops->probe_vec4(context, &rect, &v, ulps);
+        runner->ops->probe_vec4(runner, &rect, &v, ulps);
     }
     else if (match_string(line, "probe rgba", &line))
     {
@@ -343,7 +343,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
         rect.right = x + 1;
         rect.top = y;
         rect.bottom = y + 1;
-        context->ops->probe_vec4(context, &rect, &v, ulps);
+        runner->ops->probe_vec4(runner, &rect, &v, ulps);
     }
     else if (match_string(line, "uniform", &line))
     {
@@ -359,7 +359,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%f %f %f %f", &v.x, &v.y, &v.z, &v.w) < 4)
                 fatal_error("Malformed float4 constant '%s'.\n", line);
-            set_uniforms(context, offset, 4, &v);
+            set_uniforms(runner, offset, 4, &v);
         }
         else if (match_string(line, "float", &line))
         {
@@ -367,7 +367,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%f", &f) < 1)
                 fatal_error("Malformed float constant '%s'.\n", line);
-            set_uniforms(context, offset, 1, &f);
+            set_uniforms(runner, offset, 1, &f);
         }
         else if (match_string(line, "int4", &line))
         {
@@ -375,7 +375,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%d %d %d %d", &v[0], &v[1], &v[2], &v[3]) < 4)
                 fatal_error("Malformed int4 constant '%s'.\n", line);
-            set_uniforms(context, offset, 4, v);
+            set_uniforms(runner, offset, 4, v);
         }
         else if (match_string(line, "int", &line))
         {
@@ -383,7 +383,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%i", &i) < 1)
                 fatal_error("Malformed int constant '%s'.\n", line);
-            set_uniforms(context, offset, 1, &i);
+            set_uniforms(runner, offset, 1, &i);
         }
         else if (match_string(line, "uint", &line))
         {
@@ -391,7 +391,7 @@ static void parse_test_directive(struct shader_context *context, const char *lin
 
             if (sscanf(line, "%u", &u) < 1)
                 fatal_error("Malformed uint constant '%s'.\n", line);
-            set_uniforms(context, offset, 1, &u);
+            set_uniforms(runner, offset, 1, &u);
         }
     }
     else
@@ -400,14 +400,14 @@ static void parse_test_directive(struct shader_context *context, const char *lin
     }
 }
 
-static struct sampler *get_sampler(struct shader_context *context, unsigned int slot)
+static struct sampler *get_sampler(struct shader_runner *runner, unsigned int slot)
 {
     struct sampler *sampler;
     size_t i;
 
-    for (i = 0; i < context->sampler_count; ++i)
+    for (i = 0; i < runner->sampler_count; ++i)
     {
-        sampler = &context->samplers[i];
+        sampler = &runner->samplers[i];
 
         if (sampler->slot == slot)
             return sampler;
@@ -416,25 +416,25 @@ static struct sampler *get_sampler(struct shader_context *context, unsigned int 
     return NULL;
 }
 
-static void set_texture(struct shader_context *context, struct texture *texture)
+static void set_texture(struct shader_runner *runner, struct texture *texture)
 {
     size_t i;
 
-    for (i = 0; i < context->texture_count; ++i)
+    for (i = 0; i < runner->texture_count; ++i)
     {
-        if (context->textures[i]->slot == texture->slot)
+        if (runner->textures[i]->slot == texture->slot)
         {
-            context->ops->destroy_texture(context, context->textures[i]);
-            context->textures[i] = texture;
+            runner->ops->destroy_texture(runner, runner->textures[i]);
+            runner->textures[i] = texture;
             return;
         }
     }
 
-    context->textures = realloc(context->textures, (context->texture_count + 1) * sizeof(*context->textures));
-    context->textures[context->texture_count++] = texture;
+    runner->textures = realloc(runner->textures, (runner->texture_count + 1) * sizeof(*runner->textures));
+    runner->textures[runner->texture_count++] = texture;
 }
 
-void run_shader_tests(struct shader_context *context, int argc, char **argv, const struct shader_runner_ops *ops)
+void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct sampler *current_sampler = NULL;
@@ -446,7 +446,7 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
     char line[256];
     FILE *f;
 
-    context->minimum_shader_model = SHADER_MODEL_2_0;
+    runner->minimum_shader_model = SHADER_MODEL_2_0;
 
     for (i = 1; i < argc; ++i)
     {
@@ -469,8 +469,8 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
         return;
     }
 
-    memset(context, 0, sizeof(*context));
-    context->ops = ops;
+    memset(runner, 0, sizeof(*runner));
+    runner->ops = ops;
 
     for (;;)
     {
@@ -489,13 +489,13 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                     break;
 
                 case STATE_TEXTURE:
-                    set_texture(context, context->ops->create_texture(context, &current_texture));
+                    set_texture(runner, runner->ops->create_texture(runner, &current_texture));
                     free(current_texture.data);
                     break;
 
                 case STATE_SHADER_PIXEL:
-                    free(context->ps_source);
-                    context->ps_source = shader_source;
+                    free(runner->ps_source);
+                    runner->ps_source = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -599,15 +599,15 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
             {
                 state = STATE_SAMPLER;
 
-                if ((current_sampler = get_sampler(context, index)))
+                if ((current_sampler = get_sampler(runner, index)))
                 {
                     memset(current_sampler, 0, sizeof(*current_sampler));
                 }
                 else
                 {
-                    context->samplers = realloc(context->samplers,
-                            ++context->sampler_count * sizeof(*context->samplers));
-                    current_sampler = &context->samplers[context->sampler_count - 1];
+                    runner->samplers = realloc(runner->samplers,
+                            ++runner->sampler_count * sizeof(*runner->samplers));
+                    current_sampler = &runner->samplers[runner->sampler_count - 1];
                     memset(current_sampler, 0, sizeof(*current_sampler));
                 }
                 current_sampler->slot = index;
@@ -664,7 +664,7 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                 }
 
                 case STATE_REQUIRE:
-                    parse_require_directive(context, line);
+                    parse_require_directive(runner, line);
                     break;
 
                 case STATE_SAMPLER:
@@ -676,19 +676,19 @@ void run_shader_tests(struct shader_context *context, int argc, char **argv, con
                     break;
 
                 case STATE_TEST:
-                    parse_test_directive(context, line);
+                    parse_test_directive(runner, line);
                     break;
             }
         }
     }
 
-    free(context->ps_source);
-    for (i = 0; i < context->texture_count; ++i)
+    free(runner->ps_source);
+    for (i = 0; i < runner->texture_count; ++i)
     {
-        if (context->textures[i])
-            context->ops->destroy_texture(context, context->textures[i]);
+        if (runner->textures[i])
+            runner->ops->destroy_texture(runner, runner->textures[i]);
     }
-    free(context->textures);
+    free(runner->textures);
 
     fclose(f);
 
