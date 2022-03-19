@@ -51,9 +51,9 @@ static struct d3d11_texture *d3d11_texture(struct texture *t)
     return CONTAINING_RECORD(t, struct d3d11_texture, t);
 }
 
-struct d3d11_shader_context
+struct d3d11_shader_runner
 {
-    struct shader_runner c;
+    struct shader_runner r;
 
     ID3D11Device *device;
     HWND window;
@@ -65,9 +65,9 @@ struct d3d11_shader_context
     ID3D11VertexShader *vs;
 };
 
-static struct d3d11_shader_context *d3d11_shader_context(struct shader_runner *r)
+static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
 {
-    return CONTAINING_RECORD(r, struct d3d11_shader_context, c);
+    return CONTAINING_RECORD(r, struct d3d11_shader_runner, r);
 }
 
 static bool enable_debug_layer;
@@ -264,7 +264,7 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
     return swapchain;
 }
 
-static BOOL init_test_context(struct d3d11_shader_context *context)
+static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
     const D3D11_TEXTURE2D_DESC texture_desc =
     {
@@ -282,9 +282,9 @@ static BOOL init_test_context(struct d3d11_shader_context *context)
     HRESULT hr;
     RECT rect;
 
-    memset(context, 0, sizeof(*context));
+    memset(runner, 0, sizeof(*runner));
 
-    if (!(context->device = create_device()))
+    if (!(runner->device = create_device()))
     {
         skip("Failed to create device.\n");
         return FALSE;
@@ -294,19 +294,19 @@ static BOOL init_test_context(struct d3d11_shader_context *context)
     rt_height = 480;
     SetRect(&rect, 0, 0, rt_width, rt_height);
     AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW, FALSE);
-    context->window = CreateWindowA("static", "d3dcompiler_test", WS_OVERLAPPEDWINDOW,
+    runner->window = CreateWindowA("static", "d3dcompiler_test", WS_OVERLAPPEDWINDOW,
             0, 0, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, NULL, NULL);
-    context->swapchain = create_swapchain(context->device, context->window);
+    runner->swapchain = create_swapchain(runner->device, runner->window);
 
-    hr = ID3D11Device_CreateTexture2D(context->device, &texture_desc, NULL, &context->rt);
+    hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, &runner->rt);
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-    hr = ID3D11Device_CreateRenderTargetView(context->device, (ID3D11Resource *)context->rt, NULL, &context->rtv);
+    hr = ID3D11Device_CreateRenderTargetView(runner->device, (ID3D11Resource *)runner->rt, NULL, &runner->rtv);
     ok(hr == S_OK, "Failed to create rendertarget view, hr %#lx.\n", hr);
 
-    ID3D11Device_GetImmediateContext(context->device, &context->immediate_context);
+    ID3D11Device_GetImmediateContext(runner->device, &runner->immediate_context);
 
-    ID3D11DeviceContext_OMSetRenderTargets(context->immediate_context, 1, &context->rtv, NULL);
+    ID3D11DeviceContext_OMSetRenderTargets(runner->immediate_context, 1, &runner->rtv, NULL);
 
     vp.TopLeftX = 0.0f;
     vp.TopLeftY = 0.0f;
@@ -314,25 +314,25 @@ static BOOL init_test_context(struct d3d11_shader_context *context)
     vp.Height = rt_height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
-    ID3D11DeviceContext_RSSetViewports(context->immediate_context, 1, &vp);
+    ID3D11DeviceContext_RSSetViewports(runner->immediate_context, 1, &vp);
 
     return TRUE;
 }
 
-static void destroy_test_context(struct d3d11_shader_context *context)
+static void destroy_test_context(struct d3d11_shader_runner *runner)
 {
     ULONG ref;
 
-    if (context->vs)
-        ID3D11VertexShader_Release(context->vs);
+    if (runner->vs)
+        ID3D11VertexShader_Release(runner->vs);
 
-    ID3D11DeviceContext_Release(context->immediate_context);
-    ID3D11RenderTargetView_Release(context->rtv);
-    ID3D11Texture2D_Release(context->rt);
-    IDXGISwapChain_Release(context->swapchain);
-    DestroyWindow(context->window);
+    ID3D11DeviceContext_Release(runner->immediate_context);
+    ID3D11RenderTargetView_Release(runner->rtv);
+    ID3D11Texture2D_Release(runner->rt);
+    IDXGISwapChain_Release(runner->swapchain);
+    DestroyWindow(runner->window);
 
-    ref = ID3D11Device_Release(context->device);
+    ref = ID3D11Device_Release(runner->device);
     ok(!ref, "Device has %lu references left.\n", ref);
 }
 
@@ -361,8 +361,8 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
 
 static struct texture *d3d11_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
 {
-    struct d3d11_shader_context *context = d3d11_shader_context(r);
-    ID3D11Device *device = context->device;
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    ID3D11Device *device = runner->device;
     D3D11_SUBRESOURCE_DATA resource_data;
     D3D11_TEXTURE2D_DESC desc = {0};
     struct d3d11_texture *texture;
@@ -412,8 +412,8 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
         "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
         "}";
 
-    struct d3d11_shader_context *context = d3d11_shader_context(r);
-    ID3D11Device *device = context->device;
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    ID3D11Device *device = runner->device;
     ID3D11Buffer *cb = NULL;
     ID3D11PixelShader *ps;
     ID3D10Blob *ps_code;
@@ -429,15 +429,15 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
         [SHADER_MODEL_5_1] = "ps_5_1",
     };
 
-    if (!(ps_code = compile_shader(context->c.ps_source, ps_profiles[context->c.minimum_shader_model])))
+    if (!(ps_code = compile_shader(runner->r.ps_source, ps_profiles[runner->r.minimum_shader_model])))
         return;
 
-    if (!context->vs)
+    if (!runner->vs)
     {
         ID3D10Blob *vs_code = compile_shader(vs_source, "vs_4_0");
 
         hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
-                ID3D10Blob_GetBufferSize(vs_code), NULL, &context->vs);
+                ID3D10Blob_GetBufferSize(vs_code), NULL, &runner->vs);
         ok(hr == S_OK, "Failed to create vertex shader, hr %#lx.\n", hr);
         ID3D10Blob_Release(vs_code);
     }
@@ -446,23 +446,23 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
             ID3D10Blob_GetBufferSize(ps_code), NULL, &ps);
     ok(hr == S_OK, "Failed to create pixel shader, hr %#lx.\n", hr);
 
-    if (context->c.uniform_count)
+    if (runner->r.uniform_count)
     {
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
-                context->c.uniform_count * sizeof(*context->c.uniforms), context->c.uniforms);
-        ID3D11DeviceContext_PSSetConstantBuffers(context->immediate_context, 0, 1, &cb);
+                runner->r.uniform_count * sizeof(*runner->r.uniforms), runner->r.uniforms);
+        ID3D11DeviceContext_PSSetConstantBuffers(runner->immediate_context, 0, 1, &cb);
     }
 
-    for (i = 0; i < context->c.texture_count; ++i)
+    for (i = 0; i < runner->r.texture_count; ++i)
     {
-        struct d3d11_texture *texture = d3d11_texture(context->c.textures[i]);
+        struct d3d11_texture *texture = d3d11_texture(runner->r.textures[i]);
 
-        ID3D11DeviceContext_PSSetShaderResources(context->immediate_context, texture->t.slot, 1, &texture->srv);
+        ID3D11DeviceContext_PSSetShaderResources(runner->immediate_context, texture->t.slot, 1, &texture->srv);
     }
 
-    for (i = 0; i < context->c.sampler_count; ++i)
+    for (i = 0; i < runner->r.sampler_count; ++i)
     {
-        struct sampler *sampler = &context->c.samplers[i];
+        struct sampler *sampler = &runner->r.samplers[i];
         ID3D11SamplerState *d3d11_sampler;
         D3D11_SAMPLER_DESC desc = {0};
 
@@ -477,15 +477,15 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
 
         hr = ID3D11Device_CreateSamplerState(device, &desc, &d3d11_sampler);
         ok(hr == S_OK, "Failed to create sampler state, hr %#lx.\n", hr);
-        ID3D11DeviceContext_PSSetSamplers(context->immediate_context, sampler->slot, 1, &d3d11_sampler);
+        ID3D11DeviceContext_PSSetSamplers(runner->immediate_context, sampler->slot, 1, &d3d11_sampler);
         ID3D11SamplerState_Release(d3d11_sampler);
     }
 
-    ID3D11DeviceContext_IASetPrimitiveTopology(context->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ID3D11DeviceContext_VSSetShader(context->immediate_context, context->vs, NULL, 0);
-    ID3D11DeviceContext_PSSetShader(context->immediate_context, ps, NULL, 0);
+    ID3D11DeviceContext_IASetPrimitiveTopology(runner->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D11DeviceContext_VSSetShader(runner->immediate_context, runner->vs, NULL, 0);
+    ID3D11DeviceContext_PSSetShader(runner->immediate_context, ps, NULL, 0);
 
-    ID3D11DeviceContext_Draw(context->immediate_context, 3, 0);
+    ID3D11DeviceContext_Draw(runner->immediate_context, 3, 0);
 
     ID3D11PixelShader_Release(ps);
     if (cb)
@@ -500,30 +500,30 @@ struct resource_readback
     D3D11_MAPPED_SUBRESOURCE map_desc;
 };
 
-static void init_readback(struct d3d11_shader_context *context, struct resource_readback *rb)
+static void init_readback(struct d3d11_shader_runner *runner, struct resource_readback *rb)
 {
     D3D11_TEXTURE2D_DESC texture_desc;
     HRESULT hr;
 
-    ID3D11Texture2D_GetDesc(context->rt, &texture_desc);
+    ID3D11Texture2D_GetDesc(runner->rt, &texture_desc);
     texture_desc.Usage = D3D11_USAGE_STAGING;
     texture_desc.BindFlags = 0;
     texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     texture_desc.MiscFlags = 0;
-    hr = ID3D11Device_CreateTexture2D(context->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
+    hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-    ID3D11DeviceContext_CopyResource(context->immediate_context, rb->resource, (ID3D11Resource *)context->rt);
-    hr = ID3D11DeviceContext_Map(context->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &rb->map_desc);
+    ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, (ID3D11Resource *)runner->rt);
+    hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &rb->map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
 
     rb->width = texture_desc.Width;
     rb->height = texture_desc.Height;
 }
 
-static void release_readback(struct d3d11_shader_context *context, struct resource_readback *rb)
+static void release_readback(struct d3d11_shader_runner *runner, struct resource_readback *rb)
 {
-    ID3D11DeviceContext_Unmap(context->immediate_context, rb->resource, 0);
+    ID3D11DeviceContext_Unmap(runner->immediate_context, rb->resource, 0);
     ID3D11Resource_Release(rb->resource);
 }
 
@@ -563,12 +563,12 @@ static void check_readback_data_vec4(struct resource_readback *rb,
 
 static void d3d11_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
-    struct d3d11_shader_context *context = d3d11_shader_context(r);
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     struct resource_readback rb;
 
-    init_readback(context, &rb);
+    init_readback(runner, &rb);
     check_readback_data_vec4(&rb, rect, v, ulps);
-    release_readback(context, &rb);
+    release_readback(runner, &rb);
 }
 
 static const struct shader_runner_ops d3d11_runner_ops =
@@ -581,8 +581,8 @@ static const struct shader_runner_ops d3d11_runner_ops =
 
 void run_shader_tests_d3d11(int argc, char **argv)
 {
+    struct d3d11_shader_runner runner;
     HMODULE dxgi_module, d3d11_module;
-    struct d3d11_shader_context context;
 
     d3d11_module = LoadLibraryA("d3d11.dll");
     dxgi_module = LoadLibraryA("dxgi.dll");
@@ -594,9 +594,9 @@ void run_shader_tests_d3d11(int argc, char **argv)
         parse_args(argc, argv);
         enable_d3d11_debug_layer(argc, argv);
         init_adapter_info();
-        init_test_context(&context);
-        run_shader_tests(&context.c, argc, argv, &d3d11_runner_ops);
-        destroy_test_context(&context);
+        init_test_context(&runner);
+        run_shader_tests(&runner.r, argc, argv, &d3d11_runner_ops);
+        destroy_test_context(&runner);
     }
     FreeLibrary(d3d11_module);
     FreeLibrary(dxgi_module);
