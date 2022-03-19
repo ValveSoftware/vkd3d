@@ -38,18 +38,18 @@ static struct d3d12_texture *d3d12_texture(struct texture *t)
     return CONTAINING_RECORD(t, struct d3d12_texture, t);
 }
 
-struct d3d12_shader_context
+struct d3d12_shader_runner
 {
-    struct shader_runner c;
+    struct shader_runner r;
 
     struct test_context test_context;
 
     ID3D12DescriptorHeap *heap;
 };
 
-static struct d3d12_shader_context *d3d12_shader_context(struct shader_runner *r)
+static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
 {
-    return CONTAINING_RECORD(r, struct d3d12_shader_context, c);
+    return CONTAINING_RECORD(r, struct d3d12_shader_runner, r);
 }
 
 static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_model)
@@ -82,14 +82,14 @@ static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_m
 
 static struct texture *d3d12_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(r);
-    struct test_context *test_context = &context->test_context;
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
     D3D12_SUBRESOURCE_DATA resource_data;
     struct d3d12_texture *texture;
 
-    if (!context->heap)
-        context->heap = create_gpu_descriptor_heap(device,
+    if (!runner->heap)
+        runner->heap = create_gpu_descriptor_heap(device,
                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
     if (params->slot >= MAX_RESOURCE_DESCRIPTORS)
@@ -108,7 +108,7 @@ static struct texture *d3d12_runner_create_texture(struct shader_runner *r, cons
     transition_resource_state(test_context->list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     ID3D12Device_CreateShaderResourceView(device, texture->resource,
-            NULL, get_cpu_descriptor_handle(test_context, context->heap, params->slot));
+            NULL, get_cpu_descriptor_handle(test_context, runner->heap, params->slot));
 
     return &texture->t;
 }
@@ -123,8 +123,8 @@ static void d3d12_runner_destroy_texture(struct shader_runner *r, struct texture
 
 static void d3d12_runner_draw_quad(struct shader_runner *r)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(r);
-    struct test_context *test_context = &context->test_context;
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
 
     ID3D12GraphicsCommandList *command_list = test_context->list;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
@@ -140,7 +140,7 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     HRESULT hr;
     size_t i;
 
-    if (!(ps_code = compile_shader(context->c.ps_source, context->c.minimum_shader_model)))
+    if (!(ps_code = compile_shader(runner->r.ps_source, runner->r.minimum_shader_model)))
         return;
 
     root_signature_desc.NumParameters = 0;
@@ -148,20 +148,20 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     root_signature_desc.NumStaticSamplers = 0;
     root_signature_desc.pStaticSamplers = static_samplers;
 
-    if (context->c.uniform_count)
+    if (runner->r.uniform_count)
     {
         uniform_index = root_signature_desc.NumParameters++;
         root_param = &root_params[uniform_index];
         root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         root_param->Constants.ShaderRegister = 0;
         root_param->Constants.RegisterSpace = 0;
-        root_param->Constants.Num32BitValues = context->c.uniform_count;
+        root_param->Constants.Num32BitValues = runner->r.uniform_count;
         root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
-    for (i = 0; i < context->c.texture_count; ++i)
+    for (i = 0; i < runner->r.texture_count; ++i)
     {
-        struct d3d12_texture *texture = d3d12_texture(context->c.textures[i]);
+        struct d3d12_texture *texture = d3d12_texture(runner->r.textures[i]);
         D3D12_DESCRIPTOR_RANGE *range;
 
         range = &texture->descriptor_range;
@@ -182,10 +182,10 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
 
     assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
 
-    for (i = 0; i < context->c.sampler_count; ++i)
+    for (i = 0; i < runner->r.sampler_count; ++i)
     {
         D3D12_STATIC_SAMPLER_DESC *sampler_desc = &static_samplers[root_signature_desc.NumStaticSamplers++];
-        const struct sampler *sampler = &context->c.samplers[i];
+        const struct sampler *sampler = &runner->r.samplers[i];
 
         memset(sampler_desc, 0, sizeof(*sampler_desc));
         sampler_desc->Filter = sampler->filter;
@@ -214,15 +214,15 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     test_context->pso[test_context->pso_count++] = pso;
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, test_context->root_signature);
-    if (context->c.uniform_count)
+    if (runner->r.uniform_count)
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
-                context->c.uniform_count, context->c.uniforms, 0);
-    for (i = 0; i < context->c.texture_count; ++i)
+                runner->r.uniform_count, runner->r.uniforms, 0);
+    for (i = 0; i < runner->r.texture_count; ++i)
     {
-        struct d3d12_texture *texture = d3d12_texture(context->c.textures[i]);
+        struct d3d12_texture *texture = d3d12_texture(runner->r.textures[i]);
 
         ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, texture->root_index,
-                get_gpu_descriptor_handle(test_context, context->heap, texture->t.slot));
+                get_gpu_descriptor_handle(test_context, runner->heap, texture->t.slot));
     }
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &test_context->rtv, false, NULL);
@@ -246,8 +246,8 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
 static void d3d12_runner_probe_vec4(struct shader_runner *r,
         const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
-    struct d3d12_shader_context *context = d3d12_shader_context(r);
-    struct test_context *test_context = &context->test_context;
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
     struct resource_readback rb;
 
     get_texture_readback_with_command_list(test_context->render_target, 0, &rb,
@@ -274,16 +274,16 @@ void run_shader_tests_d3d12(int argc, char **argv)
         .no_root_signature = true,
         .rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT,
     };
-    struct d3d12_shader_context context = {0};
+    struct d3d12_shader_runner runner = {0};
 
     parse_args(argc, argv);
     enable_d3d12_debug_layer(argc, argv);
     init_adapter_info();
-    init_test_context(&context.test_context, &desc);
+    init_test_context(&runner.test_context, &desc);
 
-    run_shader_tests(&context.c, argc, argv, &d3d12_runner_ops);
+    run_shader_tests(&runner.r, argc, argv, &d3d12_runner_ops);
 
-    if (context.heap)
-        ID3D12DescriptorHeap_Release(context.heap);
-    destroy_test_context(&context.test_context);
+    if (runner.heap)
+        ID3D12DescriptorHeap_Release(runner.heap);
+    destroy_test_context(&runner.test_context);
 }
