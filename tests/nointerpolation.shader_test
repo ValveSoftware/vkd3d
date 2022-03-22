@@ -1,0 +1,27 @@
+[require]
+shader model >= 4.0
+
+[input layout]
+0 r32g32b32a32 float texcoord
+
+[vertex buffer 0]
+0.0 1.0 0.0 1.0
+1.0 0.0 0.0 1.0
+0.0 0.0 1.0 1.0
+
+[vertex shader]
+void main(uint id : sv_vertexid, nointerpolation inout float4 t : texcoord, out float4 pos : sv_position)
+{
+    float2 coords = float2((id << 1) & 2, id & 2);
+    pos = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
+}
+
+[pixel shader]
+float4 main(nointerpolation float4 t : texcoord) : sv_target
+{
+    return t;
+}
+
+[test]
+draw triangle list 3
+probe all rgba (0.0, 1.0, 0.0, 1.0)

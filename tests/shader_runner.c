@@ -336,6 +336,23 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
     }
+    else if (match_string(line, "draw", &line))
+    {
+        D3D_PRIMITIVE_TOPOLOGY topology;
+        unsigned int vertex_count;
+        char *rest;
+
+        if (match_string(line, "triangle list", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        else
+            fatal_error("Unknown primitive topology '%s'.\n", line);
+
+        vertex_count = strtoul(line, &rest, 10);
+        if (line == rest)
+            fatal_error("Malformed vertex count '%s'.\n", line);
+
+        runner->ops->draw(runner, topology, vertex_count);
+    }
     else if (match_string(line, "probe all rgba", &line))
     {
         static const RECT rect = {0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT};
