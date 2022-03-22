@@ -61,8 +61,6 @@ struct d3d11_shader_runner
     ID3D11Texture2D *rt;
     ID3D11RenderTargetView *rtv;
     ID3D11DeviceContext *immediate_context;
-
-    ID3D11VertexShader *vs;
 };
 
 static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
@@ -74,11 +72,22 @@ static bool enable_debug_layer;
 static bool use_warp_adapter;
 static unsigned int use_adapter_idx;
 
-static ID3D10Blob *compile_shader(const char *source, const char *profile)
+static ID3D10Blob *compile_shader(const char *source, const char *type, enum shader_model shader_model)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
+    char profile[7];
     HRESULT hr;
 
+    static const char *const shader_models[] =
+    {
+        [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_4_0] = "4_0",
+        [SHADER_MODEL_4_1] = "4_1",
+        [SHADER_MODEL_5_0] = "5_0",
+        [SHADER_MODEL_5_1] = "5_1",
+    };
+
+    sprintf(profile, "%s_%s", type, shader_models[shader_model]);
     hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
     ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
     if (errors)
@@ -323,9 +332,6 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
 {
     ULONG ref;
 
-    if (runner->vs)
-        ID3D11VertexShader_Release(runner->vs);
-
     ID3D11DeviceContext_Release(runner->immediate_context);
     ID3D11RenderTargetView_Release(runner->rtv);
     ID3D11Texture2D_Release(runner->rt);
@@ -405,42 +411,27 @@ static void d3d11_runner_destroy_texture(struct shader_runner *r, struct texture
 
 static void d3d11_runner_draw_quad(struct shader_runner *r)
 {
-    static const char vs_source[] =
-        "void main(uint id : SV_VertexID, out float4 position : SV_Position)\n"
-        "{\n"
-        "    float2 coords = float2((id << 1) & 2, id & 2);\n"
-        "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
-        "}";
-
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11Device *device = runner->device;
+    ID3D10Blob *vs_code, *ps_code;
     ID3D11Buffer *cb = NULL;
+    ID3D11VertexShader *vs;
     ID3D11PixelShader *ps;
-    ID3D10Blob *ps_code;
     unsigned int i;
     HRESULT hr;
 
-    static const char *const ps_profiles[] =
-    {
-        [SHADER_MODEL_2_0] = "ps_4_0",
-        [SHADER_MODEL_4_0] = "ps_4_0",
-        [SHADER_MODEL_4_1] = "ps_4_1",
-        [SHADER_MODEL_5_0] = "ps_5_0",
-        [SHADER_MODEL_5_1] = "ps_5_1",
-    };
-
-    if (!(ps_code = compile_shader(runner->r.ps_source, ps_profiles[runner->r.minimum_shader_model])))
+    if (!(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
         return;
 
-    if (!runner->vs)
+    if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
     {
-        ID3D10Blob *vs_code = compile_shader(runner->r.vs_source ? runner->r.vs_source : vs_source, "vs_4_0");
-
-        hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
-                ID3D10Blob_GetBufferSize(vs_code), NULL, &runner->vs);
-        ok(hr == S_OK, "Failed to create vertex shader, hr %#lx.\n", hr);
         ID3D10Blob_Release(vs_code);
+        return;
     }
+
+    hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
+            ID3D10Blob_GetBufferSize(vs_code), NULL, &vs);
+    ok(hr == S_OK, "Failed to create vertex shader, hr %#lx.\n", hr);
 
     hr = ID3D11Device_CreatePixelShader(device, ID3D10Blob_GetBufferPointer(ps_code),
             ID3D10Blob_GetBufferSize(ps_code), NULL, &ps);
@@ -482,12 +473,13 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
     }
 
     ID3D11DeviceContext_IASetPrimitiveTopology(runner->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ID3D11DeviceContext_VSSetShader(runner->immediate_context, runner->vs, NULL, 0);
+    ID3D11DeviceContext_VSSetShader(runner->immediate_context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(runner->immediate_context, ps, NULL, 0);
 
     ID3D11DeviceContext_Draw(runner->immediate_context, 3, 0);
 
     ID3D11PixelShader_Release(ps);
+    ID3D11VertexShader_Release(vs);
     if (cb)
         ID3D11Buffer_Release(cb);
 }

@@ -290,6 +290,16 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     if (match_string(line, "draw quad", &line))
     {
+        static const char vs_source[] =
+            "void main(uint id : SV_VertexID, out float4 position : SV_Position)\n"
+            "{\n"
+            "    float2 coords = float2((id << 1) & 2, id & 2);\n"
+            "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
+            "}";
+
+        if (!runner->vs_source)
+            runner->vs_source = strdup(vs_source);
+
         runner->ops->draw_quad(runner);
     }
     else if (match_string(line, "probe all rgba", &line))
