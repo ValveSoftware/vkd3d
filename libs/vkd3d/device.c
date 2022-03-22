@@ -1657,7 +1657,12 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
      * use only enough descriptors for the descriptor tables of the currently bound
      * root signature, and don't require a 32-bit push constant for each table. */
     device->use_vk_heaps = vulkan_info->EXT_descriptor_indexing
-            && !(device->vkd3d_instance->config_flags & VKD3D_CONFIG_FLAG_VIRTUAL_HEAPS);
+            && !(device->vkd3d_instance->config_flags & VKD3D_CONFIG_FLAG_VIRTUAL_HEAPS)
+            && descriptor_indexing->descriptorBindingUniformBufferUpdateAfterBind
+            && descriptor_indexing->descriptorBindingSampledImageUpdateAfterBind
+            && descriptor_indexing->descriptorBindingStorageImageUpdateAfterBind
+            && descriptor_indexing->descriptorBindingUniformTexelBufferUpdateAfterBind
+            && descriptor_indexing->descriptorBindingStorageTexelBufferUpdateAfterBind;
 
     if (device->use_vk_heaps)
         vkd3d_device_vk_heaps_descriptor_limits_init(&vulkan_info->descriptor_limits,
