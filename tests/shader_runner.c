@@ -334,7 +334,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
 
-        runner->ops->draw_quad(runner);
+        runner->ops->draw(runner, 3);
     }
     else if (match_string(line, "probe all rgba", &line))
     {

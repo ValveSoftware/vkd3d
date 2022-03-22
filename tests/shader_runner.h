@@ -112,7 +112,7 @@ struct shader_runner_ops
 {
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
-    void (*draw_quad)(struct shader_runner *runner);
+    void (*draw)(struct shader_runner *runner, unsigned int vertex_count);
     void (*probe_vec4)(struct shader_runner *runner, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };
 

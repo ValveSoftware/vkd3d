@@ -132,7 +132,7 @@ static void d3d12_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d12_runner_draw_quad(struct shader_runner *r)
+static void d3d12_runner_draw(struct shader_runner *r, unsigned int vertex_count)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
@@ -294,7 +294,7 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, test_context->rtv, clear_color, 0, NULL);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, vertex_count, 1, 0, 0);
     transition_resource_state(command_list, test_context->render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
@@ -324,7 +324,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
 {
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
-    .draw_quad = d3d12_runner_draw_quad,
+    .draw = d3d12_runner_draw,
     .probe_vec4 = d3d12_runner_probe_vec4,
 };
 

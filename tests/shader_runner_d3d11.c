@@ -423,7 +423,7 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d11_runner_draw_quad(struct shader_runner *r)
+static void d3d11_runner_draw(struct shader_runner *r, unsigned int vertex_count)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
@@ -529,7 +529,7 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
     ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);
 
-    ID3D11DeviceContext_Draw(context, 3, 0);
+    ID3D11DeviceContext_Draw(context, vertex_count, 0);
 
     ID3D11PixelShader_Release(ps);
     ID3D11VertexShader_Release(vs);
@@ -611,7 +611,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
 {
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
-    .draw_quad = d3d11_runner_draw_quad,
+    .draw = d3d11_runner_draw,
     .probe_vec4 = d3d11_runner_probe_vec4,
 };
 
