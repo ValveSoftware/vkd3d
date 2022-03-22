@@ -131,8 +131,10 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
     D3D12_ROOT_PARAMETER root_params[3], *root_param;
     ID3D12CommandQueue *queue = test_context->queue;
+    D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     D3D12_STATIC_SAMPLER_DESC static_samplers[1];
     ID3D12Device *device = test_context->device;
+    D3D12_INPUT_LAYOUT_DESC input_layout;
     static const float clear_color[4];
     ID3D10Blob *vs_code, *ps_code;
     D3D12_SHADER_BYTECODE vs, ps;
@@ -154,6 +156,7 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     root_signature_desc.pParameters = root_params;
     root_signature_desc.NumStaticSamplers = 0;
     root_signature_desc.pStaticSamplers = static_samplers;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     if (runner->r.uniform_count)
     {
@@ -209,14 +212,32 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     hr = create_root_signature(device, &root_signature_desc, &test_context->root_signature);
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
 
+    input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
+    for (i = 0; i < runner->r.input_element_count; ++i)
+    {
+        const struct input_element *element = &runner->r.input_elements[i];
+        D3D12_INPUT_ELEMENT_DESC *desc = &input_element_descs[i];
+
+        desc->SemanticName = element->name;
+        desc->SemanticIndex = element->index;
+        desc->Format = element->format;
+        desc->InputSlot = element->slot;
+        desc->AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+        desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
+    }
+
+    input_layout.pInputElementDescs = input_element_descs;
+    input_layout.NumElements = runner->r.input_element_count;
+
     vs.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
     vs.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
     ps.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
     ps.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
     pso = create_pipeline_state(device, test_context->root_signature,
-            test_context->render_target_desc.Format, &vs, &ps, NULL);
+            test_context->render_target_desc.Format, &vs, &ps, &input_layout);
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
+    free(input_element_descs);
     if (!pso)
         return;
     vkd3d_array_reserve((void **)&test_context->pso, &test_context->pso_capacity,

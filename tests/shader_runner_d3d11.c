@@ -412,6 +412,7 @@ static void d3d11_runner_destroy_texture(struct shader_runner *r, struct texture
 static void d3d11_runner_draw_quad(struct shader_runner *r)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+    ID3D11DeviceContext *context = runner->immediate_context;
     ID3D11Device *device = runner->device;
     ID3D10Blob *vs_code, *ps_code;
     ID3D11Buffer *cb = NULL;
@@ -441,14 +442,14 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
     {
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
                 runner->r.uniform_count * sizeof(*runner->r.uniforms), runner->r.uniforms);
-        ID3D11DeviceContext_PSSetConstantBuffers(runner->immediate_context, 0, 1, &cb);
+        ID3D11DeviceContext_PSSetConstantBuffers(context, 0, 1, &cb);
     }
 
     for (i = 0; i < runner->r.texture_count; ++i)
     {
         struct d3d11_texture *texture = d3d11_texture(runner->r.textures[i]);
 
-        ID3D11DeviceContext_PSSetShaderResources(runner->immediate_context, texture->t.slot, 1, &texture->srv);
+        ID3D11DeviceContext_PSSetShaderResources(context, texture->t.slot, 1, &texture->srv);
     }
 
     for (i = 0; i < runner->r.sampler_count; ++i)
@@ -468,15 +469,41 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
 
         hr = ID3D11Device_CreateSamplerState(device, &desc, &d3d11_sampler);
         ok(hr == S_OK, "Failed to create sampler state, hr %#lx.\n", hr);
-        ID3D11DeviceContext_PSSetSamplers(runner->immediate_context, sampler->slot, 1, &d3d11_sampler);
+        ID3D11DeviceContext_PSSetSamplers(context, sampler->slot, 1, &d3d11_sampler);
         ID3D11SamplerState_Release(d3d11_sampler);
     }
 
-    ID3D11DeviceContext_IASetPrimitiveTopology(runner->immediate_context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ID3D11DeviceContext_VSSetShader(runner->immediate_context, vs, NULL, 0);
-    ID3D11DeviceContext_PSSetShader(runner->immediate_context, ps, NULL, 0);
+    if (runner->r.input_element_count)
+    {
+        D3D11_INPUT_ELEMENT_DESC *descs;
+        ID3D11InputLayout *input_layout;
 
-    ID3D11DeviceContext_Draw(runner->immediate_context, 3, 0);
+        descs = calloc(runner->r.input_element_count, sizeof(*descs));
+        for (i = 0; i < runner->r.input_element_count; ++i)
+        {
+            const struct input_element *element = &runner->r.input_elements[i];
+            D3D11_INPUT_ELEMENT_DESC *desc = &descs[i];
+
+            desc->SemanticName = element->name;
+            desc->SemanticIndex = element->index;
+            desc->Format = element->format;
+            desc->InputSlot = element->slot;
+            desc->AlignedByteOffset = D3D11_APPEND_ALIGNED_ELEMENT;
+            desc->InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+        }
+
+        hr = ID3D11Device_CreateInputLayout(device, descs, runner->r.input_element_count,
+                ID3D10Blob_GetBufferPointer(vs_code), ID3D10Blob_GetBufferSize(vs_code), &input_layout);
+        ok(hr == S_OK, "Failed to create input layout, hr %#lx.\n", hr);
+        ID3D11DeviceContext_IASetInputLayout(context, input_layout);
+        ID3D11InputLayout_Release(input_layout);
+    }
+
+    ID3D11DeviceContext_IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
+    ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);
+
+    ID3D11DeviceContext_Draw(context, 3, 0);
 
     ID3D11PixelShader_Release(ps);
     ID3D11VertexShader_Release(vs);

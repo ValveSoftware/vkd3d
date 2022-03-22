@@ -54,6 +54,7 @@ typedef int HRESULT;
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 #include "vkd3d_windows.h"
 #include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3dcompiler.h"
@@ -74,6 +75,7 @@ void fatal_error(const char *format, ...)
 enum parse_state
 {
     STATE_NONE,
+    STATE_INPUT_LAYOUT,
     STATE_PREPROC,
     STATE_PREPROC_INVALID,
     STATE_REQUIRE,
@@ -88,6 +90,9 @@ enum parse_state
 static bool match_string(const char *line, const char *token, const char **const rest)
 {
     size_t len = strlen(token);
+
+    while (isspace(*line))
+        ++line;
 
     if (strncmp(line, token, len) || !isspace(line[len]))
         return false;
@@ -131,7 +136,7 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     }
 }
 
-static void parse_texture_format(struct texture_params *texture, const char *line)
+static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size, const char **rest)
 {
     static const struct
     {
@@ -151,12 +156,12 @@ static void parse_texture_format(struct texture_params *texture, const char *lin
 
     for (i = 0; i < ARRAY_SIZE(formats); ++i)
     {
-        if (match_string(line, formats[i].string, &line))
+        if (match_string(line, formats[i].string, rest))
         {
-            texture->format = formats[i].format;
-            texture->data_type = formats[i].data_type;
-            texture->texel_size = formats[i].texel_size;
-            return;
+            if (data_type)
+                *data_type = formats[i].data_type;
+            *texel_size = formats[i].texel_size;
+            return formats[i].format;
         }
     }
 
@@ -230,7 +235,7 @@ static void parse_texture_directive(struct texture_params *texture, const char *
 
     if (match_string(line, "format", &line))
     {
-        parse_texture_format(texture, line);
+        texture->format = parse_format(line, &texture->data_type, &texture->texel_size, &line);
     }
     else if (match_string(line, "size", &line))
     {
@@ -276,6 +281,34 @@ static void parse_texture_directive(struct texture_params *texture, const char *
             line = rest;
         }
     }
+}
+
+static void parse_input_layout_directive(struct shader_runner *runner, const char *line)
+{
+    struct input_element *element;
+    const char *rest;
+
+    vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
+            runner->input_element_count + 1, sizeof(*runner->input_elements));
+    element = &runner->input_elements[runner->input_element_count++];
+
+    element->slot = strtoul(line, (char **)&rest, 10);
+    if (rest == line)
+        fatal_error("Malformed input layout directive '%s'.\n", line);
+    line = rest;
+
+    element->format = parse_format(line, NULL, &element->texel_size, &line);
+
+    if (!(rest = strpbrk(line, " \n")))
+        rest = line + strlen(line);
+    element->name = malloc(rest - line + 1);
+    memcpy(element->name, line, rest - line);
+    element->name[rest - line] = 0;
+    line = rest;
+
+    element->index = strtoul(line, (char **)&rest, 10);
+    if (rest == line)
+        element->index = 0;
 }
 
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
@@ -493,6 +526,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
         {
             switch (state)
             {
+                case STATE_INPUT_LAYOUT:
                 case STATE_NONE:
                 case STATE_REQUIRE:
                 case STATE_SAMPLER:
@@ -662,6 +696,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 state = STATE_SHADER_VERTEX;
             }
+            else if (!strcmp(line, "[input layout]\n"))
+            {
+                state = STATE_INPUT_LAYOUT;
+
+                for (i = 0; i < runner->input_element_count; ++i)
+                    free(runner->input_elements[i].name);
+                runner->input_element_count = 0;
+            }
 
             vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
@@ -671,6 +713,10 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 case STATE_NONE:
                     fatal_error("Malformed line '%s'.\n", line);
+                    break;
+
+                case STATE_INPUT_LAYOUT:
+                    parse_input_layout_directive(runner, line);
                     break;
 
                 case STATE_PREPROC:
@@ -706,6 +752,9 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
         }
     }
 
+    for (i = 0; i < runner->input_element_count; ++i)
+        free(runner->input_elements[i].name);
+    free(runner->input_elements);
     free(runner->vs_source);
     free(runner->ps_source);
     for (i = 0; i < runner->texture_count; ++i)

@@ -68,6 +68,15 @@ struct texture
     unsigned int slot;
 };
 
+struct input_element
+{
+    char *name;
+    unsigned int slot;
+    DXGI_FORMAT format;
+    unsigned int texel_size;
+    unsigned int index;
+};
+
 struct shader_runner
 {
     const struct shader_runner_ops *ops;
@@ -84,6 +93,9 @@ struct shader_runner
 
     struct sampler *samplers;
     size_t sampler_count;
+
+    struct input_element *input_elements;
+    size_t input_element_count, input_element_capacity;
 };
 
 struct shader_runner_ops
