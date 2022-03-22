@@ -85,6 +85,7 @@ enum parse_state
     STATE_SHADER_VERTEX,
     STATE_TEXTURE,
     STATE_TEST,
+    STATE_VERTEX_BUFFER,
 };
 
 static bool match_string(const char *line, const char *token, const char **const rest)
@@ -478,6 +479,24 @@ static void set_resource(struct shader_runner *runner, struct resource *resource
     runner->resources[runner->resource_count++] = resource;
 }
 
+unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot)
+{
+    unsigned int stride = 0;
+    size_t i;
+
+    /* We currently don't deal with vertex formats less than 32 bits, so don't
+     * bother with alignment. */
+    for (i = 0; i < runner->input_element_count; ++i)
+    {
+        const struct input_element *element = &runner->input_elements[i];
+
+        if (element->slot == slot)
+            stride += element->texel_size;
+    }
+
+    return stride;
+}
+
 void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
@@ -534,6 +553,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_TEXTURE:
+                case STATE_VERTEX_BUFFER:
                     set_resource(runner, runner->ops->create_resource(runner, &current_resource));
                     free(current_resource.data);
                     break;
@@ -681,6 +701,16 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
             }
+            else if (sscanf(line, "[vertex buffer %u]\n", &index))
+            {
+                state = STATE_VERTEX_BUFFER;
+
+                memset(&current_resource, 0, sizeof(current_resource));
+
+                current_resource.slot = index;
+                current_resource.type = RESOURCE_TYPE_VERTEX_BUFFER;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+            }
             else if (!strcmp(line, "[test]\n"))
             {
                 state = STATE_TEST;
@@ -743,6 +773,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_TEXTURE:
+                case STATE_VERTEX_BUFFER:
                     parse_resource_directive(&current_resource, line);
                     break;
 

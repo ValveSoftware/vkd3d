@@ -92,6 +92,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     resource = calloc(1, sizeof(*resource));
     resource->r.slot = params->slot;
     resource->r.type = params->type;
+    resource->r.size = params->data_size;
 
     switch (params->type)
     {
@@ -113,6 +114,10 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             ID3D12Device_CreateShaderResourceView(device, resource->resource,
                     NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            break;
+
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+            resource->resource = create_upload_buffer(device, params->data_size, params->data);
             break;
     }
 
@@ -197,6 +202,9 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
                 range->RegisterSpace = 0;
                 range->OffsetInDescriptorsFromTableStart = 0;
                 break;
+
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                break;
         }
     }
 
@@ -261,12 +269,21 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
+        D3D12_VERTEX_BUFFER_VIEW vbv;
 
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
                 ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
                         get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                break;
+
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(resource->resource);
+                vbv.StrideInBytes = get_vb_stride(&runner->r, resource->r.slot);
+                vbv.SizeInBytes = resource->r.size;
+
+                ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, resource->r.slot, 1, &vbv);
                 break;
         }
     }

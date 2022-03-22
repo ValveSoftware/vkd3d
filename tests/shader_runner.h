@@ -54,6 +54,7 @@ struct sampler
 enum resource_type
 {
     RESOURCE_TYPE_TEXTURE,
+    RESOURCE_TYPE_VERTEX_BUFFER,
 };
 
 struct resource_params
@@ -73,6 +74,8 @@ struct resource
 {
     unsigned int slot;
     enum resource_type type;
+
+    unsigned int size;
 };
 
 struct input_element
@@ -114,6 +117,8 @@ struct shader_runner_ops
 };
 
 void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2);
+
+unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot);
 
 void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops);
 

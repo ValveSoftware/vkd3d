@@ -42,7 +42,7 @@ struct d3d11_resource
 {
     struct resource r;
 
-    ID3D11Texture2D *texture;
+    ID3D11Resource *resource;
     ID3D11ShaderResourceView *srv;
 };
 
@@ -397,12 +397,17 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             resource_data.SysMemPitch = params->width * params->texel_size;
             resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
 
-            hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, &resource->texture);
+            hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, (ID3D11Texture2D **)&resource->resource);
             ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
-            hr = ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource *)resource->texture, NULL, &resource->srv);
+            hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
             ok(hr == S_OK, "Failed to create shader resource view, hr %#lx.\n", hr);
             break;
         }
+
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+            resource->resource = (ID3D11Resource *)create_buffer(device,
+                    D3D11_BIND_VERTEX_BUFFER, params->data_size, params->data);
+            break;
     }
 
     return &resource->r;
@@ -412,8 +417,9 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
 {
     struct d3d11_resource *resource = d3d11_resource(res);
 
-    ID3D11Texture2D_Release(resource->texture);
-    ID3D11ShaderResourceView_Release(resource->srv);
+    ID3D11Resource_Release(resource->resource);
+    if (resource->srv)
+        ID3D11ShaderResourceView_Release(resource->srv);
     free(resource);
 }
 
@@ -456,11 +462,18 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
+        unsigned int stride = get_vb_stride(&runner->r, resource->r.slot);
+        unsigned int offset = 0;
 
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
                 ID3D11DeviceContext_PSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
+                break;
+
+            case RESOURCE_TYPE_VERTEX_BUFFER:
+                ID3D11DeviceContext_IASetVertexBuffers(context, resource->r.slot, 1,
+                        (ID3D11Buffer **)&resource->resource, &stride, &offset);
                 break;
         }
     }
