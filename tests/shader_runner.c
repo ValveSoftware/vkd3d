@@ -229,17 +229,17 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
     }
 }
 
-static void parse_texture_directive(struct texture_params *texture, const char *line)
+static void parse_resource_directive(struct resource_params *resource, const char *line)
 {
     int ret;
 
     if (match_string(line, "format", &line))
     {
-        texture->format = parse_format(line, &texture->data_type, &texture->texel_size, &line);
+        resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &line);
     }
     else if (match_string(line, "size", &line))
     {
-        ret = sscanf(line, "( %u , %u )", &texture->width, &texture->height);
+        ret = sscanf(line, "( %u , %u )", &resource->width, &resource->height);
         if (ret < 2)
             fatal_error("Malformed texture size '%s'.\n", line);
     }
@@ -257,7 +257,7 @@ static void parse_texture_directive(struct texture_params *texture, const char *
 
         for (;;)
         {
-            switch (texture->data_type)
+            switch (resource->data_type)
             {
                 case TEXTURE_DATA_FLOAT:
                     u.f = strtof(line, &rest);
@@ -275,9 +275,9 @@ static void parse_texture_directive(struct texture_params *texture, const char *
             if (rest == line)
                 break;
 
-            vkd3d_array_reserve((void **)&texture->data, &texture->data_capacity, texture->data_size + sizeof(u), 1);
-            memcpy(texture->data + texture->data_size, &u, sizeof(u));
-            texture->data_size += sizeof(u);
+            vkd3d_array_reserve((void **)&resource->data, &resource->data_capacity, resource->data_size + sizeof(u), 1);
+            memcpy(resource->data + resource->data_size, &u, sizeof(u));
+            resource->data_size += sizeof(u);
             line = rest;
         }
     }
@@ -460,29 +460,29 @@ static struct sampler *get_sampler(struct shader_runner *runner, unsigned int sl
     return NULL;
 }
 
-static void set_texture(struct shader_runner *runner, struct texture *texture)
+static void set_resource(struct shader_runner *runner, struct resource *resource)
 {
     size_t i;
 
-    for (i = 0; i < runner->texture_count; ++i)
+    for (i = 0; i < runner->resource_count; ++i)
     {
-        if (runner->textures[i]->slot == texture->slot)
+        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
         {
-            runner->ops->destroy_texture(runner, runner->textures[i]);
-            runner->textures[i] = texture;
+            runner->ops->destroy_resource(runner, runner->resources[i]);
+            runner->resources[i] = resource;
             return;
         }
     }
 
-    runner->textures = realloc(runner->textures, (runner->texture_count + 1) * sizeof(*runner->textures));
-    runner->textures[runner->texture_count++] = texture;
+    runner->resources = realloc(runner->resources, (runner->resource_count + 1) * sizeof(*runner->resources));
+    runner->resources[runner->resource_count++] = resource;
 }
 
 void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
+    struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
-    struct texture_params current_texture;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
     const char *filename = NULL;
@@ -534,8 +534,8 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_TEXTURE:
-                    set_texture(runner, runner->ops->create_texture(runner, &current_texture));
-                    free(current_texture.data);
+                    set_resource(runner, runner->ops->create_resource(runner, &current_resource));
+                    free(current_resource.data);
                     break;
 
                 case STATE_SHADER_PIXEL:
@@ -673,12 +673,13 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 state = STATE_TEXTURE;
 
-                memset(&current_texture, 0, sizeof(current_texture));
+                memset(&current_resource, 0, sizeof(current_resource));
 
-                current_texture.slot = index;
-                current_texture.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_texture.data_type = TEXTURE_DATA_FLOAT;
-                current_texture.texel_size = 16;
+                current_resource.slot = index;
+                current_resource.type = RESOURCE_TYPE_TEXTURE;
+                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.texel_size = 16;
             }
             else if (!strcmp(line, "[test]\n"))
             {
@@ -742,7 +743,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_TEXTURE:
-                    parse_texture_directive(&current_texture, line);
+                    parse_resource_directive(&current_resource, line);
                     break;
 
                 case STATE_TEST:
@@ -757,12 +758,12 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
     free(runner->input_elements);
     free(runner->vs_source);
     free(runner->ps_source);
-    for (i = 0; i < runner->texture_count; ++i)
+    for (i = 0; i < runner->resource_count; ++i)
     {
-        if (runner->textures[i])
-            runner->ops->destroy_texture(runner, runner->textures[i]);
+        if (runner->resources[i])
+            runner->ops->destroy_resource(runner, runner->resources[i]);
     }
-    free(runner->textures);
+    free(runner->resources);
 
     fclose(f);
 

@@ -24,18 +24,18 @@
 #include "d3d12_crosstest.h"
 #include "shader_runner.h"
 
-struct d3d12_texture
+struct d3d12_resource
 {
-    struct texture t;
+    struct resource r;
 
     D3D12_DESCRIPTOR_RANGE descriptor_range;
     ID3D12Resource *resource;
     unsigned int root_index;
 };
 
-static struct d3d12_texture *d3d12_texture(struct texture *t)
+static struct d3d12_resource *d3d12_resource(struct resource *r)
 {
-    return CONTAINING_RECORD(t, struct d3d12_texture, t);
+    return CONTAINING_RECORD(r, struct d3d12_resource, r);
 }
 
 struct d3d12_shader_runner
@@ -81,45 +81,50 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
 
 #define MAX_RESOURCE_DESCRIPTORS 256
 
-static struct texture *d3d12_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
+static struct resource *d3d12_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
     D3D12_SUBRESOURCE_DATA resource_data;
-    struct d3d12_texture *texture;
+    struct d3d12_resource *resource;
 
-    if (!runner->heap)
-        runner->heap = create_gpu_descriptor_heap(device,
-                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
+    resource = calloc(1, sizeof(*resource));
+    resource->r.slot = params->slot;
+    resource->r.type = params->type;
 
-    if (params->slot >= MAX_RESOURCE_DESCRIPTORS)
-        fatal_error("Resource slot %u is too high; please increase MAX_RESOURCE_DESCRIPTORS.\n", params->slot);
+    switch (params->type)
+    {
+        case RESOURCE_TYPE_TEXTURE:
+            if (!runner->heap)
+                runner->heap = create_gpu_descriptor_heap(device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-    texture = calloc(1, sizeof(*texture));
+            if (params->slot >= MAX_RESOURCE_DESCRIPTORS)
+                fatal_error("Resource slot %u is too high; please increase MAX_RESOURCE_DESCRIPTORS.\n", params->slot);
 
-    texture->t.slot = params->slot;
+            resource->resource = create_default_texture(device, params->width, params->height,
+                    params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+            resource_data.pData = params->data;
+            resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
+            upload_texture_data(resource->resource, &resource_data, 1, test_context->queue, test_context->list);
+            reset_command_list(test_context->list, test_context->allocator);
+            transition_resource_state(test_context->list, resource->resource, D3D12_RESOURCE_STATE_COPY_DEST,
+                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            ID3D12Device_CreateShaderResourceView(device, resource->resource,
+                    NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            break;
+    }
 
-    texture->resource = create_default_texture(device, params->width, params->height,
-            params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-    resource_data.pData = params->data;
-    resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
-    upload_texture_data(texture->resource, &resource_data, 1, test_context->queue, test_context->list);
-    reset_command_list(test_context->list, test_context->allocator);
-    transition_resource_state(test_context->list, texture->resource, D3D12_RESOURCE_STATE_COPY_DEST,
-            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    ID3D12Device_CreateShaderResourceView(device, texture->resource,
-            NULL, get_cpu_descriptor_handle(test_context, runner->heap, params->slot));
-
-    return &texture->t;
+    return &resource->r;
 }
 
-static void d3d12_runner_destroy_texture(struct shader_runner *r, struct texture *t)
+static void d3d12_runner_destroy_resource(struct shader_runner *r, struct resource *res)
 {
-    struct d3d12_texture *texture = d3d12_texture(t);
+    struct d3d12_resource *resource = d3d12_resource(res);
 
-    ID3D12Resource_Release(texture->resource);
-    free(texture);
+    ID3D12Resource_Release(resource->resource);
+    free(resource);
 }
 
 static void d3d12_runner_draw_quad(struct shader_runner *r)
@@ -169,25 +174,30 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
         root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     }
 
-    for (i = 0; i < runner->r.texture_count; ++i)
+    for (i = 0; i < runner->r.resource_count; ++i)
     {
-        struct d3d12_texture *texture = d3d12_texture(runner->r.textures[i]);
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
         D3D12_DESCRIPTOR_RANGE *range;
 
-        range = &texture->descriptor_range;
+        switch (resource->r.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                range = &resource->descriptor_range;
 
-        texture->root_index = root_signature_desc.NumParameters++;
-        root_param = &root_params[texture->root_index];
-        root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        root_param->DescriptorTable.NumDescriptorRanges = 1;
-        root_param->DescriptorTable.pDescriptorRanges = range;
-        root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                resource->root_index = root_signature_desc.NumParameters++;
+                root_param = &root_params[resource->root_index];
+                root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+                root_param->DescriptorTable.NumDescriptorRanges = 1;
+                root_param->DescriptorTable.pDescriptorRanges = range;
+                root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-        range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-        range->NumDescriptors = 1;
-        range->BaseShaderRegister = texture->t.slot;
-        range->RegisterSpace = 0;
-        range->OffsetInDescriptorsFromTableStart = 0;
+                range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                range->NumDescriptors = 1;
+                range->BaseShaderRegister = resource->r.slot;
+                range->RegisterSpace = 0;
+                range->OffsetInDescriptorsFromTableStart = 0;
+                break;
+        }
     }
 
     assert(root_signature_desc.NumParameters <= ARRAY_SIZE(root_params));
@@ -248,12 +258,17 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     if (runner->r.uniform_count)
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
                 runner->r.uniform_count, runner->r.uniforms, 0);
-    for (i = 0; i < runner->r.texture_count; ++i)
+    for (i = 0; i < runner->r.resource_count; ++i)
     {
-        struct d3d12_texture *texture = d3d12_texture(runner->r.textures[i]);
+        struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);
 
-        ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, texture->root_index,
-                get_gpu_descriptor_handle(test_context, runner->heap, texture->t.slot));
+        switch (resource->r.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
+                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                break;
+        }
     }
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &test_context->rtv, false, NULL);
@@ -290,8 +305,8 @@ static void d3d12_runner_probe_vec4(struct shader_runner *r,
 
 static const struct shader_runner_ops d3d12_runner_ops =
 {
-    .create_texture = d3d12_runner_create_texture,
-    .destroy_texture = d3d12_runner_destroy_texture,
+    .create_resource = d3d12_runner_create_resource,
+    .destroy_resource = d3d12_runner_destroy_resource,
     .draw_quad = d3d12_runner_draw_quad,
     .probe_vec4 = d3d12_runner_probe_vec4,
 };

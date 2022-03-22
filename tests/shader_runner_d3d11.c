@@ -38,17 +38,17 @@ static HRESULT (WINAPI *pD3D11CreateDevice)(IDXGIAdapter *adapter, D3D_DRIVER_TY
         UINT sdk_version, ID3D11Device **device_out, D3D_FEATURE_LEVEL *obtained_feature_level,
         ID3D11DeviceContext **immediate_context);
 
-struct d3d11_texture
+struct d3d11_resource
 {
-    struct texture t;
+    struct resource r;
 
     ID3D11Texture2D *texture;
     ID3D11ShaderResourceView *srv;
 };
 
-static struct d3d11_texture *d3d11_texture(struct texture *t)
+static struct d3d11_resource *d3d11_resource(struct resource *r)
 {
-    return CONTAINING_RECORD(t, struct d3d11_texture, t);
+    return CONTAINING_RECORD(r, struct d3d11_resource, r);
 }
 
 struct d3d11_shader_runner
@@ -365,48 +365,56 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     return buffer;
 }
 
-static struct texture *d3d11_runner_create_texture(struct shader_runner *r, const struct texture_params *params)
+static struct resource *d3d11_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11Device *device = runner->device;
     D3D11_SUBRESOURCE_DATA resource_data;
-    D3D11_TEXTURE2D_DESC desc = {0};
-    struct d3d11_texture *texture;
+    struct d3d11_resource *resource;
     HRESULT hr;
 
-    texture = calloc(1, sizeof(*texture));
+    resource = calloc(1, sizeof(*resource));
 
-    texture->t.slot = params->slot;
+    resource->r.slot = params->slot;
+    resource->r.type = params->type;
 
-    desc.Width = params->width;
-    desc.Height = params->height;
-    desc.MipLevels = 1;
-    desc.ArraySize = 1;
-    desc.Format = params->format;
-    desc.SampleDesc.Count = 1;
-    desc.Usage = D3D11_USAGE_DEFAULT;
-    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    switch (params->type)
+    {
+        case RESOURCE_TYPE_TEXTURE:
+        {
+            D3D11_TEXTURE2D_DESC desc = {0};
 
-    resource_data.pSysMem = params->data;
-    resource_data.SysMemPitch = params->width * params->texel_size;
-    resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
+            desc.Width = params->width;
+            desc.Height = params->height;
+            desc.MipLevels = 1;
+            desc.ArraySize = 1;
+            desc.Format = params->format;
+            desc.SampleDesc.Count = 1;
+            desc.Usage = D3D11_USAGE_DEFAULT;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-    hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, &texture->texture);
-    ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
-    hr = ID3D11Device_CreateShaderResourceView(device,
-            (ID3D11Resource *)texture->texture, NULL, &texture->srv);
-    ok(hr == S_OK, "Failed to create shader resource view, hr %#lx.\n", hr);
+            resource_data.pSysMem = params->data;
+            resource_data.SysMemPitch = params->width * params->texel_size;
+            resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
 
-    return &texture->t;
+            hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, &resource->texture);
+            ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+            hr = ID3D11Device_CreateShaderResourceView(device, (ID3D11Resource *)resource->texture, NULL, &resource->srv);
+            ok(hr == S_OK, "Failed to create shader resource view, hr %#lx.\n", hr);
+            break;
+        }
+    }
+
+    return &resource->r;
 }
 
-static void d3d11_runner_destroy_texture(struct shader_runner *r, struct texture *t)
+static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resource *res)
 {
-    struct d3d11_texture *texture = d3d11_texture(t);
+    struct d3d11_resource *resource = d3d11_resource(res);
 
-    ID3D11Texture2D_Release(texture->texture);
-    ID3D11ShaderResourceView_Release(texture->srv);
-    free(texture);
+    ID3D11Texture2D_Release(resource->texture);
+    ID3D11ShaderResourceView_Release(resource->srv);
+    free(resource);
 }
 
 static void d3d11_runner_draw_quad(struct shader_runner *r)
@@ -445,11 +453,16 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
         ID3D11DeviceContext_PSSetConstantBuffers(context, 0, 1, &cb);
     }
 
-    for (i = 0; i < runner->r.texture_count; ++i)
+    for (i = 0; i < runner->r.resource_count; ++i)
     {
-        struct d3d11_texture *texture = d3d11_texture(runner->r.textures[i]);
+        struct d3d11_resource *resource = d3d11_resource(runner->r.resources[i]);
 
-        ID3D11DeviceContext_PSSetShaderResources(context, texture->t.slot, 1, &texture->srv);
+        switch (resource->r.type)
+        {
+            case RESOURCE_TYPE_TEXTURE:
+                ID3D11DeviceContext_PSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
+                break;
+        }
     }
 
     for (i = 0; i < runner->r.sampler_count; ++i)
@@ -583,8 +596,8 @@ static void d3d11_runner_probe_vec4(struct shader_runner *r, const RECT *rect, c
 
 static const struct shader_runner_ops d3d11_runner_ops =
 {
-    .create_texture = d3d11_runner_create_texture,
-    .destroy_texture = d3d11_runner_destroy_texture,
+    .create_resource = d3d11_runner_create_resource,
+    .destroy_resource = d3d11_runner_destroy_resource,
     .draw_quad = d3d11_runner_draw_quad,
     .probe_vec4 = d3d11_runner_probe_vec4,
 };

@@ -51,9 +51,15 @@ struct sampler
     D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
 };
 
-struct texture_params
+enum resource_type
+{
+    RESOURCE_TYPE_TEXTURE,
+};
+
+struct resource_params
 {
     unsigned int slot;
+    enum resource_type type;
 
     DXGI_FORMAT format;
     enum texture_data_type data_type;
@@ -63,9 +69,10 @@ struct texture_params
     size_t data_size, data_capacity;
 };
 
-struct texture
+struct resource
 {
     unsigned int slot;
+    enum resource_type type;
 };
 
 struct input_element
@@ -88,8 +95,8 @@ struct shader_runner
     uint32_t *uniforms;
     size_t uniform_count, uniform_capacity;
 
-    struct texture **textures;
-    size_t texture_count;
+    struct resource **resources;
+    size_t resource_count;
 
     struct sampler *samplers;
     size_t sampler_count;
@@ -100,8 +107,8 @@ struct shader_runner
 
 struct shader_runner_ops
 {
-    struct texture *(*create_texture)(struct shader_runner *runner, const struct texture_params *params);
-    void (*destroy_texture)(struct shader_runner *runner, struct texture *texture);
+    struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
+    void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     void (*draw_quad)(struct shader_runner *runner);
     void (*probe_vec4)(struct shader_runner *runner, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };
