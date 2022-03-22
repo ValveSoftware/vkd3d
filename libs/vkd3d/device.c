@@ -1629,16 +1629,13 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     features->shaderTessellationAndGeometryPointSize = VK_FALSE;
 
     descriptor_indexing = &physical_device_info->descriptor_indexing_features;
-    if (descriptor_indexing)
-    {
-        descriptor_indexing->shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
-        descriptor_indexing->shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE;
+    descriptor_indexing->shaderInputAttachmentArrayDynamicIndexing = VK_FALSE;
+    descriptor_indexing->shaderInputAttachmentArrayNonUniformIndexing = VK_FALSE;
 
-        /* We do not use storage buffers currently. */
-        features->shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
-        descriptor_indexing->shaderStorageBufferArrayNonUniformIndexing = VK_FALSE;
-        descriptor_indexing->descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE;
-    }
+    /* We do not use storage buffers currently. */
+    features->shaderStorageBufferArrayDynamicIndexing = VK_FALSE;
+    descriptor_indexing->shaderStorageBufferArrayNonUniformIndexing = VK_FALSE;
+    descriptor_indexing->descriptorBindingStorageBufferUpdateAfterBind = VK_FALSE;
 
     if (vulkan_info->EXT_descriptor_indexing && descriptor_indexing
             && (descriptor_indexing->descriptorBindingUniformBufferUpdateAfterBind
