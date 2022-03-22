@@ -80,6 +80,7 @@ enum parse_state
     STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_PIXEL,
+    STATE_SHADER_VERTEX,
     STATE_TEXTURE,
     STATE_TEST,
 };
@@ -501,6 +502,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     shader_source_size = 0;
                     break;
 
+                case STATE_SHADER_VERTEX:
+                    free(runner->vs_source);
+                    runner->vs_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
                 case STATE_SHADER_INVALID_PIXEL:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -639,6 +648,10 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 state = STATE_PREPROC_INVALID;
             }
+            else if (!strcmp(line, "[vertex shader]\n"))
+            {
+                state = STATE_SHADER_VERTEX;
+            }
 
             vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
@@ -654,6 +667,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_INVALID_PIXEL:
                 case STATE_SHADER_PIXEL:
+                case STATE_SHADER_VERTEX:
                 {
                     size_t len = strlen(line);
 
@@ -682,6 +696,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
         }
     }
 
+    free(runner->vs_source);
     free(runner->ps_source);
     for (i = 0; i < runner->texture_count; ++i)
     {

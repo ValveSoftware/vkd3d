@@ -52,22 +52,23 @@ static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d12_shader_runner, r);
 }
 
-static ID3D10Blob *compile_shader(const char *source, enum shader_model shader_model)
+static ID3D10Blob *compile_shader(const char *source, const char *type, enum shader_model shader_model)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
+    char profile[7];
     HRESULT hr;
 
     static const char *const shader_models[] =
     {
-        [SHADER_MODEL_2_0] = "ps_4_0",
-        [SHADER_MODEL_4_0] = "ps_4_0",
-        [SHADER_MODEL_4_1] = "ps_4_1",
-        [SHADER_MODEL_5_0] = "ps_5_0",
-        [SHADER_MODEL_5_1] = "ps_5_1",
+        [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_4_0] = "4_0",
+        [SHADER_MODEL_4_1] = "4_1",
+        [SHADER_MODEL_5_0] = "5_0",
+        [SHADER_MODEL_5_1] = "5_1",
     };
 
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main",
-            shader_models[shader_model], 0, 0, &blob, &errors);
+    sprintf(profile, "%s_%s", type, shader_models[shader_model]);
+    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
     ok(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
     if (errors)
     {
@@ -132,16 +133,22 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_STATIC_SAMPLER_DESC static_samplers[1];
     ID3D12Device *device = test_context->device;
+    ID3D10Blob *vs_code = NULL, *ps_code;
     static const float clear_color[4];
+    D3D12_SHADER_BYTECODE vs, ps;
     unsigned int uniform_index;
-    D3D12_SHADER_BYTECODE ps;
     ID3D12PipelineState *pso;
-    ID3D10Blob *ps_code;
     HRESULT hr;
     size_t i;
 
-    if (!(ps_code = compile_shader(runner->r.ps_source, runner->r.minimum_shader_model)))
+    if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
         return;
+
+    if (runner->r.vs_source && !(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
+    {
+        ID3D10Blob_Release(ps_code);
+        return;
+    }
 
     root_signature_desc.NumParameters = 0;
     root_signature_desc.pParameters = root_params;
@@ -202,10 +209,17 @@ static void d3d12_runner_draw_quad(struct shader_runner *r)
     hr = create_root_signature(device, &root_signature_desc, &test_context->root_signature);
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
 
+    if (vs_code)
+    {
+        vs.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
+        vs.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
+    }
     ps.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
     ps.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
     pso = create_pipeline_state(device, test_context->root_signature,
-            test_context->render_target_desc.Format, NULL, &ps, NULL);
+            test_context->render_target_desc.Format, vs_code ? &vs : NULL, &ps, NULL);
+    if (vs_code)
+        ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     if (!pso)
         return;

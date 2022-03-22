@@ -434,7 +434,7 @@ static void d3d11_runner_draw_quad(struct shader_runner *r)
 
     if (!runner->vs)
     {
-        ID3D10Blob *vs_code = compile_shader(vs_source, "vs_4_0");
+        ID3D10Blob *vs_code = compile_shader(runner->r.vs_source ? runner->r.vs_source : vs_source, "vs_4_0");
 
         hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
                 ID3D10Blob_GetBufferSize(vs_code), NULL, &runner->vs);
