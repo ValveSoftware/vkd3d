@@ -1203,7 +1203,14 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         }
 
         if (profile->type == VKD3D_SHADER_TYPE_PIXEL)
-            instr.opcode |= VKD3DSIM_LINEAR << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
+        {
+            enum vkd3d_shader_interpolation_mode mode = VKD3DSIM_LINEAR;
+
+            if (var->modifiers & HLSL_STORAGE_NOINTERPOLATION)
+                mode = VKD3DSIM_CONSTANT;
+
+            instr.opcode |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
+        }
     }
     else
     {

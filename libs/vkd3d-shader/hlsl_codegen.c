@@ -34,7 +34,8 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     /* Use the synthetic name for the temp, rather than the uniform, so that we
      * can write the uniform name into the shader reflection data. */
 
-    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type, temp->loc, NULL, 0, &temp->reg_reservation)))
+    if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type,
+            temp->loc, NULL, temp->modifiers, &temp->reg_reservation)))
         return;
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
@@ -76,7 +77,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
+            type, var->loc, &new_semantic, var->modifiers, NULL)))
     {
         hlsl_release_string_buffer(ctx, name);
         vkd3d_free((void *)new_semantic.name);
@@ -147,7 +149,8 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
     new_semantic.index = semantic->index;
-    if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, var->loc, &new_semantic, 0, NULL)))
+    if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
+            type, var->loc, &new_semantic, var->modifiers, NULL)))
     {
         vkd3d_free((void *)new_semantic.name);
         hlsl_release_string_buffer(ctx, name);
