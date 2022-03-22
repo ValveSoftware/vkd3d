@@ -25,6 +25,20 @@
 
 static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_block *block);
 
+static bool type_is_integer(const struct hlsl_type *type)
+{
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, enum vkd3d_sm4_register_type *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
 {
@@ -1206,7 +1220,7 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         {
             enum vkd3d_shader_interpolation_mode mode = VKD3DSIM_LINEAR;
 
-            if (var->modifiers & HLSL_STORAGE_NOINTERPOLATION)
+            if ((var->modifiers & HLSL_STORAGE_NOINTERPOLATION) || type_is_integer(var->data_type))
                 mode = VKD3DSIM_CONSTANT;
 
             instr.opcode |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
@@ -1417,20 +1431,6 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     instr.src_count = 3;
 
     write_sm4_instruction(buffer, &instr);
-}
-
-static bool type_is_integer(const struct hlsl_type *type)
-{
-    switch (type->base_type)
-    {
-        case HLSL_TYPE_BOOL:
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            return true;
-
-        default:
-            return false;
-    }
 }
 
 static bool type_is_float(const struct hlsl_type *type)
