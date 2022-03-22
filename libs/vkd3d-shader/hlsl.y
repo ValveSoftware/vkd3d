@@ -1528,6 +1528,16 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
 
+        if (modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_modifiers_to_string(ctx, modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))))
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+        }
+
         if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, &v->reg_reservation)))
         {
             free_parse_variable_def(v);
@@ -2434,8 +2444,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <if_body> if_body
 
-%type <modifiers> input_mod
-%type <modifiers> input_mods
 %type <modifiers> var_modifiers
 
 %type <name> any_identifier
@@ -2812,54 +2820,21 @@ param_list:
         }
 
 parameter:
-      input_mods var_modifiers type any_identifier colon_attribute
+      var_modifiers type any_identifier colon_attribute
         {
             struct hlsl_type *type;
-            unsigned int modifiers = $2;
+            unsigned int modifiers = $1;
 
-            if (!(type = apply_type_modifiers(ctx, $3, &modifiers, @2)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
 
-            $$.modifiers = $1 ? $1 : HLSL_STORAGE_IN;
-            $$.modifiers |= modifiers;
+            $$.modifiers = modifiers;
+            if (!($$.modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT)))
+                $$.modifiers |= HLSL_STORAGE_IN;
             $$.type = type;
-            $$.name = $4;
-            $$.semantic = $5.semantic;
-            $$.reg_reservation = $5.reg_reservation;
-        }
-
-input_mods:
-      %empty
-        {
-            $$ = 0;
-        }
-    | input_mods input_mod
-        {
-            if ($1 & $2)
-            {
-                struct vkd3d_string_buffer *string;
-
-                if ((string = hlsl_modifiers_to_string(ctx, $2)))
-                    hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                            "Modifier \"%s\" was already specified.", string->buffer);
-                hlsl_release_string_buffer(ctx, string);
-                YYABORT;
-            }
-            $$ = $1 | $2;
-        }
-
-input_mod:
-      KW_IN
-        {
-            $$ = HLSL_STORAGE_IN;
-        }
-    | KW_OUT
-        {
-            $$ = HLSL_STORAGE_OUT;
-        }
-    | KW_INOUT
-        {
-            $$ = HLSL_STORAGE_IN | HLSL_STORAGE_OUT;
+            $$.name = $3;
+            $$.semantic = $4.semantic;
+            $$.reg_reservation = $4.reg_reservation;
         }
 
 texture_type:
@@ -3223,6 +3198,19 @@ var_modifiers:
         {
             $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_COLUMN_MAJOR, @1);
         }
+    | KW_IN var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN, @1);
+        }
+    | KW_OUT var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_OUT, @1);
+        }
+    | KW_INOUT var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN | HLSL_STORAGE_OUT, @1);
+        }
+
 
 complex_initializer:
       initializer_expr
