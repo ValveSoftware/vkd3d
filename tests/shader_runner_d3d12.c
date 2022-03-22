@@ -132,7 +132,8 @@ static void d3d12_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d12_runner_draw(struct shader_runner *r, unsigned int vertex_count)
+static void d3d12_runner_draw(struct shader_runner *r,
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
@@ -291,7 +292,7 @@ static void d3d12_runner_draw(struct shader_runner *r, unsigned int vertex_count
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &test_context->rtv, false, NULL);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &test_context->scissor_rect);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &test_context->viewport);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, primitive_topology);
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, test_context->rtv, clear_color, 0, NULL);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_DrawInstanced(command_list, vertex_count, 1, 0, 0);

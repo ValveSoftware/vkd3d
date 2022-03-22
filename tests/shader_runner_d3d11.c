@@ -423,7 +423,8 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d11_runner_draw(struct shader_runner *r, unsigned int vertex_count)
+static void d3d11_runner_draw(struct shader_runner *r,
+        D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
@@ -525,7 +526,7 @@ static void d3d11_runner_draw(struct shader_runner *r, unsigned int vertex_count
         ID3D11InputLayout_Release(input_layout);
     }
 
-    ID3D11DeviceContext_IASetPrimitiveTopology(context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D11DeviceContext_IASetPrimitiveTopology(context, primitive_topology);
     ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);
 
