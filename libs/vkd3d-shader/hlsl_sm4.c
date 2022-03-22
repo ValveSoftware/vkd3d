@@ -1637,6 +1637,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_binary_op(buffer, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
+        case HLSL_OP2_BIT_XOR:
+            assert(type_is_integer(dst_type));
+            write_sm4_binary_op(buffer, VKD3D_SM4_OP_XOR, &expr->node, arg1, arg2);
+            break;
+
         case HLSL_OP2_DIV:
             switch (dst_type->base_type)
             {
