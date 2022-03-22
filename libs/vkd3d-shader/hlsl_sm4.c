@@ -1568,6 +1568,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             }
             break;
 
+        case HLSL_OP1_BIT_NOT:
+            assert(type_is_integer(dst_type));
+            write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_CAST:
             write_sm4_cast(ctx, buffer, expr);
             break;
