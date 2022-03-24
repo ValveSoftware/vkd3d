@@ -59,6 +59,7 @@
 #define VKD3D_MAX_SHADER_EXTENSIONS       3u
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
+#define VKD3D_MAX_FENCE_WAITING_QUEUES    4u
 #define VKD3D_MAX_DESCRIPTOR_SETS        64u
 /* D3D12 binding tier 3 has a limit of 2048 samplers. */
 #define VKD3D_MAX_DESCRIPTOR_SET_SAMPLERS 2048u
@@ -125,6 +126,7 @@ struct vkd3d_vulkan_info
     bool KHR_maintenance3;
     bool KHR_push_descriptor;
     bool KHR_sampler_mirror_clamp_to_edge;
+    bool KHR_timeline_semaphore;
     /* EXT device extensions */
     bool EXT_calibrated_timestamps;
     bool EXT_conditional_rendering;
@@ -149,6 +151,8 @@ struct vkd3d_vulkan_info
     struct vkd3d_device_descriptor_limits descriptor_limits;
 
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
+
+    VkPhysicalDeviceTimelineSemaphorePropertiesKHR timeline_semaphore_properties;
 
     unsigned int shader_extension_count;
     enum vkd3d_shader_spirv_extension shader_extensions[VKD3D_MAX_SHADER_EXTENSIONS];
@@ -348,6 +352,7 @@ struct vkd3d_fence_worker
     struct vkd3d_enqueued_fence
     {
         VkFence vk_fence;
+        VkSemaphore vk_semaphore;
         struct vkd3d_waiting_fence waiting_fence;
     } *enqueued_fences;
     size_t enqueued_fences_size;
@@ -357,6 +362,12 @@ struct vkd3d_fence_worker
     size_t vk_fences_size;
     struct vkd3d_waiting_fence *fences;
     size_t fences_size;
+    VkSemaphore *vk_semaphores;
+    size_t vk_semaphores_size;
+    uint64_t *semaphore_wait_values;
+    size_t semaphore_wait_values_size;
+
+    void (*wait_for_gpu_fences)(struct vkd3d_fence_worker *worker);
 
     struct d3d12_device *device;
 };
@@ -511,6 +522,12 @@ struct vkd3d_signaled_semaphore
     bool is_acquired;
 };
 
+struct vkd3d_pending_fence_wait
+{
+    const struct vkd3d_queue *queue;
+    uint64_t pending_value;
+};
+
 /* ID3D12Fence */
 struct d3d12_fence
 {
@@ -530,6 +547,11 @@ struct d3d12_fence
     size_t events_size;
     size_t event_count;
 
+    VkSemaphore timeline_semaphore;
+    uint64_t pending_timeline_value;
+    struct vkd3d_pending_fence_wait gpu_waits[VKD3D_MAX_FENCE_WAITING_QUEUES];
+    unsigned int gpu_wait_count;
+
     struct list semaphores;
     unsigned int semaphore_count;
 
@@ -544,6 +566,9 @@ struct d3d12_fence
 
 HRESULT d3d12_fence_create(struct d3d12_device *device, uint64_t initial_value,
         D3D12_FENCE_FLAGS flags, struct d3d12_fence **fence);
+
+VkResult vkd3d_create_timeline_semaphore(const struct d3d12_device *device, uint64_t initial_value,
+        VkSemaphore *timeline_semaphore);
 
 /* ID3D12Heap */
 struct d3d12_heap
@@ -1284,6 +1309,9 @@ struct vkd3d_queue
     VkQueueFlags vk_queue_flags;
     uint32_t timestamp_bits;
 
+    VkSemaphore wait_completion_semaphore;
+    uint64_t pending_wait_completion_value;
+
     struct
     {
         VkSemaphore vk_semaphore;
@@ -1298,6 +1326,7 @@ struct vkd3d_queue
 VkQueue vkd3d_queue_acquire(struct vkd3d_queue *queue);
 HRESULT vkd3d_queue_create(struct d3d12_device *device, uint32_t family_index,
         const VkQueueFamilyProperties *properties, struct vkd3d_queue **queue);
+bool vkd3d_queue_init_timeline_semaphore(struct vkd3d_queue *queue, struct d3d12_device *device);
 void vkd3d_queue_destroy(struct vkd3d_queue *queue, struct d3d12_device *device);
 void vkd3d_queue_release(struct vkd3d_queue *queue);
 
@@ -1456,6 +1485,7 @@ struct d3d12_device
     VkDescriptorPoolSize vk_pool_sizes[VKD3D_DESCRIPTOR_POOL_COUNT];
     struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT];
     bool use_vk_heaps;
+    bool use_timeline_semaphores;
 };
 
 HRESULT d3d12_device_create(struct vkd3d_instance *instance,

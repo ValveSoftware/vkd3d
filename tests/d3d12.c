@@ -33240,7 +33240,9 @@ static void test_queue_wait(void)
     command_list = context.list;
     queue = context.queue;
 
-    queue2 = create_command_queue(device, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+    /* 'queue2' must not map to the same command queue as 'queue', or Wait() before GPU signal will fail.
+     * Using a compute queue fixes this on most hardware, but it may still fail on low spec hardware. */
+    queue2 = create_command_queue(device, D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
     event = create_event();
     ok(event, "Failed to create event.\n");
@@ -33304,12 +33306,6 @@ static void test_queue_wait(void)
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
     check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
-
-    if (!vkd3d_test_platform_is_windows())
-    {
-        skip("Wait() is not implemented yet.\n"); /* FIXME */
-        goto skip_tests;
-    }
 
     /* Wait() before CPU signal */
     update_buffer_data(cb, 0, sizeof(blue), &blue);
@@ -33386,7 +33382,6 @@ static void test_queue_wait(void)
     check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
 
-skip_tests:
     /* Signal() and Wait() in the same command queue */
     update_buffer_data(cb, 0, sizeof(blue), &blue);
     queue_signal(queue, fence, 7);
