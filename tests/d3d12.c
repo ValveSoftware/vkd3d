@@ -33373,6 +33373,12 @@ static void test_queue_wait(void)
     check_readback_data_uint(&rb, NULL, 0xffff0000, 0);
     release_resource_readback(&rb);
 
+    /* signal to a lower value after a GPU wait was used (test timeline semaphore replacement) */
+    hr = ID3D12Fence_Signal(fence, 0);
+    ok(hr == S_OK, "Failed to signal fence, hr %#x.\n", hr);
+    value = ID3D12Fence_GetCompletedValue(fence);
+    ok(value == 0, "Got unexpected value %"PRIu64".\n", value);
+
     hr = ID3D12Fence_Signal(fence, 6);
     ok(hr == S_OK, "Failed to signal fence, hr %#x.\n", hr);
     update_buffer_data(cb, 0, sizeof(green), &green);
