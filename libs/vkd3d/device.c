@@ -135,6 +135,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(EXT_DEBUG_MARKER, EXT_debug_marker),
     VK_EXTENSION(EXT_DEPTH_CLIP_ENABLE, EXT_depth_clip_enable),
     VK_EXTENSION(EXT_DESCRIPTOR_INDEXING, EXT_descriptor_indexing),
+    VK_EXTENSION(EXT_ROBUSTNESS_2, EXT_robustness2),
     VK_EXTENSION(EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION, EXT_shader_demote_to_helper_invocation),
     VK_EXTENSION(EXT_SHADER_STENCIL_EXPORT, EXT_shader_stencil_export),
     VK_EXTENSION(EXT_TEXEL_BUFFER_ALIGNMENT, EXT_texel_buffer_alignment),
@@ -797,6 +798,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceConditionalRenderingFeaturesEXT conditional_rendering_features;
     VkPhysicalDeviceDepthClipEnableFeaturesEXT depth_clip_features;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features;
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features;
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_features;
     VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT texel_buffer_alignment_features;
     VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb_features;
@@ -813,6 +815,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT *vertex_divisor_properties;
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT *buffer_alignment_properties;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing_features;
+    VkPhysicalDeviceRobustness2FeaturesEXT *robustness2_features;
     VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT *vertex_divisor_features;
     VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *buffer_alignment_features;
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT *demote_features;
@@ -827,6 +830,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     conditional_rendering_features = &info->conditional_rendering_features;
     depth_clip_features = &info->depth_clip_features;
     descriptor_indexing_features = &info->descriptor_indexing_features;
+    robustness2_features = &info->robustness2_features;
     descriptor_indexing_properties = &info->descriptor_indexing_properties;
     maintenance3_properties = &info->maintenance3_properties;
     demote_features = &info->demote_features;
@@ -845,6 +849,8 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->features2, depth_clip_features);
     descriptor_indexing_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
     vk_prepend_struct(&info->features2, descriptor_indexing_features);
+    robustness2_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
+    vk_prepend_struct(&info->features2, robustness2_features);
     demote_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
     vk_prepend_struct(&info->features2, demote_features);
     buffer_alignment_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT;
@@ -1577,6 +1583,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vulkan_info->EXT_conditional_rendering = false;
     if (!physical_device_info->depth_clip_features.depthClipEnable)
         vulkan_info->EXT_depth_clip_enable = false;
+    if (!physical_device_info->robustness2_features.nullDescriptor)
+        vulkan_info->EXT_robustness2 = false;
     if (!physical_device_info->demote_features.shaderDemoteToHelperInvocation)
         vulkan_info->EXT_shader_demote_to_helper_invocation = false;
     if (!physical_device_info->texel_buffer_alignment_features.texelBufferAlignment)

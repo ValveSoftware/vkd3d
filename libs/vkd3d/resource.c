@@ -2423,10 +2423,10 @@ bool vkd3d_create_buffer_view(struct d3d12_device *device, VkBuffer vk_buffer, c
         VkDeviceSize offset, VkDeviceSize size, struct vkd3d_view **view)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+    VkBufferView vk_view = VK_NULL_HANDLE;
     struct vkd3d_view *object;
-    VkBufferView vk_view;
 
-    if (!vkd3d_create_vk_buffer_view(device, vk_buffer, format, offset, size, &vk_view))
+    if (vk_buffer && !vkd3d_create_vk_buffer_view(device, vk_buffer, format, offset, size, &vk_view))
         return false;
 
     if (!(object = vkd3d_view_create(VKD3D_VIEW_TYPE_BUFFER)))
@@ -2711,28 +2711,31 @@ bool vkd3d_create_texture_view(struct d3d12_device *device, VkImage vk_image,
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     const struct vkd3d_format *format = desc->format;
     struct VkImageViewCreateInfo view_desc;
+    VkImageView vk_view = VK_NULL_HANDLE;
     struct vkd3d_view *object;
-    VkImageView vk_view;
     VkResult vr;
 
-    view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_desc.pNext = NULL;
-    view_desc.flags = 0;
-    view_desc.image = vk_image;
-    view_desc.viewType = desc->view_type;
-    view_desc.format = format->vk_format;
-    vkd3d_set_view_swizzle_for_format(&view_desc.components, format, desc->allowed_swizzle);
-    if (desc->allowed_swizzle)
-        vk_component_mapping_compose(&view_desc.components, &desc->components);
-    view_desc.subresourceRange.aspectMask = desc->vk_image_aspect;
-    view_desc.subresourceRange.baseMipLevel = desc->miplevel_idx;
-    view_desc.subresourceRange.levelCount = desc->miplevel_count;
-    view_desc.subresourceRange.baseArrayLayer = desc->layer_idx;
-    view_desc.subresourceRange.layerCount = desc->layer_count;
-    if ((vr = VK_CALL(vkCreateImageView(device->vk_device, &view_desc, NULL, &vk_view))) < 0)
+    if (vk_image)
     {
-        WARN("Failed to create Vulkan image view, vr %d.\n", vr);
-        return false;
+        view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_desc.pNext = NULL;
+        view_desc.flags = 0;
+        view_desc.image = vk_image;
+        view_desc.viewType = desc->view_type;
+        view_desc.format = format->vk_format;
+        vkd3d_set_view_swizzle_for_format(&view_desc.components, format, desc->allowed_swizzle);
+        if (desc->allowed_swizzle)
+            vk_component_mapping_compose(&view_desc.components, &desc->components);
+        view_desc.subresourceRange.aspectMask = desc->vk_image_aspect;
+        view_desc.subresourceRange.baseMipLevel = desc->miplevel_idx;
+        view_desc.subresourceRange.levelCount = desc->miplevel_count;
+        view_desc.subresourceRange.baseArrayLayer = desc->layer_idx;
+        view_desc.subresourceRange.layerCount = desc->layer_count;
+        if ((vr = VK_CALL(vkCreateImageView(device->vk_device, &view_desc, NULL, &vk_view))) < 0)
+        {
+            WARN("Failed to create Vulkan image view, vr %d.\n", vr);
+            return false;
+        }
     }
 
     if (!(object = vkd3d_view_create(VKD3D_VIEW_TYPE_IMAGE)))
@@ -2782,7 +2785,7 @@ void d3d12_desc_create_cbv(struct d3d12_desc *descriptor,
         /* NULL descriptor */
         buffer_info->buffer = device->null_resources.vk_buffer;
         buffer_info->offset = 0;
-        buffer_info->range = VKD3D_NULL_BUFFER_SIZE;
+        buffer_info->range = VK_WHOLE_SIZE;
     }
 
     descriptor->magic = VKD3D_DESCRIPTOR_MAGIC_CBV;
@@ -2815,7 +2818,8 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
     switch (desc->ViewDimension)
     {
         case D3D12_SRV_DIMENSION_BUFFER:
-            WARN("Creating NULL buffer SRV %#x.\n", desc->Format);
+            if (!device->vk_info.EXT_robustness2)
+                WARN("Creating NULL buffer SRV %#x.\n", desc->Format);
 
             if (vkd3d_create_buffer_view(device, null_resources->vk_buffer,
                     vkd3d_get_format(device, DXGI_FORMAT_R32_UINT, false),
@@ -2838,11 +2842,19 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
             break;
 
         default:
+            if (device->vk_info.EXT_robustness2)
+            {
+                vk_image = VK_NULL_HANDLE;
+                /* view_type is not used for Vulkan null descriptors, but make it valid. */
+                vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
+                break;
+            }
             FIXME("Unhandled view dimension %#x.\n", desc->ViewDimension);
             return;
     }
 
-    WARN("Creating NULL SRV %#x.\n", desc->ViewDimension);
+    if (!device->vk_info.EXT_robustness2)
+        WARN("Creating NULL SRV %#x.\n", desc->ViewDimension);
 
     vkd3d_desc.format = vkd3d_get_format(device, VKD3D_NULL_VIEW_FORMAT, false);
     vkd3d_desc.miplevel_idx = 0;
@@ -3052,7 +3064,8 @@ static void vkd3d_create_null_uav(struct d3d12_desc *descriptor,
     switch (desc->ViewDimension)
     {
         case D3D12_UAV_DIMENSION_BUFFER:
-            WARN("Creating NULL buffer UAV %#x.\n", desc->Format);
+            if (!device->vk_info.EXT_robustness2)
+                WARN("Creating NULL buffer UAV %#x.\n", desc->Format);
 
             if (vkd3d_create_buffer_view(device, null_resources->vk_storage_buffer,
                     vkd3d_get_format(device, DXGI_FORMAT_R32_UINT, false),
@@ -3075,11 +3088,19 @@ static void vkd3d_create_null_uav(struct d3d12_desc *descriptor,
             break;
 
         default:
+            if (device->vk_info.EXT_robustness2)
+            {
+                vk_image = VK_NULL_HANDLE;
+                /* view_type is not used for Vulkan null descriptors, but make it valid. */
+                vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
+                break;
+            }
             FIXME("Unhandled view dimension %#x.\n", desc->ViewDimension);
             return;
     }
 
-    WARN("Creating NULL UAV %#x.\n", desc->ViewDimension);
+    if (!device->vk_info.EXT_robustness2)
+        WARN("Creating NULL UAV %#x.\n", desc->ViewDimension);
 
     vkd3d_desc.format = vkd3d_get_format(device, VKD3D_NULL_VIEW_FORMAT, false);
     vkd3d_desc.miplevel_idx = 0;
@@ -4420,6 +4441,9 @@ HRESULT vkd3d_init_null_resources(struct vkd3d_null_resources *null_resources,
     TRACE("Creating resources for NULL views.\n");
 
     memset(null_resources, 0, sizeof(*null_resources));
+
+    if (device->vk_info.EXT_robustness2)
+        return S_OK;
 
     memset(&heap_properties, 0, sizeof(heap_properties));
     heap_properties.Type = D3D12_HEAP_TYPE_DEFAULT;
