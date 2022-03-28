@@ -1,0 +1,75 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    return transpose(5);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x1 x = 5;
+
+    return transpose(x);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float4 x = float4(1, 2, 3, 4);
+
+    return transpose(x);
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 x = float1x4(1.0, 2.0, 3.0, 4.0);
+
+    return transpose(x);
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x3 m = float4x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0,
+                          10.0, 11.0, 12.0);
+
+    return transpose(m)[1];
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 5.0, 8.0, 11.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    row_major float4x3 m = float4x3(1.0, 2.0, 3.0,
+                          4.0, 5.0, 6.0,
+                          7.0, 8.0, 9.0,
+                          10.0, 11.0, 12.0);
+
+    return transpose(m)[1];
+}
+
+[test]
+draw quad
+probe all rgba (2.0, 5.0, 8.0, 11.0)

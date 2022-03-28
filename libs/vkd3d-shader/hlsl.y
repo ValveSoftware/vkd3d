@@ -2596,6 +2596,64 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
 
+static bool intrinsic_transpose(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg = params->args[0];
+    struct hlsl_type *arg_type = arg->data_type;
+    struct hlsl_deref var_deref;
+    struct hlsl_type *mat_type;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_var *var;
+    unsigned int i, j;
+
+    if (arg_type->type != HLSL_CLASS_SCALAR && arg_type->type != HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, arg_type)))
+            hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                   "Wrong type for argument 1 of transpose(): expected a matrix or scalar type, but got '%s'.\n",
+                   string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (arg_type->type == HLSL_CLASS_SCALAR)
+    {
+        list_add_tail(params->instrs, &arg->entry);
+        return true;
+    }
+
+    mat_type = hlsl_get_matrix_type(ctx, arg_type->base_type, arg_type->dimy, arg_type->dimx);
+
+    if (!(var = hlsl_new_synthetic_var(ctx, "transpose", mat_type, loc)))
+        return false;
+    hlsl_init_simple_deref_from_var(&var_deref, var);
+
+    for (i = 0; i < arg_type->dimx; ++i)
+    {
+        for (j = 0; j < arg_type->dimy; ++j)
+        {
+            struct hlsl_ir_store *store;
+            struct hlsl_block block;
+
+            if (!(load = add_load_component(ctx, params->instrs, arg, j * arg->data_type->dimx + i, loc)))
+                return false;
+
+            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, i * var->data_type->dimx + j, &load->node)))
+                return false;
+            list_move_tail(params->instrs, &block.instrs);
+        }
+    }
+
+    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+        return false;
+    list_add_tail(params->instrs, &load->node.entry);
+
+    return true;
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -2623,6 +2681,7 @@ intrinsic_functions[] =
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
+    {"transpose",                           1, true,  intrinsic_transpose},
 };
 
 static int intrinsic_function_name_compare(const void *a, const void *b)
