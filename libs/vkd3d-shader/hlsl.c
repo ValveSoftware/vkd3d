@@ -2885,8 +2885,6 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
     ctx->location.line = ctx->location.column = 1;
     vkd3d_string_buffer_cache_init(&ctx->string_buffers);
 
-    ctx->matrix_majority = HLSL_MODIFIER_COLUMN_MAJOR;
-
     list_init(&ctx->scopes);
 
     if (!(ctx->dummy_scope = hlsl_new_scope(ctx, NULL)))
