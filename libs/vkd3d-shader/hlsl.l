@@ -235,14 +235,14 @@ row_major               {return KW_ROW_MAJOR;           }
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
                             TRACE("#pragma setting row_major mode.\n");
-                            ctx->matrix_majority = HLSL_ROW_MAJOR;
+                            ctx->matrix_majority = HLSL_MODIFIER_ROW_MAJOR;
                             BEGIN(pp_ignore);
                         }
 <pp_pragma>pack_matrix{WS}*\({WS}*column_major{WS}*\) {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
 
                             TRACE("#pragma setting column_major mode.\n");
-                            ctx->matrix_majority = HLSL_COLUMN_MAJOR;
+                            ctx->matrix_majority = HLSL_MODIFIER_COLUMN_MAJOR;
                             BEGIN(pp_ignore);
                         }
 <pp_pragma>{NEWLINE}    {
