@@ -1,0 +1,108 @@
+[pixel shader]
+typedef row_major float2x2 mat_t;
+
+row_major mat_t m;
+
+float4 main() : sv_target
+{
+    return float4(m[0], m[1]);
+}
+
+[test]
+uniform 0 float4 0.1 0.3 0.0 0.0
+uniform 4 float4 0.2 0.4 0.0 0.0
+draw quad
+probe all rgba (0.1, 0.3, 0.2, 0.4)
+
+[pixel shader fail]
+row_major row_major float4x4 m;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+typedef row_major float4x4 mat_t;
+column_major mat_t m;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+typedef row_major float4x4 matrix_t;
+typedef column_major matrix_t matrix2_t;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+typedef column_major float4 myfloat_t;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+column_major float4 f;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct apple
+{
+    float4x4 m;
+};
+typedef column_major struct apple apple_t;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+struct apple
+{
+    float4x4 m;
+};
+column_major struct apple a;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+typedef float4x4 myarray_t[2];
+
+row_major myarray_t a;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+float4 main(uniform row_major float4 f) : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+struct apple
+{
+    row_major float4 f;
+};
+
+float4 main() : sv_target
+{
+    return 0;
+}
