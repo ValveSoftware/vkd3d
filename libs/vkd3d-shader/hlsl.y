@@ -903,6 +903,10 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
         else
             default_majority = HLSL_MODIFIER_ROW_MAJOR;
     }
+    else if (type->type != HLSL_CLASS_MATRIX)
+    {
+        check_invalid_matrix_modifiers(ctx, *modifiers, loc);
+    }
 
     if (!default_majority && !(*modifiers & HLSL_TYPE_MODIFIERS_MASK))
         return type;
@@ -2040,9 +2044,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             }
         }
         vkd3d_free(v->arrays.sizes);
-
-        if (type->type != HLSL_CLASS_MATRIX)
-            check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
 
         if (modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
         {

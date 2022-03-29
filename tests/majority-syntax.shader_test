@@ -48,7 +48,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 column_major float4 f;
 
 float4 main() : sv_target
@@ -68,7 +68,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 struct apple
 {
     float4x4 m;
@@ -80,7 +80,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 typedef float4x4 myarray_t[2];
 
 row_major myarray_t a;
@@ -90,13 +90,13 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main(uniform row_major float4 f) : sv_target
 {
     return 0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 struct apple
 {
     row_major float4 f;
