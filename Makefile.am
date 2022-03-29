@@ -112,6 +112,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-vector-indexing.shader_test \
 	tests/hlsl-vector-indexing-uniform.shader_test \
 	tests/logic-operations.shader_test \
+	tests/majority-syntax.shader_test \
 	tests/math.shader_test \
 	tests/matrix-semantics.shader_test \
 	tests/multiple-rt.shader_test \
