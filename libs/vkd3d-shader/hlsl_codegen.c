@@ -805,18 +805,20 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             return false;
     }
 
-    if (!(new_node = copy_propagation_compute_replacement(ctx, state, &load->src, dimx, &swizzle)))
-        return false;
-
-    if (type->type != HLSL_CLASS_OBJECT)
+    if ((new_node = copy_propagation_compute_replacement(ctx, state, &load->src, dimx, &swizzle)))
     {
-        if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, dimx, new_node, &node->loc)))
-            return false;
-        list_add_before(&node->entry, &swizzle_node->node.entry);
-        new_node = &swizzle_node->node;
+        if (type->type != HLSL_CLASS_OBJECT)
+        {
+            if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, dimx, new_node, &node->loc)))
+                return false;
+            list_add_before(&node->entry, &swizzle_node->node.entry);
+            new_node = &swizzle_node->node;
+        }
+        hlsl_replace_node(node, new_node);
+        return true;
     }
-    hlsl_replace_node(node, new_node);
-    return true;
+
+    return false;
 }
 
 static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
