@@ -47,3 +47,114 @@ uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
 todo draw quad
 probe all rgba (0.23, 0.34, 0.5, 0.5) 1
+
+
+% The majority that applies to a typedef is the latent majority at the time
+% that typedef was declared.
+
+[pixel shader]
+#pragma pack_matrix(row_major)
+typedef float2x2 mat_t;
+#pragma pack_matrix(column_major)
+uniform mat_t m;
+
+float4 main() : sv_target
+{
+    return float4(m[0], m[1]);
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+draw quad
+todo probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+
+[pixel shader]
+#pragma pack_matrix(row_major)
+struct apple
+{
+    float2x2 m;
+};
+#pragma pack_matrix(column_major)
+uniform struct apple a;
+
+float4 main() : sv_target
+{
+    return float4(a.m[0], a.m[1]);
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+
+% In fact, it's illegal to specify a contradictory majority.
+
+[pixel shader fail todo]
+#pragma pack_matrix(row_major)
+typedef float2x2 mat_t;
+uniform column_major mat_t m;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+% However, if no pack_matrix directive has been used yet, a typedef has no
+% defined majority, and the majority can be overwritten, including by a
+% subsequent pragma.
+
+[pixel shader]
+typedef float2x2 mat_t;
+#pragma pack_matrix(row_major)
+uniform mat_t m;
+
+uniform row_major mat_t r;
+uniform column_major mat_t c;
+
+float4 main() : sv_target
+{
+    return float4(m[0], m[1]);
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+
+% This does not apply recursively to struct or array members, however. Members
+% defined while there is no latent majority are always column-major, even if
+% the type is later used after a pack_matrix(row_major) directive.
+
+% Note that the majority of the struct or array type cannot itself be
+% overwritten with modifiers; those are only valid on matrix types.
+
+[pixel shader]
+struct apple
+{
+    float2x2 m;
+};
+typedef float2x2 myarray_t[1];
+#pragma pack_matrix(row_major)
+typedef struct apple apple_t;
+uniform apple_t a;
+typedef myarray_t myarray2_t;
+uniform myarray2_t b;
+
+float4 main() : sv_target
+{
+    return float4(a.m[0], b[0][0]);
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+uniform  8 float4 0.1 0.2 0.0 0.0
+uniform 12 float4 0.3 0.4 0.0 0.0
+todo draw quad
+probe all rgba (0.1, 0.3, 0.1, 0.3)
