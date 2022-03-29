@@ -886,7 +886,8 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
             && !(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
             && type->type == HLSL_CLASS_MATRIX)
     {
-        default_majority = ctx->matrix_majority;
+        if (!(default_majority = ctx->matrix_majority))
+            default_majority = HLSL_MODIFIER_COLUMN_MAJOR;
     }
     else if (type->type != HLSL_CLASS_MATRIX)
     {
