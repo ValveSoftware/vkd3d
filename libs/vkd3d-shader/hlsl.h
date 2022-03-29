@@ -116,12 +116,6 @@ enum hlsl_sampler_dim
    HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_CUBEARRAY,
 };
 
-enum hlsl_matrix_majority
-{
-    HLSL_COLUMN_MAJOR,
-    HLSL_ROW_MAJOR
-};
-
 struct hlsl_type
 {
     struct list entry;
@@ -532,8 +526,6 @@ struct hlsl_ctx
     struct rb_tree functions;
     const struct hlsl_ir_function_decl *cur_function;
 
-    enum hlsl_matrix_majority matrix_majority;
-
     struct
     {
         struct hlsl_type *scalar[HLSL_TYPE_LAST_SCALAR + 1];
@@ -554,6 +546,8 @@ struct hlsl_ctx
     uint32_t temp_count;
 
     uint32_t thread_count[3];
+
+    unsigned int matrix_majority;
 
     uint32_t in_state_block : 1;
     uint32_t found_numthreads : 1;
