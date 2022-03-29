@@ -224,7 +224,7 @@ row_major               {return KW_ROW_MAJOR;           }
                             ctx->location.column = 1;
                         }
 
-^#                      {
+^{WS}*#                 {
                             BEGIN(pp);
                         }
 
