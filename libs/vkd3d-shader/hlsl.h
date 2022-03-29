@@ -116,12 +116,6 @@ enum hlsl_sampler_dim
    HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_CUBEARRAY,
 };
 
-enum hlsl_matrix_majority
-{
-    HLSL_COLUMN_MAJOR,
-    HLSL_ROW_MAJOR
-};
-
 /* An HLSL source-level data type, including anonymous structs and typedefs. */
 struct hlsl_type
 {
@@ -733,7 +727,7 @@ struct hlsl_ctx
     const struct hlsl_ir_function_decl *cur_function;
 
     /* Default matrix majority for matrix types. Can be set by a pragma within the HLSL source. */
-    enum hlsl_matrix_majority matrix_majority;
+    unsigned int matrix_majority;
 
     /* Basic data types stored for convenience. */
     struct
