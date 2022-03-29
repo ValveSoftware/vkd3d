@@ -408,12 +408,6 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
         hlsl_release_string_buffer(ctx, string);
         return modifiers;
     }
-    if ((mod & HLSL_MODIFIERS_MAJORITY_MASK) && (modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
-    {
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                "'row_major' and 'column_major' modifiers are mutually exclusive.");
-        return modifiers;
-    }
     return modifiers | mod;
 }
 
