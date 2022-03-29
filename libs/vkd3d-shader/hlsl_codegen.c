@@ -737,6 +737,59 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
     }
 }
 
+static struct hlsl_ir_node *copy_propagation_compute_constant(struct hlsl_ctx *ctx, struct copy_propagation_state *state,
+        const struct hlsl_deref *deref, unsigned int count, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_ir_var *var = deref->var;
+    enum hlsl_base_type type = HLSL_TYPE_VOID;
+    struct hlsl_ir_constant *constant = NULL;
+    struct hlsl_ir_node *store_nodes[4];
+    unsigned store_components[4];
+    unsigned int i, offset;
+
+    if (!hlsl_offset_from_deref(ctx, deref, &offset))
+        return NULL;
+
+    if (var->data_type->type != HLSL_CLASS_OBJECT)
+        assert(offset + count <= var->data_type->reg_size);
+
+    for (i = 0; i < count; ++i)
+    {
+        struct copy_propagation_value *value = copy_propagation_get_value(state, var, offset + i);
+        struct hlsl_ir_node *store_node;
+        enum hlsl_base_type store_type;
+
+        if (!value)
+            return NULL;
+
+        store_node = value->node;
+        if (!store_node || store_node->type != HLSL_IR_CONSTANT)
+            return NULL;
+
+        store_type = store_node->data_type->base_type;
+
+        if (type == HLSL_TYPE_VOID)
+            type = store_type;
+        else if (type != store_type)
+            return NULL;
+
+        store_nodes[i] = store_node;
+        store_components[i] = value->component;
+    }
+
+    if (!(constant = hlsl_new_uint_constant(ctx, 0, loc)))
+        return NULL;
+    constant->node.data_type = hlsl_get_vector_type(ctx, type, count);
+
+    for (i = 0; i < count; ++i)
+        constant->value[i] = hlsl_ir_constant(store_nodes[i])->value[store_components[i]];
+
+    TRACE("Load from %s[%d-%d] reconstructed as constant value.\n",
+            var->name, offset, offset + count);
+
+    return &constant->node;
+}
+
 static struct hlsl_ir_node *copy_propagation_compute_replacement(struct hlsl_ctx *ctx,
         const struct copy_propagation_state *state, const struct hlsl_deref *deref,
         unsigned int count, unsigned int *swizzle)
@@ -803,6 +856,13 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             /* FIXME: Actually we shouldn't even get here, but we don't split
              * matrices yet. */
             return false;
+    }
+
+    if ((new_node = copy_propagation_compute_constant(ctx, state, &load->src, dimx, &node->loc)))
+    {
+        list_add_before(&node->entry, &new_node->entry);
+        hlsl_replace_node(node, new_node);
+        return true;
     }
 
     if ((new_node = copy_propagation_compute_replacement(ctx, state, &load->src, dimx, &swizzle)))
