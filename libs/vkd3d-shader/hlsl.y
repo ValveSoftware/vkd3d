@@ -2408,6 +2408,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <function> func_prototype
 
 %type <initializer> complex_initializer
+%type <initializer> complex_initializer_list
 %type <initializer> func_arguments
 %type <initializer> initializer_expr_list
 
@@ -3215,13 +3216,34 @@ complex_initializer:
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
         }
-    | '{' initializer_expr_list '}'
+    | '{' complex_initializer_list '}'
         {
             $$ = $2;
         }
-    | '{' initializer_expr_list ',' '}'
+    | '{' complex_initializer_list ',' '}'
         {
             $$ = $2;
+        }
+
+complex_initializer_list:
+      complex_initializer
+    | complex_initializer_list ',' complex_initializer
+        {
+            struct hlsl_ir_node **new_args;
+            unsigned int i;
+
+            $$ = $1;
+            if (!(new_args = hlsl_realloc(ctx, $$.args, ($$.args_count + $3.args_count) * sizeof(*$$.args))))
+            {
+                free_parse_initializer(&$$);
+                free_parse_initializer(&$3);
+                YYABORT;
+            }
+            $$.args = new_args;
+            for (i = 0; i < $3.args_count; ++i)
+                $$.args[$$.args_count++] = $3.args[i];
+            list_move_tail($$.instrs, $3.instrs);
+            free_parse_initializer(&$3);
         }
 
 initializer_expr:
