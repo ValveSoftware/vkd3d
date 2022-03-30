@@ -3208,7 +3208,10 @@ complex_initializer:
         {
             $$.args_count = 1;
             if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
+            {
+                destroy_instr_list($1);
                 YYABORT;
+            }
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
         }
@@ -3229,15 +3232,25 @@ initializer_expr_list:
         {
             $$.args_count = 1;
             if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
+            {
+                destroy_instr_list($1);
                 YYABORT;
+            }
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
         }
     | initializer_expr_list ',' initializer_expr
         {
+            struct hlsl_ir_node **new_args;
+
             $$ = $1;
-            if (!($$.args = hlsl_realloc(ctx, $$.args, ($$.args_count + 1) * sizeof(*$$.args))))
+            if (!(new_args = hlsl_realloc(ctx, $$.args, ($$.args_count + 1) * sizeof(*$$.args))))
+            {
+                free_parse_initializer(&$$);
+                destroy_instr_list($3);
                 YYABORT;
+            }
+            $$.args = new_args;
             $$.args[$$.args_count++] = node_from_list($3);
             list_move_tail($$.instrs, $3);
             vkd3d_free($3);
