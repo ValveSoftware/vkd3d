@@ -1,0 +1,88 @@
+% Variables declared in a "for" loop can shadow previous variables.
+% This does generate a warning, however.
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float f[2];
+
+    for (float4 f = float4(0, 1, 0, 1);;)
+        return f;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+
+% They can also be used after the loop terminates.
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 f = float4(1, 0, 0, 1);
+
+    for (float4 f = float4(0, 1, 0, 1); false;)
+        ;
+    return f;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+
+% Variables declared inside of a loop cannot shadow each other, though.
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    for (float4 f, f; false;)
+        ;
+    return 0;
+}
+
+
+% Anonymous struct variable declarations are legal.
+
+[pixel shader]
+float4 main() : sv_target
+{
+    for (struct {float4 f;} s = {0, 1, 0, 1};;)
+        return s.f;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+
+% Named struct variable declarations are not, and neither are struct type
+% definitions.
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    for (struct apple {float4 f;} s = {0, 1, 0, 1};;)
+        return s.f;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    for (struct apple {float f;}; false;)
+        ;
+    return 0;
+}
+
+
+% Typedefs are not legal. This is not particularly surprising, but they are
+% valid everywhere else that declarations are, so it's worth checking.
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    for (typedef float myfloat_t; false;)
+        ;
+    return 0;
+}
