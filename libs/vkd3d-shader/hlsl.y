@@ -1606,19 +1606,17 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             unsigned int size = initializer_size(&v->initializer);
             struct hlsl_ir_load *load;
 
-            if (type->type <= HLSL_CLASS_LAST_NUMERIC
-                    && type->dimx * type->dimy != size && size != 1)
+            if (type->type <= HLSL_CLASS_LAST_NUMERIC && v->initializer.braces
+                    && type->dimx * type->dimy != size)
             {
-                if (size < type->dimx * type->dimy)
-                {
-                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Expected %u components in numeric initializer, but got %u.",
-                            type->dimx * type->dimy, size);
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
-                    continue;
-                }
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                        "Expected %u components in numeric initializer, but got %u.",
+                        type->dimx * type->dimy, v->initializer.args_count);
+                free_parse_initializer(&v->initializer);
+                vkd3d_free(v);
+                continue;
             }
+
             if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
                     && hlsl_type_component_count(type) != size)
             {
