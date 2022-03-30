@@ -67,7 +67,7 @@ float4 main() : sv_target
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
 draw quad
-todo probe all rgba (0.1, 0.2, 0.3, 0.4)
+probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 
 [pixel shader]
@@ -93,7 +93,7 @@ probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 % In fact, it's illegal to specify a contradictory majority.
 
-[pixel shader fail todo]
+[pixel shader fail]
 #pragma pack_matrix(row_major)
 typedef float2x2 mat_t;
 uniform column_major mat_t m;
@@ -134,7 +134,7 @@ probe all rgba (0.1, 0.2, 0.3, 0.4)
 % Note that the majority of the struct or array type cannot itself be
 % overwritten with modifiers; those are only valid on matrix types.
 
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float2x2 m;
@@ -156,5 +156,5 @@ uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
 uniform  8 float4 0.1 0.2 0.0 0.0
 uniform 12 float4 0.3 0.4 0.0 0.0
-todo draw quad
+draw quad
 probe all rgba (0.1, 0.3, 0.1, 0.3)
