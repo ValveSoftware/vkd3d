@@ -147,13 +147,6 @@ static void destroy_instr_list(struct list *list)
     vkd3d_free(list);
 }
 
-static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, struct vkd3d_shader_location loc)
-{
-    if (modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                "'row_major' and 'column_major' modifiers are only allowed for matrices.");
-}
-
 static bool convertible_data_type(struct hlsl_type *type)
 {
     return type->type != HLSL_CLASS_OBJECT;
@@ -899,7 +892,7 @@ static const struct hlsl_struct_field *get_struct_field(const struct hlsl_struct
 }
 
 static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        unsigned int *modifiers, struct vkd3d_shader_location loc)
+        unsigned int *modifiers, bool force_majority, const struct vkd3d_shader_location *loc)
 {
     unsigned int default_majority = 0;
     struct hlsl_type *new_type;
@@ -914,12 +907,12 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
             && !(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
             && type->type == HLSL_CLASS_MATRIX)
     {
-        if (!(default_majority = ctx->matrix_majority))
+        if (!(default_majority = ctx->matrix_majority) && force_majority)
             default_majority = HLSL_MODIFIER_COLUMN_MAJOR;
     }
     else if (type->type != HLSL_CLASS_MATRIX && (*modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
     {
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "'row_major' and 'column_major' modifiers are only allowed for matrices.");
     }
 
@@ -932,7 +925,7 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     *modifiers &= ~HLSL_TYPE_MODIFIERS_MASK;
 
     if ((new_type->modifiers & HLSL_MODIFIER_ROW_MAJOR) && (new_type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR))
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "'row_major' and 'column_major' modifiers are mutually exclusive.");
 
     return new_type;
@@ -985,8 +978,7 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     return true;
 }
 
-static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
-        struct hlsl_type *orig_type, struct list *list)
+static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *orig_type, struct list *list)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_type *type;
@@ -995,11 +987,11 @@ static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, list, struct parse_variable_def, entry)
     {
-        unsigned int var_modifiers = modifiers;
+        unsigned int var_modifiers = 0;
 
         if (!v->arrays.count)
         {
-            if (!(type = hlsl_type_clone(ctx, orig_type, 0, modifiers)))
+            if (!(type = hlsl_type_clone(ctx, orig_type, 0, 0)))
             {
                 free_parse_variable_def(v);
                 continue;
@@ -1007,7 +999,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
         }
         else
         {
-            if (!(type = apply_type_modifiers(ctx, orig_type, &var_modifiers, v->loc)))
+            if (!(type = apply_type_modifiers(ctx, orig_type, &var_modifiers, true, &v->loc)))
             {
                 free_parse_variable_def(v);
                 continue;
@@ -1030,14 +1022,6 @@ static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
-
-        if (type->type != HLSL_CLASS_MATRIX)
-            check_invalid_matrix_modifiers(ctx, type->modifiers, v->loc);
-
-        if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
-                && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
-            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                    "'row_major' and 'column_major' modifiers are mutually exclusive.");
 
         ret = hlsl_scope_add_type(ctx->cur_scope, type);
         if (!ret)
@@ -3240,7 +3224,7 @@ struct_declaration:
                             "Modifiers are not allowed on struct type declarations.");
             }
 
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
 
             invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
@@ -3337,7 +3321,7 @@ field:
             struct hlsl_type *type;
             unsigned int modifiers = $1;
 
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
             if (modifiers & ~HLSL_STORAGE_NOINTERPOLATION)
             {
@@ -3442,7 +3426,7 @@ func_prototype:
                         "Only majority modifiers are allowed on functions.");
                 YYABORT;
             }
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
             if ((var = hlsl_get_var(ctx->globals, $3)))
             {
@@ -3640,7 +3624,7 @@ parameter:
             struct hlsl_type *type;
             unsigned int modifiers = $1;
 
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
 
             $$.modifiers = modifiers;
@@ -3844,9 +3828,20 @@ typedef_type:
 typedef:
       KW_TYPEDEF var_modifiers typedef_type type_specs ';'
         {
-            if ($2 & ~HLSL_TYPE_MODIFIERS_MASK)
+            struct parse_variable_def *v, *v_next;
+            unsigned int modifiers = $2;
+            struct hlsl_type *type;
+
+            if (!(type = apply_type_modifiers(ctx, $3, &modifiers, false, &@2)))
             {
-                struct parse_variable_def *v, *v_next;
+                LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $4, struct parse_variable_def, entry)
+                    free_parse_variable_def(v);
+                vkd3d_free($4);
+                YYABORT;
+            }
+
+            if (modifiers)
+            {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Storage modifiers are not allowed on typedefs.");
                 LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $4, struct parse_variable_def, entry)
@@ -3854,7 +3849,7 @@ typedef:
                 vkd3d_free($4);
                 YYABORT;
             }
-            if (!add_typedef(ctx, $2, $3, $4))
+            if (!add_typedef(ctx, type, $4))
                 YYABORT;
         }
 
@@ -3887,7 +3882,7 @@ declaration:
             unsigned int modifiers = $1;
             struct hlsl_type *type;
 
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
 
             invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
