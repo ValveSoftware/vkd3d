@@ -1603,61 +1603,66 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
         if (v->initializer.args_count)
         {
-            unsigned int size = initializer_size(&v->initializer);
-            struct hlsl_ir_load *load;
-
-            if (type->type <= HLSL_CLASS_LAST_NUMERIC && v->initializer.braces
-                    && type->dimx * type->dimy != size)
+            if (v->initializer.braces)
             {
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Expected %u components in numeric initializer, but got %u.",
-                        type->dimx * type->dimy, v->initializer.args_count);
-                free_parse_initializer(&v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
+                unsigned int size = initializer_size(&v->initializer);
 
-            if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
-                    && hlsl_type_component_count(type) != size)
-            {
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Expected %u components in initializer, but got %u.", hlsl_type_component_count(type), size);
-                free_parse_initializer(&v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
+                if (type->type <= HLSL_CLASS_LAST_NUMERIC && type->dimx * type->dimy != size)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                            "Expected %u components in numeric initializer, but got %u.",
+                            type->dimx * type->dimy, v->initializer.args_count);
+                    free_parse_initializer(&v->initializer);
+                    vkd3d_free(v);
+                    continue;
+                }
 
-            if (type->type > HLSL_CLASS_LAST_NUMERIC && type->type != HLSL_CLASS_STRUCT)
-            {
-                FIXME("Initializers for non scalar/struct variables not supported yet.\n");
-                free_parse_initializer(&v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
+                if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
+                        && hlsl_type_component_count(type) != size)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                            "Expected %u components in initializer, but got %u.", hlsl_type_component_count(type), size);
+                    free_parse_initializer(&v->initializer);
+                    vkd3d_free(v);
+                    continue;
+                }
 
-            if (type->type == HLSL_CLASS_STRUCT)
-            {
-                struct_var_initializer(ctx, statements_list, var, &v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
-            if (v->initializer.args_count > 1)
-            {
-                hlsl_fixme(ctx, &v->loc, "Complex initializer.");
-                free_parse_initializer(&v->initializer);
-                vkd3d_free(v);
-                continue;
-            }
+                if (type->type > HLSL_CLASS_LAST_NUMERIC && type->type != HLSL_CLASS_STRUCT)
+                {
+                    FIXME("Initializers for non scalar/struct variables not supported yet.\n");
+                    free_parse_initializer(&v->initializer);
+                    vkd3d_free(v);
+                    continue;
+                }
 
-            load = hlsl_new_var_load(ctx, var, var->loc);
-            list_add_tail(v->initializer.instrs, &load->node.entry);
-            add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
-            vkd3d_free(v->initializer.args);
+                if (type->type == HLSL_CLASS_STRUCT)
+                {
+                    struct_var_initializer(ctx, statements_list, var, &v->initializer);
+                    vkd3d_free(v);
+                    continue;
+                }
+                else
+                {
+                    hlsl_fixme(ctx, &v->loc, "Complex initializer.");
+                    free_parse_initializer(&v->initializer);
+                    vkd3d_free(v);
+                    continue;
+                }
+            }
+            else
+            {
+                struct hlsl_ir_load *load = hlsl_new_var_load(ctx, var, var->loc);
+
+                assert(v->initializer.args_count == 1);
+                list_add_tail(v->initializer.instrs, &load->node.entry);
+                add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
+            }
 
             if (modifiers & HLSL_STORAGE_STATIC)
                 list_move_tail(&ctx->static_initializers, v->initializer.instrs);
             else
                 list_move_tail(statements_list, v->initializer.instrs);
+            vkd3d_free(v->initializer.args);
             vkd3d_free(v->initializer.instrs);
         }
         vkd3d_free(v);
