@@ -978,7 +978,7 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     return true;
 }
 
-static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *orig_type, struct list *list)
+static void add_typedefs(struct hlsl_ctx *ctx, struct hlsl_type *orig_type, struct list *list)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_type *type;
@@ -1012,13 +1012,15 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *orig_type, struc
             if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i])))
             {
                 free_parse_variable_def(v);
-                ret = false;
-                break;
+                continue;
             }
         }
         if (!ret)
             continue;
         vkd3d_free(v->arrays.sizes);
+
+        assert(!v->initializer.instrs);
+        assert(!v->semantic.name);
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
@@ -1031,7 +1033,6 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *orig_type, struc
         vkd3d_free(v);
     }
     vkd3d_free(list);
-    return true;
 }
 
 static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
@@ -3842,8 +3843,7 @@ typedef:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Storage modifiers are not allowed on typedefs.");
 
-            if (!add_typedef(ctx, type, $4))
-                YYABORT;
+            add_typedefs(ctx, type, $4);
         }
 
 type_specs:
