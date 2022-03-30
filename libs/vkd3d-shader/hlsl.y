@@ -668,6 +668,15 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     return new_type;
 }
 
+static void free_parse_variable_def(struct parse_variable_def *v)
+{
+    free_parse_initializer(&v->initializer);
+    vkd3d_free(v->arrays.sizes);
+    vkd3d_free(v->name);
+    vkd3d_free((void *)v->semantic.name);
+    vkd3d_free(v);
+}
+
 static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *type, struct list *fields)
 {
     struct parse_variable_def *v, *v_next;
@@ -685,13 +694,14 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
 
         if (!(field = hlsl_alloc(ctx, sizeof(*field))))
         {
-            vkd3d_free(v);
-            return list;
+            free_parse_variable_def(v);
+            continue;
         }
 
         field->type = type;
         for (i = 0; i < v->arrays.count; ++i)
             field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[i]);
+        vkd3d_free(v->arrays.sizes);
         field->loc = v->loc;
         field->name = v->name;
         field->semantic = v->semantic;
@@ -719,18 +729,29 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
         if (!v->arrays.count)
         {
             if (!(type = hlsl_type_clone(ctx, orig_type, 0, modifiers)))
-                return false;
+            {
+                free_parse_variable_def(v);
+                continue;
+            }
         }
         else
         {
             type = orig_type;
         }
 
+        ret = true;
         for (i = 0; i < v->arrays.count; ++i)
         {
             if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i])))
-                return false;
+            {
+                free_parse_variable_def(v);
+                ret = false;
+                break;
+            }
         }
+        if (!ret)
+            continue;
+        vkd3d_free(v->arrays.sizes);
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
@@ -747,6 +768,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
         if (!ret)
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                     "Type '%s' is already defined.", v->name);
+        free_parse_initializer(&v->initializer);
         vkd3d_free(v);
     }
     vkd3d_free(list);
@@ -1470,15 +1492,6 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
     vkd3d_free(initializer->args);
 }
 
-static void free_parse_variable_def(struct parse_variable_def *v)
-{
-    free_parse_initializer(&v->initializer);
-    vkd3d_free(v->arrays.sizes);
-    vkd3d_free(v->name);
-    vkd3d_free((void *)v->semantic.name);
-    vkd3d_free(v);
-}
-
 static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         DWORD modifiers, struct list *var_list)
 {
@@ -1510,6 +1523,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         type = basic_type;
         for (i = 0; i < v->arrays.count; ++i)
             type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
+        vkd3d_free(v->arrays.sizes);
 
         if (type->type != HLSL_CLASS_MATRIX)
             check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
@@ -1569,6 +1583,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
                     "Const variable \"%s\" is missing an initializer.", var->name);
             hlsl_free_var(var);
+            free_parse_initializer(&v->initializer);
             vkd3d_free(v);
             continue;
         }
@@ -1581,6 +1596,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                     "Variable \"%s\" was already declared in this scope.", var->name);
             hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
             hlsl_free_var(var);
+            free_parse_initializer(&v->initializer);
             vkd3d_free(v);
             continue;
         }
