@@ -48,6 +48,7 @@ struct parse_initializer
     struct hlsl_ir_node **args;
     unsigned int args_count;
     struct list *instrs;
+    bool braces;
 };
 
 struct parse_array_sizes
@@ -3215,14 +3216,17 @@ complex_initializer:
             }
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
+            $$.braces = false;
         }
     | '{' complex_initializer_list '}'
         {
             $$ = $2;
+            $$.braces = true;
         }
     | '{' complex_initializer_list ',' '}'
         {
             $$ = $2;
+            $$.braces = true;
         }
 
 complex_initializer_list:
@@ -3260,6 +3264,7 @@ initializer_expr_list:
             }
             $$.args[0] = node_from_list($1);
             $$.instrs = $1;
+            $$.braces = false;
         }
     | initializer_expr_list ',' initializer_expr
         {
@@ -3396,6 +3401,7 @@ func_arguments:
             $$.args_count = 0;
             if (!($$.instrs = make_empty_list(ctx)))
                 YYABORT;
+            $$.braces = false;
         }
     | initializer_expr_list
 
