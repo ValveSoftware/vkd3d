@@ -126,7 +126,7 @@ AS_IF([test "x$with_spirv_tools" = "xyes"],
 
 HAVE_XCB=no
 AS_IF([test "x$with_xcb" != "xno"],
-      [PKG_CHECK_MODULES([XCB], [xcb xcb-keysyms],
+      [PKG_CHECK_MODULES([XCB], [xcb xcb-event xcb-icccm xcb-keysyms],
                                 [AC_DEFINE([HAVE_XCB], [1], [Define to 1 if you have libxcb.])
                                 HAVE_XCB=yes],
                                 [HAVE_XCB=no])])
