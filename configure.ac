@@ -165,6 +165,8 @@ AS_IF([test "x$CROSSTARGET32" != "xno" -o "x$CROSSTARGET64" != "xno"],
       [HAVE_CROSSTARGET=yes], [HAVE_CROSSTARGET=no])
 AS_IF([test $DX_FLAG_doc = 1], [HAVE_DOCS=yes], [HAVE_DOCS=no])
 
+AS_IF([test "x$enable_demos" != "xyes" -a "x$enable_tests" = "xno"], [CROSSTARGET64=no CROSSTARGET32=no])
+
 AS_ECHO(["
   Configuration summary for $PACKAGE $VERSION
 
@@ -180,7 +182,7 @@ AS_ECHO(["
 "])
 
 AS_IF([test "x$enable_demos" = "xyes"], [AS_ECHO(["  Cross-compiling demos: ${HAVE_CROSSTARGET}"])])
-AS_ECHO(["  Cross-compiling tests: ${HAVE_CROSSTARGET}"])
+AS_IF([test "x$enable_tests" != "xno"], [AS_ECHO(["  Cross-compiling tests: ${HAVE_CROSSTARGET}"])])
 AS_IF([test "x$CROSSTARGET32" != "xno"], [AS_ECHO(["    Using 32-bit cross compiler: $CROSSCC32"])])
 AS_IF([test "x$CROSSTARGET64" != "xno"], [AS_ECHO(["    Using 64-bit cross compiler: $CROSSCC64"])])
 AS_ECHO([])
