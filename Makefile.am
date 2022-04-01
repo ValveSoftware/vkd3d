@@ -445,8 +445,10 @@ if HAVE_CROSSTARGET32
 CROSS32_CC = @CROSSCC32@
 CROSS32_DLLTOOL = @CROSSTARGET32@-dlltool
 CROSS32_IMPLIBS = $(cross_implibs:=.cross32.a)
-CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe) \
-	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
+CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe)
+if BUILD_DEMOS
+CROSS32_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
+endif
 CROSS32_FILES = $(CROSS32_IMPLIBS) $(CROSS32_EXEFILES) tests/shader_runner.cross32.exe
 
 CLEANFILES += $(CROSS32_FILES)
@@ -477,8 +479,10 @@ if HAVE_CROSSTARGET64
 CROSS64_CC = @CROSSCC64@
 CROSS64_DLLTOOL = @CROSSTARGET64@-dlltool
 CROSS64_IMPLIBS = $(cross_implibs:=.cross64.a)
-CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe) \
-	$(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
+CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe)
+if BUILD_DEMOS
+CROSS64_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
+endif
 CROSS64_FILES = $(CROSS64_IMPLIBS) $(CROSS64_EXEFILES) tests/shader_runner.cross64.exe
 
 CLEANFILES += $(CROSS64_FILES)

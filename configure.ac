@@ -162,7 +162,7 @@ AC_OUTPUT
 
 dnl Output configuration summary
 AS_IF([test "x$CROSSTARGET32" != "xno" -o "x$CROSSTARGET64" != "xno"],
-      [HAVE_CROSSTEST=yes], [HAVE_CROSSTEST=no])
+      [HAVE_CROSSTARGET=yes], [HAVE_CROSSTARGET=no])
 AS_IF([test $DX_FLAG_doc = 1], [HAVE_DOCS=yes], [HAVE_DOCS=no])
 
 AS_ECHO(["
@@ -177,8 +177,10 @@ AS_ECHO(["
   Building demos: ${enable_demos}
   Building tests: ${enable_tests}
   Building documentation: ${HAVE_DOCS}
+"])
 
-  Building crosstests: ${HAVE_CROSSTEST}"])
+AS_IF([test "x$enable_demos" = "xyes"], [AS_ECHO(["  Cross-compiling demos: ${HAVE_CROSSTARGET}"])])
+AS_ECHO(["  Cross-compiling tests: ${HAVE_CROSSTARGET}"])
 AS_IF([test "x$CROSSTARGET32" != "xno"], [AS_ECHO(["    Using 32-bit cross compiler: $CROSSCC32"])])
 AS_IF([test "x$CROSSTARGET64" != "xno"], [AS_ECHO(["    Using 64-bit cross compiler: $CROSSCC64"])])
 AS_ECHO([])
