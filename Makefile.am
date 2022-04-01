@@ -449,9 +449,9 @@ CROSS32_EXEFILES = $(vkd3d_cross_tests:=.cross32.exe)
 if BUILD_DEMOS
 CROSS32_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross32.exe)
 endif
-CROSS32_FILES = $(CROSS32_IMPLIBS) $(CROSS32_EXEFILES) tests/shader_runner.cross32.exe
+CROSS32_FILES = $(CROSS32_EXEFILES) tests/shader_runner.cross32.exe
 
-CLEANFILES += $(CROSS32_FILES)
+CLEANFILES += $(CROSS32_IMPLIBS) $(CROSS32_FILES)
 crosstest32: $(CROSS32_FILES)
 
 -include tests/$(DEPDIR)/*.cross32.Po
@@ -483,9 +483,9 @@ CROSS64_EXEFILES = $(vkd3d_cross_tests:=.cross64.exe)
 if BUILD_DEMOS
 CROSS64_EXEFILES += $(vkd3d_demos:demos/vkd3d-%=demos/%.cross64.exe)
 endif
-CROSS64_FILES = $(CROSS64_IMPLIBS) $(CROSS64_EXEFILES) tests/shader_runner.cross64.exe
+CROSS64_FILES = $(CROSS64_EXEFILES) tests/shader_runner.cross64.exe
 
-CLEANFILES += $(CROSS64_FILES)
+CLEANFILES += $(CROSS64_IMPLIBS) $(CROSS64_FILES)
 crosstest64: $(CROSS64_FILES)
 
 -include tests/$(DEPDIR)/*.cross64.Po
