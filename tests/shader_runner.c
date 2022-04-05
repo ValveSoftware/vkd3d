@@ -149,9 +149,11 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     formats[] =
     {
         {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
         {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
         {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
         {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
+        {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
     };
     unsigned int i;
 
@@ -344,6 +346,8 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         if (match_string(line, "triangle list", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        else if (match_string(line, "triangle strip", &line))
+            topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
         else
             fatal_error("Unknown primitive topology '%s'.\n", line);
 
