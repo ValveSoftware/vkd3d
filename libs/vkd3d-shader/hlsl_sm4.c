@@ -1475,7 +1475,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    break;
+                    assert(0);
             }
             break;
 
@@ -1501,7 +1501,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    break;
+                    assert(0);
             }
             break;
 
@@ -1527,7 +1527,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    break;
+                    assert(0);
             }
             break;
 
