@@ -2541,26 +2541,38 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
         struct hlsl_ir_resource_load *load;
+        struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_node *coords;
+        bool multisampled;
 
-        if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-                || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-        {
-            FIXME("'Load' method for multi-sample textures.\n");
-            return false;
-        }
+        multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+                || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
 
-        if (params->args_count < 1 || params->args_count > 3)
+        if (params->args_count < 1 + multisampled || params->args_count > 3 + multisampled)
         {
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'Load': expected 1, 2, or 3, but got %u.", params->args_count);
+                    "Wrong number of arguments to method 'Load': expected between %u and %u, but got %u.",
+                    1 + multisampled, 3 + multisampled, params->args_count);
             return false;
         }
-        if (params->args_count >= 2)
-            hlsl_fixme(ctx, loc, "Offset parameter.");
-        if (params->args_count == 3)
+        if (multisampled)
+        {
+            hlsl_fixme(ctx, loc, "Load() sampling index parameter.");
+        }
+
+        assert(offset_dim);
+        if (params->args_count > 1 + multisampled)
+        {
+            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
+                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+                return false;
+        }
+        if (params->args_count > 2 + multisampled)
+        {
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+        }
 
         /* +1 for the mipmap level */
         if (!(coords = add_implicit_conversion(ctx, instrs, params->args[0],
@@ -2568,7 +2580,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
 
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
-                &object_load->src, NULL, coords, NULL, loc)))
+                &object_load->src, NULL, coords, offset, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
