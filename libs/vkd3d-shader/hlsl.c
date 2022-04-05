@@ -563,15 +563,31 @@ struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir
     return hlsl_new_store(ctx, lhs, NULL, rhs, 0, rhs->loc);
 }
 
+struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_constant *c;
+
+    assert(type->type <= HLSL_CLASS_VECTOR);
+
+    if (!(c = hlsl_alloc(ctx, sizeof(*c))))
+        return NULL;
+
+    init_node(&c->node, HLSL_IR_CONSTANT, type, *loc);
+
+    return c;
+}
+
 struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_alloc(ctx, sizeof(*c))))
-        return NULL;
-    init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), *loc);
-    c->value[0].i = n;
+    c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc);
+
+    if (c)
+        c->value[0].i = n;
+
     return c;
 }
 
@@ -580,10 +596,11 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
 {
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_alloc(ctx, sizeof(*c))))
-        return NULL;
-    init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), *loc);
-    c->value[0].u = n;
+    c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
+
+    if (c)
+        c->value[0].u = n;
+
     return c;
 }
 
