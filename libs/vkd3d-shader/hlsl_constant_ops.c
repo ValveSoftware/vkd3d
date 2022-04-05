@@ -236,10 +236,17 @@ bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void 
         return false;
     expr = hlsl_ir_expr(instr);
 
+    if (instr->data_type->type > HLSL_CLASS_VECTOR)
+        return false;
+
     for (i = 0; i < ARRAY_SIZE(expr->operands); ++i)
     {
-        if (expr->operands[i].node && expr->operands[i].node->type != HLSL_IR_CONSTANT)
-            return false;
+        if (expr->operands[i].node)
+        {
+            if (expr->operands[i].node->type != HLSL_IR_CONSTANT)
+                return false;
+            assert(expr->operands[i].node->data_type->type <= HLSL_CLASS_VECTOR);
+        }
     }
     arg1 = hlsl_ir_constant(expr->operands[0].node);
     if (expr->operands[1].node)
