@@ -567,6 +567,15 @@ static bool copy_propagation_transform_resource_load(struct hlsl_ctx *ctx,
     return progress;
 }
 
+static bool copy_propagation_transform_resource_store(struct hlsl_ctx *ctx,
+        struct hlsl_ir_resource_store *store, struct copy_propagation_state *state)
+{
+    bool progress = false;
+
+    progress |= copy_propagation_transform_object_load(ctx, &store->resource, state);
+    return progress;
+}
+
 static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
         struct copy_propagation_state *state)
 {
@@ -715,6 +724,10 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
 
             case HLSL_IR_RESOURCE_LOAD:
                 progress |= copy_propagation_transform_resource_load(ctx, hlsl_ir_resource_load(instr), state);
+                break;
+
+            case HLSL_IR_RESOURCE_STORE:
+                progress |= copy_propagation_transform_resource_store(ctx, hlsl_ir_resource_store(instr), state);
                 break;
 
             case HLSL_IR_STORE:
