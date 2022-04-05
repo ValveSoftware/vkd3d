@@ -47,7 +47,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 i = src->value[k].f;
                 f = src->value[k].f;
                 d = src->value[k].f;
-                b = src->value[k].f;
+                b = !!src->value[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
@@ -55,7 +55,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 i = src->value[k].d;
                 f = src->value[k].d;
                 d = src->value[k].d;
-                b = src->value[k].d;
+                b = !!src->value[k].d;
                 break;
 
             case HLSL_TYPE_INT:
@@ -63,7 +63,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 i = src->value[k].i;
                 f = src->value[k].i;
                 d = src->value[k].i;
-                b = src->value[k].i;
+                b = !!src->value[k].i;
                 break;
 
             case HLSL_TYPE_UINT:
@@ -71,15 +71,15 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 i = src->value[k].u;
                 f = src->value[k].u;
                 d = src->value[k].u;
-                b = src->value[k].u;
+                b = !!src->value[k].u;
                 break;
 
             case HLSL_TYPE_BOOL:
-                u = src->value[k].b;
-                i = src->value[k].b;
-                f = src->value[k].b;
-                d = src->value[k].b;
-                b = src->value[k].b;
+                u = !!src->value[k].u;
+                i = !!src->value[k].u;
+                f = !!src->value[k].u;
+                d = !!src->value[k].u;
+                b = !!src->value[k].u;
                 break;
 
             default:
@@ -107,7 +107,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 break;
 
             case HLSL_TYPE_BOOL:
-                dst->value[k].b = b;
+                dst->value[k].u = b ? ~0u : 0;
                 break;
 
             default:
