@@ -194,11 +194,12 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
 {
     enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
 
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (int k = 0; k < 4; ++k)
+    for (k = 0; k < 4; ++k)
     {
         switch (type)
         {
