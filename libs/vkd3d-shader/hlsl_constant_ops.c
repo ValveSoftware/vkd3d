@@ -223,6 +223,43 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
     return true;
 }
 
+static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
+        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+{
+    unsigned int k;
+
+    assert(dst->node.data_type->base_type == HLSL_TYPE_BOOL);
+    assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (src1->node.data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value[k].u = src1->value[k].f != src2->value[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value[k].u = src1->value[k].d != src2->value[k].d;
+                break;
+
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
+                dst->value[k].u = src1->value[k].u != src2->value[k].u;
+                break;
+
+            default:
+                assert(0);
+                return false;
+        }
+
+        dst->value[k].u *= ~0u;
+    }
+    return true;
+}
+
 bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
@@ -270,6 +307,10 @@ bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void 
 
         case HLSL_OP2_MUL:
             success = fold_mul(ctx, res, arg1, arg2);
+            break;
+
+        case HLSL_OP2_NEQUAL:
+            success = fold_nequal(ctx, res, arg1, arg2);
             break;
 
         default:
