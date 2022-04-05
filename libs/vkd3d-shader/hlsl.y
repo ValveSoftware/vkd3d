@@ -574,7 +574,7 @@ static struct hlsl_ir_load *add_record_load(struct hlsl_ctx *ctx, struct list *i
 {
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, &loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
 
@@ -608,7 +608,7 @@ static struct hlsl_ir_load *add_array_load(struct hlsl_ctx *ctx, struct list *in
         return NULL;
     }
 
-    if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), &loc)))
         return NULL;
     list_add_tail(instrs, &c->node.entry);
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
@@ -1424,7 +1424,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
         hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                 "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
 
-    if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
+    if (!(one = hlsl_new_int_constant(ctx, 1, &loc)))
         return false;
     list_add_tail(instrs, &one->node.entry);
 
@@ -1477,7 +1477,7 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
 
         if (hlsl_type_component_count(field->type) == hlsl_type_component_count(node->data_type))
         {
-            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, node->loc)))
+            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, &node->loc)))
                 break;
             list_add_tail(list, &c->node.entry);
 

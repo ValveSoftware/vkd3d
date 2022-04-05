@@ -94,7 +94,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     list_add_head(instrs, &load->node.entry);
 
-    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, var->loc)))
+    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, &var->loc)))
         return;
     list_add_after(&load->node.entry, &offset->node.entry);
 
@@ -163,7 +163,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     list_add_before(&var->scope_entry, &output->scope_entry);
     list_add_tail(&ctx->extern_vars, &output->extern_entry);
 
-    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, var->loc)))
+    if (!(offset = hlsl_new_uint_constant(ctx, field_offset, &var->loc)))
         return;
     list_add_tail(instrs, &offset->node.entry);
 
@@ -577,7 +577,7 @@ static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
     struct hlsl_ir_load *split_load;
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_new_uint_constant(ctx, offset, store->node.loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, offset, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &c->node.entry);
 

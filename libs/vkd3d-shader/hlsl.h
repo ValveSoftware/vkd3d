@@ -739,7 +739,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
         struct list *parameters, const struct hlsl_semantic *semantic, struct vkd3d_shader_location loc);
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc);
 struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
-        const struct vkd3d_shader_location loc);
+        const struct vkd3d_shader_location *loc);
 struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc);
 struct hlsl_ir_load *hlsl_new_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_type *type, struct vkd3d_shader_location loc);
@@ -758,7 +758,7 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *nam
         const struct vkd3d_shader_location loc);
 struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format);
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
-        const struct vkd3d_shader_location loc);
+        const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         struct vkd3d_shader_location loc);
 struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
