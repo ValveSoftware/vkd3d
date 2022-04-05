@@ -2067,7 +2067,7 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
         {
             if (instr->data_type->type == HLSL_CLASS_MATRIX)
             {
-                FIXME("Matrix operations need to be lowered.\n");
+                hlsl_fixme(ctx, &instr->loc, "Matrix operations need to be lowered.");
                 break;
             }
             else if (instr->data_type->type == HLSL_CLASS_OBJECT)
