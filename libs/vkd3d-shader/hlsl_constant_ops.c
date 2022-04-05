@@ -83,8 +83,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 break;
 
             default:
-                FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
-                        debug_hlsl_type(ctx, dst->node.data_type));
+                assert(0);
                 return false;
         }
 
@@ -112,8 +111,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 break;
 
             default:
-                FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
-                        debug_hlsl_type(ctx, dst->node.data_type));
+                assert(0);
                 return false;
         }
     }
