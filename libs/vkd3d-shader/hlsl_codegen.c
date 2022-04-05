@@ -59,7 +59,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int field_offset, const struct hlsl_semantic *semantic)
+        struct hlsl_type *type, unsigned int field_offset, unsigned int modifiers, const struct hlsl_semantic *semantic)
 {
     struct vkd3d_string_buffer *name;
     struct hlsl_semantic new_semantic;
@@ -78,7 +78,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     new_semantic.index = semantic->index;
     if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
-            type, var->loc, &new_semantic, var->modifiers, NULL)))
+            type, var->loc, &new_semantic, modifiers, NULL)))
     {
         hlsl_release_string_buffer(ctx, name);
         vkd3d_free((void *)new_semantic.name);
@@ -113,7 +113,8 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         if (field->type->type == HLSL_CLASS_STRUCT)
             prepend_input_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
         else if (field->semantic.name)
-            prepend_input_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
+            prepend_input_copy(ctx, instrs, var, field->type,
+                    field_offset + field->reg_offset, field->modifiers, &field->semantic);
         else
             hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
@@ -127,11 +128,11 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         prepend_input_struct_copy(ctx, instrs, var, var->data_type, 0);
     else if (var->semantic.name)
-        prepend_input_copy(ctx, instrs, var, var->data_type, 0, &var->semantic);
+        prepend_input_copy(ctx, instrs, var, var->data_type, 0, var->modifiers, &var->semantic);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int field_offset, const struct hlsl_semantic *semantic)
+        struct hlsl_type *type, unsigned int field_offset, unsigned int modifiers, const struct hlsl_semantic *semantic)
 {
     struct vkd3d_string_buffer *name;
     struct hlsl_semantic new_semantic;
@@ -150,7 +151,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
     new_semantic.index = semantic->index;
     if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
-            type, var->loc, &new_semantic, var->modifiers, NULL)))
+            type, var->loc, &new_semantic, modifiers, NULL)))
     {
         vkd3d_free((void *)new_semantic.name);
         hlsl_release_string_buffer(ctx, name);
@@ -185,7 +186,8 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         if (field->type->type == HLSL_CLASS_STRUCT)
             append_output_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
         else if (field->semantic.name)
-            append_output_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset, &field->semantic);
+            append_output_copy(ctx, instrs, var, field->type,
+                    field_offset + field->reg_offset, field->modifiers, &field->semantic);
         else
             hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
@@ -200,7 +202,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         append_output_struct_copy(ctx, instrs, var, var->data_type, 0);
     else if (var->semantic.name)
-        append_output_copy(ctx, instrs, var, var->data_type, 0, &var->semantic);
+        append_output_copy(ctx, instrs, var, var->data_type, 0, var->modifiers, &var->semantic);
 }
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),

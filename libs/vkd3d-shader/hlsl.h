@@ -152,6 +152,7 @@ struct hlsl_struct_field
     struct hlsl_type *type;
     const char *name;
     struct hlsl_semantic semantic;
+    unsigned int modifiers;
     unsigned int reg_offset;
 
     size_t name_bytecode_offset;

@@ -677,7 +677,8 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v);
 }
 
-static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *type, struct list *fields)
+static struct list *gen_struct_fields(struct hlsl_ctx *ctx,
+        struct hlsl_type *type, unsigned int modifiers, struct list *fields)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_struct_field *field;
@@ -705,6 +706,7 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx, struct hlsl_type *ty
         field->loc = v->loc;
         field->name = v->name;
         field->semantic = v->semantic;
+        field->modifiers = modifiers;
         if (v->initializer.args_count)
         {
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.");
@@ -2657,7 +2659,7 @@ field:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
-            if (modifiers)
+            if (modifiers & ~HLSL_STORAGE_NOINTERPOLATION)
             {
                 struct vkd3d_string_buffer *string;
 
@@ -2666,7 +2668,7 @@ field:
                             "Modifiers '%s' are not allowed on struct fields.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
-            $$ = gen_struct_fields(ctx, type, $3);
+            $$ = gen_struct_fields(ctx, type, modifiers, $3);
         }
 
 func_declaration:
