@@ -1866,6 +1866,13 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             break;
         }
 
+        case HLSL_OP2_RSHIFT:
+            assert(type_is_integer(dst_type));
+            assert(dst_type->base_type != HLSL_TYPE_BOOL);
+            write_sm4_binary_op(buffer, dst_type->base_type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
+                    &expr->node, arg1, arg2);
+            break;
+
         default:
             hlsl_fixme(ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
     }

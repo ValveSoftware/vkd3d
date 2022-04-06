@@ -318,7 +318,6 @@ SHADER_TEST_LOG_COMPILER = tests/shader_runner
 XFAIL_TESTS = \
 	tests/arithmetic-float.shader_test \
 	tests/arithmetic-int.shader_test \
-	tests/bitwise.shader_test \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
