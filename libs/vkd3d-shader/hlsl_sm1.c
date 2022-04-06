@@ -790,7 +790,7 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             }
             else if (instr->data_type->type == HLSL_CLASS_OBJECT)
             {
-                hlsl_fixme(ctx, &instr->loc, "Object copy.\n");
+                hlsl_fixme(ctx, &instr->loc, "Object copy.");
                 break;
             }
 

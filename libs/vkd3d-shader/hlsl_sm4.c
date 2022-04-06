@@ -1519,11 +1519,11 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to uint.\n");
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to uint.");
                     break;
 
                 case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.\n");
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.");
                     break;
 
                 default:
@@ -1532,15 +1532,15 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_TYPE_HALF:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to half.\n");
+            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to half.");
             break;
 
         case HLSL_TYPE_DOUBLE:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to double.\n");
+            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to double.");
             break;
 
         case HLSL_TYPE_BOOL:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to bool.\n");
+            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to bool.");
             break;
 
         default:
@@ -2019,7 +2019,7 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
 
     if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
     {
-        hlsl_fixme(ctx, &store->node.loc, "Store to a matrix variable.\n");
+        hlsl_fixme(ctx, &store->node.loc, "Store to a matrix variable.");
         return;
     }
 
@@ -2072,7 +2072,7 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
             }
             else if (instr->data_type->type == HLSL_CLASS_OBJECT)
             {
-                hlsl_fixme(ctx, &instr->loc, "Object copy.\n");
+                hlsl_fixme(ctx, &instr->loc, "Object copy.");
                 break;
             }
 
