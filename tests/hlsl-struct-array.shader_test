@@ -1,5 +1,8 @@
 % In SM4, array elements are always aligned to the next vec4, although structs are not.
 
+[require]
+shader model >= 4.0
+
 [pixel shader]
 uniform struct
 {
