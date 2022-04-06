@@ -1940,10 +1940,11 @@ static bool type_has_numeric_components(struct hlsl_type *type)
 }
 
 static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
-        DWORD modifiers, struct list *var_list)
+        unsigned int modifiers, const struct vkd3d_shader_location *modifiers_loc, struct list *var_list)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_ir_function_decl *func;
+    unsigned int invalid_modifiers;
     struct list *statements_list;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -1962,6 +1963,17 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
     if (!var_list)
         return statements_list;
+
+    invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
+    if (invalid_modifiers)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_modifiers_to_string(ctx, invalid_modifiers)))
+            hlsl_error(ctx, modifiers_loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                    "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
     {
@@ -2038,16 +2050,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             }
         }
         vkd3d_free(v->arrays.sizes);
-
-        if (modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_modifiers_to_string(ctx, modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))))
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-        }
 
         if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, &v->reg_reservation)))
         {
@@ -3862,7 +3864,7 @@ struct_declaration:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
-            $$ = declare_vars(ctx, type, modifiers, $3);
+            $$ = declare_vars(ctx, type, modifiers, &@1, $3);
         }
 
 struct_spec:
@@ -4585,7 +4587,7 @@ declaration:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
-            $$ = declare_vars(ctx, type, modifiers, $3);
+            $$ = declare_vars(ctx, type, modifiers, &@1, $3);
         }
 
 variables_def_optional:
