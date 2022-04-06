@@ -750,6 +750,37 @@ static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     return true;
 }
 
+static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_type *type = instr->data_type, *arg_type;
+    struct hlsl_ir_constant *zero;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP1_CAST)
+        return false;
+    arg_type = expr->operands[0].node->data_type;
+    if (type->type > HLSL_CLASS_VECTOR || arg_type->type > HLSL_CLASS_VECTOR)
+        return false;
+    if (type->base_type != HLSL_TYPE_BOOL)
+        return false;
+
+    /* Narrowing casts should have already been lowered. */
+    assert(type->dimx == arg_type->dimx);
+
+    zero = hlsl_new_constant(ctx, arg_type, &instr->loc);
+    if (!zero)
+        return false;
+    list_add_before(&instr->entry, &zero->node.entry);
+
+    expr->op = HLSL_OP2_NEQUAL;
+    hlsl_src_from_node(&expr->operands[1], &zero->node);
+
+    return true;
+}
+
 static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
@@ -1655,6 +1686,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
     while (progress);
     transform_ir(ctx, lower_narrowing_casts, body, NULL);
+    transform_ir(ctx, lower_casts_to_bool, body, NULL);
     do
     {
         progress = transform_ir(ctx, hlsl_fold_constants, body, NULL);

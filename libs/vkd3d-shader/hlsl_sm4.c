@@ -1542,7 +1542,8 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_TYPE_BOOL:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to bool.");
+            /* Casts to bool should have already been lowered. */
+            assert(0);
             break;
 
         default:
