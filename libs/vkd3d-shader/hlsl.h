@@ -57,11 +57,19 @@
 #define HLSL_SWIZZLE_Z (2u)
 #define HLSL_SWIZZLE_W (3u)
 
+#define HLSL_SWIZZLE_MASK (3u)
+#define HLSL_SWIZZLE_SHIFT(idx) (2u * (idx))
+
 #define HLSL_SWIZZLE(x, y, z, w) \
-        (((HLSL_SWIZZLE_ ## x) << 0) \
-        | ((HLSL_SWIZZLE_ ## y) << 2) \
-        | ((HLSL_SWIZZLE_ ## z) << 4) \
-        | ((HLSL_SWIZZLE_ ## w) << 6))
+        (((HLSL_SWIZZLE_ ## x) << HLSL_SWIZZLE_SHIFT(0)) \
+        | ((HLSL_SWIZZLE_ ## y) << HLSL_SWIZZLE_SHIFT(1)) \
+        | ((HLSL_SWIZZLE_ ## z) << HLSL_SWIZZLE_SHIFT(2)) \
+        | ((HLSL_SWIZZLE_ ## w) << HLSL_SWIZZLE_SHIFT(3)))
+
+static inline unsigned int hlsl_swizzle_get_component(unsigned int swizzle, unsigned int idx)
+{
+    return (swizzle >> HLSL_SWIZZLE_SHIFT(idx)) & HLSL_SWIZZLE_MASK;
+}
 
 enum hlsl_type_class
 {

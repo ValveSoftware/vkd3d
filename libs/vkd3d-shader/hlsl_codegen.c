@@ -791,47 +791,65 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     return false;
 }
 
+/* Create a new load from src_load, with the given type and extra offset.
+ * Inserts new instructions right after "src_load", and returns a pointer to
+ * the resulting load instruction. */
+static struct hlsl_ir_load *split_load(struct hlsl_ctx *ctx,
+        struct hlsl_ir_load *src_load, const unsigned int offset, struct hlsl_type *type)
+{
+    struct hlsl_ir_node *offset_instr, *add;
+    struct hlsl_ir_load *dst_load;
+    struct hlsl_ir_constant *c;
+
+    if (!(c = hlsl_new_uint_constant(ctx, offset, &src_load->node.loc)))
+        return NULL;
+    list_add_after(&src_load->node.entry, &c->node.entry);
+
+    offset_instr = &c->node;
+    if (src_load->src.offset.node)
+    {
+        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, src_load->src.offset.node, &c->node)))
+            return NULL;
+        list_add_after(&c->node.entry, &add->entry);
+        offset_instr = add;
+    }
+    if (!(dst_load = hlsl_new_load(ctx, src_load->src.var, offset_instr, type, src_load->node.loc)))
+        return NULL;
+    list_add_after(&offset_instr->entry, &dst_load->node.entry);
+    return dst_load;
+}
+
 /* Copy an element of a complex variable. Helper for
  * split_array_copies(), split_struct_copies() and
  * split_matrix_copies(). Inserts new instructions right before
  * "store". */
-static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
-        const struct hlsl_ir_load *load, const unsigned int offset, struct hlsl_type *type)
+static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *src_store,
+        struct hlsl_ir_load *src_load, const unsigned int offset, struct hlsl_type *type)
 {
     struct hlsl_ir_node *offset_instr, *add;
-    struct hlsl_ir_store *split_store;
-    struct hlsl_ir_load *split_load;
+    struct hlsl_ir_store *dst_store;
+    struct hlsl_ir_load *dst_load;
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_new_uint_constant(ctx, offset, &store->node.loc)))
+    if (!(dst_load = split_load(ctx, src_load, offset, type)))
         return false;
-    list_add_before(&store->node.entry, &c->node.entry);
+
+    if (!(c = hlsl_new_uint_constant(ctx, offset, &src_store->node.loc)))
+        return NULL;
+    list_add_before(&src_store->node.entry, &c->node.entry);
 
     offset_instr = &c->node;
-    if (load->src.offset.node)
+    if (src_store->lhs.offset.node)
     {
-        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, load->src.offset.node, &c->node)))
+        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, src_store->lhs.offset.node, &c->node)))
             return false;
-        list_add_before(&store->node.entry, &add->entry);
-        offset_instr = add;
-    }
-    if (!(split_load = hlsl_new_load(ctx, load->src.var, offset_instr, type, store->node.loc)))
-        return false;
-    list_add_before(&store->node.entry, &split_load->node.entry);
-
-    offset_instr = &c->node;
-    if (store->lhs.offset.node)
-    {
-        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, store->lhs.offset.node, &c->node)))
-            return false;
-        list_add_before(&store->node.entry, &add->entry);
+        list_add_before(&src_store->node.entry, &add->entry);
         offset_instr = add;
     }
 
-    if (!(split_store = hlsl_new_store(ctx, store->lhs.var, offset_instr, &split_load->node, 0, store->node.loc)))
+    if (!(dst_store = hlsl_new_store(ctx, src_store->lhs.var, offset_instr, &dst_load->node, 0, src_store->node.loc)))
         return false;
-    list_add_before(&store->node.entry, &split_store->node.entry);
-
+    list_add_before(&src_store->node.entry, &dst_store->node.entry);
     return true;
 }
 
@@ -1063,6 +1081,78 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     hlsl_src_from_node(&sample->sampler.offset, sample->resource.offset.node);
     sample->resource.var = var;
     hlsl_src_remove(&sample->resource.offset);
+    return true;
+}
+
+/* Given a sequence like:
+ *
+ *     2: float4 | load(x)
+ *     4: float3 | @2.zyz
+ *
+ * where the swizzle of @3 is narrower than @2, convert this to a new sequence
+ *
+ *     2: float4 | load(x)
+ *     3: float2 | load(x[1])
+ *     4: float3 | @3.yxy
+ *
+ * (keeping around the old load for other instructions that might refer to it.)
+ *
+ * If the resulting swizzle is identity, we can of course then drop it, which
+ * saves us a mov instruction. (We should probably be lowering such swizzles
+ * at the assembly level anyway, though.)
+ *
+ * A secondary benefit is that we can potentially copy-prop the swizzled portion
+ * even when we can't copy-prop the whole variable. This pattern notably appears
+ * in the pattern for UAV stores—we add an implicit 0 miplevel on the assumption
+ * that an instruction is an array load, and then immediately remove it when we
+ * find it on the LHS. We could potentially generate better code there, but this
+ * is easier, and potentially useful elsewhere.
+ */
+static bool split_swizzled_load(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_type *src_load_type, *dst_load_type, *swizzle_type;
+    struct hlsl_ir_swizzle *swizzle, *new_swizzle;
+    unsigned int min_component = HLSL_SWIZZLE_W;
+    unsigned int max_component = HLSL_SWIZZLE_X;
+    struct hlsl_ir_load *src_load, *dst_load;
+    unsigned int i, s;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+    swizzle_type = swizzle->node.data_type;
+
+    if (swizzle->val.node->type != HLSL_IR_LOAD)
+        return false;
+    src_load = hlsl_ir_load(swizzle->val.node);
+    src_load_type = src_load->node.data_type;
+
+    for (i = 0; i < swizzle_type->dimx; ++i)
+    {
+        unsigned int component = hlsl_swizzle_get_component(swizzle->swizzle, i);
+
+        min_component = min(min_component, component);
+        max_component = max(max_component, component);
+    }
+    assert(max_component >= min_component);
+
+    if (min_component == 0 && max_component == src_load_type->dimx - 1)
+        return false;
+
+    dst_load_type = hlsl_get_vector_type(ctx, src_load_type->base_type, max_component - min_component + 1);
+
+    if (!(dst_load = split_load(ctx, src_load, min_component, dst_load_type)))
+        return false;
+
+    s = 0;
+    for (i = 0; i < swizzle_type->dimx; ++i)
+        s |= (hlsl_swizzle_get_component(swizzle->swizzle, i) - min_component) << HLSL_SWIZZLE_SHIFT(i);
+
+    if (!(new_swizzle = hlsl_new_swizzle(ctx, s, swizzle_type->dimx, &dst_load->node, &swizzle->node.loc)))
+        return false;
+    list_add_after(&swizzle->node.entry, &new_swizzle->node.entry);
+
+    hlsl_replace_node(&swizzle->node, &new_swizzle->node);
     return true;
 }
 
@@ -2151,6 +2241,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress = transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
         progress |= transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= copy_propagation_execute(ctx, body);
+        progress |= transform_ir(ctx, split_swizzled_load, body, NULL);
         progress |= transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }
     while (progress);
