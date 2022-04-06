@@ -1417,7 +1417,7 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
         {
             hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
-                    "Offset must resolve to integer literal in the range -8 to 7.\n");
+                    "Offset must resolve to integer literal in the range -8 to 7.");
             return;
         }
     }

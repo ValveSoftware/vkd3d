@@ -1920,7 +1920,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         if (intrinsic->param_count >= 0 && params->args_count != intrinsic->param_count)
         {
             hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to function '%s': expected %u, but got %u.\n",
+                    "Wrong number of arguments to function '%s': expected %u, but got %u.",
                     name, intrinsic->param_count, params->args_count);
             free_parse_initializer(params);
             return NULL;
@@ -1938,7 +1938,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
 
                     if ((string = hlsl_type_to_string(ctx, params->args[i]->data_type)))
                         hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                "Wrong type for argument %u of '%s': expected a numeric type, but got '%s'.\n",
+                                "Wrong type for argument %u of '%s': expected a numeric type, but got '%s'.",
                                 i + 1, name, string->buffer);
                     hlsl_release_string_buffer(ctx, string);
                     free_parse_initializer(params);
@@ -2969,7 +2969,7 @@ type:
                 string = hlsl_type_to_string(ctx, $3);
                 if (string)
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "Texture data type %s is not scalar or vector.\n", string->buffer);
+                            "Texture data type %s is not scalar or vector.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
             $$ = hlsl_new_texture_type(ctx, $1, $3);
@@ -3489,7 +3489,7 @@ primary_expr:
             }
             else
             {
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Identifier \"%s\" is not declared.\n", $1);
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Identifier \"%s\" is not declared.", $1);
                 YYABORT;
             }
         }
