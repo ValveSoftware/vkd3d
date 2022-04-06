@@ -5380,10 +5380,7 @@ assignment_expr:
             struct hlsl_ir_node *lhs = node_from_list($1), *rhs = node_from_list($3);
 
             if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
-            {
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
-                YYABORT;
-            }
             list_move_tail($3, $1);
             vkd3d_free($1);
             if (!add_assignment(ctx, $3, lhs, $2, rhs))
