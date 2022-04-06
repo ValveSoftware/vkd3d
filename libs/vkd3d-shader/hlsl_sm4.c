@@ -290,6 +290,8 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
     {
         case HLSL_TYPE_BOOL:
             return D3D_SVT_BOOL;
+        case HLSL_TYPE_DOUBLE:
+            return D3D_SVT_DOUBLE;
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_HALF:
             return D3D_SVT_FLOAT;
