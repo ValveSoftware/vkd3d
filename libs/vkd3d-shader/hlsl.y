@@ -3421,13 +3421,11 @@ func_prototype:
             struct hlsl_type *type;
 
             if (modifiers & ~HLSL_MODIFIERS_MAJORITY_MASK)
-            {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Only majority modifiers are allowed on functions.");
-                YYABORT;
-            }
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
+
             if ((var = hlsl_get_var(ctx->globals, $3)))
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
@@ -3841,14 +3839,9 @@ typedef:
             }
 
             if (modifiers)
-            {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Storage modifiers are not allowed on typedefs.");
-                LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $4, struct parse_variable_def, entry)
-                    vkd3d_free(v);
-                vkd3d_free($4);
-                YYABORT;
-            }
+
             if (!add_typedef(ctx, type, $4))
                 YYABORT;
         }
@@ -4423,12 +4416,9 @@ postfix_expr:
     | var_modifiers type '(' initializer_expr_list ')'
         {
             if ($1)
-            {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on constructors.");
-                free_parse_initializer(&$4);
-                YYABORT;
-            }
+
             if ($2->type > HLSL_CLASS_LAST_NUMERIC)
             {
                 struct vkd3d_string_buffer *string;
@@ -4519,11 +4509,7 @@ unary_expr:
             unsigned int i;
 
             if ($2)
-            {
-                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers are not allowed on casts.");
-                YYABORT;
-            }
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER, "Modifiers are not allowed on casts.");
 
             dst_type = $3;
             for (i = 0; i < $4.count; ++i)
