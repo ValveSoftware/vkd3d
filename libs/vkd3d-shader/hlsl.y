@@ -1895,16 +1895,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
         vkd3d_free(v->arrays.sizes);
 
-        if (modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_modifiers_to_string(ctx, modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT))))
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-        }
-
         if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, &v->reg_reservation)))
         {
             free_parse_variable_def(v);
@@ -3231,8 +3221,9 @@ preproc_directive:
 struct_declaration:
       var_modifiers struct_spec variables_def_optional ';'
         {
-            struct hlsl_type *type;
+            unsigned int invalid_modifiers;
             unsigned int modifiers = $1;
+            struct hlsl_type *type;
 
             if (!$3)
             {
@@ -3246,6 +3237,18 @@ struct_declaration:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
+
+            invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
+            if (invalid_modifiers)
+            {
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_modifiers_to_string(ctx, invalid_modifiers)))
+                    hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
+                hlsl_release_string_buffer(ctx, string);
+            }
+
             $$ = declare_vars(ctx, type, modifiers, $3);
         }
 
@@ -3875,11 +3878,24 @@ type_spec:
 declaration:
       var_modifiers type variables_def ';'
         {
-            struct hlsl_type *type;
+            unsigned int invalid_modifiers;
             unsigned int modifiers = $1;
+            struct hlsl_type *type;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
+
+            invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
+            if (invalid_modifiers)
+            {
+                struct vkd3d_string_buffer *string;
+
+                if ((string = hlsl_modifiers_to_string(ctx, invalid_modifiers)))
+                    hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                            "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
+                hlsl_release_string_buffer(ctx, string);
+            }
+
             $$ = declare_vars(ctx, type, modifiers, $3);
         }
 
