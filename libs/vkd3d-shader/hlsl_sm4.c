@@ -1610,6 +1610,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
                     write_sm4_unary_op(buffer, VKD3D_SM4_OP_INEG, &expr->node, arg1, 0);
                     break;
 
