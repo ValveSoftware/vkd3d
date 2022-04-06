@@ -1808,6 +1808,18 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             }
             break;
 
+        case HLSL_OP2_MOD:
+            switch (dst_type->base_type)
+            {
+                case HLSL_TYPE_UINT:
+                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_UDIV, &expr->node, 1, arg1, arg2);
+                    break;
+
+                default:
+                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s modulus expression.", dst_type_string->buffer);
+            }
+            break;
+
         case HLSL_OP2_MUL:
             switch (dst_type->base_type)
             {
