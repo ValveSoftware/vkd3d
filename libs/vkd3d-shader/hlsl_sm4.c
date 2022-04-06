@@ -1670,6 +1670,10 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     write_sm4_binary_op(buffer, VKD3D_SM4_OP_DIV, &expr->node, arg1, arg2);
                     break;
 
+                case HLSL_TYPE_UINT:
+                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_UDIV, &expr->node, 0, arg1, arg2);
+                    break;
+
                 default:
                     hlsl_fixme(ctx, &expr->node.loc, "SM4 %s division expression.", dst_type_string->buffer);
             }
