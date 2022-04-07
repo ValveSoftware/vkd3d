@@ -1,7 +1,13 @@
-[pixel shader]
-float4 main(float4 pos : SV_POSITION) : SV_TARGET
+[vertex shader]
+void main(out float tex : texcoord, inout float4 pos : sv_position)
 {
-    if(pos.x > 200.0)
+    tex = pos.x;
+}
+
+[pixel shader]
+float4 main(float tex : texcoord) : SV_TARGET
+{
+    if (tex > 0.0)
         return float4(0.1, 0.2, 0.3, 0.4);
     else
         return float4(0.9, 0.8, 0.7, 0.6);
@@ -9,5 +15,5 @@ float4 main(float4 pos : SV_POSITION) : SV_TARGET
 
 [test]
 draw quad
-probe rect rgba (0, 0, 200, 480) (0.9, 0.8, 0.7, 0.6)
-probe rect rgba (200, 0, 640, 480) (0.1, 0.2, 0.3, 0.4)
+probe rect rgba (  0, 0, 319, 480) (0.9, 0.8, 0.7, 0.6)
+probe rect rgba (321, 0, 640, 480) (0.1, 0.2, 0.3, 0.4)

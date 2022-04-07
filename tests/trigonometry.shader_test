@@ -1,7 +1,14 @@
-[pixel shader]
-float4 main(float4 pos : SV_POSITION) : SV_TARGET
+[vertex shader]
+void main(out float tex : texcoord, inout float4 pos : sv_position)
 {
-    return float4(sin(pos.x - 0.5), cos(pos.x - 0.5), 0, 0);
+    tex = (pos.x + 1) * 320;
+}
+
+[pixel shader]
+float4 main(float tex : texcoord) : sv_target
+{
+    tex = floor(tex + 0.25);
+    return float4(sin(tex), cos(tex), 0, 0);
 }
 
 [test]
@@ -17,7 +24,7 @@ probe rgba ( 7, 0) ( 0.65698660,  0.75390225, 0.0, 0.0) 1024
 probe rgba ( 8, 0) ( 0.98935825, -0.14550003, 0.0, 0.0) 1024
 probe rgba ( 9, 0) ( 0.41211849, -0.91113026, 0.0, 0.0) 1024
 probe rgba (10, 0) (-0.54402111, -0.83907153, 0.0, 0.0) 1024
-probe rgba (11, 0) (-0.99999021,  0.00442570, 0.0, 0.0) 1024
+probe rgba (11, 0) (-0.99999021,  0.00442570, 0.0, 0.0) 2048
 probe rgba (12, 0) (-0.53657292,  0.84385396, 0.0, 0.0) 1024
 probe rgba (13, 0) ( 0.42016704,  0.90744678, 0.0, 0.0) 1024
 probe rgba (14, 0) ( 0.99060736,  0.13673722, 0.0, 0.0) 1024

@@ -1,9 +1,34 @@
+[input layout]
+0 r32g32b32a32 float texcoord
+0 r32g32 float sv_position
+
+[vertex buffer 0]
+0.0 1.0 0.0 1.0   -2.0 -2.0
+0.0 1.0 0.0 1.0   -2.0  2.0
+0.0 1.0 0.0 1.0    2.0 -2.0
+0.0 1.0 0.0 1.0    2.0  2.0
+
+[vertex shader]
+
+struct vertex
+{
+    struct
+    {
+        float4 texcoord : texcoord;
+        float4 pos : sv_position;
+    } m;
+};
+
+void main(inout struct vertex v)
+{
+}
+
 [pixel shader]
 struct input
 {
     struct
     {
-        float4 pos : sv_position;
+        float4 texcoord : texcoord;
     } m;
 };
 
@@ -18,12 +43,10 @@ struct output
 struct output main(struct input i)
 {
     struct output o;
-    o.m.color = i.m.pos;
+    o.m.color = i.m.texcoord;
     return o;
 }
 
 [test]
-draw quad
-probe rgba (0, 1) (0.5, 1.5, 0.0, 1.0)
-probe rgba (1, 0) (1.5, 0.5, 0.0, 1.0)
-probe rgba (3, 5) (3.5, 5.5, 0.0, 1.0)
+draw triangle strip 4
+probe all rgba (0.0, 1.0, 0.0, 1.0)
