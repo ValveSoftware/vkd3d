@@ -126,6 +126,7 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
 void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops);
 
 #ifdef _WIN32
+void run_shader_tests_d3d9(int argc, char **argv);
 void run_shader_tests_d3d11(int argc, char **argv);
 #endif
 void run_shader_tests_d3d12(int argc, char **argv);

@@ -58,7 +58,6 @@ typedef int HRESULT;
 #include "vkd3d_windows.h"
 #include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3dcompiler.h"
-#include "vkd3d_common.h"
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
@@ -857,6 +856,7 @@ out:
 START_TEST(shader_runner)
 {
 #ifdef _WIN32
+    run_shader_tests_d3d9(argc, argv);
     run_shader_tests_d3d11(argc, argv);
 #endif
     run_shader_tests_d3d12(argc, argv);
