@@ -110,6 +110,9 @@ struct shader_runner
 
 struct shader_runner_ops
 {
+    /* Returns false if unable to run the given tests. If NULL, all tests are
+     * run. */
+    bool (*check_requirements)(struct shader_runner *runner);
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     void (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);

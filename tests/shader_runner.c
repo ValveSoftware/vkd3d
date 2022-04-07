@@ -595,9 +595,13 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 case STATE_INPUT_LAYOUT:
                 case STATE_NONE:
-                case STATE_REQUIRE:
                 case STATE_SAMPLER:
                 case STATE_TEST:
+                    break;
+
+                case STATE_REQUIRE:
+                    if (runner->ops->check_requirements && !runner->ops->check_requirements(runner))
+                        goto out;
                     break;
 
                 case STATE_TEXTURE:
@@ -832,6 +836,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
         }
     }
 
+out:
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
     free(runner->input_elements);
