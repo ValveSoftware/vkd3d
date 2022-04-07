@@ -314,6 +314,24 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
         element->index = 0;
 }
 
+static void set_resource(struct shader_runner *runner, struct resource *resource)
+{
+    size_t i;
+
+    for (i = 0; i < runner->resource_count; ++i)
+    {
+        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
+        {
+            runner->ops->destroy_resource(runner, runner->resources[i]);
+            runner->resources[i] = resource;
+            return;
+        }
+    }
+
+    runner->resources = realloc(runner->resources, (runner->resource_count + 1) * sizeof(*runner->resources));
+    runner->resources[runner->resource_count++] = resource;
+}
+
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
     runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
@@ -326,12 +344,39 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     if (match_string(line, "draw quad", &line))
     {
+        struct resource_params params;
+        struct input_element *element;
+
+        /* For simplicity, draw a large triangle instead. */
+        static const struct vec2 quad[] =
+        {
+            {-2.0f, -2.0f},
+            {-2.0f,  4.0f},
+            { 4.0f, -2.0f},
+        };
+
         static const char vs_source[] =
-            "void main(uint id : SV_VertexID, out float4 position : SV_Position)\n"
+            "void main(inout float4 position : sv_position)\n"
             "{\n"
-            "    float2 coords = float2((id << 1) & 2, id & 2);\n"
-            "    position = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);\n"
             "}";
+
+        vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
+                1, sizeof(*runner->input_elements));
+        element = &runner->input_elements[0];
+        element->name = strdup("sv_position");
+        element->slot = 0;
+        element->format = DXGI_FORMAT_R32G32_FLOAT;
+        element->texel_size = sizeof(*quad);
+        element->index = 0;
+        runner->input_element_count = 1;
+
+        memset(&params, 0, sizeof(params));
+        params.slot = 0;
+        params.type = RESOURCE_TYPE_VERTEX_BUFFER;
+        params.data = malloc(sizeof(quad));
+        memcpy(params.data, quad, sizeof(quad));
+        params.data_size = sizeof(quad);
+        set_resource(runner, runner->ops->create_resource(runner, &params));
 
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
@@ -480,24 +525,6 @@ static struct sampler *get_sampler(struct shader_runner *runner, unsigned int sl
     }
 
     return NULL;
-}
-
-static void set_resource(struct shader_runner *runner, struct resource *resource)
-{
-    size_t i;
-
-    for (i = 0; i < runner->resource_count; ++i)
-    {
-        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
-        {
-            runner->ops->destroy_resource(runner, runner->resources[i]);
-            runner->resources[i] = resource;
-            return;
-        }
-    }
-
-    runner->resources = realloc(runner->resources, (runner->resource_count + 1) * sizeof(*runner->resources));
-    runner->resources[runner->resource_count++] = resource;
 }
 
 unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot)
