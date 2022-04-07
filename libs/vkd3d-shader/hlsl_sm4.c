@@ -1905,6 +1905,7 @@ static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     }
 
     instr.opcode = VKD3D_SM4_OP_ENDIF;
+    instr.src_count = 0;
     write_sm4_instruction(buffer, &instr);
 }
 
