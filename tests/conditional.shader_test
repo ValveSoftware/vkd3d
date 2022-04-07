@@ -10,4 +10,4 @@ float4 main(float4 pos : SV_POSITION) : SV_TARGET
 [test]
 draw quad
 probe rect rgba (0, 0, 200, 480) (0.9, 0.8, 0.7, 0.6)
-probe rect rgba (200, 0, 440, 480) (0.1, 0.2, 0.3, 0.4)
+probe rect rgba (200, 0, 640, 480) (0.1, 0.2, 0.3, 0.4)

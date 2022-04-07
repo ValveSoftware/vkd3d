@@ -419,22 +419,22 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
     else if (match_string(line, "probe rect rgba", &line))
     {
-        unsigned int x, y, w, h, ulps;
+        unsigned int left, top, right, bottom, ulps;
         struct vec4 v;
         RECT rect;
         int ret;
 
-        ret = sscanf(line, "( %u , %u , %u , %u ) ( %f , %f , %f , %f ) %u",
-                     &x, &y, &w, &h, &v.x, &v.y, &v.z, &v.w, &ulps);
+        ret = sscanf(line, "( %d , %d , %d , %d ) ( %f , %f , %f , %f ) %u",
+                     &left, &top, &right, &bottom, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 8)
             fatal_error("Malformed probe arguments '%s'.\n", line);
         if (ret < 9)
             ulps = 0;
 
-        rect.left = x;
-        rect.right = x + w;
-        rect.top = y;
-        rect.bottom = y + h;
+        rect.left = left;
+        rect.top = top;
+        rect.right = right;
+        rect.bottom = bottom;
         runner->ops->probe_vec4(runner, &rect, &v, ulps);
     }
     else if (match_string(line, "probe rgba", &line))
