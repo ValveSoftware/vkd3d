@@ -1609,6 +1609,44 @@ static bool type_is_float(const struct hlsl_type *type)
     return type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF;
 }
 
+static void write_sm4_cast_from_bool(struct hlsl_ctx *ctx,
+        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr,
+        const struct hlsl_ir_node *arg)
+{
+    struct sm4_instruction instr;
+    uint32_t c;
+
+    switch (expr->node.data_type->base_type)
+    {
+        case HLSL_TYPE_FLOAT:
+            c = 0x3f800000;
+            break;
+
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_UINT:
+            c = 1;
+            break;
+
+        default:
+            assert(0);
+    }
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_AND;
+
+    sm4_dst_from_node(&instr.dsts[0], &expr->node);
+    instr.dst_count = 1;
+
+    sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].writemask);
+    instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
+    instr.srcs[1].reg.type = VKD3D_SM4_RT_IMMCONST;
+    instr.srcs[1].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+    instr.srcs[1].reg.immconst_uint[0] = c;
+    instr.src_count = 2;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_cast(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
 {
@@ -1638,7 +1676,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to float.");
+                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
@@ -1664,7 +1702,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to int.");
+                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
@@ -1690,7 +1728,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from bool to uint.");
+                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
