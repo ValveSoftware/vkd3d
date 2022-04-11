@@ -88,6 +88,7 @@ struct input_element
 };
 
 #define MAX_RESOURCES 32
+#define MAX_SAMPLERS 32
 
 struct shader_runner
 {
@@ -103,7 +104,7 @@ struct shader_runner
     struct resource *resources[MAX_RESOURCES];
     size_t resource_count;
 
-    struct sampler *samplers;
+    struct sampler samplers[MAX_SAMPLERS];
     size_t sampler_count;
 
     struct input_element *input_elements;

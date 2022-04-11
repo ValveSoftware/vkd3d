@@ -725,17 +725,14 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 state = STATE_SAMPLER;
 
-                if ((current_sampler = get_sampler(runner, index)))
+                if (!(current_sampler = get_sampler(runner, index)))
                 {
-                    memset(current_sampler, 0, sizeof(*current_sampler));
+                    if (runner->sampler_count == MAX_SAMPLERS)
+                        fatal_error("Too many samplers declared.\n");
+
+                    current_sampler = &runner->samplers[runner->sampler_count++];
                 }
-                else
-                {
-                    runner->samplers = realloc(runner->samplers,
-                            ++runner->sampler_count * sizeof(*runner->samplers));
-                    current_sampler = &runner->samplers[runner->sampler_count - 1];
-                    memset(current_sampler, 0, sizeof(*current_sampler));
-                }
+                memset(current_sampler, 0, sizeof(*current_sampler));
                 current_sampler->slot = index;
                 current_sampler->filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
                 current_sampler->u_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
