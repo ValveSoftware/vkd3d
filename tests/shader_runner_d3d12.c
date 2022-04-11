@@ -296,8 +296,6 @@ static void d3d12_runner_draw(struct shader_runner *r,
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, test_context->rtv, clear_color, 0, NULL);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_DrawInstanced(command_list, vertex_count, 1, 0, 0);
-    transition_resource_state(command_list, test_context->render_target,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     /* Finish the command list so that we can destroy objects. */
     hr = ID3D12GraphicsCommandList_Close(command_list);
@@ -314,11 +312,15 @@ static void d3d12_runner_probe_vec4(struct shader_runner *r,
     struct test_context *test_context = &runner->test_context;
     struct resource_readback rb;
 
+    transition_resource_state(test_context->list, test_context->render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(test_context->render_target, 0, &rb,
             test_context->queue, test_context->list);
     check_readback_data_vec4(&rb, rect, v, ulps);
     release_resource_readback(&rb);
     reset_command_list(test_context->list, test_context->allocator);
+    transition_resource_state(test_context->list, test_context->render_target,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 }
 
 static const struct shader_runner_ops d3d12_runner_ops =
