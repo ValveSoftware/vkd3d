@@ -856,6 +856,8 @@ START_TEST(shader_runner)
 #ifdef _WIN32
     run_shader_tests_d3d9(argc, argv);
     run_shader_tests_d3d11(argc, argv);
+#else
+    run_shader_tests_vulkan(argc, argv);
 #endif
     run_shader_tests_d3d12(argc, argv);
 }

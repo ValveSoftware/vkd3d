@@ -131,5 +131,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
 #ifdef _WIN32
 void run_shader_tests_d3d9(int argc, char **argv);
 void run_shader_tests_d3d11(int argc, char **argv);
+#else
+void run_shader_tests_vulkan(int argc, char **argv);
 #endif
 void run_shader_tests_d3d12(int argc, char **argv);

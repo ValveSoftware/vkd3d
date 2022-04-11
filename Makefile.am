@@ -297,7 +297,7 @@ vkd3d_compiler_SOURCES = programs/vkd3d-compiler/main.c
 vkd3d_compiler_CFLAGS = $(AM_CFLAGS) @NCURSES_CFLAGS@
 vkd3d_compiler_LDADD = libvkd3d-shader.la @NCURSES_LIBS@
 
-LDADD = libvkd3d.la libvkd3d-utils.la
+LDADD = libvkd3d.la libvkd3d-shader.la libvkd3d-utils.la
 AM_DEFAULT_SOURCE_EXT = .c
 
 TEST_EXTENSIONS = .shader_test
@@ -311,7 +311,8 @@ tests_hlsl_d3d12_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_LDADD = $(LDADD) @VULKAN_LIBS@
 tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
-	tests/shader_runner_d3d12.c
+	tests/shader_runner_d3d12.c \
+	tests/shader_runner_vulkan.c
 tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
