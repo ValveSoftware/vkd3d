@@ -327,7 +327,9 @@ static void set_resource(struct shader_runner *runner, struct resource *resource
         }
     }
 
-    runner->resources = realloc(runner->resources, (runner->resource_count + 1) * sizeof(*runner->resources));
+    if (runner->resource_count == MAX_RESOURCES)
+        fatal_error("Too many resources declared.\n");
+
     runner->resources[runner->resource_count++] = resource;
 }
 
@@ -846,7 +848,6 @@ out:
         if (runner->resources[i])
             runner->ops->destroy_resource(runner, runner->resources[i]);
     }
-    free(runner->resources);
 
     fclose(f);
 

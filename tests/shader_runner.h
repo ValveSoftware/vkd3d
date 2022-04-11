@@ -87,6 +87,8 @@ struct input_element
     unsigned int index;
 };
 
+#define MAX_RESOURCES 32
+
 struct shader_runner
 {
     const struct shader_runner_ops *ops;
@@ -98,7 +100,7 @@ struct shader_runner
     uint32_t *uniforms;
     size_t uniform_count, uniform_capacity;
 
-    struct resource **resources;
+    struct resource *resources[MAX_RESOURCES];
     size_t resource_count;
 
     struct sampler *samplers;
