@@ -22,6 +22,7 @@ uniform 3 float -3.6
 todo draw quad
 probe all rgba (0.5, 0.5, 0.5, 0.5)
 
+
 [pixel shader]
 
 float4 main() : sv_target
@@ -42,3 +43,55 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (0.5, 0.5, 0.5, 0.5)
+
+
+% Large values are clamped.
+
+[pixel shader]
+
+int4 main(uniform float2 u) : sv_target
+{
+    float2 f = float2(-3000000000.0, 3000000000.0);
+
+    return int4(int2(u), int2(f));
+}
+
+[test]
+uniform 0 float4 -3000000000.0 3000000000.0 0 0
+draw quad
+todo probe all rgba (-2147483648.0, 2147483648.0, -2147483648.0, 2147483648.0)
+
+
+% Infinity is also clamped.
+
+[pixel shader]
+
+int4 main(uniform float2 u) : sv_target
+{
+    float2 f = float2(1.0 / 0, -1.0 / 0);
+
+    return int4(int2(u), int2(f));
+}
+
+[test]
+uniform 0 float4 INF -INF 0 0
+draw quad
+todo probe all rgba (2147483648.0, -2147483648.0, 2147483648.0, -2147483648.0)
+
+
+% NaN is converted to zero.
+
+[pixel shader]
+
+int4 main(uniform float2 u) : sv_target
+{
+    float nan = 0 * (1.0 / 0);
+    float2 f = float2(nan, -nan);
+
+    return int4(int2(u), int2(f));
+}
+
+[test]
+uniform 0 float4 NaN -NaN 0 0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
