@@ -32,6 +32,17 @@ static uint32_t double_to_uint(double d)
     return d;
 }
 
+static uint32_t double_to_int(double d)
+{
+    if (isnan(d))
+        return 0;
+    if (d > INT_MAX)
+        return INT_MAX;
+    if (d < INT_MIN)
+        return INT_MIN;
+    return d;
+}
+
 static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
 {
     unsigned int k;
@@ -55,14 +66,14 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
                 u = double_to_uint(src->value[k].f);
-                i = src->value[k].f;
+                i = double_to_int(src->value[k].f);
                 f = src->value[k].f;
                 d = src->value[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
                 u = double_to_uint(src->value[k].d);
-                i = src->value[k].d;
+                i = double_to_int(src->value[k].d);
                 f = src->value[k].d;
                 d = src->value[k].d;
                 break;
