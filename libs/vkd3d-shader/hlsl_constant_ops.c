@@ -21,6 +21,16 @@
 #include <math.h>
 
 #include "hlsl.h"
+#include <math.h>
+
+static uint32_t double_to_uint(double d)
+{
+    if (isnan(d) || d < 0)
+        return 0;
+    if (d > UINT_MAX)
+        return UINT_MAX;
+    return d;
+}
 
 static bool fold_abs(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
@@ -86,14 +96,14 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                u = src->value.u[k].f;
+                u = double_to_uint(src->value.u[k].f);
                 i = src->value.u[k].f;
                 f = src->value.u[k].f;
                 d = src->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                u = src->value.u[k].d;
+                u = double_to_uint(src->value.u[k].d);
                 i = src->value.u[k].d;
                 f = src->value.u[k].d;
                 d = src->value.u[k].d;

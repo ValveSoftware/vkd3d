@@ -42,7 +42,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (0.5, 0.5, 0.5, 0.5)
+probe all rgba (0.5, 0.5, 0.5, 0.5)
 
 
 % Large values are clamped.
