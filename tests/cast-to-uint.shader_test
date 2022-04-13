@@ -42,7 +42,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (0.5, 0.5, 0.5, 0.5)
+probe all rgba (0.5, 0.5, 0.5, 0.5)
 
 
 % Large values are clamped.
@@ -59,7 +59,7 @@ float4 main(uniform float2 u) : sv_target
 [test]
 uniform 0 float4 -2.0 5000000000.0 0 0
 draw quad
-todo probe all rgba (0.0, 4294967296.0, 0.0, 4294967296.0)
+probe all rgba (0.0, 4294967296.0, 0.0, 4294967296.0)
 
 
 % Infinity is also clamped.
@@ -76,7 +76,7 @@ float4 main(uniform float2 u) : sv_target
 [test]
 uniform 0 float4 INF -INF 0 0
 draw quad
-todo probe all rgba (4294967296.0, 0.0, 4294967296.0, 0.0)
+probe all rgba (4294967296.0, 0.0, 4294967296.0, 0.0)
 
 
 % NaN is converted to zero.
