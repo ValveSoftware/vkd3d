@@ -1447,7 +1447,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     return true;
 }
 
-static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, struct hlsl_ir_var *var,
+static void struct_var_initializer(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         struct parse_initializer *initializer)
 {
     struct hlsl_type *type = var->data_type;
@@ -1459,12 +1459,8 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
         hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                 "Expected %u components in initializer, but got %u.",
                 hlsl_type_component_count(type), initializer_size(initializer));
-        free_parse_initializer(initializer);
         return;
     }
-
-    list_move_tail(list, initializer->instrs);
-    vkd3d_free(initializer->instrs);
 
     LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
     {
@@ -1479,19 +1475,17 @@ static void struct_var_initializer(struct hlsl_ctx *ctx, struct list *list, stru
         {
             if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, &node->loc)))
                 break;
-            list_add_tail(list, &c->node.entry);
+            list_add_tail(initializer->instrs, &c->node.entry);
 
             if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, node->loc)))
                 break;
-            list_add_tail(list, &store->node.entry);
+            list_add_tail(initializer->instrs, &store->node.entry);
         }
         else
         {
             hlsl_fixme(ctx, &node->loc, "Implicit cast in structure initializer.");
         }
     }
-
-    vkd3d_free(initializer->args);
 }
 
 static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
@@ -1649,7 +1643,10 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
                 if (type->type == HLSL_CLASS_STRUCT)
                 {
-                    struct_var_initializer(ctx, statements_list, var, &v->initializer);
+                    struct_var_initializer(ctx, var, &v->initializer);
+                    list_move_tail(statements_list, v->initializer.instrs);
+
+                    free_parse_initializer(&v->initializer);
                     vkd3d_free(v);
                     continue;
                 }
