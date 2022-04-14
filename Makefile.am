@@ -317,43 +317,8 @@ tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
 XFAIL_TESTS = \
-	tests/arithmetic-float.shader_test \
-	tests/arithmetic-int.shader_test \
-	tests/cast-to-float.shader_test \
-	tests/cast-to-half.shader_test \
-	tests/cast-to-int.shader_test \
-	tests/cast-to-uint.shader_test \
-	tests/hlsl-array-dimension.shader_test \
-	tests/hlsl-initializer-flatten.shader_test \
-	tests/hlsl-initializer-invalid-arg-count.shader_test \
-	tests/hlsl-initializer-local-array.shader_test \
-	tests/hlsl-initializer-nested.shader_test \
-	tests/hlsl-initializer-numeric.shader_test \
-	tests/hlsl-initializer-static-array.shader_test \
-	tests/hlsl-initializer-struct.shader_test \
-	tests/hlsl-duplicate-modifiers.shader_test \
-	tests/hlsl-for.shader_test \
 	tests/hlsl-function.shader_test \
-	tests/hlsl-function-cast.shader_test \
-	tests/hlsl-function-overload.shader_test \
-	tests/hlsl-gather.shader_test \
-	tests/hlsl-intrinsic-override.shader_test \
-	tests/hlsl-majority-pragma.shader_test \
-	tests/hlsl-majority-typedef.shader_test \
-	tests/hlsl-mul.shader_test \
-	tests/hlsl-numeric-constructor-truncation.shader_test \
-	tests/hlsl-numeric-types.shader_test \
-	tests/hlsl-return-implicit-conversion.shader_test \
-	tests/hlsl-return-void.shader_test \
-	tests/hlsl-shape.shader_test \
-	tests/hlsl-static-initializer.shader_test \
-	tests/hlsl-storage-qualifiers.shader_test \
-	tests/hlsl-vector-indexing.shader_test \
-	tests/hlsl-vector-indexing-uniform.shader_test \
-	tests/logic-operations.shader_test \
-	tests/max.shader_test \
-	tests/sampler-offset.shader_test \
-	tests/trigonometry.shader_test
+	tests/hlsl-return-implicit-conversion.shader_test
 endif
 
 EXTRA_DIST += $(vkd3d_shader_tests)

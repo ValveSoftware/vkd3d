@@ -12,7 +12,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-draw quad
+todo draw quad
 probe rgba ( 0, 0) ( 0.00000000,  1.00000000, 0.0, 0.0)
 probe rgba ( 1, 0) ( 0.84147098,  0.54030231, 0.0, 0.0) 1024
 probe rgba ( 2, 0) ( 0.90929743, -0.41614684, 0.0, 0.0) 1024

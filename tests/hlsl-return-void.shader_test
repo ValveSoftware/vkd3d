@@ -8,4 +8,4 @@ void main(out float4 ret : sv_target)
 
 [test]
 draw quad
-probe all rgba (0.1, 0.2, 0.3, 0.4)
+todo probe all rgba (0.1, 0.2, 0.3, 0.4)
