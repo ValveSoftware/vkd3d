@@ -382,7 +382,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
 
-        runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
+        runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
     }
     else if (match_string(line, "draw", &line))
     {
@@ -401,7 +401,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (line == rest)
             fatal_error("Malformed vertex count '%s'.\n", line);
 
-        runner->ops->draw(runner, topology, vertex_count);
+        runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count);
     }
     else if (match_string(line, "probe all rgba", &line))
     {
@@ -409,6 +409,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int ulps;
         struct vec4 v;
         int ret;
+
+        if (runner->last_render_failed)
+            return;
 
         ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 4)
@@ -424,6 +427,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         struct vec4 v;
         RECT rect;
         int ret;
+
+        if (runner->last_render_failed)
+            return;
 
         ret = sscanf(line, "( %d , %d , %d , %d ) ( %f , %f , %f , %f ) %u",
                      &left, &top, &right, &bottom, &v.x, &v.y, &v.z, &v.w, &ulps);
@@ -444,6 +450,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         struct vec4 v;
         RECT rect;
         int ret;
+
+        if (runner->last_render_failed)
+            return;
 
         ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 6)

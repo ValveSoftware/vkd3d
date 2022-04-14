@@ -754,7 +754,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
     /* The descriptor set will be freed by resetting the descriptor pool. */
 }
 
-static void vulkan_runner_draw(struct shader_runner *r,
+static bool vulkan_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
@@ -768,6 +768,7 @@ static void vulkan_runner_draw(struct shader_runner *r,
     VkDevice device = runner->device;
     VkClearRect clear_rect;
     VkPipeline pipeline;
+    bool ret = true;
     unsigned int i;
 
     /* Create this before compiling shaders, it will assign resource bindings. */
@@ -775,7 +776,10 @@ static void vulkan_runner_draw(struct shader_runner *r,
 
     pipeline_layout = create_pipeline_layout(runner, set_layout);
     if (!(pipeline = create_pipeline(runner, pipeline_layout, primitive_topology)))
+    {
+        ret = false;
         goto out;
+    }
 
     begin_command_buffer(runner);
 
@@ -813,6 +817,8 @@ out:
 
     VK_CALL(vkDestroyPipelineLayout(device, pipeline_layout, NULL));
     VK_CALL(vkDestroyDescriptorSetLayout(device, set_layout, NULL));
+
+    return ret;
 }
 
 static const struct vec4 *get_readback_vec4(const uint8_t *data, unsigned int row_pitch, unsigned int x, unsigned int y)

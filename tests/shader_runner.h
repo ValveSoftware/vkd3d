@@ -98,6 +98,8 @@ struct shader_runner
     char *ps_source;
     enum shader_model minimum_shader_model;
 
+    bool last_render_failed;
+
     uint32_t *uniforms;
     size_t uniform_count, uniform_capacity;
 
@@ -118,7 +120,7 @@ struct shader_runner_ops
     bool (*check_requirements)(struct shader_runner *runner);
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
-    void (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
+    bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
     void (*probe_vec4)(struct shader_runner *runner, const RECT *rect, const struct vec4 *v, unsigned int ulps);
 };
 

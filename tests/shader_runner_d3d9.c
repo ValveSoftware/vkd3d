@@ -308,7 +308,7 @@ static D3DDECLUSAGE vertex_decl_usage_from_name(const char *name)
     fatal_error("Cannot translate usage \"%s\" to a d3d9 usage.\n", name);
 }
 
-static void d3d9_runner_draw(struct shader_runner *r,
+static bool d3d9_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     static const D3DVERTEXELEMENT9 decl_element_end = D3DDECL_END();
@@ -323,12 +323,12 @@ static void d3d9_runner_draw(struct shader_runner *r,
     HRESULT hr;
 
     if (!(vs_code = compile_shader(runner->r.vs_source, "vs_2_0")))
-        return;
+        return false;
 
     if (!(ps_code = compile_shader(runner->r.ps_source, "ps_2_0")))
     {
         ID3D10Blob_Release(vs_code);
-        return;
+        return false;
     }
 
     if (runner->r.uniform_count)
@@ -445,6 +445,8 @@ static void d3d9_runner_draw(struct shader_runner *r,
     IDirect3DVertexDeclaration9_Release(vertex_declaration);
     IDirect3DVertexShader9_Release(vs);
     IDirect3DPixelShader9_Release(ps);
+
+    return true;
 }
 
 struct resource_readback

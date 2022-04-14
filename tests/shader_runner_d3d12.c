@@ -132,7 +132,7 @@ static void d3d12_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d12_runner_draw(struct shader_runner *r,
+static bool d3d12_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
@@ -155,12 +155,12 @@ static void d3d12_runner_draw(struct shader_runner *r,
     size_t i;
 
     if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
-        return;
+        return false;
 
     if (!(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
     {
         ID3D10Blob_Release(ps_code);
-        return;
+        return false;
     }
 
     root_signature_desc.NumParameters = 0;
@@ -257,8 +257,6 @@ static void d3d12_runner_draw(struct shader_runner *r,
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     free(input_element_descs);
-    if (!pso)
-        return;
     vkd3d_array_reserve((void **)&test_context->pso, &test_context->pso_capacity,
             test_context->pso_count + 1, sizeof(*test_context->pso));
     test_context->pso[test_context->pso_count++] = pso;
@@ -303,6 +301,8 @@ static void d3d12_runner_draw(struct shader_runner *r,
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
     reset_command_list(command_list, test_context->allocator);
+
+    return true;
 }
 
 static void d3d12_runner_probe_vec4(struct shader_runner *r,

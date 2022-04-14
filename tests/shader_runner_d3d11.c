@@ -423,7 +423,7 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     free(resource);
 }
 
-static void d3d11_runner_draw(struct shader_runner *r,
+static bool d3d11_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
@@ -437,12 +437,12 @@ static void d3d11_runner_draw(struct shader_runner *r,
     HRESULT hr;
 
     if (!(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
-        return;
+        return false;
 
     if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
     {
         ID3D10Blob_Release(vs_code);
-        return;
+        return false;
     }
 
     hr = ID3D11Device_CreateVertexShader(device, ID3D10Blob_GetBufferPointer(vs_code),
@@ -536,6 +536,8 @@ static void d3d11_runner_draw(struct shader_runner *r,
     ID3D11VertexShader_Release(vs);
     if (cb)
         ID3D11Buffer_Release(cb);
+
+    return true;
 }
 
 struct resource_readback
