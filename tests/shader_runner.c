@@ -651,12 +651,12 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
                     ok(!blob, "Expected no compiled shader blob.\n");
                     ok(!!errors, "Expected non-NULL error blob.\n");
-                    if (!errors)
-                        return;
-
-                    if (vkd3d_test_state.debug_level)
-                        trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-                    ID3D10Blob_Release(errors);
+                    if (errors)
+                    {
+                        if (vkd3d_test_state.debug_level)
+                            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+                        ID3D10Blob_Release(errors);
+                    }
 
                     shader_source_len = 0;
                     break;
