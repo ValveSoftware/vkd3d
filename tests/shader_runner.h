@@ -94,6 +94,8 @@ struct shader_runner
 {
     const struct shader_runner_ops *ops;
 
+    bool is_todo;
+
     char *vs_source;
     char *ps_source;
     enum shader_model minimum_shader_model;

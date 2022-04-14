@@ -343,6 +343,11 @@ static void set_uniforms(struct shader_runner *runner, size_t offset, size_t cou
 
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
+    runner->is_todo = false;
+
+    if (match_string(line, "todo", &line))
+        runner->is_todo = true;
+
     if (match_string(line, "draw quad", &line))
     {
         struct resource_params params;

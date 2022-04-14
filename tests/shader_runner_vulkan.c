@@ -350,7 +350,6 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     hlsl_info.profile = profile;
 
     ret = vkd3d_shader_compile(&info, dxbc, &messages);
-    ok(!ret, "Failed to compile shader, error %d.\n", ret);
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
     vkd3d_shader_free_messages(messages);
@@ -413,7 +412,6 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     interface_info.push_constant_buffers = &push_constants;
 
     ret = vkd3d_shader_compile(&info, spirv, &messages);
-    ok(!ret, "Failed to compile shader, error %d.\n", ret);
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
     vkd3d_shader_free_messages(messages);
@@ -514,11 +512,14 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner,
     unsigned int i, j;
     int ret;
 
-    if (!create_shader_stage(runner, &stage_desc[0], "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc))
-        return VK_NULL_HANDLE;
-    if (!create_shader_stage(runner, &stage_desc[1], "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL))
+    memset(stage_desc, 0, sizeof(stage_desc));
+    ret = create_shader_stage(runner, &stage_desc[0], "vs", VK_SHADER_STAGE_VERTEX_BIT, runner->r.vs_source, &vs_dxbc)
+            && create_shader_stage(runner, &stage_desc[1], "ps", VK_SHADER_STAGE_FRAGMENT_BIT, runner->r.ps_source, NULL);
+    todo_if (runner->r.is_todo) ok(ret, "Failed to compile shaders.\n");
+    if (!ret)
     {
         VK_CALL(vkDestroyShaderModule(device, stage_desc[0].module, NULL));
+        VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
         return VK_NULL_HANDLE;
     }
 
@@ -886,7 +887,7 @@ static void vulkan_runner_probe_vec4(struct shader_runner *r, const RECT *rect, 
     end_command_buffer(runner);
 
     VK_CALL(vkMapMemory(device, memory, 0, VK_WHOLE_SIZE, 0, &data));
-    check_readback_data_vec4(data, row_pitch, rect, v, ulps);
+    todo_if (runner->r.is_todo) check_readback_data_vec4(data, row_pitch, rect, v, ulps);
     VK_CALL(vkUnmapMemory(device, memory));
 
     VK_CALL(vkFreeMemory(device, memory, NULL));

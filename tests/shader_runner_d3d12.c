@@ -52,7 +52,7 @@ static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d12_shader_runner, r);
 }
 
-static ID3D10Blob *compile_shader(const char *source, const char *type, enum shader_model shader_model)
+static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, const char *source, const char *type)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
@@ -67,9 +67,9 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    sprintf(profile, "%s_%s", type, shader_models[shader_model]);
+    sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
     hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
-    ok(hr == S_OK, "Failed to compile shader, hr %#x.\n", hr);
+    ok(FAILED(hr) == !blob, "Got unexpected hr %#x, blob %p.\n", hr, blob);
     if (errors)
     {
         if (vkd3d_test_state.debug_level)
@@ -154,12 +154,16 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     HRESULT hr;
     size_t i;
 
-    if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
-        return false;
+    ps_code = compile_shader(runner, runner->r.ps_source, "ps");
+    vs_code = compile_shader(runner, runner->r.vs_source, "vs");
+    todo_if (runner->r.is_todo) ok(ps_code && vs_code, "Failed to compile shaders.\n");
 
-    if (!(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
+    if (!ps_code || !vs_code)
     {
-        ID3D10Blob_Release(ps_code);
+        if (ps_code)
+            ID3D10Blob_Release(ps_code);
+        if (vs_code)
+            ID3D10Blob_Release(vs_code);
         return false;
     }
 
@@ -316,7 +320,7 @@ static void d3d12_runner_probe_vec4(struct shader_runner *r,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(test_context->render_target, 0, &rb,
             test_context->queue, test_context->list);
-    check_readback_data_vec4(&rb, rect, v, ulps);
+    todo_if (runner->r.is_todo) check_readback_data_vec4(&rb, rect, v, ulps);
     release_resource_readback(&rb);
     reset_command_list(test_context->list, test_context->allocator);
     transition_resource_state(test_context->list, test_context->render_target,
