@@ -23,3 +23,19 @@ float4 main() : SV_TARGET
 [test]
 todo draw quad
 probe all rgba (5.0, 5.0, -5.0, 3.0)
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float x = 1;
+    float y = 0;
+
+    return x / y;
+}
+
+[test]
+draw quad
+probe all rgba (1e99, 1e99, 1e99, 1e99)
