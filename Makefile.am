@@ -85,6 +85,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-invalid.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
+	tests/hlsl-matrix-indexing.shader_test \
 	tests/hlsl-mul.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
