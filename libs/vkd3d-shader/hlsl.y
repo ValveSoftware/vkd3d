@@ -1644,11 +1644,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 if (type->type == HLSL_CLASS_STRUCT)
                 {
                     struct_var_initializer(ctx, var, &v->initializer);
-                    list_move_tail(statements_list, v->initializer.instrs);
-
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
-                    continue;
                 }
                 else
                 {
