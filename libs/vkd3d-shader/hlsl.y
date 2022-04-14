@@ -1447,6 +1447,39 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     return true;
 }
 
+static void initialize_numeric_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
+        struct parse_initializer *initializer, unsigned int reg_offset, struct hlsl_type *type,
+        unsigned int *initializer_offset)
+{
+    unsigned int i;
+
+    if (type->type == HLSL_CLASS_MATRIX)
+        hlsl_fixme(ctx, &var->loc, "Matrix initializer.");
+
+    for (i = 0; i < type->dimx; i++)
+    {
+        struct hlsl_ir_store *store;
+        struct hlsl_ir_constant *c;
+        struct hlsl_ir_node *node;
+
+        node = initializer->args[*initializer_offset];
+        *initializer_offset += 1;
+
+        if (!(node = add_implicit_conversion(ctx, initializer->instrs, node,
+                hlsl_get_scalar_type(ctx, type->base_type), &node->loc)))
+            return;
+
+        if (!(c = hlsl_new_uint_constant(ctx, reg_offset + i, &node->loc)))
+            return;
+        list_add_tail(initializer->instrs, &c->node.entry);
+
+        if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, node->loc)))
+            return;
+
+        list_add_tail(initializer->instrs, &store->node.entry);
+    }
+}
+
 static void struct_var_initializer(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         struct parse_initializer *initializer)
 {
@@ -1612,6 +1645,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             if (v->initializer.braces)
             {
                 unsigned int size = initializer_size(&v->initializer);
+                unsigned int initializer_offset = 0;
 
                 if (type->type <= HLSL_CLASS_LAST_NUMERIC && type->dimx * type->dimy != size)
                 {
@@ -1647,10 +1681,15 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 }
                 else
                 {
-                    hlsl_fixme(ctx, &v->loc, "Complex initializer.");
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
-                    continue;
+                    if (v->initializer.args_count != size)
+                    {
+                        hlsl_fixme(ctx, &v->loc, "Flatten initializer.");
+                        free_parse_initializer(&v->initializer);
+                        vkd3d_free(v);
+                        continue;
+                    }
+
+                    initialize_numeric_var(ctx, var, &v->initializer, 0, type, &initializer_offset);
                 }
             }
             else

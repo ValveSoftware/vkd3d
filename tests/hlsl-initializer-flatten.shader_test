@@ -37,8 +37,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-probe all rgba (40, 10, 20, 30)
+draw quad
+todo probe all rgba (40, 10, 20, 30)
 
 
 [pixel shader]
