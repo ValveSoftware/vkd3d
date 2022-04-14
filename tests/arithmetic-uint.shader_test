@@ -35,3 +35,12 @@ float4 main() : SV_TARGET
 
     return x / y;
 }
+
+[pixel shader fail]
+float4 main() : SV_TARGET
+{
+    uint x = 1;
+    uint y = 0;
+
+    return x % y;
+}

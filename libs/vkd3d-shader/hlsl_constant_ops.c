@@ -318,6 +318,50 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
     return true;
 }
 
+static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
+        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+
+    for (k = 0; k < dst->node.data_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_INT:
+                if (src2->value[k].i == 0)
+                {
+                    hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
+                            "Division by zero.");
+                    return false;
+                }
+                if (src1->value[k].i == INT_MIN && src2->value[k].i == -1)
+                    dst->value[k].i = 0;
+                else
+                    dst->value[k].i = src1->value[k].i % src2->value[k].i;
+                break;
+
+            case HLSL_TYPE_UINT:
+                if (src2->value[k].u == 0)
+                {
+                    hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
+                            "Division by zero.");
+                    return false;
+                }
+                dst->value[k].u = src1->value[k].u % src2->value[k].u;
+                break;
+
+            default:
+                FIXME("Fold modulus for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
 bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
@@ -373,6 +417,10 @@ bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void 
 
         case HLSL_OP2_DIV:
             success = fold_div(ctx, res, arg1, arg2);
+            break;
+
+        case HLSL_OP2_MOD:
+            success = fold_mod(ctx, res, arg1, arg2);
             break;
 
         default:
