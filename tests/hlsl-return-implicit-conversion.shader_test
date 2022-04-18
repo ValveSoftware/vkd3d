@@ -98,7 +98,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.4, 0.3, 0.2, 0.0)
 
-[pixel shader fail]
+[pixel shader fail todo]
 float3x1 func()
 {
     return float1x3(0.4, 0.3, 0.2);
@@ -109,7 +109,7 @@ float4 main() : sv_target
     return float4(func(), 0.0);
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 float1x3 func()
 {
     return float3x1(0.4, 0.3, 0.2);
@@ -165,7 +165,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.4, 0.3, 0.2, 0.0)
 
-[pixel shader fail]
+[pixel shader fail todo]
 float3x1 func()
 {
     return float4(0.4, 0.3, 0.2, 0.1);
@@ -191,7 +191,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.4, 0.3, 0.2, 0.0)
 
-[pixel shader fail]
+[pixel shader fail todo]
 float3x1 func()
 {
     return float1x4(0.4, 0.3, 0.2, 0.1);
@@ -217,7 +217,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.4, 0.3, 0.2, 0.0)
 
-[pixel shader fail]
+[pixel shader fail todo]
 float1x3 func()
 {
     return float4x1(0.4, 0.3, 0.2, 0.1);

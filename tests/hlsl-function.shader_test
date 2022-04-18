@@ -1,4 +1,4 @@
-[pixel shader fail]
+[pixel shader fail todo]
 
 float4 func();
 
@@ -23,7 +23,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(inout float o)
 {
@@ -37,7 +37,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(inout float2 o)
 {
@@ -51,7 +51,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(out float o)
 {
@@ -65,7 +65,7 @@ float4 main() : sv_target
     return x;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(inout float o)
 {
@@ -78,7 +78,7 @@ float4 main() : sv_target
     return x;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func()
 {
@@ -89,7 +89,7 @@ float4 main() : sv_target
     return func();
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void foo()
 {

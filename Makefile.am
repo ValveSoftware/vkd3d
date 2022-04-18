@@ -317,9 +317,6 @@ tests_shader_runner_SOURCES = \
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
-XFAIL_TESTS = \
-	tests/hlsl-function.shader_test \
-	tests/hlsl-return-implicit-conversion.shader_test
 endif
 
 EXTRA_DIST += $(vkd3d_shader_tests)

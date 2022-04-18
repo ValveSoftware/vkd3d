@@ -80,6 +80,7 @@ enum parse_state
     STATE_REQUIRE,
     STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
+    STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
     STATE_SHADER_VERTEX,
     STATE_TEXTURE,
@@ -642,15 +643,24 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_SHADER_INVALID_PIXEL:
+                case STATE_SHADER_INVALID_PIXEL_TODO:
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
                     HRESULT hr;
 
                     hr = D3DCompile(shader_source, strlen(shader_source), NULL,
                             NULL, NULL, "main", "ps_4_0", 0, 0, &blob, &errors);
-                    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
-                    ok(!blob, "Expected no compiled shader blob.\n");
-                    ok(!!errors, "Expected non-NULL error blob.\n");
+                    todo_if (state == STATE_SHADER_INVALID_PIXEL_TODO)
+                        ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
+                    if (hr == S_OK)
+                    {
+                        ID3D10Blob_Release(blob);
+                    }
+                    else
+                    {
+                        ok(!blob, "Expected no compiled shader blob.\n");
+                        ok(!!errors, "Expected non-NULL error blob.\n");
+                    }
                     if (errors)
                     {
                         if (vkd3d_test_state.debug_level)
@@ -735,6 +745,10 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             {
                 state = STATE_SHADER_INVALID_PIXEL;
             }
+            else if (!strcmp(line, "[pixel shader fail todo]\n"))
+            {
+                state = STATE_SHADER_INVALID_PIXEL_TODO;
+            }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
                 state = STATE_SAMPLER;
@@ -817,6 +831,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_PREPROC:
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_INVALID_PIXEL:
+                case STATE_SHADER_INVALID_PIXEL_TODO:
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_VERTEX:
                 {
