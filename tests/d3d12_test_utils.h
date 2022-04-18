@@ -52,14 +52,6 @@ static inline void wait_queue_idle_no_event_(unsigned int line, ID3D12Device *de
     ID3D12Fence_Release(fence);
 }
 
-static void set_rect(RECT *rect, int left, int top, int right, int bottom)
-{
-    rect->left = left;
-    rect->right = right;
-    rect->top = top;
-    rect->bottom = bottom;
-}
-
 static inline void set_box(D3D12_BOX *box, unsigned int left, unsigned int top, unsigned int front,
         unsigned int right, unsigned int bottom, unsigned int back)
 {

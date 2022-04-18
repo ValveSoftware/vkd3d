@@ -409,15 +409,33 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count);
     }
-    else if (match_string(line, "probe all rgba", &line))
+    else if (match_string(line, "probe", &line))
     {
-        static const RECT rect = {0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT};
-        unsigned int ulps;
+        unsigned int left, top, right, bottom, ulps;
         struct vec4 v;
-        int ret;
+        int ret, len;
+        RECT rect;
 
         if (runner->last_render_failed)
             return;
+
+        if (match_string(line, "all", &line))
+        {
+            set_rect(&rect, 0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+        }
+        else if (sscanf(line, "( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
+        {
+            set_rect(&rect, left, top, right, bottom);
+            line += len;
+        }
+        else if (sscanf(line, "( %u , %u )%n", &left, &top, &len) == 2)
+        {
+            set_rect(&rect, left, top, left + 1, top + 1);
+            line += len;
+        }
+
+        if (!match_string(line, "rgba", &line))
+            fatal_error("Malformed probe arguments '%s'.\n", line);
 
         ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
         if (ret < 4)
@@ -425,51 +443,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (ret < 5)
             ulps = 0;
 
-        runner->ops->probe_vec4(runner, &rect, &v, ulps);
-    }
-    else if (match_string(line, "probe rect rgba", &line))
-    {
-        unsigned int left, top, right, bottom, ulps;
-        struct vec4 v;
-        RECT rect;
-        int ret;
-
-        if (runner->last_render_failed)
-            return;
-
-        ret = sscanf(line, "( %d , %d , %d , %d ) ( %f , %f , %f , %f ) %u",
-                     &left, &top, &right, &bottom, &v.x, &v.y, &v.z, &v.w, &ulps);
-        if (ret < 8)
-            fatal_error("Malformed probe arguments '%s'.\n", line);
-        if (ret < 9)
-            ulps = 0;
-
-        rect.left = left;
-        rect.top = top;
-        rect.right = right;
-        rect.bottom = bottom;
-        runner->ops->probe_vec4(runner, &rect, &v, ulps);
-    }
-    else if (match_string(line, "probe rgba", &line))
-    {
-        unsigned int x, y, ulps;
-        struct vec4 v;
-        RECT rect;
-        int ret;
-
-        if (runner->last_render_failed)
-            return;
-
-        ret = sscanf(line, "( %u , %u ) ( %f , %f , %f , %f ) %u", &x, &y, &v.x, &v.y, &v.z, &v.w, &ulps);
-        if (ret < 6)
-            fatal_error("Malformed probe arguments '%s'.\n", line);
-        if (ret < 7)
-            ulps = 0;
-
-        rect.left = x;
-        rect.right = x + 1;
-        rect.top = y;
-        rect.bottom = y + 1;
         runner->ops->probe_vec4(runner, &rect, &v, ulps);
     }
     else if (match_string(line, "uniform", &line))

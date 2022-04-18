@@ -94,4 +94,12 @@ static inline bool compare_vec4(const struct vec4 *v1, const struct vec4 *v2, un
             && compare_float(v1->w, v2->w, ulps);
 }
 
+static inline void set_rect(RECT *rect, int left, int top, int right, int bottom)
+{
+    rect->left = left;
+    rect->right = right;
+    rect->top = top;
+    rect->bottom = bottom;
+}
+
 #endif
