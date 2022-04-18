@@ -592,12 +592,20 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     if (expr_type->type == HLSL_CLASS_ARRAY)
     {
         data_type = expr_type->e.array.type;
+        if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), &loc)))
+            return false;
     }
-    else if (expr_type->type == HLSL_CLASS_MATRIX || expr_type->type == HLSL_CLASS_VECTOR)
+    else if (expr_type->type == HLSL_CLASS_MATRIX)
     {
         /* This needs to be lowered now, while we still have type information. */
-        FIXME("Index of matrix or vector type.\n");
+        FIXME("Index of matrix type.\n");
         return false;
+    }
+    else if (expr_type->type == HLSL_CLASS_VECTOR)
+    {
+        data_type = hlsl_get_scalar_type(ctx, expr_type->base_type);
+        if (!(c = hlsl_new_uint_constant(ctx, 1, &loc)))
+            return false;
     }
     else
     {
@@ -608,8 +616,6 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
         return false;
     }
 
-    if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), &loc)))
-        return false;
     list_add_tail(instrs, &c->node.entry);
     if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
         return false;
