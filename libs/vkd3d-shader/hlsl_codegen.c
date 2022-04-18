@@ -672,6 +672,57 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static unsigned int minor_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+static unsigned int major_size(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimy;
+    else
+        return type->dimx;
+}
+
+static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    const struct hlsl_ir_node *rhs;
+    struct hlsl_type *element_type;
+    const struct hlsl_type *type;
+    unsigned int i;
+    struct hlsl_ir_store *store;
+
+    if (instr->type != HLSL_IR_STORE)
+        return false;
+
+    store = hlsl_ir_store(instr);
+    rhs = store->rhs.node;
+    type = rhs->data_type;
+    if (type->type != HLSL_CLASS_MATRIX)
+        return false;
+    element_type = hlsl_get_vector_type(ctx, type->base_type, minor_size(type));
+
+    if (rhs->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Copying from unsupported node type.\n");
+        return false;
+    }
+
+    for (i = 0; i < major_size(type); ++i)
+    {
+        if (!split_copy(ctx, store, hlsl_ir_load(rhs), 4 * i, element_type))
+            return false;
+    }
+
+    list_remove(&store->node.entry);
+    hlsl_free_instr(&store->node);
+    return true;
+}
+
 static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     const struct hlsl_type *src_type, *dst_type;
@@ -1685,6 +1736,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress |= transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
+    transform_ir(ctx, split_matrix_copies, body, NULL);
     transform_ir(ctx, lower_narrowing_casts, body, NULL);
     transform_ir(ctx, lower_casts_to_bool, body, NULL);
     do
