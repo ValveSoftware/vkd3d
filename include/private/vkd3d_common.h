@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
@@ -246,7 +247,33 @@ static inline void vkd3d_parse_version(const char *version, int *major, int *min
 
 HRESULT hresult_from_vkd3d_result(int vkd3d_result);
 
-#ifdef HAVE_DLFCN_H
+#ifdef _WIN32
+static inline void *vkd3d_dlopen(const char *name)
+{
+    return LoadLibraryA(name);
+}
+
+static inline void *vkd3d_dlsym(void *handle, const char *symbol)
+{
+    return GetProcAddress(handle, symbol);
+}
+
+static inline int vkd3d_dlclose(void *handle)
+{
+    return FreeLibrary(handle);
+}
+
+static inline const char *vkd3d_dlerror(void)
+{
+    unsigned int error = GetLastError();
+    static char message[256];
+
+    if (FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, error, 0, message, sizeof(message), NULL))
+        return message;
+    sprintf(message, "Unknown error %u.\n", error);
+    return message;
+}
+#elif defined(HAVE_DLFCN_H)
 #include <dlfcn.h>
 
 static inline void *vkd3d_dlopen(const char *name)
