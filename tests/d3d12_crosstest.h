@@ -39,6 +39,7 @@
 typedef int HRESULT;
 #endif
 
+#define VK_NO_PROTOTYPES
 #define COBJMACROS
 #define CONST_VTABLE
 #define INITGUID
@@ -419,6 +420,11 @@ static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
 
 #else
 
+#define DECLARE_VK_PFN(name) static PFN_##name name;
+DECLARE_VK_PFN(vkGetInstanceProcAddr)
+#define VK_INSTANCE_PFN   DECLARE_VK_PFN
+#include "vulkan_procs.h"
+
 static bool check_device_extension(VkPhysicalDevice vk_physical_device, const char *name)
 {
     VkExtensionProperties *properties;
@@ -585,7 +591,19 @@ static void init_adapter_info(void)
     VkPhysicalDeviceDriverPropertiesKHR driver_properties;
     struct vkd3d_instance *instance;
     ID3D12Device *device;
+    void *libvulkan;
     HRESULT hr;
+
+    if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
+    {
+        skip("Failed to load %s: %s.\n", SONAME_LIBVULKAN, vkd3d_dlerror());
+        return;
+    }
+
+#define LOAD_VK_PFN(name) name = vkd3d_dlsym(libvulkan, #name);
+LOAD_VK_PFN(vkGetInstanceProcAddr)
+#define VK_INSTANCE_PFN LOAD_VK_PFN
+#include "vulkan_procs.h"
 
     if (FAILED(hr = create_vkd3d_instance(&instance)))
         return;
