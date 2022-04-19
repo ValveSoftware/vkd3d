@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define VK_NO_PROTOTYPES
 #define COBJMACROS
 #define INITGUID
 #define WIDL_C_INLINE_WRAPPERS
@@ -23,6 +24,13 @@
 #include <vkd3d.h>
 
 #include "d3d12_test_utils.h"
+
+#define DECLARE_VK_PFN(name) static PFN_##name name;
+DECLARE_VK_PFN(vkEnumerateInstanceExtensionProperties)
+DECLARE_VK_PFN(vkGetInstanceProcAddr)
+#define VK_INSTANCE_PFN   DECLARE_VK_PFN
+#define VK_DEVICE_PFN     DECLARE_VK_PFN
+#include "vulkan_procs.h"
 
 HRESULT WINAPI D3D12SerializeRootSignature(const D3D12_ROOT_SIGNATURE_DESC *root_signature_desc,
         D3D_ROOT_SIGNATURE_VERSION version, ID3DBlob **blob, ID3DBlob **error_blob)
@@ -1180,6 +1188,21 @@ static bool have_d3d12_device(void)
 
 START_TEST(vkd3d_api)
 {
+    void *libvulkan;
+
+    if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
+    {
+        skip("Failed to load %s: %s.\n", SONAME_LIBVULKAN, vkd3d_dlerror());
+        return;
+    }
+
+#define LOAD_VK_PFN(name) name = vkd3d_dlsym(libvulkan, #name);
+LOAD_VK_PFN(vkEnumerateInstanceExtensionProperties)
+LOAD_VK_PFN(vkGetInstanceProcAddr)
+#define VK_DEVICE_PFN LOAD_VK_PFN
+#define VK_INSTANCE_PFN LOAD_VK_PFN
+#include "vulkan_procs.h"
+
     if (!have_d3d12_device())
     {
         skip("D3D12 device cannot be created.\n");

@@ -314,7 +314,7 @@ tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
 	tests/shader_runner_d3d12.c \
 	tests/shader_runner_vulkan.c
-tests_vkd3d_api_LDADD = libvkd3d.la @VULKAN_LIBS@
+tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
 XFAIL_TESTS = \
