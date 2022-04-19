@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define VK_NO_PROTOTYPES
 #include "config.h"
 #include "vulkan/vulkan.h"
 #include "vkd3d_shader.h"
@@ -44,6 +45,8 @@ static struct vulkan_resource *vulkan_resource(struct resource *r)
 }
 
 #define DECLARE_VK_PFN(name) PFN_##name name;
+
+DECLARE_VK_PFN(vkGetInstanceProcAddr)
 
 struct vulkan_shader_runner
 {
@@ -984,7 +987,15 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkFormatProperties format_props;
     uint32_t count, graphics_index;
     VkDevice device;
+    void *libvulkan;
     VkResult vr;
+
+    if (!(libvulkan = vkd3d_dlopen(SONAME_LIBVULKAN)))
+    {
+        skip("Failed to load %s: %s.\n", SONAME_LIBVULKAN, vkd3d_dlerror());
+        return false;
+    }
+    vkGetInstanceProcAddr = vkd3d_dlsym(libvulkan, "vkGetInstanceProcAddr");
 
     runner->vkCreateInstance = (void *)vkGetInstanceProcAddr(NULL, "vkCreateInstance");
 
