@@ -19,51 +19,6 @@
 #include "vkd3d_private.h"
 #include "vkd3d_version.h"
 
-#ifdef HAVE_DLFCN_H
-#include <dlfcn.h>
-
-static void *vkd3d_dlopen(const char *name)
-{
-    return dlopen(name, RTLD_NOW);
-}
-
-static void *vkd3d_dlsym(void *handle, const char *symbol)
-{
-    return dlsym(handle, symbol);
-}
-
-static int vkd3d_dlclose(void *handle)
-{
-    return dlclose(handle);
-}
-
-static const char *vkd3d_dlerror(void)
-{
-    return dlerror();
-}
-#else
-static void *vkd3d_dlopen(const char *name)
-{
-    FIXME("Not implemented for this platform.\n");
-    return NULL;
-}
-
-static void *vkd3d_dlsym(void *handle, const char *symbol)
-{
-    return NULL;
-}
-
-static int vkd3d_dlclose(void *handle)
-{
-    return 0;
-}
-
-static const char *vkd3d_dlerror(void)
-{
-    return "Not implemented for this platform.\n";
-}
-#endif
-
 struct vkd3d_struct
 {
     enum vkd3d_structure_type type;

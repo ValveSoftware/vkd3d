@@ -246,4 +246,48 @@ static inline void vkd3d_parse_version(const char *version, int *major, int *min
 
 HRESULT hresult_from_vkd3d_result(int vkd3d_result);
 
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+
+static inline void *vkd3d_dlopen(const char *name)
+{
+    return dlopen(name, RTLD_NOW);
+}
+
+static inline void *vkd3d_dlsym(void *handle, const char *symbol)
+{
+    return dlsym(handle, symbol);
+}
+
+static inline int vkd3d_dlclose(void *handle)
+{
+    return dlclose(handle);
+}
+
+static inline const char *vkd3d_dlerror(void)
+{
+    return dlerror();
+}
+#else
+static inline void *vkd3d_dlopen(const char *name)
+{
+    return NULL;
+}
+
+static inline void *vkd3d_dlsym(void *handle, const char *symbol)
+{
+    return NULL;
+}
+
+static inline int vkd3d_dlclose(void *handle)
+{
+    return 0;
+}
+
+static inline const char *vkd3d_dlerror(void)
+{
+    return "Not implemented for this platform.\n";
+}
+#endif
+
 #endif  /* __VKD3D_COMMON_H */
