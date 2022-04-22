@@ -17,18 +17,65 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define VK_NO_PROTOTYPES
 #define VK_USE_PLATFORM_XCB_KHR
 #define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_3
+#include "config.h"
 #include <vkd3d.h>
 #include <vkd3d_utils.h>
 #include <xcb/xcb_event.h>
 #include <xcb/xcb_icccm.h>
 #include <xcb/xcb_keysyms.h>
 #include <sys/stat.h>
+#include <dlfcn.h>
 #include <limits.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdio.h>
+
+#define DECLARE_VK_PFN(name) PFN_##name name;
+DECLARE_VK_PFN(vkAcquireNextImageKHR)
+DECLARE_VK_PFN(vkCreateFence)
+DECLARE_VK_PFN(vkCreateSwapchainKHR)
+DECLARE_VK_PFN(vkCreateXcbSurfaceKHR)
+DECLARE_VK_PFN(vkDestroyFence)
+DECLARE_VK_PFN(vkDestroySurfaceKHR)
+DECLARE_VK_PFN(vkDestroySwapchainKHR)
+DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceFormatsKHR)
+DECLARE_VK_PFN(vkGetPhysicalDeviceSurfaceSupportKHR)
+DECLARE_VK_PFN(vkGetSwapchainImagesKHR)
+DECLARE_VK_PFN(vkQueuePresentKHR)
+DECLARE_VK_PFN(vkResetFences)
+DECLARE_VK_PFN(vkWaitForFences)
+
+static void load_vulkan_procs(void)
+{
+    void *libvulkan;
+
+    if (!(libvulkan = dlopen(SONAME_LIBVULKAN, RTLD_NOW)))
+    {
+        fprintf(stderr, "Failed to load %s: %s.\n", SONAME_LIBVULKAN, dlerror());
+        exit(1);
+    }
+
+#define LOAD_VK_PFN(name) name = (void *)dlsym(libvulkan, #name);
+    LOAD_VK_PFN(vkAcquireNextImageKHR)
+    LOAD_VK_PFN(vkCreateFence)
+    LOAD_VK_PFN(vkCreateSwapchainKHR)
+    LOAD_VK_PFN(vkCreateXcbSurfaceKHR)
+    LOAD_VK_PFN(vkDestroyFence)
+    LOAD_VK_PFN(vkDestroySurfaceKHR)
+    LOAD_VK_PFN(vkDestroySwapchainKHR)
+    LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+    LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceFormatsKHR)
+    LOAD_VK_PFN(vkGetPhysicalDeviceSurfaceSupportKHR)
+    LOAD_VK_PFN(vkGetSwapchainImagesKHR)
+    LOAD_VK_PFN(vkQueuePresentKHR)
+    LOAD_VK_PFN(vkResetFences)
+    LOAD_VK_PFN(vkWaitForFences)
+}
 
 struct demo
 {
@@ -329,6 +376,8 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     VkDevice vk_device;
     VkImage *vk_images;
     VkFormat format;
+
+    load_vulkan_procs();
 
     if ((format = vkd3d_get_vk_format(desc->format)) == VK_FORMAT_UNDEFINED)
         return NULL;
