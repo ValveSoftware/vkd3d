@@ -112,7 +112,6 @@ case $host_os in
      ;;
 esac
 
-AC_ARG_VAR([VULKAN_LIBS], [linker flags for the Vulkan library])
 VKD3D_CHECK_VULKAN
 
 AS_IF([test "x$with_ncurses" != "xno"],
