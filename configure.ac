@@ -112,7 +112,10 @@ case $host_os in
      ;;
 esac
 
-VKD3D_CHECK_VULKAN
+AC_ARG_VAR([SONAME_LIBVULKAN], [shared object name for the Vulkan library])
+AS_IF([test "x$SONAME_LIBVULKAN" = "x"],
+      [VKD3D_CHECK_VULKAN],
+      [AC_DEFINE_UNQUOTED([SONAME_LIBVULKAN],["$SONAME_LIBVULKAN"],[Define to the shared object name of the Vulkan library.])])
 
 AS_IF([test "x$with_ncurses" != "xno"],
       [PKG_CHECK_MODULES([NCURSES], [ncurses],
