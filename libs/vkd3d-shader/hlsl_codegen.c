@@ -567,8 +567,10 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     return false;
 }
 
-/* Helper for split_array_copies() and split_struct_copies(). Inserts new
- * instructions right before "store". */
+/* Copy an element of a complex variable. Helper for
+ * split_array_copies(), split_struct_copies() and
+ * split_matrix_copies(). Inserts new instructions right before
+ * "store". */
 static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
         const struct hlsl_ir_load *load, const unsigned int offset, struct hlsl_type *type)
 {
