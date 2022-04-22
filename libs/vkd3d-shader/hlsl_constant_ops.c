@@ -275,7 +275,7 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
                 if (ctx->profile->major_version >= 4 && src2->value[k].f == 0)
                 {
                     hlsl_warning(ctx, &dst->node.loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
-                            "Floating point division by zero");
+                            "Floating point division by zero.");
                 }
                 dst->value[k].f = src1->value[k].f / src2->value[k].f;
                 if (ctx->profile->major_version < 4 && isinf(dst->value[k].f))
@@ -289,7 +289,7 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
                 if (src2->value[k].d == 0)
                 {
                     hlsl_warning(ctx, &dst->node.loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
-                            "Floating point division by zero");
+                            "Floating point division by zero.");
                 }
                 dst->value[k].d = src1->value[k].d / src2->value[k].d;
                 break;
