@@ -1,0 +1,72 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4x3 mat = {11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43};
+    return float4(mat[1], 0);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 23, 0)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    row_major float4x3 mat = {11, 12, 13, 21, 22, 23, 31, 32, 33, 41, 42, 43};
+    return float4(mat[1], 0);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 23, 0)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float3x4 mat = {11, 12, 13, 14, 21, 22, 23, 24, 31, 32, 33, 34};
+    return float4(mat[1]);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 23, 24)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    row_major float3x2 mat = {11, 12, 21, 22, 31, 32};
+    return float4(mat[1], mat[2]);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 31, 32)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    row_major float3x2 mat;
+    mat = float3x2(11, 12, 21, 22, 31, 32);
+    return float4(mat[1], mat[2]);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 31, 32)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 x = float4(12, 21, 22, 31);
+    float3x2 mat = float3x2(11, x, 32);
+    return float4(mat[1], mat[2]);
+}
+
+[test]
+todo draw quad
+probe all rgba (21, 22, 31, 32)
