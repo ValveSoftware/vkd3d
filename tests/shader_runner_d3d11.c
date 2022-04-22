@@ -627,9 +627,11 @@ void run_shader_tests_d3d11(int argc, char **argv)
         parse_args(argc, argv);
         enable_d3d11_debug_layer(argc, argv);
         init_adapter_info();
-        init_test_context(&runner);
-        run_shader_tests(&runner.r, argc, argv, &d3d11_runner_ops);
-        destroy_test_context(&runner);
+        if (init_test_context(&runner))
+        {
+            run_shader_tests(&runner.r, argc, argv, &d3d11_runner_ops);
+            destroy_test_context(&runner);
+        }
     }
     FreeLibrary(d3d11_module);
     FreeLibrary(dxgi_module);
