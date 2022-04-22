@@ -676,7 +676,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
 static unsigned int minor_size(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
         return type->dimx;
     else
         return type->dimy;
@@ -684,7 +684,7 @@ static unsigned int minor_size(const struct hlsl_type *type)
 
 static unsigned int major_size(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_VECTOR || type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
         return type->dimy;
     else
         return type->dimx;
