@@ -18,6 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <math.h>
+
 #include "hlsl.h"
 
 static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
@@ -270,12 +272,17 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                if (src2->value[k].f == 0)
+                if (ctx->profile->major_version >= 4 && src2->value[k].f == 0)
                 {
                     hlsl_warning(ctx, &dst->node.loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
                             "Floating point division by zero");
                 }
                 dst->value[k].f = src1->value[k].f / src2->value[k].f;
+                if (ctx->profile->major_version < 4 && isinf(dst->value[k].f))
+                {
+                    hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
+                            "Infinities are not allowed by the shader model.");
+                }
                 break;
 
             case HLSL_TYPE_DOUBLE:

@@ -25,6 +25,7 @@ todo draw quad
 probe all rgba (5.0, 5.0, -5.0, 3.0)
 
 [require]
+% Infinities are not allowed in SM1
 shader model >= 4.0
 
 [pixel shader]
