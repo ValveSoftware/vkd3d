@@ -3653,7 +3653,7 @@ static void d3d12_desc_buffered_copy_atomic(struct d3d12_desc *dst, const struct
     vkd3d_mutex_unlock(mutex);
 
     infos[set].uav_counter |= (location->src.magic == VKD3D_DESCRIPTOR_MAGIC_UAV)
-            & !!location->src.u.view_info.view->vk_counter_view;
+            && !!location->src.u.view_info.view->vk_counter_view;
     location->dst = dst;
 
     if (infos[set].count == ARRAY_SIZE(locations[0]))
