@@ -2491,6 +2491,30 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
     return params->instrs;
 }
 
+static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
+{
+    switch (dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+        case HLSL_SAMPLER_DIM_1DARRAY:
+            return 1;
+        case HLSL_SAMPLER_DIM_2D:
+        case HLSL_SAMPLER_DIM_2DMS:
+        case HLSL_SAMPLER_DIM_2DARRAY:
+        case HLSL_SAMPLER_DIM_2DMSARRAY:
+            return 2;
+        case HLSL_SAMPLER_DIM_3D:
+            return 3;
+        case HLSL_SAMPLER_DIM_CUBE:
+        case HLSL_SAMPLER_DIM_CUBEARRAY:
+            /* Offset parameters not supported for these types. */
+            return 0;
+        default:
+            assert(0);
+            return 0;
+    }
+}
+
 static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2554,6 +2578,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *offset = NULL;
@@ -2587,10 +2612,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
-        if (params->args_count == 3)
+        if (!!offset_dim && params->args_count == 3)
         {
             if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim), loc)))
+                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
 
