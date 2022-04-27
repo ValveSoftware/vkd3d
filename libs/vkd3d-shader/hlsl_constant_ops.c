@@ -278,10 +278,10 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
                             "Floating point division by zero.");
                 }
                 dst->value[k].f = src1->value[k].f / src2->value[k].f;
-                if (ctx->profile->major_version < 4 && isinf(dst->value[k].f))
+                if (ctx->profile->major_version < 4 && !isfinite(dst->value[k].f))
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
-                            "Infinities are not allowed by the shader model.");
+                            "Infinities and NaNs are not allowed by the shader model.");
                 }
                 break;
 
