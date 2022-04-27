@@ -1450,77 +1450,44 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
     return true;
 }
 
-static void initialize_numeric_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct parse_initializer *initializer, unsigned int reg_offset, struct hlsl_type *type,
-        unsigned int *initializer_offset)
+static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src,
+        const struct vkd3d_shader_location *loc)
 {
-    unsigned int i;
+    unsigned int src_comp_count = hlsl_type_component_count(src->data_type);
+    unsigned int k;
 
-    if (type->type == HLSL_CLASS_MATRIX)
-        hlsl_fixme(ctx, &var->loc, "Matrix initializer.");
-
-    for (i = 0; i < type->dimx; i++)
+    for (k = 0; k < src_comp_count; ++k)
     {
+        struct hlsl_type *dst_comp_type, *src_comp_type;
+        unsigned int dst_reg_offset, src_reg_offset;
         struct hlsl_ir_store *store;
         struct hlsl_ir_constant *c;
-        struct hlsl_ir_node *node;
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_node *conv;
 
-        node = initializer->args[*initializer_offset];
-        *initializer_offset += 1;
+        dst_reg_offset = hlsl_compute_component_offset(ctx, dst->data_type, *store_index, &dst_comp_type);
+        src_reg_offset = hlsl_compute_component_offset(ctx, src->data_type, k, &src_comp_type);
 
-        if (!(node = add_implicit_conversion(ctx, initializer->instrs, node,
-                hlsl_get_scalar_type(ctx, type->base_type), &node->loc)))
+        if (!(c = hlsl_new_uint_constant(ctx, src_reg_offset, loc)))
+            return;
+        list_add_tail(instrs, &c->node.entry);
+
+        if (!(load = add_load(ctx, instrs, src, &c->node, src_comp_type, *loc)))
             return;
 
-        if (!(c = hlsl_new_uint_constant(ctx, reg_offset + i, &node->loc)))
-            return;
-        list_add_tail(initializer->instrs, &c->node.entry);
-
-        if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, node->loc)))
+        if (!(conv = add_implicit_conversion(ctx, instrs, &load->node, dst_comp_type, loc)))
             return;
 
-        list_add_tail(initializer->instrs, &store->node.entry);
-    }
-}
+        if (!(c = hlsl_new_uint_constant(ctx, dst_reg_offset, loc)))
+            return;
+        list_add_tail(instrs, &c->node.entry);
 
-static void struct_var_initializer(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct parse_initializer *initializer)
-{
-    struct hlsl_type *type = var->data_type;
-    struct hlsl_struct_field *field;
-    unsigned int i = 0;
+        if (!(store = hlsl_new_store(ctx, dst, &c->node, conv, 0, *loc)))
+            return;
+        list_add_tail(instrs, &store->node.entry);
 
-    if (initializer_size(initializer) != hlsl_type_component_count(type))
-    {
-        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                "Expected %u components in initializer, but got %u.",
-                hlsl_type_component_count(type), initializer_size(initializer));
-        return;
-    }
-
-    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
-    {
-        struct hlsl_ir_node *node = initializer->args[i];
-        struct hlsl_ir_store *store;
-        struct hlsl_ir_constant *c;
-
-        if (i++ >= initializer->args_count)
-            break;
-
-        if (hlsl_type_component_count(field->type) == hlsl_type_component_count(node->data_type))
-        {
-            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, &node->loc)))
-                break;
-            list_add_tail(initializer->instrs, &c->node.entry);
-
-            if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, node->loc)))
-                break;
-            list_add_tail(initializer->instrs, &store->node.entry);
-        }
-        else
-        {
-            hlsl_fixme(ctx, &node->loc, "Implicit cast in structure initializer.");
-        }
+        ++*store_index;
     }
 }
 
@@ -1648,51 +1615,23 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             if (v->initializer.braces)
             {
                 unsigned int size = initializer_size(&v->initializer);
-                unsigned int initializer_offset = 0;
+                unsigned int store_index = 0;
+                unsigned int k;
 
-                if (type->type <= HLSL_CLASS_LAST_NUMERIC && type->dimx * type->dimy != size)
+                if (hlsl_type_component_count(type) != size)
                 {
                     hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Expected %u components in numeric initializer, but got %u.",
-                            type->dimx * type->dimy, v->initializer.args_count);
+                            "Expected %u components in initializer, but got %u.",
+                            hlsl_type_component_count(type), size);
                     free_parse_initializer(&v->initializer);
                     vkd3d_free(v);
                     continue;
                 }
 
-                if ((type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
-                        && hlsl_type_component_count(type) != size)
+                for (k = 0; k < v->initializer.args_count; ++k)
                 {
-                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                            "Expected %u components in initializer, but got %u.", hlsl_type_component_count(type), size);
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
-                    continue;
-                }
-
-                if (type->type > HLSL_CLASS_LAST_NUMERIC && type->type != HLSL_CLASS_STRUCT)
-                {
-                    FIXME("Initializers for non scalar/struct variables not supported yet.\n");
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
-                    continue;
-                }
-
-                if (type->type == HLSL_CLASS_STRUCT)
-                {
-                    struct_var_initializer(ctx, var, &v->initializer);
-                }
-                else
-                {
-                    if (v->initializer.args_count != size)
-                    {
-                        hlsl_fixme(ctx, &v->loc, "Flatten initializer.");
-                        free_parse_initializer(&v->initializer);
-                        vkd3d_free(v);
-                        continue;
-                    }
-
-                    initialize_numeric_var(ctx, var, &v->initializer, 0, type, &initializer_offset);
+                    initialize_var_components(ctx, v->initializer.instrs, var,
+                            &store_index, v->initializer.args[k], &v->initializer.args[k]->loc);
                 }
             }
             else

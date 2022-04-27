@@ -1660,7 +1660,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     if (*offset >= deref->var->data_type->reg_size)
     {
         hlsl_error(ctx, &deref->offset.node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
-                "Dereference is out of bounds.");
+                "Dereference is out of bounds. %u/%u", *offset, deref->var->data_type->reg_size);
         return false;
     }
 

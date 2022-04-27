@@ -12,7 +12,7 @@ float4 main() : SV_TARGET
 
 [test]
 draw quad
-todo probe all rgba (21, 22, 23, 24)
+probe all rgba (21, 22, 23, 24)
 
 
 [pixel shader]
@@ -34,4 +34,4 @@ float4 main() : SV_TARGET
 
 [test]
 draw quad
-todo probe all rgba (61, 62, 63, 64)
+probe all rgba (61, 62, 63, 64)

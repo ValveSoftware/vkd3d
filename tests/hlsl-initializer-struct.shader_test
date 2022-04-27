@@ -22,7 +22,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (41, 42, 43, 44)
 
 
@@ -52,7 +52,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (4311, 4312, 4313, 4314)
 
 
@@ -80,5 +80,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (21, 22, 23, 24)

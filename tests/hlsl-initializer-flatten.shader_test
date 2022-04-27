@@ -6,7 +6,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1, 2, 3, 4)
 
 
@@ -24,7 +24,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (4, 5, 6, 7)
 
 
@@ -38,7 +38,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (40, 10, 20, 30)
+probe all rgba (40, 10, 20, 30)
 
 
 [pixel shader]
@@ -56,7 +56,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 
@@ -69,5 +69,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)

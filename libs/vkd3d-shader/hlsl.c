@@ -232,6 +232,85 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
     return type;
 }
 
+/* Returns the register offset of a given component within a type, given its index.
+ * *comp_type will be set to the type of the component. */
+unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
+        unsigned int idx, struct hlsl_type **comp_type)
+{
+    switch (type->type)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        {
+            assert(idx < type->dimx * type->dimy);
+            *comp_type = hlsl_get_scalar_type(ctx, type->base_type);
+            return idx;
+        }
+        case HLSL_CLASS_MATRIX:
+        {
+            unsigned int minor, major, x = idx % type->dimx, y = idx / type->dimx;
+
+            assert(idx < type->dimx * type->dimy);
+
+            if (hlsl_type_is_row_major(type))
+            {
+                minor = x;
+                major = y;
+            }
+            else
+            {
+                minor = y;
+                major = x;
+            }
+
+            *comp_type = hlsl_get_scalar_type(ctx, type->base_type);
+            return 4 * major + minor;
+        }
+
+        case HLSL_CLASS_ARRAY:
+        {
+            unsigned int elem_comp_count = hlsl_type_component_count(type->e.array.type);
+            unsigned int array_idx = idx / elem_comp_count;
+            unsigned int idx_in_elem = idx % elem_comp_count;
+
+            assert(array_idx < type->e.array.elements_count);
+
+            return array_idx * hlsl_type_get_array_element_reg_size(type->e.array.type) +
+                    hlsl_compute_component_offset(ctx, type->e.array.type, idx_in_elem, comp_type);
+        }
+
+        case HLSL_CLASS_STRUCT:
+        {
+            struct hlsl_struct_field *field;
+
+            LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+            {
+                unsigned int elem_comp_count = hlsl_type_component_count(field->type);
+
+                if (idx < elem_comp_count)
+                {
+                    return field->reg_offset +
+                            hlsl_compute_component_offset(ctx, field->type, idx, comp_type);
+                }
+                idx -= elem_comp_count;
+            }
+
+            assert(0);
+            return 0;
+        }
+
+        case HLSL_CLASS_OBJECT:
+        {
+            assert(idx == 0);
+            *comp_type = type;
+            return 0;
+        }
+    }
+
+    assert(0);
+    return 0;
+}
+
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size)
 {
     struct hlsl_type *type;
