@@ -2748,10 +2748,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_ir_load *sampler_load;
         struct hlsl_ir_node *coords, *lod;
 
-        if (params->args_count != 3 && params->args_count != 4)
+        if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
         {
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'SampleLevel': expected 3 or 4, but got %u.", params->args_count);
+                    "Wrong number of arguments to method 'SampleLevel': expected from 3 to %u, but got %u.",
+                    4 + !!offset_dim, params->args_count);
             return false;
         }
 
@@ -2779,12 +2780,15 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
             lod = params->args[2];
 
-        if (params->args_count == 4)
+        if (offset_dim && params->args_count > 3)
         {
             if (!(offset = add_implicit_conversion(ctx, instrs, params->args[3],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
+
+        if (params->args_count > 3 + !!offset_dim)
+            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         if (!(load = hlsl_new_sample_lod(ctx, object_type->e.resource_format,
                 &object_load->src, &sampler_load->src, coords, offset, lod, loc)))
