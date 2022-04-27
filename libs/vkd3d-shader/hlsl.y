@@ -581,6 +581,93 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     return !!add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
+static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        const struct vkd3d_shader_location *loc);
+
+static struct hlsl_ir_node *add_matrix_scalar_load(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_node *matrix, struct hlsl_ir_node *x, struct hlsl_ir_node *y,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *major, *minor;
+    struct hlsl_ir_expr *mul, *add;
+    struct hlsl_ir_constant *four;
+    struct hlsl_ir_load *load;
+    struct hlsl_type *type = matrix->data_type, *scalar_type;
+
+    scalar_type = hlsl_get_scalar_type(ctx, type->base_type);
+
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+    {
+        minor = x;
+        major = y;
+    }
+    else
+    {
+        minor = y;
+        major = x;
+    }
+
+    if (!(four = hlsl_new_uint_constant(ctx, 4, loc)))
+        return NULL;
+    list_add_tail(instrs, &four->node.entry);
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MUL, &four->node, major, loc)))
+        return NULL;
+
+    if (!(add = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_ADD, &mul->node, minor, loc)))
+        return NULL;
+
+    if (!(load = add_load(ctx, instrs, matrix, &add->node, scalar_type, *loc)))
+        return NULL;
+
+    return &load->node;
+}
+
+static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_node *matrix, struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *mat_type = matrix->data_type, *ret_type;
+    struct vkd3d_string_buffer *name;
+    static unsigned int counter = 0;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_var *var;
+    unsigned int i;
+
+    ret_type = hlsl_get_vector_type(ctx, mat_type->base_type, mat_type->dimx);
+
+    name = vkd3d_string_buffer_get(&ctx->string_buffers);
+    vkd3d_string_buffer_printf(name, "<index-%u>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name->buffer, ret_type, *loc);
+    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    if (!var)
+        return false;
+
+    for (i = 0; i < mat_type->dimx; ++i)
+    {
+        struct hlsl_ir_store *store;
+        struct hlsl_ir_node *value;
+        struct hlsl_ir_constant *c;
+
+        if (!(c = hlsl_new_uint_constant(ctx, i, loc)))
+            return false;
+        list_add_tail(instrs, &c->node.entry);
+
+        if (!(value = add_matrix_scalar_load(ctx, instrs, matrix, &c->node, index, loc)))
+            return false;
+
+        if (!(store = hlsl_new_store(ctx, var, &c->node, value, 0, *loc)))
+            return false;
+        list_add_tail(instrs, &store->node.entry);
+    }
+
+    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+
+    return true;
+}
+
 static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
 {
@@ -602,9 +689,7 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     }
     else if (expr_type->type == HLSL_CLASS_MATRIX)
     {
-        /* This needs to be lowered now, while we still have type information. */
-        FIXME("Index of matrix type.\n");
-        return false;
+        return add_matrix_index(ctx, instrs, array, index, &loc);
     }
     else if (expr_type->type == HLSL_CLASS_VECTOR)
     {
