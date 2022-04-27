@@ -2671,12 +2671,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             read_channel = 0;
         }
 
-        if (!strcmp(name, "Gather"))
+        if (!strcmp(name, "Gather") || !offset_dim)
         {
-            if (params->args_count != 2 && params->args_count != 3)
+            if (params->args_count < 2 && params->args_count > 3 + !!offset_dim)
             {
                 hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Wrong number of arguments to method 'Gather': expected 2 or 3, but got %u.", params->args_count);
+                        "Wrong number of arguments to method '%s': expected from 2 to %u, but got %u.",
+                        name, 3 + !!offset_dim, params->args_count);
                 return false;
             }
         }
@@ -2688,13 +2689,14 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
 
-        if (params->args_count == 4 || params->args_count == 7)
+        if (params->args_count == 3 + !!offset_dim || params->args_count == 7)
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         if (params->args_count == 6 || params->args_count == 7)
-            hlsl_fixme(ctx, loc, "Multiple Gather() offset parameters.");
-
-        if (params->args_count == 3 || params->args_count == 4)
+        {
+            hlsl_fixme(ctx, loc, "Multiple %s() offset parameters.", name);
+        }
+        else if (offset_dim && params->args_count > 2)
         {
             if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
