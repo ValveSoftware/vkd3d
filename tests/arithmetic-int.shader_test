@@ -41,3 +41,19 @@ float4 main() : SV_TARGET
 
     return x % y;
 }
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    int x = -2147483648;
+    int y = -1;
+
+    return x / y;
+}
+
+[test]
+draw quad
+probe all rgba (-2147483648.0, -2147483648.0, -2147483648.0, -2147483648.0)
