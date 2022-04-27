@@ -2634,6 +2634,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY))
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
         enum hlsl_resource_load_type load_type;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
@@ -2690,7 +2691,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         if (params->args_count == 3 || params->args_count == 4)
         {
             if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim), loc)))
+                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
 
