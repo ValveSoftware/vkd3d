@@ -2585,10 +2585,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_ir_load *sampler_load;
         struct hlsl_ir_node *coords;
 
-        if (params->args_count != 2 && params->args_count != 3)
+        if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
         {
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'Sample': expected 2 or 3, but got %u.", params->args_count);
+                    "Wrong number of arguments to method 'Sample': expected from 2 to %u, but got %u.",
+                    4 + !!offset_dim, params->args_count);
             return false;
         }
 
@@ -2612,12 +2613,17 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
-        if (!!offset_dim && params->args_count == 3)
+        if (offset_dim && params->args_count > 2)
         {
             if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
+
+        if (params->args_count > 2 + !!offset_dim)
+            hlsl_fixme(ctx, loc, "Sample() clamp parameter.");
+        if (params->args_count > 3 + !!offset_dim)
+            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format,
                 HLSL_RESOURCE_SAMPLE, &object_load->src, &sampler_load->src, coords, offset, loc)))
