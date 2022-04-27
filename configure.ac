@@ -113,6 +113,7 @@ case $host_os in
 esac
 
 AC_ARG_VAR([SONAME_LIBVULKAN], [shared object name for the Vulkan library])
+AC_ARG_VAR([VULKAN_LIBS], [linker flags for the Vulkan library])
 AS_IF([test "x$SONAME_LIBVULKAN" = "x"],
       [VKD3D_CHECK_VULKAN],
       [AC_DEFINE_UNQUOTED([SONAME_LIBVULKAN],["$SONAME_LIBVULKAN"],[Define to the shared object name of the Vulkan library.])])
