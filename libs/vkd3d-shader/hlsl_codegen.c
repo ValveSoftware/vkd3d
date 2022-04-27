@@ -246,6 +246,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
             && src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR
             && src_type->dimx == 1)
     {
+        struct hlsl_ir_node *replacement;
         struct hlsl_ir_swizzle *swizzle;
         struct hlsl_ir_expr *new_cast;
 
@@ -255,11 +256,17 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
         if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_scalar_type, &cast->node.loc)))
             return false;
         list_add_after(&cast->node.entry, &new_cast->node.entry);
-        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, &new_cast->node, &cast->node.loc)))
-            return false;
-        list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+        replacement = &new_cast->node;
 
-        hlsl_replace_node(&cast->node, &swizzle->node);
+        if (dst_type->dimx != 1)
+        {
+            if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, replacement, &cast->node.loc)))
+                return false;
+            list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+            replacement = &swizzle->node;
+        }
+
+        hlsl_replace_node(&cast->node, replacement);
         return true;
     }
 
