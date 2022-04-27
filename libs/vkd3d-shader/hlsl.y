@@ -587,13 +587,18 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     const struct hlsl_type *expr_type = array->data_type;
     struct hlsl_type *data_type;
     struct hlsl_ir_constant *c;
-    struct hlsl_ir_node *mul;
 
     if (expr_type->type == HLSL_CLASS_ARRAY)
     {
         data_type = expr_type->e.array.type;
+
         if (!(c = hlsl_new_uint_constant(ctx, hlsl_type_get_array_element_reg_size(data_type), &loc)))
             return false;
+        list_add_tail(instrs, &c->node.entry);
+
+        if (!(index = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
+            return false;
+        list_add_tail(instrs, &index->entry);
     }
     else if (expr_type->type == HLSL_CLASS_MATRIX)
     {
@@ -604,8 +609,6 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     else if (expr_type->type == HLSL_CLASS_VECTOR)
     {
         data_type = hlsl_get_scalar_type(ctx, expr_type->base_type);
-        if (!(c = hlsl_new_uint_constant(ctx, 1, &loc)))
-            return false;
     }
     else
     {
@@ -615,12 +618,6 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
             hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Expression cannot be array-indexed.");
         return false;
     }
-
-    list_add_tail(instrs, &c->node.entry);
-    if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, index, &c->node)))
-        return false;
-    list_add_tail(instrs, &mul->entry);
-    index = mul;
 
     return !!add_load(ctx, instrs, array, index, data_type, loc);
 }
