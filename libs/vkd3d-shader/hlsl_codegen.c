@@ -273,8 +273,16 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
     return false;
 }
 
+enum copy_propagation_value_state
+{
+    VALUE_STATE_NOT_WRITTEN = 0,
+    VALUE_STATE_STATICALLY_WRITTEN,
+    VALUE_STATE_DYNAMICALLY_WRITTEN,
+};
+
 struct copy_propagation_value
 {
+    enum copy_propagation_value_state state;
     struct hlsl_ir_node *node;
     unsigned int component;
 };
@@ -289,6 +297,7 @@ struct copy_propagation_var_def
 struct copy_propagation_state
 {
     struct rb_tree var_defs;
+    struct copy_propagation_state *parent;
 };
 
 static int copy_propagation_var_def_compare(const void *key, const struct rb_entry *entry)
@@ -306,15 +315,32 @@ static void copy_propagation_var_def_destroy(struct rb_entry *entry, void *conte
     vkd3d_free(var_def);
 }
 
-static struct copy_propagation_var_def *copy_propagation_get_var_def(const struct copy_propagation_state *state,
-        const struct hlsl_ir_var *var)
+static struct copy_propagation_value *copy_propagation_get_value(const struct copy_propagation_state *state,
+        const struct hlsl_ir_var *var, unsigned component)
 {
-    struct rb_entry *entry = rb_get(&state->var_defs, var);
+    for (; state; state = state->parent)
+    {
+        struct rb_entry *entry = rb_get(&state->var_defs, var);
+        if (entry)
+        {
+            struct copy_propagation_var_def *var_def = RB_ENTRY_VALUE(entry, struct copy_propagation_var_def, entry);
+            enum copy_propagation_value_state state = var_def->values[component].state;
 
-    if (entry)
-        return RB_ENTRY_VALUE(entry, struct copy_propagation_var_def, entry);
-    else
-        return NULL;
+            assert(component < var_def->var->data_type->reg_size);
+
+            switch (state)
+            {
+                case VALUE_STATE_STATICALLY_WRITTEN:
+                    return &var_def->values[component];
+                case VALUE_STATE_DYNAMICALLY_WRITTEN:
+                    return NULL;
+                case VALUE_STATE_NOT_WRITTEN:
+                    break;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 static struct copy_propagation_var_def *copy_propagation_create_var_def(struct hlsl_ctx *ctx,
@@ -338,10 +364,28 @@ static struct copy_propagation_var_def *copy_propagation_create_var_def(struct h
     return var_def;
 }
 
+static void copy_propagation_invalidate_variable(struct copy_propagation_var_def *var_def,
+        unsigned offset, unsigned char writemask)
+{
+    unsigned i;
+
+    TRACE("Invalidate variable %s[%u]%s.\n", var_def->var->name, offset, debug_hlsl_writemask(writemask));
+
+    for (i = 0; i < 4; ++i)
+    {
+        if (writemask & (1u << i))
+            var_def->values[offset + i].state = VALUE_STATE_DYNAMICALLY_WRITTEN;
+    }
+}
+
 static void copy_propagation_invalidate_whole_variable(struct copy_propagation_var_def *var_def)
 {
+    unsigned i;
+
     TRACE("Invalidate variable %s.\n", var_def->var->name);
-    memset(var_def->values, 0, sizeof(*var_def->values) * var_def->var->data_type->reg_size);
+
+    for (i = 0; i < var_def->var->data_type->reg_size; ++i)
+        var_def->values[i].state = VALUE_STATE_DYNAMICALLY_WRITTEN;
 }
 
 static void copy_propagation_set_value(struct copy_propagation_var_def *var_def, unsigned int offset,
@@ -355,6 +399,7 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
         {
             TRACE("Variable %s[%u] is written by instruction %p%s.\n",
                     var_def->var->name, offset + i, node, debug_hlsl_writemask(1u << i));
+            var_def->values[offset + i].state = VALUE_STATE_STATICALLY_WRITTEN;
             var_def->values[offset + i].node = node;
             var_def->values[offset + i].component = j++;
         }
@@ -366,32 +411,34 @@ static struct hlsl_ir_node *copy_propagation_compute_replacement(struct hlsl_ctx
         unsigned int count, unsigned int *swizzle)
 {
     const struct hlsl_ir_var *var = deref->var;
-    struct copy_propagation_var_def *var_def;
     struct hlsl_ir_node *node = NULL;
     unsigned int offset, i;
 
     if (!hlsl_offset_from_deref(ctx, deref, &offset))
         return NULL;
 
-    if (!(var_def = copy_propagation_get_var_def(state, var)))
-        return NULL;
-
-    assert(offset + count <= var_def->var->data_type->reg_size);
+    if (var->data_type->type != HLSL_CLASS_OBJECT)
+        assert(offset + count <= var->data_type->reg_size);
 
     *swizzle = 0;
 
     for (i = 0; i < count; ++i)
     {
+        struct copy_propagation_value *value = copy_propagation_get_value(state, var, offset + i);
+
+        if (!value)
+            return NULL;
+
         if (!node)
         {
-            node = var_def->values[offset + i].node;
+            node = value->node;
         }
-        else if (node != var_def->values[offset + i].node)
+        else if (node != value->node)
         {
             TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, offset, offset + count);
             return NULL;
         }
-        *swizzle |= var_def->values[offset + i].component << i * 2;
+        *swizzle |= value->component << i * 2;
     }
 
     TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
@@ -495,6 +542,98 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
     }
 }
 
+static void copy_propagation_state_init(struct hlsl_ctx *ctx, struct copy_propagation_state *state,
+        struct copy_propagation_state *parent)
+{
+    rb_init(&state->var_defs, copy_propagation_var_def_compare);
+    state->parent = parent;
+}
+
+static void copy_propagation_state_destroy(struct copy_propagation_state *state)
+{
+    rb_destroy(&state->var_defs, copy_propagation_var_def_destroy, NULL);
+}
+
+static void copy_propagation_invalidate_from_block(struct hlsl_ctx *ctx, struct copy_propagation_state *state,
+        struct hlsl_block *block)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        switch (instr->type)
+        {
+            case HLSL_IR_STORE:
+            {
+                struct hlsl_ir_store *store = hlsl_ir_store(instr);
+                struct copy_propagation_var_def *var_def;
+                struct hlsl_deref *lhs = &store->lhs;
+                struct hlsl_ir_var *var = lhs->var;
+                unsigned int offset;
+
+                if (!(var_def = copy_propagation_create_var_def(ctx, state, var)))
+                    continue;
+
+                if (hlsl_offset_from_deref(ctx, lhs, &offset))
+                    copy_propagation_invalidate_variable(var_def, offset, store->writemask);
+                else
+                    copy_propagation_invalidate_whole_variable(var_def);
+
+                break;
+            }
+
+            case HLSL_IR_IF:
+            {
+                struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+                copy_propagation_invalidate_from_block(ctx, state, &iff->then_instrs);
+                copy_propagation_invalidate_from_block(ctx, state, &iff->else_instrs);
+
+                break;
+            }
+
+            case HLSL_IR_LOOP:
+            {
+                struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+
+                copy_propagation_invalidate_from_block(ctx, state, &loop->body);
+
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+}
+
+static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct copy_propagation_state *state);
+
+static bool copy_propagation_process_if(struct hlsl_ctx *ctx, struct hlsl_ir_if *iff,
+        struct copy_propagation_state *state)
+{
+    struct copy_propagation_state inner_state;
+    bool progress = false;
+
+    copy_propagation_state_init(ctx, &inner_state, state);
+    progress |= copy_propagation_transform_block(ctx, &iff->then_instrs, &inner_state);
+    copy_propagation_state_destroy(&inner_state);
+
+    copy_propagation_state_init(ctx, &inner_state, state);
+    progress |= copy_propagation_transform_block(ctx, &iff->else_instrs, &inner_state);
+    copy_propagation_state_destroy(&inner_state);
+
+    /* Ideally we'd invalidate the outer state looking at what was
+     * touched in the two inner states, but this doesn't work for
+     * loops (because we need to know what is invalidated in advance),
+     * so we need copy_propagation_invalidate_from_block() anyway. */
+    copy_propagation_invalidate_from_block(ctx, state, &iff->then_instrs);
+    copy_propagation_invalidate_from_block(ctx, state, &iff->else_instrs);
+
+    return progress;
+}
+
 static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct copy_propagation_state *state)
 {
@@ -518,8 +657,8 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
                 break;
 
             case HLSL_IR_IF:
-                FIXME("Copy propagation doesn't support conditionals yet, leaving.\n");
-                return progress;
+                progress |= copy_propagation_process_if(ctx, hlsl_ir_if(instr), state);
+                break;
 
             case HLSL_IR_LOOP:
                 FIXME("Copy propagation doesn't support loops yet, leaving.\n");
@@ -538,11 +677,11 @@ static bool copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *bl
     struct copy_propagation_state state;
     bool progress;
 
-    rb_init(&state.var_defs, copy_propagation_var_def_compare);
+    copy_propagation_state_init(ctx, &state, NULL);
 
     progress = copy_propagation_transform_block(ctx, block, &state);
 
-    rb_destroy(&state.var_defs, copy_propagation_var_def_destroy, NULL);
+    copy_propagation_state_destroy(&state);
 
     return progress;
 }
