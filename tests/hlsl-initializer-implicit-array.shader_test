@@ -1,0 +1,18 @@
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 arr[] = {10, 20, 30, 40, 50, 60, 70, 80};
+    return arr[1];
+}
+
+[test]
+todo draw quad
+todo probe all rgba (50, 60, 70, 80)
+
+
+[pixel shader fail]
+float4 main() : SV_TARGET
+{
+    float4 arr[] = {10, 20, 30, 40, 50, 60, 70};
+    return arr[0];
+}

@@ -77,6 +77,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-gather.shader_test \
 	tests/hlsl-initializer-flatten.shader_test \
 	tests/hlsl-initializer-invalid-arg-count.shader_test \
+	tests/hlsl-initializer-implicit-array.shader_test \
 	tests/hlsl-initializer-local-array.shader_test \
 	tests/hlsl-initializer-nested.shader_test \
 	tests/hlsl-initializer-numeric.shader_test \
