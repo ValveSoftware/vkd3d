@@ -637,6 +637,12 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     element_type = type->e.array.type;
     element_size = hlsl_type_get_array_element_reg_size(element_type);
 
+    if (rhs->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Array store rhs is not HLSL_IR_LOAD. Broadcast may be missing.");
+        return false;
+    }
+
     for (i = 0; i < type->e.array.elements_count; ++i)
     {
         if (!split_copy(ctx, store, hlsl_ir_load(rhs), i * element_size, element_type))
@@ -666,6 +672,12 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     type = rhs->data_type;
     if (type->type != HLSL_CLASS_STRUCT)
         return false;
+
+    if (rhs->type != HLSL_IR_LOAD)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Struct store rhs is not HLSL_IR_LOAD. Broadcast may be missing.");
+        return false;
+    }
 
     LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
     {
