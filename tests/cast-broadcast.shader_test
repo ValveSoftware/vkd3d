@@ -1,0 +1,24 @@
+[pixel shader]
+
+struct foo
+{
+    float3 aa;
+    float4 bb;
+};
+
+struct bar
+{
+    struct foo aa;
+    int2 bb;
+    int4 cc[8];
+};
+
+float4 main() : SV_TARGET
+{
+    struct bar p = (struct bar)42;
+    return p.aa.bb + p.cc[5];
+}
+
+[test]
+todo draw quad
+todo probe all rgba (84.0, 84.0, 84.0, 84.0)

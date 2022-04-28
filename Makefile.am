@@ -56,6 +56,7 @@ vkd3d_shader_tests = \
 	tests/arithmetic-int.shader_test \
 	tests/arithmetic-uint.shader_test \
 	tests/bitwise.shader_test \
+	tests/cast-broadcast.shader_test \
 	tests/cast-to-float.shader_test \
 	tests/cast-to-half.shader_test \
 	tests/cast-to-int.shader_test \
