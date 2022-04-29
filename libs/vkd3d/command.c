@@ -20,6 +20,8 @@
 
 #include "vkd3d_private.h"
 
+static void d3d12_fence_incref(struct d3d12_fence *fence);
+static void d3d12_fence_decref(struct d3d12_fence *fence);
 static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkFence vk_fence);
 
 HRESULT vkd3d_queue_create(struct d3d12_device *device,
@@ -295,43 +297,12 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
     waiting_fence->queue_sequence_number = queue_sequence_number;
     ++worker->enqueued_fence_count;
 
-    InterlockedIncrement(&fence->pending_worker_operation_count);
+    d3d12_fence_incref(fence);
 
     vkd3d_cond_signal(&worker->cond);
     vkd3d_mutex_unlock(&worker->mutex);
 
     return S_OK;
-}
-
-static void vkd3d_fence_worker_remove_fence(struct vkd3d_fence_worker *worker, struct d3d12_fence *fence)
-{
-    LONG count;
-    int rc;
-
-    if (!(count = InterlockedAdd(&fence->pending_worker_operation_count, 0)))
-        return;
-
-    WARN("Waiting for %u pending fence operations (fence %p).\n", count, fence);
-
-    if ((rc = vkd3d_mutex_lock(&worker->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return;
-    }
-
-    while ((count = InterlockedAdd(&fence->pending_worker_operation_count, 0)))
-    {
-        TRACE("Still waiting for %u pending fence operations (fence %p).\n", count, fence);
-
-        worker->pending_fence_destruction = true;
-        vkd3d_cond_signal(&worker->cond);
-
-        vkd3d_cond_wait(&worker->fence_destruction_cond, &worker->mutex);
-    }
-
-    TRACE("Removed fence %p.\n", fence);
-
-    vkd3d_mutex_unlock(&worker->mutex);
 }
 
 static void vkd3d_fence_worker_move_enqueued_fences_locked(struct vkd3d_fence_worker *worker)
@@ -432,7 +403,7 @@ static void vkd3d_wait_for_gpu_timeline_semaphores(struct vkd3d_fence_worker *wo
             if (FAILED(hr = d3d12_fence_signal(current->fence, counter_value, VK_NULL_HANDLE)))
                 ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
 
-            InterlockedDecrement(&current->fence->pending_worker_operation_count);
+            d3d12_fence_decref(current->fence);
             continue;
         }
 
@@ -480,7 +451,7 @@ static void vkd3d_wait_for_gpu_fences(struct vkd3d_fence_worker *worker)
             if (FAILED(hr = d3d12_fence_signal(current->fence, current->value, vk_fence)))
                 ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
 
-            InterlockedDecrement(&current->fence->pending_worker_operation_count);
+            d3d12_fence_decref(current->fence);
 
             vkd3d_queue_update_sequence_number(current->queue, current->queue_sequence_number, device);
             continue;
@@ -516,12 +487,6 @@ static void *vkd3d_fence_worker_main(void *arg)
             {
                 ERR("Failed to lock mutex, error %d.\n", rc);
                 break;
-            }
-
-            if (worker->pending_fence_destruction)
-            {
-                vkd3d_cond_broadcast(&worker->fence_destruction_cond);
-                worker->pending_fence_destruction = false;
             }
 
             if (worker->enqueued_fence_count)
@@ -560,7 +525,6 @@ HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
     TRACE("worker %p.\n", worker);
 
     worker->should_exit = false;
-    worker->pending_fence_destruction = false;
     worker->device = device;
 
     worker->enqueued_fence_count = 0;
@@ -1026,21 +990,34 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_AddRef(ID3D12Fence *iface)
     return refcount;
 }
 
+static void d3d12_fence_incref(struct d3d12_fence *fence)
+{
+    InterlockedIncrement(&fence->internal_refcount);
+}
+
 static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence *iface)
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence(iface);
     ULONG refcount = InterlockedDecrement(&fence->refcount);
-    int rc;
 
     TRACE("%p decreasing refcount to %u.\n", fence, refcount);
 
     if (!refcount)
+        d3d12_fence_decref(fence);
+
+    return refcount;
+}
+
+static void d3d12_fence_decref(struct d3d12_fence *fence)
+{
+    ULONG internal_refcount = InterlockedDecrement(&fence->internal_refcount);
+    int rc;
+
+    if (!internal_refcount)
     {
         struct d3d12_device *device = fence->device;
 
         vkd3d_private_store_destroy(&fence->private_store);
-
-        vkd3d_fence_worker_remove_fence(&device->fence_worker, fence);
 
         d3d12_fence_destroy_vk_objects(fence);
 
@@ -1052,8 +1029,6 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence *iface)
 
         d3d12_device_release(device);
     }
-
-    return refcount;
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_fence_GetPrivateData(ID3D12Fence *iface,
@@ -1380,6 +1355,7 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
     int rc;
 
     fence->ID3D12Fence_iface.lpVtbl = &d3d12_fence_vtbl;
+    fence->internal_refcount = 1;
     fence->refcount = 1;
 
     fence->value = initial_value;
@@ -1418,8 +1394,6 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
     fence->semaphore_count = 0;
 
     memset(fence->old_vk_fences, 0, sizeof(fence->old_vk_fences));
-
-    fence->pending_worker_operation_count = 0;
 
     if (FAILED(hr = vkd3d_private_store_init(&fence->private_store)))
     {
@@ -6496,7 +6470,7 @@ static HRESULT vkd3d_enqueue_timeline_semaphore(struct vkd3d_fence_worker *worke
     waiting_fence->queue = queue;
     ++worker->enqueued_fence_count;
 
-    InterlockedIncrement(&fence->pending_worker_operation_count);
+    d3d12_fence_incref(fence);
 
     vkd3d_cond_signal(&worker->cond);
     vkd3d_mutex_unlock(&worker->mutex);

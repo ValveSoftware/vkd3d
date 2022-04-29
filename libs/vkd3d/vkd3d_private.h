@@ -346,7 +346,6 @@ struct vkd3d_fence_worker
     struct vkd3d_cond cond;
     struct vkd3d_cond fence_destruction_cond;
     bool should_exit;
-    bool pending_fence_destruction;
 
     LONG enqueued_fence_count;
     struct vkd3d_enqueued_fence
@@ -532,6 +531,7 @@ struct vkd3d_pending_fence_wait
 struct d3d12_fence
 {
     ID3D12Fence ID3D12Fence_iface;
+    LONG internal_refcount;
     LONG refcount;
 
     uint64_t value;
@@ -554,8 +554,6 @@ struct d3d12_fence
 
     struct list semaphores;
     unsigned int semaphore_count;
-
-    LONG pending_worker_operation_count;
 
     VkFence old_vk_fences[VKD3D_MAX_VK_SYNC_OBJECTS];
 
