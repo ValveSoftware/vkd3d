@@ -335,7 +335,11 @@ struct vkd3d_waiting_fence
 {
     struct d3d12_fence *fence;
     uint64_t value;
-    struct vkd3d_queue *queue;
+    union
+    {
+        VkFence vk_fence;
+        VkSemaphore vk_semaphore;
+    } u;
     uint64_t queue_sequence_number;
 };
 
@@ -347,32 +351,15 @@ struct vkd3d_fence_worker
     struct vkd3d_cond fence_destruction_cond;
     bool should_exit;
 
-    LONG enqueued_fence_count;
-    struct vkd3d_enqueued_fence
-    {
-        VkFence vk_fence;
-        VkSemaphore vk_semaphore;
-        struct vkd3d_waiting_fence waiting_fence;
-    } *enqueued_fences;
-    size_t enqueued_fences_size;
-
     size_t fence_count;
-    VkFence *vk_fences;
-    size_t vk_fences_size;
     struct vkd3d_waiting_fence *fences;
     size_t fences_size;
-    VkSemaphore *vk_semaphores;
-    size_t vk_semaphores_size;
-    uint64_t *semaphore_wait_values;
-    size_t semaphore_wait_values_size;
 
-    void (*wait_for_gpu_fences)(struct vkd3d_fence_worker *worker);
+    void (*wait_for_gpu_fence)(struct vkd3d_fence_worker *worker, const struct vkd3d_waiting_fence *enqueued_fence);
 
+    struct vkd3d_queue *queue;
     struct d3d12_device *device;
 };
-
-HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker, struct d3d12_device *device);
-HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker, struct d3d12_device *device);
 
 struct vkd3d_gpu_va_allocation
 {
@@ -1338,6 +1325,7 @@ struct d3d12_command_queue
 
     struct vkd3d_queue *vkd3d_queue;
 
+    struct vkd3d_fence_worker fence_worker;
     const struct d3d12_fence *last_waited_fence;
     uint64_t last_waited_fence_value;
 
@@ -1440,7 +1428,6 @@ struct d3d12_device
 
     struct vkd3d_gpu_descriptor_allocator gpu_descriptor_allocator;
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
-    struct vkd3d_fence_worker fence_worker;
 
     struct vkd3d_mutex mutex;
     struct vkd3d_mutex desc_mutex[8];

@@ -2711,7 +2711,6 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device *iface)
         vkd3d_gpu_va_allocator_cleanup(&device->gpu_va_allocator);
         vkd3d_gpu_descriptor_allocator_cleanup(&device->gpu_descriptor_allocator);
         vkd3d_render_pass_cache_cleanup(&device->render_pass_cache, device);
-        vkd3d_fence_worker_stop(&device->fence_worker, device);
         d3d12_device_destroy_pipeline_cache(device);
         d3d12_device_destroy_vkd3d_queues(device);
         for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
@@ -4346,11 +4345,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     if (FAILED(hr = vkd3d_private_store_init(&device->private_store)))
         goto out_free_pipeline_cache;
 
-    if (FAILED(hr = vkd3d_fence_worker_start(&device->fence_worker, device)))
-        goto out_free_private_store;
-
     if (FAILED(hr = vkd3d_init_format_info(device)))
-        goto out_stop_fence_worker;
+        goto out_free_private_store;
 
     if (FAILED(hr = vkd3d_init_null_resources(&device->null_resources, device)))
         goto out_cleanup_format_info;
@@ -4382,8 +4378,6 @@ out_destroy_null_resources:
     vkd3d_destroy_null_resources(&device->null_resources, device);
 out_cleanup_format_info:
     vkd3d_cleanup_format_info(device);
-out_stop_fence_worker:
-    vkd3d_fence_worker_stop(&device->fence_worker, device);
 out_free_private_store:
     vkd3d_private_store_destroy(&device->private_store);
 out_free_pipeline_cache:

@@ -280,22 +280,19 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
         return hresult_from_errno(rc);
     }
 
-    if (!vkd3d_array_reserve((void **)&worker->enqueued_fences, &worker->enqueued_fences_size,
-            worker->enqueued_fence_count + 1, sizeof(*worker->enqueued_fences)))
+    if (!vkd3d_array_reserve((void **)&worker->fences, &worker->fences_size,
+            worker->fence_count + 1, sizeof(*worker->fences)))
     {
         ERR("Failed to add GPU fence.\n");
         vkd3d_mutex_unlock(&worker->mutex);
         return E_OUTOFMEMORY;
     }
 
-    worker->enqueued_fences[worker->enqueued_fence_count].vk_fence = vk_fence;
-    worker->enqueued_fences[worker->enqueued_fence_count].vk_semaphore = VK_NULL_HANDLE;
-    waiting_fence = &worker->enqueued_fences[worker->enqueued_fence_count].waiting_fence;
+    waiting_fence = &worker->fences[worker->fence_count++];
     waiting_fence->fence = fence;
     waiting_fence->value = value;
-    waiting_fence->queue = queue;
+    waiting_fence->u.vk_fence = vk_fence;
     waiting_fence->queue_sequence_number = queue_sequence_number;
-    ++worker->enqueued_fence_count;
 
     d3d12_fence_incref(fence);
 
@@ -305,219 +302,124 @@ static HRESULT vkd3d_enqueue_gpu_fence(struct vkd3d_fence_worker *worker,
     return S_OK;
 }
 
-static void vkd3d_fence_worker_move_enqueued_fences_locked(struct vkd3d_fence_worker *worker)
-{
-    unsigned int i;
-    bool timeline;
-    size_t count;
-    bool ret;
-
-    if (!worker->enqueued_fence_count)
-        return;
-
-    count = worker->fence_count + worker->enqueued_fence_count;
-
-    if ((timeline = worker->device->use_timeline_semaphores))
-    {
-        ret = vkd3d_array_reserve((void **) &worker->vk_semaphores, &worker->vk_semaphores_size,
-                count, sizeof(*worker->vk_semaphores));
-        ret &= vkd3d_array_reserve((void **) &worker->semaphore_wait_values, &worker->semaphore_wait_values_size,
-                count, sizeof(*worker->semaphore_wait_values));
-    }
-    else
-    {
-        ret = vkd3d_array_reserve((void **)&worker->vk_fences, &worker->vk_fences_size,
-                count, sizeof(*worker->vk_fences));
-    }
-    ret &= vkd3d_array_reserve((void **)&worker->fences, &worker->fences_size,
-            count, sizeof(*worker->fences));
-    if (!ret)
-    {
-        ERR("Failed to reserve memory.\n");
-        return;
-    }
-
-    for (i = 0; i < worker->enqueued_fence_count; ++i)
-    {
-        struct vkd3d_enqueued_fence *current = &worker->enqueued_fences[i];
-
-        if (timeline)
-        {
-            worker->vk_semaphores[worker->fence_count] = current->vk_semaphore;
-            worker->semaphore_wait_values[worker->fence_count] = current->waiting_fence.value;
-        }
-        else
-        {
-            worker->vk_fences[worker->fence_count] = current->vk_fence;
-        }
-
-        worker->fences[worker->fence_count] = current->waiting_fence;
-        ++worker->fence_count;
-    }
-    assert(worker->fence_count == count);
-    worker->enqueued_fence_count = 0;
-}
-
-static void vkd3d_wait_for_gpu_timeline_semaphores(struct vkd3d_fence_worker *worker)
+static void vkd3d_wait_for_gpu_timeline_semaphore(struct vkd3d_fence_worker *worker,
+        const struct vkd3d_waiting_fence *waiting_fence)
 {
     const struct d3d12_device *device = worker->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkSemaphoreWaitInfoKHR wait_info;
-    VkSemaphore vk_semaphore;
     uint64_t counter_value;
-    unsigned int i, j;
+    VkResult vr;
     HRESULT hr;
-    int vr;
-
-    if (!worker->fence_count)
-        return;
 
     wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO_KHR;
     wait_info.pNext = NULL;
-    wait_info.flags = VK_SEMAPHORE_WAIT_ANY_BIT_KHR;
-    wait_info.pSemaphores = worker->vk_semaphores;
-    wait_info.semaphoreCount = worker->fence_count;
-    wait_info.pValues = worker->semaphore_wait_values;
+    wait_info.flags = 0;
+    wait_info.semaphoreCount = 1;
+    wait_info.pSemaphores = &waiting_fence->u.vk_semaphore;
+    wait_info.pValues = &waiting_fence->value;
 
     vr = VK_CALL(vkWaitSemaphoresKHR(device->vk_device, &wait_info, ~(uint64_t)0));
     if (vr == VK_TIMEOUT)
         return;
     if (vr != VK_SUCCESS)
     {
-        ERR("Failed to wait for Vulkan timeline semaphores, vr %d.\n", vr);
+        ERR("Failed to wait for Vulkan timeline semaphore, vr %d.\n", vr);
         return;
     }
 
-    for (i = 0, j = 0; i < worker->fence_count; ++i)
+    if ((vr = VK_CALL(vkGetSemaphoreCounterValueKHR(device->vk_device, waiting_fence->u.vk_semaphore,
+            &counter_value))) < 0)
     {
-        struct vkd3d_waiting_fence *current = &worker->fences[i];
-
-        vk_semaphore = worker->vk_semaphores[i];
-        if ((vr = VK_CALL(vkGetSemaphoreCounterValueKHR(device->vk_device, vk_semaphore, &counter_value))) < 0)
-        {
-            ERR("Failed to get Vulkan semaphore value, vr %d.\n", vr);
-        }
-        else if (counter_value >= current->value)
-        {
-            TRACE("Signaling fence %p value %#"PRIx64".\n", current->fence, current->value);
-            if (FAILED(hr = d3d12_fence_signal(current->fence, counter_value, VK_NULL_HANDLE)))
-                ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
-
-            d3d12_fence_decref(current->fence);
-            continue;
-        }
-
-        if (i != j)
-        {
-            worker->vk_semaphores[j] = worker->vk_semaphores[i];
-            worker->semaphore_wait_values[j] = worker->semaphore_wait_values[i];
-            worker->fences[j] = worker->fences[i];
-        }
-        ++j;
+        ERR("Failed to get Vulkan semaphore value, vr %d.\n", vr);
     }
-    worker->fence_count = j;
+    else
+    {
+        TRACE("Signaling fence %p value %#"PRIx64".\n", waiting_fence->fence, waiting_fence->value);
+        if (FAILED(hr = d3d12_fence_signal(waiting_fence->fence, counter_value, VK_NULL_HANDLE)))
+            ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
+
+        d3d12_fence_decref(waiting_fence->fence);
+    }
 }
 
-static void vkd3d_wait_for_gpu_fences(struct vkd3d_fence_worker *worker)
+static void vkd3d_wait_for_gpu_fence(struct vkd3d_fence_worker *worker,
+        const struct vkd3d_waiting_fence *waiting_fence)
 {
     struct d3d12_device *device = worker->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    unsigned int i, j;
-    VkFence vk_fence;
     HRESULT hr;
     int vr;
 
-    if (!worker->fence_count)
-        return;
-
-    vr = VK_CALL(vkWaitForFences(device->vk_device,
-            worker->fence_count, worker->vk_fences, VK_FALSE, ~(uint64_t)0));
+    vr = VK_CALL(vkWaitForFences(device->vk_device, 1, &waiting_fence->u.vk_fence, VK_FALSE, ~(uint64_t)0));
     if (vr == VK_TIMEOUT)
         return;
     if (vr != VK_SUCCESS)
     {
-        ERR("Failed to wait for Vulkan fences, vr %d.\n", vr);
+        ERR("Failed to wait for Vulkan fence, vr %d.\n", vr);
         return;
     }
 
-    for (i = 0, j = 0; i < worker->fence_count; ++i)
-    {
-        vk_fence = worker->vk_fences[i];
-        if (!(vr = VK_CALL(vkGetFenceStatus(device->vk_device, vk_fence))))
-        {
-            struct vkd3d_waiting_fence *current = &worker->fences[i];
+    TRACE("Signaling fence %p value %#"PRIx64".\n", waiting_fence->fence, waiting_fence->value);
+    if (FAILED(hr = d3d12_fence_signal(waiting_fence->fence, waiting_fence->value, waiting_fence->u.vk_fence)))
+        ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
 
-            TRACE("Signaling fence %p value %#"PRIx64".\n", current->fence, current->value);
-            if (FAILED(hr = d3d12_fence_signal(current->fence, current->value, vk_fence)))
-                ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
+    d3d12_fence_decref(waiting_fence->fence);
 
-            d3d12_fence_decref(current->fence);
-
-            vkd3d_queue_update_sequence_number(current->queue, current->queue_sequence_number, device);
-            continue;
-        }
-
-        if (vr != VK_NOT_READY)
-            ERR("Failed to get Vulkan fence status, vr %d.\n", vr);
-
-        if (i != j)
-        {
-            worker->vk_fences[j] = worker->vk_fences[i];
-            worker->fences[j] = worker->fences[i];
-        }
-        ++j;
-    }
-    worker->fence_count = j;
+    vkd3d_queue_update_sequence_number(worker->queue, waiting_fence->queue_sequence_number, device);
 }
 
 static void *vkd3d_fence_worker_main(void *arg)
 {
+    size_t old_fences_size, cur_fences_size = 0, cur_fence_count = 0;
+    struct vkd3d_waiting_fence *old_fences, *cur_fences = NULL;
     struct vkd3d_fence_worker *worker = arg;
+    unsigned int i;
     int rc;
 
     vkd3d_set_thread_name("vkd3d_fence");
 
     for (;;)
     {
-        worker->wait_for_gpu_fences(worker);
-
-        if (!worker->fence_count || InterlockedAdd(&worker->enqueued_fence_count, 0))
+        if ((rc = vkd3d_mutex_lock(&worker->mutex)))
         {
-            if ((rc = vkd3d_mutex_lock(&worker->mutex)))
-            {
-                ERR("Failed to lock mutex, error %d.\n", rc);
-                break;
-            }
-
-            if (worker->enqueued_fence_count)
-            {
-                vkd3d_fence_worker_move_enqueued_fences_locked(worker);
-            }
-            else
-            {
-                if (worker->should_exit)
-                {
-                    vkd3d_mutex_unlock(&worker->mutex);
-                    break;
-                }
-
-                if ((rc = vkd3d_cond_wait(&worker->cond, &worker->mutex)))
-                {
-                    ERR("Failed to wait on condition variable, error %d.\n", rc);
-                    vkd3d_mutex_unlock(&worker->mutex);
-                    break;
-                }
-            }
-
-            vkd3d_mutex_unlock(&worker->mutex);
+            ERR("Failed to lock mutex, error %d.\n", rc);
+            break;
         }
+
+        if (!worker->fence_count && !worker->should_exit && (rc = vkd3d_cond_wait(&worker->cond, &worker->mutex)))
+        {
+            ERR("Failed to wait on condition variable, error %d.\n", rc);
+            vkd3d_mutex_unlock(&worker->mutex);
+            break;
+        }
+
+        if (worker->should_exit)
+            break;
+
+        old_fences_size = cur_fences_size;
+        old_fences = cur_fences;
+
+        cur_fence_count = worker->fence_count;
+        cur_fences_size = worker->fences_size;
+        cur_fences = worker->fences;
+
+        worker->fence_count = 0;
+        worker->fences_size = old_fences_size;
+        worker->fences = old_fences;
+
+        vkd3d_mutex_unlock(&worker->mutex);
+
+        for (i = 0; i < cur_fence_count; ++i)
+            worker->wait_for_gpu_fence(worker, &cur_fences[i]);
     }
 
+    vkd3d_free(cur_fences);
     return NULL;
 }
 
-HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
-        struct d3d12_device *device)
+static HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
+        struct vkd3d_queue *queue, struct d3d12_device *device)
 {
     HRESULT hr;
     int rc;
@@ -525,25 +427,15 @@ HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
     TRACE("worker %p.\n", worker);
 
     worker->should_exit = false;
+    worker->queue = queue;
     worker->device = device;
 
-    worker->enqueued_fence_count = 0;
-    worker->enqueued_fences = NULL;
-    worker->enqueued_fences_size = 0;
-
     worker->fence_count = 0;
-
-    worker->vk_fences = NULL;
-    worker->vk_fences_size = 0;
     worker->fences = NULL;
     worker->fences_size = 0;
-    worker->vk_semaphores = NULL;
-    worker->vk_semaphores_size = 0;
-    worker->semaphore_wait_values = NULL;
-    worker->semaphore_wait_values_size = 0;
 
-    worker->wait_for_gpu_fences = device->use_timeline_semaphores
-            ? vkd3d_wait_for_gpu_timeline_semaphores : vkd3d_wait_for_gpu_fences;
+    worker->wait_for_gpu_fence = device->use_timeline_semaphores
+            ? vkd3d_wait_for_gpu_timeline_semaphore : vkd3d_wait_for_gpu_fence;
 
     if ((rc = vkd3d_mutex_init(&worker->mutex)))
     {
@@ -577,7 +469,7 @@ HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
     return hr;
 }
 
-HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
+static HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
         struct d3d12_device *device)
 {
     HRESULT hr;
@@ -603,11 +495,7 @@ HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
     vkd3d_cond_destroy(&worker->cond);
     vkd3d_cond_destroy(&worker->fence_destruction_cond);
 
-    vkd3d_free(worker->enqueued_fences);
-    vkd3d_free(worker->vk_fences);
     vkd3d_free(worker->fences);
-    vkd3d_free(worker->vk_semaphores);
-    vkd3d_free(worker->semaphore_wait_values);
 
     return S_OK;
 }
@@ -6227,6 +6115,8 @@ static ULONG STDMETHODCALLTYPE d3d12_command_queue_Release(ID3D12CommandQueue *i
     {
         struct d3d12_device *device = command_queue->device;
 
+        vkd3d_fence_worker_stop(&command_queue->fence_worker, device);
+
         vkd3d_private_store_destroy(&command_queue->private_store);
 
         vkd3d_free(command_queue);
@@ -6455,20 +6345,18 @@ static HRESULT vkd3d_enqueue_timeline_semaphore(struct vkd3d_fence_worker *worke
         return hresult_from_errno(rc);
     }
 
-    if (!vkd3d_array_reserve((void **)&worker->enqueued_fences, &worker->enqueued_fences_size,
-            worker->enqueued_fence_count + 1, sizeof(*worker->enqueued_fences)))
+    if (!vkd3d_array_reserve((void **)&worker->fences, &worker->fences_size,
+            worker->fence_count + 1, sizeof(*worker->fences)))
     {
         ERR("Failed to add GPU timeline semaphore.\n");
         vkd3d_mutex_unlock(&worker->mutex);
         return E_OUTOFMEMORY;
     }
 
-    worker->enqueued_fences[worker->enqueued_fence_count].vk_semaphore = vk_semaphore;
-    waiting_fence = &worker->enqueued_fences[worker->enqueued_fence_count].waiting_fence;
+    waiting_fence = &worker->fences[worker->fence_count++];
     waiting_fence->fence = fence;
     waiting_fence->value = value;
-    waiting_fence->queue = queue;
-    ++worker->enqueued_fence_count;
+    waiting_fence->u.vk_semaphore = vk_semaphore;
 
     d3d12_fence_incref(fence);
 
@@ -6574,7 +6462,10 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
     }
 
     if (device->use_timeline_semaphores)
-        return vkd3d_enqueue_timeline_semaphore(&device->fence_worker, vk_semaphore, fence, value, vkd3d_queue);
+    {
+        return vkd3d_enqueue_timeline_semaphore(&command_queue->fence_worker,
+                vk_semaphore, fence, value, vkd3d_queue);
+    }
 
     if (vk_semaphore && SUCCEEDED(hr = d3d12_fence_add_vk_semaphore(fence, vk_semaphore, vk_fence, value)))
         vk_semaphore = VK_NULL_HANDLE;
@@ -6582,8 +6473,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
     vr = VK_CALL(vkGetFenceStatus(device->vk_device, vk_fence));
     if (vr == VK_NOT_READY)
     {
-        if (SUCCEEDED(hr = vkd3d_enqueue_gpu_fence(&device->fence_worker, vk_fence, fence, value, vkd3d_queue, sequence_number)))
+        if (SUCCEEDED(hr = vkd3d_enqueue_gpu_fence(&command_queue->fence_worker,
+                vk_fence, fence, value, vkd3d_queue, sequence_number)))
+        {
             vk_fence = VK_NULL_HANDLE;
+        }
     }
     else if (vr == VK_SUCCESS)
     {
@@ -6977,6 +6871,12 @@ static HRESULT d3d12_command_queue_init(struct d3d12_command_queue *queue,
 
     if (FAILED(hr = vkd3d_private_store_init(&queue->private_store)))
         return hr;
+
+    if (FAILED(hr = vkd3d_fence_worker_start(&queue->fence_worker, queue->vkd3d_queue, device)))
+    {
+        vkd3d_private_store_destroy(&queue->private_store);
+        return hr;
+    }
 
     d3d12_device_add_ref(queue->device = device);
 
