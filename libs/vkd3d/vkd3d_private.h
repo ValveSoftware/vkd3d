@@ -501,7 +501,6 @@ HRESULT vkd3d_set_private_data_interface(struct vkd3d_private_store *store, cons
 
 struct vkd3d_signaled_semaphore
 {
-    struct list entry;
     uint64_t value;
     VkSemaphore vk_semaphore;
     VkFence vk_fence;
@@ -539,7 +538,8 @@ struct d3d12_fence
     struct vkd3d_pending_fence_wait gpu_waits[VKD3D_MAX_FENCE_WAITING_QUEUES];
     unsigned int gpu_wait_count;
 
-    struct list semaphores;
+    struct vkd3d_signaled_semaphore *semaphores;
+    size_t semaphores_size;
     unsigned int semaphore_count;
 
     VkFence old_vk_fences[VKD3D_MAX_VK_SYNC_OBJECTS];

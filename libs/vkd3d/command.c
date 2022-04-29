@@ -590,32 +590,34 @@ static void d3d12_fence_garbage_collect_vk_semaphores_locked(struct d3d12_fence 
 {
     struct d3d12_device *device = fence->device;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    struct vkd3d_signaled_semaphore *current, *p;
-    unsigned int semaphore_count;
+    struct vkd3d_signaled_semaphore *current;
+    unsigned int i, semaphore_count;
 
     semaphore_count = fence->semaphore_count;
     if (!destroy_all && semaphore_count < VKD3D_MAX_VK_SYNC_OBJECTS)
         return;
 
-    LIST_FOR_EACH_ENTRY_SAFE(current, p, &fence->semaphores, struct vkd3d_signaled_semaphore, entry)
+    i = 0;
+    while (i < fence->semaphore_count)
     {
         if (!destroy_all && fence->semaphore_count < VKD3D_MAX_VK_SYNC_OBJECTS)
             break;
 
+        current = &fence->semaphores[i];
         /* The semaphore doesn't have a pending signal operation if the fence
          * was signaled. */
         if ((current->vk_fence || current->is_acquired) && !destroy_all)
+        {
+            ++i;
             continue;
+        }
 
         if (current->vk_fence)
             WARN("Destroying potentially pending semaphore.\n");
         assert(!current->is_acquired);
 
         VK_CALL(vkDestroySemaphore(device->vk_device, current->vk_semaphore, NULL));
-        list_remove(&current->entry);
-        vkd3d_free(current);
-
-        --fence->semaphore_count;
+        fence->semaphores[i] = fence->semaphores[--fence->semaphore_count];
     }
 
     if (semaphore_count != fence->semaphore_count)
@@ -656,6 +658,7 @@ static struct vkd3d_signaled_semaphore *d3d12_fence_acquire_vk_semaphore(struct 
     struct vkd3d_signaled_semaphore *semaphore;
     struct vkd3d_signaled_semaphore *current;
     uint64_t semaphore_value;
+    unsigned int i;
     int rc;
 
     TRACE("fence %p, value %#"PRIx64".\n", fence, value);
@@ -669,8 +672,9 @@ static struct vkd3d_signaled_semaphore *d3d12_fence_acquire_vk_semaphore(struct 
     semaphore = NULL;
     semaphore_value = ~(uint64_t)0;
 
-    LIST_FOR_EACH_ENTRY(current, &fence->semaphores, struct vkd3d_signaled_semaphore, entry)
+    for (i = 0; i < fence->semaphore_count; ++i)
     {
+        current = &fence->semaphores[i];
         /* Prefer a semaphore with the smallest value. */
         if (!current->is_acquired && current->value >= value && semaphore_value >= current->value)
         {
@@ -703,10 +707,7 @@ static void d3d12_fence_remove_vk_semaphore(struct d3d12_fence *fence, struct vk
 
     assert(semaphore->is_acquired);
 
-    list_remove(&semaphore->entry);
-    vkd3d_free(semaphore);
-
-    --fence->semaphore_count;
+    *semaphore = fence->semaphores[--fence->semaphore_count];
 
     vkd3d_mutex_unlock(&fence->mutex);
 }
@@ -751,13 +752,19 @@ static HRESULT d3d12_fence_add_vk_semaphore(struct d3d12_fence *fence,
 
     d3d12_fence_garbage_collect_vk_semaphores_locked(fence, false);
 
+    if (!vkd3d_array_reserve((void**)&fence->semaphores, &fence->semaphores_size,
+            fence->semaphore_count + 1, sizeof(*fence->semaphores)))
+    {
+        ERR("Failed to add semaphore.\n");
+        vkd3d_mutex_unlock(&fence->mutex);
+        return false;
+    }
+
+    semaphore = &fence->semaphores[fence->semaphore_count++];
     semaphore->value = value;
     semaphore->vk_semaphore = vk_semaphore;
     semaphore->vk_fence = vk_fence;
     semaphore->is_acquired = false;
-
-    list_add_tail(&fence->semaphores, &semaphore->entry);
-    ++fence->semaphore_count;
 
     vkd3d_mutex_unlock(&fence->mutex);
 
@@ -821,8 +828,9 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
     {
         const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
 
-        LIST_FOR_EACH_ENTRY(current, &fence->semaphores, struct vkd3d_signaled_semaphore, entry)
+        for (i = 0; i < fence->semaphore_count; ++i)
         {
+            current = &fence->semaphores[i];
             if (current->vk_fence == vk_fence)
                 current->vk_fence = VK_NULL_HANDLE;
         }
@@ -910,6 +918,7 @@ static void d3d12_fence_decref(struct d3d12_fence *fence)
         d3d12_fence_destroy_vk_objects(fence);
 
         vkd3d_free(fence->events);
+        vkd3d_free(fence->semaphores);
         if ((rc = vkd3d_mutex_destroy(&fence->mutex)))
             ERR("Failed to destroy mutex, error %d.\n", rc);
         vkd3d_cond_destroy(&fence->null_event_cond);
@@ -1278,7 +1287,8 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
     fence->pending_timeline_value = initial_value;
     fence->gpu_wait_count = 0;
 
-    list_init(&fence->semaphores);
+    fence->semaphores = NULL;
+    fence->semaphores_size = 0;
     fence->semaphore_count = 0;
 
     memset(fence->old_vk_fences, 0, sizeof(fence->old_vk_fences));
