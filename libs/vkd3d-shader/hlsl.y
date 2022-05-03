@@ -2049,7 +2049,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
             continue;
         }
 
-        initialize_var_components(ctx, params->instrs, var, &idx, arg, &loc);
+        initialize_var_components(ctx, params->instrs, var, &idx, arg, &arg->loc);
     }
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
