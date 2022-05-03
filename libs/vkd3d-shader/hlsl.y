@@ -1536,8 +1536,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
 }
 
 static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src,
-        const struct vkd3d_shader_location *loc)
+        struct hlsl_ir_var *dst, unsigned int *store_index, struct hlsl_ir_node *src)
 {
     unsigned int src_comp_count = hlsl_type_component_count(src->data_type);
     unsigned int k;
@@ -1554,21 +1553,21 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
         dst_reg_offset = hlsl_compute_component_offset(ctx, dst->data_type, *store_index, &dst_comp_type);
         src_reg_offset = hlsl_compute_component_offset(ctx, src->data_type, k, &src_comp_type);
 
-        if (!(c = hlsl_new_uint_constant(ctx, src_reg_offset, loc)))
+        if (!(c = hlsl_new_uint_constant(ctx, src_reg_offset, &src->loc)))
             return;
         list_add_tail(instrs, &c->node.entry);
 
-        if (!(load = add_load(ctx, instrs, src, &c->node, src_comp_type, *loc)))
+        if (!(load = add_load(ctx, instrs, src, &c->node, src_comp_type, src->loc)))
             return;
 
-        if (!(conv = add_implicit_conversion(ctx, instrs, &load->node, dst_comp_type, loc)))
+        if (!(conv = add_implicit_conversion(ctx, instrs, &load->node, dst_comp_type, &src->loc)))
             return;
 
-        if (!(c = hlsl_new_uint_constant(ctx, dst_reg_offset, loc)))
+        if (!(c = hlsl_new_uint_constant(ctx, dst_reg_offset, &src->loc)))
             return;
         list_add_tail(instrs, &c->node.entry);
 
-        if (!(store = hlsl_new_store(ctx, dst, &c->node, conv, 0, *loc)))
+        if (!(store = hlsl_new_store(ctx, dst, &c->node, conv, 0, src->loc)))
             return;
         list_add_tail(instrs, &store->node.entry);
 
@@ -1716,7 +1715,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 for (k = 0; k < v->initializer.args_count; ++k)
                 {
                     initialize_var_components(ctx, v->initializer.instrs, var,
-                            &store_index, v->initializer.args[k], &v->initializer.args[k]->loc);
+                            &store_index, v->initializer.args[k]);
                 }
             }
             else
@@ -2049,7 +2048,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
             continue;
         }
 
-        initialize_var_components(ctx, params->instrs, var, &idx, arg, &arg->loc);
+        initialize_var_components(ctx, params->instrs, var, &idx, arg);
     }
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
