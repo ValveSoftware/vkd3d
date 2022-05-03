@@ -634,6 +634,21 @@ static bool copy_propagation_process_if(struct hlsl_ctx *ctx, struct hlsl_ir_if 
     return progress;
 }
 
+static bool copy_propagation_process_loop(struct hlsl_ctx *ctx, struct hlsl_ir_loop *loop,
+        struct copy_propagation_state *state)
+{
+    struct copy_propagation_state inner_state;
+    bool progress = false;
+
+    copy_propagation_invalidate_from_block(ctx, state, &loop->body);
+
+    copy_propagation_state_init(ctx, &inner_state, state);
+    progress |= copy_propagation_transform_block(ctx, &loop->body, &inner_state);
+    copy_propagation_state_destroy(&inner_state);
+
+    return progress;
+}
+
 static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct copy_propagation_state *state)
 {
@@ -661,8 +676,8 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
                 break;
 
             case HLSL_IR_LOOP:
-                FIXME("Copy propagation doesn't support loops yet, leaving.\n");
-                return progress;
+                progress |= copy_propagation_process_loop(ctx, hlsl_ir_loop(instr), state);
+                break;
 
             default:
                 break;
