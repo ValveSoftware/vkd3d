@@ -891,7 +891,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
             if (has_idx)
             {
-                reg->idx[0] = var->semantic.index;
+                reg->idx[0] = var->semantic.index + offset / 4;
                 reg->idx_count = 1;
             }
 
@@ -922,7 +922,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
             if (has_idx)
             {
-                reg->idx[0] = var->semantic.index;
+                reg->idx[0] = var->semantic.index + offset / 4;
                 reg->idx_count = 1;
             }
 
