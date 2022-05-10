@@ -2,6 +2,7 @@
 float4 main() : SV_TARGET
 {
     float4 arr[] = {10, 20, 30, 40, 50, 60, 70, 80};
+
     return arr[1];
 }
 
@@ -10,9 +11,229 @@ todo draw quad
 todo probe all rgba (50, 60, 70, 80)
 
 
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 arr1[2] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float4 arr2[] = arr1;
+
+    return arr2[1];
+}
+
+[test]
+todo draw quad
+todo probe all rgba (5.0, 6.0, 7.0, 8.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2 arr[][3] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+
+    return float4(arr[1][0], arr[1][1]);
+}
+
+[test]
+todo draw quad
+todo probe all rgba (7.0, 8.0, 9.0, 10.0)
+
+
+[pixel shader]
+struct foo
+{
+    float3 foo1;
+    float4 foo2;
+};
+
+struct bar
+{
+    struct foo aa;
+    int2 bb;
+    float4 cc[2];
+};
+
+float4 main() : SV_TARGET
+{
+    struct bar p[] = {
+        101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
+        201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217,
+    };
+    return p[0].aa.foo2 + p[1].cc[1];
+}
+
+[test]
+todo draw quad
+todo probe all rgba (318.0, 320.0, 322.0, 324.0)
+
+
 [pixel shader fail]
+// Incompatible number of arguments in implicit size array initializer
 float4 main() : SV_TARGET
 {
     float4 arr[] = {10, 20, 30, 40, 50, 60, 70};
-    return arr[0];
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Incompatible number of arguments in implicit size array initializer
+float4 main() : SV_TARGET
+{
+    float4 arr[] = {10, 20, 30, 40, 50, 60, 70, 80, 90};
+
+    return 0.0;
+}
+
+[pixel shader fail]
+// Implicit size inner array
+float4 main() : sv_target
+{
+    float2 arr[3][] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array without initializer
+float4 main() : sv_target
+{
+    float4 arr[];
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array as struct member
+struct foobar
+{
+    int a;
+    float4 arr[];
+};
+
+float4 main() : sv_target
+{
+    struct foobar s;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array as function argument
+float4 fun(float4 arr[])
+{
+    return 1.0;
+}
+float4 main() : sv_target
+{
+    float4 arr[3] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    return fun(arr);
+}
+
+
+[pixel shader fail]
+// Implicit size array as function return type
+// Note: explicit size arrays are not allowed either.
+float4[] fun()
+{
+    float4 ret[2] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    return ret;
+}
+
+float4 main() : sv_target
+{   fun();
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array as a cast
+float4 main() : sv_target
+{
+    float2 arr1[4] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float4 arr2[2] = (float4 []) arr1;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array as a typedef
+typedef float4 arrtype[];
+
+float4 main() : sv_target
+{
+    arrtype arr1 = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array of elements of size 0
+struct emp
+{
+};
+
+float4 main() : sv_target
+{
+    struct emp arr[] = {1, 2, 3, 4};
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array of elements of size 0, without initializer
+struct emp
+{
+};
+
+float4 main() : sv_target
+{
+    struct emp arr[];
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Broadcast to an implicit size array
+float4 main() : sv_target
+{
+    int a[4] = (int[]) 0;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array with an initializer of size 0
+struct emp
+{
+};
+
+float4 main() : sv_target
+{
+    float4 arr[] = (struct emp) 42;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array of elements of size 0 with initializer of size 0
+struct emp
+{
+};
+
+float4 main() : sv_target
+{
+    struct emp arr[] = (struct emp) 42;
+
+    return 0.0;
 }
