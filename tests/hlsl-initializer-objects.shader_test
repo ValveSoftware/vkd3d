@@ -1,0 +1,109 @@
+[require]
+shader model >= 4.0
+
+[texture 0]
+size (3, 3)
+0.1 0.1 0.1 0.1     0.2 0.2 0.2 0.2     0.3 0.3 0.3 0.3
+0.4 0.4 0.4 0.4     0.5 0.5 0.5 0.5     0.6 0.6 0.6 0.6
+0.7 0.7 0.7 0.7     0.8 0.8 0.8 0.8     0.9 0.9 0.9 0.9
+
+[texture 1]
+size (2, 2)
+0.1 0.1 0.1 0.0     0.2 0.2 0.2 0.0
+0.4 0.4 0.4 0.0     0.5 0.5 0.5 0.0
+
+
+[pixel shader]
+Texture2D tex1;
+Texture2D tex2;
+
+float4 main() : sv_target
+{
+    Texture2D q[2] = {tex1, tex2};
+
+    return q[0].Load(int3(0, 0, 0)) + q[1].Load(int3(0, 0, 0));
+}
+
+[test]
+todo draw quad
+todo probe all rgba (0.2, 0.2, 0.2, 0.1)
+
+
+[pixel shader]
+Texture2D tex;
+
+struct foo
+{
+    float2 aa;
+    Texture2D bb;
+    Texture2D cc;
+    float4 dd;
+};
+
+float4 main() : sv_target
+{
+    struct foo q = {10, 20, tex, tex, 30, 40, 50, 60};
+
+    return q.bb.Load(int3(2, 0, 0)) + q.cc.Load(int3(1, 2, 0)) + q.dd;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (31.1, 41.1, 51.1, 61.1) 1
+
+
+[pixel shader]
+Texture2D tex1;
+Texture2D tex2;
+
+struct foo
+{
+    float2 aa;
+    Texture2D bb[2]; // NOTE: this cannot be initialized in shader model >= 5.1
+    float4 cc;
+};
+
+float4 main() : sv_target
+{
+    struct foo q = {10, 20, tex1, tex2, 30, 40, 50, 60};
+
+    return q.bb[0].Load(int3(0, 0, 0)) + q.bb[1].Load(int3(1, 1, 0)) + q.cc;
+}
+
+
+[pixel shader fail todo]
+Texture2D tex;
+
+struct foo
+{
+    float2 aa;
+    Texture2D bb;
+    Texture2D cc;
+    float4 dd;
+};
+
+float4 main() : sv_target
+{
+    struct foo q = {10, 20, tex, 30, 40, 50, 60};
+
+    return 0.0;
+}
+
+
+[pixel shader fail todo]
+Texture2D tex;
+
+struct foo
+{
+    float2 aa;
+    Texture2D bb;
+    Texture2D cc;
+    float4 dd;
+};
+
+float4 main() : sv_target
+{
+    struct foo q = {10, 20, tex, tex, tex, 30, 40, 50, 60};
+
+    return 0.0;
+}

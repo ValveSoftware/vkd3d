@@ -79,6 +79,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-initializer-invalid-arg-count.shader_test \
 	tests/hlsl-initializer-implicit-array.shader_test \
 	tests/hlsl-initializer-local-array.shader_test \
+	tests/hlsl-initializer-objects.shader_test \
 	tests/hlsl-initializer-nested.shader_test \
 	tests/hlsl-initializer-numeric.shader_test \
 	tests/hlsl-initializer-matrix.shader_test \
