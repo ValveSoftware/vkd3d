@@ -2726,14 +2726,18 @@ func_prototype:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
       var_modifiers type var_identifier '(' parameters ')' colon_attribute
         {
+            unsigned int modifiers = $1;
             struct hlsl_ir_var *var;
+            struct hlsl_type *type;
 
-            if ($1)
+            if (modifiers & ~HLSL_MODIFIERS_MAJORITY_MASK)
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Modifiers are not allowed on functions.");
+                        "Only majority modifiers are allowed on functions.");
                 YYABORT;
             }
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
+                YYABORT;
             if ((var = hlsl_get_var(ctx->globals, $3)))
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
@@ -2742,7 +2746,7 @@ func_prototype:
                         "\"%s\" was previously declared here.", $3);
                 YYABORT;
             }
-            if (hlsl_types_are_equal($2, ctx->builtin_types.Void) && $7.semantic.name)
+            if (hlsl_types_are_equal(type, ctx->builtin_types.Void) && $7.semantic.name)
             {
                 hlsl_error(ctx, &@7, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                         "Semantics are not allowed on void functions.");
@@ -2751,7 +2755,7 @@ func_prototype:
             if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
 
-            if (!($$.decl = hlsl_new_func_decl(ctx, $2, $5, &$7.semantic, @3)))
+            if (!($$.decl = hlsl_new_func_decl(ctx, type, $5, &$7.semantic, @3)))
                 YYABORT;
             $$.name = $3;
             ctx->cur_function = $$.decl;
