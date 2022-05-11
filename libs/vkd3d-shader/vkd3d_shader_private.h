@@ -1035,6 +1035,8 @@ static inline size_t bytecode_get_size(struct vkd3d_bytecode_buffer *buffer)
     return buffer->size;
 }
 
+uint32_t vkd3d_parse_integer(const char *s);
+
 struct vkd3d_shader_message_context
 {
     enum vkd3d_shader_log_level log_level;
