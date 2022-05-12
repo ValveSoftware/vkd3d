@@ -33224,9 +33224,7 @@ static void test_queue_wait(void)
     command_list = context.list;
     queue = context.queue;
 
-    /* 'queue2' must not map to the same command queue as 'queue', or Wait() before GPU signal will fail.
-     * Using a compute queue fixes this on most hardware, but it may still fail on low spec hardware. */
-    queue2 = create_command_queue(device, D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
+    queue2 = create_command_queue(device, D3D12_COMMAND_LIST_TYPE_DIRECT, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
     event = create_event();
     ok(event, "Failed to create event.\n");

@@ -59,7 +59,7 @@
 #define VKD3D_MAX_SHADER_EXTENSIONS       3u
 #define VKD3D_MAX_SHADER_STAGES           5u
 #define VKD3D_MAX_VK_SYNC_OBJECTS         4u
-#define VKD3D_MAX_FENCE_WAITING_QUEUES    4u
+#define VKD3D_MAX_DEVICE_BLOCKED_QUEUES  16u
 #define VKD3D_MAX_DESCRIPTOR_SETS        64u
 /* D3D12 binding tier 3 has a limit of 2048 samplers. */
 #define VKD3D_MAX_DESCRIPTOR_SET_SAMPLERS 2048u
@@ -151,8 +151,6 @@ struct vkd3d_vulkan_info
     struct vkd3d_device_descriptor_limits descriptor_limits;
 
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
-
-    VkPhysicalDeviceTimelineSemaphorePropertiesKHR timeline_semaphore_properties;
 
     unsigned int shader_extension_count;
     enum vkd3d_shader_spirv_extension shader_extensions[VKD3D_MAX_SHADER_EXTENSIONS];
@@ -502,15 +500,17 @@ HRESULT vkd3d_set_private_data_interface(struct vkd3d_private_store *store, cons
 struct vkd3d_signaled_semaphore
 {
     uint64_t value;
-    VkSemaphore vk_semaphore;
-    VkFence vk_fence;
-    bool is_acquired;
-};
-
-struct vkd3d_pending_fence_wait
-{
-    const struct vkd3d_queue *queue;
-    uint64_t pending_value;
+    union
+    {
+        struct
+        {
+            VkSemaphore vk_semaphore;
+            VkFence vk_fence;
+            bool is_acquired;
+        } binary;
+        uint64_t timeline_value;
+    } u;
+    const struct vkd3d_queue *signalling_queue;
 };
 
 /* ID3D12Fence */
@@ -521,6 +521,7 @@ struct d3d12_fence
     LONG refcount;
 
     uint64_t value;
+    uint64_t max_pending_value;
     struct vkd3d_mutex mutex;
     struct vkd3d_cond null_event_cond;
 
@@ -534,9 +535,8 @@ struct d3d12_fence
     size_t event_count;
 
     VkSemaphore timeline_semaphore;
+    uint64_t timeline_value;
     uint64_t pending_timeline_value;
-    struct vkd3d_pending_fence_wait gpu_waits[VKD3D_MAX_FENCE_WAITING_QUEUES];
-    unsigned int gpu_wait_count;
 
     struct vkd3d_signaled_semaphore *semaphores;
     size_t semaphores_size;
@@ -1294,9 +1294,6 @@ struct vkd3d_queue
     VkQueueFlags vk_queue_flags;
     uint32_t timestamp_bits;
 
-    VkSemaphore wait_completion_semaphore;
-    uint64_t pending_wait_completion_value;
-
     struct
     {
         VkSemaphore vk_semaphore;
@@ -1311,9 +1308,44 @@ struct vkd3d_queue
 VkQueue vkd3d_queue_acquire(struct vkd3d_queue *queue);
 HRESULT vkd3d_queue_create(struct d3d12_device *device, uint32_t family_index,
         const VkQueueFamilyProperties *properties, struct vkd3d_queue **queue);
-bool vkd3d_queue_init_timeline_semaphore(struct vkd3d_queue *queue, struct d3d12_device *device);
 void vkd3d_queue_destroy(struct vkd3d_queue *queue, struct d3d12_device *device);
 void vkd3d_queue_release(struct vkd3d_queue *queue);
+
+enum vkd3d_cs_op
+{
+    VKD3D_CS_OP_WAIT,
+    VKD3D_CS_OP_SIGNAL,
+    VKD3D_CS_OP_EXECUTE,
+};
+
+struct vkd3d_cs_wait
+{
+    struct d3d12_fence *fence;
+    uint64_t value;
+};
+
+struct vkd3d_cs_signal
+{
+    struct d3d12_fence *fence;
+    uint64_t value;
+};
+
+struct vkd3d_cs_execute
+{
+    VkCommandBuffer *buffers;
+    unsigned int buffer_count;
+};
+
+struct vkd3d_cs_op_data
+{
+    enum vkd3d_cs_op opcode;
+    union
+    {
+        struct vkd3d_cs_wait wait;
+        struct vkd3d_cs_signal signal;
+        struct vkd3d_cs_execute execute;
+    } u;
+};
 
 /* ID3D12CommandQueue */
 struct d3d12_command_queue
@@ -1330,6 +1362,12 @@ struct d3d12_command_queue
     uint64_t last_waited_fence_value;
 
     struct d3d12_device *device;
+
+    struct vkd3d_mutex op_mutex;
+    struct vkd3d_cs_op_data *ops;
+    size_t ops_count;
+    size_t ops_size;
+    bool is_flushing;
 
     struct vkd3d_private_store private_store;
 };
@@ -1452,6 +1490,9 @@ struct d3d12_device
     unsigned int queue_family_count;
     VkTimeDomainEXT vk_host_time_domain;
 
+    struct d3d12_command_queue *blocked_queues[VKD3D_MAX_DEVICE_BLOCKED_QUEUES];
+    unsigned int blocked_queue_count;
+
     struct vkd3d_instance *vkd3d_instance;
 
     IUnknown *parent;
@@ -1470,7 +1511,6 @@ struct d3d12_device
     VkDescriptorPoolSize vk_pool_sizes[VKD3D_DESCRIPTOR_POOL_COUNT];
     struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT];
     bool use_vk_heaps;
-    bool use_timeline_semaphores;
 };
 
 HRESULT d3d12_device_create(struct vkd3d_instance *instance,

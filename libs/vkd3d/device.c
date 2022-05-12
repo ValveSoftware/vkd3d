@@ -747,7 +747,6 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
     VkPhysicalDeviceTransformFeedbackPropertiesEXT xfb_properties;
     VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT vertex_divisor_properties;
-    VkPhysicalDeviceTimelineSemaphorePropertiesKHR timeline_semaphore_properties;
 
     VkPhysicalDeviceProperties2KHR properties2;
 
@@ -772,7 +771,6 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDeviceDescriptorIndexingPropertiesEXT *descriptor_indexing_properties;
     VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT *vertex_divisor_properties;
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT *buffer_alignment_properties;
-    VkPhysicalDeviceTimelineSemaphorePropertiesKHR *timeline_semaphore_properties;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing_features;
     VkPhysicalDeviceRobustness2FeaturesEXT *robustness2_features;
     VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT *vertex_divisor_features;
@@ -799,7 +797,6 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vertex_divisor_features = &info->vertex_divisor_features;
     vertex_divisor_properties = &info->vertex_divisor_properties;
     timeline_semaphore_features = &info->timeline_semaphore_features;
-    timeline_semaphore_properties = &info->timeline_semaphore_properties;
     xfb_features = &info->xfb_features;
     xfb_properties = &info->xfb_properties;
 
@@ -841,8 +838,6 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->properties2, xfb_properties);
     vertex_divisor_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT;
     vk_prepend_struct(&info->properties2, vertex_divisor_properties);
-    timeline_semaphore_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_PROPERTIES_KHR;
-    vk_prepend_struct(&info->properties2, timeline_semaphore_properties);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceProperties2KHR(physical_device, &info->properties2));
@@ -1431,7 +1426,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     vulkan_info->rasterization_stream = physical_device_info->xfb_properties.transformFeedbackRasterizationStreamSelect;
     vulkan_info->transform_feedback_queries = physical_device_info->xfb_properties.transformFeedbackQueries;
     vulkan_info->max_vertex_attrib_divisor = max(physical_device_info->vertex_divisor_properties.maxVertexAttribDivisor, 1);
-    vulkan_info->timeline_semaphore_properties = physical_device_info->timeline_semaphore_properties;
 
     device->feature_options.DoublePrecisionFloatShaderOps = features->shaderFloat64;
     device->feature_options.OutputMergerLogicOp = features->logicOp;
@@ -1908,75 +1902,6 @@ static bool d3d12_is_64k_msaa_supported(struct d3d12_device *device)
             && info.Alignment <= 0x10000;
 }
 
-/* A lower value can be signalled on a D3D12 fence. Vulkan timeline semaphores
- * do not support this, but test if it works anyway. */
-static bool d3d12_is_timeline_semaphore_supported(const struct d3d12_device *device)
-{
-    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-    VkTimelineSemaphoreSubmitInfoKHR timeline_submit_info;
-    VkSemaphore timeline_semaphore;
-    VkSubmitInfo submit_info;
-    bool result = false;
-    uint64_t value = 0;
-    VkQueue vk_queue;
-    VkResult vr;
-
-    if (!device->vk_info.KHR_timeline_semaphore)
-        return false;
-
-    if ((vr = vkd3d_create_timeline_semaphore(device, 1, &timeline_semaphore)) < 0)
-    {
-        WARN("Failed to create timeline semaphore, vr %d.\n", vr);
-        return false;
-    }
-
-    if (!(vk_queue = vkd3d_queue_acquire(device->direct_queue)))
-    {
-        ERR("Failed to acquire queue %p.\n", device->direct_queue);
-        VK_CALL(vkDestroySemaphore(device->vk_device, timeline_semaphore, NULL));
-        return false;
-    }
-
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.pNext = &timeline_submit_info;
-    submit_info.waitSemaphoreCount = 0;
-    submit_info.pWaitSemaphores = NULL;
-    submit_info.pWaitDstStageMask = NULL;
-    submit_info.commandBufferCount = 0;
-    submit_info.pCommandBuffers = NULL;
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &timeline_semaphore;
-
-    timeline_submit_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO_KHR;
-    timeline_submit_info.pNext = NULL;
-    timeline_submit_info.pSignalSemaphoreValues = &value;
-    timeline_submit_info.signalSemaphoreValueCount = 1;
-    timeline_submit_info.waitSemaphoreValueCount = 0;
-    timeline_submit_info.pWaitSemaphoreValues = NULL;
-
-    vr = VK_CALL(vkQueueSubmit(vk_queue, 1, &submit_info, VK_NULL_HANDLE));
-
-    if (vr >= 0)
-    {
-        if ((vr = VK_CALL(vkQueueWaitIdle(vk_queue))) < 0)
-            WARN("Failed to wait for queue, vr %d.\n", vr);
-
-        if ((vr = VK_CALL(vkGetSemaphoreCounterValueKHR(device->vk_device, timeline_semaphore, &value))) < 0)
-            ERR("Failed to get Vulkan semaphore status, vr %d.\n", vr);
-        else if (!(result = !value))
-            WARN("Disabling timeline semaphore use due to incompatible behaviour.\n");
-    }
-    else
-    {
-        WARN("Failed to submit signal operation, vr %d.\n", vr);
-    }
-
-    vkd3d_queue_release(device->direct_queue);
-    VK_CALL(vkDestroySemaphore(device->vk_device, timeline_semaphore, NULL));
-
-    return result;
-}
-
 static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
         const struct vkd3d_device_create_info *create_info)
 {
@@ -2075,10 +2000,6 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
     }
 
     device->feature_options4.MSAA64KBAlignedTextureSupported = d3d12_is_64k_msaa_supported(device);
-    device->use_timeline_semaphores = d3d12_is_timeline_semaphore_supported(device)
-            && vkd3d_queue_init_timeline_semaphore(device->direct_queue, device)
-            && vkd3d_queue_init_timeline_semaphore(device->compute_queue, device)
-            && vkd3d_queue_init_timeline_semaphore(device->copy_queue, device);
 
     TRACE("Created Vulkan device %p.\n", vk_device);
 
@@ -4361,6 +4282,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     vkd3d_gpu_descriptor_allocator_init(&device->gpu_descriptor_allocator);
     vkd3d_gpu_va_allocator_init(&device->gpu_va_allocator);
     vkd3d_time_domains_init(device);
+
+    device->blocked_queue_count = 0;
 
     for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
         vkd3d_mutex_init(&device->desc_mutex[i]);
