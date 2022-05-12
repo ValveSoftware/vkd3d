@@ -1247,6 +1247,7 @@ static struct d3d12_fence *unsafe_impl_from_ID3D12Fence(ID3D12Fence *iface)
 static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *device,
         UINT64 initial_value, D3D12_FENCE_FLAGS flags)
 {
+    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkResult vr;
     HRESULT hr;
     int rc;
@@ -1266,8 +1267,8 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
     if ((rc = vkd3d_cond_init(&fence->null_event_cond)))
     {
         ERR("Failed to initialize cond variable, error %d.\n", rc);
-        vkd3d_mutex_destroy(&fence->mutex);
-        return hresult_from_errno(rc);
+        hr = hresult_from_errno(rc);
+        goto fail_destroy_mutex;
     }
 
     if (flags)
@@ -1282,7 +1283,8 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
             &fence->timeline_semaphore)) < 0)
     {
         WARN("Failed to create timeline semaphore, vr %d.\n", vr);
-        return hresult_from_vk_result(vr);
+        hr = hresult_from_vk_result(vr);
+        goto fail_destroy_null_cond;
     }
     fence->pending_timeline_value = initial_value;
     fence->gpu_wait_count = 0;
@@ -1295,14 +1297,21 @@ static HRESULT d3d12_fence_init(struct d3d12_fence *fence, struct d3d12_device *
 
     if (FAILED(hr = vkd3d_private_store_init(&fence->private_store)))
     {
-        vkd3d_mutex_destroy(&fence->mutex);
-        vkd3d_cond_destroy(&fence->null_event_cond);
-        return hr;
+        goto fail_destroy_timeline_semaphore;
     }
 
     d3d12_device_add_ref(fence->device = device);
 
     return S_OK;
+
+fail_destroy_timeline_semaphore:
+    VK_CALL(vkDestroySemaphore(device->vk_device, fence->timeline_semaphore, NULL));
+fail_destroy_null_cond:
+    vkd3d_cond_destroy(&fence->null_event_cond);
+fail_destroy_mutex:
+    vkd3d_mutex_destroy(&fence->mutex);
+
+    return hr;
 }
 
 HRESULT d3d12_fence_create(struct d3d12_device *device,
