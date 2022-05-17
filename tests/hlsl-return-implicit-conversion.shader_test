@@ -50,8 +50,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader]
 float3 func()
@@ -65,8 +65,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader]
 float1x3 func()
@@ -80,8 +80,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader]
 float3x1 func()
@@ -95,8 +95,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader fail]
 float3x1 func()
@@ -147,8 +147,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader]
 float3 func()
@@ -162,8 +162,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader fail todo]
 float3x1 func()
@@ -188,8 +188,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader fail]
 float3x1 func()
@@ -214,8 +214,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
 
 [pixel shader fail]
 float1x3 func()
@@ -240,5 +240,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.4, 0.3, 0.2, 0.0)
+draw quad
+probe all rgba (0.4, 0.3, 0.2, 0.0)
