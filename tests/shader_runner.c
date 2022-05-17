@@ -412,6 +412,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     else if (match_string(line, "probe", &line))
     {
         unsigned int left, top, right, bottom, ulps;
+        struct resource_readback *rb;
         struct vec4 v;
         int ret, len;
         RECT rect;
@@ -433,6 +434,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             set_rect(&rect, left, top, left + 1, top + 1);
             line += len;
         }
+        else
+        {
+            fatal_error("Malformed probe arguments '%s'.\n", line);
+        }
 
         if (!match_string(line, "rgba", &line))
             fatal_error("Malformed probe arguments '%s'.\n", line);
@@ -443,7 +448,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (ret < 5)
             ulps = 0;
 
-        runner->ops->probe_vec4(runner, &rect, &v, ulps);
+        rb = runner->ops->get_rt_readback(runner);
+        todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
+        runner->ops->release_readback(runner, rb);
     }
     else if (match_string(line, "uniform", &line))
     {

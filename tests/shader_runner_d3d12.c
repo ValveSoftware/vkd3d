@@ -309,22 +309,31 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     return true;
 }
 
-static void d3d12_runner_probe_vec4(struct shader_runner *r,
-        const RECT *rect, const struct vec4 *v, unsigned int ulps)
+static struct resource_readback *d3d12_runner_get_rt_readback(struct shader_runner *r)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
-    struct d3d12_resource_readback rb;
+    struct d3d12_resource_readback *rb = malloc(sizeof(*rb));
 
     transition_resource_state(test_context->list, test_context->render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(test_context->render_target, 0, &rb,
+    get_texture_readback_with_command_list(test_context->render_target, 0, rb,
             test_context->queue, test_context->list);
-    todo_if (runner->r.is_todo) check_readback_data_vec4(&rb.rb, rect, v, ulps);
-    release_resource_readback(&rb);
+
+    return &rb->rb;
+}
+
+static void d3d12_runner_release_readback(struct shader_runner *r, struct resource_readback *rb)
+{
+    struct d3d12_resource_readback *d3d12_rb = CONTAINING_RECORD(rb, struct d3d12_resource_readback, rb);
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+    struct test_context *test_context = &runner->test_context;
+
+    release_resource_readback(d3d12_rb);
     reset_command_list(test_context->list, test_context->allocator);
     transition_resource_state(test_context->list, test_context->render_target,
             D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    free(d3d12_rb);
 }
 
 static const struct shader_runner_ops d3d12_runner_ops =
@@ -332,7 +341,8 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
     .draw = d3d12_runner_draw,
-    .probe_vec4 = d3d12_runner_probe_vec4,
+    .get_rt_readback = d3d12_runner_get_rt_readback,
+    .release_readback = d3d12_runner_release_readback,
 };
 
 void run_shader_tests_d3d12(int argc, char **argv)

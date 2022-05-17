@@ -832,21 +832,21 @@ struct vulkan_resource_readback
     VkBuffer buffer;
 };
 
-static void vulkan_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
+static struct resource_readback *vulkan_runner_get_rt_readback(struct shader_runner *r)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
-    struct vulkan_resource_readback rb;
+    struct vulkan_resource_readback *rb = malloc(sizeof(*rb));
     VkDevice device = runner->device;
     VkBufferImageCopy region = {0};
 
-    rb.rb.width = RENDER_TARGET_WIDTH;
-    rb.rb.height = RENDER_TARGET_HEIGHT;
-    rb.rb.depth = 1;
+    rb->rb.width = RENDER_TARGET_WIDTH;
+    rb->rb.height = RENDER_TARGET_HEIGHT;
+    rb->rb.depth = 1;
 
-    rb.rb.row_pitch = rb.rb.width * sizeof(struct vec4);
+    rb->rb.row_pitch = rb->rb.width * sizeof(struct vec4);
 
-    rb.buffer = create_buffer(runner, rb.rb.row_pitch * RENDER_TARGET_HEIGHT,
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb.memory);
+    rb->buffer = create_buffer(runner, rb->rb.row_pitch * RENDER_TARGET_HEIGHT,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
     begin_command_buffer(runner);
 
@@ -860,19 +860,28 @@ static void vulkan_runner_probe_vec4(struct shader_runner *r, const RECT *rect, 
     region.imageExtent.depth = 1;
 
     VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, runner->render_target,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb.buffer, 1, &region));
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
 
     transition_image_layout(runner, runner->render_target,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     end_command_buffer(runner);
 
-    VK_CALL(vkMapMemory(device, rb.memory, 0, VK_WHOLE_SIZE, 0, &rb.rb.data));
-    todo_if (runner->r.is_todo) check_readback_data_vec4(&rb.rb, rect, v, ulps);
-    VK_CALL(vkUnmapMemory(device, rb.memory));
+    VK_CALL(vkMapMemory(device, rb->memory, 0, VK_WHOLE_SIZE, 0, &rb->rb.data));
+    return &rb->rb;
+}
 
-    VK_CALL(vkFreeMemory(device, rb.memory, NULL));
-    VK_CALL(vkDestroyBuffer(device, rb.buffer, NULL));
+static void vulkan_runner_release_readback(struct shader_runner *r, struct resource_readback *rb)
+{
+    struct vulkan_resource_readback *vulkan_rb = CONTAINING_RECORD(rb, struct vulkan_resource_readback, rb);
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+    VkDevice device = runner->device;
+
+    VK_CALL(vkUnmapMemory(device, vulkan_rb->memory));
+
+    VK_CALL(vkFreeMemory(device, vulkan_rb->memory, NULL));
+    VK_CALL(vkDestroyBuffer(device, vulkan_rb->buffer, NULL));
+    free(vulkan_rb);
 }
 
 static const struct shader_runner_ops vulkan_runner_ops =
@@ -880,7 +889,8 @@ static const struct shader_runner_ops vulkan_runner_ops =
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
     .draw = vulkan_runner_draw,
-    .probe_vec4 = vulkan_runner_probe_vec4,
+    .get_rt_readback = vulkan_runner_get_rt_readback,
+    .release_readback = vulkan_runner_release_readback,
 };
 
 static bool get_graphics_queue_index(const struct vulkan_shader_runner *runner, uint32_t *index)

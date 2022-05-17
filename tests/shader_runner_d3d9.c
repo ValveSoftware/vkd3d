@@ -455,8 +455,10 @@ struct d3d9_resource_readback
     IDirect3DSurface9 *surface;
 };
 
-static void init_readback(struct d3d9_shader_runner *runner, struct d3d9_resource_readback *rb)
+static struct resource_readback *d3d9_runner_get_rt_readback(struct shader_runner *r)
 {
+    struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
+    struct d3d9_resource_readback *rb = malloc(sizeof(*rb));
     D3DLOCKED_RECT map_desc;
     D3DSURFACE_DESC desc;
     HRESULT hr;
@@ -478,22 +480,16 @@ static void init_readback(struct d3d9_shader_runner *runner, struct d3d9_resourc
     rb->rb.width = desc.Width;
     rb->rb.height = desc.Height;
     rb->rb.depth = 1;
+    return &rb->rb;
 }
 
-static void release_readback(struct d3d9_resource_readback *rb)
+static void d3d9_runner_release_readback(struct shader_runner *r, struct resource_readback *rb)
 {
-    IDirect3DSurface9_UnlockRect(rb->surface);
-    IDirect3DSurface9_Release(rb->surface);
-}
+    struct d3d9_resource_readback *d3d9_rb = CONTAINING_RECORD(rb, struct d3d9_resource_readback, rb);
 
-static void d3d9_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
-{
-    struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
-    struct d3d9_resource_readback rb;
-
-    init_readback(runner, &rb);
-    check_readback_data_vec4(&rb.rb, rect, v, ulps);
-    release_readback(&rb);
+    IDirect3DSurface9_UnlockRect(d3d9_rb->surface);
+    IDirect3DSurface9_Release(d3d9_rb->surface);
+    free(d3d9_rb);
 }
 
 static const struct shader_runner_ops d3d9_runner_ops =
@@ -502,7 +498,8 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .create_resource = d3d9_runner_create_resource,
     .destroy_resource = d3d9_runner_destroy_resource,
     .draw = d3d9_runner_draw,
-    .probe_vec4 = d3d9_runner_probe_vec4,
+    .get_rt_readback = d3d9_runner_get_rt_readback,
+    .release_readback = d3d9_runner_release_readback,
 };
 
 void run_shader_tests_d3d9(int argc, char **argv)

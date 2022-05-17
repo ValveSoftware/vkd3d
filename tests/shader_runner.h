@@ -123,7 +123,8 @@ struct shader_runner_ops
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
-    void (*probe_vec4)(struct shader_runner *runner, const RECT *rect, const struct vec4 *v, unsigned int ulps);
+    struct resource_readback *(*get_rt_readback)(struct shader_runner *runner);
+    void (*release_readback)(struct shader_runner *runner, struct resource_readback *rb);
 };
 
 void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2);
