@@ -991,7 +991,8 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     return true;
 }
 
-static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type *orig_type, struct list *list)
+static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
+        struct hlsl_type *orig_type, struct list *list)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_type *type;
@@ -1000,6 +1001,8 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, list, struct parse_variable_def, entry)
     {
+        unsigned int var_modifiers = modifiers;
+
         if (!v->arrays.count)
         {
             if (!(type = hlsl_type_clone(ctx, orig_type, 0, modifiers)))
@@ -1010,7 +1013,11 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
         }
         else
         {
-            type = orig_type;
+            if (!(type = apply_type_modifiers(ctx, orig_type, &var_modifiers, v->loc)))
+            {
+                free_parse_variable_def(v);
+                continue;
+            }
         }
 
         ret = true;
