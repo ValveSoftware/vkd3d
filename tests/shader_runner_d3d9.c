@@ -480,36 +480,6 @@ static void init_readback(struct d3d9_shader_runner *runner, struct d3d9_resourc
     rb->rb.depth = 1;
 }
 
-static const struct vec4 *get_readback_vec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
-{
-    return (struct vec4 *)((BYTE *)rb->data + y * rb->row_pitch + x * sizeof(struct vec4));
-}
-
-static void check_readback_data_vec4(struct resource_readback *rb,
-        const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
-{
-    unsigned int x = 0, y = 0;
-    struct vec4 got = {0};
-    bool all_match = true;
-
-    for (y = rect->top; y < rect->bottom; ++y)
-    {
-        for (x = rect->left; x < rect->right; ++x)
-        {
-            got = *get_readback_vec4(rb, x, y);
-            if (!compare_vec4(&got, expected, max_diff))
-            {
-                all_match = false;
-                break;
-            }
-        }
-        if (!all_match)
-            break;
-    }
-    ok(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
-            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
-}
-
 static void release_readback(struct d3d9_resource_readback *rb)
 {
     IDirect3DSurface9_UnlockRect(rb->surface);

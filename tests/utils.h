@@ -23,6 +23,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "vkd3d_test.h"
 
 struct vec2
 {
@@ -110,6 +111,48 @@ static inline void set_rect(RECT *rect, int left, int top, int right, int bottom
     rect->right = right;
     rect->top = top;
     rect->bottom = bottom;
+}
+
+static void *get_readback_data(const struct resource_readback *rb,
+        unsigned int x, unsigned int y, unsigned int z, size_t element_size)
+{
+    unsigned int slice_pitch = rb->row_pitch * rb->height;
+    return &((uint8_t *)rb->data)[slice_pitch * z + rb->row_pitch * y + x * element_size];
+}
+
+static const struct vec4 *get_readback_vec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return get_readback_data(rb, x, y, 0, sizeof(struct vec4));
+}
+
+#define check_readback_data_vec4(a, b, c, d) check_readback_data_vec4_(__LINE__, a, b, c, d)
+static inline void check_readback_data_vec4_(unsigned int line, const struct resource_readback *rb,
+        const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
+{
+    RECT r = {0, 0, rb->width, rb->height};
+    unsigned int x = 0, y = 0;
+    struct vec4 got = {0};
+    bool all_match = true;
+
+    if (rect)
+        r = *rect;
+
+    for (y = r.top; y < r.bottom; ++y)
+    {
+        for (x = r.left; x < r.right; ++x)
+        {
+            got = *get_readback_vec4(rb, x, y);
+            if (!compare_vec4(&got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
+            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
 #endif
