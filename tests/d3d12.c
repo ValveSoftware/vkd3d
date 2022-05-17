@@ -191,29 +191,29 @@ static const DXGI_FORMAT depth_stencil_formats[] =
     DXGI_FORMAT_D16_UNORM,
 };
 
-static void init_readback(struct resource_readback *rb, ID3D12Resource *buffer,
+static void init_readback(struct d3d12_resource_readback *rb, ID3D12Resource *buffer,
         uint64_t buffer_size, uint64_t width, uint64_t height, unsigned int depth, uint64_t row_pitch)
 {
     D3D12_RANGE read_range;
     HRESULT hr;
 
-    rb->width = width;
-    rb->height = height;
-    rb->depth = depth;
+    rb->rb.width = width;
+    rb->rb.height = height;
+    rb->rb.depth = depth;
     rb->resource = buffer;
-    rb->row_pitch = row_pitch;
-    rb->data = NULL;
+    rb->rb.row_pitch = row_pitch;
+    rb->rb.data = NULL;
 
     ID3D12Resource_AddRef(rb->resource);
 
     read_range.Begin = 0;
     read_range.End = buffer_size;
-    hr = ID3D12Resource_Map(rb->resource, 0, &read_range, &rb->data);
+    hr = ID3D12Resource_Map(rb->resource, 0, &read_range, &rb->rb.data);
     ok(hr == S_OK, "Failed to map readback buffer, hr %#x.\n", hr);
 }
 
 static void get_buffer_readback_with_command_list(ID3D12Resource *buffer, DXGI_FORMAT format,
-        struct resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+        struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
@@ -250,16 +250,16 @@ static void get_buffer_readback_with_command_list(ID3D12Resource *buffer, DXGI_F
     wait_queue_idle(device, queue);
     ID3D12Device_Release(device);
 
-    rb->width = resource_desc.Width / format_size(format);
-    rb->height = 1;
-    rb->depth = 1;
+    rb->rb.width = resource_desc.Width / format_size(format);
+    rb->rb.height = 1;
+    rb->rb.depth = 1;
     rb->resource = rb_buffer;
-    rb->row_pitch = resource_desc.Width;
-    rb->data = NULL;
+    rb->rb.row_pitch = resource_desc.Width;
+    rb->rb.data = NULL;
 
     read_range.Begin = 0;
     read_range.End = resource_desc.Width;
-    hr = ID3D12Resource_Map(rb_buffer, 0, &read_range, &rb->data);
+    hr = ID3D12Resource_Map(rb_buffer, 0, &read_range, &rb->rb.data);
     ok(SUCCEEDED(hr), "Failed to map readback buffer, hr %#x.\n", hr);
 }
 
@@ -322,10 +322,10 @@ static void check_sub_resource_float_(unsigned int line, ID3D12Resource *texture
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         float expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_float_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_float_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -363,10 +363,10 @@ static void check_sub_resource_uint8_(unsigned int line, ID3D12Resource *texture
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint8_t expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint8_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_uint8_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -404,10 +404,10 @@ static void check_sub_resource_uint16_(unsigned int line, ID3D12Resource *textur
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint16_t expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint16_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_uint16_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -445,10 +445,10 @@ static void check_sub_resource_uint64_(unsigned int line, ID3D12Resource *textur
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint64_t expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint64_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_uint64_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -457,17 +457,17 @@ static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *texture
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const struct uvec4 *expected_value)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct uvec4 value = {0};
     unsigned int x = 0, y;
     bool all_match = true;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            value = *get_readback_uvec4(&rb, x, y);
+            value = *get_readback_uvec4(&rb.rb, x, y);
             if (!compare_uvec4(&value, expected_value))
             {
                 all_match = false;
@@ -490,10 +490,10 @@ static void check_buffer_uint_(unsigned int line, ID3D12Resource *buffer,
         ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         unsigned int expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    check_readback_data_uint_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_uint_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -4576,11 +4576,11 @@ static void test_clear_render_target_view(void)
     D3D12_RENDER_TARGET_VIEW_DESC rtv_desc;
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
+    struct d3d12_resource_readback rb;
     unsigned int rtv_increment_size;
     ID3D12DescriptorHeap *rtv_heap;
     D3D12_CLEAR_VALUE clear_value;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *resource;
@@ -4822,11 +4822,11 @@ static void test_clear_render_target_view(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 32, 32, 2);
-    check_readback_data_uint(&rb, &box, 0xbf4c7f19, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xbf4c7f19, 1);
     set_box(&box, 0, 0, 2, 32, 32, 4);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     set_box(&box, 0, 0, 4, 32, 32, 32);
-    check_readback_data_uint(&rb, &box, 0xbf4c7f19, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xbf4c7f19, 1);
     release_resource_readback(&rb);
 
     rtv_desc.Texture3D.FirstWSlice = 30;
@@ -4841,9 +4841,9 @@ static void test_clear_render_target_view(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 4, 32, 32, 30);
-    check_readback_data_uint(&rb, &box, 0xbf4c7f19, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xbf4c7f19, 1);
     set_box(&box, 0, 0, 30, 32, 32, 32);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(resource);
@@ -4856,9 +4856,9 @@ static void test_clear_unordered_access_view_buffer(void)
     D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
     ID3D12DescriptorHeap *cpu_heap, *gpu_heap;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     D3D12_HEAP_DESC heap_desc;
     ID3D12Resource *buffer;
@@ -5029,14 +5029,14 @@ static void test_clear_unordered_access_view_buffer(void)
         get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_TYPELESS, &rb, queue, command_list);
         box.left = 0;
         box.right = uav_desc.Buffer.FirstElement;
-        check_readback_data_uint(&rb, &box, clear_value[0], 0);
+        check_readback_data_uint(&rb.rb, &box, clear_value[0], 0);
         box.left = uav_desc.Buffer.FirstElement;
         box.right = uav_desc.Buffer.FirstElement + uav_desc.Buffer.NumElements;
         todo_if(tests[i].is_todo)
-        check_readback_data_uint(&rb, &box, tests[i].expected, tests[i].is_float ? 1 : 0);
+        check_readback_data_uint(&rb.rb, &box, tests[i].expected, tests[i].is_float ? 1 : 0);
         box.left = uav_desc.Buffer.FirstElement + uav_desc.Buffer.NumElements;
         box.right = BUFFER_SIZE / format_size(uav_desc.Format);
-        check_readback_data_uint(&rb, &box, clear_value[0], 0);
+        check_readback_data_uint(&rb.rb, &box, clear_value[0], 0);
         release_resource_readback(&rb);
 
         reset_command_list(command_list, context.allocator);
@@ -5060,10 +5060,10 @@ static void test_clear_unordered_access_view_image(void)
     unsigned int i, j, d, p, x, y, z, layer;
     D3D12_HEAP_PROPERTIES heap_properties;
     unsigned int image_size, image_depth;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     bool is_inside, success;
     ID3D12Resource *texture;
@@ -5305,7 +5305,7 @@ static void test_clear_unordered_access_view_image(void)
                                 && layer < tests[i].first_layer + tests[i].layer_count;
 
                     expected_colour = is_inside ? tests[i].expected : clear_value[0];
-                    actual_colour = get_readback_uint(&rb, x, y, z);
+                    actual_colour = get_readback_uint(&rb.rb, x, y, z);
                     success = compare_color(actual_colour, expected_colour, tests[i].is_float ? 1 : 0);
 
                     todo_if(tests[i].is_todo && expected_colour)
@@ -5964,10 +5964,10 @@ static void test_append_aligned_element(void)
 {
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     D3D12_VERTEX_BUFFER_VIEW vbv[6];
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb[3];
     unsigned int color;
@@ -6143,13 +6143,13 @@ static void test_append_aligned_element(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    color = get_readback_uint(&rb, 80, 16, 0);
+    color = get_readback_uint(&rb.rb, 80, 16, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 240, 16, 0);
+    color = get_readback_uint(&rb.rb, 240, 16, 0);
     ok(compare_color(color, 0xff00ff00, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 400, 16, 0);
+    color = get_readback_uint(&rb.rb, 400, 16, 0);
     ok(compare_color(color, 0xffff0000, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 560, 16, 0);
+    color = get_readback_uint(&rb.rb, 560, 16, 0);
     ok(compare_color(color, 0xffff00ff, 1), "Got unexpected color 0x%08x.\n", color);
     release_resource_readback(&rb);
 
@@ -6291,10 +6291,10 @@ static void test_fragment_coords(void)
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     struct test_context context;
-    struct resource_readback rb;
     const struct vec4 *v = NULL;
     struct vec4 expected = {0};
     ID3D12CommandQueue *queue;
@@ -6422,11 +6422,11 @@ static void test_fragment_coords(void)
 
         get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         all_match = true;
-        for (y = 0; y < rb.height; ++y)
+        for (y = 0; y < rb.rb.height; ++y)
         {
-            for (x = 0; x < rb.width; ++x)
+            for (x = 0; x < rb.rb.width; ++x)
             {
-                v = get_readback_vec4(&rb, x, y);
+                v = get_readback_vec4(&rb.rb, x, y);
                 expected.x = x + 0.5f;
                 expected.y = y + 0.5f;
                 expected.z = vertices[4 * i].z / vertices[4 * i].w;
@@ -6459,10 +6459,10 @@ static void test_fractional_viewports(void)
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     D3D12_VIEWPORT viewport;
     unsigned int i, x, y;
@@ -6582,11 +6582,11 @@ static void test_fractional_viewports(void)
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
         get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-        for (y = 0; y < rb.height; ++y)
+        for (y = 0; y < rb.rb.height; ++y)
         {
-            for (x = 0; x < rb.width; ++x)
+            for (x = 0; x < rb.rb.width; ++x)
             {
-                const struct vec4 *v = get_readback_vec4(&rb, x, y);
+                const struct vec4 *v = get_readback_vec4(&rb.rb, x, y);
                 struct vec4 expected = {x + 0.5f, y + 0.5f,
                         (x + 0.5f - viewport_offsets[i]) / context.render_target_desc.Width,
                         1.0f - (y + 0.5f - viewport_offsets[i]) / context.render_target_desc.Height};
@@ -6610,9 +6610,9 @@ static void test_fractional_viewports(void)
 static void test_scissor(void)
 {
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     unsigned int color;
     RECT scissor_rect;
@@ -6661,15 +6661,15 @@ static void test_scissor(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    color = get_readback_uint(&rb, 320, 60, 0);
+    color = get_readback_uint(&rb.rb, 320, 60, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 80, 240, 0);
+    color = get_readback_uint(&rb.rb, 80, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 240, 0);
+    color = get_readback_uint(&rb.rb, 320, 240, 0);
     ok(compare_color(color, 0xff00ff00, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 560, 240, 0);
+    color = get_readback_uint(&rb.rb, 560, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 420, 0);
+    color = get_readback_uint(&rb.rb, 320, 420, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     release_resource_readback(&rb);
 
@@ -6779,9 +6779,9 @@ static void test_draw_depth_only(void)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct depth_stencil_resource ds;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     unsigned int i, j;
@@ -6903,7 +6903,7 @@ static void test_draw_depth_only(void)
         {
             float obtained_depth, expected_depth;
 
-            obtained_depth = get_readback_float(&rb, 80 + j * 160, 60 + i * 120);
+            obtained_depth = get_readback_float(&rb.rb, 80 + j * 160, 60 + i * 120);
             expected_depth = 1.0f / 16.0f * (j + 4 * i);
             ok(compare_float(obtained_depth, expected_depth, 1),
                     "Got unexpected depth %.8e at (%u, %u), expected %.8e.\n",
@@ -7309,10 +7309,10 @@ static void test_map_placed_resources(void)
     ID3D12GraphicsCommandList *command_list;
     ID3D12Heap *upload_heap, *readback_heap;
     D3D12_ROOT_PARAMETER root_parameters[2];
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Resource *readback_buffer;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12Resource *uav_buffer;
     D3D12_HEAP_DESC heap_desc;
@@ -7475,7 +7475,7 @@ static void test_map_placed_resources(void)
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(expected_values); ++i)
     {
-        unsigned int value = get_readback_uint(&rb, i, 0, 0);
+        unsigned int value = get_readback_uint(&rb.rb, i, 0, 0);
         ok(value == expected_values[i], "Got %#x, expected %#x at %u.\n", value, expected_values[i], i);
     }
     release_resource_readback(&rb);
@@ -7494,8 +7494,8 @@ static void test_bundle_state_inheritance(void)
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     ID3D12GraphicsCommandList *command_list, *bundle;
     ID3D12CommandAllocator *bundle_allocator;
+    struct d3d12_resource_readback rb;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
     unsigned int x, y;
@@ -7547,11 +7547,11 @@ static void test_bundle_state_inheritance(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-           unsigned int v = get_readback_uint(&rb, x, y, 0);
+           unsigned int v = get_readback_uint(&rb.rb, x, y, 0);
            /* This works on AMD. */
            ok(v == 0xffffffff || v == 0xff00ff00, "Got unexpected value 0x%08x at (%u, %u).\n", v, x, y);
         }
@@ -7584,11 +7584,11 @@ static void test_bundle_state_inheritance(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-           unsigned int v = get_readback_uint(&rb, x, y, 0);
+           unsigned int v = get_readback_uint(&rb.rb, x, y, 0);
            /* This works on AMD, even though the debug layer says that the primitive topology is undefined. */
            ok(v == 0xffffffff || v == 0xff00ff00, "Got unexpected value 0x%08x at (%u, %u).\n", v, x, y);
         }
@@ -10625,7 +10625,7 @@ static void test_compute_shader_instructions(void)
     const D3D12_SHADER_BYTECODE *current_cs;
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[2];
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *buffer;
@@ -10791,7 +10791,7 @@ static void test_compute_shader_instructions(void)
         get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(tests[i].expected_data); ++j)
         {
-            value = get_readback_uint(&rb, j, 0, 0);
+            value = get_readback_uint(&rb.rb, j, 0, 0);
             ok(value == tests[i].expected_data[j], "Test %u: Got 0x%08x, expected 0x%08x at %u.\n",
                     i, value, tests[i].expected_data[j], j);
         }
@@ -12407,9 +12407,9 @@ static void test_cs_constant_buffer(void)
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *resource, *cb;
     unsigned int descriptor_size;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -12520,7 +12520,7 @@ static void test_cs_constant_buffer(void)
     transition_sub_resource_state(command_list, resource, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
-    check_readback_data_float(&rb, NULL, 2.0f, 0);
+    check_readback_data_float(&rb.rb, NULL, 2.0f, 0);
     release_resource_readback(&rb);
 
     value = 6.0f;
@@ -12541,7 +12541,7 @@ static void test_cs_constant_buffer(void)
     transition_sub_resource_state(command_list, resource, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
-    check_readback_data_float(&rb, NULL, 6.0f, 0);
+    check_readback_data_float(&rb.rb, NULL, 6.0f, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(cb);
@@ -12557,7 +12557,7 @@ static void test_constant_buffer_relative_addressing(void)
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_ROOT_PARAMETER root_parameters[2];
     ID3D12GraphicsCommandList *command_list;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *uav, *cb;
@@ -12642,9 +12642,9 @@ static void test_constant_buffer_relative_addressing(void)
     transition_sub_resource_state(command_list, uav, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(uav, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    for (i = 0; i < rb.width; ++i)
+    for (i = 0; i < rb.rb.width; ++i)
     {
-        unsigned int got = get_readback_uint(&rb, i, 0, 0);
+        unsigned int got = get_readback_uint(&rb.rb, i, 0, 0);
         const unsigned int *expected = &cb_data[1].x;
         ok(got == expected[i], "Got %#x, expected %#x at %u.\n", got, expected[i], i);
     }
@@ -13161,9 +13161,9 @@ static void test_sample_instructions(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
+    struct d3d12_resource_readback rb;
     D3D12_SAMPLER_DESC sampler_desc;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     unsigned int x_step, y_step;
     ID3D12CommandQueue *queue;
@@ -13553,7 +13553,7 @@ static void test_sample_instructions(void)
         {
             for (x = 0; x < tests[i].texture->width; ++x)
             {
-                unsigned int color = get_readback_uint(&rb, x * x_step + x_step / 2, y * y_step + y_step / 2, 0);
+                unsigned int color = get_readback_uint(&rb.rb, x * x_step + x_step / 2, y * y_step + y_step / 2, 0);
                 ok(compare_color(color, tests[i].expected_data[tests[i].texture->width * y + x], 1),
                         "Got color 0x%08x, expected 0x%08x at (%u, %u).\n",
                         color, tests[i].expected_data[tests[i].texture->width * y + x], x, y);
@@ -13804,8 +13804,8 @@ static void test_gather(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -13999,12 +13999,12 @@ static void test_gather(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14037,12 +14037,12 @@ static void test_gather(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_offset[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_offset[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14075,12 +14075,12 @@ static void test_gather(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_green[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_green[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14113,12 +14113,12 @@ static void test_gather(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_offset[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_offset[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14149,12 +14149,12 @@ static void test_gather(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14180,8 +14180,8 @@ static void test_gather_c(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -14339,12 +14339,12 @@ static void test_gather_c(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_c[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_c[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14377,12 +14377,12 @@ static void test_gather_c(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_po_c[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_po_c[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14413,12 +14413,12 @@ static void test_gather_c(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    for (y = 0; y < rb.height; ++y)
+    for (y = 0; y < rb.rb.height; ++y)
     {
-        for (x = 0; x < rb.width; ++x)
+        for (x = 0; x < rb.rb.width; ++x)
         {
-            const struct vec4 *expected = &expected_gather4_c[y * rb.width + x];
-            const struct vec4 *got = get_readback_vec4(&rb, x, y);
+            const struct vec4 *expected = &expected_gather4_c[y * rb.rb.width + x];
+            const struct vec4 *got = get_readback_vec4(&rb.rb, x, y);
             ok(compare_vec4(got, expected, 0),
                     "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                     got->x, got->y, got->z, got->w, expected->x, expected->y, expected->z, expected->w);
@@ -14438,8 +14438,8 @@ static void test_sample_c_lz(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc;
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -14847,7 +14847,7 @@ static void test_sample_c_lz(void)
         get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         /* Avoid testing values affected by seamless cube map filtering. */
         set_rect(&rect, 100, 100, 540, 380);
-        check_readback_data_float(&rb, &rect, tests[i].expected, 2);
+        check_readback_data_float(&rb.rb, &rect, tests[i].expected, 2);
         release_resource_readback(&rb);
 
         reset_command_list(command_list, context.allocator);
@@ -14898,7 +14898,7 @@ static void test_sample_c_lz(void)
         get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         /* Avoid testing values affected by seamless cube map filtering. */
         set_rect(&rect, 100, 100, 540, 380);
-        check_readback_data_float(&rb, &rect, tests[i].expected, 2);
+        check_readback_data_float(&rb.rb, &rect, tests[i].expected, 2);
         release_resource_readback(&rb);
 
         reset_command_list(command_list, context.allocator);
@@ -15230,9 +15230,9 @@ static void test_multisample_array_texture(void)
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
     D3D12_HEAP_PROPERTIES heap_properties;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12Resource *uav_buffer;
@@ -15431,7 +15431,7 @@ static void test_multisample_array_texture(void)
     get_buffer_readback_with_command_list(uav_buffer, DXGI_FORMAT_R32G32B32A32_UINT, &rb, queue, command_list);
     for (i = 0; i < 2; ++i)
     {
-        const struct uvec4 *v = get_readback_uvec4(&rb, i, 0);
+        const struct uvec4 *v = get_readback_uvec4(&rb.rb, i, 0);
         ok(v->x == resource_desc.Width, "Got unexpected width %u.\n", v->x);
         ok(v->y == resource_desc.Height, "Got unexpected height %u.\n", v->y);
         ok(v->z == resource_desc.DepthOrArraySize, "Got unexpected array size %u.\n", v->z);
@@ -16272,7 +16272,7 @@ static void test_descriptor_tables_overlapping_bindings(void)
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     D3D12_ROOT_PARAMETER root_parameters[3];
     ID3D12GraphicsCommandList *command_list;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -16433,7 +16433,7 @@ static void test_descriptor_tables_overlapping_bindings(void)
     get_buffer_readback_with_command_list(output_buffers[0], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(buffer_data); ++i)
     {
-        unsigned int value = get_readback_uint(&rb, i, 0, 0);
+        unsigned int value = get_readback_uint(&rb.rb, i, 0, 0);
         ok(value == buffer_data[i], "Got %#x, expected %#x.\n", value, buffer_data[i]);
     }
     release_resource_readback(&rb);
@@ -16441,7 +16441,7 @@ static void test_descriptor_tables_overlapping_bindings(void)
     get_buffer_readback_with_command_list(output_buffers[1], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(buffer_data2); ++i)
     {
-        unsigned int value = get_readback_uint(&rb, i, 0, 0);
+        unsigned int value = get_readback_uint(&rb.rb, i, 0, 0);
         ok(value == buffer_data2[i], "Got %#x, expected %#x.\n", value, buffer_data2[i]);
     }
     release_resource_readback(&rb);
@@ -16462,8 +16462,8 @@ static void test_update_root_descriptors(void)
     ID3D12GraphicsCommandList *command_list;
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *resource, *cb;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -16559,7 +16559,7 @@ static void test_update_root_descriptors(void)
     for (i = 0; i < ARRAY_SIZE(input); ++i)
     {
         unsigned int offset = input[i].uav_offset + input[i].offset;
-        unsigned int value = get_readback_uint(&rb, offset, 0, 0);
+        unsigned int value = get_readback_uint(&rb.rb, offset, 0, 0);
         ok(value == input[i].value, "Got %#x, expected %#x.\n", value, input[i].value);
     }
     release_resource_readback(&rb);
@@ -16580,9 +16580,9 @@ static void test_update_descriptor_tables(void)
     ID3D12DescriptorHeap *heap, *cpu_heap;
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
     D3D12_ROOT_PARAMETER root_parameter;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_SUBRESOURCE_DATA data;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12Resource *textures[3];
     ID3D12CommandQueue *queue;
@@ -16730,9 +16730,9 @@ static void test_update_descriptor_tables(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 16, 32, 1);
-    check_readback_data_uint(&rb, &box, 0xff00407f, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff00407f, 1);
     set_box(&box, 16, 0, 0, 32, 32, 1);
-    check_readback_data_uint(&rb, &box, 0xff007f40, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff007f40, 1);
     release_resource_readback(&rb);
 
     for (i = 0; i < ARRAY_SIZE(textures); ++i)
@@ -16755,8 +16755,8 @@ static void test_update_descriptor_heap_after_closing_command_list(void)
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
     ID3D12DescriptorHeap *cpu_heap, *heap;
     D3D12_SUBRESOURCE_DATA texture_data;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     unsigned int value;
@@ -16862,7 +16862,7 @@ static void test_update_descriptor_heap_after_closing_command_list(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    value = get_readback_uint(&rb, 0, 0, 0);
+    value = get_readback_uint(&rb.rb, 0, 0, 0);
     todo_if(binding_tier < D3D12_RESOURCE_BINDING_TIER_3)
     ok(value == 0xff00ff00, "Got unexpected value %#x.\n", value);
     release_resource_readback(&rb);
@@ -16893,10 +16893,10 @@ static void test_update_compute_descriptor_tables(void)
     D3D12_SUBRESOURCE_DATA subresource_data;
     ID3D12Resource *buffer_cb, *texture_cb;
     ID3D12DescriptorHeap *descriptor_heap;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *output_buffers[2];
     ID3D12Resource *input_buffers[5];
     ID3D12Resource *textures[3];
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     struct cb_data cb_data;
@@ -17382,7 +17382,7 @@ static void test_update_compute_descriptor_tables(void)
     get_buffer_readback_with_command_list(output_buffers[0], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(expected_output0); ++i)
     {
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         ok(data == expected_output0[i], "Got %#x, expected %#x at %u.\n", data, expected_output0[i], i);
     }
     release_resource_readback(&rb);
@@ -17393,7 +17393,7 @@ static void test_update_compute_descriptor_tables(void)
     get_buffer_readback_with_command_list(output_buffers[1], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(expected_output1); ++i)
     {
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         ok(data == expected_output1[i], "Got %#x, expected %#x at %u.\n", data, expected_output1[i], i);
     }
     release_resource_readback(&rb);
@@ -17650,13 +17650,13 @@ static void test_copy_descriptors(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[4];
     D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *t[7], *u[3], *cb;
     struct depth_stencil_resource ds;
     D3D12_SAMPLER_DESC sampler_desc;
     struct test_context_desc desc;
     unsigned int descriptor_size;
     D3D12_SUBRESOURCE_DATA data;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     unsigned int sampler_size;
@@ -18142,7 +18142,7 @@ static void test_copy_descriptors(void)
     transition_sub_resource_state(command_list, u[2], 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(u[2], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    result = get_readback_data(&rb, 0, 0, 0, sizeof(*result));
+    result = get_readback_data(&rb.rb, 0, 0, 0, sizeof(*result));
     ok(result[ 0] == cb0_data, "Got unexpected value %#x.\n", result[0]);
     ok(result[ 1] == cb1_data, "Got unexpected value %#x.\n", result[1]);
     ok(result[ 2] == cb2_data, "Got unexpected value %#x.\n", result[2]);
@@ -18187,7 +18187,7 @@ static void test_copy_descriptors(void)
     ok(result[41] == u1_data.f, "Got unexpected value %#x.\n", result[41]);
     ok(result[42] == u1_data.f, "Got unexpected value %#x.\n", result[42]);
     ok(result[43] == 0xdeadbeef, "Got unexpected value %#x.\n", result[43]);
-    assert(rb.width == 44);
+    assert(rb.rb.width == 44);
     release_resource_readback(&rb);
 
     ID3D12DescriptorHeap_Release(cpu_heap);
@@ -18211,10 +18211,10 @@ static void test_copy_descriptors_range_sizes(void)
     ID3D12Resource *green_texture, *blue_texture;
     UINT dst_range_sizes[1], src_range_sizes[1];
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     ID3D12DescriptorHeap *cpu_heap;
     struct test_context_desc desc;
     D3D12_SUBRESOURCE_DATA data;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -18357,7 +18357,7 @@ static void test_copy_descriptors_range_sizes(void)
     for (i = 0; i < desc.rt_width; ++i)
     {
         set_box(&box, i, 0, 0, i + 1, desc.rt_height, 1);
-        check_readback_data_uint(&rb, &box, i % 2 ? 0xffff0000 : 0xff00ff00, 0);
+        check_readback_data_uint(&rb.rb, &box, i % 2 ? 0xffff0000 : 0xff00ff00, 0);
     }
     release_resource_readback(&rb);
 
@@ -20954,7 +20954,7 @@ static void test_typed_buffer_uav(void)
     ID3D12DescriptorHeap *descriptor_heap;
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *resource;
@@ -21035,7 +21035,7 @@ static void test_typed_buffer_uav(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
-    check_readback_data_float(&rb, NULL, 0.5f, 0);
+    check_readback_data_float(&rb.rb, NULL, 0.5f, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(resource);
@@ -21197,7 +21197,7 @@ static void test_compute_shader_registers(void)
     D3D12_ROOT_PARAMETER root_parameters[2];
     unsigned int i, x, y, group_x, group_y;
     ID3D12DescriptorHeap *descriptor_heap;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *resource;
@@ -21312,7 +21312,7 @@ static void test_compute_shader_registers(void)
 
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
     i = 0;
-    data = rb.data;
+    data = rb.rb.data;
     for (y = 0; y < dimensions.y; ++y)
     {
         for (group_y = 0; group_y < 2; ++group_y)
@@ -21366,9 +21366,9 @@ static void test_tgsm(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[1];
     ID3D12DescriptorHeap *descriptor_heap;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *buffer, *buffer2;
     unsigned int data, expected;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -21580,7 +21580,7 @@ static void test_tgsm(void)
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < 64; ++i)
     {
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         expected = 33 * i;
         ok(data == expected, "Got %u, expected %u (index %u).\n", data, expected, i);
     }
@@ -21629,7 +21629,7 @@ static void test_tgsm(void)
     for (i = 0; i < 32; ++i)
     {
         expected = 64 * i + 32;
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         ok(data == expected, "Got %u, expected %u (index %u).\n", data, expected, i);
     }
     release_resource_readback(&rb);
@@ -21638,7 +21638,7 @@ static void test_tgsm(void)
     for (i = 0; i < 32; ++i)
     {
         expected = 64 * i + 32;
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         ok(data == expected || !data, "Got %u, expected %u (index %u).\n", data, expected, i);
     }
     release_resource_readback(&rb);
@@ -21678,7 +21678,7 @@ static void test_tgsm(void)
     for (i = 0; i < 96; ++i)
     {
         expected = (i % 32 + 1) * (i / 32);
-        float_data = get_readback_float(&rb, i, 0);
+        float_data = get_readback_float(&rb.rb, i, 0);
         ok(float_data == expected, "Got %.8e, expected %u (index %u).\n", float_data, expected, i);
     }
     release_resource_readback(&rb);
@@ -21687,7 +21687,7 @@ static void test_tgsm(void)
     for (i = 0; i < 96; ++i)
     {
         expected = (i % 32 + 1) * (i / 32);
-        data = get_readback_uint(&rb, i, 0, 0);
+        data = get_readback_uint(&rb.rb, i, 0, 0);
         ok(data == expected, "Got %u, expected %u (index %u).\n", data, expected, i);
     }
     release_resource_readback(&rb);
@@ -21722,11 +21722,11 @@ static void test_uav_load(void)
     const struct texture *current_texture;
     D3D12_HEAP_PROPERTIES heap_properties;
     ID3D12Resource *texture, *rt_texture;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     D3D12_CLEAR_VALUE clear_value;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     unsigned int rtv_size;
     ID3D12Device *device;
@@ -22095,7 +22095,7 @@ static void test_uav_load(void)
             for (x = 0; x < 4; ++x)
             {
                 unsigned int expected = test->expected_colors[y * 4 + x];
-                unsigned int color = get_readback_uint(&rb, 80 + x * 160, 60 + y * 120, 0);
+                unsigned int color = get_readback_uint(&rb.rb, 80 + x * 160, 60 + y * 120, 0);
                 ok(compare_color(color, expected, 0),
                         "Test %u: Got 0x%08x, expected 0x%08x at (%u, %u).\n",
                         i, color, expected, x, y);
@@ -22129,7 +22129,7 @@ static void test_cs_uav_store(void)
     ID3D12DescriptorHeap *descriptor_heap;
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *resource;
@@ -22440,11 +22440,11 @@ static void test_cs_uav_store(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_rect(&rect, 0, 0, 16, 32);
-    check_readback_data_float(&rb, &rect, 0.5f, 2);
-    set_rect(&rect, 0, 32, rb.width, rb.height);
-    check_readback_data_float(&rb, &rect, 1.0f, 2);
-    set_rect(&rect, 16, 0, rb.width, rb.height);
-    check_readback_data_float(&rb, &rect, 1.0f, 2);
+    check_readback_data_float(&rb.rb, &rect, 0.5f, 2);
+    set_rect(&rect, 0, 32, rb.rb.width, rb.rb.height);
+    check_readback_data_float(&rb.rb, &rect, 1.0f, 2);
+    set_rect(&rect, 16, 0, rb.rb.width, rb.rb.height);
+    check_readback_data_float(&rb.rb, &rect, 1.0f, 2);
     release_resource_readback(&rb);
 
     ID3D12PipelineState_Release(pipeline_state);
@@ -22470,11 +22470,11 @@ static void test_cs_uav_store(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_rect(&rect, 0, 0, 60, 60);
-    check_readback_data_float(&rb, &rect, 0.6f, 2);
-    set_rect(&rect, 0, 60, rb.width, rb.height);
-    check_readback_data_float(&rb, &rect, 1.0f, 2);
-    set_rect(&rect, 60, 0, rb.width, rb.height);
-    check_readback_data_float(&rb, &rect, 1.0f, 2);
+    check_readback_data_float(&rb.rb, &rect, 0.6f, 2);
+    set_rect(&rect, 0, 60, rb.rb.width, rb.rb.height);
+    check_readback_data_float(&rb.rb, &rect, 1.0f, 2);
+    set_rect(&rect, 60, 0, rb.rb.width, rb.rb.height);
+    check_readback_data_float(&rb.rb, &rect, 1.0f, 2);
     release_resource_readback(&rb);
 
     memset(&input, 0, sizeof(input));
@@ -22509,14 +22509,14 @@ static void test_cs_uav_store(void)
 static unsigned int read_uav_counter(const struct test_context *context,
         ID3D12Resource *counter_buffer, size_t offset)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     uint32_t counter;
 
     transition_sub_resource_state(context->list, counter_buffer, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(counter_buffer, DXGI_FORMAT_R32_UINT, &rb,
             context->queue, context->list);
-    counter = get_readback_uint(&rb, offset / sizeof(counter), 0, 0);
+    counter = get_readback_uint(&rb.rb, offset / sizeof(counter), 0, 0);
     release_resource_readback(&rb);
     reset_command_list(context->list, context->allocator);
     transition_sub_resource_state(context->list, counter_buffer, 0,
@@ -22538,7 +22538,7 @@ static void test_uav_counters(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[1];
     ID3D12DescriptorHeap *descriptor_heap;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     uint32_t data, id[128];
@@ -22665,7 +22665,7 @@ static void test_uav_counters(void)
         transition_sub_resource_state(command_list, buffer, 0,
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-        memcpy(id, rb.data, 64 * sizeof(*id));
+        memcpy(id, rb.rb.data, 64 * sizeof(*id));
         release_resource_readback(&rb);
         qsort(id, 64, sizeof(*id), compare_id);
         for (j = 0; j < 64; ++j)
@@ -22696,7 +22696,7 @@ static void test_uav_counters(void)
         counter = read_uav_counter(&context, counter_buffer, uav_desc.Buffer.CounterOffsetInBytes);
         ok(!counter, "Got unexpected value %u.\n", counter);
         get_buffer_readback_with_command_list(out_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-        memcpy(id, rb.data, 64 * sizeof(*id));
+        memcpy(id, rb.rb.data, 64 * sizeof(*id));
         release_resource_readback(&rb);
         qsort(id, 64, sizeof(*id), compare_id);
         for (j = 0; j < 64; ++j)
@@ -22745,7 +22745,7 @@ static void test_uav_counters(void)
         get_buffer_readback_with_command_list(out_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         for (j = 0; j < 8; ++j)
         {
-            data = get_readback_uint(&rb, j, 0, 0);
+            data = get_readback_uint(&rb.rb, j, 0, 0);
             ok(data == 0xdeadbeef, "Got data %u at %u.\n", data, j);
         }
         release_resource_readback(&rb);
@@ -22911,9 +22911,9 @@ static void test_graphics_uav_counters(void)
     ID3D12GraphicsCommandList *command_list;
     ID3D12Resource *buffer, *counter_buffer;
     D3D12_ROOT_PARAMETER root_parameters[1];
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
     uint32_t counter;
@@ -23023,7 +23023,7 @@ static void test_graphics_uav_counters(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, uav_desc.Buffer.NumElements, 1, 1);
-    check_readback_data_uint(&rb, &box, 1, 0);
+    check_readback_data_uint(&rb.rb, &box, 1, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(buffer);
@@ -23040,8 +23040,8 @@ static void test_atomic_instructions(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[3];
     ID3D12PipelineState *pipeline_state;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -23253,7 +23253,7 @@ static void test_atomic_instructions(void)
         get_buffer_readback_with_command_list(ps_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(instructions); ++j)
         {
-            unsigned int value = get_readback_uint(&rb, j, 0, 0);
+            unsigned int value = get_readback_uint(&rb.rb, j, 0, 0);
             unsigned int expected = test->expected_result[j];
             bool is_bug;
 
@@ -23277,7 +23277,7 @@ static void test_atomic_instructions(void)
         {
             bool bug_instruction = !strcmp(imm_instructions[j], "imm_atomic_imax")
                     || !strcmp(imm_instructions[j], "imm_atomic_imin");
-            unsigned int value = get_readback_uint(&rb, j, 0, 0);
+            unsigned int value = get_readback_uint(&rb.rb, j, 0, 0);
             unsigned int expected = test->expected_result[j];
 
             /* Fixed at least on radv with mesa >= 21.3.7. */
@@ -23295,7 +23295,7 @@ static void test_atomic_instructions(void)
         get_buffer_readback_with_command_list(cs_buffer2, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(instructions); ++j)
         {
-            unsigned int out_value = get_readback_uint(&rb, j, 0, 0);
+            unsigned int out_value = get_readback_uint(&rb.rb, j, 0, 0);
             ok(out_value == test->input[j], "Got original value %u, expected %u for '%s'.\n",
                     out_value, test->input[j], imm_instructions[j]);
         }
@@ -23338,9 +23338,9 @@ static void test_buffer_srv(void)
     ID3D12DescriptorHeap *descriptor_heap;
     const struct buffer *current_buffer;
     unsigned int color, expected_color;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Resource *buffer;
     ID3D12Device *device;
@@ -23599,7 +23599,7 @@ static void test_buffer_srv(void)
         {
             for (x = 0; x < 4; ++x)
             {
-                color = get_readback_uint(&rb, 80 + x * 160, 60 + y * 120, 0);
+                color = get_readback_uint(&rb.rb, 80 + x * 160, 60 + y * 120, 0);
                 expected_color = test->expected_colors[y * 4 + x];
                 ok(compare_color(color, expected_color, 1),
                         "Test %u: Got 0x%08x, expected 0x%08x at (%u, %u).\n",
@@ -23676,10 +23676,10 @@ static void test_query_timestamp(void)
 {
     uint64_t timestamps[4], timestamp_frequency, timestamp_diff, time_diff;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     D3D12_QUERY_HEAP_DESC heap_desc;
     struct test_context_desc desc;
     ID3D12QueryHeap *query_heap;
-    struct resource_readback rb;
     struct test_context context;
     time_t time_start, time_end;
     ID3D12CommandQueue *queue;
@@ -23722,7 +23722,7 @@ static void test_query_timestamp(void)
     time_end = time(NULL) + 1;
 
     for (i = 0; i < ARRAY_SIZE(timestamps); ++i)
-        timestamps[i] = get_readback_uint64(&rb, i, 0);
+        timestamps[i] = get_readback_uint64(&rb.rb, i, 0);
 
     for (i = 0; i < ARRAY_SIZE(timestamps) - 1; ++i)
     {
@@ -23747,13 +23747,13 @@ static void test_query_pipeline_statistics(void)
     D3D12_QUERY_DATA_PIPELINE_STATISTICS *pipeline_statistics;
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
     D3D12_QUERY_HEAP_DESC heap_desc;
     ID3D12QueryHeap *query_heap;
     ID3D12Resource *resource;
-    struct resource_readback rb;
     unsigned int pixel_count, i;
     HRESULT hr;
 
@@ -23798,11 +23798,11 @@ static void test_query_pipeline_statistics(void)
 
     for (i = 0; i < sizeof(struct D3D12_QUERY_DATA_PIPELINE_STATISTICS) / sizeof(uint64_t); ++i)
     {
-        uint64_t value = get_readback_uint64(&rb, i, 0);
+        uint64_t value = get_readback_uint64(&rb.rb, i, 0);
         ok(!value, "Element %d: Got %"PRIu64", expected 0.\n", i, value);
     }
 
-    pipeline_statistics = get_readback_data(&rb, 1, 0, 0, sizeof(*pipeline_statistics));
+    pipeline_statistics = get_readback_data(&rb.rb, 1, 0, 0, sizeof(*pipeline_statistics));
 
     /* We read 3 vertices that formed one primitive. */
     ok(pipeline_statistics->IAVertices == 3, "IAVertices: Got %"PRIu64", expected 3.\n",
@@ -23847,6 +23847,7 @@ static void test_query_occlusion(void)
 {
     struct test_context_desc desc;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -23855,7 +23856,6 @@ static void test_query_occlusion(void)
     D3D12_QUERY_HEAP_DESC heap_desc;
     ID3D12QueryHeap *query_heap;
     ID3D12Resource *resource;
-    struct resource_readback rb;
     unsigned int i;
     HRESULT hr;
 
@@ -23960,7 +23960,7 @@ static void test_query_occlusion(void)
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
         const bool samples_passed = tests[i].draw && tests[i].clear_depth > tests[i].depth;
-        const uint64_t result = get_readback_uint64(&rb, i, 0);
+        const uint64_t result = get_readback_uint64(&rb.rb, i, 0);
         uint64_t expected_result;
 
         if (tests[i].type == D3D12_QUERY_TYPE_BINARY_OCCLUSION)
@@ -23984,10 +23984,10 @@ static void test_resolve_non_issued_query_data(void)
     static const uint64_t initial_data[] = {0xdeadbeef, 0xdeadbeef, 0xdeadbabe, 0xdeadbeef};
     ID3D12Resource *readback_buffer, *upload_buffer;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     D3D12_QUERY_HEAP_DESC heap_desc;
     struct test_context_desc desc;
     ID3D12QueryHeap *query_heap;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -24018,7 +24018,7 @@ static void test_resolve_non_issued_query_data(void)
             D3D12_QUERY_TYPE_TIMESTAMP, 0, 4, readback_buffer, 0);
 
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    timestamps = get_readback_data(&rb, 0, 0, 0, sizeof(*timestamps));
+    timestamps = get_readback_data(&rb.rb, 0, 0, 0, sizeof(*timestamps));
     ok(timestamps[0] != initial_data[0] && timestamps[0] > 0,
             "Got unexpected timestamp %#"PRIx64".\n", timestamps[0]);
     ok(!timestamps[1], "Got unexpected timestamp %#"PRIx64".\n", timestamps[1]);
@@ -24036,9 +24036,9 @@ static void test_resolve_non_issued_query_data(void)
 static void test_resolve_query_data_in_different_command_list(void)
 {
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     D3D12_QUERY_HEAP_DESC heap_desc;
     ID3D12Resource *readback_buffer;
-    struct resource_readback rb;
     ID3D12QueryHeap *query_heap;
     struct test_context context;
     ID3D12CommandQueue *queue;
@@ -24102,7 +24102,7 @@ static void test_resolve_query_data_in_different_command_list(void)
     for (i = 0; i < readback_buffer_capacity; ++i)
     {
         uint64_t expected_result = context.render_target_desc.Width * context.render_target_desc.Height;
-        uint64_t result = get_readback_uint64(&rb, i, 0);
+        uint64_t result = get_readback_uint64(&rb.rb, i, 0);
 
         ok(result == expected_result, "Got unexpected result %"PRIu64" at %u.\n", result, i);
     }
@@ -24117,9 +24117,9 @@ static void test_resolve_query_data_in_reordered_command_list(void)
 {
     ID3D12GraphicsCommandList *command_lists[2];
     ID3D12CommandAllocator *command_allocator;
+    struct d3d12_resource_readback rb;
     D3D12_QUERY_HEAP_DESC heap_desc;
     ID3D12Resource *readback_buffer;
-    struct resource_readback rb;
     ID3D12QueryHeap *query_heap;
     struct test_context context;
     ID3D12CommandQueue *queue;
@@ -24173,7 +24173,7 @@ static void test_resolve_query_data_in_reordered_command_list(void)
 
     reset_command_list(command_lists[0], context.allocator);
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_lists[0]);
-    result = get_readback_uint64(&rb, 0, 0);
+    result = get_readback_uint64(&rb.rb, 0, 0);
     todo ok(result == context.render_target_desc.Width * context.render_target_desc.Height,
             "Got unexpected result %"PRIu64".\n", result);
     release_resource_readback(&rb);
@@ -24195,10 +24195,10 @@ static void test_execute_indirect(void)
     D3D12_ROOT_PARAMETER root_parameter;
     ID3D12PipelineState *pipeline_state;
     ID3D12RootSignature *root_signature;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     D3D12_INDEX_BUFFER_VIEW ibv;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb, *ib;
@@ -24418,9 +24418,9 @@ static void test_execute_indirect(void)
     transition_sub_resource_state(command_list, uav, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(uav, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    for (i = 0; i < rb.width; ++i)
+    for (i = 0; i < rb.rb.width; ++i)
     {
-        unsigned int ret = get_readback_uint(&rb, i, 0, 0);
+        unsigned int ret = get_readback_uint(&rb.rb, i, 0, 0);
         ok(ret == i, "Got unexpected result %#x at index %u.\n", ret, i);
     }
     release_resource_readback(&rb);
@@ -24450,11 +24450,11 @@ static void test_execute_indirect(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 32, 8, 1);
-    check_readback_data_uint(&rb, &box, 0xffffff00, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xffffff00, 0);
     set_box(&box, 24, 8, 0, 32, 32, 1);
-    check_readback_data_uint(&rb, &box, 0xffffff00, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xffffff00, 0);
     set_box(&box, 0, 8, 0, 24, 32, 1);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -24497,7 +24497,7 @@ static void test_dispatch_zero_thread_groups(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[2];
     ID3D12Resource *argument_buffer, *uav;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     unsigned int ret, i;
@@ -24595,9 +24595,9 @@ static void test_dispatch_zero_thread_groups(void)
     transition_sub_resource_state(command_list, uav, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(uav, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    ret = get_readback_uint(&rb, 0, 0, 0);
+    ret = get_readback_uint(&rb.rb, 0, 0, 0);
     ok(ret == 10, "Got unexpected result %#x.\n", ret);
-    ret = get_readback_uint(&rb, 64, 0, 0);
+    ret = get_readback_uint(&rb.rb, 64, 0, 0);
     ok(ret == 50, "Got unexpected result %#x.\n", ret);
     release_resource_readback(&rb);
 
@@ -24784,12 +24784,12 @@ static void test_instance_id(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2];
+    struct d3d12_resource_readback rb;
     D3D12_VERTEX_BUFFER_VIEW vbv[3];
     ID3D12Resource *argument_buffer;
     ID3D12Resource *render_target;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb[3];
     unsigned int i, j;
@@ -25036,14 +25036,14 @@ static void test_instance_id(void)
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(expected_results); ++j)
-            check_readback_data_uint(&rb, &expected_results[j].box, tests[i].expected_colors[j], 1);
+            check_readback_data_uint(&rb.rb, &expected_results[j].box, tests[i].expected_colors[j], 1);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
         transition_resource_state(command_list, render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_texture_readback_with_command_list(render_target, 0, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(expected_results); ++j)
-            check_readback_data_uint(&rb, &expected_results[j].box, expected_results[j].instance_id, 0);
+            check_readback_data_uint(&rb.rb, &expected_results[j].box, expected_results[j].instance_id, 0);
         release_resource_readback(&rb);
 
         reset_command_list(command_list, context.allocator);
@@ -25203,11 +25203,11 @@ static void test_vertex_id(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *upload_buffer;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     D3D12_INDEX_BUFFER_VIEW ibv;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb, *ib;
@@ -25312,7 +25312,7 @@ static void test_vertex_id(void)
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_buffer_readback_with_command_list(counter_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    count = get_readback_uint(&rb, 0, 0, 0);
+    count = get_readback_uint(&rb.rb, 0, 0, 0);
     ok(count == ARRAY_SIZE(expected_values) * sizeof(struct vec4), "Got counter value %u, expected %uu.\n",
             count, (unsigned int)(ARRAY_SIZE(expected_values) * sizeof(struct vec4)));
     release_resource_readback(&rb);
@@ -25325,7 +25325,7 @@ static void test_vertex_id(void)
     {
         for (j = 0; j < count; ++j)
         {
-            if (!used_values[j] && compare_uvec4(get_readback_uvec4(&rb, j, 0), &expected_values[i]))
+            if (!used_values[j] && compare_uvec4(get_readback_uvec4(&rb.rb, j, 0), &expected_values[i]))
             {
                 found_values[i] = true;
                 used_values[j] = true;
@@ -25336,7 +25336,7 @@ static void test_vertex_id(void)
 
     for (i = 0; i < count; ++i)
     {
-        const struct uvec4 *v = get_readback_uvec4(&rb, i, 0);
+        const struct uvec4 *v = get_readback_uvec4(&rb.rb, i, 0);
         ok(used_values[i], "Found unexpected value {0x%08x, 0x%08x, 0x%08x, 0x%08x}.\n", v->x, v->y, v->z, v->w);
     }
     release_resource_readback(&rb);
@@ -25365,10 +25365,10 @@ static void test_copy_texture(void)
     ID3D12Resource *src_texture, *dst_texture;
     ID3D12GraphicsCommandList *command_list;
     D3D12_SUBRESOURCE_DATA texture_data;
+    struct d3d12_resource_readback rb;
     struct depth_stencil_resource ds;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -25472,7 +25472,7 @@ static void test_copy_texture(void)
         {
             for (x = 0; x < 4; ++x)
             {
-                unsigned int color = get_readback_uint(&rb, x, y, 0);
+                unsigned int color = get_readback_uint(&rb.rb, x, y, 0);
                 unsigned int expected = result_data[y * 4 + x];
 
                 ok(color == expected,
@@ -25554,10 +25554,10 @@ static void test_copy_texture_buffer(void)
     D3D12_TEXTURE_COPY_LOCATION src_location, dst_location;
     ID3D12GraphicsCommandList *command_list;
     D3D12_SUBRESOURCE_DATA texture_data;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *dst_buffers[4];
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12Resource *src_texture;
     unsigned int got, expected;
     ID3D12CommandQueue *queue;
@@ -25653,7 +25653,7 @@ static void test_copy_texture_buffer(void)
     get_buffer_readback_with_command_list(dst_buffers[0], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
     for (i = 0; i < 64 * 32; ++i)
     {
-        got = get_readback_uint(&rb, i, 0, 0);
+        got = get_readback_uint(&rb.rb, i, 0, 0);
         expected = i;
 
         if (got != expected)
@@ -25669,7 +25669,7 @@ static void test_copy_texture_buffer(void)
     {
         for (x = 0; x < 64; ++x)
         {
-            got = get_readback_uint(&rb, 64 * y + x, 0, 0);
+            got = get_readback_uint(&rb.rb, 64 * y + x, 0, 0);
             expected = 64 * (31 - y) + x;
 
             if (got != expected)
@@ -25688,7 +25688,7 @@ static void test_copy_texture_buffer(void)
     {
         for (x = 0; x < 64; ++x)
         {
-            got = get_readback_uint(&rb, 64 * y + x, 0, 0);
+            got = get_readback_uint(&rb.rb, 64 * y + x, 0, 0);
             expected = 64 * y + 63 - x;
 
             if (got != expected)
@@ -25707,7 +25707,7 @@ static void test_copy_texture_buffer(void)
     {
         for (x = 0; x < 64; ++x)
         {
-            got = get_readback_uint(&rb, 64 * y + x, 0, 0);
+            got = get_readback_uint(&rb.rb, 64 * y + x, 0, 0);
             expected = 64 * y + x % 32;
 
             if (got != expected)
@@ -25729,9 +25729,9 @@ static void test_copy_buffer_texture(void)
 {
     D3D12_TEXTURE_COPY_LOCATION src_location, dst_location;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12Resource *zero_buffer;
     ID3D12Resource *dst_texture;
     ID3D12Resource *src_buffer;
@@ -25844,7 +25844,7 @@ static void test_copy_buffer_texture(void)
         {
             for (x = 0; x < 128; ++x)
             {
-                got = get_readback_uint(&rb, x, y, z);
+                got = get_readback_uint(&rb.rb, x, y, z);
 
                 if (2 <= x && x < 6 && 2 <= y && y < 6 && 2 <= z && z < 6)
                     expected = (z - 1) << 16 | (y - 1) << 8 | (x - 1); /* copy region 1 */
@@ -25876,7 +25876,7 @@ static void test_copy_buffer_texture(void)
         {
             for (x = 0; x < 64; ++x)
             {
-                got = get_readback_uint(&rb, x, y, z);
+                got = get_readback_uint(&rb.rb, x, y, z);
                 expected = (z + 1) << 16 | (y + 1) << 8 | (x + 1);
 
                 if (got != expected)
@@ -25904,10 +25904,10 @@ static void test_copy_block_compressed_texture(void)
     D3D12_TEXTURE_COPY_LOCATION src_location, dst_location;
     ID3D12Resource *dst_buffer, *src_buffer;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     unsigned int x, y, block_id;
     struct test_context context;
-    struct resource_readback rb;
     struct uvec4 got, expected;
     ID3D12CommandQueue *queue;
     ID3D12Resource *texture;
@@ -26030,7 +26030,7 @@ static void test_copy_block_compressed_texture(void)
             expected.y = block_id << 8 | 1;
             expected.z = block_id << 8 | 2;
             expected.w = block_id << 8 | 3;
-            got = *get_readback_uvec4(&rb, x, y);
+            got = *get_readback_uvec4(&rb.rb, x, y);
 
             if (!compare_uvec4(&got, &expected))
                 break;
@@ -26050,7 +26050,7 @@ static void test_copy_block_compressed_texture(void)
     expected.y = block_id << 8 | 1;
     expected.z = block_id << 8 | 2;
     expected.w = block_id << 8 | 3;
-    got = *get_readback_uvec4(&rb, 0, 0);
+    got = *get_readback_uvec4(&rb.rb, 0, 0);
     release_resource_readback(&rb);
     ok(compare_uvec4(&got, &expected),
             "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x}.\n",
@@ -26063,7 +26063,7 @@ static void test_copy_block_compressed_texture(void)
     expected.y = block_id << 8 | 1;
     expected.z = block_id << 8 | 2;
     expected.w = block_id << 8 | 3;
-    got = *get_readback_uvec4(&rb, 0, 0);
+    got = *get_readback_uvec4(&rb.rb, 0, 0);
     release_resource_readback(&rb);
     ok(compare_uvec4(&got, &expected),
             "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x}.\n",
@@ -26090,7 +26090,7 @@ static void test_copy_block_compressed_texture(void)
             expected.y = block_id << 8 | 1;
             expected.z = block_id << 8 | 2;
             expected.w = block_id << 8 | 3;
-            got = *get_readback_uvec4(&rb, x + row_offset, 0);
+            got = *get_readback_uvec4(&rb.rb, x + row_offset, 0);
 
             if (!compare_uvec4(&got, &expected))
                 break;
@@ -26118,10 +26118,10 @@ static void test_separate_bindings(void)
     D3D12_DESCRIPTOR_RANGE descriptor_ranges[2];
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[4];
+    struct d3d12_resource_readback rb;
     ID3D12PipelineState *compute_pso;
     ID3D12Resource *cs_cb, *ps_cb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     D3D12_SUBRESOURCE_DATA data;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
@@ -26409,7 +26409,7 @@ static void test_separate_bindings(void)
     transition_resource_state(command_list, cs_raw_uav_buffer,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(cs_raw_uav_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    check_readback_data_uint(&rb, NULL, 0xffffffff, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xffffffff, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(cs_cb);
@@ -26796,9 +26796,9 @@ static void test_geometry_shader(void)
     D3D12_INPUT_LAYOUT_DESC input_layout;
     D3D12_CPU_DESCRIPTOR_HANDLE rtvs[2];
     ID3D12PipelineState *pso_5_0, *pso;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *texture;
@@ -27023,29 +27023,29 @@ static void test_geometry_shader(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    color = get_readback_uint(&rb, 320, 190, 0);
+    color = get_readback_uint(&rb.rb, 320, 190, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 255, 240, 0);
+    color = get_readback_uint(&rb.rb, 255, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 240, 0);
+    color = get_readback_uint(&rb.rb, 320, 240, 0);
     ok(compare_color(color, 0xffffff00, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 385, 240, 0);
+    color = get_readback_uint(&rb.rb, 385, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 290, 0);
+    color = get_readback_uint(&rb.rb, 320, 290, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
     get_texture_readback_with_command_list(texture, 0, &rb, queue, command_list);
-    color = get_readback_uint(&rb, 320, 190, 0);
+    color = get_readback_uint(&rb.rb, 320, 190, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 255, 240, 0);
+    color = get_readback_uint(&rb.rb, 255, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 240, 0);
+    color = get_readback_uint(&rb.rb, 320, 240, 0);
     ok(compare_color(color, 0xffffff00, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 385, 240, 0);
+    color = get_readback_uint(&rb.rb, 385, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
-    color = get_readback_uint(&rb, 320, 290, 0);
+    color = get_readback_uint(&rb.rb, 320, 290, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     release_resource_readback(&rb);
 
@@ -27938,9 +27938,9 @@ static void test_quad_tessellation(void)
     D3D12_QUERY_HEAP_DESC query_heap_desc;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    struct resource_readback rb;
     ID3D12QueryHeap *query_heap;
     struct test_context context;
     ID3D12CommandQueue *queue;
@@ -28042,7 +28042,7 @@ static void test_quad_tessellation(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    check_triangles(&rb, expected_quad_ccw, ARRAY_SIZE(expected_quad_ccw));
+    check_triangles(&rb.rb, expected_quad_ccw, ARRAY_SIZE(expected_quad_ccw));
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -28083,7 +28083,7 @@ static void test_quad_tessellation(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    check_triangles(&rb, expected_quad_cw, ARRAY_SIZE(expected_quad_cw));
+    check_triangles(&rb.rb, expected_quad_cw, ARRAY_SIZE(expected_quad_cw));
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -28129,7 +28129,7 @@ static void test_quad_tessellation(void)
             query_heap, D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0, 0, 2, readback_buffer, 0);
 
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    so_statistics = get_readback_data(&rb, 0, 0, 0, sizeof(*so_statistics));
+    so_statistics = get_readback_data(&rb.rb, 0, 0, 0, sizeof(*so_statistics));
     ok(so_statistics[0].NumPrimitivesWritten == 8, "Got unexpected primitives written %u.\n",
             (unsigned int)so_statistics[0].NumPrimitivesWritten);
     ok(so_statistics[0].PrimitivesStorageNeeded == 8, "Got unexpected primitives storage needed %u.\n",
@@ -28730,9 +28730,9 @@ static void test_line_tessellation(void)
     D3D12_QUERY_HEAP_DESC query_heap_desc;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv[2];
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    struct resource_readback rb;
     ID3D12QueryHeap *query_heap;
     struct test_context context;
     const struct vec4 *expected;
@@ -29011,7 +29011,7 @@ static void test_line_tessellation(void)
             query_heap, D3D12_QUERY_TYPE_SO_STATISTICS_STREAM0, 0, 1, readback_buffer, 0);
 
     get_buffer_readback_with_command_list(readback_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    so_statistics = get_readback_data(&rb, 0, 0, 0, sizeof(*so_statistics));
+    so_statistics = get_readback_data(&rb.rb, 0, 0, 0, sizeof(*so_statistics));
     broken_warp = broken_on_warp(so_statistics[0].NumPrimitivesWritten != 9);
     ok(so_statistics[0].NumPrimitivesWritten == 9 || broken_warp, "Got unexpected primitives written %u.\n",
             (unsigned int)so_statistics[0].NumPrimitivesWritten);
@@ -29031,12 +29031,12 @@ static void test_line_tessellation(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (i = 0; i < ARRAY_SIZE(expected_data) / 3 ; ++i)
     {
-        data = get_readback_data(&rb, i, 0, 0, sizeof(*data));
+        data = get_readback_data(&rb.rb, i, 0, 0, sizeof(*data));
         expected = &expected_data[3 * i + 0];
         ok(compare_vec4(data, expected, 1),
                 "Got position {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at %u.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w, i);
-        data = get_readback_data(&rb, i + 2048 / (2 * sizeof(*data)), 0, 0, 2 * sizeof(*data));
+        data = get_readback_data(&rb.rb, i + 2048 / (2 * sizeof(*data)), 0, 0, 2 * sizeof(*data));
         expected = &expected_data[3 * i + 1];
         bug_if(is_nvidia_device(context.device))
         ok(compare_vec4(data, expected, 1),
@@ -29387,8 +29387,8 @@ static void test_domain_shader_inputs(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12Resource *so_buffer;
     ID3D12CommandQueue *queue;
@@ -29573,7 +29573,7 @@ static void test_domain_shader_inputs(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (y = 0; y < ARRAY_SIZE(reference); ++y)
     {
-        const float *elems = get_readback_data(&rb, y, 0, 0, stride);
+        const float *elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
             ok(compare_float(reference[y][x], elems[x], 0),
@@ -29592,8 +29592,8 @@ static void test_domain_shader_one_patch_constant_input(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12Resource *so_buffer;
     ID3D12CommandQueue *queue;
@@ -29747,7 +29747,7 @@ static void test_domain_shader_one_patch_constant_input(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (y = 0; y < ARRAY_SIZE(reference); ++y)
     {
-        const float *elems = get_readback_data(&rb, y, 0, 0, stride);
+        const float *elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
             ok(compare_float(reference[y][x], elems[x], 0),
@@ -29951,7 +29951,7 @@ static void check_clip_distance(struct test_context *context, ID3D12PipelineStat
 
     ID3D12GraphicsCommandList *command_list = context->list;
     ID3D12CommandQueue *queue = context->queue;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct vertex vertices[4];
     unsigned int i;
     D3D12_BOX box;
@@ -30064,9 +30064,9 @@ static void check_clip_distance(struct test_context *context, ID3D12PipelineStat
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 320, 480, 1);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     set_box(&box, 320, 0, 0, 320, 480, 1);
-    check_readback_data_uint(&rb, &box, 0xffffffff, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xffffffff, 1);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context->allocator);
@@ -30097,9 +30097,9 @@ static void check_clip_distance(struct test_context *context, ID3D12PipelineStat
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 640, 240, 1);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
     set_box(&box, 0, 240, 0, 640, 240, 1);
-    check_readback_data_uint(&rb, &box, 0xffffffff, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xffffffff, 0);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context->allocator);
@@ -30115,9 +30115,9 @@ static void test_clip_distance(void)
     D3D12_ROOT_PARAMETER root_parameters[4];
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     D3D12_VERTEX_BUFFER_VIEW vbv[2];
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12PipelineState *pso;
@@ -30738,11 +30738,11 @@ static void test_clip_distance(void)
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 320, 240, 1);
-    check_readback_data_uint(&rb, &box, 0xff00ff00, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     set_box(&box, 0, 240, 0, 320, 480, 1);
-    check_readback_data_uint(&rb, &box, 0xffffffff, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xffffffff, 1);
     set_box(&box, 320, 0, 0, 640, 480, 1);
-    check_readback_data_uint(&rb, &box, 0xffffffff, 1);
+    check_readback_data_uint(&rb.rb, &box, 0xffffffff, 1);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -30787,10 +30787,10 @@ static void test_combined_clip_and_cull_distances(void)
 {
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     D3D12_VERTEX_BUFFER_VIEW vbv[2];
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb[2];
     ID3D12Device *device;
@@ -30996,9 +30996,9 @@ static void test_combined_clip_and_cull_distances(void)
             else
             {
                 get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-                color = get_readback_uint(&rb, 160, 240, 0);
+                color = get_readback_uint(&rb.rb, 160, 240, 0);
                 ok(color == expected_color[0], "Got unexpected color 0x%08x.\n", color);
-                color = get_readback_uint(&rb, 480, 240, 0);
+                color = get_readback_uint(&rb.rb, 480, 240, 0);
                 ok(color == expected_color[1], "Got unexpected color 0x%08x.\n", color);
                 release_resource_readback(&rb);
             }
@@ -31203,9 +31203,9 @@ static void test_64kb_texture_alignment(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_RESOURCE_ALLOCATION_INFO info;
     D3D12_SUBRESOURCE_DATA texture_data;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12Resource *textures[2];
     D3D12_HEAP_DESC heap_desc;
     ID3D12CommandQueue *queue;
@@ -31283,7 +31283,7 @@ static void test_64kb_texture_alignment(void)
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, resource_desc.Width, resource_desc.Height, 1);
-    check_readback_data_uint(&rb, &box, 0xcafef00d, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xcafef00d, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(textures[1]);
@@ -31295,7 +31295,7 @@ static void test_64kb_texture_alignment(void)
     /* If the heap could not be used, the texture is not aliased. */
     reset_command_list(command_list, context.allocator);
     get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
-    check_readback_data_uint(&rb, &box, 0xdeadbeef, 0);
+    check_readback_data_uint(&rb.rb, &box, 0xdeadbeef, 0);
     release_resource_readback(&rb);
 
     free(upload_buffer);
@@ -32277,9 +32277,9 @@ static void test_shader_sample_position(void)
     ID3D12Resource *texture, *readback_texture;
     ID3D12GraphicsCommandList *command_list;
     D3D12_HEAP_PROPERTIES heap_properties;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -32378,7 +32378,7 @@ static void test_shader_sample_position(void)
     get_texture_readback_with_command_list(readback_texture, 0, &rb, queue, command_list);
     for (i = 0; i < resource_desc.SampleDesc.Count; ++i)
     {
-        const struct vec4 *position = get_readback_vec4(&rb, i, 0);
+        const struct vec4 *position = get_readback_vec4(&rb.rb, i, 0);
 
         vkd3d_test_set_context("Sample %u", i);
 
@@ -32589,11 +32589,11 @@ static void test_primitive_restart(void)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     struct test_context context;
     D3D12_INDEX_BUFFER_VIEW ibv;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     unsigned int index_count;
     ID3D12Resource *ib, *vb;
@@ -32731,15 +32731,15 @@ static void test_primitive_restart(void)
         if (tests[i].full_quad)
         {
             todo_if(tests[i].is_todo)
-            check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
+            check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
         }
         else
         {
             set_box(&box, 16, 0, 0, 32, 10, 1);
             todo_if(tests[i].is_todo)
-            check_readback_data_uint(&rb, &box, 0xffffffff, 0);
+            check_readback_data_uint(&rb.rb, &box, 0xffffffff, 0);
             set_box(&box, 0, 16, 0, 16, 32, 1);
-            check_readback_data_uint(&rb, &box, 0xff00ff00, 0);
+            check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
         }
         release_resource_readback(&rb);
 
@@ -32763,9 +32763,9 @@ static void test_vertex_shader_stream_output(void)
     ID3D12Resource *counter_buffer, *so_buffer;
     ID3D12GraphicsCommandList *command_list;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *upload_buffer;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     unsigned int counter, i;
@@ -32841,7 +32841,7 @@ static void test_vertex_shader_stream_output(void)
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_buffer_readback_with_command_list(counter_buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    counter = get_readback_uint(&rb, 0, 0, 0);
+    counter = get_readback_uint(&rb.rb, 0, 0, 0);
     ok(counter == 3 * sizeof(struct vec4), "Got unexpected counter %u.\n", counter);
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
@@ -32849,7 +32849,7 @@ static void test_vertex_shader_stream_output(void)
     for (i = 0; i < ARRAY_SIZE(expected_output); ++i)
     {
         const struct vec4 *expected = &expected_output[i];
-        data = get_readback_vec4(&rb, i, 0);
+        data = get_readback_vec4(&rb.rb, i, 0);
         ok(compare_vec4(data, expected, 1),
                 "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e}.\n",
                 data->x, data->y, data->z, data->w, expected->x, expected->y, expected->z, expected->w);
@@ -32869,10 +32869,10 @@ static void test_read_write_subresource(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_SUBRESOURCE_DATA texture_data;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context_desc desc;
     struct test_context context;
-    struct resource_readback rb;
     ID3D12Resource *src_texture;
     ID3D12Resource *dst_texture;
     ID3D12CommandQueue *queue;
@@ -33106,7 +33106,7 @@ static void test_read_write_subresource(void)
                 else /* Untouched */
                     expected = 0;
 
-                got = get_readback_uint(&rb, x, y, z);
+                got = get_readback_uint(&rb.rb, x, y, z);
                 if (got != expected)
                     break;
             }
@@ -33180,10 +33180,10 @@ static void test_queue_wait(void)
     ID3D12GraphicsCommandList *command_list;
     ID3D12Resource *readback_buffer, *cb;
     ID3D12CommandQueue *queue, *queue2;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     uint64_t row_pitch, buffer_size;
     struct test_context_desc desc;
-    struct resource_readback rb;
     ID3D12Fence *fence, *fence2;
     struct test_context context;
     ID3D12Device *device;
@@ -33286,7 +33286,7 @@ static void test_queue_wait(void)
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
 
     /* Wait() before CPU signal */
@@ -33299,7 +33299,7 @@ static void test_queue_wait(void)
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got unexpected return value %#x.\n", ret);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
     value = ID3D12Fence_GetCompletedValue(fence2);
     ok(value == 0, "Got unexpected value %"PRIu64".\n", value);
@@ -33311,7 +33311,7 @@ static void test_queue_wait(void)
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got unexpected return value %#x.\n", ret);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xffff0000, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xffff0000, 0);
     release_resource_readback(&rb);
     value = ID3D12Fence_GetCompletedValue(fence2);
     ok(value == 1, "Got unexpected value %"PRIu64".\n", value);
@@ -33326,7 +33326,7 @@ static void test_queue_wait(void)
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got unexpected return value %#x.\n", ret);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xffff0000, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xffff0000, 0);
     release_resource_readback(&rb);
     value = ID3D12Fence_GetCompletedValue(fence2);
     ok(value == 1, "Got unexpected value %"PRIu64".\n", value);
@@ -33337,7 +33337,7 @@ static void test_queue_wait(void)
     ret = wait_event(event, 0);
     ok(ret == WAIT_TIMEOUT, "Got unexpected return value %#x.\n", ret);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
     value = ID3D12Fence_GetCompletedValue(fence2);
     ok(value == 2, "Got unexpected value %"PRIu64".\n", value);
@@ -33352,7 +33352,7 @@ static void test_queue_wait(void)
     ok(hr == S_OK, "Failed to signal fence, hr %#x.\n", hr);
     wait_queue_idle(device, queue);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xffff0000, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xffff0000, 0);
     release_resource_readback(&rb);
 
     /* signal to a lower value after a GPU wait was used (test timeline semaphore replacement) */
@@ -33367,7 +33367,7 @@ static void test_queue_wait(void)
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xff00ff00, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
     release_resource_readback(&rb);
 
     /* Signal() and Wait() in the same command queue */
@@ -33377,7 +33377,7 @@ static void test_queue_wait(void)
     exec_command_list(queue, command_list);
     wait_queue_idle(device, queue);
     init_readback(&rb, readback_buffer, buffer_size, resource_desc.Width, resource_desc.Height, 1, row_pitch);
-    check_readback_data_uint(&rb, NULL, 0xffff0000, 0);
+    check_readback_data_uint(&rb.rb, NULL, 0xffff0000, 0);
     release_resource_readback(&rb);
 
     value = ID3D12Fence_GetCompletedValue(fence);
@@ -33403,8 +33403,8 @@ static void test_graphics_compute_queue_synchronization(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_ROOT_PARAMETER root_parameters[2];
     ID3D12CommandAllocator *allocators[3];
+    struct d3d12_resource_readback rb;
     struct test_context_desc desc;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12Fence *fence, *fence2;
     ID3D12Resource *buffer;
@@ -33590,7 +33590,7 @@ static void test_graphics_compute_queue_synchronization(void)
     transition_resource_state(command_list, buffer,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    value = get_readback_uint(&rb, 0, 0, 0);
+    value = get_readback_uint(&rb.rb, 0, 0, 0);
     ok(value == 24, "Got unexpected value %u.\n", value);
     release_resource_readback(&rb);
 
@@ -33787,10 +33787,10 @@ static void test_conditional_rendering(void)
     D3D12_HEAP_PROPERTIES heap_properties;
     ID3D12PipelineState *pipeline_state;
     ID3D12RootSignature *root_signature;
+    struct d3d12_resource_readback rb;
     D3D12_RESOURCE_DESC resource_desc;
     struct test_context context;
     ID3D12Resource *buffer, *cb;
-    struct resource_readback rb;
     ID3D12CommandQueue *queue;
     unsigned int i;
     uint32_t value;
@@ -33906,7 +33906,7 @@ static void test_conditional_rendering(void)
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     bug_if(is_radv_device(context.device))
-    todo check_readback_data_uint(&rb, NULL, 0xffffffff, 0);
+    todo check_readback_data_uint(&rb.rb, NULL, 0xffffffff, 0);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -33958,7 +33958,7 @@ static void test_conditional_rendering(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    todo check_readback_data_uint(&rb, NULL, 0xffffffff, 0);
+    todo check_readback_data_uint(&rb.rb, NULL, 0xffffffff, 0);
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
     transition_resource_state(command_list, context.render_target,
@@ -34075,7 +34075,7 @@ static void test_conditional_rendering(void)
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_texture_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
-    todo check_readback_data_uint(&rb, NULL, r8g8b8a8_data[1], 0);
+    todo check_readback_data_uint(&rb.rb, NULL, r8g8b8a8_data[1], 0);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -34141,7 +34141,7 @@ static void test_conditional_rendering(void)
 
     get_texture_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
     bug_if(is_radv_device(context.device))
-    todo check_readback_data_uint(&rb, NULL, r8g8b8a8_data[1], 0);
+    todo check_readback_data_uint(&rb.rb, NULL, r8g8b8a8_data[1], 0);
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
@@ -34205,7 +34205,7 @@ static void test_conditional_rendering(void)
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
         get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-        value = get_readback_uint(&rb, 0, 0, 0);
+        value = get_readback_uint(&rb.rb, 0, 0, 0);
         ok(value == (!i ? init_value : input.value), "Got %#x, expected %#x.\n", value, input.value);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
@@ -34596,7 +34596,7 @@ static void test_write_buffer_immediate(void)
     ID3D12GraphicsCommandList2 *command_list2;
     D3D12_WRITEBUFFERIMMEDIATE_MODE modes[2];
     ID3D12GraphicsCommandList *command_list;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Resource *buffer;
@@ -34637,9 +34637,9 @@ static void test_write_buffer_immediate(void)
     reset_command_list(command_list, context.allocator);
 
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    value = get_readback_uint(&rb, 0, 0, 0);
+    value = get_readback_uint(&rb.rb, 0, 0, 0);
     todo ok(value == parameters[0].Value, "Got unexpected value %#x, expected %#x.\n", value, parameters[0].Value);
-    value = get_readback_uint(&rb, 1, 0, 0);
+    value = get_readback_uint(&rb.rb, 1, 0, 0);
     todo ok(value == parameters[1].Value, "Got unexpected value %#x, expected %#x.\n", value, parameters[1].Value);
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
@@ -34656,9 +34656,9 @@ static void test_write_buffer_immediate(void)
     reset_command_list(command_list, context.allocator);
 
     get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-    value = get_readback_uint(&rb, 0, 0, 0);
+    value = get_readback_uint(&rb.rb, 0, 0, 0);
     todo ok(value == parameters[0].Value, "Got unexpected value %#x, expected %#x.\n", value, parameters[0].Value);
-    value = get_readback_uint(&rb, 1, 0, 0);
+    value = get_readback_uint(&rb.rb, 1, 0, 0);
     todo ok(value == parameters[1].Value, "Got unexpected value %#x, expected %#x.\n", value, parameters[1].Value);
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
@@ -35037,10 +35037,10 @@ static void test_hull_shader_relative_addressing(void)
     D3D12_ROOT_PARAMETER root_parameters[1];
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *vb, *so_buffer;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     HRESULT hr;
@@ -35261,7 +35261,7 @@ static void test_hull_shader_relative_addressing(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    check_triangles(&rb, &expected_triangle, 1);
+    check_triangles(&rb.rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -35275,10 +35275,10 @@ static void test_hull_shader_patch_constant_inputs(void)
     ID3D12GraphicsCommandList *command_list;
     D3D12_STREAM_OUTPUT_BUFFER_VIEW sobv;
     D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
     ID3D12Resource *vb, *so_buffer;
     struct test_context_desc desc;
     D3D12_VERTEX_BUFFER_VIEW vbv;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     HRESULT hr;
@@ -35493,7 +35493,7 @@ static void test_hull_shader_patch_constant_inputs(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    check_triangles(&rb, &expected_triangle, 1);
+    check_triangles(&rb.rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -35508,8 +35508,8 @@ static void test_resource_arrays(void)
     D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc;
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     unsigned int descriptor_count;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -35682,7 +35682,7 @@ static void test_resource_arrays(void)
         transition_sub_resource_state(command_list, output_buffers[i], 0,
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
-        check_readback_data_uint(&rb, NULL, uav_data[i], 0);
+        check_readback_data_uint(&rb.rb, NULL, uav_data[i], 0);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
     }
@@ -35704,7 +35704,7 @@ static void test_unbounded_resource_arrays(void)
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc;
     ID3D12GraphicsCommandList *command_list;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
     struct test_context context;
     ID3D12DescriptorHeap *heap;
     ID3D12CommandQueue *queue;
@@ -35861,7 +35861,7 @@ static void test_unbounded_resource_arrays(void)
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_buffer_readback_with_command_list(output_buffers[i], DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         /* Buffers at index >= 64 are aliased. */
-        check_readback_data_uint(&rb, NULL, (i < 64 ? 63 - i : 127 - i) ^ 0x35, 0);
+        check_readback_data_uint(&rb.rb, NULL, (i < 64 ? 63 - i : 127 - i) ^ 0x35, 0);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
     }
@@ -35884,9 +35884,9 @@ static void test_unbounded_samplers(void)
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc;
     ID3D12GraphicsCommandList *command_list;
+    struct d3d12_resource_readback rb;
     D3D12_SAMPLER_DESC sampler_desc;
     D3D12_SUBRESOURCE_DATA data;
-    struct resource_readback rb;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -36005,7 +36005,7 @@ static void test_unbounded_samplers(void)
     get_buffer_readback_with_command_list(output_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (i = 0; i < 64; ++i)
     {
-        unsigned int value = get_readback_uint(&rb, i, 0, 0);
+        unsigned int value = get_readback_uint(&rb.rb, i, 0, 0);
         unsigned int expected = (i & 1) ? 100 : 10;
         ok(value == expected, "Got %u, expected %u at %u.\n", value, expected, i);
     }

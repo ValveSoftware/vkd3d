@@ -314,13 +314,13 @@ static void d3d12_runner_probe_vec4(struct shader_runner *r,
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     transition_resource_state(test_context->list, test_context->render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(test_context->render_target, 0, &rb,
             test_context->queue, test_context->list);
-    todo_if (runner->r.is_todo) check_readback_data_vec4(&rb, rect, v, ulps);
+    todo_if (runner->r.is_todo) check_readback_data_vec4(&rb.rb, rect, v, ulps);
     release_resource_readback(&rb);
     reset_command_list(test_context->list, test_context->allocator);
     transition_resource_state(test_context->list, test_context->render_target,

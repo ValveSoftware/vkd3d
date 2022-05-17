@@ -416,13 +416,18 @@ struct resource_readback
     uint64_t width;
     unsigned int height;
     unsigned int depth;
-    ID3D12Resource *resource;
     uint64_t row_pitch;
     void *data;
 };
 
+struct d3d12_resource_readback
+{
+    struct resource_readback rb;
+    ID3D12Resource *resource;
+};
+
 static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsigned int sub_resource,
-        struct resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+        struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
     D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
     D3D12_HEAP_PROPERTIES heap_properties;
@@ -442,14 +447,14 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
             "Resource %p is not texture.\n", texture);
 
     miplevel = sub_resource % resource_desc.MipLevels;
-    rb->width = max(1, resource_desc.Width >> miplevel);
-    rb->width = align(rb->width, format_block_width(resource_desc.Format));
-    rb->height = max(1, resource_desc.Height >> miplevel);
-    rb->height = align(rb->height, format_block_height(resource_desc.Format));
-    rb->depth = resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D
+    rb->rb.width = max(1, resource_desc.Width >> miplevel);
+    rb->rb.width = align(rb->rb.width, format_block_width(resource_desc.Format));
+    rb->rb.height = max(1, resource_desc.Height >> miplevel);
+    rb->rb.height = align(rb->rb.height, format_block_height(resource_desc.Format));
+    rb->rb.depth = resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D
             ? max(1, resource_desc.DepthOrArraySize >> miplevel) : 1;
-    rb->row_pitch = align(rb->width * format_size(resource_desc.Format), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-    rb->data = NULL;
+    rb->rb.row_pitch = align(rb->rb.width * format_size(resource_desc.Format), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    rb->rb.data = NULL;
 
     if (resource_desc.SampleDesc.Count > 1)
     {
@@ -477,17 +482,17 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
         src_resource = texture;
     }
 
-    buffer_size = rb->row_pitch * rb->height * rb->depth;
+    buffer_size = rb->rb.row_pitch * rb->rb.height * rb->rb.depth;
     rb->resource = create_readback_buffer(device, buffer_size);
 
     dst_location.pResource = rb->resource;
     dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
     dst_location.PlacedFootprint.Offset = 0;
     dst_location.PlacedFootprint.Footprint.Format = resource_desc.Format;
-    dst_location.PlacedFootprint.Footprint.Width = rb->width;
-    dst_location.PlacedFootprint.Footprint.Height = rb->height;
-    dst_location.PlacedFootprint.Footprint.Depth = rb->depth;
-    dst_location.PlacedFootprint.Footprint.RowPitch = rb->row_pitch;
+    dst_location.PlacedFootprint.Footprint.Width = rb->rb.width;
+    dst_location.PlacedFootprint.Footprint.Height = rb->rb.height;
+    dst_location.PlacedFootprint.Footprint.Depth = rb->rb.depth;
+    dst_location.PlacedFootprint.Footprint.RowPitch = rb->rb.row_pitch;
 
     src_location.pResource = src_resource;
     src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
@@ -506,7 +511,7 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
 
     read_range.Begin = 0;
     read_range.End = buffer_size;
-    hr = ID3D12Resource_Map(rb->resource, 0, &read_range, &rb->data);
+    hr = ID3D12Resource_Map(rb->resource, 0, &read_range, &rb->rb.data);
     assert_that(hr == S_OK, "Failed to map readback buffer, hr %#x.\n", hr);
 }
 
@@ -528,7 +533,7 @@ static const struct vec4 *get_readback_vec4(struct resource_readback *rb, unsign
     return get_readback_data(rb, x, y, 0, sizeof(struct vec4));
 }
 
-static void release_resource_readback(struct resource_readback *rb)
+static void release_resource_readback(struct d3d12_resource_readback *rb)
 {
     D3D12_RANGE range = {0, 0};
     ID3D12Resource_Unmap(rb->resource, 0, &range);
@@ -604,10 +609,10 @@ static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *t
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         unsigned int expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_uint_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_uint_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
@@ -616,10 +621,10 @@ static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *t
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const struct vec4 *expected, unsigned int max_diff)
 {
-    struct resource_readback rb;
+    struct d3d12_resource_readback rb;
 
     get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
-    check_readback_data_vec4_(line, &rb, NULL, expected, max_diff);
+    check_readback_data_vec4_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
