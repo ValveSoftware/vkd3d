@@ -413,7 +413,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         unsigned int left, top, right, bottom, ulps;
         struct resource_readback *rb;
-        struct vec4 v;
         int ret, len;
         RECT rect;
 
@@ -439,17 +438,35 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             fatal_error("Malformed probe arguments '%s'.\n", line);
         }
 
-        if (!match_string(line, "rgba", &line))
-            fatal_error("Malformed probe arguments '%s'.\n", line);
-
-        ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
-        if (ret < 4)
-            fatal_error("Malformed probe arguments '%s'.\n", line);
-        if (ret < 5)
-            ulps = 0;
-
         rb = runner->ops->get_rt_readback(runner);
-        todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
+
+        if (match_string(line, "rgba", &line))
+        {
+            struct vec4 v;
+
+            ret = sscanf(line, "( %f , %f , %f , %f ) %u", &v.x, &v.y, &v.z, &v.w, &ulps);
+            if (ret < 4)
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            if (ret < 5)
+                ulps = 0;
+            todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
+        }
+        else if (match_string(line, "r", &line))
+        {
+            float expect;
+
+            ret = sscanf(line, "( %f ) %u", &expect, &ulps);
+            if (ret < 1)
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            if (ret < 2)
+                ulps = 0;
+            todo_if(runner->is_todo) check_readback_data_float(rb, &rect, expect, ulps);
+        }
+        else
+        {
+            fatal_error("Malformed probe arguments '%s'.\n", line);
+        }
+
         runner->ops->release_readback(runner, rb);
     }
     else if (match_string(line, "uniform", &line))
