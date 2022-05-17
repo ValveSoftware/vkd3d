@@ -540,15 +540,16 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     return true;
 }
 
-struct resource_readback
+struct d3d11_resource_readback
 {
+    struct resource_readback rb;
     ID3D11Resource *resource;
-    D3D11_MAPPED_SUBRESOURCE map_desc;
 };
 
-static void init_readback(struct d3d11_shader_runner *runner, struct resource_readback *rb)
+static void init_readback(struct d3d11_shader_runner *runner, struct d3d11_resource_readback *rb)
 {
     D3D11_TEXTURE2D_DESC texture_desc;
+    D3D11_MAPPED_SUBRESOURCE map_desc;
     HRESULT hr;
 
     ID3D11Texture2D_GetDesc(runner->rt, &texture_desc);
@@ -560,11 +561,17 @@ static void init_readback(struct d3d11_shader_runner *runner, struct resource_re
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
     ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, (ID3D11Resource *)runner->rt);
-    hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &rb->map_desc);
+    hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
+
+    rb->rb.data = map_desc.pData;
+    rb->rb.row_pitch = map_desc.RowPitch;
+    rb->rb.width = texture_desc.Width;
+    rb->rb.height = texture_desc.Height;
+    rb->rb.depth = 1;
 }
 
-static void release_readback(struct d3d11_shader_runner *runner, struct resource_readback *rb)
+static void release_readback(struct d3d11_shader_runner *runner, struct d3d11_resource_readback *rb)
 {
     ID3D11DeviceContext_Unmap(runner->immediate_context, rb->resource, 0);
     ID3D11Resource_Release(rb->resource);
@@ -572,7 +579,7 @@ static void release_readback(struct d3d11_shader_runner *runner, struct resource
 
 static const struct vec4 *get_readback_vec4(struct resource_readback *rb, unsigned int x, unsigned int y)
 {
-    return (struct vec4 *)((BYTE *)rb->map_desc.pData + y * rb->map_desc.RowPitch) + x;
+    return (struct vec4 *)((BYTE *)rb->data + y * rb->row_pitch) + x;
 }
 
 static void check_readback_data_vec4(struct resource_readback *rb,
@@ -603,10 +610,10 @@ static void check_readback_data_vec4(struct resource_readback *rb,
 static void d3d11_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
-    struct resource_readback rb;
+    struct d3d11_resource_readback rb;
 
     init_readback(runner, &rb);
-    check_readback_data_vec4(&rb, rect, v, ulps);
+    check_readback_data_vec4(&rb.rb, rect, v, ulps);
     release_readback(runner, &rb);
 }
 

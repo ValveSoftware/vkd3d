@@ -449,14 +449,15 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     return true;
 }
 
-struct resource_readback
+struct d3d9_resource_readback
 {
+    struct resource_readback rb;
     IDirect3DSurface9 *surface;
-    D3DLOCKED_RECT rect;
 };
 
-static void init_readback(struct d3d9_shader_runner *runner, struct resource_readback *rb)
+static void init_readback(struct d3d9_shader_runner *runner, struct d3d9_resource_readback *rb)
 {
+    D3DLOCKED_RECT map_desc;
     D3DSURFACE_DESC desc;
     HRESULT hr;
 
@@ -469,13 +470,19 @@ static void init_readback(struct d3d9_shader_runner *runner, struct resource_rea
     hr = IDirect3DDevice9Ex_GetRenderTargetData(runner->device, runner->rt, rb->surface);
     ok(hr == D3D_OK, "Failed to get render target data, hr %#lx.\n", hr);
 
-    hr = IDirect3DSurface9_LockRect(rb->surface, &rb->rect, NULL, D3DLOCK_READONLY);
+    hr = IDirect3DSurface9_LockRect(rb->surface, &map_desc, NULL, D3DLOCK_READONLY);
     ok(hr == D3D_OK, "Failed to lock surface, hr %#lx.\n", hr);
+
+    rb->rb.data = map_desc.pBits;
+    rb->rb.row_pitch = map_desc.Pitch;
+    rb->rb.width = desc.Width;
+    rb->rb.height = desc.Height;
+    rb->rb.depth = 1;
 }
 
 static const struct vec4 *get_readback_vec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
 {
-    return (struct vec4 *)((BYTE *)rb->rect.pBits + y * rb->rect.Pitch + x * sizeof(struct vec4));
+    return (struct vec4 *)((BYTE *)rb->data + y * rb->row_pitch + x * sizeof(struct vec4));
 }
 
 static void check_readback_data_vec4(struct resource_readback *rb,
@@ -503,7 +510,7 @@ static void check_readback_data_vec4(struct resource_readback *rb,
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
-static void release_readback(struct resource_readback *rb)
+static void release_readback(struct d3d9_resource_readback *rb)
 {
     IDirect3DSurface9_UnlockRect(rb->surface);
     IDirect3DSurface9_Release(rb->surface);
@@ -512,10 +519,10 @@ static void release_readback(struct resource_readback *rb)
 static void d3d9_runner_probe_vec4(struct shader_runner *r, const RECT *rect, const struct vec4 *v, unsigned int ulps)
 {
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
-    struct resource_readback rb;
+    struct d3d9_resource_readback rb;
 
     init_readback(runner, &rb);
-    check_readback_data_vec4(&rb, rect, v, ulps);
+    check_readback_data_vec4(&rb.rb, rect, v, ulps);
     release_readback(&rb);
 }
 

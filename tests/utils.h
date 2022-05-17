@@ -21,6 +21,7 @@
 
 #include <limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 struct vec2
@@ -31,6 +32,15 @@ struct vec2
 struct vec4
 {
     float x, y, z, w;
+};
+
+struct resource_readback
+{
+    uint64_t width;
+    unsigned int height;
+    unsigned int depth;
+    uint64_t row_pitch;
+    void *data;
 };
 
 static inline bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size)

@@ -411,15 +411,6 @@ static inline unsigned int format_block_height(DXGI_FORMAT format)
     }
 }
 
-struct resource_readback
-{
-    uint64_t width;
-    unsigned int height;
-    unsigned int depth;
-    uint64_t row_pitch;
-    void *data;
-};
-
 struct d3d12_resource_readback
 {
     struct resource_readback rb;
