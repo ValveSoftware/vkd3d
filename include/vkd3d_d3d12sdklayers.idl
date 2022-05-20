@@ -899,6 +899,13 @@ typedef enum D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE
     NUM_D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODES = 0x4,
 } D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE;
 
+typedef enum D3D12_GPU_BASED_VALIDATION_FLAGS
+{
+    D3D12_GPU_BASED_VALIDATION_FLAGS_NONE = 0x00,
+    D3D12_GPU_BASED_VALIDATION_FLAGS_DISABLE_STATE_TRACKING = 0x01,
+} D3D12_GPU_BASED_VALIDATION_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_GPU_BASED_VALIDATION_FLAGS)")
+
 typedef struct D3D12_MESSAGE
 {
     D3D12_MESSAGE_CATEGORY Category;
@@ -946,6 +953,52 @@ interface ID3D12Debug1 : IUnknown
     void EnableDebugLayer();
     void SetEnableGPUBasedValidation(BOOL enable);
     void SetEnableSynchronizedCommandQueueValidation(BOOL enable);
+}
+
+[
+    uuid(93a665c4-a3b2-4e5d-b692-a26ae14e3374),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Debug2 : IUnknown
+{
+    void SetGPUBasedValidationFlags(D3D12_GPU_BASED_VALIDATION_FLAGS flags);
+}
+
+[
+    uuid(5cf4e58f-f671-4ff1-a542-3686e3d153d1),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Debug3 : ID3D12Debug
+{
+    void SetEnableGPUBasedValidation(BOOL enable);
+    void SetEnableSynchronizedCommandQueueValidation(BOOL enable);
+    void SetGPUBasedValidationFlags(D3D12_GPU_BASED_VALIDATION_FLAGS flags);
+}
+
+[
+    uuid(014b816e-9ec5-4a2f-a845-ffbe441ce13a),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Debug4 : ID3D12Debug3
+{
+    void DisableDebugLayer();
+}
+
+[
+    uuid(548d6b12-09fa-40e0-9069-5dcd589a52c9),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Debug5 : ID3D12Debug4
+{
+    void SetEnableAutoName(BOOL enable);
 }
 
 [
