@@ -536,3 +536,9 @@ HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
     }
     return hr;
 }
+
+void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback)
+{
+    vkd3d_set_log_callback(callback);
+    vkd3d_dbg_set_log_callback(callback);
+}

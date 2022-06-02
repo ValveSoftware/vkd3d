@@ -75,6 +75,21 @@ VKD3D_UTILS_API HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, cons
         const D3D_SHADER_MACRO *defines, ID3DInclude *include,
         ID3DBlob **shader, ID3DBlob **error_messages);
 
+/**
+ * Set a callback to be called when vkd3d-utils outputs debug logging.
+ *
+ * If NULL, or if this function has not been called, libvkd3d-utils will print
+ * all enabled log output to stderr.
+ *
+ * Calling this function will also set the log callback for libvkd3d and
+ * libvkd3d-shader.
+ *
+ * \param callback Callback function to set.
+ *
+ * \since 1.4
+ */
+VKD3D_UTILS_API void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback);
+
 #ifdef __cplusplus
 }
 #endif  /* __cplusplus */
