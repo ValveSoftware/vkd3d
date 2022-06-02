@@ -1550,3 +1550,8 @@ int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info
     vkd3d_shader_message_context_cleanup(&message_context);
     return ret;
 }
+
+void vkd3d_shader_set_log_callback(PFN_vkd3d_log callback)
+{
+    vkd3d_dbg_set_log_callback(callback);
+}

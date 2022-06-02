@@ -17,6 +17,7 @@ global:
     vkd3d_shader_preprocess;
     vkd3d_shader_scan;
     vkd3d_shader_serialize_root_signature;
+    vkd3d_shader_set_log_callback;
 
 local: *;
 };
