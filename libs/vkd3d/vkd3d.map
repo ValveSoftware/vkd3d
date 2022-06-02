@@ -22,6 +22,7 @@ global:
     vkd3d_resource_incref;
     vkd3d_serialize_root_signature;
     vkd3d_serialize_versioned_root_signature;
+    vkd3d_set_log_callback;
 
 local: *;
 };
