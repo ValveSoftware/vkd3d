@@ -2376,6 +2376,8 @@ struct vkd3d_dxbc_compiler *vkd3d_dxbc_compiler_create(const struct vkd3d_shader
 
             default:
                 WARN("Ignoring unrecognised option %#x with value %#x.\n", option->name, option->value);
+
+            case VKD3D_SHADER_COMPILE_OPTION_API_VERSION:
                 break;
         }
     }
