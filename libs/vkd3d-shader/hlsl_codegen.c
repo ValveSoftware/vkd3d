@@ -21,6 +21,22 @@
 #include "hlsl.h"
 #include <stdio.h>
 
+static unsigned int minor_size(const struct hlsl_type *type)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+static unsigned int major_size(const struct hlsl_type *type)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimy;
+    else
+        return type->dimx;
+}
+
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
@@ -140,6 +156,21 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_store *store;
     struct hlsl_ir_var *output;
     struct hlsl_ir_load *load;
+
+    if (type->type == HLSL_CLASS_MATRIX)
+    {
+        struct hlsl_type *vector_type = hlsl_get_vector_type(ctx, type->base_type, minor_size(type));
+        struct hlsl_semantic vector_semantic = *semantic;
+        unsigned int i;
+
+        for (i = 0; i < major_size(type); ++i)
+        {
+            append_output_copy(ctx, instrs, var, vector_type, 4 * i, modifiers, &vector_semantic);
+            ++vector_semantic.index;
+        }
+
+        return;
+    }
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return;
@@ -845,22 +876,6 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     list_remove(&store->node.entry);
     hlsl_free_instr(&store->node);
     return true;
-}
-
-static unsigned int minor_size(const struct hlsl_type *type)
-{
-    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return type->dimx;
-    else
-        return type->dimy;
-}
-
-static unsigned int major_size(const struct hlsl_type *type)
-{
-    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return type->dimy;
-    else
-        return type->dimx;
 }
 
 static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
