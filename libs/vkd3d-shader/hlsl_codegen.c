@@ -1378,7 +1378,7 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
                     var->last_read, var->data_type->reg_size);
         else
             var->reg = allocate_register(ctx, liveness, var->first_write,
-                    var->last_read, var->data_type->dimx);
+                    var->last_read, hlsl_type_component_count(var->data_type));
         TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
                 debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
     }
