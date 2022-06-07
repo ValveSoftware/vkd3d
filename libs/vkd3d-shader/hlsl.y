@@ -266,7 +266,7 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
     return false;
 }
 
-static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
@@ -274,6 +274,17 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
 
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
+
+    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
+        return NULL;
+    list_add_tail(instrs, &cast->node.entry);
+    return &cast->node;
+}
+
+static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct list *instrs,
+        struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *src_type = node->data_type;
 
     if (!implicit_compatible_data_types(src_type, dst_type))
     {
@@ -293,10 +304,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
         hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
                 src_type->type == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
-    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
-        return NULL;
-    list_add_tail(instrs, &cast->node.entry);
-    return &cast->node;
+    return add_cast(ctx, instrs, node, dst_type, loc);
 }
 
 static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, const struct vkd3d_shader_location loc)
@@ -3718,7 +3726,6 @@ unary_expr:
         {
             struct hlsl_type *src_type = node_from_list($6)->data_type;
             struct hlsl_type *dst_type;
-            struct hlsl_ir_expr *cast;
             unsigned int i;
 
             if ($2)
@@ -3746,12 +3753,11 @@ unary_expr:
                 YYABORT;
             }
 
-            if (!(cast = hlsl_new_cast(ctx, node_from_list($6), dst_type, &@3)))
+            if (!add_cast(ctx, $6, node_from_list($6), dst_type, &@3))
             {
                 hlsl_free_instr_list($6);
                 YYABORT;
             }
-            list_add_tail($6, &cast->node.entry);
             $$ = $6;
         }
 
