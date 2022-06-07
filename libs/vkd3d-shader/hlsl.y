@@ -589,7 +589,7 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     return !!add_load(ctx, instrs, record, &c->node, field->type, loc);
 }
 
-static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc);
 
@@ -597,8 +597,7 @@ static struct hlsl_ir_node *add_matrix_scalar_load(struct hlsl_ctx *ctx, struct 
         struct hlsl_ir_node *matrix, struct hlsl_ir_node *x, struct hlsl_ir_node *y,
         const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *major, *minor;
-    struct hlsl_ir_expr *mul, *add;
+    struct hlsl_ir_node *major, *minor, *mul, *add;
     struct hlsl_ir_constant *four;
     struct hlsl_ir_load *load;
     struct hlsl_type *type = matrix->data_type, *scalar_type;
@@ -623,10 +622,10 @@ static struct hlsl_ir_node *add_matrix_scalar_load(struct hlsl_ctx *ctx, struct 
     if (!(mul = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_MUL, &four->node, major, loc)))
         return NULL;
 
-    if (!(add = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_ADD, &mul->node, minor, loc)))
+    if (!(add = add_binary_arithmetic_expr(ctx, instrs, HLSL_OP2_ADD, mul, minor, loc)))
         return NULL;
 
-    if (!(load = add_load(ctx, instrs, matrix, &add->node, scalar_type, *loc)))
+    if (!(load = add_load(ctx, instrs, matrix, add, scalar_type, *loc)))
         return NULL;
 
     return &load->node;
@@ -1117,7 +1116,7 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
     return true;
 }
 
-static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
@@ -1132,7 +1131,7 @@ static struct hlsl_ir_expr *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         hlsl_src_from_node(&expr->operands[i], operands[i]);
     list_add_tail(instrs, &expr->node.entry);
 
-    return expr;
+    return &expr->node;
 }
 
 static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)
@@ -1156,7 +1155,7 @@ static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *
     }
 }
 
-static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
@@ -1164,7 +1163,7 @@ static struct hlsl_ir_expr *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
     return add_expr(ctx, instrs, op, args, arg->data_type, loc);
 }
 
-static struct hlsl_ir_expr *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     check_integer_type(ctx, arg);
@@ -1172,7 +1171,7 @@ static struct hlsl_ir_expr *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct 
     return add_unary_arithmetic_expr(ctx, instrs, op, arg, loc);
 }
 
-static struct hlsl_ir_expr *add_unary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
@@ -1187,7 +1186,7 @@ static struct hlsl_ir_expr *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
     return add_expr(ctx, instrs, op, args, bool_type, loc);
 }
 
-static struct hlsl_ir_expr *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1222,7 +1221,7 @@ static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struc
     return list1;
 }
 
-static struct hlsl_ir_expr *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1244,7 +1243,7 @@ static struct list *add_binary_bitwise_expr_merge(struct hlsl_ctx *ctx, struct l
     return list1;
 }
 
-static struct hlsl_ir_expr *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         struct vkd3d_shader_location *loc)
 {
@@ -1280,7 +1279,7 @@ static struct list *add_binary_comparison_expr_merge(struct hlsl_ctx *ctx, struc
     return list1;
 }
 
-static struct hlsl_ir_expr *add_binary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1315,7 +1314,7 @@ static struct list *add_binary_logical_expr_merge(struct hlsl_ctx *ctx, struct l
     return list1;
 }
 
-static struct hlsl_ir_expr *add_binary_shift_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1424,22 +1423,17 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     if (assign_op == ASSIGN_OP_SUB)
     {
-        struct hlsl_ir_expr *expr;
-
-        if (!(expr = add_unary_arithmetic_expr(ctx, instrs, HLSL_OP1_NEG, rhs, &rhs->loc)))
+        if (!(rhs = add_unary_arithmetic_expr(ctx, instrs, HLSL_OP1_NEG, rhs, &rhs->loc)))
             return NULL;
-        rhs = &expr->node;
         assign_op = ASSIGN_OP_ADD;
     }
     if (assign_op != ASSIGN_OP_ASSIGN)
     {
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
-        struct hlsl_ir_expr *expr;
 
         assert(op);
-        if (!(expr = add_binary_arithmetic_expr(ctx, instrs, op, lhs, rhs, &rhs->loc)))
+        if (!(rhs = add_binary_arithmetic_expr(ctx, instrs, op, lhs, rhs, &rhs->loc)))
             return NULL;
-        rhs = &expr->node;
     }
 
     if (lhs_type->type <= HLSL_CLASS_LAST_NUMERIC)
@@ -1809,12 +1803,12 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_expr *max;
+    struct hlsl_ir_node *max;
 
     if (!(max = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], loc)))
         return false;
 
-    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, &max->node, params->args[2], loc);
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, max, params->args[2], loc);
 }
 
 static bool intrinsic_cross(struct hlsl_ctx *ctx,
@@ -1822,8 +1816,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_swizzle *arg1_swzl1, *arg1_swzl2, *arg2_swzl1, *arg2_swzl2;
     struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1];
-    struct hlsl_ir_node *arg1_cast, *arg2_cast, *mul1_neg;
-    struct hlsl_ir_expr *mul1, *mul2;
+    struct hlsl_ir_node *arg1_cast, *arg2_cast, *mul1_neg, *mul1, *mul2;
     struct hlsl_type *cast_type;
     enum hlsl_base_type base;
 
@@ -1852,7 +1845,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
             &arg1_swzl1->node, &arg2_swzl1->node, loc)))
         return false;
 
-    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, &mul1->node, *loc)))
+    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, *loc)))
         return false;
     list_add_tail(params->instrs, &mul1_neg->entry);
 
@@ -1868,7 +1861,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
             &arg1_swzl2->node, &arg2_swzl2->node, loc)))
         return false;
 
-    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, &mul2->node, mul1_neg, loc);
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, mul2, mul1_neg, loc);
 }
 
 static bool intrinsic_floor(struct hlsl_ctx *ctx,
@@ -1897,8 +1890,7 @@ static bool intrinsic_min(struct hlsl_ctx *ctx,
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *log, *exp, *arg;
-    struct hlsl_ir_expr *mul;
+    struct hlsl_ir_node *log, *exp, *arg, *mul;
 
     if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
         return false;
@@ -1910,7 +1902,7 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
     if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[1], log, loc)))
         return false;
 
-    if (!(exp = hlsl_new_unary_expr(ctx, HLSL_OP1_EXP2, &mul->node, *loc)))
+    if (!(exp = hlsl_new_unary_expr(ctx, HLSL_OP1_EXP2, mul, *loc)))
         return false;
     list_add_tail(params->instrs, &exp->entry);
     return true;
