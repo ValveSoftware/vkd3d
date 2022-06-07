@@ -84,6 +84,21 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *input;
 
+    if (type->type == HLSL_CLASS_MATRIX)
+    {
+        struct hlsl_type *vector_type = hlsl_get_vector_type(ctx, type->base_type, minor_size(type));
+        struct hlsl_semantic vector_semantic = *semantic;
+        unsigned int i;
+
+        for (i = 0; i < major_size(type); ++i)
+        {
+            prepend_input_copy(ctx, instrs, var, vector_type, 4 * i, modifiers, &vector_semantic);
+            ++vector_semantic.index;
+        }
+
+        return;
+    }
+
     if (!(name = hlsl_get_string_buffer(ctx)))
         return;
     vkd3d_string_buffer_printf(name, "<input-%s%u>", semantic->name, semantic->index);
