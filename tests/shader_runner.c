@@ -78,14 +78,13 @@ enum parse_state
     STATE_PREPROC,
     STATE_PREPROC_INVALID,
     STATE_REQUIRE,
+    STATE_RESOURCE,
     STATE_SAMPLER,
     STATE_SHADER_INVALID_PIXEL,
     STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
     STATE_SHADER_VERTEX,
-    STATE_TEXTURE,
     STATE_TEST,
-    STATE_VERTEX_BUFFER,
 };
 
 static bool match_string(const char *line, const char *token, const char **const rest)
@@ -312,6 +311,13 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
     element->index = strtoul(line, (char **)&rest, 10);
     if (rest == line)
         element->index = 0;
+}
+
+void init_resource(struct resource *resource, const struct resource_params *params)
+{
+    resource->type = params->type;
+    resource->slot = params->slot;
+    resource->size = params->data_size;
 }
 
 static void set_resource(struct shader_runner *runner, struct resource *resource)
@@ -617,8 +623,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                         goto out;
                     break;
 
-                case STATE_TEXTURE:
-                case STATE_VERTEX_BUFFER:
+                case STATE_RESOURCE:
                     set_resource(runner, runner->ops->create_resource(runner, &current_resource));
                     free(current_resource.data);
                     break;
@@ -766,7 +771,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             }
             else if (sscanf(line, "[texture %u]\n", &index))
             {
-                state = STATE_TEXTURE;
+                state = STATE_RESOURCE;
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
@@ -776,9 +781,21 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
             }
+            else if (sscanf(line, "[uav %u]\n", &index))
+            {
+                state = STATE_RESOURCE;
+
+                memset(&current_resource, 0, sizeof(current_resource));
+
+                current_resource.slot = index;
+                current_resource.type = RESOURCE_TYPE_UAV;
+                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.texel_size = 16;
+            }
             else if (sscanf(line, "[vertex buffer %u]\n", &index))
             {
-                state = STATE_VERTEX_BUFFER;
+                state = STATE_RESOURCE;
 
                 memset(&current_resource, 0, sizeof(current_resource));
 
@@ -844,13 +861,12 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     parse_require_directive(runner, line);
                     break;
 
-                case STATE_SAMPLER:
-                    parse_sampler_directive(current_sampler, line);
+                case STATE_RESOURCE:
+                    parse_resource_directive(&current_resource, line);
                     break;
 
-                case STATE_TEXTURE:
-                case STATE_VERTEX_BUFFER:
-                    parse_resource_directive(&current_resource, line);
+                case STATE_SAMPLER:
+                    parse_sampler_directive(current_sampler, line);
                     break;
 
                 case STATE_TEST:

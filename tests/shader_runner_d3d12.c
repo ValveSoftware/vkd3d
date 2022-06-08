@@ -79,7 +79,7 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
     return blob;
 }
 
-#define MAX_RESOURCE_DESCRIPTORS 256
+#define MAX_RESOURCE_DESCRIPTORS (MAX_RESOURCES * 2)
 
 static struct resource *d3d12_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
@@ -90,9 +90,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     struct d3d12_resource *resource;
 
     resource = calloc(1, sizeof(*resource));
-    resource->r.slot = params->slot;
-    resource->r.type = params->type;
-    resource->r.size = params->data_size;
+    init_resource(&resource->r, params);
 
     switch (params->type)
     {
@@ -100,9 +98,6 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             if (!runner->heap)
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
-
-            if (params->slot >= MAX_RESOURCE_DESCRIPTORS)
-                fatal_error("Resource slot %u is too high; please increase MAX_RESOURCE_DESCRIPTORS.\n", params->slot);
 
             resource->resource = create_default_texture(device, params->width, params->height,
                     params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
@@ -114,6 +109,23 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             ID3D12Device_CreateShaderResourceView(device, resource->resource,
                     NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            break;
+
+        case RESOURCE_TYPE_UAV:
+            if (!runner->heap)
+                runner->heap = create_gpu_descriptor_heap(device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
+
+            resource->resource = create_default_texture(device, params->width, params->height,
+                    params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+            resource_data.pData = params->data;
+            resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
+            upload_texture_data(resource->resource, &resource_data, 1, test_context->queue, test_context->list);
+            reset_command_list(test_context->list, test_context->allocator);
+            transition_resource_state(test_context->list, resource->resource,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
+                    NULL, NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -192,6 +204,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
+            case RESOURCE_TYPE_UAV:
                 range = &resource->descriptor_range;
 
                 resource->root_index = root_signature_desc.NumParameters++;
@@ -201,7 +214,10 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 root_param->DescriptorTable.pDescriptorRanges = range;
                 root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                if (resource->r.type == RESOURCE_TYPE_UAV)
+                    range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                else
+                    range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
                 range->NumDescriptors = 1;
                 range->BaseShaderRegister = resource->r.slot;
                 range->RegisterSpace = 0;
@@ -279,6 +295,11 @@ static bool d3d12_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_TEXTURE:
                 ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
                         get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                break;
+
+            case RESOURCE_TYPE_UAV:
+                ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
+                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:

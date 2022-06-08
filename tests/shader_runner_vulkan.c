@@ -245,17 +245,25 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
     void *data;
 
     resource = calloc(1, sizeof(*resource));
-
-    resource->r.slot = params->slot;
-    resource->r.type = params->type;
+    init_resource(&resource->r, params);
 
     switch (params->type)
     {
         case RESOURCE_TYPE_TEXTURE:
+        case RESOURCE_TYPE_UAV:
+        {
+            VkImageUsageFlagBits usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
             format = vkd3d_get_vk_format(params->format);
 
-            resource->image = create_2d_image(runner, params->width, params->height,
-                    VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, format, &resource->memory);
+            if (params->type == RESOURCE_TYPE_UAV)
+            {
+                layout = VK_IMAGE_LAYOUT_GENERAL;
+                usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+            }
+
+            resource->image = create_2d_image(runner, params->width, params->height, usage, format, &resource->memory);
             resource->view = create_2d_image_view(runner, resource->image, format);
 
             staging_buffer = create_buffer(runner, params->data_size,
@@ -277,14 +285,14 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             VK_CALL(vkCmdCopyBufferToImage(runner->cmd_buffer, staging_buffer, resource->image,
                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
 
-            transition_image_layout(runner, resource->image,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
 
             end_command_buffer(runner);
 
             VK_CALL(vkFreeMemory(device, staging_memory, NULL));
             VK_CALL(vkDestroyBuffer(device, staging_buffer, NULL));
             break;
+        }
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
             resource->buffer = create_buffer(runner, params->data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -383,8 +391,12 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
+            case RESOURCE_TYPE_UAV:
                 binding = &bindings[interface_info.binding_count++];
-                binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
+                if (resource->r.type == RESOURCE_TYPE_UAV)
+                    binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
+                else
+                    binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
                 binding->register_space = 0;
                 binding->register_index = resource->r.slot;
                 binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
@@ -557,6 +569,7 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner,
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
+            case RESOURCE_TYPE_UAV:
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -662,12 +675,16 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
+            case RESOURCE_TYPE_UAV:
                 binding = &bindings[set_desc.bindingCount++];
 
                 resource->binding = binding_index++;
 
                 binding->binding = resource->binding;
-                binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                if (resource->r.type == RESOURCE_TYPE_UAV)
+                    binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                else
+                    binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 binding->descriptorCount = 1;
                 binding->stageFlags = VK_SHADER_STAGE_ALL;
                 binding->pImmutableSamplers = NULL;
@@ -729,6 +746,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
+            case RESOURCE_TYPE_UAV:
                 image_info.imageView = resource->view;
                 image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
@@ -738,6 +756,12 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                 write.descriptorCount = 1;
                 write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 write.pImageInfo = &image_info;
+
+                if (resource->r.type == RESOURCE_TYPE_UAV)
+                {
+                    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                }
 
                 VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
                 break;
@@ -967,7 +991,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkPhysicalDeviceFeatures ret_features, features;
-    VkDescriptorPoolSize descriptor_pool_sizes[2];
+    VkDescriptorPoolSize descriptor_pool_sizes[3];
     VkAttachmentDescription attachment_desc = {0};
     static const float queue_priority = 1.0f;
     VkSubpassDescription subpass_desc = {0};
@@ -1049,7 +1073,9 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     } \
     features.x = VK_TRUE
 
+    ENABLE_FEATURE(fragmentStoresAndAtomics);
     ENABLE_FEATURE(shaderImageGatherExtended);
+    ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
 
     if ((vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device))))
     {
@@ -1115,6 +1141,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     descriptor_pool_sizes[0].descriptorCount = MAX_RESOURCES;
     descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
     descriptor_pool_sizes[1].descriptorCount = MAX_SAMPLERS;
+    descriptor_pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descriptor_pool_sizes[2].descriptorCount = MAX_RESOURCES;
 
     descriptor_pool_desc.maxSets = 1;
     descriptor_pool_desc.poolSizeCount = ARRAY_SIZE(descriptor_pool_sizes);

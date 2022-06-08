@@ -222,9 +222,7 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
     void *data;
 
     resource = calloc(1, sizeof(*resource));
-    resource->r.slot = params->slot;
-    resource->r.type = params->type;
-    resource->r.size = params->data_size;
+    init_resource(&resource->r, params);
 
     switch (params->type)
     {
@@ -255,6 +253,10 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
                 memcpy((char *)map_desc.pBits + y * map_desc.Pitch, params->data + y * src_pitch, src_pitch);
             hr = IDirect3DTexture9_UnlockRect(resource->texture, 0);
             ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+            break;
+
+        case RESOURCE_TYPE_UAV:
+            fatal_error("UAVs are not supported.\n");
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -364,6 +366,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
             case RESOURCE_TYPE_TEXTURE:
                 hr = IDirect3DDevice9_SetTexture(device, resource->r.slot, (IDirect3DBaseTexture9 *)resource->texture);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
+                break;
+
+            case RESOURCE_TYPE_UAV:
+                assert(0);
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
