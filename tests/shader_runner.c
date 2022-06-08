@@ -370,6 +370,8 @@ static void set_uniforms(struct shader_runner *runner, size_t offset, size_t cou
 
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
+    char *rest;
+
     runner->is_todo = false;
 
     if (match_string(line, "todo", &line))
@@ -475,19 +477,33 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (runner->last_render_failed)
             return;
 
-        resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
+        if (match_string(line, "uav", &line))
+        {
+            unsigned int slot = strtoul(line, &rest, 10);
+
+            if (rest == line)
+                fatal_error("Malformed UAV index '%s'.\n", line);
+            line = rest;
+
+            resource = get_resource(runner, RESOURCE_TYPE_UAV, slot);
+        }
+        else
+        {
+            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
+        }
+
         rb = runner->ops->get_resource_readback(runner, resource);
 
         if (match_string(line, "all", &line))
         {
             set_rect(&rect, 0, 0, resource->width, resource->height);
         }
-        else if (sscanf(line, "( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
+        else if (sscanf(line, " ( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
         {
             set_rect(&rect, left, top, right, bottom);
             line += len;
         }
-        else if (sscanf(line, "( %u , %u )%n", &left, &top, &len) == 2)
+        else if (sscanf(line, " ( %u , %u )%n", &left, &top, &len) == 2)
         {
             set_rect(&rect, left, top, left + 1, top + 1);
             line += len;

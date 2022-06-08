@@ -373,16 +373,20 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
     struct test_context *test_context = &runner->test_context;
     struct d3d12_resource_readback *rb = malloc(sizeof(*rb));
     struct d3d12_resource *resource = d3d12_resource(res);
+    D3D12_RESOURCE_STATES state;
 
-    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+    if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+        state = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    else
+        state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
     transition_resource_state(test_context->list, resource->resource,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+            state, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_texture_readback_with_command_list(resource->resource, 0, rb,
             test_context->queue, test_context->list);
     reset_command_list(test_context->list, test_context->allocator);
     transition_resource_state(test_context->list, resource->resource,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            D3D12_RESOURCE_STATE_COPY_SOURCE, state);
 
     return &rb->rb;
 }

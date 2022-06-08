@@ -943,8 +943,12 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     struct vulkan_resource *resource = vulkan_resource(res);
     VkDevice device = runner->device;
     VkBufferImageCopy region = {0};
+    VkImageLayout layout;
 
-    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+    if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+        layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    else
+        layout = VK_IMAGE_LAYOUT_GENERAL;
 
     rb->rb.width = resource->r.width;
     rb->rb.height = resource->r.height;
@@ -957,8 +961,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
 
     begin_command_buffer(runner);
 
-    transition_image_layout(runner, resource->image,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    transition_image_layout(runner, resource->image, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.layerCount = 1;
@@ -969,8 +972,7 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
 
-    transition_image_layout(runner, resource->image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+    transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
 
     end_command_buffer(runner);
 
