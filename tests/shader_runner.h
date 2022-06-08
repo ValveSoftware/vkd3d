@@ -53,6 +53,7 @@ struct sampler
 
 enum resource_type
 {
+    RESOURCE_TYPE_RENDER_TARGET,
     RESOURCE_TYPE_TEXTURE,
     RESOURCE_TYPE_UAV,
     RESOURCE_TYPE_VERTEX_BUFFER,
@@ -76,7 +77,10 @@ struct resource
     unsigned int slot;
     enum resource_type type;
 
+    DXGI_FORMAT format;
     unsigned int size;
+    unsigned int texel_size;
+    unsigned int width, height;
 };
 
 struct input_element
@@ -124,7 +128,7 @@ struct shader_runner_ops
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
-    struct resource_readback *(*get_rt_readback)(struct shader_runner *runner);
+    struct resource_readback *(*get_resource_readback)(struct shader_runner *runner, struct resource *resource);
     void (*release_readback)(struct shader_runner *runner, struct resource_readback *rb);
 };
 

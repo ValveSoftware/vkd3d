@@ -44,7 +44,7 @@ struct d3d12_shader_runner
 
     struct test_context test_context;
 
-    ID3D12DescriptorHeap *heap;
+    ID3D12DescriptorHeap *heap, *rtv_heap;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -94,6 +94,20 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
     switch (params->type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            if (!runner->rtv_heap)
+                runner->rtv_heap = create_cpu_descriptor_heap(device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_RTV, MAX_RESOURCE_DESCRIPTORS);
+
+            if (params->slot >= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT)
+                fatal_error("RTV slot %u is too high.\n", params->slot);
+
+            resource->resource = create_default_texture(device, params->width, params->height,
+                    params->format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            ID3D12Device_CreateRenderTargetView(device, resource->resource,
+                    NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot));
+            break;
+
         case RESOURCE_TYPE_TEXTURE:
             if (!runner->heap)
                 runner->heap = create_gpu_descriptor_heap(device,
@@ -150,18 +164,19 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
 
+    D3D12_CPU_DESCRIPTOR_HANDLE rtvs[D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT] = {0};
     ID3D12GraphicsCommandList *command_list = test_context->list;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc = {0};
     D3D12_ROOT_PARAMETER root_params[3], *root_param;
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     D3D12_STATIC_SAMPLER_DESC static_samplers[1];
     ID3D12Device *device = test_context->device;
-    D3D12_INPUT_LAYOUT_DESC input_layout;
     static const float clear_color[4];
+    unsigned int uniform_index = 0;
     ID3D10Blob *vs_code, *ps_code;
-    D3D12_SHADER_BYTECODE vs, ps;
-    unsigned int uniform_index;
+    unsigned int rtv_count = 0;
     ID3D12PipelineState *pso;
     HRESULT hr;
     size_t i;
@@ -184,6 +199,16 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     root_signature_desc.NumStaticSamplers = 0;
     root_signature_desc.pStaticSamplers = static_samplers;
     root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
+    pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    pso_desc.SampleDesc.Count = 1;
+    pso_desc.SampleMask = ~(UINT)0;
 
     if (runner->r.uniform_count)
     {
@@ -224,6 +249,12 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 range->OffsetInDescriptorsFromTableStart = 0;
                 break;
 
+            case RESOURCE_TYPE_RENDER_TARGET:
+                pso_desc.RTVFormats[resource->r.slot] = resource->r.format;
+                pso_desc.NumRenderTargets = max(pso_desc.NumRenderTargets, resource->r.slot + 1);
+                pso_desc.BlendState.RenderTarget[resource->r.slot].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+                break;
+
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
         }
@@ -251,6 +282,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     hr = create_root_signature(device, &root_signature_desc, &test_context->root_signature);
     ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
 
+    pso_desc.pRootSignature = test_context->root_signature;
+
     input_element_descs = calloc(runner->r.input_element_count, sizeof(*input_element_descs));
     for (i = 0; i < runner->r.input_element_count; ++i)
     {
@@ -265,15 +298,12 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         desc->InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
     }
 
-    input_layout.pInputElementDescs = input_element_descs;
-    input_layout.NumElements = runner->r.input_element_count;
+    pso_desc.InputLayout.pInputElementDescs = input_element_descs;
+    pso_desc.InputLayout.NumElements = runner->r.input_element_count;
 
-    vs.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs_code);
-    vs.BytecodeLength = ID3D10Blob_GetBufferSize(vs_code);
-    ps.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
-    ps.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
-    pso = create_pipeline_state(device, test_context->root_signature,
-            test_context->render_target_desc.Format, &vs, &ps, &input_layout);
+    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+            &IID_ID3D12PipelineState, (void **)&pso);
+    ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     free(input_element_descs);
@@ -292,6 +322,13 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
         switch (resource->r.type)
         {
+            case RESOURCE_TYPE_RENDER_TARGET:
+                rtvs[resource->r.slot] = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot);
+                ID3D12GraphicsCommandList_ClearRenderTargetView(command_list,
+                        rtvs[resource->r.slot], clear_color, 0, NULL);
+                rtv_count = max(rtv_count, resource->r.slot + 1);
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
                         get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
@@ -312,11 +349,11 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         }
     }
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &test_context->rtv, false, NULL);
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, rtv_count, rtvs, false, NULL);
+
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &test_context->scissor_rect);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &test_context->viewport);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, primitive_topology);
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, test_context->rtv, clear_color, 0, NULL);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_DrawInstanced(command_list, vertex_count, 1, 0, 0);
 
@@ -330,16 +367,22 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     return true;
 }
 
-static struct resource_readback *d3d12_runner_get_rt_readback(struct shader_runner *r)
+static struct resource_readback *d3d12_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     struct d3d12_resource_readback *rb = malloc(sizeof(*rb));
+    struct d3d12_resource *resource = d3d12_resource(res);
 
-    transition_resource_state(test_context->list, test_context->render_target,
+    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+
+    transition_resource_state(test_context->list, resource->resource,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(test_context->render_target, 0, rb,
+    get_texture_readback_with_command_list(resource->resource, 0, rb,
             test_context->queue, test_context->list);
+    reset_command_list(test_context->list, test_context->allocator);
+    transition_resource_state(test_context->list, resource->resource,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
     return &rb->rb;
 }
@@ -347,13 +390,8 @@ static struct resource_readback *d3d12_runner_get_rt_readback(struct shader_runn
 static void d3d12_runner_release_readback(struct shader_runner *r, struct resource_readback *rb)
 {
     struct d3d12_resource_readback *d3d12_rb = CONTAINING_RECORD(rb, struct d3d12_resource_readback, rb);
-    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
-    struct test_context *test_context = &runner->test_context;
 
     release_resource_readback(d3d12_rb);
-    reset_command_list(test_context->list, test_context->allocator);
-    transition_resource_state(test_context->list, test_context->render_target,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     free(d3d12_rb);
 }
 
@@ -362,7 +400,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
     .draw = d3d12_runner_draw,
-    .get_rt_readback = d3d12_runner_get_rt_readback,
+    .get_resource_readback = d3d12_runner_get_resource_readback,
     .release_readback = d3d12_runner_release_readback,
 };
 
@@ -386,5 +424,7 @@ void run_shader_tests_d3d12(int argc, char **argv)
 
     if (runner.heap)
         ID3D12DescriptorHeap_Release(runner.heap);
+    if (runner.rtv_heap)
+        ID3D12DescriptorHeap_Release(runner.rtv_heap);
     destroy_test_context(&runner.test_context);
 }

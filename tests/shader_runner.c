@@ -317,7 +317,27 @@ void init_resource(struct resource *resource, const struct resource_params *para
 {
     resource->type = params->type;
     resource->slot = params->slot;
+    resource->format = params->format;
     resource->size = params->data_size;
+    resource->texel_size = params->texel_size;
+    resource->width = params->width;
+    resource->height = params->height;
+}
+
+static struct resource *get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
+{
+    struct resource *resource;
+    size_t i;
+
+    for (i = 0; i < runner->resource_count; ++i)
+    {
+        resource = runner->resources[i];
+
+        if (resource->type == type && resource->slot == slot)
+            return resource;
+    }
+
+    return NULL;
 }
 
 static void set_resource(struct shader_runner *runner, struct resource *resource)
@@ -373,6 +393,20 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             "{\n"
             "}";
 
+        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        {
+            memset(&params, 0, sizeof(params));
+            params.slot = 0;
+            params.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            params.data_type = TEXTURE_DATA_FLOAT;
+            params.texel_size = 16;
+            params.width = RENDER_TARGET_WIDTH;
+            params.height = RENDER_TARGET_HEIGHT;
+
+            set_resource(runner, runner->ops->create_resource(runner, &params));
+        }
+
         vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
                 1, sizeof(*runner->input_elements));
         element = &runner->input_elements[0];
@@ -399,8 +433,23 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     else if (match_string(line, "draw", &line))
     {
         D3D_PRIMITIVE_TOPOLOGY topology;
+        struct resource_params params;
         unsigned int vertex_count;
         char *rest;
+
+        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        {
+            memset(&params, 0, sizeof(params));
+            params.slot = 0;
+            params.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            params.data_type = TEXTURE_DATA_FLOAT;
+            params.texel_size = 16;
+            params.width = RENDER_TARGET_WIDTH;
+            params.height = RENDER_TARGET_HEIGHT;
+
+            set_resource(runner, runner->ops->create_resource(runner, &params));
+        }
 
         if (match_string(line, "triangle list", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -419,15 +468,19 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         unsigned int left, top, right, bottom, ulps;
         struct resource_readback *rb;
+        struct resource *resource;
         int ret, len;
         RECT rect;
 
         if (runner->last_render_failed)
             return;
 
+        resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
+        rb = runner->ops->get_resource_readback(runner, resource);
+
         if (match_string(line, "all", &line))
         {
-            set_rect(&rect, 0, 0, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT);
+            set_rect(&rect, 0, 0, resource->width, resource->height);
         }
         else if (sscanf(line, "( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
         {
@@ -443,8 +496,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             fatal_error("Malformed probe arguments '%s'.\n", line);
         }
-
-        rb = runner->ops->get_rt_readback(runner);
 
         if (match_string(line, "rgba", &line))
         {

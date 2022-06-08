@@ -43,6 +43,8 @@ struct d3d11_resource
     struct resource r;
 
     ID3D11Resource *resource;
+    ID3D11Texture2D *texture;
+    ID3D11RenderTargetView *rtv;
     ID3D11ShaderResourceView *srv;
     ID3D11UnorderedAccessView *uav;
 };
@@ -59,8 +61,6 @@ struct d3d11_shader_runner
     ID3D11Device *device;
     HWND window;
     IDXGISwapChain *swapchain;
-    ID3D11Texture2D *rt;
-    ID3D11RenderTargetView *rtv;
     ID3D11DeviceContext *immediate_context;
 };
 
@@ -276,20 +276,8 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
 
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
-    const D3D11_TEXTURE2D_DESC texture_desc =
-    {
-        .Width = RENDER_TARGET_WIDTH,
-        .Height = RENDER_TARGET_HEIGHT,
-        .MipLevels = 1,
-        .ArraySize = 1,
-        .Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
-        .SampleDesc.Count = 1,
-        .Usage = D3D11_USAGE_DEFAULT,
-        .BindFlags = D3D11_BIND_RENDER_TARGET,
-    };
     unsigned int rt_width, rt_height;
     D3D11_VIEWPORT vp;
-    HRESULT hr;
     RECT rect;
 
     memset(runner, 0, sizeof(*runner));
@@ -308,15 +296,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
             0, 0, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, NULL, NULL);
     runner->swapchain = create_swapchain(runner->device, runner->window);
 
-    hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, &runner->rt);
-    ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
-
-    hr = ID3D11Device_CreateRenderTargetView(runner->device, (ID3D11Resource *)runner->rt, NULL, &runner->rtv);
-    ok(hr == S_OK, "Failed to create rendertarget view, hr %#lx.\n", hr);
-
     ID3D11Device_GetImmediateContext(runner->device, &runner->immediate_context);
-
-    ID3D11DeviceContext_OMSetRenderTargets(runner->immediate_context, 1, &runner->rtv, NULL);
 
     vp.TopLeftX = 0.0f;
     vp.TopLeftY = 0.0f;
@@ -334,8 +314,6 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
     ULONG ref;
 
     ID3D11DeviceContext_Release(runner->immediate_context);
-    ID3D11RenderTargetView_Release(runner->rtv);
-    ID3D11Texture2D_Release(runner->rt);
     IDXGISwapChain_Release(runner->swapchain);
     DestroyWindow(runner->window);
 
@@ -379,6 +357,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
 
     switch (params->type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
         {
@@ -393,17 +372,29 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             desc.Usage = D3D11_USAGE_DEFAULT;
             if (params->type == RESOURCE_TYPE_UAV)
                 desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+            else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
+                desc.BindFlags = D3D11_BIND_RENDER_TARGET;
             else
                 desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
 
-            resource_data.pSysMem = params->data;
-            resource_data.SysMemPitch = params->width * params->texel_size;
-            resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
-
-            hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, (ID3D11Texture2D **)&resource->resource);
+            if (params->data)
+            {
+                resource_data.pSysMem = params->data;
+                resource_data.SysMemPitch = params->width * params->texel_size;
+                resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
+                hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, &resource->texture);
+            }
+            else
+            {
+                hr = ID3D11Device_CreateTexture2D(device, &desc, NULL, &resource->texture);
+            }
             ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+
+            resource->resource = (ID3D11Resource *)resource->texture;
             if (params->type == RESOURCE_TYPE_UAV)
                 hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
+            else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
+                hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
             else
                 hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, NULL, &resource->srv);
             ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
@@ -424,6 +415,8 @@ static void d3d11_runner_destroy_resource(struct shader_runner *r, struct resour
     struct d3d11_resource *resource = d3d11_resource(res);
 
     ID3D11Resource_Release(resource->resource);
+    if (resource->rtv)
+        ID3D11RenderTargetView_Release(resource->rtv);
     if (resource->srv)
         ID3D11ShaderResourceView_Release(resource->srv);
     if (resource->uav)
@@ -435,11 +428,13 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
     ID3D11UnorderedAccessView *uavs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
+    ID3D11RenderTargetView *rtvs[D3D11_PS_CS_UAV_REGISTER_COUNT] = {0};
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11DeviceContext *context = runner->immediate_context;
     unsigned int min_uav_slot = ARRAY_SIZE(uavs);
     ID3D11Device *device = runner->device;
     ID3D10Blob *vs_code, *ps_code;
+    unsigned int rtv_count = 0;
     ID3D11Buffer *cb = NULL;
     ID3D11VertexShader *vs;
     ID3D11PixelShader *ps;
@@ -478,6 +473,11 @@ static bool d3d11_runner_draw(struct shader_runner *r,
 
         switch (resource->r.type)
         {
+            case RESOURCE_TYPE_RENDER_TARGET:
+                rtvs[resource->r.slot] = resource->rtv;
+                rtv_count = max(rtv_count, resource->r.slot + 1);
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 ID3D11DeviceContext_PSSetShaderResources(context, resource->r.slot, 1, &resource->srv);
                 break;
@@ -494,8 +494,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
         }
     }
 
-    ID3D11DeviceContext_OMSetRenderTargetsAndUnorderedAccessViews(context,
-            D3D11_KEEP_RENDER_TARGETS_AND_DEPTH_STENCIL, NULL, NULL,
+    ID3D11DeviceContext_OMSetRenderTargetsAndUnorderedAccessViews(context, rtv_count, rtvs, NULL,
             min_uav_slot, ARRAY_SIZE(uavs) - min_uav_slot, &uavs[min_uav_slot], NULL);
 
     for (i = 0; i < runner->r.sampler_count; ++i)
@@ -565,15 +564,16 @@ struct d3d11_resource_readback
     ID3D11Resource *resource;
 };
 
-static struct resource_readback *d3d11_runner_get_rt_readback(struct shader_runner *r)
+static struct resource_readback *d3d11_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     struct d3d11_resource_readback *rb = malloc(sizeof(*rb));
+    struct d3d11_resource *resource = d3d11_resource(res);
     D3D11_TEXTURE2D_DESC texture_desc;
     D3D11_MAPPED_SUBRESOURCE map_desc;
     HRESULT hr;
 
-    ID3D11Texture2D_GetDesc(runner->rt, &texture_desc);
+    ID3D11Texture2D_GetDesc(resource->texture, &texture_desc);
     texture_desc.Usage = D3D11_USAGE_STAGING;
     texture_desc.BindFlags = 0;
     texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -581,7 +581,7 @@ static struct resource_readback *d3d11_runner_get_rt_readback(struct shader_runn
     hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
     ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-    ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, (ID3D11Resource *)runner->rt);
+    ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, resource->resource);
     hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
 
@@ -608,7 +608,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
     .draw = d3d11_runner_draw,
-    .get_rt_readback = d3d11_runner_get_rt_readback,
+    .get_resource_readback = d3d11_runner_get_resource_readback,
     .release_readback = d3d11_runner_release_readback,
 };
 

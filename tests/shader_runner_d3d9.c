@@ -29,6 +29,7 @@ struct d3d9_resource
 {
     struct resource r;
 
+    IDirect3DSurface9 *surface;
     IDirect3DTexture9 *texture;
     IDirect3DVertexBuffer9 *vb;
 };
@@ -43,7 +44,6 @@ struct d3d9_shader_runner
     struct shader_runner r;
 
     IDirect3DDevice9 *device;
-    IDirect3DSurface9 *rt;
     HWND window;
 };
 
@@ -151,18 +151,6 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
         return false;
     }
 
-    if (FAILED(hr = IDirect3DDevice9_CreateRenderTarget(runner->device, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT,
-            D3DFMT_A32B32G32R32F, D3DMULTISAMPLE_NONE, 0, FALSE, &runner->rt, NULL)))
-    {
-        skip("Failed to create an A32B32G32R32F surface, hr %#lx.\n", hr);
-        IDirect3DDevice9_Release(runner->device);
-        DestroyWindow(runner->window);
-        return false;
-    }
-    ok(hr == D3D_OK, "Got unexpected hr %#lx.\n", hr);
-    hr = IDirect3DDevice9_SetRenderTarget(runner->device, 0, runner->rt);
-    ok(hr == D3D_OK, "Failed to set render target, hr %#lx.\n", hr);
-
     return true;
 }
 
@@ -170,7 +158,6 @@ static void destroy_test_context(struct d3d9_shader_runner *runner)
 {
     ULONG ref;
 
-    IDirect3DSurface9_Release(runner->rt);
     ref = IDirect3DDevice9_Release(runner->device);
     ok(!ref, "Device has %lu references left.\n", ref);
     DestroyWindow(runner->window);
@@ -224,24 +211,30 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
 
+    switch (params->format)
+    {
+        case DXGI_FORMAT_R32G32B32A32_FLOAT:
+            format = D3DFMT_A32B32G32R32F;
+            break;
+
+        case DXGI_FORMAT_R32_FLOAT:
+            format = D3DFMT_R32F;
+            break;
+
+        default:
+            format = D3DFMT_UNKNOWN;
+            break;
+    }
+
     switch (params->type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            hr = IDirect3DDevice9_CreateRenderTarget(device, params->width, params->height,
+                    format, D3DMULTISAMPLE_NONE, 0, FALSE, &resource->surface, NULL);
+            ok(hr == D3D_OK, "Failed to create render target, hr %#lx.\n", hr);
+            break;
+
         case RESOURCE_TYPE_TEXTURE:
-            switch (params->format)
-            {
-                case DXGI_FORMAT_R32G32B32A32_FLOAT:
-                    format = D3DFMT_A32B32G32R32F;
-                    break;
-
-                case DXGI_FORMAT_R32_FLOAT:
-                    format = D3DFMT_R32F;
-                    break;
-
-                default:
-                    format = D3DFMT_UNKNOWN;
-                    break;
-            }
-
             hr = IDirect3DDevice9_CreateTexture(device, params->width, params->height,
                     1, D3DUSAGE_DYNAMIC, format, D3DPOOL_DEFAULT, &resource->texture, NULL);
             ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
@@ -279,6 +272,8 @@ static void d3d9_runner_destroy_resource(struct shader_runner *r, struct resourc
 {
     struct d3d9_resource *resource = d3d9_resource(res);
 
+    if (resource->surface)
+        IDirect3DSurface9_Release(resource->surface);
     if (resource->texture)
         IDirect3DTexture9_Release(resource->texture);
     if (resource->vb)
@@ -363,6 +358,11 @@ static bool d3d9_runner_draw(struct shader_runner *r,
 
         switch (resource->r.type)
         {
+            case RESOURCE_TYPE_RENDER_TARGET:
+                hr = IDirect3DDevice9_SetRenderTarget(device, resource->r.slot, resource->surface);
+                ok(hr == D3D_OK, "Failed to set render target, hr %#lx.\n", hr);
+                break;
+
             case RESOURCE_TYPE_TEXTURE:
                 hr = IDirect3DDevice9_SetTexture(device, resource->r.slot, (IDirect3DBaseTexture9 *)resource->texture);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
@@ -461,21 +461,24 @@ struct d3d9_resource_readback
     IDirect3DSurface9 *surface;
 };
 
-static struct resource_readback *d3d9_runner_get_rt_readback(struct shader_runner *r)
+static struct resource_readback *d3d9_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
     struct d3d9_resource_readback *rb = malloc(sizeof(*rb));
+    struct d3d9_resource *resource = d3d9_resource(res);
     D3DLOCKED_RECT map_desc;
     D3DSURFACE_DESC desc;
     HRESULT hr;
 
-    hr = IDirect3DSurface9_GetDesc(runner->rt, &desc);
+    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+
+    hr = IDirect3DSurface9_GetDesc(resource->surface, &desc);
     ok(hr == D3D_OK, "Failed to get surface desc, hr %#lx.\n", hr);
     hr = IDirect3DDevice9Ex_CreateOffscreenPlainSurface(runner->device, desc.Width,
             desc.Height, desc.Format, D3DPOOL_SYSTEMMEM, &rb->surface, NULL);
     ok(hr == D3D_OK, "Failed to create surface, hr %#lx.\n", hr);
 
-    hr = IDirect3DDevice9Ex_GetRenderTargetData(runner->device, runner->rt, rb->surface);
+    hr = IDirect3DDevice9Ex_GetRenderTargetData(runner->device, resource->surface, rb->surface);
     ok(hr == D3D_OK, "Failed to get render target data, hr %#lx.\n", hr);
 
     hr = IDirect3DSurface9_LockRect(rb->surface, &map_desc, NULL, D3DLOCK_READONLY);
@@ -504,7 +507,7 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .create_resource = d3d9_runner_create_resource,
     .destroy_resource = d3d9_runner_destroy_resource,
     .draw = d3d9_runner_draw,
-    .get_rt_readback = d3d9_runner_get_rt_readback,
+    .get_resource_readback = d3d9_runner_get_resource_readback,
     .release_readback = d3d9_runner_release_readback,
 };
 

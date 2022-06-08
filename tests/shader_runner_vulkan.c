@@ -60,10 +60,6 @@ struct vulkan_shader_runner
     VkCommandBuffer cmd_buffer;
     VkDescriptorPool descriptor_pool;
 
-    VkImage render_target;
-    VkDeviceMemory rt_memory;
-    VkImageView rtv;
-
     struct vulkan_sampler
     {
         VkSampler vk_sampler;
@@ -247,6 +243,19 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
     switch (params->type)
     {
+        case RESOURCE_TYPE_RENDER_TARGET:
+            format = vkd3d_get_vk_format(params->format);
+
+            resource->image = create_2d_image(runner, params->width, params->height,
+                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
+            resource->view = create_2d_image_view(runner, resource->image, format);
+
+            begin_command_buffer(runner);
+            transition_image_layout(runner, resource->image,
+                    VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            end_command_buffer(runner);
+            break;
+
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
         {
@@ -385,6 +394,7 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
 
         switch (resource->r.type)
         {
+            case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
 
@@ -514,7 +524,7 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkR
     VkPipelineViewportStateCreateInfo vp_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    VkPipelineColorBlendAttachmentState attachment_desc = {0};
+    VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
     VkVertexInputAttributeDescription input_attributes[32];
     VkVertexInputBindingDescription input_bindings[32];
     struct vkd3d_shader_signature vs_input_signature;
@@ -560,6 +570,9 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkR
     input_desc.pVertexAttributeDescriptions = input_attributes;
     input_desc.pVertexBindingDescriptions = input_bindings;
 
+    blend_desc.attachmentCount = 0;
+    blend_desc.pAttachments = attachment_desc;
+
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
@@ -568,6 +581,12 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkR
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
+                break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+                attachment_desc[blend_desc.attachmentCount++].colorWriteMask =
+                        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                        | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -602,12 +621,6 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkR
     rs_desc.lineWidth = 1.0f;
 
     ms_desc.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    blend_desc.attachmentCount = 1;
-    blend_desc.pAttachments = &attachment_desc;
-
-    attachment_desc.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-            | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     pipeline_desc.stageCount = ARRAY_SIZE(stage_desc);
     pipeline_desc.pStages = stage_desc;
@@ -669,6 +682,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
 
         switch (resource->r.type)
         {
+            case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 break;
 
@@ -768,6 +782,9 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                 if (bind_point == VK_PIPELINE_BIND_POINT_GRAPHICS)
                     VK_CALL(vkCmdBindVertexBuffers(cmd_buffer, resource->r.slot, 1, &resource->buffer, &zero_offset));
                 break;
+
+            case RESOURCE_TYPE_RENDER_TARGET:
+                break;
         }
     }
 
@@ -785,36 +802,53 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
 {
     VkRenderPassCreateInfo render_pass_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     VkFramebufferCreateInfo fb_desc = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-    VkAttachmentDescription attachment_desc = {0};
+    VkAttachmentDescription attachment_descs[MAX_RESOURCES] = {0};
+    VkAttachmentReference color_refs[MAX_RESOURCES] = {0};
     VkSubpassDescription subpass_desc = {0};
-    VkAttachmentReference color_ref = {0};
+    VkImageView rtvs[MAX_RESOURCES];
+    unsigned int rt_count = 0;
+    unsigned int i;
 
-    attachment_desc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment_desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    for (i = 0; i < runner->r.resource_count; ++i)
+    {
+        const struct vulkan_resource *resource = vulkan_resource(runner->r.resources[i]);
+        VkAttachmentDescription *attachment_desc = &attachment_descs[rt_count];
+        VkAttachmentReference *color_ref = &color_refs[rt_count];
 
-    color_ref.attachment = 0;
-    color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET)
+            continue;
+
+        attachment_desc->format = vkd3d_get_vk_format(resource->r.format);
+        attachment_desc->samples = VK_SAMPLE_COUNT_1_BIT;
+        attachment_desc->loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        attachment_desc->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachment_desc->initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        attachment_desc->finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        color_ref->attachment = rt_count;
+        color_ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+        rtvs[rt_count] = resource->view;
+
+        ++rt_count;
+    }
 
     subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass_desc.colorAttachmentCount = 1;
-    subpass_desc.pColorAttachments = &color_ref;
+    subpass_desc.colorAttachmentCount = rt_count;
+    subpass_desc.pColorAttachments = color_refs;
 
-    render_pass_desc.attachmentCount = 1;
-    render_pass_desc.pAttachments = &attachment_desc;
+    render_pass_desc.attachmentCount = rt_count;
+    render_pass_desc.pAttachments = attachment_descs;
     render_pass_desc.subpassCount = 1;
     render_pass_desc.pSubpasses = &subpass_desc;
 
     VK_CALL(vkCreateRenderPass(runner->device, &render_pass_desc, NULL, render_pass));
 
     fb_desc.renderPass = *render_pass;
-    fb_desc.attachmentCount = 1;
-    fb_desc.pAttachments = &runner->rtv;
+    fb_desc.attachmentCount = rt_count;
+    fb_desc.pAttachments = rtvs;
     fb_desc.width = RENDER_TARGET_WIDTH;
     fb_desc.height = RENDER_TARGET_HEIGHT;
     fb_desc.layers = 1;
@@ -902,37 +936,40 @@ struct vulkan_resource_readback
     VkBuffer buffer;
 };
 
-static struct resource_readback *vulkan_runner_get_rt_readback(struct shader_runner *r)
+static struct resource_readback *vulkan_runner_get_resource_readback(struct shader_runner *r, struct resource *res)
 {
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
     struct vulkan_resource_readback *rb = malloc(sizeof(*rb));
+    struct vulkan_resource *resource = vulkan_resource(res);
     VkDevice device = runner->device;
     VkBufferImageCopy region = {0};
 
-    rb->rb.width = RENDER_TARGET_WIDTH;
-    rb->rb.height = RENDER_TARGET_HEIGHT;
+    assert(resource->r.type == RESOURCE_TYPE_RENDER_TARGET);
+
+    rb->rb.width = resource->r.width;
+    rb->rb.height = resource->r.height;
     rb->rb.depth = 1;
 
-    rb->rb.row_pitch = rb->rb.width * sizeof(struct vec4);
+    rb->rb.row_pitch = rb->rb.width * resource->r.texel_size;
 
-    rb->buffer = create_buffer(runner, rb->rb.row_pitch * RENDER_TARGET_HEIGHT,
+    rb->buffer = create_buffer(runner, rb->rb.row_pitch * rb->rb.height,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
     begin_command_buffer(runner);
 
-    transition_image_layout(runner, runner->render_target,
+    transition_image_layout(runner, resource->image,
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.layerCount = 1;
-    region.imageExtent.width = RENDER_TARGET_WIDTH;
-    region.imageExtent.height = RENDER_TARGET_HEIGHT;
+    region.imageExtent.width = resource->r.width;
+    region.imageExtent.height = resource->r.height;
     region.imageExtent.depth = 1;
 
-    VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, runner->render_target,
+    VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
 
-    transition_image_layout(runner, runner->render_target,
+    transition_image_layout(runner, resource->image,
             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
     end_command_buffer(runner);
@@ -959,7 +996,7 @@ static const struct shader_runner_ops vulkan_runner_ops =
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
     .draw = vulkan_runner_draw,
-    .get_rt_readback = vulkan_runner_get_rt_readback,
+    .get_resource_readback = vulkan_runner_get_resource_readback,
     .release_readback = vulkan_runner_release_readback,
 };
 
@@ -1141,11 +1178,6 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
 
     VK_CALL(vkAllocateCommandBuffers(device, &cmd_buffer_desc, &runner->cmd_buffer));
 
-    runner->render_target = create_2d_image(runner, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT,
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-            VK_FORMAT_R32G32B32A32_SFLOAT, &runner->rt_memory);
-    runner->rtv = create_2d_image_view(runner, runner->render_target, VK_FORMAT_R32G32B32A32_SFLOAT);
-
     descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     descriptor_pool_sizes[0].descriptorCount = MAX_RESOURCES;
     descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -1159,13 +1191,6 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
 
     VK_CALL(vkCreateDescriptorPool(device, &descriptor_pool_desc, NULL, &runner->descriptor_pool));
 
-    begin_command_buffer(runner);
-
-    transition_image_layout(runner, runner->render_target,
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-
-    end_command_buffer(runner);
-
     return true;
 
 out_destroy_instance:
@@ -1176,10 +1201,6 @@ out_destroy_instance:
 static void cleanup_vulkan_runner(struct vulkan_shader_runner *runner)
 {
     VkDevice device = runner->device;
-
-    VK_CALL(vkFreeMemory(device, runner->rt_memory, NULL));
-    VK_CALL(vkDestroyImageView(device, runner->rtv, NULL));
-    VK_CALL(vkDestroyImage(device, runner->render_target, NULL));
 
     VK_CALL(vkDestroyDescriptorPool(device, runner->descriptor_pool, NULL));
     VK_CALL(vkFreeCommandBuffers(device, runner->command_pool, 1, &runner->cmd_buffer));
