@@ -5,7 +5,7 @@ float4x1 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 [pixel shader]
@@ -15,7 +15,7 @@ row_major float1x4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 [require]
@@ -44,7 +44,7 @@ row_major float4x1 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (3.0)
@@ -57,7 +57,7 @@ float1x4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (3.0)
@@ -78,7 +78,7 @@ void main(out float1x2 x : sv_target0, out float1x2 y : sv_target2)
 }
 
 [test]
-todo draw quad
+draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (5.0)
@@ -96,7 +96,7 @@ void main(out row_major float1x4 x : sv_target0, out float1x2 y : sv_target1)
 }
 
 [test]
-todo draw quad
+draw quad
 probe render target 0 all rgba (1.0, 2.0, 3.0, 4.0)
 probe render target 1 all r (5.0)
 probe render target 2 all r (6.0)

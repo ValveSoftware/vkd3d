@@ -266,6 +266,9 @@ static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_typ
     return false;
 }
 
+static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_node,
+        struct hlsl_ir_node *offset, struct hlsl_type *data_type, const struct vkd3d_shader_location loc);
+
 static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
@@ -275,10 +278,92 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
 
-    if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
-        return NULL;
-    list_add_tail(instrs, &cast->node.entry);
-    return &cast->node;
+    if ((src_type->type == HLSL_CLASS_MATRIX || dst_type->type == HLSL_CLASS_MATRIX)
+        && src_type->type <= HLSL_CLASS_LAST_NUMERIC && dst_type->type <= HLSL_CLASS_LAST_NUMERIC)
+    {
+        struct vkd3d_string_buffer *name;
+        static unsigned int counter = 0;
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_var *var;
+        unsigned int dst_idx;
+        bool broadcast;
+
+        broadcast = src_type->dimx == 1 && src_type->dimy == 1;
+        assert(dst_type->dimx * dst_type->dimy <= src_type->dimx * src_type->dimy || broadcast);
+        if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX && !broadcast)
+        {
+            assert(dst_type->dimx <= src_type->dimx);
+            assert(dst_type->dimy <= src_type->dimy);
+        }
+
+        name = vkd3d_string_buffer_get(&ctx->string_buffers);
+        vkd3d_string_buffer_printf(name, "<cast-%u>", counter++);
+        var = hlsl_new_synthetic_var(ctx, name->buffer, dst_type, *loc);
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        if (!var)
+            return NULL;
+
+        for (dst_idx = 0; dst_idx < dst_type->dimx * dst_type->dimy; ++dst_idx)
+        {
+            struct hlsl_type *src_scalar_type, *dst_scalar_type;
+            unsigned int src_idx, src_offset, dst_offset;
+            struct hlsl_ir_store *store;
+            struct hlsl_ir_constant *c;
+
+            if (broadcast)
+            {
+                src_idx = 0;
+            }
+            else
+            {
+                if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX)
+                {
+                    unsigned int x = dst_idx % dst_type->dimx, y = dst_idx / dst_type->dimx;
+
+                    src_idx = y * src_type->dimx + x;
+                }
+                else
+                {
+                    src_idx = dst_idx;
+                }
+            }
+
+            dst_offset = hlsl_compute_component_offset(ctx, dst_type, dst_idx, &dst_scalar_type);
+            src_offset = hlsl_compute_component_offset(ctx, src_type, src_idx, &src_scalar_type);
+
+            if (!(c = hlsl_new_uint_constant(ctx, src_offset, loc)))
+                return NULL;
+            list_add_tail(instrs, &c->node.entry);
+
+            if (!(load = add_load(ctx, instrs, node, &c->node, src_scalar_type, *loc)))
+                return NULL;
+
+            if (!(cast = hlsl_new_cast(ctx, &load->node, dst_scalar_type, loc)))
+                return NULL;
+            list_add_tail(instrs, &cast->node.entry);
+
+            if (!(c = hlsl_new_uint_constant(ctx, dst_offset, loc)))
+                return NULL;
+            list_add_tail(instrs, &c->node.entry);
+
+            if (!(store = hlsl_new_store(ctx, var, &c->node, &cast->node, 0, *loc)))
+                return NULL;
+            list_add_tail(instrs, &store->node.entry);
+        }
+
+        if (!(load = hlsl_new_load(ctx, var, NULL, dst_type, *loc)))
+            return NULL;
+        list_add_tail(instrs, &load->node.entry);
+
+        return &load->node;
+    }
+    else
+    {
+        if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
+            return NULL;
+        list_add_tail(instrs, &cast->node.entry);
+        return &cast->node;
+    }
 }
 
 static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct list *instrs,
