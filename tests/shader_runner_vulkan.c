@@ -58,13 +58,11 @@ struct vulkan_shader_runner
     VkQueue queue;
     VkCommandPool command_pool;
     VkCommandBuffer cmd_buffer;
-    VkRenderPass render_pass;
     VkDescriptorPool descriptor_pool;
 
     VkImage render_target;
     VkDeviceMemory rt_memory;
     VkImageView rtv;
-    VkFramebuffer fb;
 
     struct vulkan_sampler
     {
@@ -504,7 +502,7 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
     return pipeline_layout;
 }
 
-static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner,
+static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner, VkRenderPass render_pass,
         VkPipelineLayout pipeline_layout, D3D_PRIMITIVE_TOPOLOGY primitive_topology)
 {
     VkPipelineInputAssemblyStateCreateInfo ia_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -620,7 +618,7 @@ static VkPipeline create_pipeline(const struct vulkan_shader_runner *runner,
     pipeline_desc.pMultisampleState = &ms_desc;
     pipeline_desc.pColorBlendState = &blend_desc;
     pipeline_desc.layout = pipeline_layout;
-    pipeline_desc.renderPass = runner->render_pass;
+    pipeline_desc.renderPass = render_pass;
     pipeline_desc.subpass = 0;
 
     VK_CALL(vkCreateGraphicsPipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
@@ -782,6 +780,48 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
     /* The descriptor set will be freed by resetting the descriptor pool. */
 }
 
+static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runner,
+        VkRenderPass *render_pass, VkFramebuffer *fb)
+{
+    VkRenderPassCreateInfo render_pass_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+    VkFramebufferCreateInfo fb_desc = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    VkAttachmentDescription attachment_desc = {0};
+    VkSubpassDescription subpass_desc = {0};
+    VkAttachmentReference color_ref = {0};
+
+    attachment_desc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment_desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment_desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    color_ref.attachment = 0;
+    color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass_desc.colorAttachmentCount = 1;
+    subpass_desc.pColorAttachments = &color_ref;
+
+    render_pass_desc.attachmentCount = 1;
+    render_pass_desc.pAttachments = &attachment_desc;
+    render_pass_desc.subpassCount = 1;
+    render_pass_desc.pSubpasses = &subpass_desc;
+
+    VK_CALL(vkCreateRenderPass(runner->device, &render_pass_desc, NULL, render_pass));
+
+    fb_desc.renderPass = *render_pass;
+    fb_desc.attachmentCount = 1;
+    fb_desc.pAttachments = &runner->rtv;
+    fb_desc.width = RENDER_TARGET_WIDTH;
+    fb_desc.height = RENDER_TARGET_HEIGHT;
+    fb_desc.layers = 1;
+
+    VK_CALL(vkCreateFramebuffer(runner->device, &fb_desc, NULL, fb));
+}
+
 static bool vulkan_runner_draw(struct shader_runner *r,
         D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count)
 {
@@ -794,16 +834,20 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
     VkDevice device = runner->device;
+    VkRenderPass render_pass;
     VkClearRect clear_rect;
     VkPipeline pipeline;
+    VkFramebuffer fb;
     bool ret = true;
     unsigned int i;
+
+    create_render_pass_and_framebuffer(runner, &render_pass, &fb);
 
     /* Create this before compiling shaders, it will assign resource bindings. */
     set_layout = create_descriptor_set_layout(runner);
 
     pipeline_layout = create_pipeline_layout(runner, set_layout);
-    if (!(pipeline = create_pipeline(runner, pipeline_layout, primitive_topology)))
+    if (!(pipeline = create_pipeline(runner, render_pass, pipeline_layout, primitive_topology)))
     {
         ret = false;
         goto out;
@@ -811,8 +855,8 @@ static bool vulkan_runner_draw(struct shader_runner *r,
 
     begin_command_buffer(runner);
 
-    pass_begin_desc.renderPass = runner->render_pass;
-    pass_begin_desc.framebuffer = runner->fb;
+    pass_begin_desc.renderPass = render_pass;
+    pass_begin_desc.framebuffer = fb;
     pass_begin_desc.renderArea = rt_rect;
 
     VK_CALL(vkCmdBeginRenderPass(cmd_buffer, &pass_begin_desc, VK_SUBPASS_CONTENTS_INLINE));
@@ -845,6 +889,8 @@ out:
 
     VK_CALL(vkDestroyPipelineLayout(device, pipeline_layout, NULL));
     VK_CALL(vkDestroyDescriptorSetLayout(device, set_layout, NULL));
+    VK_CALL(vkDestroyRenderPass(device, render_pass, NULL));
+    VK_CALL(vkDestroyFramebuffer(device, fb, NULL));
 
     return ret;
 }
@@ -985,17 +1031,12 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkDescriptorPoolCreateInfo descriptor_pool_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     VkCommandBufferAllocateInfo cmd_buffer_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     VkCommandPoolCreateInfo command_pool_desc = {.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    VkRenderPassCreateInfo render_pass_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
     VkDeviceQueueCreateInfo queue_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    VkFramebufferCreateInfo fb_desc = {.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkPhysicalDeviceFeatures ret_features, features;
     VkDescriptorPoolSize descriptor_pool_sizes[3];
-    VkAttachmentDescription attachment_desc = {0};
     static const float queue_priority = 1.0f;
-    VkSubpassDescription subpass_desc = {0};
-    VkAttachmentReference color_ref = {0};
     VkFormatProperties format_props;
     uint32_t count, graphics_index;
     VkDevice device;
@@ -1100,42 +1141,10 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
 
     VK_CALL(vkAllocateCommandBuffers(device, &cmd_buffer_desc, &runner->cmd_buffer));
 
-    attachment_desc.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
-    attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_desc.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment_desc.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    color_ref.attachment = 0;
-    color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass_desc.colorAttachmentCount = 1;
-    subpass_desc.pColorAttachments = &color_ref;
-
-    render_pass_desc.attachmentCount = 1;
-    render_pass_desc.pAttachments = &attachment_desc;
-    render_pass_desc.subpassCount = 1;
-    render_pass_desc.pSubpasses = &subpass_desc;
-
-    VK_CALL(vkCreateRenderPass(device, &render_pass_desc, NULL, &runner->render_pass));
-
     runner->render_target = create_2d_image(runner, RENDER_TARGET_WIDTH, RENDER_TARGET_HEIGHT,
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
             VK_FORMAT_R32G32B32A32_SFLOAT, &runner->rt_memory);
     runner->rtv = create_2d_image_view(runner, runner->render_target, VK_FORMAT_R32G32B32A32_SFLOAT);
-
-    fb_desc.renderPass = runner->render_pass;
-    fb_desc.attachmentCount = 1;
-    fb_desc.pAttachments = &runner->rtv;
-    fb_desc.width = RENDER_TARGET_WIDTH;
-    fb_desc.height = RENDER_TARGET_HEIGHT;
-    fb_desc.layers = 1;
-
-    VK_CALL(vkCreateFramebuffer(device, &fb_desc, NULL, &runner->fb));
 
     descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     descriptor_pool_sizes[0].descriptorCount = MAX_RESOURCES;
@@ -1169,12 +1178,10 @@ static void cleanup_vulkan_runner(struct vulkan_shader_runner *runner)
     VkDevice device = runner->device;
 
     VK_CALL(vkFreeMemory(device, runner->rt_memory, NULL));
-    VK_CALL(vkDestroyFramebuffer(device, runner->fb, NULL));
     VK_CALL(vkDestroyImageView(device, runner->rtv, NULL));
     VK_CALL(vkDestroyImage(device, runner->render_target, NULL));
 
     VK_CALL(vkDestroyDescriptorPool(device, runner->descriptor_pool, NULL));
-    VK_CALL(vkDestroyRenderPass(device, runner->render_pass, NULL));
     VK_CALL(vkFreeCommandBuffers(device, runner->command_pool, 1, &runner->cmd_buffer));
     VK_CALL(vkDestroyCommandPool(device, runner->command_pool, NULL));
     VK_CALL(vkDestroyDevice(device, NULL));
