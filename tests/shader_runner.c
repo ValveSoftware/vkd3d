@@ -468,7 +468,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
     else if (match_string(line, "probe", &line))
     {
-        unsigned int left, top, right, bottom, ulps;
+        unsigned int left, top, right, bottom, ulps, slot;
         struct resource_readback *rb;
         struct resource *resource;
         int ret, len;
@@ -479,13 +479,23 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         if (match_string(line, "uav", &line))
         {
-            unsigned int slot = strtoul(line, &rest, 10);
+            slot = strtoul(line, &rest, 10);
 
             if (rest == line)
                 fatal_error("Malformed UAV index '%s'.\n", line);
             line = rest;
 
             resource = get_resource(runner, RESOURCE_TYPE_UAV, slot);
+        }
+        else if (match_string(line, "render target", &line))
+        {
+            slot = strtoul(line, &rest, 10);
+
+            if (rest == line)
+                fatal_error("Malformed render target index '%s'.\n", line);
+            line = rest;
+
+            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot);
         }
         else
         {
@@ -835,6 +845,18 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 current_sampler->u_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
                 current_sampler->v_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
                 current_sampler->w_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            }
+            else if (sscanf(line, "[render target %u]\n", &index))
+            {
+                state = STATE_RESOURCE;
+
+                memset(&current_resource, 0, sizeof(current_resource));
+
+                current_resource.slot = index;
+                current_resource.type = RESOURCE_TYPE_RENDER_TARGET;
+                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.texel_size = 16;
             }
             else if (sscanf(line, "[texture %u]\n", &index))
             {

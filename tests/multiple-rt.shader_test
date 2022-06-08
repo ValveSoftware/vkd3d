@@ -1,0 +1,19 @@
+[render target 0]
+format r32g32b32a32 float
+size (640, 480)
+
+[render target 1]
+format r32g32b32a32 float
+size (640, 480)
+
+[pixel shader]
+void main(out float4 o0 : sv_target0, out float4 o1 : sv_target1)
+{
+    o0 = float4(0.1, 0.2, 0.3, 0.4);
+    o1 = float4(0.5, 0.6, 0.7, 0.8);
+}
+
+[test]
+draw quad
+probe render target 0 all rgba (0.1, 0.2, 0.3, 0.4)
+probe render target 1 all rgba (0.5, 0.6, 0.7, 0.8)
