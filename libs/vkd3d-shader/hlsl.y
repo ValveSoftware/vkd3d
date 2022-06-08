@@ -2046,6 +2046,123 @@ static bool intrinsic_min(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_mul(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1], *cast1, *cast2;
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    struct hlsl_type *cast_type1 = arg1->data_type, *cast_type2 = arg2->data_type, *matrix_type, *ret_type;
+    unsigned int i, j, k, vect_count = 0;
+    struct vkd3d_string_buffer *name;
+    static unsigned int counter = 0;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_var *var;
+
+    if (arg1->data_type->type == HLSL_CLASS_SCALAR || arg2->data_type->type == HLSL_CLASS_SCALAR)
+        return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1, arg2, loc);
+
+    if (arg1->data_type->type == HLSL_CLASS_VECTOR)
+    {
+        vect_count++;
+        cast_type1 = hlsl_get_matrix_type(ctx, base, arg1->data_type->dimx, 1);
+    }
+    if (arg2->data_type->type == HLSL_CLASS_VECTOR)
+    {
+        vect_count++;
+        cast_type2 = hlsl_get_matrix_type(ctx, base, 1, arg2->data_type->dimx);
+    }
+
+    matrix_type = hlsl_get_matrix_type(ctx, base, cast_type2->dimx, cast_type1->dimy);
+
+    if (vect_count == 0)
+    {
+        ret_type = matrix_type;
+    }
+    else if (vect_count == 1)
+    {
+        assert(matrix_type->dimx == 1 || matrix_type->dimy == 1);
+        ret_type = hlsl_get_vector_type(ctx, base, matrix_type->dimx * matrix_type->dimy);
+    }
+    else
+    {
+        assert(matrix_type->dimx == 1 && matrix_type->dimy == 1);
+        ret_type = hlsl_get_scalar_type(ctx, base);
+    }
+
+    if (!(cast1 = add_implicit_conversion(ctx, params->instrs, arg1, cast_type1, loc)))
+        return false;
+
+    if (!(cast2 = add_implicit_conversion(ctx, params->instrs, arg2, cast_type2, loc)))
+        return false;
+
+    name = vkd3d_string_buffer_get(&ctx->string_buffers);
+    vkd3d_string_buffer_printf(name, "<mul-%u>", counter++);
+    var = hlsl_new_synthetic_var(ctx, name->buffer, matrix_type, *loc);
+    vkd3d_string_buffer_release(&ctx->string_buffers, name);
+    if (!var)
+        return false;
+
+    for (i = 0; i < matrix_type->dimx; ++i)
+        for (j = 0; j < matrix_type->dimy; ++j)
+        {
+            struct hlsl_ir_node *node = NULL;
+            struct hlsl_type *scalar_type;
+            struct hlsl_ir_store *store;
+            struct hlsl_ir_constant *c;
+            unsigned int offset;
+
+            for (k = 0; k < cast_type1->dimx && k < cast_type2->dimy; ++k)
+            {
+                struct hlsl_ir_load *value1, *value2;
+                struct hlsl_ir_node *mul;
+
+                offset = hlsl_compute_component_offset(ctx, cast_type1, j * cast_type1->dimx + k, &scalar_type);
+                if (!(c = hlsl_new_uint_constant(ctx, offset, loc)))
+                    return false;
+                list_add_tail(params->instrs, &c->node.entry);
+
+                if (!(value1 = add_load(ctx, params->instrs, cast1, &c->node, scalar_type, *loc)))
+                    return false;
+
+                offset = hlsl_compute_component_offset(ctx, cast_type2, k * cast_type2->dimx + i, &scalar_type);
+                if (!(c = hlsl_new_uint_constant(ctx, offset, loc)))
+                    return false;
+                list_add_tail(params->instrs, &c->node.entry);
+
+                if (!(value2 = add_load(ctx, params->instrs, cast2, &c->node, scalar_type, *loc)))
+                    return false;
+
+                if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &value1->node, &value2->node, loc)))
+                    return false;
+
+                if (node)
+                {
+                    if (!(node = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, node, mul, loc)))
+                        return false;
+                }
+                else
+                {
+                    node = mul;
+                }
+            }
+
+            offset = hlsl_compute_component_offset(ctx, matrix_type, j * matrix_type->dimx + i, &scalar_type);
+            if (!(c = hlsl_new_uint_constant(ctx, offset, loc)))
+                return false;
+            list_add_tail(params->instrs, &c->node.entry);
+
+            if (!(store = hlsl_new_store(ctx, var, &c->node, node, 0, *loc)))
+                return false;
+            list_add_tail(params->instrs, &store->node.entry);
+        }
+
+    if (!(load = hlsl_new_load(ctx, var, NULL, matrix_type, *loc)))
+        return false;
+    list_add_tail(params->instrs, &load->node.entry);
+
+    return !!add_implicit_conversion(ctx, params->instrs, &load->node, ret_type, loc);
+}
+
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2106,6 +2223,7 @@ intrinsic_functions[] =
     {"floor",                               1, true,  intrinsic_floor},
     {"max",                                 2, true,  intrinsic_max},
     {"min",                                 2, true,  intrinsic_min},
+    {"mul",                                 2, true,  intrinsic_mul},
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
