@@ -1201,12 +1201,86 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
     return true;
 }
 
+static unsigned int minor_size(const struct hlsl_type *type)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+static unsigned int major_size(const struct hlsl_type *type)
+{
+    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+        return type->dimy;
+    else
+        return type->dimx;
+}
+
 static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_expr *expr;
     unsigned int i;
+
+    if (type->type == HLSL_CLASS_MATRIX)
+    {
+        struct vkd3d_string_buffer *name;
+        static unsigned int counter = 0;
+        struct hlsl_type *vector_type;
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_var *var;
+
+        vector_type = hlsl_get_vector_type(ctx, type->base_type, minor_size(type));
+
+        name = vkd3d_string_buffer_get(&ctx->string_buffers);
+        vkd3d_string_buffer_printf(name, "<split_op-%u>", counter++);
+        var = hlsl_new_synthetic_var(ctx, name->buffer, type, *loc);
+        vkd3d_string_buffer_release(&ctx->string_buffers, name);
+        if (!var)
+            return NULL;
+
+        for (i = 0; i < major_size(type); i++)
+        {
+            struct hlsl_ir_node *value, *vector_operands[HLSL_MAX_OPERANDS] = { NULL };
+            struct hlsl_ir_store *store;
+            struct hlsl_ir_constant *c;
+            unsigned int j;
+
+            if (!(c = hlsl_new_uint_constant(ctx, 4 * i, loc)))
+                return NULL;
+            list_add_tail(instrs, &c->node.entry);
+
+            for (j = 0; j < HLSL_MAX_OPERANDS; j++)
+            {
+                if (operands[j])
+                {
+                    struct hlsl_type *vector_arg_type;
+                    struct hlsl_ir_load *load;
+
+                    vector_arg_type = hlsl_get_vector_type(ctx, operands[j]->data_type->base_type, minor_size(type));
+
+                    if (!(load = add_load(ctx, instrs, operands[j], &c->node, vector_arg_type, *loc)))
+                        return NULL;
+                    vector_operands[j] = &load->node;
+                }
+            }
+
+            if (!(value = add_expr(ctx, instrs, op, vector_operands, vector_type, loc)))
+                return NULL;
+
+            if (!(store = hlsl_new_store(ctx, var, &c->node, value, 0, *loc)))
+                return NULL;
+            list_add_tail(instrs, &store->node.entry);
+        }
+
+        if (!(load = hlsl_new_load(ctx, var, NULL, type, *loc)))
+            return NULL;
+        list_add_tail(instrs, &load->node.entry);
+
+        return &load->node;
+    }
 
     if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;

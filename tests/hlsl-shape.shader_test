@@ -93,7 +93,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 7.0, 9.0)
 
 [pixel shader]
@@ -107,7 +107,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 7.0, 9.0)
 
 [pixel shader]
@@ -122,7 +122,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
@@ -137,7 +137,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
@@ -152,7 +152,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 7.0, 12.0, 17.0)
 
 [pixel shader]
@@ -167,7 +167,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 7.0, 12.0, 17.0)
 
 [pixel shader]
@@ -183,7 +183,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 0.0)
 
 [pixel shader]
@@ -199,7 +199,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (9.0, 11.0, 13.0, 0.0)
 
 [pixel shader]
@@ -223,7 +223,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
@@ -247,7 +247,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
@@ -273,7 +273,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
@@ -285,7 +285,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
@@ -297,7 +297,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
@@ -336,7 +336,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
@@ -351,5 +351,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (6.0, 7.0, 8.0, 9.0)
