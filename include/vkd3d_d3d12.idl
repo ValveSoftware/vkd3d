@@ -1641,6 +1641,12 @@ typedef struct D3D12_COMPUTE_PIPELINE_STATE_DESC
     D3D12_PIPELINE_STATE_FLAGS Flags;
 } D3D12_COMPUTE_PIPELINE_STATE_DESC;
 
+typedef struct D3D12_PIPELINE_STATE_STREAM_DESC
+{
+    SIZE_T SizeInBytes;
+    void *pPipelineStateSubobjectStream;
+} D3D12_PIPELINE_STATE_STREAM_DESC;
+
 typedef enum D3D12_COMMAND_LIST_TYPE
 {
     D3D12_COMMAND_LIST_TYPE_DIRECT = 0,
@@ -2536,6 +2542,20 @@ interface ID3D12Device1 : ID3D12Device
 
     HRESULT SetResidencyPriority(UINT object_count, ID3D12Pageable * const *objects,
             const D3D12_RESIDENCY_PRIORITY *priorities);
+}
+
+[
+    uuid(30baa41e-b15b-475c-a0bb-1af5c5b64328),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device2 : ID3D12Device1
+{
+    HRESULT CreatePipelineState(
+        [in] const D3D12_PIPELINE_STATE_STREAM_DESC *desc,
+        [in] REFIID riid,
+        [out, iid_is(riid)] void **pipeline_state);
 }
 
 [
