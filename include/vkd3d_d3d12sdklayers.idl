@@ -1088,6 +1088,20 @@ interface ID3D12DebugDevice2 : ID3D12DebugDevice
 }
 
 [
+    uuid(0adf7d52-929c-4e61-addb-ffed30de66ef),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12SharingContract : IUnknown
+{
+    void Present(ID3D12Resource *resource, UINT sub_resource, HWND window);
+    void SharedFenceSignal(ID3D12Fence *fence, UINT64 fence_value);
+    void BeginCapturableWork(REFGUID guid);
+    void EndCapturableWork(REFGUID guid);
+}
+
+[
     uuid(0742a90b-c387-483f-b946-30a7e4e61458),
     object,
     local,
