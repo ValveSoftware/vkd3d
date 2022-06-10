@@ -2046,6 +2046,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             break;
         }
 
+        case HLSL_OP2_LOGIC_AND:
+            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            write_sm4_binary_op(buffer, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
+            break;
+
         case HLSL_OP2_LSHIFT:
             assert(type_is_integer(dst_type));
             assert(dst_type->base_type != HLSL_TYPE_BOOL);
