@@ -1637,6 +1637,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);
             break;
 
+        case HLSL_OP1_FRACT:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op(buffer, VKD3D_SM4_OP_FRC, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_LOG2:
             assert(type_is_float(dst_type));
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
