@@ -250,6 +250,13 @@ typedef enum D3D12_RAYTRACING_TIER
     D3D12_RAYTRACING_TIER_1_0 = 0xa,
 } D3D12_RAYTRACING_TIER;
 
+typedef enum D3D12_RESIDENCY_FLAGS
+{
+    D3D12_RESIDENCY_FLAG_NONE = 0x0,
+    D3D12_RESIDENCY_FLAG_DENY_OVERBUDGET = 0x1,
+} D3D12_RESIDENCY_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_RESIDENCY_FLAGS);")
+
 interface ID3D12Fence;
 interface ID3D12RootSignature;
 interface ID3D12Heap;
@@ -2561,6 +2568,32 @@ interface ID3D12Device2 : ID3D12Device1
         [in] const D3D12_PIPELINE_STATE_STREAM_DESC *desc,
         [in] REFIID riid,
         [out, iid_is(riid)] void **pipeline_state);
+}
+
+[
+    uuid(81dadc15-2bad-4392-93c5-101345c4aa98),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device3 : ID3D12Device2
+{
+    HRESULT OpenExistingHeapFromAddress(
+        [in] const void *address,
+        [in] REFIID riid,
+        [out, iid_is(riid)] void **heap);
+
+    HRESULT OpenExistingHeapFromFileMapping(
+        [in] HANDLE file_mapping,
+        [in] REFIID riid,
+        [out, iid_is(riid)] void **heap);
+
+    HRESULT EnqueueMakeResident(
+        [in] D3D12_RESIDENCY_FLAGS flags,
+        [in] UINT num_objects,
+        [in] ID3D12Pageable *const *objects,
+        [in] ID3D12Fence *fence,
+        [in] UINT64 fence_value);
 }
 
 [
