@@ -500,6 +500,32 @@ static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
     return true;
 }
 
+static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
+        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+
+    for (k = 0; k < dst->node.data_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+                dst->value[k].u = src1->value[k].u | src2->value[k].u;
+                break;
+
+            default:
+                FIXME("Fold bit or for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
 bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
@@ -577,6 +603,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP2_BIT_AND:
             success = fold_bit_and(ctx, res, arg1, arg2);
+            break;
+
+        case HLSL_OP2_BIT_OR:
+            success = fold_bit_or(ctx, res, arg1, arg2);
             break;
 
         default:
