@@ -1597,7 +1597,7 @@ static struct list *add_binary_shift_expr_merge(struct hlsl_ctx *ctx, struct lis
     return list1;
 }
 
-static struct hlsl_ir_expr *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2, const struct vkd3d_shader_location *loc)
 {
     enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
