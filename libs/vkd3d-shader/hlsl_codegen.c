@@ -1485,6 +1485,75 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
     return true;
 }
 
+static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *arg1, *arg2, *mul1, *neg1, *ge, *neg2, *div, *mul2, *frc;
+    struct hlsl_type *type = instr->data_type, *btype;
+    struct hlsl_ir_constant *one;
+    struct hlsl_ir_load *cond;
+    struct hlsl_ir_expr *expr;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    arg1 = expr->operands[0].node;
+    arg2 = expr->operands[1].node;
+    if (expr->op != HLSL_OP2_MOD)
+        return false;
+    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+        return false;
+    if (type->base_type != HLSL_TYPE_FLOAT)
+        return false;
+    btype = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_BOOL, type->dimx, type->dimy);
+
+    if (!(mul1 = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, arg2, arg1)))
+        return false;
+    list_add_before(&instr->entry, &mul1->entry);
+
+    if (!(neg1 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &neg1->entry);
+
+    if (!(ge = hlsl_new_binary_expr(ctx, HLSL_OP2_GEQUAL, mul1, neg1)))
+        return false;
+    ge->data_type = btype;
+    list_add_before(&instr->entry, &ge->entry);
+
+    if (!(neg2 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg2, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &neg2->entry);
+
+    if (!(cond = add_conditional(ctx, &instr->entry, ge, arg2, neg2)))
+        return false;
+
+    if (!(one = hlsl_new_constant(ctx, type, &instr->loc)))
+        return false;
+    for (i = 0; i < type->dimx; ++i)
+        one->value[i].f = 1.0f;
+    list_add_before(&instr->entry, &one->node.entry);
+
+    if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_DIV, &one->node, &cond->node)))
+        return false;
+    list_add_before(&instr->entry, &div->entry);
+
+    if (!(mul2 = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, div, arg1)))
+        return false;
+    list_add_before(&instr->entry, &mul2->entry);
+
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, mul2, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &frc->entry);
+
+    expr->op = HLSL_OP2_MUL;
+    hlsl_src_remove(&expr->operands[0]);
+    hlsl_src_remove(&expr->operands[1]);
+    hlsl_src_from_node(&expr->operands[0], frc);
+    hlsl_src_from_node(&expr->operands[1], &cond->node);
+
+    return true;
+}
+
 static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
@@ -2472,6 +2541,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     transform_ir(ctx, lower_int_division, body, NULL);
     transform_ir(ctx, lower_int_modulus, body, NULL);
     transform_ir(ctx, lower_int_abs, body, NULL);
+    transform_ir(ctx, lower_float_modulus, body, NULL);
     do
     {
         progress = transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
