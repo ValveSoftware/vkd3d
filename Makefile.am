@@ -144,7 +144,8 @@ vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
 	tests/d3d12_test_utils.h \
 	tests/shader_runner.h \
-	tests/utils.h
+	tests/utils.h \
+	tests/vulkan_procs.h
 
 vkd3d_demos = \
 	demos/vkd3d-gears \
