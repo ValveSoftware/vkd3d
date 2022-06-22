@@ -663,11 +663,11 @@ int main(int argc, char **argv)
     {
         uint32_t token;
 
-        if (options.preprocess_only)
+        if (options.preprocess_only || info.source.size < sizeof(token))
         {
             options.source_type = VKD3D_SHADER_SOURCE_HLSL;
         }
-        else if (info.source.size >= sizeof(token))
+        else
         {
             memcpy(&token, info.source.code, sizeof(token));
             if (token == TAG_DXBC)
