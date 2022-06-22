@@ -45,6 +45,7 @@ enum vkd3d_shader_api_version
     VKD3D_SHADER_API_VERSION_1_1,
     VKD3D_SHADER_API_VERSION_1_2,
     VKD3D_SHADER_API_VERSION_1_3,
+    VKD3D_SHADER_API_VERSION_1_4,
 };
 
 /** The type of a chained structure. */

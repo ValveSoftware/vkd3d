@@ -1,16 +1,17 @@
-The Wine team is proud to announce that release 1.3 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.4 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Initial HLSL compilation support.
-  - Shader model 5.1 descriptor array support.
-  - Support for disassembling Direct3D shaders.
+  - Many improvements to the HLSL compiler.
+  - A new descriptor heap implementation using the VK_EXT_descriptor_indexing
+    extension.
+  - A new fence implementation using the VK_KHR_timeline_semaphore extension.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.3.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.4.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -21,136 +22,75 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.3
+What's new in vkd3d 1.4
 =======================
 
 
 *** libvkd3d
 
-- Newly implemented Direct3D 12 features:
-  - Root signature support for unbounded descriptor tables.
-  - Unordered-access view counters in pixel shaders. These were previously
-    only supported in compute shaders.
-  - Output merger logical operations.
-  - Retrieving CPU/GPU timestamp calibration values. This requires support for
-    the VK_EXT_calibrated_timestamps extension.
-  - The `mirror_once' texture addressing mode. This requires support for the
-    VK_KHR_sampler_mirror_clamp_to_edge extension.
+- A new descriptor heap implementation using the VK_EXT_descriptor_indexing
+  extension. In particular, the new implementation is more efficient when
+  large descriptor heaps are used by multiple command lists. The new
+  `virtual_heaps' configuration option can be used to select the original
+  implementation even when the VK_EXT_descriptor_indexing extension is
+  available.
+
+- A new fence implementation using the VK_KHR_timeline_semaphore extension.
+  The new implementation addresses a number of edge cases the original
+  implementation was unable to, as well as being somewhat more efficient.
+
+- When the VK_EXT_robustness2 extension is available, it is used to implement
+  null views. This more accurately matches Direct3D 12 behaviour. For example,
+  all reads from such a null view return zeroes, while that isn't necessarily
+  the case for out-of-bounds reads with the original implementation.
 
 - New interfaces:
-  - The vkd3d_host_time_domain_info structure extends the
-    vkd3d_instance_create_info structure, and can be used to specify how to
-    convert between timestamps and tick counts. If left unspecified, a tick
-    is assumed to take 100 nanoseconds.
-
-- Various bug fixes.
+  - vkd3d_set_log_callback() allows writing log output via a custom callback.
+    This can be used to integrate vkd3d's log output with other logging
+    systems.
 
 
 *** libvkd3d-shader
 
-- New features:
-  - Initial support for HLSL compilation and preprocessing. This is an ongoing
-    effort; although support for many features is already implemented, support
-    for many more isn't yet.
-  - Support for disassembling Direct3D byte-code shaders to Direct3D assembly.
-  - Support for parsing the legacy Direct3D byte-code format used by Direct3D
-    shader model 1, 2, and 3 shaders. In the current vkd3d-shader release,
-    only Direct3D assembly is supported as a target for these; we intend to
-    support SPIR-V as a target in a future release.
+- New features for the HLSL source type:
+  - Support for integer arithmetic, bitwise and shift operations.
+  - Support for matrix and vector subscripting.
+  - Support for the mul() intrinsic function.
+  - Support for matrix copying, casting, and entry-wise operations.
+  - Support for complex initialisers.
+  - Support for the `nointerpolation' modifier. This modifier is applied by
+    default to integer variables.
+  - Support for the SV_VertexID semantic.
+  - Support for matrix-typed varyings.
+  - Constant folding for a number of operators.
+  - Copy propagation across branches and loops. This allows use of non-numeric
+    variables anywhere in a program, as well as more optimised code for
+    accessing numeric variables within branches and loops.
 
-- New features for the SPIR-V target:
-  - Support for various aspects of Direct3D shader model 5.1 descriptor
-    arrays, including unbounded descriptor arrays, UAV counter arrays, dynamic
-    indexing of descriptor arrays, and non-uniform indexing of descriptor
-    arrays. With the exception of some special cases, this requires support
-    for the SPV_EXT_descriptor_indexing extension in the target environment.
-  - Support for double precision floating-point operations.
-  - Support for indirect addressing of tessellation control shader inputs.
-  - Stencil export. I.e., writing stencil values from shaders. This requires
-    support for the SPV_EXT_shader_stencil_export extension in the target
-    environment.
-  - Support for the Direct3D shader model 4+ `precise' modifier.
-  - Support for Direct3D shader model 4+ global resource memory barriers.
+- The disassembler supports the shader model 5 `msad' instruction.
 
-New interfaces:
-  - vkd3d_shader_preprocess() provides support for preprocessing shaders.
-  - The vkd3d_shader_preprocess_info structure extends the
-    vkd3d_shader_compile_info structure, and can be used to specify
-    preprocessing parameters like preprocessor macro definitions.
-  - The vkd3d_shader_hlsl_source_info structure extends the
-    vkd3d_shader_compile_info structure, and can be used to specify HLSL
-    compilation parameters like the target profile and entry point.
-  - The vkd3d_shader_descriptor_offset_info structure extends the
-    vkd3d_shader_interface_info structure, and can be used to specify offsets
-    into descriptor arrays referenced by shader interface bindings. This
-    allows mapping multiple descriptor arrays in a shader to a single binding
-    point in the target environment, and helps with mapping between the
-    Direct3D 12 and Vulkan binding models.
-  - The VKD3D_SHADER_COMPILE_OPTION_API_VERSION compile option can
-    be used to specify the version of the libvkd3d-shader API the
-    application is targeting. If left unspecified,
-    VKD3D_SHADER_API_VERSION_1_2 will be used.
-
-- Various shader translation fixes, for tessellation shaders in particular.
-
-
-*** vkd3d-compiler
-
-- New source and target types:
-  - The `hlsl' source type specifies High Level Shader Language source code.
-  - The `d3d-asm' target type specifies Direct3D assembly shaders.
-  - The `d3dbc' format specifies legacy Direct3D byte-code, which is used for
-    Direct3D shader model 1, 2, and 3 shaders.
-  - The existing `dxbc-tpf' format can now also be used as a target format.
-
-- New command line options:
-  - `-E' can be used to specify the input should only be preprocessed.
-  - `-e'/`--entry' can be used to specify the entry point for HLSL and/or
-    SPIR-V shaders.
-  - `-p'/`--profile' can be used to specify the target profile for HLSL
-    shaders.
-
-- When no source type is explicitly specified, vkd3d-compiler will attempt to
-  determine the source type from the provided input. Note that this is
-  intended as a convenience for interactive usage only, and the heuristics
-  used are subject to future change. Non-interactive usage of vkd3d-compiler,
-  for example in build scripts, should always explicitly specify source and
-  target types.
-
-- When no target type is explicitly specified, a default will be chosen based
-  on the source type. Like the earlier mentioned source type detection, this
-  is intended for interactive usage only.
-
-- vkd3d-compiler will default to colour output if it can determine that the
-  output is a colour-capable teleprinter.
-
-- New environment variables:
-  - NO_COLOUR/NO_COLOR can be used to disable default colour output.
-  See the README for more detailed descriptions and how to use these.
+- New interfaces:
+  - vkd3d_shader_set_log_callback() allows writing log output via a custom
+    callback.
 
 
 *** libvkd3d-utils
 
 - New interfaces:
-  - D3DCreateBlob() provides support for creating ID3DBlob objects.
-  - D3DPreprocess() provides support for preprocessing HLSL source code.
-  - D3DCompile() and D3DCompile2() provide support for compiling HLSL source
-    code.
+  - vkd3d_utils_set_log_callback() allows writing log output via a custom
+    callback.
 
 
 *** build
 
-- The `gears' and `triangle' demo applications are installed as `vkd3d-gears'
-  and `vkd3d-triangle'. These were originally intended more as documentation
-  than as end-user executables, but there's some value in using them for
-  diagnostic purposes, much like e.g. `glxgears'.
+- The minimum required version of Vulkan-Headers and SPIRV-Headers for this
+  release is version 1.2.139.
 
-- The VULKAN_LIBS configure variable is used when detecting the Vulkan
-  library.
+- The SONAME_LIBVULKAN configure variable can be used to specify the shared
+  object name of the Vulkan library. Because vkd3d loads the Vulkan library
+  dynamically, specifying this removes the need for a Vulkan import library at
+  build time.
 
-- Builds for the Microsoft Windows target platform no longer require support
-  for POSIX threads. Windows synchronisation primitives are used instead.
-
-- If ncurses is available, it will be use by vkd3d-compiler to determine the
-  capabilities of the connected teleprinter, if any.
+- The `crosstests' target no longer builds Win32/PE demos or tests when these
+  were not enabled at configure time.
 
