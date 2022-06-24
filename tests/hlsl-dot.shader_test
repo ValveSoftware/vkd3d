@@ -56,7 +56,7 @@ float4 main() : SV_TARGET
 % Account for both the SM1 and SM4 uniform layout
 uniform 0 float4 2.0 3.0 0.0 0.0
 uniform 4 float4 3.0 0.0 0.0 0.0
-todo draw quad
+draw quad
 probe all rgba (6.0, 6.0, 6.0, 6.0)
 
 [pixel shader fail]
