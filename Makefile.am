@@ -88,6 +88,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-initializer-struct.shader_test \
 	tests/hlsl-intrinsic-override.shader_test \
 	tests/hlsl-invalid.shader_test \
+	tests/hlsl-ldexp.shader_test \
 	tests/hlsl-majority-pragma.shader_test \
 	tests/hlsl-majority-typedef.shader_test \
 	tests/hlsl-matrix-indexing.shader_test \
