@@ -1946,7 +1946,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     transform_ir(ctx, lower_casts_to_bool, body, NULL);
     do
     {
-        progress = transform_ir(ctx, hlsl_fold_constants, body, NULL);
+        progress = transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
+        progress |= transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= copy_propagation_execute(ctx, body);
         progress |= transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }

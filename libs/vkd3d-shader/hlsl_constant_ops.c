@@ -369,7 +369,7 @@ static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
     return true;
 }
 
-bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *res;
     struct hlsl_ir_expr *expr;
@@ -446,4 +446,33 @@ bool hlsl_fold_constants(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void 
         vkd3d_free(res);
     }
     return success;
+}
+
+bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_constant *value, *res;
+    struct hlsl_ir_swizzle *swizzle;
+    unsigned int i, swizzle_bits;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+    if (swizzle->val.node->type != HLSL_IR_CONSTANT)
+        return false;
+    value = hlsl_ir_constant(swizzle->val.node);
+
+    if (!(res = hlsl_alloc(ctx, sizeof(*res))))
+        return false;
+    init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
+
+    swizzle_bits = swizzle->swizzle;
+    for (i = 0; i < swizzle->node.data_type->dimx; ++i)
+    {
+        res->value[i] = value->value[swizzle_bits & 3];
+        swizzle_bits >>= 2;
+    }
+
+    list_add_before(&swizzle->node.entry, &res->node.entry);
+    hlsl_replace_node(&swizzle->node, &res->node);
+    return true;
 }
