@@ -797,25 +797,6 @@ void hlsl_cleanup_deref(struct hlsl_deref *deref)
     hlsl_src_remove(&deref->offset);
 }
 
-struct hlsl_ir_store *hlsl_new_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
-        struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc)
-{
-    struct hlsl_ir_store *store;
-
-    if (!writemask && type_is_single_reg(rhs->data_type))
-        writemask = (1 << rhs->data_type->dimx) - 1;
-
-    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
-        return NULL;
-
-    init_node(&store->node, HLSL_IR_STORE, NULL, loc);
-    init_deref(ctx, &store->lhs, var, 0);
-    hlsl_src_from_node(&store->lhs.offset, offset);
-    hlsl_src_from_node(&store->rhs, rhs);
-    store->writemask = writemask;
-    return store;
-}
-
 /* Initializes a simple variable derefence, so that it can be passed to load/store functions. */
 void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_var *var)
 {
@@ -969,19 +950,6 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condit
     list_init(&iff->then_instrs.instrs);
     list_init(&iff->else_instrs.instrs);
     return iff;
-}
-
-struct hlsl_ir_load *hlsl_new_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
-        struct hlsl_type *type, const struct vkd3d_shader_location loc)
-{
-    struct hlsl_ir_load *load;
-
-    if (!(load = hlsl_alloc(ctx, sizeof(*load))))
-        return NULL;
-    init_node(&load->node, HLSL_IR_LOAD, type, loc);
-    init_deref(ctx, &load->src, var, 0);
-    hlsl_src_from_node(&load->src.offset, offset);
-    return load;
 }
 
 struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,

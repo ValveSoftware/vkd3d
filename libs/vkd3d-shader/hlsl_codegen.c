@@ -958,39 +958,21 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
  * split_matrix_copies(). Inserts new instructions right before
  * "store". */
 static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
-        const struct hlsl_ir_load *load, const unsigned int offset, struct hlsl_type *type)
+        const struct hlsl_ir_load *load, const unsigned int idx, struct hlsl_type *type)
 {
-    struct hlsl_ir_node *offset_instr, *add;
     struct hlsl_ir_store *split_store;
     struct hlsl_ir_load *split_load;
     struct hlsl_ir_constant *c;
 
-    if (!(c = hlsl_new_uint_constant(ctx, offset, &store->node.loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, idx, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &c->node.entry);
 
-    offset_instr = &c->node;
-    if (load->src.offset.node)
-    {
-        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, load->src.offset.node, &c->node)))
-            return false;
-        list_add_before(&store->node.entry, &add->entry);
-        offset_instr = add;
-    }
-    if (!(split_load = hlsl_new_load(ctx, load->src.var, offset_instr, type, store->node.loc)))
+    if (!(split_load = hlsl_new_load_index(ctx, &load->src, &c->node, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &split_load->node.entry);
 
-    offset_instr = &c->node;
-    if (store->lhs.offset.node)
-    {
-        if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, store->lhs.offset.node, &c->node)))
-            return false;
-        list_add_before(&store->node.entry, &add->entry);
-        offset_instr = add;
-    }
-
-    if (!(split_store = hlsl_new_store(ctx, store->lhs.var, offset_instr, &split_load->node, 0, store->node.loc)))
+    if (!(split_store = hlsl_new_store_index(ctx, &store->lhs, &c->node, &split_load->node, 0, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &split_store->node.entry);
 
@@ -1002,8 +984,8 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     const struct hlsl_ir_node *rhs;
     struct hlsl_type *element_type;
     const struct hlsl_type *type;
-    unsigned int element_size, i;
     struct hlsl_ir_store *store;
+    unsigned int i;
 
     if (instr->type != HLSL_IR_STORE)
         return false;
@@ -1014,7 +996,6 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     if (type->type != HLSL_CLASS_ARRAY)
         return false;
     element_type = type->e.array.type;
-    element_size = hlsl_type_get_array_element_reg_size(element_type);
 
     if (rhs->type != HLSL_IR_LOAD)
     {
@@ -1024,7 +1005,7 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
     for (i = 0; i < type->e.array.elements_count; ++i)
     {
-        if (!split_copy(ctx, store, hlsl_ir_load(rhs), i * element_size, element_type))
+        if (!split_copy(ctx, store, hlsl_ir_load(rhs), i, element_type))
             return false;
     }
 
@@ -1062,7 +1043,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     {
         const struct hlsl_struct_field *field = &type->e.record.fields[i];
 
-        if (!split_copy(ctx, store, hlsl_ir_load(rhs), field->reg_offset, field->type))
+        if (!split_copy(ctx, store, hlsl_ir_load(rhs), i, field->type))
             return false;
     }
 
@@ -1100,7 +1081,7 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        if (!split_copy(ctx, store, hlsl_ir_load(rhs), 4 * i, element_type))
+        if (!split_copy(ctx, store, hlsl_ir_load(rhs), i, element_type))
             return false;
     }
 
@@ -2114,8 +2095,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
     }
 
-    transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL); /* TODO: move forward, remove when no longer needed */
-
     transform_ir(ctx, lower_broadcasts, body, NULL);
     while (transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
@@ -2125,6 +2104,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
     while (progress);
     transform_ir(ctx, split_matrix_copies, body, NULL);
+
+    transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL); /* TODO: move forward, remove when no longer needed */
+
     transform_ir(ctx, lower_narrowing_casts, body, NULL);
     transform_ir(ctx, lower_casts_to_bool, body, NULL);
     do
