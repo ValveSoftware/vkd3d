@@ -352,7 +352,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
             list_add_tail(instrs, &store->node.entry);
         }
 
-        if (!(load = hlsl_new_load(ctx, var, NULL, dst_type, *loc)))
+        if (!(load = hlsl_new_var_load(ctx, var, *loc)))
             return NULL;
         list_add_tail(instrs, &load->node.entry);
 
@@ -625,31 +625,18 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
 static struct hlsl_ir_load *add_load_index(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_type *elem_type;
-    struct hlsl_ir_node *offset;
+    const struct hlsl_deref *src;
     struct hlsl_ir_load *load;
-    struct hlsl_block block;
-    struct hlsl_ir_var *var;
-
-    elem_type = hlsl_get_inner_type_from_path_index(ctx, var_instr->data_type, idx);
 
     if (var_instr->type == HLSL_IR_LOAD)
     {
-        const struct hlsl_deref *src = &hlsl_ir_load(var_instr)->src;
-
-        var = src->var;
-        if (!(offset = hlsl_new_offset_from_path_index(ctx, &block, var_instr->data_type, src->offset.node, idx, loc)))
-            return NULL;
-        list_move_tail(instrs, &block.instrs);
+        src = &hlsl_ir_load(var_instr)->src;
     }
     else
     {
         struct vkd3d_string_buffer *name;
         struct hlsl_ir_store *store;
-
-        if (!(offset = hlsl_new_offset_from_path_index(ctx, &block, var_instr->data_type, NULL, idx, loc)))
-            return NULL;
-        list_move_tail(instrs, &block.instrs);
+        struct hlsl_ir_var *var;
 
         if (!(name = hlsl_get_string_buffer(ctx)))
             return NULL;
@@ -662,9 +649,11 @@ static struct hlsl_ir_load *add_load_index(struct hlsl_ctx *ctx, struct list *in
         if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
             return NULL;
         list_add_tail(instrs, &store->node.entry);
+
+        src = &store->lhs;
     }
 
-    if (!(load = hlsl_new_load(ctx, var, offset, elem_type, *loc)))
+    if (!(load = hlsl_new_load_index(ctx, src, idx, loc)))
         return NULL;
     list_add_tail(instrs, &load->node.entry);
 
@@ -674,39 +663,19 @@ static struct hlsl_ir_load *add_load_index(struct hlsl_ctx *ctx, struct list *in
 static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         unsigned int comp, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_type *comp_type;
-    struct hlsl_ir_node *offset;
-    struct hlsl_ir_constant *c;
+    const struct hlsl_deref *src;
     struct hlsl_ir_load *load;
-    unsigned int comp_offset;
-    struct hlsl_ir_var *var;
-
-    comp_offset = hlsl_compute_component_offset(ctx, var_instr->data_type, comp, &comp_type);
-
-    if (!(c = hlsl_new_uint_constant(ctx, comp_offset, loc)))
-        return NULL;
-    list_add_tail(instrs, &c->node.entry);
-
-    offset = &c->node;
+    struct hlsl_block block;
 
     if (var_instr->type == HLSL_IR_LOAD)
     {
-        const struct hlsl_deref *src = &hlsl_ir_load(var_instr)->src;
-        struct hlsl_ir_node *add;
-
-        var = src->var;
-        if (src->offset.node)
-        {
-            if (!(add = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, src->offset.node, &c->node)))
-                return NULL;
-            list_add_tail(instrs, &add->entry);
-            offset = add;
-        }
+        src = &hlsl_ir_load(var_instr)->src;
     }
     else
     {
         struct vkd3d_string_buffer *name;
         struct hlsl_ir_store *store;
+        struct hlsl_ir_var *var;
 
         if (!(name = hlsl_get_string_buffer(ctx)))
             return NULL;
@@ -719,11 +688,13 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
         if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
             return NULL;
         list_add_tail(instrs, &store->node.entry);
+
+        src = &store->lhs;
     }
 
-    if (!(load = hlsl_new_load(ctx, var, offset, comp_type, *loc)))
+    if (!(load = hlsl_new_load_component(ctx, &block, src, comp, loc)))
         return NULL;
-    list_add_tail(instrs, &load->node.entry);
+    list_move_tail(instrs, &block.instrs);
 
     return load;
 }
@@ -1277,7 +1248,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             list_add_tail(instrs, &store->node.entry);
         }
 
-        if (!(load = hlsl_new_load(ctx, var, NULL, type, *loc)))
+        if (!(load = hlsl_new_var_load(ctx, var, *loc)))
             return NULL;
         list_add_tail(instrs, &load->node.entry);
 
@@ -1634,8 +1605,10 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 {
     struct hlsl_type *lhs_type = lhs->data_type;
     struct hlsl_ir_store *store;
+    struct hlsl_ir_node *offset;
     struct hlsl_ir_expr *copy;
     unsigned int writemask = 0;
+    struct hlsl_block block;
 
     if (assign_op == ASSIGN_OP_SUB)
     {
@@ -1704,10 +1677,13 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
     }
 
+    offset = hlsl_new_offset_instr_from_deref(ctx, &block, &hlsl_ir_load(lhs)->src, &lhs->loc);
+    list_move_tail(instrs, &block.instrs);
+
     init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
     store->writemask = writemask;
     store->lhs.var = hlsl_ir_load(lhs)->src.var;
-    hlsl_src_from_node(&store->lhs.offset, hlsl_ir_load(lhs)->src.offset.node);
+    hlsl_src_from_node(&store->lhs.offset, offset);
     hlsl_src_from_node(&store->rhs, rhs);
     list_add_tail(instrs, &store->node.entry);
 
@@ -2238,7 +2214,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
             list_add_tail(params->instrs, &store->node.entry);
         }
 
-    if (!(load = hlsl_new_load(ctx, var, NULL, matrix_type, *loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
         return false;
     list_add_tail(params->instrs, &load->node.entry);
 
@@ -2447,8 +2423,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        struct hlsl_ir_node *object_load_offset;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *coords;
+        struct hlsl_block block;
 
         if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
                 || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
@@ -2473,8 +2451,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
             return false;
 
+        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
+        list_move_tail(instrs, &block.instrs);
+
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
-                object_load->src.var, object_load->src.offset.node, NULL, NULL, coords, NULL, loc)))
+                object_load->src.var, object_load_offset, NULL, NULL, coords, NULL, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
@@ -2484,11 +2465,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        struct hlsl_ir_node *object_load_offset, *sampler_load_offset;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_load *sampler_load;
         struct hlsl_ir_node *coords;
+        struct hlsl_block block;
 
         if (params->args_count != 2 && params->args_count != 3)
         {
@@ -2524,11 +2507,18 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 return false;
         }
 
+        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
+        list_move_tail(instrs, &block.instrs);
+
+        sampler_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &sampler_load->src, loc);
+        list_move_tail(instrs, &block.instrs);
+
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format,
-                HLSL_RESOURCE_SAMPLE, object_load->src.var, object_load->src.offset.node,
-                sampler_load->src.var, sampler_load->src.offset.node, coords, offset, loc)))
+                HLSL_RESOURCE_SAMPLE, object_load->src.var, object_load_offset,
+                sampler_load->src.var, sampler_load_offset, coords, offset, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
+
         return true;
     }
     else if ((!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
@@ -2539,6 +2529,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY))
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+        struct hlsl_ir_node *object_load_offset, *sampler_load_offset;
         enum hlsl_resource_load_type load_type;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
@@ -2547,6 +2538,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_type *result_type;
         struct hlsl_ir_node *coords;
         unsigned int read_channel;
+        struct hlsl_block block;
 
         if (!strcmp(name, "GatherGreen"))
         {
@@ -2628,9 +2620,15 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
+        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
+        list_move_tail(instrs, &block.instrs);
+
+        sampler_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &sampler_load->src, loc);
+        list_move_tail(instrs, &block.instrs);
+
         if (!(load = hlsl_new_resource_load(ctx, result_type,
-                load_type, object_load->src.var, object_load->src.offset.node,
-                sampler_load->src.var, sampler_load->src.offset.node, coords, offset, loc)))
+                load_type, object_load->src.var, object_load_offset,
+                sampler_load->src.var, sampler_load_offset, coords, offset, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;

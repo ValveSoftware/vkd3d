@@ -21,6 +21,48 @@
 #include "hlsl.h"
 #include <stdio.h>
 
+/* TODO: remove when no longer needed, only used for transform_deref_paths_into_offsets() */
+static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+        struct hlsl_ir_node *instr)
+{
+    struct hlsl_ir_node *offset;
+    struct hlsl_block block;
+
+    if (!deref->var)
+        return;
+
+    if (!(offset = hlsl_new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
+        return;
+    list_move_before(&instr->entry, &block.instrs);
+
+    hlsl_cleanup_deref(deref);
+    hlsl_src_from_node(&deref->offset, offset);
+}
+
+/* TODO: remove when no longer needed. */
+static bool transform_deref_paths_into_offsets(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    switch(instr->type)
+    {
+        case HLSL_IR_LOAD:
+            replace_deref_path_with_offset(ctx, &hlsl_ir_load(instr)->src, instr);
+            return true;
+
+        case HLSL_IR_STORE:
+            replace_deref_path_with_offset(ctx, &hlsl_ir_store(instr)->lhs, instr);
+            return true;
+
+        case HLSL_IR_RESOURCE_LOAD:
+            replace_deref_path_with_offset(ctx, &hlsl_ir_resource_load(instr)->resource, instr);
+            replace_deref_path_with_offset(ctx, &hlsl_ir_resource_load(instr)->sampler, instr);
+            return true;
+
+        default:
+            return false;
+    }
+    return false;
+}
+
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
@@ -1889,6 +1931,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     bool progress;
 
     list_move_head(&body->instrs, &ctx->static_initializers);
+
+    transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL); /* TODO: move forward, remove when no longer needed */
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
