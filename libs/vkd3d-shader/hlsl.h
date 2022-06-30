@@ -729,6 +729,12 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
 
+struct hlsl_type *hlsl_get_inner_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+        struct hlsl_ir_node *idx);
+struct hlsl_ir_node *hlsl_new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_type *type, struct hlsl_ir_node *offset, struct hlsl_ir_node *idx,
+        const struct vkd3d_shader_location *loc);
+
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size);
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1,
         struct hlsl_ir_node *arg2);
@@ -792,6 +798,7 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type);
 unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type);
 unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int idx, struct hlsl_type **comp_type);
+bool hlsl_type_is_row_major(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 

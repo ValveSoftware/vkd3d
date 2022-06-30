@@ -117,7 +117,7 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     vkd3d_free(decl);
 }
 
-static bool hlsl_type_is_row_major(const struct hlsl_type *type)
+bool hlsl_type_is_row_major(const struct hlsl_type *type)
 {
     /* Default to column-major if the majority isn't explicitly set, which can
      * happen for anonymous nodes. */
@@ -312,6 +312,111 @@ unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_typ
 
     assert(0);
     return 0;
+}
+
+struct hlsl_type *hlsl_get_inner_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+        struct hlsl_ir_node *idx)
+{
+    assert(idx);
+
+    switch (type->type)
+    {
+        case HLSL_CLASS_VECTOR:
+            return hlsl_get_scalar_type(ctx, type->base_type);
+
+        case HLSL_CLASS_MATRIX:
+            if (hlsl_type_is_row_major(type))
+                return hlsl_get_vector_type(ctx, type->base_type, type->dimx);
+            else
+                return hlsl_get_vector_type(ctx, type->base_type, type->dimy);
+
+        case HLSL_CLASS_ARRAY:
+            return type->e.array.type;
+
+        case HLSL_CLASS_STRUCT:
+        {
+            struct hlsl_ir_constant *c = hlsl_ir_constant(idx);
+
+            assert(c->value[0].u < type->e.record.field_count);
+            return type->e.record.fields[c->value[0].u].type;
+        }
+
+        default:
+            assert(0);
+            return NULL;
+    }
+}
+
+struct hlsl_ir_node *hlsl_new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_type *type, struct hlsl_ir_node *offset, struct hlsl_ir_node *idx,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *idx_offset = NULL;
+    struct hlsl_ir_constant *c;
+
+    list_init(&block->instrs);
+
+    switch (type->type)
+    {
+        case HLSL_CLASS_VECTOR:
+            idx_offset = idx;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+        {
+            if (!(c = hlsl_new_uint_constant(ctx, 4, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+                return NULL;
+            list_add_tail(&block->instrs, &idx_offset->entry);
+
+            break;
+        }
+
+        case HLSL_CLASS_ARRAY:
+        {
+            unsigned int size = hlsl_type_get_array_element_reg_size(type->e.array.type);
+
+            if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+                return NULL;
+            list_add_tail(&block->instrs, &idx_offset->entry);
+
+            break;
+        }
+
+        case HLSL_CLASS_STRUCT:
+        {
+            unsigned int field_idx = hlsl_ir_constant(idx)->value[0].u;
+            struct hlsl_struct_field *field = &type->e.record.fields[field_idx];
+
+            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            idx_offset = &c->node;
+
+            break;
+        }
+
+        default:
+            assert(0);
+            return NULL;
+    }
+
+    if (offset)
+    {
+        if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, offset, idx_offset)))
+            return NULL;
+        list_add_tail(&block->instrs, &idx_offset->entry);
+    }
+
+    return idx_offset;
 }
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size)
