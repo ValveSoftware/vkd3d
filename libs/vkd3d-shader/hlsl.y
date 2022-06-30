@@ -1218,22 +1218,6 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
     return true;
 }
 
-static unsigned int minor_size(const struct hlsl_type *type)
-{
-    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return type->dimx;
-    else
-        return type->dimy;
-}
-
-static unsigned int major_size(const struct hlsl_type *type)
-{
-    if (type->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-        return type->dimy;
-    else
-        return type->dimx;
-}
-
 static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
@@ -1249,7 +1233,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
 
-        vector_type = hlsl_get_vector_type(ctx, type->base_type, minor_size(type));
+        vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
         name = vkd3d_string_buffer_get(&ctx->string_buffers);
         vkd3d_string_buffer_printf(name, "<split_op-%u>", counter++);
@@ -1258,7 +1242,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         if (!var)
             return NULL;
 
-        for (i = 0; i < major_size(type); i++)
+        for (i = 0; i < hlsl_type_major_size(type); ++i)
         {
             struct hlsl_ir_node *value, *vector_operands[HLSL_MAX_OPERANDS] = { NULL };
             struct hlsl_ir_store *store;

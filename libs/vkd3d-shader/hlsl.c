@@ -124,6 +124,22 @@ bool hlsl_type_is_row_major(const struct hlsl_type *type)
     return !!(type->modifiers & HLSL_MODIFIER_ROW_MAJOR);
 }
 
+unsigned int hlsl_type_minor_size(const struct hlsl_type *type)
+{
+    if (type->type != HLSL_CLASS_MATRIX || hlsl_type_is_row_major(type))
+        return type->dimx;
+    else
+        return type->dimy;
+}
+
+unsigned int hlsl_type_major_size(const struct hlsl_type *type)
+{
+    if (type->type != HLSL_CLASS_MATRIX || hlsl_type_is_row_major(type))
+        return type->dimy;
+    else
+        return type->dimx;
+}
+
 static unsigned int get_array_size(const struct hlsl_type *type)
 {
     if (type->type == HLSL_CLASS_ARRAY)

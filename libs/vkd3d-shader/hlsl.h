@@ -799,6 +799,8 @@ unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type);
 unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int idx, struct hlsl_type **comp_type);
 bool hlsl_type_is_row_major(const struct hlsl_type *type);
+unsigned int hlsl_type_minor_size(const struct hlsl_type *type);
+unsigned int hlsl_type_major_size(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 
