@@ -204,11 +204,44 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     list_add_after(&load->node.entry, &store->node.entry);
 }
 
+static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
+        struct hlsl_type *type, unsigned int modifiers, const struct hlsl_semantic *semantic, bool output)
+{
+    struct hlsl_semantic new_semantic;
+    struct vkd3d_string_buffer *name;
+    struct hlsl_ir_var *ext_var;
+
+    if (!(name = hlsl_get_string_buffer(ctx)))
+        return NULL;
+    vkd3d_string_buffer_printf(name, "<%s-%s%u>", output ? "output" : "input", semantic->name, semantic->index);
+    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
+    {
+        hlsl_release_string_buffer(ctx, name);
+        return NULL;
+    }
+    new_semantic.index = semantic->index;
+    if (!(ext_var = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
+            type, var->loc, &new_semantic, modifiers, NULL)))
+    {
+        hlsl_release_string_buffer(ctx, name);
+        vkd3d_free((void *)new_semantic.name);
+        return NULL;
+    }
+    hlsl_release_string_buffer(ctx, name);
+    if (output)
+        ext_var->is_output_semantic = 1;
+    else
+        ext_var->is_input_semantic = 1;
+    ext_var->is_param = var->is_param;
+    list_add_before(&var->scope_entry, &ext_var->scope_entry);
+    list_add_tail(&ctx->extern_vars, &ext_var->extern_entry);
+
+    return ext_var;
+}
+
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
         struct hlsl_type *type, unsigned int field_offset, unsigned int modifiers, const struct hlsl_semantic *semantic)
 {
-    struct vkd3d_string_buffer *name;
-    struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
@@ -229,27 +262,8 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
 
-    if (!(name = hlsl_get_string_buffer(ctx)))
+    if (!(input = add_semantic_var(ctx, var, type, modifiers, semantic, false)))
         return;
-    vkd3d_string_buffer_printf(name, "<input-%s%u>", semantic->name, semantic->index);
-    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
-    {
-        hlsl_release_string_buffer(ctx, name);
-        return;
-    }
-    new_semantic.index = semantic->index;
-    if (!(input = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
-            type, var->loc, &new_semantic, modifiers, NULL)))
-    {
-        hlsl_release_string_buffer(ctx, name);
-        vkd3d_free((void *)new_semantic.name);
-        return;
-    }
-    hlsl_release_string_buffer(ctx, name);
-    input->is_input_semantic = 1;
-    input->is_param = var->is_param;
-    list_add_before(&var->scope_entry, &input->scope_entry);
-    list_add_tail(&ctx->extern_vars, &input->extern_entry);
 
     if (!(load = hlsl_new_var_load(ctx, input, var->loc)))
         return;
@@ -297,8 +311,6 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
         struct hlsl_type *type, unsigned int field_offset, unsigned int modifiers, const struct hlsl_semantic *semantic)
 {
-    struct vkd3d_string_buffer *name;
-    struct hlsl_semantic new_semantic;
     struct hlsl_ir_constant *offset;
     struct hlsl_ir_store *store;
     struct hlsl_ir_var *output;
@@ -319,27 +331,8 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         return;
     }
 
-    if (!(name = hlsl_get_string_buffer(ctx)))
+    if (!(output = add_semantic_var(ctx, var, type, modifiers, semantic, true)))
         return;
-    vkd3d_string_buffer_printf(name, "<output-%s%u>", semantic->name, semantic->index);
-    if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
-    {
-        hlsl_release_string_buffer(ctx, name);
-        return;
-    }
-    new_semantic.index = semantic->index;
-    if (!(output = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
-            type, var->loc, &new_semantic, modifiers, NULL)))
-    {
-        vkd3d_free((void *)new_semantic.name);
-        hlsl_release_string_buffer(ctx, name);
-        return;
-    }
-    hlsl_release_string_buffer(ctx, name);
-    output->is_output_semantic = 1;
-    output->is_param = var->is_param;
-    list_add_before(&var->scope_entry, &output->scope_entry);
-    list_add_tail(&ctx->extern_vars, &output->extern_entry);
 
     if (!(offset = hlsl_new_uint_constant(ctx, field_offset, &var->loc)))
         return;
