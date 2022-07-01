@@ -1594,10 +1594,23 @@ static void dump_ir_var(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer
 
 static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_deref *deref)
 {
+    unsigned int i;
+
     if (deref->var)
     {
         vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
-        if (deref->offset.node)
+        if (deref->path_len)
+        {
+            vkd3d_string_buffer_printf(buffer, "[");
+            for (i = 0; i < deref->path_len; ++i)
+            {
+                vkd3d_string_buffer_printf(buffer, "[");
+                dump_src(buffer, &deref->path[i]);
+                vkd3d_string_buffer_printf(buffer, "]");
+            }
+            vkd3d_string_buffer_printf(buffer, "]");
+        }
+        else if (deref->offset.node)
         {
             vkd3d_string_buffer_printf(buffer, "[");
             dump_src(buffer, &deref->offset);
