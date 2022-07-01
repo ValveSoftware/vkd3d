@@ -19,8 +19,8 @@ uniform 0 float 2.6
 uniform 1 int -2
 uniform 2 int -2
 uniform 3 float -3.6
-todo draw quad
-probe all rgba (0.5, 0.5, 0.5, 0.5)
+draw quad
+todo probe all rgba (0.5, 0.5, 0.5, 0.5)
 
 [pixel shader]
 

@@ -12,3 +12,21 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe all rgba (0.0, 0.0, 1.0, 1.0)
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+uniform float4 x;
+uniform int4 y;
+
+float4 main() : SV_TARGET
+{
+    return (float4)(bool4)x + 10.0 * (float4)(int4)(bool4)y;
+}
+
+[test]
+uniform 0 float4 0.0 0.0 2.0 4.0
+uniform 4 int4 0 1 0 10
+draw quad
+probe all rgba (0.0, 10.0, 1.0, 11.0)
