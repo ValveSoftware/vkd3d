@@ -1648,6 +1648,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
             break;
 
+        case HLSL_OP1_LOGIC_NOT:
+            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_NEG:
             switch (dst_type->base_type)
             {
