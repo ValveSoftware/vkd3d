@@ -21,6 +21,107 @@
 #include "hlsl.h"
 #include <stdio.h>
 
+/* TODO: remove when no longer needed, only used for new_offset_instr_from_deref() */
+static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_type *type, struct hlsl_ir_node *offset, struct hlsl_ir_node *idx,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *idx_offset = NULL;
+    struct hlsl_ir_constant *c;
+
+    list_init(&block->instrs);
+
+    switch (type->type)
+    {
+        case HLSL_CLASS_VECTOR:
+            idx_offset = idx;
+            break;
+
+        case HLSL_CLASS_MATRIX:
+        {
+            if (!(c = hlsl_new_uint_constant(ctx, 4, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+                return NULL;
+            list_add_tail(&block->instrs, &idx_offset->entry);
+
+            break;
+        }
+
+        case HLSL_CLASS_ARRAY:
+        {
+            unsigned int size = hlsl_type_get_array_element_reg_size(type->e.array.type);
+
+            if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+                return NULL;
+            list_add_tail(&block->instrs, &idx_offset->entry);
+
+            break;
+        }
+
+        case HLSL_CLASS_STRUCT:
+        {
+            unsigned int field_idx = hlsl_ir_constant(idx)->value[0].u;
+            struct hlsl_struct_field *field = &type->e.record.fields[field_idx];
+
+            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
+                return NULL;
+            list_add_tail(&block->instrs, &c->node.entry);
+
+            idx_offset = &c->node;
+
+            break;
+        }
+
+        default:
+            assert(0);
+            return NULL;
+    }
+
+    if (offset)
+    {
+        if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, offset, idx_offset)))
+            return NULL;
+        list_add_tail(&block->instrs, &idx_offset->entry);
+    }
+
+    return idx_offset;
+}
+
+/* TODO: remove when no longer needed, only used for replace_deref_path_with_offset() */
+static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_deref *deref, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *offset = NULL;
+    struct hlsl_type *type;
+    unsigned int i;
+
+    list_init(&block->instrs);
+
+    assert(deref->var);
+    type = deref->var->data_type;
+
+    for (i = 0; i < deref->path_len; ++i)
+    {
+        struct hlsl_block idx_block;
+
+        if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node, loc)))
+            return NULL;
+
+        list_move_tail(&block->instrs, &idx_block.instrs);
+
+        type = hlsl_get_inner_type_from_path_index(ctx, type, deref->path[i].node);
+    }
+
+    return offset;
+}
+
 /* TODO: remove when no longer needed, only used for transform_deref_paths_into_offsets() */
 static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
@@ -34,7 +135,7 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     /* register offsets shouldn't be used before this point is reached. */
     assert(!deref->offset.node);
 
-    if (!(offset = hlsl_new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
+    if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
         return;
     list_move_before(&instr->entry, &block.instrs);
 
