@@ -777,9 +777,8 @@ struct hlsl_ir_node *hlsl_new_offset_instr_from_deref(struct hlsl_ctx *ctx, stru
         const struct hlsl_deref *deref, const struct vkd3d_shader_location *loc);
 
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
-        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
-        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
-        struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc);
+        enum hlsl_resource_load_type type, struct hlsl_deref *resource, struct hlsl_deref *sampler,
+        struct hlsl_ir_node *coords, struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc);
 
 struct hlsl_ir_load *hlsl_new_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_type *type, struct vkd3d_shader_location loc);

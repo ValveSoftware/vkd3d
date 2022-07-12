@@ -31,6 +31,9 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     if (!deref->var)
         return;
 
+    /* register offsets shouldn't be used before this point is reached. */
+    assert(!deref->offset.node);
+
     if (!(offset = hlsl_new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
         return;
     list_move_before(&instr->entry, &block.instrs);

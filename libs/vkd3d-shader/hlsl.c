@@ -866,6 +866,26 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
+static bool copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_deref *other)
+{
+    unsigned int i;
+
+    memset(deref, 0, sizeof(*deref));
+
+    if (!other)
+        return true;
+
+    assert(!other->offset.node);
+
+    if (!init_deref(ctx, deref, other->var, other->path_len))
+        return false;
+
+    for (i = 0; i < deref->path_len; ++i)
+        hlsl_src_from_node(&deref->path[i], other->path[i].node);
+
+    return true;
+}
+
 void hlsl_cleanup_deref(struct hlsl_deref *deref)
 {
     unsigned int i;
@@ -1135,9 +1155,8 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
 }
 
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
-        enum hlsl_resource_load_type type, struct hlsl_ir_var *resource, struct hlsl_ir_node *resource_offset,
-        struct hlsl_ir_var *sampler, struct hlsl_ir_node *sampler_offset, struct hlsl_ir_node *coords,
-        struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc)
+        enum hlsl_resource_load_type type, struct hlsl_deref *resource, struct hlsl_deref *sampler,
+        struct hlsl_ir_node *coords, struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_load *load;
 
@@ -1145,10 +1164,8 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
         return NULL;
     init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, *loc);
     load->load_type = type;
-    load->resource.var = resource;
-    hlsl_src_from_node(&load->resource.offset, resource_offset);
-    load->sampler.var = sampler;
-    hlsl_src_from_node(&load->sampler.offset, sampler_offset);
+    copy_deref(ctx, &load->resource, resource);
+    copy_deref(ctx, &load->sampler, sampler);
     hlsl_src_from_node(&load->coords, coords);
     hlsl_src_from_node(&load->texel_offset, texel_offset);
     return load;

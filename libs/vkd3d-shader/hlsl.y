@@ -2402,10 +2402,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        struct hlsl_ir_node *object_load_offset;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *coords;
-        struct hlsl_block block;
 
         if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
                 || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
@@ -2430,11 +2428,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
             return false;
 
-        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
-        list_move_tail(instrs, &block.instrs);
-
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
-                object_load->src.var, object_load_offset, NULL, NULL, coords, NULL, loc)))
+                &object_load->src, NULL, coords, NULL, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
@@ -2444,13 +2439,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        struct hlsl_ir_node *object_load_offset, *sampler_load_offset;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
         struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_load *sampler_load;
         struct hlsl_ir_node *coords;
-        struct hlsl_block block;
 
         if (params->args_count != 2 && params->args_count != 3)
         {
@@ -2486,15 +2479,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 return false;
         }
 
-        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
-        list_move_tail(instrs, &block.instrs);
-
-        sampler_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &sampler_load->src, loc);
-        list_move_tail(instrs, &block.instrs);
-
         if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format,
-                HLSL_RESOURCE_SAMPLE, object_load->src.var, object_load_offset,
-                sampler_load->src.var, sampler_load_offset, coords, offset, loc)))
+                HLSL_RESOURCE_SAMPLE, &object_load->src, &sampler_load->src, coords, offset, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
 
@@ -2508,7 +2494,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY))
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        struct hlsl_ir_node *object_load_offset, *sampler_load_offset;
         enum hlsl_resource_load_type load_type;
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
@@ -2517,7 +2502,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_type *result_type;
         struct hlsl_ir_node *coords;
         unsigned int read_channel;
-        struct hlsl_block block;
 
         if (!strcmp(name, "GatherGreen"))
         {
@@ -2599,15 +2583,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
-        object_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &object_load->src, loc);
-        list_move_tail(instrs, &block.instrs);
-
-        sampler_load_offset = hlsl_new_offset_instr_from_deref(ctx, &block, &sampler_load->src, loc);
-        list_move_tail(instrs, &block.instrs);
-
-        if (!(load = hlsl_new_resource_load(ctx, result_type,
-                load_type, object_load->src.var, object_load_offset,
-                sampler_load->src.var, sampler_load_offset, coords, offset, loc)))
+        if (!(load = hlsl_new_resource_load(ctx, result_type, load_type, &object_load->src,
+                &sampler_load->src, coords, offset, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
