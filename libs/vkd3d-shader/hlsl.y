@@ -1202,6 +1202,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         struct vkd3d_string_buffer *name;
         static unsigned int counter = 0;
         struct hlsl_type *vector_type;
+        struct hlsl_deref var_deref;
         struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
 
@@ -1213,6 +1214,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         vkd3d_string_buffer_release(&ctx->string_buffers, name);
         if (!var)
             return NULL;
+        hlsl_init_simple_deref_from_var(&var_deref, var);
 
         for (i = 0; i < hlsl_type_major_size(type); ++i)
         {
@@ -1240,11 +1242,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             if (!(value = add_expr(ctx, instrs, op, vector_operands, vector_type, loc)))
                 return NULL;
 
-            if (!(c = hlsl_new_uint_constant(ctx, 4 * i, loc)))
-                return NULL;
-            list_add_tail(instrs, &c->node.entry);
-
-            if (!(store = hlsl_new_store(ctx, var, &c->node, value, 0, *loc)))
+            if (!(store = hlsl_new_store_index(ctx, &var_deref, &c->node, value, 0, loc)))
                 return NULL;
             list_add_tail(instrs, &store->node.entry);
         }
@@ -1606,10 +1604,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 {
     struct hlsl_type *lhs_type = lhs->data_type;
     struct hlsl_ir_store *store;
-    struct hlsl_ir_node *offset;
     struct hlsl_ir_expr *copy;
     unsigned int writemask = 0;
-    struct hlsl_block block;
 
     if (assign_op == ASSIGN_OP_SUB)
     {
@@ -1634,15 +1630,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             return NULL;
     }
 
-    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
-        return NULL;
-
     while (lhs->type != HLSL_IR_LOAD)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
             hlsl_fixme(ctx, &lhs->loc, "Cast on the LHS.");
-            vkd3d_free(store);
             return NULL;
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
@@ -1656,13 +1648,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             if (!invert_swizzle(&s, &writemask, &width))
             {
                 hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK, "Invalid writemask.");
-                vkd3d_free(store);
                 return NULL;
             }
 
             if (!(new_swizzle = hlsl_new_swizzle(ctx, s, width, rhs, &swizzle->node.loc)))
             {
-                vkd3d_free(store);
                 return NULL;
             }
             list_add_tail(instrs, &new_swizzle->node.entry);
@@ -1673,19 +1663,12 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         else
         {
             hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid lvalue.");
-            vkd3d_free(store);
             return NULL;
         }
     }
 
-    offset = hlsl_new_offset_instr_from_deref(ctx, &block, &hlsl_ir_load(lhs)->src, &lhs->loc);
-    list_move_tail(instrs, &block.instrs);
-
-    init_node(&store->node, HLSL_IR_STORE, NULL, lhs->loc);
-    store->writemask = writemask;
-    store->lhs.var = hlsl_ir_load(lhs)->src.var;
-    hlsl_src_from_node(&store->lhs.offset, offset);
-    hlsl_src_from_node(&store->rhs, rhs);
+    if (!(store = hlsl_new_store_index(ctx, &hlsl_ir_load(lhs)->src, NULL, rhs, writemask, &rhs->loc)))
+        return NULL;
     list_add_tail(instrs, &store->node.entry);
 
     /* Don't use the instruction itself as a source, as this makes structure

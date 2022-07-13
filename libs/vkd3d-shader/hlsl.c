@@ -249,87 +249,6 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
     return type;
 }
 
-/* Returns the register offset of a given component within a type, given its index.
- * *comp_type will be set to the type of the component. */
-unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        unsigned int idx, struct hlsl_type **comp_type)
-{
-    switch (type->type)
-    {
-        case HLSL_CLASS_SCALAR:
-        case HLSL_CLASS_VECTOR:
-        {
-            assert(idx < type->dimx * type->dimy);
-            *comp_type = hlsl_get_scalar_type(ctx, type->base_type);
-            return idx;
-        }
-        case HLSL_CLASS_MATRIX:
-        {
-            unsigned int minor, major, x = idx % type->dimx, y = idx / type->dimx;
-
-            assert(idx < type->dimx * type->dimy);
-
-            if (hlsl_type_is_row_major(type))
-            {
-                minor = x;
-                major = y;
-            }
-            else
-            {
-                minor = y;
-                major = x;
-            }
-
-            *comp_type = hlsl_get_scalar_type(ctx, type->base_type);
-            return 4 * major + minor;
-        }
-
-        case HLSL_CLASS_ARRAY:
-        {
-            unsigned int elem_comp_count = hlsl_type_component_count(type->e.array.type);
-            unsigned int array_idx = idx / elem_comp_count;
-            unsigned int idx_in_elem = idx % elem_comp_count;
-
-            assert(array_idx < type->e.array.elements_count);
-
-            return array_idx * hlsl_type_get_array_element_reg_size(type->e.array.type) +
-                    hlsl_compute_component_offset(ctx, type->e.array.type, idx_in_elem, comp_type);
-        }
-
-        case HLSL_CLASS_STRUCT:
-        {
-            struct hlsl_struct_field *field;
-            unsigned int elem_comp_count, i;
-
-            for (i = 0; i < type->e.record.field_count; ++i)
-            {
-                field = &type->e.record.fields[i];
-                elem_comp_count = hlsl_type_component_count(field->type);
-
-                if (idx < elem_comp_count)
-                {
-                    return field->reg_offset +
-                            hlsl_compute_component_offset(ctx, field->type, idx, comp_type);
-                }
-                idx -= elem_comp_count;
-            }
-
-            assert(0);
-            return 0;
-        }
-
-        case HLSL_CLASS_OBJECT:
-        {
-            assert(idx == 0);
-            *comp_type = type;
-            return 0;
-        }
-    }
-
-    assert(0);
-    return 0;
-}
-
 static bool type_is_single_component(const struct hlsl_type *type)
 {
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_OBJECT;
@@ -989,7 +908,39 @@ void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_va
 
 struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
 {
-    return hlsl_new_store(ctx, lhs, NULL, rhs, 0, rhs->loc);
+    struct hlsl_deref lhs_deref;
+
+    hlsl_init_simple_deref_from_var(&lhs_deref, lhs);
+    return hlsl_new_store_index(ctx, &lhs_deref, NULL, rhs, 0, &rhs->loc);
+}
+
+struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hlsl_deref *lhs,
+        struct hlsl_ir_node *idx, struct hlsl_ir_node *rhs, unsigned int writemask, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_store *store;
+    unsigned int i;
+
+    assert(lhs);
+    assert(!lhs->offset.node);
+
+    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
+        return NULL;
+    init_node(&store->node, HLSL_IR_STORE, NULL, *loc);
+
+    if (!init_deref(ctx, &store->lhs, lhs->var, lhs->path_len + !!idx))
+        return NULL;
+    for (i = 0; i < lhs->path_len; ++i)
+        hlsl_src_from_node(&store->lhs.path[i], lhs->path[i].node);
+    if (idx)
+        hlsl_src_from_node(&store->lhs.path[lhs->path_len], idx);
+
+    hlsl_src_from_node(&store->rhs, rhs);
+
+    if (!writemask && type_is_single_reg(rhs->data_type))
+        writemask = (1 << rhs->data_type->dimx) - 1;
+    store->writemask = writemask;
+
+    return store;
 }
 
 struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
