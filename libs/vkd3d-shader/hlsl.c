@@ -992,6 +992,34 @@ struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir
     return hlsl_new_store(ctx, lhs, NULL, rhs, 0, rhs->loc);
 }
 
+struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs)
+{
+    struct hlsl_block comp_path_block;
+    struct hlsl_ir_store *store;
+
+    list_init(&block->instrs);
+
+    if (!(store = hlsl_alloc(ctx, sizeof(*store))))
+        return NULL;
+    init_node(&store->node, HLSL_IR_STORE, NULL, rhs->loc);
+
+    if (!init_deref_from_component_index(ctx, &comp_path_block, &store->lhs, lhs, comp, &rhs->loc))
+    {
+        vkd3d_free(store);
+        return NULL;
+    }
+    list_move_tail(&block->instrs, &comp_path_block.instrs);
+    hlsl_src_from_node(&store->rhs, rhs);
+
+    if (type_is_single_reg(rhs->data_type))
+        store->writemask = (1 << rhs->data_type->dimx) - 1;
+
+    list_add_tail(&block->instrs, &store->node.entry);
+
+    return store;
+}
+
 struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc)
 {
