@@ -669,9 +669,13 @@ static struct hlsl_ir_load *add_load(struct hlsl_ctx *ctx, struct list *instrs, 
 }
 
 static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
-        const struct hlsl_struct_field *field, const struct vkd3d_shader_location loc)
+        unsigned int idx, const struct vkd3d_shader_location loc)
 {
+    const struct hlsl_struct_field *field;
     struct hlsl_ir_constant *c;
+
+    assert(idx < record->data_type->e.record.field_count);
+    field = &record->data_type->e.record.fields[idx];
 
     if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, &loc)))
         return false;
@@ -3948,6 +3952,7 @@ postfix_expr:
             {
                 struct hlsl_type *type = node->data_type;
                 const struct hlsl_struct_field *field;
+                unsigned int field_idx = 0;
 
                 if (!(field = get_struct_field(type->e.record.fields, type->e.record.field_count, $3)))
                 {
@@ -3955,7 +3960,8 @@ postfix_expr:
                     YYABORT;
                 }
 
-                if (!add_record_load(ctx, $1, node, field, @2))
+                field_idx = field - type->e.record.fields;
+                if (!add_record_load(ctx, $1, node, field_idx, @2))
                     YYABORT;
                 $$ = $1;
             }
