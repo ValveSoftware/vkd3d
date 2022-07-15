@@ -137,10 +137,12 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
         struct hlsl_type *type, unsigned int field_offset)
 {
-    struct hlsl_struct_field *field;
+    size_t i;
 
-    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+    for (i = 0; i < type->e.record.field_count; ++i)
     {
+        const struct hlsl_struct_field *field = &type->e.record.fields[i];
+
         if (field->type->type == HLSL_CLASS_STRUCT)
             prepend_input_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
         else if (field->semantic.name)
@@ -225,10 +227,12 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var,
         struct hlsl_type *type, unsigned int field_offset)
 {
-    struct hlsl_struct_field *field;
+    size_t i;
 
-    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+    for (i = 0; i < type->e.record.field_count; ++i)
     {
+        const struct hlsl_struct_field *field = &type->e.record.fields[i];
+
         if (field->type->type == HLSL_CLASS_STRUCT)
             append_output_struct_copy(ctx, instrs, var, field->type, field_offset + field->reg_offset);
         else if (field->semantic.name)
@@ -859,10 +863,10 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
 static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    const struct hlsl_struct_field *field;
     const struct hlsl_ir_node *rhs;
     const struct hlsl_type *type;
     struct hlsl_ir_store *store;
+    size_t i;
 
     if (instr->type != HLSL_IR_STORE)
         return false;
@@ -879,8 +883,10 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     }
 
-    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+    for (i = 0; i < type->e.record.field_count; ++i)
     {
+        const struct hlsl_struct_field *field = &type->e.record.fields[i];
+
         if (!split_copy(ctx, store, hlsl_ir_load(rhs), field->reg_offset, field->type))
             return false;
     }

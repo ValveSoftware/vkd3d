@@ -28,6 +28,12 @@
 
 #define HLSL_YYLTYPE struct vkd3d_shader_location
 
+struct parse_fields
+{
+    struct hlsl_struct_field *fields;
+    size_t count, capacity;
+};
+
 struct parse_parameter
 {
     struct hlsl_type *type;
@@ -799,14 +805,15 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     return !!add_load(ctx, instrs, array, index, data_type, loc);
 }
 
-static struct hlsl_struct_field *get_struct_field(struct list *fields, const char *name)
+static const struct hlsl_struct_field *get_struct_field(const struct hlsl_struct_field *fields,
+        size_t count, const char *name)
 {
-    struct hlsl_struct_field *f;
+    size_t i;
 
-    LIST_FOR_EACH_ENTRY(f, fields, struct hlsl_struct_field, entry)
+    for (i = 0; i < count; ++i)
     {
-        if (!strcmp(f->name, name))
-            return f;
+        if (!strcmp(fields[i].name, name))
+            return &fields[i];
     }
     return NULL;
 }
@@ -857,31 +864,28 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v);
 }
 
-static struct list *gen_struct_fields(struct hlsl_ctx *ctx,
-        struct hlsl_type *type, unsigned int modifiers, struct list *fields)
+static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
+        struct hlsl_type *type, unsigned int modifiers, struct list *defs)
 {
     struct parse_variable_def *v, *v_next;
-    struct hlsl_struct_field *field;
-    struct list *list;
+    size_t i = 0;
 
     if (type->type == HLSL_CLASS_MATRIX)
         assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
-    if (!(list = make_empty_list(ctx)))
-        return NULL;
-    LIST_FOR_EACH_ENTRY_SAFE(v, v_next, fields, struct parse_variable_def, entry)
-    {
-        unsigned int i;
+    memset(fields, 0, sizeof(*fields));
+    fields->count = list_count(defs);
+    if (!hlsl_array_reserve(ctx, (void **)&fields->fields, &fields->capacity, fields->count, sizeof(*fields->fields)))
+        return false;
 
-        if (!(field = hlsl_alloc(ctx, sizeof(*field))))
-        {
-            free_parse_variable_def(v);
-            continue;
-        }
+    LIST_FOR_EACH_ENTRY_SAFE(v, v_next, defs, struct parse_variable_def, entry)
+    {
+        struct hlsl_struct_field *field = &fields->fields[i++];
+        unsigned int j;
 
         field->type = type;
-        for (i = 0; i < v->arrays.count; ++i)
-            field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[i]);
+        for (j = 0; j < v->arrays.count; ++j)
+            field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[j]);
         vkd3d_free(v->arrays.sizes);
         field->loc = v->loc;
         field->name = v->name;
@@ -892,11 +896,10 @@ static struct list *gen_struct_fields(struct hlsl_ctx *ctx,
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.");
             free_parse_initializer(&v->initializer);
         }
-        list_add_tail(list, &field->entry);
         vkd3d_free(v);
     }
-    vkd3d_free(fields);
-    return list;
+    vkd3d_free(defs);
+    return true;
 }
 
 static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type *orig_type, struct list *list)
@@ -2681,6 +2684,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     DWORD modifiers;
     struct hlsl_ir_node *instr;
     struct list *list;
+    struct parse_fields fields;
     struct parse_function function;
     struct parse_parameter parameter;
     struct parse_initializer initializer;
@@ -2809,8 +2813,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <list> equality_expr
 %type <list> expr
 %type <list> expr_statement
-%type <list> field
-%type <list> fields_list
 %type <list> initializer_expr
 %type <list> jump_statement
 %type <list> logicand_expr
@@ -2846,6 +2848,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <buffer_type> buffer_type
 
 %type <colon_attribute> colon_attribute
+
+%type <fields> field
+%type <fields> fields_list
 
 %type <function> func_declaration
 %type <function> func_prototype
@@ -3002,7 +3007,7 @@ named_struct_spec:
         {
             bool ret;
 
-            $$ = hlsl_new_struct_type(ctx, $2, $4);
+            $$ = hlsl_new_struct_type(ctx, $2, $4.fields, $4.count);
 
             if (hlsl_get_var(ctx->cur_scope, $2))
             {
@@ -3021,7 +3026,7 @@ named_struct_spec:
 unnamed_struct_spec:
       KW_STRUCT '{' fields_list '}'
         {
-            $$ = hlsl_new_struct_type(ctx, NULL, $3);
+            $$ = hlsl_new_struct_type(ctx, NULL, $3.fields, $3.count);
         }
 
 any_identifier:
@@ -3032,30 +3037,35 @@ any_identifier:
 fields_list:
       %empty
         {
-            if (!($$ = make_empty_list(ctx)))
-                YYABORT;
+            $$.fields = NULL;
+            $$.count = 0;
+            $$.capacity = 0;
         }
     | fields_list field
         {
-            struct hlsl_struct_field *field, *next, *existing;
+            size_t i;
 
-            $$ = $1;
-            LIST_FOR_EACH_ENTRY_SAFE(field, next, $2, struct hlsl_struct_field, entry)
+            for (i = 0; i < $2.count; ++i)
             {
-                if ((existing = get_struct_field($$, field->name)))
+                const struct hlsl_struct_field *field = &$2.fields[i];
+                const struct hlsl_struct_field *existing;
+
+                if ((existing = get_struct_field($1.fields, $1.count, field->name)))
                 {
-                    hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                    hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                             "Field \"%s\" is already defined.", field->name);
                     hlsl_note(ctx, &existing->loc, VKD3D_SHADER_LOG_ERROR,
                             "'%s' was previously defined here.", field->name);
-                    vkd3d_free(field);
-                }
-                else
-                {
-                    list_add_tail($$, &field->entry);
                 }
             }
-            vkd3d_free($2);
+
+            if (!hlsl_array_reserve(ctx, (void **)&$1.fields, &$1.capacity, $1.count + $2.count, sizeof(*$1.fields)))
+                YYABORT;
+            memcpy($1.fields + $1.count, $2.fields, $2.count * sizeof(*$2.fields));
+            $1.count += $2.count;
+            vkd3d_free($2.fields);
+
+            $$ = $1;
         }
 
 field_type:
@@ -3079,7 +3089,8 @@ field:
                             "Modifiers '%s' are not allowed on struct fields.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
-            $$ = gen_struct_fields(ctx, type, modifiers, $3);
+            if (!gen_struct_fields(ctx, &$$, type, modifiers, $3))
+                YYABORT;
         }
 
 func_declaration:
@@ -3936,9 +3947,9 @@ postfix_expr:
             if (node->data_type->type == HLSL_CLASS_STRUCT)
             {
                 struct hlsl_type *type = node->data_type;
-                struct hlsl_struct_field *field;
+                const struct hlsl_struct_field *field;
 
-                if (!(field = get_struct_field(type->e.elements, $3)))
+                if (!(field = get_struct_field(type->e.record.fields, type->e.record.field_count, $3)))
                 {
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", $3);
                     YYABORT;

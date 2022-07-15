@@ -175,13 +175,14 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
 
         case HLSL_CLASS_STRUCT:
         {
-            struct hlsl_struct_field *field;
+            unsigned int i;
 
             type->dimx = 0;
             type->reg_size = 0;
 
-            LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+            for (i = 0; i < type->e.record.field_count; ++i)
             {
+                struct hlsl_struct_field *field = &type->e.record.fields[i];
                 unsigned int field_size = field->type->reg_size;
 
                 assert(field_size);
@@ -282,10 +283,12 @@ unsigned int hlsl_compute_component_offset(struct hlsl_ctx *ctx, struct hlsl_typ
         case HLSL_CLASS_STRUCT:
         {
             struct hlsl_struct_field *field;
+            unsigned int elem_comp_count, i;
 
-            LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
+            for (i = 0; i < type->e.record.field_count; ++i)
             {
-                unsigned int elem_comp_count = hlsl_type_component_count(field->type);
+                field = &type->e.record.fields[i];
+                elem_comp_count = hlsl_type_component_count(field->type);
 
                 if (idx < elem_comp_count)
                 {
@@ -331,7 +334,8 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
     return type;
 }
 
-struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, struct list *fields)
+struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
+        struct hlsl_struct_field *fields, size_t field_count)
 {
     struct hlsl_type *type;
 
@@ -341,7 +345,8 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name, s
     type->base_type = HLSL_TYPE_VOID;
     type->name = name;
     type->dimy = 1;
-    type->e.elements = fields;
+    type->e.record.fields = fields;
+    type->e.record.field_count = field_count;
     hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);
@@ -401,8 +406,7 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
 
 unsigned int hlsl_type_component_count(struct hlsl_type *type)
 {
-    struct hlsl_struct_field *field;
-    unsigned int count = 0;
+    unsigned int count = 0, i;
 
     if (type->type <= HLSL_CLASS_LAST_NUMERIC)
     {
@@ -418,10 +422,8 @@ unsigned int hlsl_type_component_count(struct hlsl_type *type)
         return 0;
     }
 
-    LIST_FOR_EACH_ENTRY(field, type->e.elements, struct hlsl_struct_field, entry)
-    {
-        count += hlsl_type_component_count(field->type);
-    }
+    for (i = 0; i < type->e.record.field_count; ++i)
+        count += hlsl_type_component_count(type->e.record.fields[i].type);
     return count;
 }
 
@@ -451,24 +453,22 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         return false;
     if (t1->type == HLSL_CLASS_STRUCT)
     {
-        struct list *t1cur, *t2cur;
-        struct hlsl_struct_field *t1field, *t2field;
+        size_t i;
 
-        t1cur = list_head(t1->e.elements);
-        t2cur = list_head(t2->e.elements);
-        while (t1cur && t2cur)
-        {
-            t1field = LIST_ENTRY(t1cur, struct hlsl_struct_field, entry);
-            t2field = LIST_ENTRY(t2cur, struct hlsl_struct_field, entry);
-            if (!hlsl_types_are_equal(t1field->type, t2field->type))
-                return false;
-            if (strcmp(t1field->name, t2field->name))
-                return false;
-            t1cur = list_next(t1->e.elements, t1cur);
-            t2cur = list_next(t2->e.elements, t2cur);
-        }
-        if (t1cur != t2cur)
+        if (t1->e.record.field_count != t2->e.record.field_count)
             return false;
+
+        for (i = 0; i < t1->e.record.field_count; ++i)
+        {
+            const struct hlsl_struct_field *field1 = &t1->e.record.fields[i];
+            const struct hlsl_struct_field *field2 = &t2->e.record.fields[i];
+
+            if (!hlsl_types_are_equal(field1->type, field2->type))
+                return false;
+
+            if (strcmp(field1->name, field2->name))
+                return false;
+        }
     }
     if (t1->type == HLSL_CLASS_ARRAY)
         return t1->e.array.elements_count == t2->e.array.elements_count
@@ -480,7 +480,6 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, unsigned int modifiers)
 {
-    struct hlsl_struct_field *old_field, *field;
     struct hlsl_type *type;
 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
@@ -512,37 +511,30 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
 
         case HLSL_CLASS_STRUCT:
         {
-            if (!(type->e.elements = hlsl_alloc(ctx, sizeof(*type->e.elements))))
+            size_t field_count = old->e.record.field_count, i;
+
+            type->e.record.field_count = field_count;
+
+            if (!(type->e.record.fields = hlsl_alloc(ctx, field_count * sizeof(*type->e.record.fields))))
             {
                 vkd3d_free((void *)type->name);
                 vkd3d_free(type);
                 return NULL;
             }
-            list_init(type->e.elements);
-            LIST_FOR_EACH_ENTRY(old_field, old->e.elements, struct hlsl_struct_field, entry)
+
+            for (i = 0; i < field_count; ++i)
             {
-                if (!(field = hlsl_alloc(ctx, sizeof(*field))))
+                const struct hlsl_struct_field *src_field = &old->e.record.fields[i];
+                struct hlsl_struct_field *dst_field = &type->e.record.fields[i];
+
+                dst_field->loc = src_field->loc;
+                dst_field->type = hlsl_type_clone(ctx, src_field->type, default_majority, modifiers);
+                dst_field->name = hlsl_strdup(ctx, src_field->name);
+                if (src_field->semantic.name)
                 {
-                    LIST_FOR_EACH_ENTRY_SAFE(field, old_field, type->e.elements, struct hlsl_struct_field, entry)
-                    {
-                        vkd3d_free((void *)field->semantic.name);
-                        vkd3d_free((void *)field->name);
-                        vkd3d_free(field);
-                    }
-                    vkd3d_free(type->e.elements);
-                    vkd3d_free((void *)type->name);
-                    vkd3d_free(type);
-                    return NULL;
+                    dst_field->semantic.name = hlsl_strdup(ctx, src_field->semantic.name);
+                    dst_field->semantic.index = src_field->semantic.index;
                 }
-                field->loc = old_field->loc;
-                field->type = hlsl_type_clone(ctx, old_field->type, default_majority, modifiers);
-                field->name = hlsl_strdup(ctx, old_field->name);
-                if (old_field->semantic.name)
-                {
-                    field->semantic.name = hlsl_strdup(ctx, old_field->semantic.name);
-                    field->semantic.index = old_field->semantic.index;
-                }
-                list_add_tail(type->e.elements, &field->entry);
             }
             break;
         }
@@ -911,24 +903,22 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
         return r;
     if (t1->type == HLSL_CLASS_STRUCT)
     {
-        struct list *t1cur, *t2cur;
-        struct hlsl_struct_field *t1field, *t2field;
+        size_t i;
 
-        t1cur = list_head(t1->e.elements);
-        t2cur = list_head(t2->e.elements);
-        while (t1cur && t2cur)
+        if (t1->e.record.field_count != t2->e.record.field_count)
+            return t1->e.record.field_count - t2->e.record.field_count;
+
+        for (i = 0; i < t1->e.record.field_count; ++i)
         {
-            t1field = LIST_ENTRY(t1cur, struct hlsl_struct_field, entry);
-            t2field = LIST_ENTRY(t2cur, struct hlsl_struct_field, entry);
-            if ((r = compare_param_hlsl_types(t1field->type, t2field->type)))
+            const struct hlsl_struct_field *field1 = &t1->e.record.fields[i];
+            const struct hlsl_struct_field *field2 = &t2->e.record.fields[i];
+
+            if ((r = compare_param_hlsl_types(field1->type, field2->type)))
                 return r;
-            if ((r = strcmp(t1field->name, t2field->name)))
+
+            if ((r = strcmp(field1->name, field2->name)))
                 return r;
-            t1cur = list_next(t1->e.elements, t1cur);
-            t2cur = list_next(t2->e.elements, t2cur);
         }
-        if (t1cur != t2cur)
-            return t1cur ? 1 : -1;
         return 0;
     }
     if (t1->type == HLSL_CLASS_ARRAY)
@@ -1519,17 +1509,20 @@ void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new)
 
 void hlsl_free_type(struct hlsl_type *type)
 {
-    struct hlsl_struct_field *field, *next_field;
+    struct hlsl_struct_field *field;
+    size_t i;
 
     vkd3d_free((void *)type->name);
     if (type->type == HLSL_CLASS_STRUCT)
     {
-        LIST_FOR_EACH_ENTRY_SAFE(field, next_field, type->e.elements, struct hlsl_struct_field, entry)
+        for (i = 0; i < type->e.record.field_count; ++i)
         {
+            field = &type->e.record.fields[i];
+
             vkd3d_free((void *)field->name);
             vkd3d_free((void *)field->semantic.name);
-            vkd3d_free(field);
         }
+        vkd3d_free((void *)type->e.record.fields);
     }
     vkd3d_free(type);
 }
