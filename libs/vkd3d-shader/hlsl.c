@@ -621,6 +621,11 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
+static void cleanup_deref(struct hlsl_deref *deref)
+{
+    hlsl_src_remove(&deref->offset);
+}
+
 struct hlsl_ir_store *hlsl_new_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct hlsl_ir_node *offset,
         struct hlsl_ir_node *rhs, unsigned int writemask, struct vkd3d_shader_location loc)
 {
@@ -1579,7 +1584,7 @@ static void free_ir_jump(struct hlsl_ir_jump *jump)
 
 static void free_ir_load(struct hlsl_ir_load *load)
 {
-    hlsl_src_remove(&load->src.offset);
+    cleanup_deref(&load->src);
     vkd3d_free(load);
 }
 
@@ -1592,8 +1597,8 @@ static void free_ir_loop(struct hlsl_ir_loop *loop)
 static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 {
     hlsl_src_remove(&load->coords);
-    hlsl_src_remove(&load->sampler.offset);
-    hlsl_src_remove(&load->resource.offset);
+    cleanup_deref(&load->sampler);
+    cleanup_deref(&load->resource);
     hlsl_src_remove(&load->texel_offset);
     vkd3d_free(load);
 }
@@ -1601,7 +1606,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 static void free_ir_store(struct hlsl_ir_store *store)
 {
     hlsl_src_remove(&store->rhs);
-    hlsl_src_remove(&store->lhs.offset);
+    cleanup_deref(&store->lhs);
     vkd3d_free(store);
 }
 
