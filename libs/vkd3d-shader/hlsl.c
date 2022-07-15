@@ -505,7 +505,12 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
     switch (old->type)
     {
         case HLSL_CLASS_ARRAY:
-            type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority, modifiers);
+            if (!(type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority, modifiers)))
+            {
+                vkd3d_free((void *)type->name);
+                vkd3d_free(type);
+                return NULL;
+            }
             type->e.array.elements_count = old->e.array.elements_count;
             break;
 
@@ -528,7 +533,13 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
                 struct hlsl_struct_field *dst_field = &type->e.record.fields[i];
 
                 dst_field->loc = src_field->loc;
-                dst_field->type = hlsl_type_clone(ctx, src_field->type, default_majority, modifiers);
+                if (!(dst_field->type = hlsl_type_clone(ctx, src_field->type, default_majority, modifiers)))
+                {
+                    vkd3d_free(type->e.record.fields);
+                    vkd3d_free((void *)type->name);
+                    vkd3d_free(type);
+                    return NULL;
+                }
                 dst_field->name = hlsl_strdup(ctx, src_field->name);
                 if (src_field->semantic.name)
                 {
