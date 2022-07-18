@@ -6812,12 +6812,6 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
      * where multiple queues alias over the same physical queue, so effectively,
      * we need to manage out-of-order submits ourselves. */
 
-    if (!command_queue->ops_count)
-        hr = d3d12_device_add_blocked_command_queues(command_queue->device, &command_queue, 1);
-
-    if (FAILED(hr))
-        goto done;
-
     if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
     {
         hr = E_OUTOFMEMORY;
@@ -6828,6 +6822,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
     op->u.wait.value = value;
 
     d3d12_fence_incref(fence);
+
+    /* Add the queue to the blocked list after writing the op to ensure the queue isn't
+     * removed again in another thread because it has no ops. */
+    if (command_queue->ops_count == 1)
+        hr = d3d12_device_add_blocked_command_queues(command_queue->device, &command_queue, 1);
 
 done:
     vkd3d_mutex_unlock(&command_queue->op_mutex);
