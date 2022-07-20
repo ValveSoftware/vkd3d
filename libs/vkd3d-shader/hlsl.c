@@ -770,7 +770,7 @@ static bool type_is_single_reg(const struct hlsl_type *type)
     return type->type == HLSL_CLASS_SCALAR || type->type == HLSL_CLASS_VECTOR;
 }
 
-static bool copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_deref *other)
+bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_deref *other)
 {
     unsigned int i;
 
@@ -1036,8 +1036,8 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
         return NULL;
     init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, *loc);
     load->load_type = type;
-    copy_deref(ctx, &load->resource, resource);
-    copy_deref(ctx, &load->sampler, sampler);
+    hlsl_copy_deref(ctx, &load->resource, resource);
+    hlsl_copy_deref(ctx, &load->sampler, sampler);
     hlsl_src_from_node(&load->coords, coords);
     hlsl_src_from_node(&load->texel_offset, texel_offset);
     return load;

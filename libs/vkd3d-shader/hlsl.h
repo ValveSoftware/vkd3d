@@ -721,6 +721,7 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
 
+bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_deref *other);
 void hlsl_cleanup_deref(struct hlsl_deref *deref);
 
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
@@ -821,6 +822,8 @@ unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
 unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask);
 unsigned int hlsl_swizzle_from_writemask(unsigned int writemask);
 
+bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        unsigned int *start, unsigned int *count);
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset);
 unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
 struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
