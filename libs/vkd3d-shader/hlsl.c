@@ -140,6 +140,23 @@ unsigned int hlsl_type_major_size(const struct hlsl_type *type)
         return type->dimx;
 }
 
+unsigned int hlsl_type_element_count(const struct hlsl_type *type)
+{
+    switch (type->type)
+    {
+        case HLSL_CLASS_VECTOR:
+            return type->dimx;
+        case HLSL_CLASS_MATRIX:
+            return hlsl_type_major_size(type);
+        case HLSL_CLASS_ARRAY:
+            return type->e.array.elements_count;
+        case HLSL_CLASS_STRUCT:
+            return type->e.record.field_count;
+        default:
+            return 0;
+    }
+}
+
 static unsigned int get_array_size(const struct hlsl_type *type)
 {
     if (type->type == HLSL_CLASS_ARRAY)

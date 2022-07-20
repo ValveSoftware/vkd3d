@@ -606,15 +606,58 @@ static void copy_propagation_invalidate_variable(struct copy_propagation_var_def
     }
 }
 
-static void copy_propagation_invalidate_whole_variable(struct copy_propagation_var_def *var_def)
+static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_ctx *ctx,
+        struct copy_propagation_var_def *var_def, const struct hlsl_deref *deref,
+        struct hlsl_type *type, unsigned int depth, unsigned int comp_start, unsigned char writemask)
 {
-    unsigned int component_count = hlsl_type_component_count(var_def->var->data_type);
-    unsigned i;
+    unsigned int i, subtype_comp_count;
+    struct hlsl_ir_node *path_node;
+    struct hlsl_type *subtype;
 
-    TRACE("Invalidate variable %s.\n", var_def->var->name);
+    if (depth == deref->path_len)
+    {
+        copy_propagation_invalidate_variable(var_def, comp_start, writemask);
+        return;
+    }
 
-    for (i = 0; i < component_count; ++i)
-        var_def->values[i].state = VALUE_STATE_DYNAMICALLY_WRITTEN;
+    path_node = deref->path[depth].node;
+    subtype = hlsl_get_element_type_from_path_index(ctx, type, path_node);
+
+    if (type->type == HLSL_CLASS_STRUCT)
+    {
+        unsigned int idx = hlsl_ir_constant(path_node)->value[0].u;
+
+        for (i = 0; i < idx; ++i)
+            comp_start += hlsl_type_component_count(type->e.record.fields[i].type);
+
+        copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
+                depth + 1, comp_start, writemask);
+    }
+    else
+    {
+        subtype_comp_count = hlsl_type_component_count(subtype);
+
+        if (path_node->type == HLSL_IR_CONSTANT)
+        {
+            copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
+                    depth + 1, hlsl_ir_constant(path_node)->value[0].u * subtype_comp_count, writemask);
+        }
+        else
+        {
+            for (i = 0; i < hlsl_type_element_count(type); ++i)
+            {
+                copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
+                        depth + 1, i * subtype_comp_count, writemask);
+            }
+        }
+    }
+}
+
+static void copy_propagation_invalidate_variable_from_deref(struct hlsl_ctx *ctx,
+        struct copy_propagation_var_def *var_def, const struct hlsl_deref *deref, unsigned char writemask)
+{
+    copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, deref->var->data_type,
+            0, 0, writemask);
 }
 
 static void copy_propagation_set_value(struct copy_propagation_var_def *var_def, unsigned int comp,
@@ -765,7 +808,7 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
     }
     else
     {
-        copy_propagation_invalidate_whole_variable(var_def);
+        copy_propagation_invalidate_variable_from_deref(ctx, var_def, lhs, store->writemask);
     }
 }
 
@@ -796,15 +839,11 @@ static void copy_propagation_invalidate_from_block(struct hlsl_ctx *ctx, struct 
                 struct copy_propagation_var_def *var_def;
                 struct hlsl_deref *lhs = &store->lhs;
                 struct hlsl_ir_var *var = lhs->var;
-                unsigned int start, count;
 
                 if (!(var_def = copy_propagation_create_var_def(ctx, state, var)))
                     continue;
 
-                if (hlsl_component_index_range_from_deref(ctx, lhs, &start, &count))
-                    copy_propagation_invalidate_variable(var_def, start, store->writemask);
-                else
-                    copy_propagation_invalidate_whole_variable(var_def);
+                copy_propagation_invalidate_variable_from_deref(ctx, var_def, lhs, store->writemask);
 
                 break;
             }
