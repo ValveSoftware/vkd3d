@@ -20947,6 +20947,57 @@ static void test_typed_buffer_uav(void)
         0x00000000, 0x0002100a, 0x00004001, 0x00000020, 0x0002400a, 0x0a0000a4, 0x0011e0f2, 0x00000000,
         0x00100006, 0x00000000, 0x00004002, 0x3f000000, 0x3f000000, 0x3f000000, 0x3f000000, 0x0100003e,
     };
+    static const DWORD cs_vec4_code[] =
+    {
+#if 0
+        RWBuffer<float4> buffer;
+
+        [numthreads(8, 1, 1)]
+        void main(uint3 group_id : SV_groupID, uint group_index : SV_GroupIndex)
+        {
+            uint global_index = 8 * group_id.x + group_index;
+            buffer[global_index] = float4(0.5f, 0.625f, 0.75f, 1.0f);
+        }
+#endif
+        0x43425844, 0x37e9fa91, 0x11ca38f4, 0x9d4a70b7, 0x4fd05c45, 0x00000001, 0x000000e0, 0x00000003,
+        0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x0000008c, 0x00050050, 0x00000023, 0x0100086a,
+        0x0400089c, 0x0011e000, 0x00000000, 0x00005555, 0x0200005f, 0x00024000, 0x0200005f, 0x00021012,
+        0x02000068, 0x00000001, 0x0400009b, 0x00000008, 0x00000001, 0x00000001, 0x07000023, 0x00100012,
+        0x00000000, 0x0002100a, 0x00004001, 0x00000008, 0x0002400a, 0x0a0000a4, 0x0011e0f2, 0x00000000,
+        0x00100006, 0x00000000, 0x00004002, 0x3f000000, 0x3f200000, 0x3f400000, 0x3f800000, 0x0100003e,
+    };
+    static const DWORD cs_vec4_load_code[] =
+    {
+        /* Compiled with /Od */
+#if 0
+        RWBuffer<float4> buffer;
+
+        [numthreads(4, 1, 1)]
+        void main(uint3 group_id : SV_groupID, uint group_index : SV_GroupIndex)
+        {
+            uint global_index = 8 * group_id.x + group_index * 2u;
+            buffer[global_index] = float4(0.625f, 0.5f, 1.0f, 0.75f);
+            buffer[global_index + 1] = buffer[global_index];
+        }
+#endif
+        0x43425844, 0xe4c1718b, 0xd2cd85b0, 0x06a8d73e, 0x2815a795, 0x00000001, 0x000001b0, 0x00000004,
+        0x00000030, 0x00000040, 0x00000050, 0x000001a0, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000148, 0x00050050, 0x00000052,
+        0x0100886a, 0x0400089c, 0x0011e000, 0x00000000, 0x00005555, 0x0200005f, 0x00024000, 0x0200005f,
+        0x00021012, 0x02000068, 0x00000002, 0x0400009b, 0x00000004, 0x00000001, 0x00000001, 0x05000036,
+        0x00100012, 0x00000000, 0x00004001, 0x00000008, 0x07000026, 0x0000d000, 0x00100012, 0x00000000,
+        0x0010000a, 0x00000000, 0x0002100a, 0x07000026, 0x0000d000, 0x00100022, 0x00000000, 0x0002400a,
+        0x00004001, 0x00000002, 0x0700001e, 0x00100012, 0x00000000, 0x0010001a, 0x00000000, 0x0010000a,
+        0x00000000, 0x0a0000a4, 0x0011e0f2, 0x00000000, 0x00100006, 0x00000000, 0x00004002, 0x3f200000,
+        0x3f000000, 0x3f800000, 0x3f400000, 0x05000036, 0x00100022, 0x00000000, 0x00004001, 0x00000001,
+        0x0700001e, 0x00100022, 0x00000000, 0x0010001a, 0x00000000, 0x0010000a, 0x00000000, 0x890000a3,
+        0x80000042, 0x00155543, 0x001000f2, 0x00000001, 0x00100006, 0x00000000, 0x0011ee46, 0x00000000,
+        0x070000a4, 0x0011e0f2, 0x00000000, 0x00100556, 0x00000000, 0x00100e46, 0x00000001, 0x0100003e,
+        0x30494653, 0x00000008, 0x00000800, 0x00000000,
+    };
+    static const struct vec4 expected = {0.5f, 0.625f, 0.75f, 1.0f};
+    static const struct vec4 expected_ld = {0.625f, 0.5f, 1.0f, 0.75f};
 
     if (!init_compute_test_context(&context))
         return;
@@ -21002,6 +21053,48 @@ static void test_typed_buffer_uav(void)
 
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
     check_readback_data_float(&rb.rb, NULL, 0.5f, 0);
+    release_resource_readback(&rb);
+
+    reset_command_list(command_list, context.allocator);
+    transition_sub_resource_state(command_list, resource, 0,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    ID3D12PipelineState_Release(pipeline_state);
+    pipeline_state = create_compute_pipeline_state(device, root_signature,
+            shader_bytecode(cs_vec4_code, sizeof(cs_vec4_code)));
+
+    uav_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    uav_desc.Buffer.NumElements = 16;
+    ID3D12Device_CreateUnorderedAccessView(device, resource, NULL, &uav_desc, cpu_descriptor_handle);
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, 0, gpu_descriptor_handle);
+    ID3D12GraphicsCommandList_Dispatch(command_list, 2, 1, 1);
+
+    transition_sub_resource_state(command_list, resource, 0,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
+    check_readback_data_vec4(&rb.rb, NULL, &expected, 0);
+    release_resource_readback(&rb);
+
+    reset_command_list(command_list, context.allocator);
+    transition_sub_resource_state(command_list, resource, 0,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    ID3D12PipelineState_Release(pipeline_state);
+    pipeline_state = create_compute_pipeline_state(device, root_signature,
+            shader_bytecode(cs_vec4_load_code, sizeof(cs_vec4_load_code)));
+
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
+    ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, 0, gpu_descriptor_handle);
+    ID3D12GraphicsCommandList_Dispatch(command_list, 2, 1, 1);
+
+    transition_sub_resource_state(command_list, resource, 0,
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
+    todo check_readback_data_vec4(&rb.rb, NULL, &expected_ld, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(resource);
