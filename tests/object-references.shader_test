@@ -89,7 +89,7 @@ draw quad
 probe all rgba (2132, 2132, 2132, 1111)
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 Texture2D tex[3];
 uniform int n;
 
@@ -109,7 +109,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 // Note: Only valid in shader model 5.1
 Texture2D tex[3];
 uniform int n;

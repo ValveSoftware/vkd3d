@@ -967,6 +967,51 @@ static bool copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *bl
     return progress;
 }
 
+static void note_non_static_deref_expressions(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        const char *usage)
+{
+    unsigned int i;
+
+    for (i = 0; i < deref->path_len; ++i)
+    {
+        struct hlsl_ir_node *path_node = deref->path[i].node;
+
+        assert(path_node);
+        if (path_node->type != HLSL_IR_CONSTANT)
+            hlsl_note(ctx, &path_node->loc, VKD3D_SHADER_LOG_ERROR,
+                    "Expression for %s within \"%s\" cannot be resolved statically.",
+                    usage, deref->var->name);
+    }
+}
+
+static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
+        void *context)
+{
+    unsigned int start, count;
+
+    if (instr->type == HLSL_IR_RESOURCE_LOAD)
+    {
+        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
+
+        if (!hlsl_component_index_range_from_deref(ctx, &load->resource, &start, &count))
+        {
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                    "Loaded resource from \"%s\" must be determinable at compile time.",
+                    load->resource.var->name);
+            note_non_static_deref_expressions(ctx, &load->resource, "loaded resource");
+        }
+        if (load->sampler.var && !hlsl_component_index_range_from_deref(ctx, &load->sampler, &start, &count))
+        {
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                    "Resource load sampler from \"%s\" must be determinable at compile time.",
+                    load->sampler.var->name);
+            note_non_static_deref_expressions(ctx, &load->sampler, "resource load sampler");
+        }
+    }
+
+    return false;
+}
+
 static bool is_vec1(const struct hlsl_type *type)
 {
     return (type->type == HLSL_CLASS_SCALAR) || (type->type == HLSL_CLASS_VECTOR && type->dimx == 1);
@@ -2235,6 +2280,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (ctx->profile->major_version < 4)
         transform_ir(ctx, lower_division, body, NULL);
+
+    transform_ir(ctx, validate_static_object_references, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
     transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL);
