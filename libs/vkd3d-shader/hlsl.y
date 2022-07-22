@@ -370,6 +370,9 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
 {
     struct hlsl_type *src_type = node->data_type;
 
+    if (hlsl_types_are_equal(src_type, dst_type))
+        return node;
+
     if (!implicit_compatible_data_types(src_type, dst_type))
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
