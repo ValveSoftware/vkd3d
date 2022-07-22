@@ -71,7 +71,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 Texture2D tex;
 
 struct foo
@@ -90,7 +90,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 Texture2D tex;
 
 struct foo

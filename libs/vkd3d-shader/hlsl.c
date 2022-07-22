@@ -548,25 +548,32 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
 
 unsigned int hlsl_type_component_count(const struct hlsl_type *type)
 {
-    unsigned int count = 0, i;
+    switch (type->type)
+    {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            return type->dimx * type->dimy;
 
-    if (type->type <= HLSL_CLASS_LAST_NUMERIC)
-    {
-        return type->dimx * type->dimy;
-    }
-    if (type->type == HLSL_CLASS_ARRAY)
-    {
-        return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
-    }
-    if (type->type != HLSL_CLASS_STRUCT)
-    {
-        ERR("Unexpected data type %#x.\n", type->type);
-        return 0;
-    }
+        case HLSL_CLASS_STRUCT:
+        {
+            unsigned int count = 0, i;
 
-    for (i = 0; i < type->e.record.field_count; ++i)
-        count += hlsl_type_component_count(type->e.record.fields[i].type);
-    return count;
+            for (i = 0; i < type->e.record.field_count; ++i)
+                count += hlsl_type_component_count(type->e.record.fields[i].type);
+            return count;
+        }
+
+        case HLSL_CLASS_ARRAY:
+            return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
+
+        case HLSL_CLASS_OBJECT:
+            return 1;
+
+        default:
+            assert(0);
+            return 0;
+    }
 }
 
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2)
