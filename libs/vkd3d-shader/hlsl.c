@@ -1545,6 +1545,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
                 break;
 
             case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
                 vkd3d_string_buffer_printf(buffer, "%.8e ", value->f);
                 break;
 
