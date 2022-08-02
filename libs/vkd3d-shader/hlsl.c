@@ -198,7 +198,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         {
             unsigned int element_size = type->e.array.type->reg_size;
 
-            assert(element_size);
             if (is_sm4)
                 type->reg_size = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
             else
@@ -218,8 +217,6 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
                 struct hlsl_struct_field *field = &type->e.record.fields[i];
                 unsigned int field_size = field->type->reg_size;
 
-                assert(field_size);
-
                 type->reg_size = hlsl_type_get_sm4_offset(field->type, type->reg_size);
                 field->reg_offset = type->reg_size;
                 type->reg_size += field_size;
@@ -230,8 +227,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         }
 
         case HLSL_CLASS_OBJECT:
-            /* For convenience when performing copy propagation. */
-            type->reg_size = 1;
+            type->reg_size = 0;
             break;
     }
 }
