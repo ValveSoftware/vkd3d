@@ -2082,11 +2082,23 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
 
+    if (resource_type->type != HLSL_CLASS_OBJECT)
+    {
+        assert(resource_type->type == HLSL_CLASS_ARRAY || resource_type->type == HLSL_CLASS_STRUCT);
+        hlsl_fixme(ctx, &load->node.loc, "Resource being a component of another variable.");
+        return;
+    }
+
     if (load->sampler.var)
     {
         const struct hlsl_type *sampler_type = load->sampler.var->data_type;
 
-        assert(sampler_type->type == HLSL_CLASS_OBJECT);
+        if (sampler_type->type != HLSL_CLASS_OBJECT)
+        {
+            assert(sampler_type->type == HLSL_CLASS_ARRAY || sampler_type->type == HLSL_CLASS_STRUCT);
+            hlsl_fixme(ctx, &load->node.loc, "Sampler being a component of another variable.");
+            return;
+        }
         assert(sampler_type->base_type == HLSL_TYPE_SAMPLER);
         assert(sampler_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC);
 
