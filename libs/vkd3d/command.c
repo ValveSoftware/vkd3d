@@ -369,7 +369,10 @@ static void *vkd3d_fence_worker_main(void *arg)
         }
 
         if (worker->should_exit)
+        {
+            vkd3d_mutex_unlock(&worker->mutex);
             break;
+        }
 
         old_fences_size = cur_fences_size;
         old_fences = cur_fences;
