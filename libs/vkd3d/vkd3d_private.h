@@ -346,7 +346,6 @@ struct vkd3d_fence_worker
     union vkd3d_thread_handle thread;
     struct vkd3d_mutex mutex;
     struct vkd3d_cond cond;
-    struct vkd3d_cond fence_destruction_cond;
     bool should_exit;
 
     size_t fence_count;

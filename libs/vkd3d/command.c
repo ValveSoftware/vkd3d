@@ -427,20 +427,11 @@ static HRESULT vkd3d_fence_worker_start(struct vkd3d_fence_worker *worker,
         return hresult_from_errno(rc);
     }
 
-    if ((rc = vkd3d_cond_init(&worker->fence_destruction_cond)))
-    {
-        ERR("Failed to initialize condition variable, error %d.\n", rc);
-        vkd3d_mutex_destroy(&worker->mutex);
-        vkd3d_cond_destroy(&worker->cond);
-        return hresult_from_errno(rc);
-    }
-
     if (FAILED(hr = vkd3d_create_thread(device->vkd3d_instance,
             vkd3d_fence_worker_main, worker, &worker->thread)))
     {
         vkd3d_mutex_destroy(&worker->mutex);
         vkd3d_cond_destroy(&worker->cond);
-        vkd3d_cond_destroy(&worker->fence_destruction_cond);
     }
 
     return hr;
@@ -470,7 +461,6 @@ static HRESULT vkd3d_fence_worker_stop(struct vkd3d_fence_worker *worker,
 
     vkd3d_mutex_destroy(&worker->mutex);
     vkd3d_cond_destroy(&worker->cond);
-    vkd3d_cond_destroy(&worker->fence_destruction_cond);
 
     vkd3d_free(worker->fences);
 
