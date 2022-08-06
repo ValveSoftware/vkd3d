@@ -2310,7 +2310,9 @@ static const char *spirv_compiler_get_entry_point_name(const struct spirv_compil
     return info && info->entry_point ? info->entry_point : "main";
 }
 
-struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
+static void spirv_compiler_destroy(struct spirv_compiler *compiler);
+
+static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
@@ -9823,7 +9825,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
     return ret;
 }
 
-int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
+static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_code *spirv)
 {
@@ -9916,7 +9918,28 @@ int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     return VKD3D_OK;
 }
 
-void spirv_compiler_destroy(struct spirv_compiler *compiler)
+int spirv_compile(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
+        const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
+{
+    struct spirv_compiler *spirv_compiler;
+    int ret;
+
+    if (!(spirv_compiler = spirv_compiler_create(&parser->shader_version, &parser->shader_desc,
+            compile_info, scan_descriptor_info, message_context, &parser->location)))
+    {
+        ERR("Failed to create SPIR-V compiler.\n");
+        return VKD3D_ERROR;
+    }
+
+    ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, parser, out);
+
+    spirv_compiler_destroy(spirv_compiler);
+    return ret;
+}
+
+static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 {
     vkd3d_free(compiler->control_flow_info);
 

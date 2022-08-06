@@ -1173,7 +1173,6 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
 {
     struct vkd3d_shader_scan_descriptor_info scan_descriptor_info;
     struct vkd3d_shader_compile_info scan_info;
-    struct spirv_compiler *spirv_compiler;
     struct vkd3d_shader_parser *parser;
     int ret;
 
@@ -1223,18 +1222,8 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return ret;
     }
 
-    if (!(spirv_compiler = spirv_compiler_create(&parser->shader_version, &parser->shader_desc,
-            compile_info, &scan_descriptor_info, message_context, &parser->location)))
-    {
-        ERR("Failed to create DXBC compiler.\n");
-        vkd3d_shader_parser_destroy(parser);
-        vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        return VKD3D_ERROR;
-    }
+    ret = spirv_compile(parser, &scan_descriptor_info, compile_info, out, message_context);
 
-    ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, parser, out);
-
-    spirv_compiler_destroy(spirv_compiler);
     vkd3d_shader_parser_destroy(parser);
     vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
     return ret;
