@@ -143,6 +143,8 @@ struct vkd3d_vulkan_info
     bool rasterization_stream;
     bool transform_feedback_queries;
 
+    bool uav_read_without_format;
+
     bool vertex_attrib_zero_divisor;
     unsigned int max_vertex_attrib_divisor;
 

@@ -590,6 +590,21 @@ static bool is_stencil_ref_export_supported(ID3D12Device *device)
     return options.PSSpecifiedStencilRefSupported;
 }
 
+static bool are_typed_uav_load_additional_formats_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return false;
+    }
+
+    return options.TypedUAVLoadAdditionalFormats;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -21094,7 +21109,8 @@ static void test_typed_buffer_uav(void)
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_buffer_readback_with_command_list(resource, uav_desc.Format, &rb, queue, command_list);
-    todo check_readback_data_vec4(&rb.rb, NULL, &expected_ld, 0);
+    todo_if(!are_typed_uav_load_additional_formats_supported(device))
+    check_readback_data_vec4(&rb.rb, NULL, &expected_ld, 0);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(resource);
