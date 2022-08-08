@@ -198,7 +198,9 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         {
             unsigned int element_size = type->e.array.type->reg_size;
 
-            if (is_sm4)
+            if (type->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                type->reg_size = 0;
+            else if (is_sm4)
                 type->reg_size = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
             else
                 type->reg_size = type->e.array.elements_count * element_size;
@@ -1313,7 +1315,12 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             }
 
             for (t = type; t->type == HLSL_CLASS_ARRAY; t = t->e.array.type)
-                vkd3d_string_buffer_printf(string, "[%u]", t->e.array.elements_count);
+            {
+                if (t->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                    vkd3d_string_buffer_printf(string, "[]");
+                else
+                    vkd3d_string_buffer_printf(string, "[%u]", t->e.array.elements_count);
+            }
             return string;
         }
 

@@ -230,6 +230,8 @@ struct hlsl_src
 
 #define HLSL_MODIFIERS_MAJORITY_MASK (HLSL_MODIFIER_ROW_MAJOR | HLSL_MODIFIER_COLUMN_MAJOR)
 
+#define HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT 0
+
 struct hlsl_reg_reservation
 {
     char type;

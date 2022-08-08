@@ -853,6 +853,11 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v);
 }
 
+static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
+{
+    return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
+}
+
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
         struct hlsl_type *type, unsigned int modifiers, struct list *defs)
 {
@@ -870,11 +875,45 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, defs, struct parse_variable_def, entry)
     {
         struct hlsl_struct_field *field = &fields->fields[i++];
-        unsigned int j;
+        bool unbounded_res_array = false;
+        unsigned int k;
 
         field->type = type;
-        for (j = 0; j < v->arrays.count; ++j)
-            field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[j]);
+
+        if (shader_is_sm_5_1(ctx) && type->type == HLSL_CLASS_OBJECT)
+        {
+            for (k = 0; k < v->arrays.count; ++k)
+                unbounded_res_array |= (v->arrays.sizes[k] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
+        }
+
+        if (unbounded_res_array)
+        {
+            if (v->arrays.count == 1)
+            {
+                hlsl_fixme(ctx, &v->loc, "Unbounded resource arrays as struct fields.");
+                free_parse_variable_def(v);
+                vkd3d_free(field);
+                continue;
+            }
+            else
+            {
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Unbounded resource arrays cannot be multi-dimensional.");
+            }
+        }
+        else
+        {
+            for (k = 0; k < v->arrays.count; ++k)
+            {
+                if (v->arrays.sizes[k] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Implicit size arrays not allowed in struct fields.");
+                }
+
+                field->type = hlsl_new_array_type(ctx, field->type, v->arrays.sizes[k]);
+            }
+        }
         vkd3d_free(v->arrays.sizes);
         field->loc = v->loc;
         field->name = v->name;
@@ -916,6 +955,12 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
         ret = true;
         for (i = 0; i < v->arrays.count; ++i)
         {
+            if (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+            {
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Implicit size arrays not allowed in typedefs.");
+            }
+
             if (!(type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i])))
             {
                 free_parse_variable_def(v);
@@ -1775,11 +1820,78 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
     {
+        bool unbounded_res_array = false;
         unsigned int i;
 
         type = basic_type;
-        for (i = 0; i < v->arrays.count; ++i)
-            type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
+
+        if (shader_is_sm_5_1(ctx) && type->type == HLSL_CLASS_OBJECT)
+        {
+            for (i = 0; i < v->arrays.count; ++i)
+                unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
+        }
+
+        if (unbounded_res_array)
+        {
+            if (v->arrays.count == 1)
+            {
+                hlsl_fixme(ctx, &v->loc, "Unbounded resource arrays.");
+                free_parse_variable_def(v);
+                continue;
+            }
+            else
+            {
+                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Unbounded resource arrays cannot be multi-dimensional.");
+            }
+        }
+        else
+        {
+            for (i = 0; i < v->arrays.count; ++i)
+            {
+                if (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                {
+                    unsigned int size = initializer_size(&v->initializer);
+                    unsigned int elem_components = hlsl_type_component_count(type);
+
+                    if (i < v->arrays.count - 1)
+                    {
+                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Only innermost array size can be implicit.");
+                        free_parse_initializer(&v->initializer);
+                        v->initializer.args_count = 0;
+                    }
+                    else if (elem_components == 0)
+                    {
+                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Cannot declare an implicit size array of a size 0 type.");
+                        free_parse_initializer(&v->initializer);
+                        v->initializer.args_count = 0;
+                    }
+                    else if (size == 0)
+                    {
+                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                "Implicit size arrays need to be initialized.");
+                        free_parse_initializer(&v->initializer);
+                        v->initializer.args_count = 0;
+
+                    }
+                    else if (size % elem_components != 0)
+                    {
+                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                                "Cannot initialize implicit size array with %u components, expected a multiple of %u.",
+                                size, elem_components);
+                        free_parse_initializer(&v->initializer);
+                        v->initializer.args_count = 0;
+                    }
+                    else
+                    {
+                        v->arrays.sizes[i] = size / elem_components;
+                    }
+                }
+                type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
+            }
+        }
         vkd3d_free(v->arrays.sizes);
 
         if (type->type != HLSL_CLASS_MATRIX)
@@ -3517,6 +3629,21 @@ arrays:
             $$.sizes = new_array;
             $$.sizes[$$.count++] = size;
         }
+    | '[' ']' arrays
+        {
+            uint32_t *new_array;
+
+            $$ = $3;
+
+            if (!(new_array = hlsl_realloc(ctx, $$.sizes, ($$.count + 1) * sizeof(*new_array))))
+            {
+                vkd3d_free($$.sizes);
+                YYABORT;
+            }
+
+            $$.sizes = new_array;
+            $$.sizes[$$.count++] = HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT;
+        }
 
 var_modifiers:
       %empty
@@ -4058,7 +4185,14 @@ unary_expr:
 
             dst_type = $3;
             for (i = 0; i < $4.count; ++i)
+            {
+                if ($4.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                {
+                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Implicit size arrays not allowed in casts.");
+                }
                 dst_type = hlsl_new_array_type(ctx, dst_type, $4.sizes[i]);
+            }
 
             if (!compatible_data_types(src_type, dst_type))
             {
