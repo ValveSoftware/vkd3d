@@ -530,7 +530,7 @@ struct d3d12_fence
     {
         uint64_t value;
         HANDLE event;
-        bool latch;
+        bool *latch;
     } *events;
     size_t events_size;
     size_t event_count;

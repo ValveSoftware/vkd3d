@@ -851,7 +851,7 @@ static void d3d12_fence_signal_external_events_locked(struct d3d12_fence *fence)
             }
             else
             {
-                current->latch = true;
+                *current->latch = true;
                 signal_null_event_cond = true;
             }
         }
@@ -1155,7 +1155,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence(iface);
     unsigned int i;
-    bool *latch;
+    bool latch = false;
     int rc;
 
     TRACE("iface %p, value %#"PRIx64", event %p.\n", iface, value, event);
@@ -1196,8 +1196,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
 
     fence->events[fence->event_count].value = value;
     fence->events[fence->event_count].event = event;
-    fence->events[fence->event_count].latch = false;
-    latch = &fence->events[fence->event_count].latch;
+    fence->events[fence->event_count].latch = &latch;
     ++fence->event_count;
 
     /* If event is NULL, we need to block until the fence value completes.
@@ -1206,7 +1205,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_SetEventOnCompletion(ID3D12Fence *i
      * and signal a condition variable instead of calling external signal_event callback. */
     if (!event)
     {
-        while (!*latch)
+        while (!latch)
             vkd3d_cond_wait(&fence->null_event_cond, &fence->mutex);
     }
 
