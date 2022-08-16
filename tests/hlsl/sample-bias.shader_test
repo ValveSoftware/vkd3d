@@ -12,9 +12,10 @@ levels 2
 0.0 0.0 1.0 0.0
 
 [vertex shader]
-void main(out float2 tex : texcoord, inout float4 pos : sv_position)
+void main(float4 pos : position, out float2 tex : texcoord, out float4 out_pos : sv_position)
 {
     tex = pos.xy;
+    out_pos = pos;
 }
 
 [pixel shader]

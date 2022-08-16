@@ -2,9 +2,10 @@
 % definition and its declarations.
 
 [vertex shader]
-void main(out float tex : texcoord, inout float4 pos : sv_position)
+void main(float4 pos : position, out float tex : texcoord, out float4 out_pos : sv_position)
 {
     tex = 0.2;
+    out_pos = pos;
 }
 
 [pixel shader fail]
@@ -53,12 +54,13 @@ probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 
 [vertex shader]
-void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
+void main(float4 pos : position, out float4 tex[4] : texcoord, out float4 out_pos : sv_position)
 {
     tex[0] = float4(10.0, 11.0, 12.0, 13.0);
     tex[1] = float4(20.0, 21.0, 22.0, 23.0);
     tex[2] = float4(30.0, 31.0, 32.0, 33.0);
     tex[3] = float4(40.0, 41.0, 42.0, 43.0);
+    out_pos = pos;
 }
 
 
@@ -196,10 +198,11 @@ struct apple
     float4 tex[2] : TEXCOORD0;
 };
 
-void main(out apple apl, inout float4 pos : sv_position)
+void main(float4 pos : position, out apple apl, out float4 out_pos : sv_position)
 {
     apl.tex[0] = float4(1, 2, 3, 4);
     apl.tex[1] = float4(10, 20, 30, 40);
+    out_pos = pos;
 }
 
 [pixel shader]
@@ -220,10 +223,11 @@ struct apple
     float2 tex : TEXCOORD0;
 };
 
-void main(out apple apls[2], inout float4 pos : sv_position)
+void main(float4 pos : position, out apple apls[2], out float4 out_pos : sv_position)
 {
     apls[0].tex = float2(1, 2);
     apls[1].tex = float2(3, 4);
+    out_pos = pos;
 }
 
 
@@ -233,29 +237,32 @@ struct apple
     float2 f : SEMANTIC;
 };
 
-void main(out apple a, out apple b, inout float4 pos : sv_position)
+void main(float4 pos : position, out apple a, out apple b, out float4 out_pos : sv_position)
 {
     a.f = float2(1, 2);
     b.f = float2(3, 4);
+    out_pos = pos;
 }
 
 
 % Semantic names are case-insensitive.
 [vertex shader fail]
-void main(out float2 a : sem0, out float2 b : SEM, inout float4 pos : sv_position)
+void main(float4 pos : position, out float2 a : sem0, out float2 b : SEM, out float4 out_pos : sv_position)
 {
     a = float2(1, 2);
     b = float2(3, 4);
+    out_pos = pos;
 }
 
 
 [vertex shader]
-void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
+void main(float4 pos : position, out float4 tex[4] : texcoord, out float4 out_pos : sv_position)
 {
     tex[0] = float4(10.0, 11.0, 12.0, 13.0);
     tex[1] = float4(20.0, 21.0, 22.0, 23.0);
     tex[2] = float4(30.0, 31.0, 32.0, 33.0);
     tex[3] = float4(40.0, 41.0, 42.0, 43.0);
+    out_pos = pos;
 }
 
 

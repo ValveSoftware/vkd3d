@@ -1,7 +1,8 @@
 [vertex shader]
-void main(out float tex : texcoord, inout float4 pos : sv_position)
+void main(float4 pos : position, out float tex : texcoord, out float4 out_pos : sv_position)
 {
     tex = (pos.x + 1) * 320;
+    out_pos = pos;
 }
 
 [pixel shader]

@@ -579,8 +579,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         };
 
         static const char vs_source[] =
-            "void main(inout float4 position : sv_position)\n"
+            "float4 main(float4 pos : position) : sv_position\n"
             "{\n"
+            "    return pos;\n"
             "}";
 
         if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
@@ -601,7 +602,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
                 1, sizeof(*runner->input_elements));
         element = &runner->input_elements[0];
-        element->name = strdup("sv_position");
+        element->name = strdup("position");
         element->slot = 0;
         element->format = DXGI_FORMAT_R32G32_FLOAT;
         element->texel_size = sizeof(*quad);
