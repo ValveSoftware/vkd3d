@@ -116,7 +116,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 
         list_move_tail(&block->instrs, &idx_block.instrs);
 
-        type = hlsl_get_inner_type_from_path_index(ctx, type, deref->path[i].node);
+        type = hlsl_get_element_type_from_path_index(ctx, type, deref->path[i].node);
     }
 
     return offset;

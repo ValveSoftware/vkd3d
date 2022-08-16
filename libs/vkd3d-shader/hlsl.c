@@ -370,7 +370,7 @@ static struct hlsl_type *get_type_from_deref(struct hlsl_ctx *ctx, const struct 
 
     type = deref->var->data_type;
     for (i = 0; i < deref->path_len; ++i)
-        type = hlsl_get_inner_type_from_path_index(ctx, type, deref->path[i].node);
+        type = hlsl_get_element_type_from_path_index(ctx, type, deref->path[i].node);
     return type;
 }
 
@@ -423,7 +423,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
     return true;
 }
 
-struct hlsl_type *hlsl_get_inner_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
         struct hlsl_ir_node *idx)
 {
     assert(idx);
@@ -963,7 +963,7 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
 
     type = get_type_from_deref(ctx, deref);
     if (idx)
-        type = hlsl_get_inner_type_from_path_index(ctx, type, idx);
+        type = hlsl_get_element_type_from_path_index(ctx, type, idx);
 
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;

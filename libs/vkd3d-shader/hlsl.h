@@ -735,7 +735,7 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
 
-struct hlsl_type *hlsl_get_inner_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
+struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,
         struct hlsl_ir_node *idx);
 
 struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *basic_type, unsigned int array_size);
