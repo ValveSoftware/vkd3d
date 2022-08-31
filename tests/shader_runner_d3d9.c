@@ -183,8 +183,7 @@ static D3DTEXTUREADDRESS sampler_address_to_d3d9(D3D12_TEXTURE_ADDRESS_MODE addr
             return D3DTADDRESS_MIRRORONCE;
     }
 
-    assert(0);
-    return 0;
+    vkd3d_unreachable();
 }
 
 static bool d3d9_runner_check_requirements(struct shader_runner *r)
@@ -369,8 +368,7 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
-                assert(0);
-                break;
+                vkd3d_unreachable();
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
                 for (j = 0; j < runner->r.input_element_count; ++j)

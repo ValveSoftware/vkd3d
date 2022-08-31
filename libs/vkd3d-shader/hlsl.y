@@ -1086,8 +1086,7 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
                 case HLSL_TYPE_BOOL:
                     return !!value->u;
                 default:
-                    assert(0);
-                    return 0;
+                    vkd3d_unreachable();
             }
         }
 
@@ -1104,10 +1103,10 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
         case HLSL_IR_STORE:
             WARN("Invalid node type %s.\n", hlsl_node_type_to_string(node->type));
             return 0;
-    }
 
-    assert(0);
-    return 0;
+        default:
+            vkd3d_unreachable();
+    }
 }
 
 static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
@@ -2510,8 +2509,7 @@ static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
             /* Offset parameters not supported for these types. */
             return 0;
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 

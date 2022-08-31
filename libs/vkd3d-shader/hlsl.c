@@ -333,13 +333,11 @@ static unsigned int traverse_path_from_component_index(struct hlsl_ctx *ctx,
                 }
                 index -= field_comp_count;
             }
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
         }
 
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -466,8 +464,7 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
         }
 
         default:
-            assert(0);
-            return NULL;
+            vkd3d_unreachable();
     }
 }
 
@@ -586,8 +583,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
             return 1;
 
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -1590,7 +1586,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
                 break;
 
             default:
-                assert(0);
+                vkd3d_unreachable();
         }
     }
     if (type->dimx != 1)

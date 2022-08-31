@@ -159,8 +159,7 @@ static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
             return D3DXPC_VECTOR;
         default:
             ERR("Invalid class %#x.\n", type->type);
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -193,6 +192,7 @@ static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
                     return D3DXPT_SAMPLER;
                 default:
                     ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                    vkd3d_unreachable();
             }
             break;
         case HLSL_TYPE_STRING:
@@ -212,6 +212,7 @@ static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
                     return D3DXPT_TEXTURE;
                 default:
                     ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                    vkd3d_unreachable();
             }
             break;
         case HLSL_TYPE_VERTEXSHADER:
@@ -219,10 +220,8 @@ static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
         case HLSL_TYPE_VOID:
             return D3DXPT_VOID;
         default:
-            assert(0);
+            vkd3d_unreachable();
     }
-    assert(0);
-    return 0;
 }
 
 static const struct hlsl_type *get_array_type(const struct hlsl_type *type)

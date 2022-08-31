@@ -701,8 +701,7 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return 4;
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 

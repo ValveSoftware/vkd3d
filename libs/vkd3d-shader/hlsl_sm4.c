@@ -279,8 +279,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
             return D3D_SVC_VECTOR;
         default:
             ERR("Invalid class %#x.\n", type->type);
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -313,7 +312,7 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
                 case HLSL_SAMPLER_DIM_GENERIC:
                     return D3D_SVT_SAMPLER;
                 default:
-                    assert(0);
+                    vkd3d_unreachable();
             }
             break;
         case HLSL_TYPE_STRING:
@@ -332,7 +331,7 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
                 case HLSL_SAMPLER_DIM_GENERIC:
                     return D3D_SVT_TEXTURE;
                 default:
-                    assert(0);
+                    vkd3d_unreachable();
             }
             break;
         case HLSL_TYPE_UINT:
@@ -342,10 +341,8 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
         case HLSL_TYPE_VOID:
             return D3D_SVT_VOID;
         default:
-            assert(0);
+            vkd3d_unreachable();
     }
-    assert(0);
-    return 0;
 }
 
 static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type)
@@ -414,8 +411,7 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
         case HLSL_TYPE_TEXTURE:
             return D3D_SIT_TEXTURE;
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -439,8 +435,7 @@ static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type
             return D3D_RETURN_TYPE_UINT;
 
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -467,8 +462,7 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return D3D_SRV_DIMENSION_TEXTURECUBEARRAY;
         default:
-            assert(0);
-            return D3D_SRV_DIMENSION_UNKNOWN;
+            vkd3d_unreachable();
     }
 }
 
@@ -764,8 +758,7 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY;
         default:
-            assert(0);
-            return 0;
+            vkd3d_unreachable();
     }
 }
 
@@ -800,8 +793,7 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
             break;
 
         default:
-            assert(0);
-            break;
+            vkd3d_unreachable();
     }
 
     return word;
@@ -1528,7 +1520,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    assert(0);
+                    vkd3d_unreachable();
             }
             break;
 
@@ -1554,7 +1546,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    assert(0);
+                    vkd3d_unreachable();
             }
             break;
 
@@ -1580,7 +1572,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    assert(0);
+                    vkd3d_unreachable();
             }
             break;
 
@@ -1594,11 +1586,8 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
 
         case HLSL_TYPE_BOOL:
             /* Casts to bool should have already been lowered. */
-            assert(0);
-            break;
-
         default:
-            assert(0);
+            vkd3d_unreachable();
     }
 }
 
@@ -1754,11 +1743,8 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                             break;
 
                         case 1:
-                            assert(0);
-                            break;
-
                         default:
-                            assert(0);
+                            vkd3d_unreachable();
                     }
                     break;
 

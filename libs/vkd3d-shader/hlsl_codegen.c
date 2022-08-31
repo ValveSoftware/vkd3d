@@ -80,8 +80,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
         }
 
         default:
-            assert(0);
-            return NULL;
+            vkd3d_unreachable();
     }
 
     if (offset)
@@ -1763,8 +1762,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                                 return;
 
                             default:
-                                assert(0);
-                                return;
+                                vkd3d_unreachable();
                         }
                         defs->values[constant->reg.id + y].f[x] = f;
                     }
@@ -2149,8 +2147,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
                 break;
 
             default:
-                assert(0);
-                break;
+                vkd3d_unreachable();
         }
 
         type = hlsl_get_element_type_from_path_index(ctx, type, path_node);

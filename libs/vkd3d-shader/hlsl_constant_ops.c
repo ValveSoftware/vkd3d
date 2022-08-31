@@ -79,8 +79,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 break;
 
             default:
-                assert(0);
-                return false;
+                vkd3d_unreachable();
         }
 
         switch (dst->node.data_type->base_type)
@@ -104,12 +103,8 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
 
             case HLSL_TYPE_BOOL:
                 /* Casts to bool should have already been lowered. */
-                assert(0);
-                break;
-
             default:
-                assert(0);
-                return false;
+                vkd3d_unreachable();
         }
     }
     return true;
@@ -248,8 +243,7 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
                 break;
 
             default:
-                assert(0);
-                return false;
+                vkd3d_unreachable();
         }
 
         dst->value[k].u *= ~0u;

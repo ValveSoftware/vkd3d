@@ -1314,7 +1314,7 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
             break;
 
         default:
-            assert(0);
+            vkd3d_unreachable();
     }
 
     vkd3d_shader_message_context_trace_messages(&message_context);
