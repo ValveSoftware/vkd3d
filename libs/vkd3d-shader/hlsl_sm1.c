@@ -272,7 +272,7 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
         }
     }
 
-    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm1_class(type), sm1_base_type(type)));
+    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm1_class(type), sm1_base_type(array_type)));
     put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
     put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);
