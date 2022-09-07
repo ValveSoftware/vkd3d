@@ -2103,6 +2103,9 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     {
         if (var->is_uniform && var->last_read)
         {
+            if (var->data_type->reg_size == 0)
+                continue;
+
             if (var->data_type->reg_size > 4)
                 var->reg = allocate_range(ctx, &liveness, 1, UINT_MAX, var->data_type->reg_size);
             else
