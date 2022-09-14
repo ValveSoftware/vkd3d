@@ -885,7 +885,10 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
     init_node(&store->node, HLSL_IR_STORE, NULL, loc);
 
     if (!init_deref(ctx, &store->lhs, lhs->var, lhs->path_len + !!idx))
+    {
+        vkd3d_free(store);
         return NULL;
+    }
     for (i = 0; i < lhs->path_len; ++i)
         hlsl_src_from_node(&store->lhs.path[i], lhs->path[i].node);
     if (idx)
