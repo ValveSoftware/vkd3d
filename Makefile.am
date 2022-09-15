@@ -179,6 +179,7 @@ libvkd3d_common_la_SOURCES = \
 	libs/vkd3d-common/error.c \
 	libs/vkd3d-common/memory.c \
 	libs/vkd3d-common/utf8.c
+libvkd3d_common_la_LIBADD = @PTHREAD_LIBS@
 
 lib_LTLIBRARIES = libvkd3d-shader.la libvkd3d.la libvkd3d-utils.la
 
