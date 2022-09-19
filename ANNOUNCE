@@ -1,96 +1,50 @@
-The Wine team is proud to announce that release 1.4 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.5 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Many improvements to the HLSL compiler.
-  - A new descriptor heap implementation using the VK_EXT_descriptor_indexing
-    extension.
-  - A new fence implementation using the VK_KHR_timeline_semaphore extension.
+  - Support for various HLSL features and intrinsics.
+  - Typed unordered access view loads of multicomponent formats.
+  - Miscellaneous bug fixes.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.4.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.5.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
-  https://source.winehq.org/git/vkd3d.git/
+  https://gitlab.winehq.org/wine/vkd3d.git
 
 Vkd3d is available thanks to the work of multiple people. See the file AUTHORS
 for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.4
+What's new in vkd3d 1.5
 =======================
-
-
-*** libvkd3d
-
-- A new descriptor heap implementation using the VK_EXT_descriptor_indexing
-  extension. In particular, the new implementation is more efficient when
-  large descriptor heaps are used by multiple command lists. The new
-  `virtual_heaps' configuration option can be used to select the original
-  implementation even when the VK_EXT_descriptor_indexing extension is
-  available.
-
-- A new fence implementation using the VK_KHR_timeline_semaphore extension.
-  The new implementation addresses a number of edge cases the original
-  implementation was unable to, as well as being somewhat more efficient.
-
-- When the VK_EXT_robustness2 extension is available, it is used to implement
-  null views. This more accurately matches Direct3D 12 behaviour. For example,
-  all reads from such a null view return zeroes, while that isn't necessarily
-  the case for out-of-bounds reads with the original implementation.
-
-- New interfaces:
-  - vkd3d_set_log_callback() allows writing log output via a custom callback.
-    This can be used to integrate vkd3d's log output with other logging
-    systems.
 
 
 *** libvkd3d-shader
 
 - New features for the HLSL source type:
-  - Support for integer arithmetic, bitwise and shift operations.
-  - Support for matrix and vector subscripting.
-  - Support for the mul() intrinsic function.
-  - Support for matrix copying, casting, and entry-wise operations.
-  - Support for complex initialisers.
-  - Support for the `nointerpolation' modifier. This modifier is applied by
-    default to integer variables.
-  - Support for the SV_VertexID semantic.
-  - Support for matrix-typed varyings.
-  - Constant folding for a number of operators.
-  - Copy propagation across branches and loops. This allows use of non-numeric
-    variables anywhere in a program, as well as more optimised code for
-    accessing numeric variables within branches and loops.
-
-- The disassembler supports the shader model 5 `msad' instruction.
+  - Improved support for HLSL object types (like e.g. `Texture2D') inside
+    structures and arrays.
+  - Implicitly sized array initialisers.
+  - Support for the dot() intrinsic function.
+  - Support for the ldexp() intrinsic function.
+  - Support for the lerp() intrinsic function.
+  - Support for the logical `and', `or', and `not' operators in shader model 4
+    and 5 targets.
+  - Support for casts from `bool' types in shader model 4 and 5 targets.
+  - Constant folding for integer bitwise operations.
+  - Constant folding for integer min() and max().
 
 - New interfaces:
-  - vkd3d_shader_set_log_callback() allows writing log output via a custom
-    callback.
-
-
-*** libvkd3d-utils
-
-- New interfaces:
-  - vkd3d_utils_set_log_callback() allows writing log output via a custom
-    callback.
-
-
-*** build
-
-- The minimum required version of Vulkan-Headers and SPIRV-Headers for this
-  release is version 1.2.139.
-
-- The SONAME_LIBVULKAN configure variable can be used to specify the shared
-  object name of the Vulkan library. Because vkd3d loads the Vulkan library
-  dynamically, specifying this removes the need for a Vulkan import library at
-  build time.
-
-- The `crosstests' target no longer builds Win32/PE demos or tests when these
-  were not enabled at configure time.
+  - The VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV compile option can be used to
+    specify the SPIR-V format to use for typed unordered access view loads.
+    When set to `Unknown', and the `shaderStorageImageReadWithoutFormat'
+    feature is enabled in the target environment, this allows typed loads from
+    multicomponent format unordered access views. If left unspecified, a R32
+    format will be used, like in previous versions of libvkd3d-shader.
 
