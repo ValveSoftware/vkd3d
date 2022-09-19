@@ -103,6 +103,7 @@ enum vkd3d_shader_compile_option_buffer_uav
 
 /**
  * Determines how typed UAVs are declared.
+ * \since 1.5
  */
 enum vkd3d_shader_compile_option_typed_uav
 {
