@@ -2621,6 +2621,9 @@ interface ID3D12VersionedRootSignatureDeserializer : IUnknown
     const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *GetUnconvertedRootSignatureDesc();
 };
 
+typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
+        const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
+
 [local] HRESULT __stdcall D3D12CreateRootSignatureDeserializer(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
