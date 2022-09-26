@@ -2501,9 +2501,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_node *offset = NULL;
-        struct hlsl_ir_node *coords;
         bool multisampled;
 
         multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
@@ -2524,7 +2523,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         assert(offset_dim);
         if (params->args_count > 1 + multisampled)
         {
-            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
+            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
@@ -2534,12 +2533,14 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         }
 
         /* +1 for the mipmap level */
-        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[0],
+        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[0],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
             return false;
 
-        if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format, HLSL_RESOURCE_LOAD,
-                &object_load->src, NULL, coords, offset, loc)))
+        load_params.format = object_type->e.resource_format;
+        load_params.resource = object_load->src;
+
+        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
@@ -2550,11 +2551,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_load *sampler_load;
-        struct hlsl_ir_node *coords;
 
         if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
         {
@@ -2580,13 +2580,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         /* Only HLSL_IR_LOAD can return an object. */
         sampler_load = hlsl_ir_load(params->args[0]);
 
-        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[1],
+        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
         if (offset_dim && params->args_count > 2)
         {
-            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
+            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
@@ -2596,8 +2596,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         if (params->args_count > 3 + !!offset_dim)
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-        if (!(load = hlsl_new_resource_load(ctx, object_type->e.resource_format,
-                HLSL_RESOURCE_SAMPLE, &object_load->src, &sampler_load->src, coords, offset, loc)))
+        load_params.format = object_type->e.resource_format;
+        load_params.resource = object_load->src;
+        load_params.sampler = sampler_load->src;
+
+        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
 
@@ -2612,33 +2615,30 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     {
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-        enum hlsl_resource_load_type load_type;
+        struct hlsl_resource_load_params load_params = {0};
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_load *sampler_load;
-        struct hlsl_type *result_type;
-        struct hlsl_ir_node *coords;
         unsigned int read_channel;
 
         if (!strcmp(name, "GatherGreen"))
         {
-            load_type = HLSL_RESOURCE_GATHER_GREEN;
+            load_params.type = HLSL_RESOURCE_GATHER_GREEN;
             read_channel = 1;
         }
         else if (!strcmp(name, "GatherBlue"))
         {
-            load_type = HLSL_RESOURCE_GATHER_BLUE;
+            load_params.type = HLSL_RESOURCE_GATHER_BLUE;
             read_channel = 2;
         }
         else if (!strcmp(name, "GatherAlpha"))
         {
-            load_type = HLSL_RESOURCE_GATHER_ALPHA;
+            load_params.type = HLSL_RESOURCE_GATHER_ALPHA;
             read_channel = 3;
         }
         else
         {
-            load_type = HLSL_RESOURCE_GATHER_RED;
+            load_params.type = HLSL_RESOURCE_GATHER_RED;
             read_channel = 0;
         }
 
@@ -2669,7 +2669,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         }
         else if (offset_dim && params->args_count > 2)
         {
-            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[2],
+            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
@@ -2694,17 +2694,18 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
 
-        result_type = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
-
         /* Only HLSL_IR_LOAD can return an object. */
         sampler_load = hlsl_ir_load(params->args[0]);
 
-        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[1],
+        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
-        if (!(load = hlsl_new_resource_load(ctx, result_type, load_type, &object_load->src,
-                &sampler_load->src, coords, offset, loc)))
+        load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
+        load_params.resource = object_load->src;
+        load_params.sampler = sampler_load->src;
+
+        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;
@@ -2713,13 +2714,12 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
+        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE_LOD};
         const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
         const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_node *offset = NULL;
         struct hlsl_ir_load *sampler_load;
-        struct hlsl_ir_node *coords, *lod;
 
         if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
         {
@@ -2745,17 +2745,17 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         /* Only HLSL_IR_LOAD can return an object. */
         sampler_load = hlsl_ir_load(params->args[0]);
 
-        if (!(coords = add_implicit_conversion(ctx, instrs, params->args[1],
+        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-            coords = params->args[1];
+            load_params.coords = params->args[1];
 
-        if (!(lod = add_implicit_conversion(ctx, instrs, params->args[2],
+        if (!(load_params.lod = add_implicit_conversion(ctx, instrs, params->args[2],
                 hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-            lod = params->args[2];
+            load_params.lod = params->args[2];
 
         if (offset_dim && params->args_count > 3)
         {
-            if (!(offset = add_implicit_conversion(ctx, instrs, params->args[3],
+            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[3],
                     hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
                 return false;
         }
@@ -2763,8 +2763,11 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         if (params->args_count > 3 + !!offset_dim)
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-        if (!(load = hlsl_new_sample_lod(ctx, object_type->e.resource_format,
-                &object_load->src, &sampler_load->src, coords, offset, lod, loc)))
+        load_params.format = object_type->e.resource_format;
+        load_params.resource = object_load->src;
+        load_params.sampler = sampler_load->src;
+
+        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
         list_add_tail(instrs, &load->node.entry);
         return true;

@@ -1050,41 +1050,29 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     return load;
 }
 
-struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
-        enum hlsl_resource_load_type type, struct hlsl_deref *resource, struct hlsl_deref *sampler,
-        struct hlsl_ir_node *coords, struct hlsl_ir_node *texel_offset, const struct vkd3d_shader_location *loc)
+struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
+        const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_load *load;
 
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;
-    init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, *loc);
-    load->load_type = type;
-    if (!hlsl_copy_deref(ctx, &load->resource, resource))
+    init_node(&load->node, HLSL_IR_RESOURCE_LOAD, params->format, *loc);
+    load->load_type = params->type;
+    if (!hlsl_copy_deref(ctx, &load->resource, &params->resource))
     {
         vkd3d_free(load);
         return NULL;
     }
-    if (!hlsl_copy_deref(ctx, &load->sampler, sampler))
+    if (!hlsl_copy_deref(ctx, &load->sampler, &params->sampler))
     {
         hlsl_cleanup_deref(&load->resource);
         vkd3d_free(load);
         return NULL;
     }
-    hlsl_src_from_node(&load->coords, coords);
-    hlsl_src_from_node(&load->texel_offset, texel_offset);
-    return load;
-}
-
-struct hlsl_ir_resource_load *hlsl_new_sample_lod(struct hlsl_ctx *ctx, struct hlsl_type *data_type,
-        struct hlsl_deref *resource, struct hlsl_deref *sampler, struct hlsl_ir_node *coords,
-        struct hlsl_ir_node *texel_offset, struct hlsl_ir_node *lod, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_resource_load *load;
-
-    if ((load = hlsl_new_resource_load(ctx, data_type, HLSL_RESOURCE_SAMPLE_LOD,
-            resource, sampler, coords, texel_offset, loc)))
-        hlsl_src_from_node(&load->lod, lod);
+    hlsl_src_from_node(&load->coords, params->coords);
+    hlsl_src_from_node(&load->texel_offset, params->texel_offset);
+    hlsl_src_from_node(&load->lod, params->lod);
     return load;
 }
 
