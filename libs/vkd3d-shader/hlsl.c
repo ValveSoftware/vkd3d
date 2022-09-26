@@ -1047,8 +1047,17 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx, struc
         return NULL;
     init_node(&load->node, HLSL_IR_RESOURCE_LOAD, data_type, *loc);
     load->load_type = type;
-    hlsl_copy_deref(ctx, &load->resource, resource);
-    hlsl_copy_deref(ctx, &load->sampler, sampler);
+    if (!hlsl_copy_deref(ctx, &load->resource, resource))
+    {
+        vkd3d_free(load);
+        return NULL;
+    }
+    if (!hlsl_copy_deref(ctx, &load->sampler, sampler))
+    {
+        hlsl_cleanup_deref(&load->resource);
+        vkd3d_free(load);
+        return NULL;
+    }
     hlsl_src_from_node(&load->coords, coords);
     hlsl_src_from_node(&load->texel_offset, texel_offset);
     return load;
