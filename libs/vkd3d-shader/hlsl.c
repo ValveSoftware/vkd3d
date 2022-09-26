@@ -915,6 +915,17 @@ struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_typ
     return c;
 }
 
+struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx, float f,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_constant *c;
+
+    if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
+        c->value[0].f = f;
+
+    return c;
+}
+
 struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
         const struct vkd3d_shader_location *loc)
 {

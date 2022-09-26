@@ -3981,10 +3981,8 @@ primary_expr:
         {
             struct hlsl_ir_constant *c;
 
-            if (!(c = hlsl_alloc(ctx, sizeof(*c))))
+            if (!(c = hlsl_new_float_constant(ctx, $1, &@1)))
                 YYABORT;
-            init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), @1);
-            c->value[0].f = $1;
             if (!($$ = make_list(ctx, &c->node)))
                 YYABORT;
         }
