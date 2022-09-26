@@ -766,11 +766,24 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
     return var;
 }
 
-struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
-        const struct vkd3d_shader_location loc)
+struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *template,
+        struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_var *var = hlsl_new_var(ctx, hlsl_strdup(ctx, name), type, loc, NULL, 0, NULL);
+    struct vkd3d_string_buffer *string;
+    struct hlsl_ir_var *var;
+    static LONG counter;
+    const char *name;
 
+    if (!(string = hlsl_get_string_buffer(ctx)))
+        return NULL;
+    vkd3d_string_buffer_printf(string, "<%s-%u>", template, InterlockedIncrement(&counter));
+    if (!(name = hlsl_strdup(ctx, string->buffer)))
+    {
+        hlsl_release_string_buffer(ctx, string);
+        return NULL;
+    }
+    var = hlsl_new_var(ctx, name, type, *loc, NULL, 0, NULL);
+    hlsl_release_string_buffer(ctx, string);
     if (var)
         list_add_tail(&ctx->globals->vars, &var->scope_entry);
     return var;

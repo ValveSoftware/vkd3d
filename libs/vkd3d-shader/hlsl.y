@@ -287,8 +287,6 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
     if ((src_type->type == HLSL_CLASS_MATRIX || dst_type->type == HLSL_CLASS_MATRIX)
         && src_type->type <= HLSL_CLASS_LAST_NUMERIC && dst_type->type <= HLSL_CLASS_LAST_NUMERIC)
     {
-        struct vkd3d_string_buffer *name;
-        static unsigned int counter = 0;
         struct hlsl_deref var_deref;
         struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
@@ -303,11 +301,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
             assert(dst_type->dimy <= src_type->dimy);
         }
 
-        name = vkd3d_string_buffer_get(&ctx->string_buffers);
-        vkd3d_string_buffer_printf(name, "<cast-%u>", counter++);
-        var = hlsl_new_synthetic_var(ctx, name->buffer, dst_type, *loc);
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        if (!var)
+        if (!(var = hlsl_new_synthetic_var(ctx, "cast", dst_type, loc)))
             return NULL;
         hlsl_init_simple_deref_from_var(&var_deref, var);
 
@@ -635,16 +629,10 @@ static struct hlsl_ir_load *add_load_index(struct hlsl_ctx *ctx, struct list *in
     }
     else
     {
-        struct vkd3d_string_buffer *name;
         struct hlsl_ir_store *store;
         struct hlsl_ir_var *var;
 
-        if (!(name = hlsl_get_string_buffer(ctx)))
-            return NULL;
-        vkd3d_string_buffer_printf(name, "<deref-%p>", var_instr);
-        var = hlsl_new_synthetic_var(ctx, name->buffer, var_instr->data_type, var_instr->loc);
-        hlsl_release_string_buffer(ctx, name);
-        if (!var)
+        if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
             return NULL;
 
         if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
@@ -674,16 +662,10 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
     }
     else
     {
-        struct vkd3d_string_buffer *name;
         struct hlsl_ir_store *store;
         struct hlsl_ir_var *var;
 
-        if (!(name = hlsl_get_string_buffer(ctx)))
-            return NULL;
-        vkd3d_string_buffer_printf(name, "<deref-%p>", var_instr);
-        var = hlsl_new_synthetic_var(ctx, name->buffer, var_instr->data_type, var_instr->loc);
-        hlsl_release_string_buffer(ctx, name);
-        if (!var)
+        if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
             return NULL;
 
         if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
@@ -722,8 +704,6 @@ static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *matrix, struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *mat_type = matrix->data_type, *ret_type;
-    struct vkd3d_string_buffer *name;
-    static unsigned int counter = 0;
     struct hlsl_deref var_deref;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
@@ -734,11 +714,7 @@ static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
 
     ret_type = hlsl_get_vector_type(ctx, mat_type->base_type, mat_type->dimx);
 
-    name = vkd3d_string_buffer_get(&ctx->string_buffers);
-    vkd3d_string_buffer_printf(name, "<index-%u>", counter++);
-    var = hlsl_new_synthetic_var(ctx, name->buffer, ret_type, *loc);
-    vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    if (!var)
+    if (!(var = hlsl_new_synthetic_var(ctx, "index", ret_type, loc)))
         return false;
     hlsl_init_simple_deref_from_var(&var_deref, var);
 
@@ -1246,8 +1222,6 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
 
     if (type->type == HLSL_CLASS_MATRIX)
     {
-        struct vkd3d_string_buffer *name;
-        static unsigned int counter = 0;
         struct hlsl_type *vector_type;
         struct hlsl_deref var_deref;
         struct hlsl_ir_load *load;
@@ -1255,11 +1229,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
 
         vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
-        name = vkd3d_string_buffer_get(&ctx->string_buffers);
-        vkd3d_string_buffer_printf(name, "<split_op-%u>", counter++);
-        var = hlsl_new_synthetic_var(ctx, name->buffer, type, *loc);
-        vkd3d_string_buffer_release(&ctx->string_buffers, name);
-        if (!var)
+        if (!(var = hlsl_new_synthetic_var(ctx, "split_op", type, loc)))
             return NULL;
         hlsl_init_simple_deref_from_var(&var_deref, var);
 
@@ -2217,8 +2187,6 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     struct hlsl_type *cast_type1 = arg1->data_type, *cast_type2 = arg2->data_type, *matrix_type, *ret_type;
     unsigned int i, j, k, vect_count = 0;
-    struct vkd3d_string_buffer *name;
-    static unsigned int counter = 0;
     struct hlsl_deref var_deref;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
@@ -2260,11 +2228,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
     if (!(cast2 = add_implicit_conversion(ctx, params->instrs, arg2, cast_type2, loc)))
         return false;
 
-    name = vkd3d_string_buffer_get(&ctx->string_buffers);
-    vkd3d_string_buffer_printf(name, "<mul-%u>", counter++);
-    var = hlsl_new_synthetic_var(ctx, name->buffer, matrix_type, *loc);
-    vkd3d_string_buffer_release(&ctx->string_buffers, name);
-    if (!var)
+    if (!(var = hlsl_new_synthetic_var(ctx, "mul", matrix_type, loc)))
         return false;
     hlsl_init_simple_deref_from_var(&var_deref, var);
 
@@ -2454,14 +2418,11 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
 static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
         struct parse_initializer *params, struct vkd3d_shader_location loc)
 {
-    static unsigned int counter;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
     unsigned int i, idx = 0;
-    char name[23];
 
-    sprintf(name, "<constructor-%x>", counter++);
-    if (!(var = hlsl_new_synthetic_var(ctx, name, type, loc)))
+    if (!(var = hlsl_new_synthetic_var(ctx, "constructor", type, &loc)))
         return NULL;
 
     for (i = 0; i < params->args_count; ++i)
@@ -4077,8 +4038,8 @@ primary_expr:
                 struct hlsl_ir_load *load;
                 struct hlsl_ir_var *var;
 
-                if (!(var = hlsl_new_synthetic_var(ctx, "<state-block-expr>",
-                        hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), @1)))
+                if (!(var = hlsl_new_synthetic_var(ctx, "state_block_expr",
+                        hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), &@1)))
                     YYABORT;
                 if (!(load = hlsl_new_var_load(ctx, var, @1)))
                     YYABORT;
