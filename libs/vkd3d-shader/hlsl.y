@@ -2800,7 +2800,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     struct hlsl_type *type;
     INT intval;
     FLOAT floatval;
-    BOOL boolval;
+    bool boolval;
     char *name;
     DWORD modifiers;
     struct hlsl_ir_node *instr;
@@ -3857,11 +3857,11 @@ initializer_expr_list:
 boolean:
       KW_TRUE
         {
-            $$ = TRUE;
+            $$ = true;
         }
     | KW_FALSE
         {
-            $$ = FALSE;
+            $$ = false;
         }
 
 statement_list:
@@ -4001,12 +4001,13 @@ primary_expr:
         {
             struct hlsl_ir_constant *c;
 
-            if (!(c = hlsl_alloc(ctx, sizeof(*c))))
+            if (!(c = hlsl_new_bool_constant(ctx, $1, &@1)))
                 YYABORT;
-            init_node(&c->node, HLSL_IR_CONSTANT, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), @1);
-            c->value[0].u = $1 ? ~0u : 0;
             if (!($$ = make_list(ctx, &c->node)))
+            {
+                hlsl_free_instr(&c->node);
                 YYABORT;
+            }
         }
     | VAR_IDENTIFIER
         {
