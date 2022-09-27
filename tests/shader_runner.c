@@ -557,7 +557,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int offset;
 
         if (!sscanf(line, "%u", &offset))
-            fatal_error("Unknown uniform type '%s'.\n", line);
+            fatal_error("Malformed uniform offset '%s'.\n", line);
         line = strchr(line, ' ') + 1;
 
         if (match_string(line, "float4", &line))
@@ -576,12 +576,12 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed float constant '%s'.\n", line);
             set_uniforms(runner, offset, 1, &f);
         }
-        else if (match_string(line, "int4", &line))
+        else if (match_string(line, "int4", &line) || match_string(line, "uint4", &line))
         {
             int v[4];
 
-            if (sscanf(line, "%d %d %d %d", &v[0], &v[1], &v[2], &v[3]) < 4)
-                fatal_error("Malformed int4 constant '%s'.\n", line);
+            if (sscanf(line, "%i %i %i %i", &v[0], &v[1], &v[2], &v[3]) < 4)
+                fatal_error("Malformed (u)int4 constant '%s'.\n", line);
             set_uniforms(runner, offset, 4, v);
         }
         else if (match_string(line, "int", &line))
@@ -599,6 +599,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             if (sscanf(line, "%u", &u) < 1)
                 fatal_error("Malformed uint constant '%s'.\n", line);
             set_uniforms(runner, offset, 1, &u);
+        }
+        else
+        {
+            fatal_error("Unknown uniform type '%s'.\n", line);
         }
     }
     else
