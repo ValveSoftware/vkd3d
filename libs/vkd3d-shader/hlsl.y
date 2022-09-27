@@ -1217,7 +1217,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *expr;
     unsigned int i;
 
     if (type->type == HLSL_CLASS_MATRIX)
@@ -1271,15 +1271,11 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         return &load->node;
     }
 
-    if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
+    if (!(expr = hlsl_new_expr(ctx, op, operands, type, loc)))
         return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, type, *loc);
-    expr->op = op;
-    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
-        hlsl_src_from_node(&expr->operands[i], operands[i]);
-    list_add_tail(instrs, &expr->node.entry);
+    list_add_tail(instrs, &expr->entry);
 
-    return &expr->node;
+    return expr;
 }
 
 static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *instr)

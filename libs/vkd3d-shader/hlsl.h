@@ -589,16 +589,6 @@ static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node 
     return CONTAINING_RECORD(node, struct hlsl_ir_swizzle, node);
 }
 
-static inline void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
-        struct hlsl_type *data_type, struct vkd3d_shader_location loc)
-{
-    memset(node, 0, sizeof(*node));
-    node->type = type;
-    node->data_type = data_type;
-    node->loc = loc;
-    list_init(&node->uses);
-}
-
 static inline void hlsl_src_from_node(struct hlsl_src *src, struct hlsl_ir_node *node)
 {
     src->node = node;
@@ -760,6 +750,9 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node);
+struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
+        struct hlsl_type *data_type, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx,
         float f, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,

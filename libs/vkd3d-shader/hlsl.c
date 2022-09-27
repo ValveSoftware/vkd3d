@@ -835,6 +835,16 @@ void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_va
     deref->var = var;
 }
 
+static void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
+        struct hlsl_type *data_type, struct vkd3d_shader_location loc)
+{
+    memset(node, 0, sizeof(*node));
+    node->type = type;
+    node->data_type = data_type;
+    node->loc = loc;
+    list_init(&node->uses);
+}
+
 struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
 {
     struct hlsl_deref lhs_deref;
@@ -962,33 +972,37 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
     return c;
 }
 
-struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
-        struct hlsl_ir_node *arg, struct vkd3d_shader_location loc)
+struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
+        struct hlsl_type *data_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_expr *expr;
+    unsigned int i;
 
     if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, arg->data_type, loc);
+    init_node(&expr->node, HLSL_IR_EXPR, data_type, *loc);
     expr->op = op;
-    hlsl_src_from_node(&expr->operands[0], arg);
+    for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
+        hlsl_src_from_node(&expr->operands[i], operands[i]);
     return &expr->node;
+}
+
+struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
+        struct hlsl_ir_node *arg, struct vkd3d_shader_location loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg};
+
+    return hlsl_new_expr(ctx, op, operands, arg->data_type, &loc);
 }
 
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2)
 {
-    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg1, arg2};
 
     assert(hlsl_types_are_equal(arg1->data_type, arg2->data_type));
-
-    if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
-        return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, arg1->data_type, arg1->loc);
-    expr->op = op;
-    hlsl_src_from_node(&expr->operands[0], arg1);
-    hlsl_src_from_node(&expr->operands[1], arg2);
-    return &expr->node;
+    return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
 }
 
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc)
