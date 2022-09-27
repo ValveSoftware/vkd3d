@@ -526,9 +526,8 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     if (expr->operands[1].node)
         arg2 = hlsl_ir_constant(expr->operands[1].node);
 
-    if (!(res = hlsl_alloc(ctx, sizeof(*res))))
+    if (!(res = hlsl_new_constant(ctx, instr->data_type, &instr->loc)))
         return false;
-    init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
 
     switch (expr->op)
     {
@@ -611,9 +610,8 @@ bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         return false;
     value = hlsl_ir_constant(swizzle->val.node);
 
-    if (!(res = hlsl_alloc(ctx, sizeof(*res))))
+    if (!(res = hlsl_new_constant(ctx, instr->data_type, &instr->loc)))
         return false;
-    init_node(&res->node, HLSL_IR_CONSTANT, instr->data_type, instr->loc);
 
     swizzle_bits = swizzle->swizzle;
     for (i = 0; i < swizzle->node.data_type->dimx; ++i)
