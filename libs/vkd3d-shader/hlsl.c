@@ -836,12 +836,12 @@ void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_va
 }
 
 static void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
-        struct hlsl_type *data_type, struct vkd3d_shader_location loc)
+        struct hlsl_type *data_type, const struct vkd3d_shader_location *loc)
 {
     memset(node, 0, sizeof(*node));
     node->type = type;
     node->data_type = data_type;
-    node->loc = loc;
+    node->loc = *loc;
     list_init(&node->uses);
 }
 
@@ -864,7 +864,7 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
-    init_node(&store->node, HLSL_IR_STORE, NULL, *loc);
+    init_node(&store->node, HLSL_IR_STORE, NULL, loc);
 
     if (!init_deref(ctx, &store->lhs, lhs->var, lhs->path_len + !!idx))
         return NULL;
@@ -892,7 +892,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
-    init_node(&store->node, HLSL_IR_STORE, NULL, rhs->loc);
+    init_node(&store->node, HLSL_IR_STORE, NULL, &rhs->loc);
 
     if (!init_deref_from_component_index(ctx, &comp_path_block, &store->lhs, lhs, comp, &rhs->loc))
     {
@@ -920,7 +920,7 @@ struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_typ
     if (!(c = hlsl_alloc(ctx, sizeof(*c))))
         return NULL;
 
-    init_node(&c->node, HLSL_IR_CONSTANT, type, *loc);
+    init_node(&c->node, HLSL_IR_CONSTANT, type, loc);
 
     return c;
 }
@@ -981,7 +981,7 @@ struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op
 
     if (!(expr = hlsl_alloc(ctx, sizeof(*expr))))
         return NULL;
-    init_node(&expr->node, HLSL_IR_EXPR, data_type, *loc);
+    init_node(&expr->node, HLSL_IR_EXPR, data_type, loc);
     expr->op = op;
     for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
         hlsl_src_from_node(&expr->operands[i], operands[i]);
@@ -1011,7 +1011,7 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condit
 
     if (!(iff = hlsl_alloc(ctx, sizeof(*iff))))
         return NULL;
-    init_node(&iff->node, HLSL_IR_IF, NULL, loc);
+    init_node(&iff->node, HLSL_IR_IF, NULL, &loc);
     hlsl_src_from_node(&iff->condition, condition);
     list_init(&iff->then_instrs.instrs);
     list_init(&iff->else_instrs.instrs);
@@ -1033,7 +1033,7 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
 
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;
-    init_node(&load->node, HLSL_IR_LOAD, type, *loc);
+    init_node(&load->node, HLSL_IR_LOAD, type, loc);
 
     if (!init_deref(ctx, &load->src, deref->var, deref->path_len + !!idx))
     {
@@ -1071,7 +1071,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
 
     type = get_type_from_deref(ctx, deref);
     comp_type = hlsl_type_get_component_type(ctx, type, comp);
-    init_node(&load->node, HLSL_IR_LOAD, comp_type, *loc);
+    init_node(&load->node, HLSL_IR_LOAD, comp_type, loc);
 
     if (!init_deref_from_component_index(ctx, &comp_path_block, &load->src, deref, comp, loc))
     {
@@ -1092,7 +1092,7 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
 
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;
-    init_node(&load->node, HLSL_IR_RESOURCE_LOAD, params->format, *loc);
+    init_node(&load->node, HLSL_IR_RESOURCE_LOAD, params->format, loc);
     load->load_type = params->type;
     if (!hlsl_copy_deref(ctx, &load->resource, &params->resource))
     {
@@ -1119,7 +1119,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
     init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            hlsl_get_vector_type(ctx, val->data_type->base_type, components), *loc);
+            hlsl_get_vector_type(ctx, val->data_type->base_type, components), loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;
@@ -1131,7 +1131,7 @@ struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type 
 
     if (!(jump = hlsl_alloc(ctx, sizeof(*jump))))
         return NULL;
-    init_node(&jump->node, HLSL_IR_JUMP, NULL, loc);
+    init_node(&jump->node, HLSL_IR_JUMP, NULL, &loc);
     jump->type = type;
     return jump;
 }
@@ -1142,7 +1142,7 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
 
     if (!(loop = hlsl_alloc(ctx, sizeof(*loop))))
         return NULL;
-    init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
+    init_node(&loop->node, HLSL_IR_LOOP, NULL, &loc);
     list_init(&loop->body.instrs);
     return loop;
 }
