@@ -96,6 +96,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-matrix-indexing.shader_test \
 	tests/hlsl-mul.shader_test \
 	tests/hlsl-nested-arrays.shader_test \
+	tests/hlsl-normalize.shader_test \
 	tests/hlsl-numeric-constructor-truncation.shader_test \
 	tests/hlsl-numeric-types.shader_test \
 	tests/hlsl-return-implicit-conversion.shader_test \
