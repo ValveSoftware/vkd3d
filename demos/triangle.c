@@ -45,8 +45,7 @@
 #include <assert.h>
 #include "demo.h"
 
-#include "triangle_vs.h"
-#include "triangle_ps.h"
+#include "triangle_hlsl.h"
 
 struct cxt_fence
 {
@@ -277,6 +276,7 @@ static void cxt_load_assets(struct cx_triangle *cxt)
     D3D12_RESOURCE_DESC resource_desc;
     D3D12_HEAP_PROPERTIES heap_desc;
     D3D12_RANGE read_range = {0, 0};
+    ID3DBlob *vs, *ps;
     HRESULT hr;
     void *data;
 
@@ -285,14 +285,19 @@ static void cxt_load_assets(struct cx_triangle *cxt)
     hr = demo_create_root_signature(cxt->device, &root_signature_desc, &cxt->root_signature);
     assert(SUCCEEDED(hr));
 
+    hr = D3DCompile(triangle_hlsl, strlen(triangle_hlsl), NULL, NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
+    assert(SUCCEEDED(hr));
+    hr = D3DCompile(triangle_hlsl, strlen(triangle_hlsl), NULL, NULL, NULL, "ps_main", "ps_5_0", 0, 0, &ps, NULL);
+    assert(SUCCEEDED(hr));
+
     memset(&pso_desc, 0, sizeof(pso_desc));
     pso_desc.InputLayout.pInputElementDescs = il_desc;
     pso_desc.InputLayout.NumElements = ARRAY_SIZE(il_desc);
     pso_desc.pRootSignature = cxt->root_signature;
-    pso_desc.VS.pShaderBytecode = g_vs_main;
-    pso_desc.VS.BytecodeLength = sizeof(g_vs_main);
-    pso_desc.PS.pShaderBytecode = g_ps_main;
-    pso_desc.PS.BytecodeLength = sizeof(g_ps_main);
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps);
     demo_rasterizer_desc_init_default(&pso_desc.RasterizerState);
     demo_blend_desc_init_default(&pso_desc.BlendState);
     pso_desc.DepthStencilState.DepthEnable = FALSE;
@@ -305,6 +310,9 @@ static void cxt_load_assets(struct cx_triangle *cxt)
     hr = ID3D12Device_CreateGraphicsPipelineState(cxt->device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&cxt->pipeline_state);
     assert(SUCCEEDED(hr));
+
+    ID3D10Blob_Release(vs);
+    ID3D10Blob_Release(ps);
 
     hr = ID3D12Device_CreateCommandList(cxt->device, 0, D3D12_COMMAND_LIST_TYPE_DIRECT, cxt->command_allocator,
             cxt->pipeline_state, &IID_ID3D12GraphicsCommandList, (void **)&cxt->command_list);

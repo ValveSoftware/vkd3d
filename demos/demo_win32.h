@@ -18,6 +18,7 @@
  */
 
 #include <vkd3d_dxgi1_4.h>
+#include <vkd3d_d3dcompiler.h>
 #include <stdbool.h>
 #include <stdio.h>
 
