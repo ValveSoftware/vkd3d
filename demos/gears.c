@@ -48,9 +48,7 @@
 #include <math.h>
 #include "demo.h"
 
-#include "gears_vs.h"
-#include "gears_ps_flat.h"
-#include "gears_ps_smooth.h"
+#include "gears_hlsl.h"
 
 struct cxg_fence
 {
@@ -659,6 +657,7 @@ static void cxg_load_assets(struct cx_gears *cxg)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle;
     D3D12_ROOT_PARAMETER root_parameter;
+    ID3DBlob *vs, *ps_flat, *ps_smooth;
     D3D12_RESOURCE_DESC resource_desc;
     D3D12_HEAP_PROPERTIES heap_desc;
     D3D12_RANGE read_range = {0, 0};
@@ -682,14 +681,21 @@ static void cxg_load_assets(struct cx_gears *cxg)
     hr = demo_create_root_signature(cxg->device, &root_signature_desc, &cxg->root_signature);
     assert(SUCCEEDED(hr));
 
+    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "vs_main", "vs_5_0", 0, 0, &vs, NULL);
+    assert(SUCCEEDED(hr));
+    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "ps_main_flat", "ps_5_0", 0, 0, &ps_flat, NULL);
+    assert(SUCCEEDED(hr));
+    hr = D3DCompile(gears_hlsl, strlen(gears_hlsl), NULL, NULL, NULL, "ps_main_smooth", "ps_5_0", 0, 0, &ps_smooth, NULL);
+    assert(SUCCEEDED(hr));
+
     memset(&pso_desc, 0, sizeof(pso_desc));
     pso_desc.InputLayout.pInputElementDescs = il_desc;
     pso_desc.InputLayout.NumElements = ARRAY_SIZE(il_desc);
     pso_desc.pRootSignature = cxg->root_signature;
-    pso_desc.VS.pShaderBytecode = g_vs_main;
-    pso_desc.VS.BytecodeLength = sizeof(g_vs_main);
-    pso_desc.PS.pShaderBytecode = g_ps_main_flat;
-    pso_desc.PS.BytecodeLength = sizeof(g_ps_main_flat);
+    pso_desc.VS.pShaderBytecode = ID3D10Blob_GetBufferPointer(vs);
+    pso_desc.VS.BytecodeLength = ID3D10Blob_GetBufferSize(vs);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_flat);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_flat);
 
     demo_rasterizer_desc_init_default(&pso_desc.RasterizerState);
     pso_desc.RasterizerState.FrontCounterClockwise = TRUE;
@@ -708,11 +714,15 @@ static void cxg_load_assets(struct cx_gears *cxg)
             &IID_ID3D12PipelineState, (void **)&cxg->pipeline_state_flat);
     assert(SUCCEEDED(hr));
 
-    pso_desc.PS.pShaderBytecode = g_ps_main_smooth;
-    pso_desc.PS.BytecodeLength = sizeof(g_ps_main_smooth);
+    pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_smooth);
+    pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_smooth);
     hr = ID3D12Device_CreateGraphicsPipelineState(cxg->device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&cxg->pipeline_state_smooth);
     assert(SUCCEEDED(hr));
+
+    ID3D10Blob_Release(vs);
+    ID3D10Blob_Release(ps_flat);
+    ID3D10Blob_Release(ps_smooth);
 
     for (i = 0; i < ARRAY_SIZE(cxg->command_list); ++i)
     {
