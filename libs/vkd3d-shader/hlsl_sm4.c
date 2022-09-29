@@ -2265,7 +2265,10 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
         case HLSL_RESOURCE_SAMPLE:
             if (!load->sampler.var)
+            {
                 hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
+                return;
+            }
             write_sm4_sample(ctx, buffer, resource_type, &load->node,
                     &load->resource, &load->sampler, coords, texel_offset);
             break;
