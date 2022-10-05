@@ -27,3 +27,16 @@ float4 main() : SV_TARGET
 uniform 0 float4 5.0 16.0 0.0 0.0
 todo draw quad
 probe all rgba (5.0, 5.0, -5.0, 3.0)
+
+[pixel shader]
+uniform float4 a;
+
+float4 main() : SV_TARGET
+{
+    return abs(int4(a));
+}
+
+[test]
+uniform 0 float4 5.0 -7.0 0.0 -10.0
+todo draw quad
+probe all rgba (5.0, 7.0, 0.0, 10.0)
