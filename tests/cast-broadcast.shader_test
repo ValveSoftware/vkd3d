@@ -21,3 +21,50 @@ float4 main() : SV_TARGET
 [test]
 todo draw quad
 todo probe all rgba (84.0, 84.0, 84.0, 84.0)
+
+
+[pixel shader fail todo]
+struct apple
+{
+    float3 aa;
+    float4 bb;
+};
+
+float4 main() : SV_TARGET
+{
+    struct apple f = 31;
+    return f.bb;
+}
+
+
+[pixel shader fail]
+struct apple
+{
+    float3 aa;
+    float4 bb;
+};
+
+float4 fun(struct apple f)
+{
+    return f.bb;
+}
+
+float4 main() : SV_TARGET
+{
+    return fun(31);
+}
+
+
+[pixel shader fail]
+struct apple
+{
+    float4 foo;
+    Texture2D tex;
+};
+
+float4 PSMain() : SV_TARGET
+{
+    struct apple a1;
+    a1 = (struct apple)1;
+    return a1.foo;
+}
