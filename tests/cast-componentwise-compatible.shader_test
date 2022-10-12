@@ -1,0 +1,185 @@
+[pixel shader]
+struct apple
+{
+    float3 aa;
+    int bb;
+};
+
+float4 main() : sv_target
+{
+    float f[4] = {1, 2, 3, 4};
+    struct apple a;
+
+    a = (struct apple) f;
+    return a.aa.xyzx;
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (1.0, 2.0, 3.0, 1.0)
+
+
+[pixel shader]
+struct apple
+{
+    float3 aa;
+    int bb;
+    float cc;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {5, 6, 7, 8.8, 9.0};
+    float f[4];
+
+    f = (float[4]) a;
+    return float4(f);
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (5.0, 6.0, 7.0, 8.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float f[6] = {1, 2, 3, 4, 5, 6};
+    int i[4];
+
+    i = (int[4]) f;
+    return float4(i[0], i[1], i[2], i[3]);
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+[pixel shader]
+Texture2D tex;
+
+struct apple
+{
+    int2 aa;
+    Texture2D bb;
+    float cc;
+};
+
+struct banana
+{
+    float aa[2];
+    Texture2D bb;
+    int cc;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {1, 2, tex, 7.2};
+    struct banana b;
+
+    b = (struct banana) a;
+    return b.cc;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (7.0, 7.0, 7.0, 7.0)
+
+
+[pixel shader]
+Texture2D tex;
+
+struct apple
+{
+    int2 aa;
+    Texture2D bb;
+    float cc;
+    float4 dd;
+    Texture2D ee;
+};
+
+struct banana
+{
+    float aa[2];
+    Texture2D bb;
+    int cc;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {1, 2, tex, 3, 4, 5, 6, 7, tex};
+    struct banana b;
+
+    b = (struct banana) a;
+    return b.cc;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (3.0, 3.0, 3.0, 3.0)
+
+
+[pixel shader fail]
+struct apple
+{
+    int2 aa;
+    float bb;
+};
+
+struct banana
+{
+    int2 aa;
+    float bb;
+    float cc;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {1, 2, 3};
+    struct banana b;
+
+    b = (struct banana) a;
+    return b.bb;
+}
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 v = float4(10.1, 20.2, 30.3, 40.4);
+    int i[3];
+
+    i = (int[3]) v;
+    return float4(i[0], i[1], i[2], i[2]);
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (10.0, 20.0, 30.0, 30.0)
+
+
+[pixel shader]
+struct apple
+{
+    int aa;
+    float bb[2];
+};
+
+float4 main() : sv_target
+{
+    float4 f = {10.4, 11.4, 12.4, 13.4};
+    struct apple a;
+
+    a = (struct apple) f;
+    return float4(a.aa, a.aa, a.bb[0], a.bb[1]);
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (10.0, 10.0, 11.4, 12.4)
