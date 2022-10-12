@@ -1636,12 +1636,10 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     }
 
     if (lhs_type->type <= HLSL_CLASS_LAST_NUMERIC)
-    {
         writemask = (1 << lhs_type->dimx) - 1;
 
-        if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
-            return NULL;
-    }
+    if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
+        return NULL;
 
     while (lhs->type != HLSL_IR_LOAD)
     {

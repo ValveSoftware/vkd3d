@@ -23,7 +23,7 @@ todo draw quad
 todo probe all rgba (84.0, 84.0, 84.0, 84.0)
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 struct apple
 {
     float3 aa;
