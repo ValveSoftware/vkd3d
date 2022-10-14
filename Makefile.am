@@ -53,6 +53,7 @@ vkd3d_cross_tests = \
 vkd3d_shader_tests = \
 	tests/abs.shader_test \
 	tests/arithmetic-float.shader_test \
+	tests/arithmetic-float-uniform.shader_test \
 	tests/arithmetic-int.shader_test \
 	tests/arithmetic-int-uniform.shader_test \
 	tests/arithmetic-uint.shader_test \
