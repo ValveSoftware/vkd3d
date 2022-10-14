@@ -748,23 +748,35 @@ static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
 }
 
 static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
-        struct hlsl_ir_node *index, const struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *expr_type = array->data_type;
+    struct hlsl_ir_expr *cast;
+
+    if (index->data_type->type != HLSL_CLASS_SCALAR)
+    {
+        hlsl_error(ctx, &index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Array index is not scalar.");
+        return false;
+    }
+
+    if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
+        return false;
+    list_add_tail(instrs, &cast->node.entry);
+    index = &cast->node;
 
     if (expr_type->type == HLSL_CLASS_MATRIX)
-        return add_matrix_index(ctx, instrs, array, index, &loc);
+        return add_matrix_index(ctx, instrs, array, index, loc);
 
     if (expr_type->type != HLSL_CLASS_ARRAY && expr_type->type != HLSL_CLASS_VECTOR)
     {
         if (expr_type->type == HLSL_CLASS_SCALAR)
-            hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Scalar expressions cannot be array-indexed.");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Scalar expressions cannot be array-indexed.");
         else
-            hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Expression cannot be array-indexed.");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Expression cannot be array-indexed.");
         return false;
     }
 
-    if (!add_load_index(ctx, instrs, array, index, &loc))
+    if (!add_load_index(ctx, instrs, array, index, loc))
         return false;
 
     return true;
@@ -4209,26 +4221,11 @@ postfix_expr:
     | postfix_expr '[' expr ']'
         {
             struct hlsl_ir_node *array = node_from_list($1), *index = node_from_list($3);
-            struct hlsl_ir_expr *cast;
 
             list_move_tail($1, $3);
             vkd3d_free($3);
 
-            if (index->data_type->type != HLSL_CLASS_SCALAR)
-            {
-                hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Array index is not scalar.");
-                destroy_instr_list($1);
-                YYABORT;
-            }
-
-            if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
-            {
-                destroy_instr_list($1);
-                YYABORT;
-            }
-            list_add_tail($1, &cast->node.entry);
-
-            if (!add_array_load(ctx, $1, array, &cast->node, @2))
+            if (!add_array_load(ctx, $1, array, index, &@2))
             {
                 destroy_instr_list($1);
                 YYABORT;
