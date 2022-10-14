@@ -24,6 +24,32 @@ float4 main() : SV_TARGET
 draw quad
 probe all rgba (5.0, 5.0, -5.0, 3.0)
 
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float x = 42;
+    float y = 5;
+
+    return float4(x % y, -x % y, x % -y, -x % -y);
+}
+
+[test]
+draw quad
+probe all rgba (2.0, -2.0, 2.0, -2.0) 16
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float x = 45;
+    float y = 5;
+
+    return float4(x % y, -x % y, x % -y, -x % -y);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
 [require]
 % Infinities are not allowed in SM1
 shader model >= 4.0
