@@ -1,21 +1,20 @@
 [pixel shader]
-
-struct foo
+struct apple
 {
     float3 aa;
     float4 bb;
 };
 
-struct bar
+struct banana
 {
-    struct foo aa;
+    struct apple aa;
     int2 bb;
     int4 cc[8];
 };
 
 float4 main() : SV_TARGET
 {
-    struct bar p = (struct bar)42;
+    struct banana p = (struct banana)42;
     return p.aa.bb + p.cc[5];
 }
 
