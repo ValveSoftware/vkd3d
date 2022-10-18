@@ -379,3 +379,206 @@ float4 main() : sv_target
     vec = (float3) mat;
     return 0;
 }
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float arr[5] = {1, 2, 3, 4, 5};
+    float4x1 mat;
+
+    mat = (float4x1) arr;
+    return 0;
+}
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float arr[5] = {81, 82, 83, 84, 85};
+    int1x4 mat;
+
+    mat = (int1x4) arr;
+    return float4(mat);
+}
+
+
+[test]
+draw quad
+probe all rgba (81.0, 82.0, 83.0, 84.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x1 mat = {91, 92, 93, 94};
+    int arr[3];
+
+    arr = (int[3]) mat;
+    return float4(arr, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (91.0, 92.0, 93.0, 0.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 mat = {11, 12, 13, 14};
+    int arr[3];
+
+    arr = (int[3]) mat;
+    return float4(arr, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (11.0, 12.0, 13.0, 0.0)
+
+
+[pixel shader fail]
+struct apple
+{
+    float3 aa;
+    float2 bb;
+};
+
+
+float4 main() : sv_target
+{
+    struct apple a = {1, 2, 3, 4, 5};
+    float4x1 mat;
+
+    mat = (float4x1) a;
+    return 0;
+}
+
+
+[pixel shader]
+struct apple
+{
+    float3 aa;
+    float2 bb;
+};
+
+
+float4 main() : sv_target
+{
+    struct apple a = {21, 22, 23, 24, 25};
+    float1x4 mat;
+
+    mat = (float1x4) a;
+    return float4(mat);
+}
+
+
+[test]
+draw quad
+probe all rgba (21.0, 22.0, 23.0, 24.0)
+
+
+[pixel shader]
+struct apple
+{
+    int aa;
+    float2 bb;
+};
+
+float4 main() : sv_target
+{
+    float4x1 mat = {31, 32, 33, 34};
+    struct apple a;
+
+    a = (struct apple) mat;
+    return float4(a.aa, a.bb, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (31.0, 32.0, 33.0, 0.0)
+
+
+[pixel shader]
+struct apple
+{
+    int aa;
+    float2 bb;
+};
+
+float4 main() : sv_target
+{
+    float1x4 mat = {41, 42, 43, 44};
+    struct apple a;
+
+    a = (struct apple) mat;
+    return float4(a.aa, a.bb, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (41.0, 42.0, 43.0, 0.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 vec = {51, 52, 53, 54};
+    int1x3 mat;
+
+    mat = (int1x3) vec;
+    return float4(mat, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (51.0, 52.0, 53.0, 0.0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float4 vec = {1, 2, 3, 4};
+    float3x1 mat;
+
+    mat = (float3x1) vec;
+    return 0;
+}
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float1x4 mat = {61, 62, 63, 64};
+    int3 vec;
+
+    vec = (int1x3) mat;
+    return float4(vec, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (61.0, 62.0, 63.0, 0.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4x1 mat = {71, 72, 73, 74};
+    int3 vec;
+
+    vec = (int3) mat;
+    return float4(vec, 0);
+}
+
+
+[test]
+draw quad
+probe all rgba (71.0, 72.0, 73.0, 0.0)
