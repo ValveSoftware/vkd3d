@@ -238,3 +238,144 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (31.0, 32.0, 33.0, 33.0)
+
+
+[pixel shader]
+struct apple
+{
+    int2 aa;
+    float2 bb;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {41, 42, 43, 44};
+    float2x2 mat;
+
+    mat = (float2x2) a;
+    return float4(mat);
+}
+
+
+[test]
+draw quad
+probe all rgba (41.0, 42.0, 43.0, 44.0)
+
+
+[pixel shader fail]
+struct apple
+{
+    float2 aa;
+    float3 bb;
+};
+
+float4 main() : sv_target
+{
+    struct apple a = {1, 2, 3, 4, 5};
+    float2x2 mat;
+
+    mat = (float2x2) a;
+    return float4(mat);
+}
+
+
+[pixel shader]
+struct apple
+{
+    float3 aa;
+    int bb;
+};
+
+float4 main() : sv_target
+{
+    float2x2 mat = {55, 56, 57, 58};
+    struct apple a;
+
+    a = (struct apple) mat;
+    return float4(a.aa, a.bb);
+}
+
+
+[test]
+draw quad
+probe all rgba (55.0, 56.0, 57.0, 58.0)
+
+
+[pixel shader fail]
+struct apple
+{
+    float2 aa;
+    float2 bb;
+};
+
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    struct apple a;
+
+    a = (struct apple) mat;
+    return float4(a.aa, a.bb);
+}
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float arr[4] = {61, 62, 63, 64};
+    int2x2 mat;
+
+    mat = (int2x2) arr;
+    return float4(mat);
+}
+
+[test]
+draw quad
+probe all rgba (61.0, 62.0, 63.0, 64.0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float arr[5] = {1, 2, 3, 4, 5};
+    float2x2 mat;
+
+    mat = (float2x2) arr;
+    return float4(mat);
+}
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x2 mat = {71, 72, 73, 74};
+    int arr[4];
+
+    arr = (int[4]) mat;
+    return float4(arr);
+}
+
+[test]
+draw quad
+probe all rgba (71.0, 72.0, 73.0, 74.0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float2x2 mat = {1, 2, 3, 4};
+    int arr[3];
+
+    arr = (int[3]) mat;
+    return 0;
+}
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float2x2 mat = {1, 2, 3, 4};
+    float3 vec;
+
+    vec = (float3) mat;
+    return 0;
+}
