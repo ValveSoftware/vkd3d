@@ -50,8 +50,8 @@ float4 main() : sv_target
 
 
 [test]
-todo draw quad
-todo probe all rgba (1.0, 2.0, 3.0, 1.0)
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 1.0)
 
 
 [pixel shader fail]
@@ -89,8 +89,8 @@ float4 main() : sv_target
 
 
 [test]
-todo draw quad
-todo probe all rgba (5.0, 6.0, 7.0, 8.0)
+draw quad
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 
 
 [pixel shader]
@@ -120,8 +120,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (4.0, 4.0, 4.0, 4.0)
+draw quad
+probe all rgba (4.0, 4.0, 4.0, 4.0)
 
 
 [pixel shader]
@@ -199,8 +199,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (71.0, 73.0, 73.0, 74.0)
+draw quad
+probe all rgba (71.0, 73.0, 73.0, 74.0)
 
 
 [pixel shader fail]

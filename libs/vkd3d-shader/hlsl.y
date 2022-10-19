@@ -153,6 +153,27 @@ static bool convertible_data_type(struct hlsl_type *type)
     return type->type != HLSL_CLASS_OBJECT;
 }
 
+static bool hlsl_types_are_componentwise_equal(struct hlsl_ctx *ctx, struct hlsl_type *src,
+        struct hlsl_type *dst)
+{
+    unsigned int k, count = hlsl_type_component_count(src);
+
+    if (count != hlsl_type_component_count(dst))
+        return false;
+
+    for (k = 0; k < count; ++k)
+    {
+        struct hlsl_type *src_comp_type, *dst_comp_type;
+
+        src_comp_type = hlsl_type_get_component_type(ctx, src, k);
+        dst_comp_type = hlsl_type_get_component_type(ctx, dst, k);
+
+        if (!hlsl_types_are_equal(src_comp_type, dst_comp_type))
+            return false;
+    }
+    return true;
+}
+
 static bool compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
 {
    if (!convertible_data_type(src) || !convertible_data_type(dst))
@@ -207,53 +228,47 @@ static bool compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
     return false;
 }
 
-static bool implicit_compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
+static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
 {
-    if (!convertible_data_type(src) || !convertible_data_type(dst))
+    if ((src->type <= HLSL_CLASS_LAST_NUMERIC) != (dst->type <= HLSL_CLASS_LAST_NUMERIC))
         return false;
 
     if (src->type <= HLSL_CLASS_LAST_NUMERIC)
     {
         /* Scalar vars can be converted to any other numeric data type */
-        if (src->dimx == 1 && src->dimy == 1 && dst->type <= HLSL_CLASS_LAST_NUMERIC)
+        if (src->dimx == 1 && src->dimy == 1)
             return true;
         /* The other way around is true too */
-        if (dst->dimx == 1 && dst->dimy == 1 && dst->type <= HLSL_CLASS_LAST_NUMERIC)
+        if (dst->dimx == 1 && dst->dimy == 1)
             return true;
-    }
 
-    if (src->type <= HLSL_CLASS_VECTOR && dst->type <= HLSL_CLASS_VECTOR)
-    {
-        if (src->dimx >= dst->dimx)
-            return true;
-        return false;
-    }
-
-    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
-    {
-        if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX)
-            return src->dimx >= dst->dimx && src->dimy >= dst->dimy;
-
-        /* Matrix-vector conversion is apparently allowed if they have
-         * the same components count, or if the matrix is 1xN or Nx1
-         * and we are reducing the component count */
-        if (src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
+        if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
         {
-            if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
-                return true;
+            if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX)
+                return src->dimx >= dst->dimx && src->dimy >= dst->dimy;
 
-            if ((src->type == HLSL_CLASS_VECTOR || src->dimx == 1 || src->dimy == 1) &&
-                    (dst->type == HLSL_CLASS_VECTOR || dst->dimx == 1 || dst->dimy == 1))
-                return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
+            /* Matrix-vector conversion is apparently allowed if they have
+            * the same components count, or if the matrix is 1xN or Nx1
+            * and we are reducing the component count */
+            if (src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
+            {
+                if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
+                    return true;
+
+                if ((src->type == HLSL_CLASS_VECTOR || src->dimx == 1 || src->dimy == 1) &&
+                        (dst->type == HLSL_CLASS_VECTOR || dst->dimx == 1 || dst->dimy == 1))
+                    return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
+            }
+
+            return false;
         }
-
-        return false;
+        else
+        {
+            return src->dimx >= dst->dimx;
+        }
     }
 
-    if (src->type == HLSL_CLASS_STRUCT && dst->type == HLSL_CLASS_STRUCT)
-        return hlsl_types_are_equal(src, dst);
-
-    return false;
+    return hlsl_types_are_componentwise_equal(ctx, src, dst);
 }
 
 static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
@@ -351,7 +366,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
 
-    if (!implicit_compatible_data_types(src_type, dst_type))
+    if (!implicit_compatible_data_types(ctx, src_type, dst_type))
     {
         struct vkd3d_string_buffer *src_string, *dst_string;
 
