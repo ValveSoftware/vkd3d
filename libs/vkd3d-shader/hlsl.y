@@ -284,18 +284,21 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
 
-    if ((src_type->type == HLSL_CLASS_MATRIX || dst_type->type == HLSL_CLASS_MATRIX)
-        && src_type->type <= HLSL_CLASS_LAST_NUMERIC && dst_type->type <= HLSL_CLASS_LAST_NUMERIC)
+    if (src_type->type > HLSL_CLASS_VECTOR || dst_type->type > HLSL_CLASS_VECTOR)
     {
+        unsigned int src_comp_count = hlsl_type_component_count(src_type);
+        unsigned int dst_comp_count = hlsl_type_component_count(dst_type);
         struct hlsl_deref var_deref;
+        bool broadcast, matrix_cast;
         struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
         unsigned int dst_idx;
-        bool broadcast;
 
-        broadcast = src_type->dimx == 1 && src_type->dimy == 1;
-        assert(dst_type->dimx * dst_type->dimy <= src_type->dimx * src_type->dimy || broadcast);
-        if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX && !broadcast)
+        broadcast = src_type->type <= HLSL_CLASS_LAST_NUMERIC && src_type->dimx == 1 && src_type->dimy == 1;
+        matrix_cast = !broadcast && dst_comp_count != src_comp_count
+                && src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX;
+        assert(src_comp_count >= dst_comp_count || broadcast);
+        if (matrix_cast)
         {
             assert(dst_type->dimx <= src_type->dimx);
             assert(dst_type->dimy <= src_type->dimy);
@@ -305,9 +308,9 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
             return NULL;
         hlsl_init_simple_deref_from_var(&var_deref, var);
 
-        for (dst_idx = 0; dst_idx < dst_type->dimx * dst_type->dimy; ++dst_idx)
+        for (dst_idx = 0; dst_idx < dst_comp_count; ++dst_idx)
         {
-            struct hlsl_type *dst_scalar_type;
+            struct hlsl_type *dst_comp_type;
             struct hlsl_ir_store *store;
             struct hlsl_block block;
             unsigned int src_idx;
@@ -316,26 +319,23 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
             {
                 src_idx = 0;
             }
+            else if (matrix_cast)
+            {
+                unsigned int x = dst_idx % dst_type->dimx, y = dst_idx / dst_type->dimx;
+
+                src_idx = y * src_type->dimx + x;
+            }
             else
             {
-                if (src_type->type == HLSL_CLASS_MATRIX && dst_type->type == HLSL_CLASS_MATRIX)
-                {
-                    unsigned int x = dst_idx % dst_type->dimx, y = dst_idx / dst_type->dimx;
-
-                    src_idx = y * src_type->dimx + x;
-                }
-                else
-                {
-                    src_idx = dst_idx;
-                }
+                src_idx = dst_idx;
             }
 
-            dst_scalar_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
+            dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
 
             if (!(load = add_load_component(ctx, instrs, node, src_idx, loc)))
                 return NULL;
 
-            if (!(cast = hlsl_new_cast(ctx, &load->node, dst_scalar_type, loc)))
+            if (!(cast = hlsl_new_cast(ctx, &load->node, dst_comp_type, loc)))
                 return NULL;
             list_add_tail(instrs, &cast->node.entry);
 
