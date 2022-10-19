@@ -148,9 +148,26 @@ static void check_invalid_matrix_modifiers(struct hlsl_ctx *ctx, DWORD modifiers
                 "'row_major' and 'column_major' modifiers are only allowed for matrices.");
 }
 
-static bool convertible_data_type(struct hlsl_type *type)
+static bool hlsl_types_are_componentwise_compatible(struct hlsl_ctx *ctx, struct hlsl_type *src,
+        struct hlsl_type *dst)
 {
-    return type->type != HLSL_CLASS_OBJECT;
+    unsigned int k, count = hlsl_type_component_count(dst);
+
+    if (count > hlsl_type_component_count(src))
+        return false;
+
+    for (k = 0; k < count; ++k)
+    {
+        struct hlsl_type *src_comp_type, *dst_comp_type;
+
+        src_comp_type = hlsl_type_get_component_type(ctx, src, k);
+        dst_comp_type = hlsl_type_get_component_type(ctx, dst, k);
+
+        if ((src_comp_type->type != HLSL_CLASS_SCALAR || dst_comp_type->type != HLSL_CLASS_SCALAR)
+                && !hlsl_types_are_equal(src_comp_type, dst_comp_type))
+            return false;
+    }
+    return true;
 }
 
 static bool hlsl_types_are_componentwise_equal(struct hlsl_ctx *ctx, struct hlsl_type *src,
@@ -174,58 +191,42 @@ static bool hlsl_types_are_componentwise_equal(struct hlsl_ctx *ctx, struct hlsl
     return true;
 }
 
-static bool compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
+static bool type_contains_only_numerics(struct hlsl_type *type)
 {
-   if (!convertible_data_type(src) || !convertible_data_type(dst))
-        return false;
+    unsigned int i;
 
-    if (src->type <= HLSL_CLASS_LAST_NUMERIC)
+    if (type->type == HLSL_CLASS_ARRAY)
+        return type_contains_only_numerics(type->e.array.type);
+    if (type->type == HLSL_CLASS_STRUCT)
     {
-        /* Scalar vars can be cast to pretty much everything */
-        if (src->dimx == 1 && src->dimy == 1)
-            return true;
-
-        if (src->type == HLSL_CLASS_VECTOR && dst->type == HLSL_CLASS_VECTOR)
-            return src->dimx >= dst->dimx;
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            if (!type_contains_only_numerics(type->e.record.fields[i].type))
+                return false;
+        }
+        return true;
     }
+    return type->type <= HLSL_CLASS_LAST_NUMERIC;
+}
 
-    /* The other way around is true too i.e. whatever to scalar */
-    if (dst->type <= HLSL_CLASS_LAST_NUMERIC && dst->dimx == 1 && dst->dimy == 1)
+static bool compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
+{
+    if (src->type <= HLSL_CLASS_LAST_NUMERIC && src->dimx == 1 && src->dimy == 1 && type_contains_only_numerics(dst))
         return true;
 
-    if (src->type == HLSL_CLASS_ARRAY)
-    {
-        if (hlsl_types_are_equal(src->e.array.type, dst))
-            /* e.g. float4[3] to float4 is allowed */
-            return true;
-
-        if (dst->type == HLSL_CLASS_ARRAY || dst->type == HLSL_CLASS_STRUCT)
-            return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
-        else
-            return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
-    }
-
-    if (src->type == HLSL_CLASS_STRUCT)
-        return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
-
-    if (dst->type == HLSL_CLASS_ARRAY || dst->type == HLSL_CLASS_STRUCT)
-        return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
-
-    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
-    {
-        if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX && src->dimx >= dst->dimx && src->dimy >= dst->dimy)
-            return true;
-
-        /* Matrix-vector conversion is apparently allowed if they have the same components count */
-        if ((src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
-                && hlsl_type_component_count(src) == hlsl_type_component_count(dst))
-            return true;
-        return false;
-    }
-
-    if (hlsl_type_component_count(src) >= hlsl_type_component_count(dst))
+    if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX
+            && src->dimx >= dst->dimx && src->dimy >= dst->dimy)
         return true;
-    return false;
+
+    if ((src->type == HLSL_CLASS_MATRIX && src->dimx > 1 && src->dimy > 1)
+            && hlsl_type_component_count(src) != hlsl_type_component_count(dst))
+        return false;
+
+    if ((dst->type == HLSL_CLASS_MATRIX && dst->dimy > 1)
+            && hlsl_type_component_count(src) != hlsl_type_component_count(dst))
+        return false;
+
+    return hlsl_types_are_componentwise_compatible(ctx, src, dst);
 }
 
 static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
@@ -4450,7 +4451,7 @@ unary_expr:
                 dst_type = hlsl_new_array_type(ctx, dst_type, $4.sizes[i]);
             }
 
-            if (!compatible_data_types(src_type, dst_type))
+            if (!compatible_data_types(ctx, src_type, dst_type))
             {
                 struct vkd3d_string_buffer *src_string, *dst_string;
 
