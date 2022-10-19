@@ -153,121 +153,121 @@ static bool convertible_data_type(struct hlsl_type *type)
     return type->type != HLSL_CLASS_OBJECT;
 }
 
-static bool compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
+static bool compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
 {
-   if (!convertible_data_type(t1) || !convertible_data_type(t2))
+   if (!convertible_data_type(src) || !convertible_data_type(dst))
         return false;
 
-    if (t1->type <= HLSL_CLASS_LAST_NUMERIC)
+    if (src->type <= HLSL_CLASS_LAST_NUMERIC)
     {
         /* Scalar vars can be cast to pretty much everything */
-        if (t1->dimx == 1 && t1->dimy == 1)
+        if (src->dimx == 1 && src->dimy == 1)
             return true;
 
-        if (t1->type == HLSL_CLASS_VECTOR && t2->type == HLSL_CLASS_VECTOR)
-            return t1->dimx >= t2->dimx;
+        if (src->type == HLSL_CLASS_VECTOR && dst->type == HLSL_CLASS_VECTOR)
+            return src->dimx >= dst->dimx;
     }
 
     /* The other way around is true too i.e. whatever to scalar */
-    if (t2->type <= HLSL_CLASS_LAST_NUMERIC && t2->dimx == 1 && t2->dimy == 1)
+    if (dst->type <= HLSL_CLASS_LAST_NUMERIC && dst->dimx == 1 && dst->dimy == 1)
         return true;
 
-    if (t1->type == HLSL_CLASS_ARRAY)
+    if (src->type == HLSL_CLASS_ARRAY)
     {
-        if (hlsl_types_are_equal(t1->e.array.type, t2))
+        if (hlsl_types_are_equal(src->e.array.type, dst))
             /* e.g. float4[3] to float4 is allowed */
             return true;
 
-        if (t2->type == HLSL_CLASS_ARRAY || t2->type == HLSL_CLASS_STRUCT)
-            return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
+        if (dst->type == HLSL_CLASS_ARRAY || dst->type == HLSL_CLASS_STRUCT)
+            return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
         else
-            return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
+            return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
     }
 
-    if (t1->type == HLSL_CLASS_STRUCT)
-        return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
+    if (src->type == HLSL_CLASS_STRUCT)
+        return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
 
-    if (t2->type == HLSL_CLASS_ARRAY || t2->type == HLSL_CLASS_STRUCT)
-        return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
+    if (dst->type == HLSL_CLASS_ARRAY || dst->type == HLSL_CLASS_STRUCT)
+        return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
 
-    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
+    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
     {
-        if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX && t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
+        if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX && src->dimx >= dst->dimx && src->dimy >= dst->dimy)
             return true;
 
         /* Matrix-vector conversion is apparently allowed if they have the same components count */
-        if ((t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
-                && hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
+        if ((src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
+                && hlsl_type_component_count(src) == hlsl_type_component_count(dst))
             return true;
         return false;
     }
 
-    if (hlsl_type_component_count(t1) >= hlsl_type_component_count(t2))
+    if (hlsl_type_component_count(src) >= hlsl_type_component_count(dst))
         return true;
     return false;
 }
 
-static bool implicit_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
+static bool implicit_compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
 {
-    if (!convertible_data_type(t1) || !convertible_data_type(t2))
+    if (!convertible_data_type(src) || !convertible_data_type(dst))
         return false;
 
-    if (t1->type <= HLSL_CLASS_LAST_NUMERIC)
+    if (src->type <= HLSL_CLASS_LAST_NUMERIC)
     {
         /* Scalar vars can be converted to any other numeric data type */
-        if (t1->dimx == 1 && t1->dimy == 1 && t2->type <= HLSL_CLASS_LAST_NUMERIC)
+        if (src->dimx == 1 && src->dimy == 1 && dst->type <= HLSL_CLASS_LAST_NUMERIC)
             return true;
         /* The other way around is true too */
-        if (t2->dimx == 1 && t2->dimy == 1 && t2->type <= HLSL_CLASS_LAST_NUMERIC)
+        if (dst->dimx == 1 && dst->dimy == 1 && dst->type <= HLSL_CLASS_LAST_NUMERIC)
             return true;
     }
 
-    if (t1->type == HLSL_CLASS_ARRAY && t2->type == HLSL_CLASS_ARRAY)
+    if (src->type == HLSL_CLASS_ARRAY && dst->type == HLSL_CLASS_ARRAY)
     {
-        return hlsl_type_component_count(t1) == hlsl_type_component_count(t2);
+        return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
     }
 
-    if ((t1->type == HLSL_CLASS_ARRAY && t2->type <= HLSL_CLASS_LAST_NUMERIC)
-            || (t1->type <= HLSL_CLASS_LAST_NUMERIC && t2->type == HLSL_CLASS_ARRAY))
+    if ((src->type == HLSL_CLASS_ARRAY && dst->type <= HLSL_CLASS_LAST_NUMERIC)
+            || (src->type <= HLSL_CLASS_LAST_NUMERIC && dst->type == HLSL_CLASS_ARRAY))
     {
         /* e.g. float4[3] to float4 is allowed */
-        if (t1->type == HLSL_CLASS_ARRAY && hlsl_types_are_equal(t1->e.array.type, t2))
+        if (src->type == HLSL_CLASS_ARRAY && hlsl_types_are_equal(src->e.array.type, dst))
             return true;
-        if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
-            return true;
-        return false;
-    }
-
-    if (t1->type <= HLSL_CLASS_VECTOR && t2->type <= HLSL_CLASS_VECTOR)
-    {
-        if (t1->dimx >= t2->dimx)
+        if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
             return true;
         return false;
     }
 
-    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
+    if (src->type <= HLSL_CLASS_VECTOR && dst->type <= HLSL_CLASS_VECTOR)
     {
-        if (t1->type == HLSL_CLASS_MATRIX && t2->type == HLSL_CLASS_MATRIX)
-            return t1->dimx >= t2->dimx && t1->dimy >= t2->dimy;
+        if (src->dimx >= dst->dimx)
+            return true;
+        return false;
+    }
+
+    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
+    {
+        if (src->type == HLSL_CLASS_MATRIX && dst->type == HLSL_CLASS_MATRIX)
+            return src->dimx >= dst->dimx && src->dimy >= dst->dimy;
 
         /* Matrix-vector conversion is apparently allowed if they have
          * the same components count, or if the matrix is 1xN or Nx1
          * and we are reducing the component count */
-        if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
+        if (src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
         {
-            if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
+            if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
                 return true;
 
-            if ((t1->type == HLSL_CLASS_VECTOR || t1->dimx == 1 || t1->dimy == 1) &&
-                    (t2->type == HLSL_CLASS_VECTOR || t2->dimx == 1 || t2->dimy == 1))
-                return hlsl_type_component_count(t1) >= hlsl_type_component_count(t2);
+            if ((src->type == HLSL_CLASS_VECTOR || src->dimx == 1 || src->dimy == 1) &&
+                    (dst->type == HLSL_CLASS_VECTOR || dst->dimx == 1 || dst->dimy == 1))
+                return hlsl_type_component_count(src) >= hlsl_type_component_count(dst);
         }
 
         return false;
     }
 
-    if (t1->type == HLSL_CLASS_STRUCT && t2->type == HLSL_CLASS_STRUCT)
-        return hlsl_types_are_equal(t1, t2);
+    if (src->type == HLSL_CLASS_STRUCT && dst->type == HLSL_CLASS_STRUCT)
+        return hlsl_types_are_equal(src, dst);
 
     return false;
 }
@@ -1167,34 +1167,34 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
     }
 }
 
-static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
+static bool expr_compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
 {
-    if (t1->base_type > HLSL_TYPE_LAST_SCALAR || t2->base_type > HLSL_TYPE_LAST_SCALAR)
+    if (src->base_type > HLSL_TYPE_LAST_SCALAR || dst->base_type > HLSL_TYPE_LAST_SCALAR)
         return false;
 
     /* Scalar vars can be converted to pretty much everything */
-    if ((t1->dimx == 1 && t1->dimy == 1) || (t2->dimx == 1 && t2->dimy == 1))
+    if ((src->dimx == 1 && src->dimy == 1) || (dst->dimx == 1 && dst->dimy == 1))
         return true;
 
-    if (t1->type == HLSL_CLASS_VECTOR && t2->type == HLSL_CLASS_VECTOR)
+    if (src->type == HLSL_CLASS_VECTOR && dst->type == HLSL_CLASS_VECTOR)
         return true;
 
-    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
+    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
     {
         /* Matrix-vector conversion is apparently allowed if either they have the same components
            count or the matrix is nx1 or 1xn */
-        if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
+        if (src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
         {
-            if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
+            if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
                 return true;
 
-            return (t1->type == HLSL_CLASS_MATRIX && (t1->dimx == 1 || t1->dimy == 1))
-                    || (t2->type == HLSL_CLASS_MATRIX && (t2->dimx == 1 || t2->dimy == 1));
+            return (src->type == HLSL_CLASS_MATRIX && (src->dimx == 1 || src->dimy == 1))
+                    || (dst->type == HLSL_CLASS_MATRIX && (dst->dimx == 1 || dst->dimy == 1));
         }
 
         /* Both matrices */
-        if ((t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
-                || (t1->dimx <= t2->dimx && t1->dimy <= t2->dimy))
+        if ((src->dimx >= dst->dimx && src->dimy >= dst->dimy)
+                || (src->dimx <= dst->dimx && src->dimy <= dst->dimy))
             return true;
     }
 
