@@ -226,7 +226,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float main() : SV_TARGET
 {
     float arr[3] = {1, 2, 3};
@@ -237,7 +237,7 @@ float main() : SV_TARGET
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float main() : SV_TARGET
 {
     float2 arr[3] = {1, 2, 3, 4, 5, 6};
@@ -248,7 +248,7 @@ float main() : SV_TARGET
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : SV_TARGET
 {
     int arr1[4] = {1, 2, 3, 4};
@@ -270,7 +270,7 @@ float4 main() : SV_TARGET
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : SV_TARGET
 {
     float4 f = {1, 2, 3, 4};
@@ -281,7 +281,7 @@ float4 main() : SV_TARGET
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : SV_TARGET
 {
     float arr[4] = {1, 2, 3, 4};

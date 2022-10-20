@@ -222,22 +222,6 @@ static bool implicit_compatible_data_types(struct hlsl_type *src, struct hlsl_ty
             return true;
     }
 
-    if (src->type == HLSL_CLASS_ARRAY && dst->type == HLSL_CLASS_ARRAY)
-    {
-        return hlsl_type_component_count(src) == hlsl_type_component_count(dst);
-    }
-
-    if ((src->type == HLSL_CLASS_ARRAY && dst->type <= HLSL_CLASS_LAST_NUMERIC)
-            || (src->type <= HLSL_CLASS_LAST_NUMERIC && dst->type == HLSL_CLASS_ARRAY))
-    {
-        /* e.g. float4[3] to float4 is allowed */
-        if (src->type == HLSL_CLASS_ARRAY && hlsl_types_are_equal(src->e.array.type, dst))
-            return true;
-        if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
-            return true;
-        return false;
-    }
-
     if (src->type <= HLSL_CLASS_VECTOR && dst->type <= HLSL_CLASS_VECTOR)
     {
         if (src->dimx >= dst->dimx)
