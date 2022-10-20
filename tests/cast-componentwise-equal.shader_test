@@ -224,3 +224,93 @@ float4 main() : sv_target
     b = a;
     return b.bb;
 }
+
+
+[pixel shader fail todo]
+float main() : SV_TARGET
+{
+    float arr[3] = {1, 2, 3};
+    float v;
+
+    v = arr;
+    return 0;
+}
+
+
+[pixel shader fail todo]
+float main() : SV_TARGET
+{
+    float2 arr[3] = {1, 2, 3, 4, 5, 6};
+    float2 vec;
+
+    vec = arr;
+    return 0;
+}
+
+
+[pixel shader fail todo]
+float4 main() : SV_TARGET
+{
+    int arr1[4] = {1, 2, 3, 4};
+    float arr2[4];
+
+    arr2 = arr1;
+    return 0;
+}
+
+
+[pixel shader fail]
+float4 main() : SV_TARGET
+{
+    float2x2 mat = {1, 2, 3, 4};
+    float3 vec;
+
+    vec = mat;
+    return 0;
+}
+
+
+[pixel shader fail todo]
+float4 main() : SV_TARGET
+{
+    float4 f = {1, 2, 3, 4};
+    float arr[4];
+
+    arr = f;
+    return 0;
+}
+
+
+[pixel shader fail todo]
+float4 main() : SV_TARGET
+{
+    float arr[4] = {1, 2, 3, 4};
+    float4 f;
+
+    f = arr;
+    return 0;
+}
+
+
+[pixel shader fail]
+float4 main() : SV_TARGET
+{
+    float3x2 mat1 = {1, 2, 3, 4, 5, 6};
+    float2x3 mat2;
+
+    mat2 = mat1;
+    return 0;
+}
+
+
+[pixel shader fail]
+struct apple {
+    float aa;
+};
+
+float4 main() : SV_TARGET
+{
+    struct apple a = 3.0;
+
+    return 0;
+}
