@@ -7,8 +7,8 @@ RWTexture2D<float4> u;
 float4 main() : sv_target
 {
     /* All four components must be written in a single statement. */
-    u[uint2(0, 0)].xy = float4(1, 2);
-    u[uint2(0, 0)].zw = float4(3, 4);
+    u[uint2(0, 0)].xy = float2(1, 2);
+    u[uint2(0, 0)].zw = float2(3, 4);
     return 0;
 }
 
