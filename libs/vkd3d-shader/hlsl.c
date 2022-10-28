@@ -164,6 +164,49 @@ static unsigned int get_array_size(const struct hlsl_type *type)
     return 1;
 }
 
+bool hlsl_type_is_resource(const struct hlsl_type *type)
+{
+    if (type->type == HLSL_CLASS_OBJECT)
+    {
+        switch (type->base_type)
+        {
+            case HLSL_TYPE_TEXTURE:
+            case HLSL_TYPE_SAMPLER:
+            case HLSL_TYPE_UAV:
+                return true;
+            default:
+                return false;
+        }
+    }
+    return false;
+}
+
+enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
+{
+    if (type->type <= HLSL_CLASS_LAST_NUMERIC)
+        return HLSL_REGSET_NUMERIC;
+
+    if (type->type == HLSL_CLASS_OBJECT)
+    {
+        switch (type->base_type)
+        {
+            case HLSL_TYPE_TEXTURE:
+                return HLSL_REGSET_TEXTURES;
+
+            case HLSL_TYPE_SAMPLER:
+                return HLSL_REGSET_SAMPLERS;
+
+            case HLSL_TYPE_UAV:
+                return HLSL_REGSET_UAVS;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+
+    vkd3d_unreachable();
+}
+
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset)
 {
     /* Align to the next vec4 boundary if:
@@ -171,7 +214,7 @@ unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int
      *  (b) the type would cross a vec4 boundary; i.e. a vec3 and a
      *      vec1 can be packed together, but not a vec3 and a vec2.
      */
-    if (type->type > HLSL_CLASS_LAST_NUMERIC || (offset & 3) + type->reg_size > 4)
+    if (type->type > HLSL_CLASS_LAST_NUMERIC || (offset & 3) + type->reg_size[HLSL_REGSET_NUMERIC] > 4)
         return align(offset, 4);
     return offset;
 }
@@ -179,31 +222,40 @@ unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int
 static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type *type)
 {
     bool is_sm4 = (ctx->profile->major_version >= 4);
+    unsigned int k;
+
+    for (k = 0; k <= HLSL_REGSET_LAST; ++k)
+        type->reg_size[k] = 0;
 
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
-            type->reg_size = is_sm4 ? type->dimx : 4;
+            type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? type->dimx : 4;
             break;
 
         case HLSL_CLASS_MATRIX:
             if (hlsl_type_is_row_major(type))
-                type->reg_size = is_sm4 ? (4 * (type->dimy - 1) + type->dimx) : (4 * type->dimy);
+                type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? (4 * (type->dimy - 1) + type->dimx) : (4 * type->dimy);
             else
-                type->reg_size = is_sm4 ? (4 * (type->dimx - 1) + type->dimy) : (4 * type->dimx);
+                type->reg_size[HLSL_REGSET_NUMERIC] = is_sm4 ? (4 * (type->dimx - 1) + type->dimy) : (4 * type->dimx);
             break;
 
         case HLSL_CLASS_ARRAY:
         {
-            unsigned int element_size = type->e.array.type->reg_size;
-
             if (type->e.array.elements_count == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
-                type->reg_size = 0;
-            else if (is_sm4)
-                type->reg_size = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
-            else
-                type->reg_size = type->e.array.elements_count * element_size;
+                break;
+
+            for (k = 0; k <= HLSL_REGSET_LAST; ++k)
+            {
+                unsigned int element_size = type->e.array.type->reg_size[k];
+
+                if (is_sm4 && k == HLSL_REGSET_NUMERIC)
+                    type->reg_size[k] = (type->e.array.elements_count - 1) * align(element_size, 4) + element_size;
+                else
+                    type->reg_size[k] = type->e.array.elements_count * element_size;
+            }
+
             break;
         }
 
@@ -212,16 +264,17 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             unsigned int i;
 
             type->dimx = 0;
-            type->reg_size = 0;
-
             for (i = 0; i < type->e.record.field_count; ++i)
             {
                 struct hlsl_struct_field *field = &type->e.record.fields[i];
-                unsigned int field_size = field->type->reg_size;
 
-                type->reg_size = hlsl_type_get_sm4_offset(field->type, type->reg_size);
-                field->reg_offset = type->reg_size;
-                type->reg_size += field_size;
+                for (k = 0; k <= HLSL_REGSET_LAST; ++k)
+                {
+                    if (k == HLSL_REGSET_NUMERIC)
+                        type->reg_size[k] = hlsl_type_get_sm4_offset(field->type, type->reg_size[k]);
+                    field->reg_offset[k] = type->reg_size[k];
+                    type->reg_size[k] += field->type->reg_size[k];
+                }
 
                 type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
             }
@@ -229,16 +282,25 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         }
 
         case HLSL_CLASS_OBJECT:
-            type->reg_size = 0;
+        {
+            if (hlsl_type_is_resource(type))
+            {
+                enum hlsl_regset regset = hlsl_type_get_regset(type);
+
+                type->reg_size[regset] = 1;
+            }
             break;
+        }
     }
 }
 
-/* Returns the size of a type, considered as part of an array of that type.
- * As such it includes padding after the type. */
-unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type)
+/* Returns the size of a type, considered as part of an array of that type, within a specific
+ * register set. As such it includes padding after the type, when applicable. */
+unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, enum hlsl_regset regset)
 {
-    return align(type->reg_size, 4);
+    if (regset == HLSL_REGSET_NUMERIC)
+        return align(type->reg_size[regset], 4);
+    return type->reg_size[regset];
 }
 
 static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, enum hlsl_type_class type_class,

@@ -122,6 +122,16 @@ enum hlsl_matrix_majority
     HLSL_ROW_MAJOR
 };
 
+enum hlsl_regset
+{
+    HLSL_REGSET_SAMPLERS,
+    HLSL_REGSET_TEXTURES,
+    HLSL_REGSET_UAVS,
+    HLSL_REGSET_LAST_OBJECT = HLSL_REGSET_UAVS,
+    HLSL_REGSET_NUMERIC,
+    HLSL_REGSET_LAST = HLSL_REGSET_NUMERIC,
+};
+
 /* An HLSL source-level data type, including anonymous structs and typedefs. */
 struct hlsl_type
 {
@@ -183,12 +193,12 @@ struct hlsl_type
         struct hlsl_type *resource_format;
     } e;
 
-    /* Number of numeric register components used by one value of this type (4 components make 1
-     *   register).
-     * If type is HLSL_CLASS_STRUCT or HLSL_CLASS_ARRAY, this value includes the reg_size of
-     *   their elements and padding (which varies according to the backend).
-     * This value is 0 for types without numeric components, like objects. */
-    unsigned int reg_size;
+    /* Number of numeric register components used by one value of this type, for each regset.
+     * For HLSL_REGSET_NUMERIC, 4 components make 1 register, while for other regsets 1 component makes
+     *   1 register.
+     * If type is HLSL_CLASS_STRUCT or HLSL_CLASS_ARRAY, the reg_size of their elements and padding
+     *   (which varies according to the backend) is also included. */
+    unsigned int reg_size[HLSL_REGSET_LAST + 1];
     /* Offset where the type's description starts in the output bytecode, in bytes. */
     size_t bytecode_offset;
 
@@ -215,8 +225,8 @@ struct hlsl_struct_field
      *   type->modifiers instead) and that also are specific to the field and not the whole variable.
      *   In particular, interpolation modifiers. */
     unsigned int storage_modifiers;
-    /* Offset of the field within the type it belongs to, in numeric register components. */
-    unsigned int reg_offset;
+    /* Offset of the field within the type it belongs to, in register components, for each regset. */
+    unsigned int reg_offset[HLSL_REGSET_LAST + 1];
 
     /* Offset where the fields's name starts in the output bytecode, in bytes. */
     size_t name_bytecode_offset;
@@ -556,10 +566,12 @@ struct hlsl_deref
     struct hlsl_src *path;
 
     /* Single instruction node of data type uint used to represent the register offset (in register
-     *   components), from the start of the variable, of the part referenced.
+     *   components, within the pertaining regset), from the start of the variable, of the part
+     *   referenced.
      * The path is lowered to this single offset -- whose value may vary between SM1 and SM4 --
      *   before writing the bytecode. */
     struct hlsl_src offset;
+    enum hlsl_regset offset_regset;
 };
 
 struct hlsl_ir_load
@@ -1086,13 +1098,15 @@ bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type);
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         unsigned int default_majority, unsigned int modifiers);
 unsigned int hlsl_type_component_count(const struct hlsl_type *type);
-unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type);
+unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, enum hlsl_regset regset);
 struct hlsl_type *hlsl_type_get_component_type(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int index);
 bool hlsl_type_is_row_major(const struct hlsl_type *type);
 unsigned int hlsl_type_minor_size(const struct hlsl_type *type);
 unsigned int hlsl_type_major_size(const struct hlsl_type *type);
 unsigned int hlsl_type_element_count(const struct hlsl_type *type);
+bool hlsl_type_is_resource(const struct hlsl_type *type);
+enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 

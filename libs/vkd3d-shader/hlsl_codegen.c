@@ -24,7 +24,7 @@
 /* TODO: remove when no longer needed, only used for new_offset_instr_from_deref() */
 static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_type *type, struct hlsl_ir_node *offset, struct hlsl_ir_node *idx,
-        const struct vkd3d_shader_location *loc)
+        enum hlsl_regset regset, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *idx_offset = NULL;
     struct hlsl_ir_constant *c;
@@ -52,7 +52,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
         case HLSL_CLASS_ARRAY:
         {
-            unsigned int size = hlsl_type_get_array_element_reg_size(type->e.array.type);
+            unsigned int size = hlsl_type_get_array_element_reg_size(type->e.array.type, regset);
 
             if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
                 return NULL;
@@ -70,7 +70,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
             unsigned int field_idx = hlsl_ir_constant(idx)->value[0].u;
             struct hlsl_struct_field *field = &type->e.record.fields[field_idx];
 
-            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset, loc)))
+            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset[regset], loc)))
                 return NULL;
             list_add_tail(&block->instrs, &c->node.entry);
 
@@ -110,7 +110,8 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
     {
         struct hlsl_block idx_block;
 
-        if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node, loc)))
+        if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node,
+                deref->offset_regset, loc)))
             return NULL;
 
         list_move_tail(&block->instrs, &idx_block.instrs);
@@ -144,6 +145,8 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
         hlsl_cleanup_deref(deref);
         return;
     }
+
+    deref->offset_regset = hlsl_type_get_regset(type);
 
     if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
         return;
@@ -2488,24 +2491,26 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
 static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx, struct liveness *liveness,
         unsigned int first_write, unsigned int last_read, const struct hlsl_type *type)
 {
+    unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
+
     if (type->type <= HLSL_CLASS_VECTOR)
-        return allocate_register(ctx, liveness, first_write, last_read, type->reg_size, type->dimx);
+        return allocate_register(ctx, liveness, first_write, last_read, reg_size, type->dimx);
     else
-        return allocate_range(ctx, liveness, first_write, last_read, type->reg_size);
+        return allocate_range(ctx, liveness, first_write, last_read, reg_size);
 }
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
 {
     static const char writemask_offset[] = {'w','x','y','z'};
+    unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
-    if (type->reg_size > 4)
+    if (reg_size > 4)
     {
-        if (type->reg_size & 3)
-            return vkd3d_dbg_sprintf("%c%u-%c%u.%c", class, reg.id, class,
-                    reg.id + (type->reg_size / 4), writemask_offset[type->reg_size & 3]);
+        if (reg_size & 3)
+            return vkd3d_dbg_sprintf("%c%u-%c%u.%c", class, reg.id, class, reg.id + (reg_size / 4),
+                    writemask_offset[reg_size & 3]);
 
-        return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class,
-                reg.id + (type->reg_size / 4) - 1);
+        return vkd3d_dbg_sprintf("%c%u-%c%u", class, reg.id, class, reg.id + (reg_size / 4) - 1);
     }
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
@@ -2592,7 +2597,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
                 const struct hlsl_type *type = instr->data_type;
                 unsigned int x, y, i, writemask, end_reg;
-                unsigned int reg_size = type->reg_size;
+                unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
                 constant->reg = allocate_numeric_registers_for_type(ctx, liveness, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
@@ -2688,7 +2693,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     {
         if (var->is_uniform && var->last_read)
         {
-            if (var->data_type->reg_size == 0)
+            if (var->data_type->reg_size[HLSL_REGSET_NUMERIC] == 0)
                 continue;
 
             var->reg = allocate_numeric_registers_for_type(ctx, &liveness, 1, UINT_MAX, var->data_type);
@@ -2807,7 +2812,7 @@ static void calculate_buffer_offset(struct hlsl_ir_var *var)
 
     var->buffer_offset = buffer->size;
     TRACE("Allocated buffer offset %u to %s.\n", var->buffer_offset, var->name);
-    buffer->size += var->data_type->reg_size;
+    buffer->size += var->data_type->reg_size[HLSL_REGSET_NUMERIC];
     if (var->last_read)
         buffer->used_size = buffer->size;
 }
@@ -3062,6 +3067,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
+    unsigned int size;
 
     if (!offset_node)
     {
@@ -3078,10 +3084,11 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
 
     *offset = hlsl_ir_constant(offset_node)->value[0].u;
 
-    if (*offset >= deref->var->data_type->reg_size)
+    size = deref->var->data_type->reg_size[deref->offset_regset];
+    if (*offset >= size)
     {
         hlsl_error(ctx, &deref->offset.node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
-                "Dereference is out of bounds. %u/%u", *offset, deref->var->data_type->reg_size);
+                "Dereference is out of bounds. %u/%u", *offset, size);
         return false;
     }
 
@@ -3106,6 +3113,8 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_reg ret = var->reg;
     unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
+
+    assert(deref->offset_regset == HLSL_REGSET_NUMERIC);
 
     ret.id += offset / 4;
 

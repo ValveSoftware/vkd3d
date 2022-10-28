@@ -366,7 +366,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
             else
             {
                 put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->reg.id));
-                put_u32(buffer, var->data_type->reg_size / 4);
+                put_u32(buffer, var->data_type->reg_size[HLSL_REGSET_NUMERIC] / 4);
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */

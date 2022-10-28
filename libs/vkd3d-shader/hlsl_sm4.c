@@ -395,7 +395,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
             put_u32(buffer, field->name_bytecode_offset);
             put_u32(buffer, field->type->bytecode_offset);
-            put_u32(buffer, field->reg_offset);
+            put_u32(buffer, field->reg_offset[HLSL_REGSET_NUMERIC]);
         }
     }
 
@@ -711,7 +711,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
                 put_u32(&buffer, 0); /* name */
                 put_u32(&buffer, var->buffer_offset * sizeof(float));
-                put_u32(&buffer, var->data_type->reg_size * sizeof(float));
+                put_u32(&buffer, var->data_type->reg_size[HLSL_REGSET_NUMERIC] * sizeof(float));
                 put_u32(&buffer, flags);
                 put_u32(&buffer, 0); /* type */
                 put_u32(&buffer, 0); /* FIXME: default value */
