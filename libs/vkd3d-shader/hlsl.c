@@ -1193,17 +1193,12 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
 
     if (!hlsl_types_are_equal(return_type, ctx->builtin_types.Void))
     {
-        struct hlsl_ir_var *return_var;
-        char name[28];
-
-        sprintf(name, "<retval-%p>", decl);
-        if (!(return_var = hlsl_new_var(ctx, hlsl_strdup(ctx, name), return_type, loc, semantic, 0, NULL)))
+        if (!(decl->return_var = hlsl_new_synthetic_var(ctx, "retval", return_type, &loc)))
         {
             vkd3d_free(decl);
             return NULL;
         }
-        list_add_tail(&ctx->globals->vars, &return_var->scope_entry);
-        decl->return_var = return_var;
+        decl->return_var->semantic = *semantic;
     }
 
     return decl;
