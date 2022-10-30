@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader todo]
 float myfunc()
 {
     return 0.6;

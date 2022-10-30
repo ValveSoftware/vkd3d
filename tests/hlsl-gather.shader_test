@@ -73,7 +73,7 @@ draw quad
 probe all rgba (0.2, 0.2, 0.1, 0.1)
 
 
-[pixel shader]
+[pixel shader todo]
 SamplerState s;
 Texture2D t;
 

@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader todo]
 
 float2 max(float2 a, float2 b)
 {
@@ -14,7 +14,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.3, 0.3, 0.4, 0.6)
 
-[pixel shader]
+[pixel shader todo]
 
 float2 max(float2 a, float3 b)
 {

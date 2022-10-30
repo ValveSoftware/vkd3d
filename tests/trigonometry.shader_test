@@ -4,7 +4,7 @@ void main(out float tex : texcoord, inout float4 pos : sv_position)
     tex = (pos.x + 1) * 320;
 }
 
-[pixel shader]
+[pixel shader todo]
 float4 main(float tex : texcoord) : sv_target
 {
     tex = floor(tex + 0.25);

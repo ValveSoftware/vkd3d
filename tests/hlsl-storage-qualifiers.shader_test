@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader todo]
 void sub2(in uniform float4 i, out float4 o)
 {
     o = i;

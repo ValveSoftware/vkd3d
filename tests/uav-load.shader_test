@@ -13,7 +13,7 @@ size (1, 1)
 
 0.5
 
-[compute shader]
+[compute shader todo]
 RWTexture2D<float> u, v;
     [numthreads(1, 1, 1)]
 void main()

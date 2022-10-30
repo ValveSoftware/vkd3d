@@ -1,6 +1,6 @@
 % Test what kinds of expressions are valid array dimensions.
 
-[pixel shader]
+[pixel shader todo]
 float4 main() : sv_target
 {
     const int dim = 4;

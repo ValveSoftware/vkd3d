@@ -1,6 +1,6 @@
 % Use a uniform to prevent the compiler from optimizing.
 
-[pixel shader]
+[pixel shader todo]
 uniform float i;
 float4 main() : SV_TARGET
 {

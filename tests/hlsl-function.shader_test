@@ -9,7 +9,7 @@ float4 main() : sv_target
 
 % It's legal to call an undefined function in unused code, though.
 
-[pixel shader]
+[pixel shader todo]
 
 float4 func();
 
@@ -118,7 +118,7 @@ void func()
 {
 }
 
-[pixel shader]
+[pixel shader todo]
 
 float func(in float a, out float b, inout float c)
 {
@@ -142,7 +142,7 @@ float4 main() : sv_target
 todo draw quad
 probe all rgba (0.5, 0.6, 0.7, 0)
 
-[pixel shader]
+[pixel shader todo]
 
 void func(in float a, inout float2 b)
 {

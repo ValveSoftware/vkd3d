@@ -1,6 +1,6 @@
 % Test implicit and explicit casts on function output parameters.
 
-[pixel shader]
+[pixel shader todo]
 
 uniform float4 f;
 
@@ -23,7 +23,7 @@ probe all rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but cast "x" to float4 first.
 
-[pixel shader]
+[pixel shader todo]
 
 uniform float4 f;
 
@@ -46,7 +46,7 @@ probe all rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but declare "x" as float4 and cast it to int4.
 
-[pixel shader]
+[pixel shader todo]
 
 uniform float4 f;
 
@@ -70,7 +70,7 @@ probe all rgba (-1.0, -1.0, 2.0, 4.0)
 [require]
 shader model >= 4.0
 
-[pixel shader]
+[pixel shader todo]
 
 void func(inout float4 a)
 {

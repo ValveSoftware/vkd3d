@@ -124,7 +124,7 @@ draw quad
 probe all rgba (4.0, 4.0, 4.0, 4.0)
 
 
-[pixel shader]
+[pixel shader todo]
 Texture2D tex;
 
 struct apple
