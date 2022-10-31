@@ -688,7 +688,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
     .release_readback = d3d11_runner_release_readback,
 };
 
-void run_shader_tests_d3d11(int argc, char **argv)
+void run_shader_tests_d3d11(shader_runner_frontend_func func, int argc, char **argv)
 {
     struct d3d11_shader_runner runner;
     HMODULE dxgi_module, d3d11_module;
@@ -705,7 +705,7 @@ void run_shader_tests_d3d11(int argc, char **argv)
         init_adapter_info();
         if (init_test_context(&runner))
         {
-            run_shader_tests(&runner.r, argc, argv, &d3d11_runner_ops);
+            func(&runner.r, argc, argv, &d3d11_runner_ops);
             destroy_test_context(&runner);
         }
     }

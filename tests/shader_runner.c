@@ -692,7 +692,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     }
 }
 
-void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
+static void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct resource_params current_resource;
@@ -1119,13 +1119,13 @@ START_TEST(shader_runner)
     trace("Running tests from a Windows cross build\n");
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(argc, argv);
+    run_shader_tests_d3d9(run_shader_tests, argc, argv);
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(argc, argv);
+    run_shader_tests_d3d11(run_shader_tests, argc, argv);
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12(run_shader_tests, argc, argv);
 
     print_dll_version("d3dcompiler_47.dll");
     print_dll_version("dxgi.dll");
@@ -1136,13 +1136,13 @@ START_TEST(shader_runner)
     trace("Running tests from a Windows non-cross build\n");
 
     trace("Compiling shaders with vkd3d-shader and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(argc, argv);
+    run_shader_tests_d3d9(run_shader_tests, argc, argv);
 
     trace("Compiling shaders with vkd3d-shader and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(argc, argv);
+    run_shader_tests_d3d11(run_shader_tests, argc, argv);
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12(run_shader_tests, argc, argv);
 
     print_dll_version("d3d9.dll");
     print_dll_version("d3d11.dll");
@@ -1150,9 +1150,9 @@ START_TEST(shader_runner)
     trace("Running tests from a Unix build\n");
 
     trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests_vulkan(argc, argv);
+    run_shader_tests_vulkan(run_shader_tests, argc, argv);
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12(run_shader_tests, argc, argv);
 #endif
 }

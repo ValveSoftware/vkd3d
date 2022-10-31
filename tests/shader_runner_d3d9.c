@@ -517,7 +517,7 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .release_readback = d3d9_runner_release_readback,
 };
 
-void run_shader_tests_d3d9(int argc, char **argv)
+void run_shader_tests_d3d9(shader_runner_frontend_func func, int argc, char **argv)
 {
     struct d3d9_shader_runner runner;
     HMODULE d3d9_module;
@@ -530,7 +530,7 @@ void run_shader_tests_d3d9(int argc, char **argv)
         parse_args(argc, argv);
         init_adapter_info();
         init_test_context(&runner);
-        run_shader_tests(&runner.r, argc, argv, &d3d9_runner_ops);
+        func(&runner.r, argc, argv, &d3d9_runner_ops);
         destroy_test_context(&runner);
     }
     FreeLibrary(d3d9_module);
