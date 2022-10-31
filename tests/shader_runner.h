@@ -37,40 +37,12 @@ enum shader_model
     SHADER_MODEL_5_1,
 };
 
-enum texture_data_type
-{
-    TEXTURE_DATA_FLOAT,
-    TEXTURE_DATA_SINT,
-    TEXTURE_DATA_UINT,
-};
-
 struct sampler
 {
     unsigned int slot;
 
     D3D12_FILTER filter;
     D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
-};
-
-enum resource_type
-{
-    RESOURCE_TYPE_RENDER_TARGET,
-    RESOURCE_TYPE_TEXTURE,
-    RESOURCE_TYPE_UAV,
-    RESOURCE_TYPE_VERTEX_BUFFER,
-};
-
-struct resource_params
-{
-    unsigned int slot;
-    enum resource_type type;
-
-    DXGI_FORMAT format;
-    enum texture_data_type data_type;
-    unsigned int texel_size;
-    unsigned int width, height;
-    uint8_t *data;
-    size_t data_size, data_capacity;
 };
 
 struct resource

@@ -341,26 +341,6 @@ static struct resource *get_resource(struct shader_runner *runner, enum resource
     return NULL;
 }
 
-static void set_resource(struct shader_runner *runner, struct resource *resource)
-{
-    size_t i;
-
-    for (i = 0; i < runner->resource_count; ++i)
-    {
-        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
-        {
-            runner->ops->destroy_resource(runner, runner->resources[i]);
-            runner->resources[i] = resource;
-            return;
-        }
-    }
-
-    if (runner->resource_count == MAX_RESOURCES)
-        fatal_error("Too many resources declared.\n");
-
-    runner->resources[runner->resource_count++] = resource;
-}
-
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
     runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
@@ -418,7 +398,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.width = RENDER_TARGET_WIDTH;
             params.height = RENDER_TARGET_HEIGHT;
 
-            set_resource(runner, runner->ops->create_resource(runner, &params));
+            shader_runner_create_resource(runner, &params);
         }
 
         vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
@@ -437,7 +417,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         params.data = malloc(sizeof(quad));
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
-        set_resource(runner, runner->ops->create_resource(runner, &params));
+        shader_runner_create_resource(runner, &params);
 
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
@@ -462,7 +442,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.width = RENDER_TARGET_WIDTH;
             params.height = RENDER_TARGET_HEIGHT;
 
-            set_resource(runner, runner->ops->create_resource(runner, &params));
+            shader_runner_create_resource(runner, &params);
         }
 
         if (match_string(line, "triangle list", &line))
@@ -753,7 +733,7 @@ static void run_shader_tests(struct shader_runner *runner, int argc, char **argv
                     break;
 
                 case STATE_RESOURCE:
-                    set_resource(runner, runner->ops->create_resource(runner, &current_resource));
+                    shader_runner_create_resource(runner, &current_resource);
                     free(current_resource.data);
                     break;
 

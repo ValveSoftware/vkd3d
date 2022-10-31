@@ -36,6 +36,27 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
+void shader_runner_create_resource(struct shader_runner *runner, const struct resource_params *params)
+{
+    struct resource *resource = runner->ops->create_resource(runner, params);
+    size_t i;
+
+    for (i = 0; i < runner->resource_count; ++i)
+    {
+        if (runner->resources[i]->slot == resource->slot && runner->resources[i]->type == resource->type)
+        {
+            runner->ops->destroy_resource(runner, runner->resources[i]);
+            runner->resources[i] = resource;
+            return;
+        }
+    }
+
+    if (runner->resource_count == MAX_RESOURCES)
+        fatal_error("Too many resources declared.\n");
+
+    runner->resources[runner->resource_count++] = resource;
+}
+
 void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv)
 {
 #if defined(VKD3D_CROSSTEST)
