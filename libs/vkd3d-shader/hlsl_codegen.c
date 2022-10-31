@@ -1927,7 +1927,7 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
                     var->last_read, var->data_type->reg_size);
         else
             var->reg = allocate_register(ctx, liveness, var->first_write,
-                    var->last_read, hlsl_type_component_count(var->data_type));
+                    var->last_read, var->data_type->reg_size);
         TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
                 debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
     }
@@ -1946,7 +1946,7 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
                         instr->last_read, instr->data_type->reg_size);
             else
                 instr->reg = allocate_register(ctx, liveness, instr->index,
-                        instr->last_read, instr->data_type->dimx);
+                        instr->last_read, instr->data_type->reg_size);
             TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
                     debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
         }
@@ -2009,7 +2009,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                 if (reg_size > 4)
                     constant->reg = allocate_range(ctx, liveness, 1, UINT_MAX, reg_size);
                 else
-                    constant->reg = allocate_register(ctx, liveness, 1, UINT_MAX, type->dimx);
+                    constant->reg = allocate_register(ctx, liveness, 1, UINT_MAX, reg_size);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
@@ -2111,7 +2111,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             else
             {
                 var->reg = allocate_register(ctx, &liveness, 1, UINT_MAX, 4);
-                var->reg.writemask = (1u << var->data_type->dimx) - 1;
+                var->reg.writemask = (1u << var->data_type->reg_size) - 1;
             }
             TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
         }
