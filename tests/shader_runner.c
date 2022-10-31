@@ -637,41 +637,6 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
     return stride;
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
-{
-    ID3D10Blob *blob = NULL, *errors = NULL;
-    char profile[7];
-    HRESULT hr;
-
-    static const char *const shader_models[] =
-    {
-        [SHADER_MODEL_2_0] = "4_0",
-        [SHADER_MODEL_4_0] = "4_0",
-        [SHADER_MODEL_4_1] = "4_1",
-        [SHADER_MODEL_5_0] = "5_0",
-        [SHADER_MODEL_5_1] = "5_1",
-    };
-
-    sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
-    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
-    ok(hr == expect, "Got unexpected hr %#x.\n", hr);
-    if (hr == S_OK)
-    {
-        ID3D10Blob_Release(blob);
-    }
-    else
-    {
-        assert_that(!blob, "Expected no compiled shader blob.\n");
-        assert_that(!!errors, "Expected non-NULL error blob.\n");
-    }
-    if (errors)
-    {
-        if (vkd3d_test_state.debug_level)
-            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
-        ID3D10Blob_Release(errors);
-    }
-}
-
 static void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
@@ -740,32 +705,20 @@ static void run_shader_tests(struct shader_runner *runner, int argc, char **argv
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
                     todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "cs", expect_hr);
-                    free(runner->cs_source);
-                    runner->cs_source = shader_source;
-                    shader_source = NULL;
+                        shader_runner_compile_cs(runner, shader_source, expect_hr);
                     shader_source_len = 0;
-                    shader_source_size = 0;
                     break;
 
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
                     todo_if (state == STATE_SHADER_PIXEL_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "ps", expect_hr);
-                    free(runner->ps_source);
-                    runner->ps_source = shader_source;
-                    shader_source = NULL;
+                        shader_runner_compile_ps(runner, shader_source, expect_hr);
                     shader_source_len = 0;
-                    shader_source_size = 0;
                     break;
 
                 case STATE_SHADER_VERTEX:
-                    compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
-                    free(runner->vs_source);
-                    runner->vs_source = shader_source;
-                    shader_source = NULL;
+                    shader_runner_compile_vs(runner, shader_source, S_OK);
                     shader_source_len = 0;
-                    shader_source_size = 0;
                     break;
 
                 case STATE_PREPROC_INVALID:

@@ -36,6 +36,41 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
+static void compile_shader(struct shader_runner *runner, const char *source, const char *type, HRESULT expect)
+{
+    ID3D10Blob *blob = NULL, *errors = NULL;
+    char profile[7];
+    HRESULT hr;
+
+    static const char *const shader_models[] =
+    {
+        [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_4_0] = "4_0",
+        [SHADER_MODEL_4_1] = "4_1",
+        [SHADER_MODEL_5_0] = "5_0",
+        [SHADER_MODEL_5_1] = "5_1",
+    };
+
+    sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
+    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
+    ok(hr == expect, "Got unexpected hr %#x.\n", hr);
+    if (hr == S_OK)
+    {
+        ID3D10Blob_Release(blob);
+    }
+    else
+    {
+        assert_that(!blob, "Expected no compiled shader blob.\n");
+        assert_that(!!errors, "Expected non-NULL error blob.\n");
+    }
+    if (errors)
+    {
+        if (vkd3d_test_state.debug_level)
+            trace("%s\n", (char *)ID3D10Blob_GetBufferPointer(errors));
+        ID3D10Blob_Release(errors);
+    }
+}
+
 void shader_runner_create_resource(struct shader_runner *runner, const struct resource_params *params)
 {
     struct resource *resource = runner->ops->create_resource(runner, params);
@@ -55,6 +90,27 @@ void shader_runner_create_resource(struct shader_runner *runner, const struct re
         fatal_error("Too many resources declared.\n");
 
     runner->resources[runner->resource_count++] = resource;
+}
+
+void shader_runner_compile_cs(struct shader_runner *runner, const char *source, HRESULT expect_hr)
+{
+    compile_shader(runner, source, "cs", expect_hr);
+    free(runner->cs_source);
+    runner->cs_source = strdup(source);
+}
+
+void shader_runner_compile_ps(struct shader_runner *runner, const char *source, HRESULT expect_hr)
+{
+    compile_shader(runner, source, "ps", expect_hr);
+    free(runner->ps_source);
+    runner->ps_source = strdup(source);
+}
+
+void shader_runner_compile_vs(struct shader_runner *runner, const char *source, HRESULT expect_hr)
+{
+    compile_shader(runner, source, "vs", expect_hr);
+    free(runner->vs_source);
+    runner->vs_source = strdup(source);
 }
 
 void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv)

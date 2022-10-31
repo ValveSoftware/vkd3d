@@ -61,6 +61,9 @@ struct resource_params
 typedef void (*shader_runner_frontend_func)(struct shader_runner *runner,
         int argc, char **argv, const struct shader_runner_ops *ops);
 
+SHADER_RUNNER_API void shader_runner_compile_cs(struct shader_runner *runner, const char *source, HRESULT expect_hr);
+SHADER_RUNNER_API void shader_runner_compile_ps(struct shader_runner *runner, const char *source, HRESULT expect_hr);
+SHADER_RUNNER_API void shader_runner_compile_vs(struct shader_runner *runner, const char *source, HRESULT expect_hr);
 SHADER_RUNNER_API void shader_runner_create_resource(struct shader_runner *runner, const struct resource_params *params);
 SHADER_RUNNER_API void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv);
 
