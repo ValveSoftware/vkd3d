@@ -1,0 +1,17 @@
+[pixel shader]
+// Test empty constant buffer.
+cbuffer Constants : register(b1)
+{
+};
+
+float4 foo;
+
+float4 main() : sv_target
+{
+    return foo;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)

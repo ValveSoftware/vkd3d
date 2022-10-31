@@ -3361,7 +3361,7 @@ buffer_type:
         }
 
 declaration_statement_list:
-      declaration_statement
+      %empty
     | declaration_statement_list declaration_statement
 
 preproc_directive:
