@@ -36,6 +36,22 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
+static struct resource *get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
+{
+    struct resource *resource;
+    size_t i;
+
+    for (i = 0; i < runner->resource_count; ++i)
+    {
+        resource = runner->resources[i];
+
+        if (resource->type == type && resource->slot == slot)
+            return resource;
+    }
+
+    return NULL;
+}
+
 static void compile_shader(struct shader_runner *runner, const char *source, const char *type, HRESULT expect)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -111,6 +127,73 @@ void shader_runner_compile_vs(struct shader_runner *runner, const char *source, 
     compile_shader(runner, source, "vs", expect_hr);
     free(runner->vs_source);
     runner->vs_source = strdup(source);
+}
+
+void shader_runner_dispatch(struct shader_runner *runner, unsigned int x, unsigned int y, unsigned int z)
+{
+    runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
+}
+
+void shader_runner_draw(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count)
+{
+    if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+    {
+        struct resource_params params = {0};
+
+        params.slot = 0;
+        params.type = RESOURCE_TYPE_RENDER_TARGET;
+        params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+        params.data_type = TEXTURE_DATA_FLOAT;
+        params.texel_size = 16;
+        params.width = RENDER_TARGET_WIDTH;
+        params.height = RENDER_TARGET_HEIGHT;
+
+        shader_runner_create_resource(runner, &params);
+    }
+
+    runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count);
+}
+
+void shader_runner_draw_quad(struct shader_runner *runner)
+{
+    struct resource_params params;
+    struct input_element *element;
+
+    /* For simplicity, draw a large triangle instead. */
+    static const struct vec2 quad[] =
+    {
+        {-2.0f, -2.0f},
+        {-2.0f,  4.0f},
+        { 4.0f, -2.0f},
+    };
+
+    static const char vs_source[] =
+        "void main(inout float4 position : sv_position)\n"
+        "{\n"
+        "}";
+
+    vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
+            1, sizeof(*runner->input_elements));
+    element = &runner->input_elements[0];
+    element->name = strdup("sv_position");
+    element->slot = 0;
+    element->format = DXGI_FORMAT_R32G32_FLOAT;
+    element->texel_size = sizeof(*quad);
+    element->index = 0;
+    runner->input_element_count = 1;
+
+    memset(&params, 0, sizeof(params));
+    params.slot = 0;
+    params.type = RESOURCE_TYPE_VERTEX_BUFFER;
+    params.data = malloc(sizeof(quad));
+    memcpy(params.data, quad, sizeof(quad));
+    params.data_size = sizeof(quad);
+    shader_runner_create_resource(runner, &params);
+
+    if (!runner->vs_source)
+        shader_runner_compile_vs(runner, vs_source, S_OK);
+
+    shader_runner_draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
 }
 
 void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv)

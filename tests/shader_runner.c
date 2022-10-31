@@ -367,83 +367,17 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (ret < 3)
             fatal_error("Malformed dispatch arguments '%s'.\n", line);
 
-        runner->last_render_failed = !runner->ops->dispatch(runner, x, y, z);
+        shader_runner_dispatch(runner, x, y, z);
     }
     else if (match_string(line, "draw quad", &line))
     {
-        struct resource_params params;
-        struct input_element *element;
-
-        /* For simplicity, draw a large triangle instead. */
-        static const struct vec2 quad[] =
-        {
-            {-2.0f, -2.0f},
-            {-2.0f,  4.0f},
-            { 4.0f, -2.0f},
-        };
-
-        static const char vs_source[] =
-            "void main(inout float4 position : sv_position)\n"
-            "{\n"
-            "}";
-
-        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
-        {
-            memset(&params, 0, sizeof(params));
-            params.slot = 0;
-            params.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-            params.data_type = TEXTURE_DATA_FLOAT;
-            params.texel_size = 16;
-            params.width = RENDER_TARGET_WIDTH;
-            params.height = RENDER_TARGET_HEIGHT;
-
-            shader_runner_create_resource(runner, &params);
-        }
-
-        vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
-                1, sizeof(*runner->input_elements));
-        element = &runner->input_elements[0];
-        element->name = strdup("sv_position");
-        element->slot = 0;
-        element->format = DXGI_FORMAT_R32G32_FLOAT;
-        element->texel_size = sizeof(*quad);
-        element->index = 0;
-        runner->input_element_count = 1;
-
-        memset(&params, 0, sizeof(params));
-        params.slot = 0;
-        params.type = RESOURCE_TYPE_VERTEX_BUFFER;
-        params.data = malloc(sizeof(quad));
-        memcpy(params.data, quad, sizeof(quad));
-        params.data_size = sizeof(quad);
-        shader_runner_create_resource(runner, &params);
-
-        if (!runner->vs_source)
-            runner->vs_source = strdup(vs_source);
-
-        runner->last_render_failed = !runner->ops->draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
+        shader_runner_draw_quad(runner);
     }
     else if (match_string(line, "draw", &line))
     {
         D3D_PRIMITIVE_TOPOLOGY topology;
-        struct resource_params params;
         unsigned int vertex_count;
         char *rest;
-
-        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
-        {
-            memset(&params, 0, sizeof(params));
-            params.slot = 0;
-            params.type = RESOURCE_TYPE_RENDER_TARGET;
-            params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-            params.data_type = TEXTURE_DATA_FLOAT;
-            params.texel_size = 16;
-            params.width = RENDER_TARGET_WIDTH;
-            params.height = RENDER_TARGET_HEIGHT;
-
-            shader_runner_create_resource(runner, &params);
-        }
 
         if (match_string(line, "triangle list", &line))
             topology = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -456,7 +390,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         if (line == rest)
             fatal_error("Malformed vertex count '%s'.\n", line);
 
-        runner->last_render_failed = !runner->ops->draw(runner, topology, vertex_count);
+        shader_runner_draw(runner, topology, vertex_count);
     }
     else if (match_string(line, "probe", &line))
     {

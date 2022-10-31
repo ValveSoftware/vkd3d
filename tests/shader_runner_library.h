@@ -65,6 +65,10 @@ SHADER_RUNNER_API void shader_runner_compile_cs(struct shader_runner *runner, co
 SHADER_RUNNER_API void shader_runner_compile_ps(struct shader_runner *runner, const char *source, HRESULT expect_hr);
 SHADER_RUNNER_API void shader_runner_compile_vs(struct shader_runner *runner, const char *source, HRESULT expect_hr);
 SHADER_RUNNER_API void shader_runner_create_resource(struct shader_runner *runner, const struct resource_params *params);
+SHADER_RUNNER_API void shader_runner_dispatch(struct shader_runner *runner, unsigned int x, unsigned int y, unsigned int z);
+SHADER_RUNNER_API void shader_runner_draw_quad(struct shader_runner *runner);
+SHADER_RUNNER_API void shader_runner_draw(struct shader_runner *runner,
+        D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count);
 SHADER_RUNNER_API void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv);
 
 #endif  /* __SHADER_RUNNER_LIBRARY_H */
