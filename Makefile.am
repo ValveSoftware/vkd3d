@@ -327,13 +327,14 @@ TEST_EXTENSIONS = .shader_test
 
 if BUILD_TESTS
 check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) tests/shader_runner
+check_LTLIBRARIES = tests/libshader_runner.la
 TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @DL_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @DL_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @DL_LIBS@
-tests_shader_runner_LDADD = $(LDADD) @DL_LIBS@
-tests_shader_runner_SOURCES = \
-	tests/shader_runner.c \
+tests_shader_runner_LDADD = tests/libshader_runner.la $(LDADD) @DL_LIBS@
+tests_libshader_runner_la_SOURCES = \
+	tests/shader_runner_library.c \
 	tests/shader_runner_d3d9.c \
 	tests/shader_runner_d3d11.c \
 	tests/shader_runner_d3d12.c \

@@ -1115,44 +1115,5 @@ out:
 
 START_TEST(shader_runner)
 {
-#if defined(VKD3D_CROSSTEST)
-    trace("Running tests from a Windows cross build\n");
-
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(run_shader_tests, argc, argv);
-
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(run_shader_tests, argc, argv);
-
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
-    run_shader_tests_d3d12(run_shader_tests, argc, argv);
-
-    print_dll_version("d3dcompiler_47.dll");
-    print_dll_version("dxgi.dll");
-    print_dll_version("d3d9.dll");
-    print_dll_version("d3d11.dll");
-    print_dll_version("d3d12.dll");
-#elif defined(_WIN32)
-    trace("Running tests from a Windows non-cross build\n");
-
-    trace("Compiling shaders with vkd3d-shader and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(run_shader_tests, argc, argv);
-
-    trace("Compiling shaders with vkd3d-shader and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(run_shader_tests, argc, argv);
-
-    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(run_shader_tests, argc, argv);
-
-    print_dll_version("d3d9.dll");
-    print_dll_version("d3d11.dll");
-#else
-    trace("Running tests from a Unix build\n");
-
-    trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests_vulkan(run_shader_tests, argc, argv);
-
-    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(run_shader_tests, argc, argv);
-#endif
+    shader_runner_run(run_shader_tests, argc, argv);
 }

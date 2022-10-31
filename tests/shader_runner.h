@@ -22,6 +22,7 @@
 #include "vkd3d_d3d12.h"
 #include "vkd3d_dxgiformat.h"
 #include "vkd3d_common.h"
+#include "shader_runner_library.h"
 #include "utils.h"
 
 #define RENDER_TARGET_WIDTH 640
@@ -138,9 +139,6 @@ void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2)
 
 unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot);
 void init_resource(struct resource *resource, const struct resource_params *params);
-
-typedef void (*shader_runner_frontend_func)(struct shader_runner *runner,
-        int argc, char **argv, const struct shader_runner_ops *ops);
 
 #ifdef _WIN32
 void run_shader_tests_d3d9(shader_runner_frontend_func func, int argc, char **argv);
