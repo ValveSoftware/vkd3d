@@ -250,3 +250,17 @@ float4 main() : sv_target
     a.a = 1;
     return a.a;
 }
+
+[pixel shader fail]
+struct apple
+{
+    sampler sam;
+    float4 aa;
+};
+
+static struct apple a;
+
+float4 main() : sv_target
+{
+    return 1.0;
+}

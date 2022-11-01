@@ -1907,6 +1907,26 @@ static bool type_has_object_components(struct hlsl_type *type, bool must_be_in_s
     return false;
 }
 
+static bool type_has_numeric_components(struct hlsl_type *type)
+{
+    if (type->type <= HLSL_CLASS_LAST_NUMERIC)
+        return true;
+    if (type->type == HLSL_CLASS_ARRAY)
+        return type_has_numeric_components(type->e.array.type);
+
+    if (type->type == HLSL_CLASS_STRUCT)
+    {
+        unsigned int i;
+
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            if (type_has_numeric_components(type->e.record.fields[i].type))
+                return true;
+        }
+    }
+    return false;
+}
+
 static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         DWORD modifiers, struct list *var_list)
 {
@@ -2074,6 +2094,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             if (var->semantic.name)
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                         "Semantics are not allowed on local variables.");
+        }
+
+        if ((var->modifiers & HLSL_STORAGE_STATIC) && type_has_numeric_components(var->data_type)
+                && type_has_object_components(var->data_type, false))
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Static variables cannot have both numeric and resource components.");
         }
 
         if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
