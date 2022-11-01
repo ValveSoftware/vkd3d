@@ -1887,6 +1887,26 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
     }
 }
 
+static bool type_has_object_components(struct hlsl_type *type, bool must_be_in_struct)
+{
+    if (type->type == HLSL_CLASS_OBJECT)
+        return !must_be_in_struct;
+    if (type->type == HLSL_CLASS_ARRAY)
+        return type_has_object_components(type->e.array.type, must_be_in_struct);
+
+    if (type->type == HLSL_CLASS_STRUCT)
+    {
+        unsigned int i;
+
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            if (type_has_object_components(type->e.record.fields[i].type, false))
+                return true;
+        }
+    }
+    return false;
+}
+
 static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
         DWORD modifiers, struct list *var_list)
 {
@@ -2021,6 +2041,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
              * considered uniforms, and we have no way of telling otherwise. */
             if (!(modifiers & HLSL_STORAGE_STATIC))
                 var->modifiers |= HLSL_STORAGE_UNIFORM;
+
+            if (ctx->profile->major_version < 5 && (var->modifiers & HLSL_STORAGE_UNIFORM) &&
+                    type_has_object_components(var->data_type, true))
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Target profile doesn't support objects as struct members in uniform variables.\n");
+            }
 
             if ((func = hlsl_get_func_decl(ctx, var->name)))
             {
