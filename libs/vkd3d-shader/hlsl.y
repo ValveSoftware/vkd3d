@@ -2596,6 +2596,82 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
 
+/* smoothstep(a, b, x) = p^2 (3 - 2p), where p = saturate((x - a)/(b - a)) */
+static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *min_arg, *max_arg, *x_arg, *p, *p_num, *p_denom, *res;
+    struct hlsl_ir_constant *one, *minus_two, *three;
+    enum hlsl_type_class common_class;
+    struct hlsl_type *common_type;
+    unsigned int dimx, dimy;
+
+    min_arg = params->args[0];
+    max_arg = params->args[1];
+    x_arg = params->args[2];
+
+    if (!expr_common_shape(ctx, min_arg->data_type, max_arg->data_type, loc, &common_class, &dimx, &dimy))
+        return false;
+    common_type = hlsl_get_numeric_type(ctx, common_class, HLSL_TYPE_FLOAT, dimx, dimy);
+
+    if (!expr_common_shape(ctx, common_type, x_arg->data_type, loc, &common_class, &dimx, &dimy))
+        return false;
+    common_type = hlsl_get_numeric_type(ctx, common_class, HLSL_TYPE_FLOAT, dimx, dimy);
+
+    if (!(min_arg = add_implicit_conversion(ctx, params->instrs, min_arg, common_type, loc)))
+        return false;
+
+    if (!(max_arg = add_implicit_conversion(ctx, params->instrs, max_arg, common_type, loc)))
+        return false;
+
+    if (!(x_arg = add_implicit_conversion(ctx, params->instrs, x_arg, common_type, loc)))
+        return false;
+
+    if (!(min_arg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, min_arg, loc)))
+        return false;
+
+    if (!(p_num = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, x_arg, min_arg, loc)))
+        return false;
+
+    if (!(p_denom = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, max_arg, min_arg, loc)))
+        return false;
+
+    if (!(one = hlsl_new_float_constant(ctx, 1.0, loc)))
+        return false;
+    list_add_tail(params->instrs, &one->node.entry);
+
+    if (!(p_denom = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, &one->node, p_denom, loc)))
+        return false;
+
+    if (!(p = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p_num, p_denom, loc)))
+        return false;
+
+    if (!(p = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, p, loc)))
+        return false;
+
+    if (!(minus_two = hlsl_new_float_constant(ctx, -2.0, loc)))
+        return false;
+    list_add_tail(params->instrs, &minus_two->node.entry);
+
+    if (!(three = hlsl_new_float_constant(ctx, 3.0, loc)))
+        return false;
+    list_add_tail(params->instrs, &three->node.entry);
+
+    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &minus_two->node, p, loc)))
+        return false;
+
+    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, &three->node, res, loc)))
+        return false;
+
+    if (!(p = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p, p, loc)))
+        return false;
+
+    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p, res, loc)))
+        return false;
+
+    return true;
+}
+
 static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2681,6 +2757,7 @@ intrinsic_functions[] =
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
+    {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"transpose",                           1, true,  intrinsic_transpose},
 };
 
