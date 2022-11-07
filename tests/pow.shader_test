@@ -25,7 +25,7 @@ todo draw quad
 todo probe all rgba (1.0, 32.0, 256.0, 125.0)
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float2x2 a = {1, 2, 3, 4};

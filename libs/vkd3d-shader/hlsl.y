@@ -2225,6 +2225,84 @@ static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
     return add_implicit_conversion(ctx, params->instrs, arg, type, loc);
 }
 
+static bool convert_args(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        struct hlsl_type *type, const struct vkd3d_shader_location *loc)
+{
+    unsigned int i;
+
+    for (i = 0; i < params->args_count; ++i)
+    {
+        struct hlsl_ir_node *new_arg;
+
+        if (!(new_arg = add_implicit_conversion(ctx, params->instrs, params->args[i], type, loc)))
+            return false;
+        params->args[i] = new_arg;
+    }
+
+    return true;
+}
+
+static struct hlsl_type *elementwise_intrinsic_get_common_type(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    enum hlsl_base_type base = params->args[0]->data_type->base_type;
+    bool vectors = false, matrices = false;
+    unsigned int dimx = 4, dimy = 4;
+    struct hlsl_type *common_type;
+    unsigned int i;
+
+    for (i = 0; i < params->args_count; ++i)
+    {
+        struct hlsl_type *arg_type = params->args[i]->data_type;
+
+        base = expr_common_base_type(base, arg_type->base_type);
+
+        if (arg_type->type == HLSL_CLASS_VECTOR)
+        {
+            vectors = true;
+            dimx = min(dimx, arg_type->dimx);
+        }
+        else if (arg_type->type == HLSL_CLASS_MATRIX)
+        {
+            matrices = true;
+            dimx = min(dimx, arg_type->dimx);
+            dimy = min(dimy, arg_type->dimy);
+        }
+    }
+
+    if (matrices && vectors)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Cannot use both matrices and vectors in an elementwise intrinsic.");
+        return NULL;
+    }
+    else if (matrices)
+    {
+        common_type = hlsl_get_matrix_type(ctx, base, dimx, dimy);
+    }
+    else if (vectors)
+    {
+        common_type = hlsl_get_vector_type(ctx, base, dimx);
+    }
+    else
+    {
+        common_type = hlsl_get_scalar_type(ctx, base);
+    }
+
+    return common_type;
+}
+
+static bool elementwise_intrinsic_convert_args(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *common_type;
+
+    if (!(common_type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+        return false;
+
+    return convert_args(ctx, params, common_type, loc);
+}
+
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2279,6 +2357,9 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *max;
+
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
 
     if (!(max = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], loc)))
         return false;
@@ -2361,6 +2442,9 @@ static bool intrinsic_ldexp(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
     if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
         return false;
 
@@ -2400,6 +2484,9 @@ static bool intrinsic_lerp(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg, *neg, *add, *mul;
 
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
     if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
         return false;
 
@@ -2418,12 +2505,18 @@ static bool intrinsic_lerp(struct hlsl_ctx *ctx,
 static bool intrinsic_max(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, params->args[0], params->args[1], loc);
 }
 
 static bool intrinsic_min(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, params->args[0], params->args[1], loc);
 }
 
@@ -2558,6 +2651,9 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *log, *exp, *arg, *mul;
 
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
+
     if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
         return false;
 
@@ -2602,21 +2698,18 @@ static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *min_arg, *max_arg, *x_arg, *p, *p_num, *p_denom, *res;
     struct hlsl_ir_constant *one, *minus_two, *three;
-    enum hlsl_type_class common_class;
     struct hlsl_type *common_type;
-    unsigned int dimx, dimy;
+
+    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+        return false;
 
     min_arg = params->args[0];
     max_arg = params->args[1];
     x_arg = params->args[2];
 
-    if (!expr_common_shape(ctx, min_arg->data_type, max_arg->data_type, loc, &common_class, &dimx, &dimy))
-        return false;
-    common_type = hlsl_get_numeric_type(ctx, common_class, HLSL_TYPE_FLOAT, dimx, dimy);
-
-    if (!expr_common_shape(ctx, common_type, x_arg->data_type, loc, &common_class, &dimx, &dimy))
-        return false;
-    common_type = hlsl_get_numeric_type(ctx, common_class, HLSL_TYPE_FLOAT, dimx, dimy);
+    common_type = x_arg->data_type;
+    common_type = hlsl_get_numeric_type(ctx, common_type->type, HLSL_TYPE_FLOAT, common_type->dimx,
+            common_type->dimy);
 
     if (!(min_arg = add_implicit_conversion(ctx, params->instrs, min_arg, common_type, loc)))
         return false;
