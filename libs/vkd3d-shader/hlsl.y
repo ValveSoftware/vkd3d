@@ -2661,16 +2661,15 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    if (!(log = hlsl_new_unary_expr(ctx, HLSL_OP1_LOG2, params->args[0], *loc)))
+    if (!(log = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_LOG2, params->args[0], loc)))
         return false;
-    list_add_tail(params->instrs, &log->entry);
 
     if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[1], log, loc)))
         return false;
 
-    if (!(exp = hlsl_new_unary_expr(ctx, HLSL_OP1_EXP2, mul, *loc)))
+    if (!(exp = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, mul, loc)))
         return false;
-    list_add_tail(params->instrs, &exp->entry);
+
     return true;
 }
 
