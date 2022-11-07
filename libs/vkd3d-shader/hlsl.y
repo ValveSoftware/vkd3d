@@ -1175,34 +1175,34 @@ static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
     }
 }
 
-static bool expr_compatible_data_types(struct hlsl_type *src, struct hlsl_type *dst)
+static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 {
-    if (src->base_type > HLSL_TYPE_LAST_SCALAR || dst->base_type > HLSL_TYPE_LAST_SCALAR)
+    if (t1->base_type > HLSL_TYPE_LAST_SCALAR || t2->base_type > HLSL_TYPE_LAST_SCALAR)
         return false;
 
     /* Scalar vars can be converted to pretty much everything */
-    if ((src->dimx == 1 && src->dimy == 1) || (dst->dimx == 1 && dst->dimy == 1))
+    if ((t1->dimx == 1 && t1->dimy == 1) || (t2->dimx == 1 && t2->dimy == 1))
         return true;
 
-    if (src->type == HLSL_CLASS_VECTOR && dst->type == HLSL_CLASS_VECTOR)
+    if (t1->type == HLSL_CLASS_VECTOR && t2->type == HLSL_CLASS_VECTOR)
         return true;
 
-    if (src->type == HLSL_CLASS_MATRIX || dst->type == HLSL_CLASS_MATRIX)
+    if (t1->type == HLSL_CLASS_MATRIX || t2->type == HLSL_CLASS_MATRIX)
     {
         /* Matrix-vector conversion is apparently allowed if either they have the same components
            count or the matrix is nx1 or 1xn */
-        if (src->type == HLSL_CLASS_VECTOR || dst->type == HLSL_CLASS_VECTOR)
+        if (t1->type == HLSL_CLASS_VECTOR || t2->type == HLSL_CLASS_VECTOR)
         {
-            if (hlsl_type_component_count(src) == hlsl_type_component_count(dst))
+            if (hlsl_type_component_count(t1) == hlsl_type_component_count(t2))
                 return true;
 
-            return (src->type == HLSL_CLASS_MATRIX && (src->dimx == 1 || src->dimy == 1))
-                    || (dst->type == HLSL_CLASS_MATRIX && (dst->dimx == 1 || dst->dimy == 1));
+            return (t1->type == HLSL_CLASS_MATRIX && (t1->dimx == 1 || t1->dimy == 1))
+                    || (t2->type == HLSL_CLASS_MATRIX && (t2->dimx == 1 || t2->dimy == 1));
         }
 
         /* Both matrices */
-        if ((src->dimx >= dst->dimx && src->dimy >= dst->dimy)
-                || (src->dimx <= dst->dimx && src->dimy <= dst->dimy))
+        if ((t1->dimx >= t2->dimx && t1->dimy >= t2->dimy)
+                || (t1->dimx <= t2->dimx && t1->dimy <= t2->dimy))
             return true;
     }
 
