@@ -288,3 +288,33 @@ float4 main(float4 pos : sv_position) : sv_target
 [test]
 draw quad
 probe all rgba (78.0, 96.0, 114.0, 0.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x3 a = float2x3(1, 2, 3, 4, 5, 6);
+    float3x2 b = float3x2(6, 5, 4, 3, 2, 1);
+
+    float2x2 r = mul(a, b);
+    return float4(r);
+}
+
+[test]
+draw quad
+probe all rgba (20.0, 14.0, 56.0, 41.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x2 a = float2x2(1, 2, 3, 4);
+    float2 b = float2(1, 2);
+
+    float2 r = mul(a, b);
+    return float4(r, 0, 0);
+}
+
+[test]
+draw quad
+probe all rgba (5.0, 11.0, 0.0, 0.0)

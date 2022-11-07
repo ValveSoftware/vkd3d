@@ -34,3 +34,31 @@ uniform 4 int4 0 -10 10 1000000
 uniform 8 int4 0 1 -1 1000000
 draw quad
 probe all rgba (2.0, -10.0, -2.0, 1e12)
+
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    float3x2 a = {6, 5, 4, 3, 2, 1};
+    float2x3 b = {1, 2, 3, 4.2, 5.2, 6.2};
+    float3x4 c = 2.4;
+
+    float2x2 r = lerp(a, b, c);
+    return float4(r);
+}
+
+[test]
+todo draw quad
+todo probe all rgba (-6.0, -2.2, 4.48, 8.28)
+
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float2x2 a = {0, 1, 2, 3};
+    float2x2 b = {1, 2, 3, 4};
+    float4 c = {0.5, 0.5, 0.5, 0.5};
+
+    lerp(a, b, c);
+    return 0;
+}
