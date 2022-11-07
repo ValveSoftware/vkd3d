@@ -3359,8 +3359,6 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     struct register_allocator allocator = {0};
     struct hlsl_ir_var *var;
 
-    allocate_const_registers_recurse(ctx, &entry_func->body, &allocator);
-
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (var->is_uniform && var->last_read)
@@ -3376,6 +3374,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
+
+    allocate_const_registers_recurse(ctx, &entry_func->body, &allocator);
 
     vkd3d_free(allocator.allocations);
 }
