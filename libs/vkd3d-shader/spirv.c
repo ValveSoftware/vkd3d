@@ -5518,13 +5518,14 @@ static void spirv_compiler_emit_push_constant_buffers(struct spirv_compiler *com
 
     struct_id = vkd3d_spirv_build_op_type_struct(builder, member_ids, count);
     vkd3d_spirv_build_op_decorate(builder, struct_id, SpvDecorationBlock, NULL, 0);
-    vkd3d_spirv_build_op_name(builder, struct_id, "push_cb");
+    vkd3d_spirv_build_op_name(builder, struct_id, "push_cb_struct");
     vkd3d_free(member_ids);
 
     pointer_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, struct_id);
     var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
             pointer_type_id, storage_class, 0);
     compiler->push_constants_var_id = var_id;
+    vkd3d_spirv_build_op_name(builder, var_id, "push_cb");
 
     for (i = 0, j = 0; i < compiler->shader_interface.push_constant_buffer_count; ++i)
     {
