@@ -120,6 +120,18 @@ float4 main() : sv_target
 }
 
 
+[pixel shader fail]
+// Note: Only valid in shader model 5.1
+RWTexture2D<float4> tex[3];
+uniform int n;
+
+float4 main() : sv_target
+{
+    tex[n][int2(0, 0)] = 0.6;
+    return 0;
+}
+
+
 [pixel shader todo]
 Texture2D tex;
 uniform float f;

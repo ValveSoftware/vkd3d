@@ -1024,6 +1024,18 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
             note_non_static_deref_expressions(ctx, &load->sampler, "resource load sampler");
         }
     }
+    else if (instr->type == HLSL_IR_RESOURCE_STORE)
+    {
+        struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
+
+        if (!hlsl_component_index_range_from_deref(ctx, &store->resource, &start, &count))
+        {
+            hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
+                    "Accessed resource from \"%s\" must be determinable at compile time.",
+                    store->resource.var->name);
+            note_non_static_deref_expressions(ctx, &store->resource, "accessed resource");
+        }
+    }
 
     return false;
 }
