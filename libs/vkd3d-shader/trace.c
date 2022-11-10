@@ -1930,7 +1930,8 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
             case VKD3DSIH_ENDIF:
             case VKD3DSIH_ENDLOOP:
             case VKD3DSIH_ENDSWITCH:
-                --indent;
+                if (indent)
+                    --indent;
                 break;
 
             default:
