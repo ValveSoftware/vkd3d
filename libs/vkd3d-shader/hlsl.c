@@ -540,7 +540,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
 {
     unsigned int path_len, path_index, deref_path_len, i;
     struct hlsl_type *path_type;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
 
     hlsl_block_init(block);
 
@@ -571,9 +571,9 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
             hlsl_block_cleanup(block);
             return false;
         }
-        hlsl_block_add_instr(block, &c->node);
+        hlsl_block_add_instr(block, c);
 
-        hlsl_src_from_node(&deref->path[deref_path_len++], &c->node);
+        hlsl_src_from_node(&deref->path[deref_path_len++], c);
     }
 
     assert(deref_path_len == deref->path_len);
@@ -1194,7 +1194,7 @@ struct hlsl_ir_node *hlsl_new_int_constant(struct hlsl_ctx *ctx, int32_t n, cons
     return &c->node;
 }
 
-struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
+struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_constant *c;
@@ -1204,7 +1204,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
     if (c)
         c->value.u[0].u = n;
 
-    return c;
+    return &c->node;
 }
 
 struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,

@@ -689,16 +689,15 @@ static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list
 static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
         unsigned int idx, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *index;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *index, *c;
 
     assert(idx < record->data_type->e.record.field_count);
 
     if (!(c = hlsl_new_uint_constant(ctx, idx, loc)))
         return false;
-    list_add_tail(instrs, &c->node.entry);
+    list_add_tail(instrs, &c->entry);
 
-    if (!(index = hlsl_new_index(ctx, record, &c->node, loc)))
+    if (!(index = hlsl_new_index(ctx, record, c, loc)))
         return false;
     list_add_tail(instrs, &index->entry);
 
@@ -1754,8 +1753,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
-            struct hlsl_ir_node *cell, *load, *store;
-            struct hlsl_ir_constant *c;
+            struct hlsl_ir_node *cell, *load, *store, *c;
             struct hlsl_deref deref;
 
             if (!(writemask & (1 << i)))
@@ -1763,9 +1761,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &lhs->loc)))
                 return NULL;
-            list_add_tail(instrs, &c->node.entry);
+            list_add_tail(instrs, &c->entry);
 
-            if (!(cell = hlsl_new_index(ctx, &row->node, &c->node, &lhs->loc)))
+            if (!(cell = hlsl_new_index(ctx, &row->node, c, &lhs->loc)))
                 return NULL;
             list_add_tail(instrs, &cell->entry);
 
@@ -2162,8 +2160,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
-            struct hlsl_ir_node *cast, *store;
-            struct hlsl_ir_constant *zero;
+            struct hlsl_ir_node *cast, *store, *zero;
 
             /* Initialize statics to zero by default. */
 
@@ -2178,9 +2175,9 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 vkd3d_free(v);
                 continue;
             }
-            list_add_tail(&ctx->static_initializers, &zero->node.entry);
+            list_add_tail(&ctx->static_initializers, &zero->entry);
 
-            if (!(cast = add_cast(ctx, &ctx->static_initializers, &zero->node, var->data_type, &var->loc)))
+            if (!(cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc)))
             {
                 vkd3d_free(v);
                 continue;

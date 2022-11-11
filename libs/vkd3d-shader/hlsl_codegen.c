@@ -27,7 +27,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
         enum hlsl_regset regset, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *idx_offset = NULL;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
 
     hlsl_block_init(block);
 
@@ -41,9 +41,9 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
         {
             if (!(c = hlsl_new_uint_constant(ctx, 4, loc)))
                 return NULL;
-            hlsl_block_add_instr(block, &c->node);
+            hlsl_block_add_instr(block, c);
 
-            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, c, idx)))
                 return NULL;
             hlsl_block_add_instr(block, idx_offset);
 
@@ -56,9 +56,9 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
                 return NULL;
-            hlsl_block_add_instr(block, &c->node);
+            hlsl_block_add_instr(block, c);
 
-            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
+            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, c, idx)))
                 return NULL;
             hlsl_block_add_instr(block, idx_offset);
 
@@ -72,9 +72,9 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset[regset], loc)))
                 return NULL;
-            hlsl_block_add_instr(block, &c->node);
+            hlsl_block_add_instr(block, c);
 
-            idx_offset = &c->node;
+            idx_offset = c;
 
             break;
         }
@@ -333,7 +333,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_ir_var *var = lhs->src.var;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
     unsigned int i;
 
     if (type->class > HLSL_CLASS_LAST_NUMERIC)
@@ -373,11 +373,11 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_after(&cast->entry, &c->node.entry);
+            list_add_after(&cast->entry, &c->entry);
 
-            if (!(store = hlsl_new_store_index(ctx, &lhs->src, &c->node, cast, 0, &var->loc)))
+            if (!(store = hlsl_new_store_index(ctx, &lhs->src, c, cast, 0, &var->loc)))
                 return;
-            list_add_after(&c->node.entry, &store->entry);
+            list_add_after(&c->entry, &store->entry);
         }
         else
         {
@@ -396,7 +396,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_type *type = lhs->node.data_type;
     struct hlsl_ir_var *var = lhs->src.var;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
     unsigned int i;
 
     if (type->class == HLSL_CLASS_ARRAY || type->class == HLSL_CLASS_STRUCT)
@@ -425,12 +425,12 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_after(&lhs->node.entry, &c->node.entry);
+            list_add_after(&lhs->node.entry, &c->entry);
 
             /* This redundant load is expected to be deleted later by DCE. */
-            if (!(element_load = hlsl_new_load_index(ctx, &lhs->src, &c->node, loc)))
+            if (!(element_load = hlsl_new_load_index(ctx, &lhs->src, c, loc)))
                 return;
-            list_add_after(&c->node.entry, &element_load->node.entry);
+            list_add_after(&c->entry, &element_load->node.entry);
 
             prepend_input_copy_recurse(ctx, instrs, element_load, modifiers, semantic, elem_semantic_index);
         }
@@ -461,7 +461,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct vkd3d_shader_location *loc = &rhs->node.loc;
     struct hlsl_ir_var *var = rhs->src.var;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
     unsigned int i;
 
     if (type->class > HLSL_CLASS_LAST_NUMERIC)
@@ -490,9 +490,9 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_tail(instrs, &c->node.entry);
+            list_add_tail(instrs, &c->entry);
 
-            if (!(load = hlsl_new_load_index(ctx, &rhs->src, &c->node, &var->loc)))
+            if (!(load = hlsl_new_load_index(ctx, &rhs->src, c, &var->loc)))
                 return;
             list_add_tail(instrs, &load->node.entry);
         }
@@ -517,7 +517,7 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
     struct vkd3d_shader_location *loc = &rhs->node.loc;
     struct hlsl_type *type = rhs->node.data_type;
     struct hlsl_ir_var *var = rhs->src.var;
-    struct hlsl_ir_constant *c;
+    struct hlsl_ir_node *c;
     unsigned int i;
 
     if (type->class == HLSL_CLASS_ARRAY || type->class == HLSL_CLASS_STRUCT)
@@ -546,9 +546,9 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_tail(instrs, &c->node.entry);
+            list_add_tail(instrs, &c->entry);
 
-            if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, &c->node, loc)))
+            if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, c, loc)))
                 return;
             list_add_tail(instrs, &element_load->node.entry);
 
@@ -864,10 +864,9 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
         const struct vkd3d_shader_location *loc)
 {
     unsigned int dim_count = index->data_type->dimx;
+    struct hlsl_ir_node *store, *zero;
     struct hlsl_ir_load *coords_load;
     struct hlsl_deref coords_deref;
-    struct hlsl_ir_constant *zero;
-    struct hlsl_ir_node *store;
     struct hlsl_ir_var *coords;
 
     assert(dim_count < 4);
@@ -883,11 +882,11 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
 
     if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
         return NULL;
-    list_add_after(&store->entry, &zero->node.entry);
+    list_add_after(&store->entry, &zero->entry);
 
-    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, &zero->node, 1u << dim_count, loc)))
+    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, zero, 1u << dim_count, loc)))
         return NULL;
-    list_add_after(&zero->node.entry, &store->entry);
+    list_add_after(&zero->entry, &store->entry);
 
     if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
         return NULL;
@@ -963,13 +962,13 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
-            struct hlsl_ir_constant *c;
+            struct hlsl_ir_node *c;
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &instr->loc)))
                 return false;
-            list_add_before(&instr->entry, &c->node.entry);
+            list_add_before(&instr->entry, &c->entry);
 
-            if (!(load = hlsl_new_load_index(ctx, &var_deref, &c->node, &instr->loc)))
+            if (!(load = hlsl_new_load_index(ctx, &var_deref, c, &instr->loc)))
                 return false;
             list_add_before(&instr->entry, &load->node.entry);
 
@@ -977,7 +976,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
                 return false;
             list_add_before(&instr->entry, &load->node.entry);
 
-            if (!(store = hlsl_new_store_index(ctx, &row_deref, &c->node, &load->node, 0, &instr->loc)))
+            if (!(store = hlsl_new_store_index(ctx, &row_deref, c, &load->node, 0, &instr->loc)))
                 return false;
             list_add_before(&instr->entry, &store->entry);
         }
@@ -1766,19 +1765,18 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
         const struct hlsl_ir_load *load, const unsigned int idx, struct hlsl_type *type)
 {
-    struct hlsl_ir_node *split_store;
+    struct hlsl_ir_node *split_store, *c;
     struct hlsl_ir_load *split_load;
-    struct hlsl_ir_constant *c;
 
     if (!(c = hlsl_new_uint_constant(ctx, idx, &store->node.loc)))
         return false;
-    list_add_before(&store->node.entry, &c->node.entry);
+    list_add_before(&store->node.entry, &c->entry);
 
-    if (!(split_load = hlsl_new_load_index(ctx, &load->src, &c->node, &store->node.loc)))
+    if (!(split_load = hlsl_new_load_index(ctx, &load->src, c, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &split_load->node.entry);
 
-    if (!(split_store = hlsl_new_store_index(ctx, &store->lhs, &c->node, &split_load->node, 0, &store->node.loc)))
+    if (!(split_store = hlsl_new_store_index(ctx, &store->lhs, c, &split_load->node, 0, &store->node.loc)))
         return false;
     list_add_before(&store->node.entry, &split_store->entry);
 
