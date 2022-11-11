@@ -1263,7 +1263,7 @@ struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     return hlsl_new_load_index(ctx, &var_deref, NULL, loc);
 }
 
-struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+struct hlsl_ir_node *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, unsigned int comp, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *type, *comp_type;
@@ -1288,7 +1288,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
 
     hlsl_block_add_instr(block, &load->node);
 
-    return load;
+    return &load->node;
 }
 
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,

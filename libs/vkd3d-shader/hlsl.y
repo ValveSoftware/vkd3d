@@ -628,7 +628,7 @@ static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list
 {
     const struct hlsl_deref *src;
     struct hlsl_ir_store *store;
-    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *load;
     struct hlsl_block block;
     struct hlsl_ir_var *var;
 
@@ -645,7 +645,7 @@ static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list
         return NULL;
     list_move_tail(instrs, &block.instrs);
 
-    return &load->node;
+    return load;
 }
 
 static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
