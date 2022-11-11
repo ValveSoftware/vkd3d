@@ -1753,8 +1753,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
-            struct hlsl_ir_node *cell, *load;
-            struct hlsl_ir_store *store;
+            struct hlsl_ir_node *cell, *load, *store;
             struct hlsl_ir_constant *c;
             struct hlsl_deref deref;
 
@@ -1780,13 +1779,13 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
                 hlsl_cleanup_deref(&deref);
                 return NULL;
             }
-            list_add_tail(instrs, &store->node.entry);
+            list_add_tail(instrs, &store->entry);
             hlsl_cleanup_deref(&deref);
         }
     }
     else
     {
-        struct hlsl_ir_store *store;
+        struct hlsl_ir_node *store;
         struct hlsl_deref deref;
 
         if (!hlsl_init_deref_from_index_chain(ctx, &deref, lhs))
@@ -1797,7 +1796,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             hlsl_cleanup_deref(&deref);
             return NULL;
         }
-        list_add_tail(instrs, &store->node.entry);
+        list_add_tail(instrs, &store->entry);
         hlsl_cleanup_deref(&deref);
     }
 

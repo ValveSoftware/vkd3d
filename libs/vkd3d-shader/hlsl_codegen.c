@@ -353,10 +353,9 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        struct hlsl_ir_store *store;
+        struct hlsl_ir_node *store, *cast;
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
-        struct hlsl_ir_node *cast;
 
         if (!(input = add_semantic_var(ctx, var, vector_type_src, modifiers, semantic,
                 semantic_index + i, false, loc)))
@@ -378,7 +377,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
             if (!(store = hlsl_new_store_index(ctx, &lhs->src, &c->node, cast, 0, &var->loc)))
                 return;
-            list_add_after(&c->node.entry, &store->node.entry);
+            list_add_after(&c->node.entry, &store->entry);
         }
         else
         {
@@ -386,7 +385,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
             if (!(store = hlsl_new_store_index(ctx, &lhs->src, NULL, cast, 0, &var->loc)))
                 return;
-            list_add_after(&cast->entry, &store->node.entry);
+            list_add_after(&cast->entry, &store->entry);
         }
     }
 }
@@ -868,7 +867,7 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     struct hlsl_ir_load *coords_load;
     struct hlsl_deref coords_deref;
     struct hlsl_ir_constant *zero;
-    struct hlsl_ir_store *store;
+    struct hlsl_ir_node *store;
     struct hlsl_ir_var *coords;
 
     assert(dim_count < 4);
@@ -880,19 +879,19 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     hlsl_init_simple_deref_from_var(&coords_deref, coords);
     if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
         return NULL;
-    list_add_after(&index->entry, &store->node.entry);
+    list_add_after(&index->entry, &store->entry);
 
     if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
         return NULL;
-    list_add_after(&store->node.entry, &zero->node.entry);
+    list_add_after(&store->entry, &zero->node.entry);
 
     if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, &zero->node, 1u << dim_count, loc)))
         return NULL;
-    list_add_after(&zero->node.entry, &store->node.entry);
+    list_add_after(&zero->node.entry, &store->entry);
 
     if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
         return NULL;
-    list_add_after(&store->node.entry, &coords_load->node.entry);
+    list_add_after(&store->entry, &coords_load->node.entry);
 
     return &coords_load->node;
 }
@@ -964,7 +963,6 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
-            struct hlsl_ir_store *store;
             struct hlsl_ir_constant *c;
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &instr->loc)))
@@ -981,7 +979,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
             if (!(store = hlsl_new_store_index(ctx, &row_deref, &c->node, &load->node, 0, &instr->loc)))
                 return false;
-            list_add_before(&instr->entry, &store->node.entry);
+            list_add_before(&instr->entry, &store->entry);
         }
 
         if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
@@ -1769,7 +1767,7 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
         const struct hlsl_ir_load *load, const unsigned int idx, struct hlsl_type *type)
 {
-    struct hlsl_ir_store *split_store;
+    struct hlsl_ir_node *split_store;
     struct hlsl_ir_load *split_load;
     struct hlsl_ir_constant *c;
 
@@ -1783,7 +1781,7 @@ static bool split_copy(struct hlsl_ctx *ctx, struct hlsl_ir_store *store,
 
     if (!(split_store = hlsl_new_store_index(ctx, &store->lhs, &c->node, &split_load->node, 0, &store->node.loc)))
         return false;
-    list_add_before(&store->node.entry, &split_store->node.entry);
+    list_add_before(&store->node.entry, &split_store->entry);
 
     return true;
 }

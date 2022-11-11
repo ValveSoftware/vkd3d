@@ -1067,16 +1067,13 @@ static void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
 
 struct hlsl_ir_node *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
 {
-    struct hlsl_ir_store *store;
     struct hlsl_deref lhs_deref;
 
     hlsl_init_simple_deref_from_var(&lhs_deref, lhs);
-    if (!(store = hlsl_new_store_index(ctx, &lhs_deref, NULL, rhs, 0, &rhs->loc)))
-        return NULL;
-    return &store->node;
+    return hlsl_new_store_index(ctx, &lhs_deref, NULL, rhs, 0, &rhs->loc);
 }
 
-struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hlsl_deref *lhs,
+struct hlsl_ir_node *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hlsl_deref *lhs,
         struct hlsl_ir_node *idx, struct hlsl_ir_node *rhs, unsigned int writemask, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_store *store;
@@ -1105,7 +1102,7 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
         writemask = (1 << rhs->data_type->dimx) - 1;
     store->writemask = writemask;
 
-    return store;
+    return &store->node;
 }
 
 bool hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
