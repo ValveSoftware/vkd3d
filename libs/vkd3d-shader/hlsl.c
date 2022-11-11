@@ -1149,8 +1149,7 @@ struct hlsl_ir_node *hlsl_new_float_constant(struct hlsl_ctx *ctx, float f,
     return &c->node;
 }
 
-struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
-        const struct vkd3d_shader_location *loc)
+struct hlsl_ir_node *hlsl_new_int_constant(struct hlsl_ctx *ctx, int32_t n, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_constant *c;
 
@@ -1159,7 +1158,7 @@ struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
     if (c)
         c->value[0].i = n;
 
-    return c;
+    return &c->node;
 }
 
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,

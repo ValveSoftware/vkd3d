@@ -1839,7 +1839,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *lhs = node_from_list(instrs);
-    struct hlsl_ir_constant *one;
+    struct hlsl_ir_node *one;
 
     if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
@@ -1847,9 +1847,9 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
 
     if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
         return false;
-    list_add_tail(instrs, &one->node.entry);
+    list_add_tail(instrs, &one->entry);
 
-    if (!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, &one->node))
+    if (!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
         return false;
 
     if (post)
@@ -5389,11 +5389,11 @@ primary_expr:
         }
     | C_INTEGER
         {
-            struct hlsl_ir_constant *c;
+            struct hlsl_ir_node *c;
 
             if (!(c = hlsl_new_int_constant(ctx, $1, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, &c->node)))
+            if (!($$ = make_list(ctx, c)))
                 YYABORT;
         }
     | boolean
