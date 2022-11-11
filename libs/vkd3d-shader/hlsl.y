@@ -459,6 +459,7 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
         struct list *iter, struct list *body, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_loop *loop = NULL;
+    struct hlsl_block body_block;
     unsigned int i;
 
     if (attribute_list_has_duplicates(attributes))
@@ -494,23 +495,25 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
     if (!init && !(init = make_empty_list(ctx)))
         goto oom;
 
-    if (!(loop = hlsl_new_loop(ctx, loc)))
-        goto oom;
-    list_add_tail(init, &loop->node.entry);
-
     if (!append_conditional_break(ctx, cond))
         goto oom;
 
-    if (type != LOOP_DO_WHILE)
-        list_move_tail(&loop->body.instrs, cond);
+    hlsl_block_init(&body_block);
 
-    list_move_tail(&loop->body.instrs, body);
+    if (type != LOOP_DO_WHILE)
+        list_move_tail(&body_block.instrs, cond);
+
+    list_move_tail(&body_block.instrs, body);
 
     if (iter)
-        list_move_tail(&loop->body.instrs, iter);
+        list_move_tail(&body_block.instrs, iter);
 
     if (type == LOOP_DO_WHILE)
-        list_move_tail(&loop->body.instrs, cond);
+        list_move_tail(&body_block.instrs, cond);
+
+    if (!(loop = hlsl_new_loop(ctx, &body_block, loc)))
+        goto oom;
+    list_add_tail(init, &loop->node.entry);
 
     vkd3d_free(cond);
     vkd3d_free(body);

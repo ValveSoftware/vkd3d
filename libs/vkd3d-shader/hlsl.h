@@ -1109,7 +1109,8 @@ bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index);
 
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
