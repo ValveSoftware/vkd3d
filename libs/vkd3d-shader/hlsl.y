@@ -1778,9 +1778,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     if (lhs->type == HLSL_IR_RESOURCE_LOAD)
     {
         struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(lhs);
-        struct hlsl_ir_resource_store *store;
         struct hlsl_type *resource_type;
         struct hlsl_ir_swizzle *coords;
+        struct hlsl_ir_node *store;
         unsigned int dim_count;
 
         /* Such an lvalue was produced by an index expression. */
@@ -1809,7 +1809,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
         if (!(store = hlsl_new_resource_store(ctx, &load->resource, &coords->node, rhs, &lhs->loc)))
             return NULL;
-        list_add_tail(instrs, &store->node.entry);
+        list_add_tail(instrs, &store->entry);
     }
     else if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_noncontiguous(hlsl_ir_index(lhs)))
     {

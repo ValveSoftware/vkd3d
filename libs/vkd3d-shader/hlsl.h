@@ -1113,7 +1113,7 @@ struct hlsl_ir_node *hlsl_new_loop(struct hlsl_ctx *ctx,
         struct hlsl_block *block, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
+struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,
         struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
         struct hlsl_struct_field *fields, size_t field_count);
