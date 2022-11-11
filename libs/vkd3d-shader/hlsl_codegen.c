@@ -516,10 +516,9 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 static void insert_early_return_break(struct hlsl_ctx *ctx,
         struct hlsl_ir_function_decl *func, struct hlsl_ir_node *cf_instr)
 {
+    struct hlsl_ir_node *iff, *jump;
     struct hlsl_block then_block;
-    struct hlsl_ir_jump *jump;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_node *iff;
 
     hlsl_block_init(&then_block);
 
@@ -529,7 +528,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &cf_instr->loc)))
         return;
-    hlsl_block_add_instr(&then_block, &jump->node);
+    hlsl_block_add_instr(&then_block, jump);
 
     if (!(iff = hlsl_new_if(ctx, &load->node, &then_block, NULL, &cf_instr->loc)))
         return;

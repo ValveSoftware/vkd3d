@@ -407,9 +407,8 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod,
 
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_list)
 {
-    struct hlsl_ir_node *condition, *not, *iff;
+    struct hlsl_ir_node *condition, *not, *iff, *jump;
     struct hlsl_block then_block;
-    struct hlsl_ir_jump *jump;
 
     /* E.g. "for (i = 0; ; ++i)". */
     if (list_empty(cond_list))
@@ -424,7 +423,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &condition->loc)))
         return false;
-    hlsl_block_add_instr(&then_block, &jump->node);
+    hlsl_block_add_instr(&then_block, jump);
 
     if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
         return false;
@@ -585,11 +584,11 @@ static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_
     return NULL;
 }
 
-static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs,
+static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *return_value, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *return_type = ctx->cur_function->return_type;
-    struct hlsl_ir_jump *jump;
+    struct hlsl_ir_node *jump;
 
     if (ctx->cur_function->return_var)
     {
@@ -598,16 +597,16 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
             struct hlsl_ir_store *store;
 
             if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, loc)))
-                return NULL;
+                return false;
 
             if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
-                return NULL;
+                return false;
             list_add_after(&return_value->entry, &store->node.entry);
         }
         else
         {
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void functions must return a value.");
-            return NULL;
+            return false;
         }
     }
     else
@@ -617,10 +616,10 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     }
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, loc)))
-        return NULL;
-    list_add_tail(instrs, &jump->node.entry);
+        return false;
+    list_add_tail(instrs, &jump->entry);
 
-    return jump;
+    return true;
 }
 
 static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,

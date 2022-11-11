@@ -1070,8 +1070,8 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 struct hlsl_ir_node *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition,
         struct hlsl_block *then_block, struct hlsl_block *else_block, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_int_constant(struct hlsl_ctx *ctx, int32_t n, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type,
-        const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_jump(struct hlsl_ctx *ctx,
+        enum hlsl_ir_jump_type type, const struct vkd3d_shader_location *loc);
 
 void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_var *var);
 
