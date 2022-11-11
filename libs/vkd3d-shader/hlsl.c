@@ -1373,7 +1373,7 @@ struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct 
     return &store->node;
 }
 
-struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
+struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_swizzle *swizzle;
@@ -1388,7 +1388,7 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
-    return swizzle;
+    return &swizzle->node;
 }
 
 bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index)
@@ -1687,12 +1687,8 @@ static struct hlsl_ir_node *clone_store(struct hlsl_ctx *ctx, struct clone_instr
 static struct hlsl_ir_node *clone_swizzle(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, struct hlsl_ir_swizzle *src)
 {
-    struct hlsl_ir_swizzle *dst;
-
-    if (!(dst = hlsl_new_swizzle(ctx, src->swizzle, src->node.data_type->dimx,
-            map_instr(map, src->val.node), &src->node.loc)))
-        return NULL;
-    return &dst->node;
+    return hlsl_new_swizzle(ctx, src->swizzle, src->node.data_type->dimx,
+            map_instr(map, src->val.node), &src->node.loc);
 }
 
 static struct hlsl_ir_node *clone_index(struct hlsl_ctx *ctx, struct clone_instr_map *map,

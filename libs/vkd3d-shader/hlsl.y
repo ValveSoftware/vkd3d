@@ -543,7 +543,7 @@ static void free_parse_initializer(struct parse_initializer *initializer)
     vkd3d_free(initializer->args);
 }
 
-static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_node *value, const char *swizzle,
+static struct hlsl_ir_node *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_node *value, const char *swizzle,
         struct vkd3d_shader_location *loc)
 {
     unsigned int len = strlen(swizzle), component = 0;
@@ -1680,8 +1680,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
-            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs), *new_swizzle;
+            struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
             unsigned int width, s = swizzle->swizzle;
+            struct hlsl_ir_node *new_swizzle;
 
             if (lhs->data_type->class == HLSL_CLASS_MATRIX)
                 hlsl_fixme(ctx, &lhs->loc, "Matrix assignment with a writemask.");
@@ -1696,10 +1697,10 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             {
                 return NULL;
             }
-            list_add_tail(instrs, &new_swizzle->node.entry);
+            list_add_tail(instrs, &new_swizzle->entry);
 
             lhs = swizzle->val.node;
-            rhs = &new_swizzle->node;
+            rhs = new_swizzle;
         }
         else
         {
@@ -2548,7 +2549,7 @@ static bool intrinsic_cos(struct hlsl_ctx *ctx,
 static bool intrinsic_cross(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_swizzle *arg1_swzl1, *arg1_swzl2, *arg2_swzl1, *arg2_swzl2;
+    struct hlsl_ir_node *arg1_swzl1, *arg1_swzl2, *arg2_swzl1, *arg2_swzl2;
     struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1];
     struct hlsl_ir_node *arg1_cast, *arg2_cast, *mul1_neg, *mul1, *mul2;
     struct hlsl_type *cast_type;
@@ -2569,14 +2570,13 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
 
     if (!(arg1_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg1_cast, loc)))
         return false;
-    list_add_tail(params->instrs, &arg1_swzl1->node.entry);
+    list_add_tail(params->instrs, &arg1_swzl1->entry);
 
     if (!(arg2_swzl1 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg2_cast, loc)))
         return false;
-    list_add_tail(params->instrs, &arg2_swzl1->node.entry);
+    list_add_tail(params->instrs, &arg2_swzl1->entry);
 
-    if (!(mul1 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL,
-            &arg1_swzl1->node, &arg2_swzl1->node, loc)))
+    if (!(mul1 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1_swzl1, arg2_swzl1, loc)))
         return false;
 
     if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, loc)))
@@ -2585,14 +2585,13 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
 
     if (!(arg1_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Z, X, Y), 3, arg1_cast, loc)))
         return false;
-    list_add_tail(params->instrs, &arg1_swzl2->node.entry);
+    list_add_tail(params->instrs, &arg1_swzl2->entry);
 
     if (!(arg2_swzl2 = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, X, Y, Z), 3, arg2_cast, loc)))
         return false;
-    list_add_tail(params->instrs, &arg2_swzl2->node.entry);
+    list_add_tail(params->instrs, &arg2_swzl2->entry);
 
-    if (!(mul2 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL,
-            &arg1_swzl2->node, &arg2_swzl2->node, loc)))
+    if (!(mul2 = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg1_swzl2, arg2_swzl2, loc)))
         return false;
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, mul2, mul1_neg, loc);
@@ -3421,9 +3420,8 @@ static bool intrinsic_trunc(struct hlsl_ctx *ctx,
 static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *ret, *c;
+    struct hlsl_ir_node *arg = params->args[0], *ret, *c, *swizzle;
     struct hlsl_type *arg_type = arg->data_type;
-    struct hlsl_ir_swizzle *swizzle;
 
     if (arg_type->class != HLSL_CLASS_SCALAR && !(arg_type->class == HLSL_CLASS_VECTOR && arg_type->dimx == 4))
     {
@@ -3449,9 +3447,9 @@ static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
     {
         if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, Y, X, W), 4, arg, loc)))
             return false;
-        list_add_tail(params->instrs, &swizzle->node.entry);
+        list_add_tail(params->instrs, &swizzle->entry);
 
-        arg = &swizzle->node;
+        arg = swizzle;
     }
 
     if (!(ret = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, c, loc)))
@@ -5732,14 +5730,14 @@ postfix_expr:
             }
             else if (node->data_type->class <= HLSL_CLASS_LAST_NUMERIC)
             {
-                struct hlsl_ir_swizzle *swizzle;
+                struct hlsl_ir_node *swizzle;
 
                 if (!(swizzle = get_swizzle(ctx, node, $3, &@3)))
                 {
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
                     YYABORT;
                 }
-                list_add_tail($1, &swizzle->node.entry);
+                list_add_tail($1, &swizzle->entry);
                 $$ = $1;
             }
             else

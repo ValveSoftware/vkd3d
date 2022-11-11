@@ -1014,8 +1014,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
 
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && src_type->dimx == 1)
     {
-        struct hlsl_ir_node *replacement, *new_cast;
-        struct hlsl_ir_swizzle *swizzle;
+        struct hlsl_ir_node *replacement, *new_cast, *swizzle;
 
         dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->base_type);
         /* We need to preserve the cast since it might be doing more than just
@@ -1029,8 +1028,8 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
         {
             if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, replacement, &cast->node.loc)))
                 return false;
-            list_add_after(&new_cast->entry, &swizzle->node.entry);
-            replacement = &swizzle->node;
+            list_add_after(&new_cast->entry, &swizzle->entry);
+            replacement = swizzle;
         }
 
         hlsl_replace_node(&cast->node, replacement);
@@ -1308,12 +1307,12 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
 
     if (instr->data_type->class != HLSL_CLASS_OBJECT)
     {
-        struct hlsl_ir_swizzle *swizzle_node;
+        struct hlsl_ir_node *swizzle_node;
 
         if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, instr_component_count, new_instr, &instr->loc)))
             return false;
-        list_add_before(&instr->entry, &swizzle_node->node.entry);
-        new_instr = &swizzle_node->node;
+        list_add_before(&instr->entry, &swizzle_node->entry);
+        new_instr = swizzle_node;
     }
 
     hlsl_replace_node(instr, new_instr);
@@ -1913,8 +1912,7 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
 
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && dst_type->dimx < src_type->dimx)
     {
-        struct hlsl_ir_swizzle *swizzle;
-        struct hlsl_ir_node *new_cast;
+        struct hlsl_ir_node *new_cast, *swizzle;
 
         dst_vector_type = hlsl_get_vector_type(ctx, dst_type->base_type, src_type->dimx);
         /* We need to preserve the cast since it might be doing more than just
@@ -1924,9 +1922,9 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
         list_add_after(&cast->node.entry, &new_cast->entry);
         if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dst_type->dimx, new_cast, &cast->node.loc)))
             return false;
-        list_add_after(&new_cast->entry, &swizzle->node.entry);
+        list_add_after(&new_cast->entry, &swizzle->entry);
 
-        hlsl_replace_node(&cast->node, &swizzle->node);
+        hlsl_replace_node(&cast->node, swizzle);
         return true;
     }
 
@@ -1946,8 +1944,7 @@ static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
     if (next_instr->type == HLSL_IR_SWIZZLE)
     {
-        struct hlsl_ir_swizzle *new_swizzle;
-        struct hlsl_ir_node *new_instr;
+        struct hlsl_ir_node *new_swizzle;
         unsigned int combined_swizzle;
 
         combined_swizzle = hlsl_combine_swizzles(hlsl_ir_swizzle(next_instr)->swizzle,
@@ -1957,9 +1954,8 @@ static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         if (!(new_swizzle = hlsl_new_swizzle(ctx, combined_swizzle, instr->data_type->dimx, next_instr, &instr->loc)))
             return false;
 
-        new_instr = &new_swizzle->node;
-        list_add_before(&instr->entry, &new_instr->entry);
-        hlsl_replace_node(instr, new_instr);
+        list_add_before(&instr->entry, &new_swizzle->entry);
+        hlsl_replace_node(instr, new_swizzle);
         return true;
     }
 
@@ -2032,8 +2028,7 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *c
 /* Lower DP2 to MUL + ADD */
 static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement, *zero;
-    struct hlsl_ir_swizzle *add_x, *add_y;
+    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement, *zero, *add_x, *add_y;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -2069,13 +2064,13 @@ static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *co
 
         if (!(add_x = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), instr->data_type->dimx, mul, &expr->node.loc)))
             return false;
-        list_add_before(&instr->entry, &add_x->node.entry);
+        list_add_before(&instr->entry, &add_x->entry);
 
         if (!(add_y = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Y, Y, Y), instr->data_type->dimx, mul, &expr->node.loc)))
             return false;
-        list_add_before(&instr->entry, &add_y->node.entry);
+        list_add_before(&instr->entry, &add_y->entry);
 
-        if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, &add_x->node, &add_y->node)))
+        if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, add_x, add_y)))
             return false;
     }
     list_add_before(&instr->entry, &replacement->entry);
