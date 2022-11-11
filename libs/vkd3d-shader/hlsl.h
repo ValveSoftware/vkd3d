@@ -1061,7 +1061,7 @@ struct hlsl_ir_node *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
         struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *data_type, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx,
+struct hlsl_ir_node *hlsl_new_float_constant(struct hlsl_ctx *ctx,
         float f, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
         struct hlsl_type *return_type, const struct hlsl_func_parameters *parameters,
