@@ -5300,7 +5300,11 @@ primary_expr:
     | var_identifier '(' func_arguments ')'
         {
             if (!($$ = add_call(ctx, $1, &$3, &@1)))
+            {
+                vkd3d_free($1);
                 YYABORT;
+            }
+            vkd3d_free($1);
         }
     | NEW_IDENTIFIER
         {
