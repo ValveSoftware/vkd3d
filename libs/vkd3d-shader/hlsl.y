@@ -3701,7 +3701,7 @@ hlsl_prog:
                 }
             }
 
-            hlsl_add_function(ctx, $2.name, $2.decl, false);
+            hlsl_add_function(ctx, $2.name, $2.decl);
         }
     | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement

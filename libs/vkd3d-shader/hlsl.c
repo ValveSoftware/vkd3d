@@ -2185,7 +2185,7 @@ static void free_function_rb(struct rb_entry *entry, void *context)
     free_function(RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry));
 }
 
-void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl, bool intrinsic)
+void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl)
 {
     struct hlsl_ir_function *func;
     struct rb_entry *func_entry, *old_entry;
