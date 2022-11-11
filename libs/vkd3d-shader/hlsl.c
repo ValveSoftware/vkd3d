@@ -1105,7 +1105,7 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
     return store;
 }
 
-struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
+bool hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs)
 {
     struct hlsl_block comp_path_block;
@@ -1114,13 +1114,13 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
     hlsl_block_init(block);
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
-        return NULL;
+        return false;
     init_node(&store->node, HLSL_IR_STORE, NULL, &rhs->loc);
 
     if (!init_deref_from_component_index(ctx, &comp_path_block, &store->lhs, lhs, comp, &rhs->loc))
     {
         vkd3d_free(store);
-        return NULL;
+        return false;
     }
     hlsl_block_add_block(block, &comp_path_block);
     hlsl_src_from_node(&store->rhs, rhs);
@@ -1130,7 +1130,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
 
     hlsl_block_add_instr(block, &store->node);
 
-    return store;
+    return true;
 }
 
 struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *decl,
