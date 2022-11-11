@@ -273,7 +273,7 @@ static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_typ
     return hlsl_types_are_componentwise_equal(ctx, src, dst);
 }
 
-static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
+static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         unsigned int comp, const struct vkd3d_shader_location *loc);
 
 static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
@@ -311,6 +311,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
 
         for (dst_idx = 0; dst_idx < dst_comp_count; ++dst_idx)
         {
+            struct hlsl_ir_node *component_load;
             struct hlsl_type *dst_comp_type;
             struct hlsl_ir_store *store;
             struct hlsl_block block;
@@ -333,10 +334,10 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
 
             dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
 
-            if (!(load = add_load_component(ctx, instrs, node, src_idx, loc)))
+            if (!(component_load = add_load_component(ctx, instrs, node, src_idx, loc)))
                 return NULL;
 
-            if (!(cast = hlsl_new_cast(ctx, &load->node, dst_comp_type, loc)))
+            if (!(cast = hlsl_new_cast(ctx, component_load, dst_comp_type, loc)))
                 return NULL;
             list_add_tail(instrs, &cast->entry);
 
@@ -622,7 +623,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
     return true;
 }
 
-static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
+static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         unsigned int comp, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_deref *src;
@@ -644,7 +645,7 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
         return NULL;
     list_move_tail(instrs, &block.instrs);
 
-    return load;
+    return &load->node;
 }
 
 static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
@@ -1283,8 +1284,9 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
     if (type->class == HLSL_CLASS_MATRIX)
     {
         struct hlsl_type *scalar_type;
+        struct hlsl_ir_load *var_load;
         struct hlsl_deref var_deref;
-        struct hlsl_ir_load *load;
+        struct hlsl_ir_node *load;
         struct hlsl_ir_var *var;
 
         scalar_type = hlsl_get_scalar_type(ctx, type->base_type);
@@ -1307,7 +1309,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
                     if (!(load = add_load_component(ctx, instrs, operands[j], i, loc)))
                         return NULL;
 
-                    cell_operands[j] = &load->node;
+                    cell_operands[j] = load;
                 }
             }
 
@@ -1319,11 +1321,11 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             list_move_tail(instrs, &block.instrs);
         }
 
-        if (!(load = hlsl_new_var_load(ctx, var, loc)))
+        if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
             return NULL;
-        list_add_tail(instrs, &load->node.entry);
+        list_add_tail(instrs, &var_load->node.entry);
 
-        return &load->node;
+        return &var_load->node;
     }
 
     if (!(expr = hlsl_new_expr(ctx, op, operands, type, loc)))
@@ -1776,10 +1778,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
+            struct hlsl_ir_node *cell, *load;
             struct hlsl_ir_store *store;
             struct hlsl_ir_constant *c;
-            struct hlsl_ir_node *cell;
-            struct hlsl_ir_load *load;
             struct hlsl_deref deref;
 
             if (!(writemask & (1 << i)))
@@ -1799,7 +1800,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             if (!hlsl_init_deref_from_index_chain(ctx, &deref, cell))
                 return NULL;
 
-            if (!(store = hlsl_new_store_index(ctx, &deref, NULL, &load->node, 0, &rhs->loc)))
+            if (!(store = hlsl_new_store_index(ctx, &deref, NULL, load, 0, &rhs->loc)))
             {
                 hlsl_cleanup_deref(&deref);
                 return NULL;
@@ -1878,10 +1879,9 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
 
     for (k = 0; k < src_comp_count; ++k)
     {
+        struct hlsl_ir_node *conv, *load;
         struct hlsl_type *dst_comp_type;
         struct hlsl_ir_store *store;
-        struct hlsl_ir_load *load;
-        struct hlsl_ir_node *conv;
         struct hlsl_block block;
 
         if (!(load = add_load_component(ctx, instrs, src, k, &src->loc)))
@@ -1889,7 +1889,7 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct list *instrs,
 
         dst_comp_type = hlsl_type_get_component_type(ctx, dst->data_type, *store_index);
 
-        if (!(conv = add_implicit_conversion(ctx, instrs, &load->node, dst_comp_type, &src->loc)))
+        if (!(conv = add_implicit_conversion(ctx, instrs, load, dst_comp_type, &src->loc)))
             return;
 
         if (!(store = hlsl_new_store_component(ctx, &block, &dst_deref, *store_index, conv)))
@@ -2407,8 +2407,7 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
 static bool intrinsic_all(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *mul, *one, *zero;
-    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *arg = params->args[0], *mul, *one, *zero, *load;
     unsigned int i, count;
 
     if (!(one = hlsl_new_float_constant(ctx, 1.0f, loc)))
@@ -2427,7 +2426,7 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
         if (!(load = add_load_component(ctx, params->instrs, arg, i, loc)))
             return false;
 
-        if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &load->node, mul, loc)))
+        if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, load, mul, loc)))
             return false;
     }
 
@@ -2437,8 +2436,7 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
 static bool intrinsic_any(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *dot, *or, *zero, *bfalse;
-    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *arg = params->args[0], *dot, *or, *zero, *bfalse, *load;
     unsigned int i, count;
 
     if (arg->data_type->class != HLSL_CLASS_VECTOR && arg->data_type->class != HLSL_CLASS_SCALAR)
@@ -2472,7 +2470,7 @@ static bool intrinsic_any(struct hlsl_ctx *ctx,
             if (!(load = add_load_component(ctx, params->instrs, arg, i, loc)))
                 return false;
 
-            if (!(or = add_binary_bitwise_expr(ctx, params->instrs, HLSL_OP2_BIT_OR, or, &load->node, loc)))
+            if (!(or = add_binary_bitwise_expr(ctx, params->instrs, HLSL_OP2_BIT_OR, or, load, loc)))
                 return false;
         }
 
@@ -2974,8 +2972,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
 
             for (k = 0; k < cast_type1->dimx && k < cast_type2->dimy; ++k)
             {
-                struct hlsl_ir_load *value1, *value2;
-                struct hlsl_ir_node *mul;
+                struct hlsl_ir_node *value1, *value2, *mul;
 
                 if (!(value1 = add_load_component(ctx, params->instrs, cast1, j * cast1->data_type->dimx + k, loc)))
                     return false;
@@ -2983,7 +2980,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
                 if (!(value2 = add_load_component(ctx, params->instrs, cast2, k * cast2->data_type->dimx + i, loc)))
                     return false;
 
-                if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &value1->node, &value2->node, loc)))
+                if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, value1, value2, loc)))
                     return false;
 
                 if (instr)
@@ -3266,9 +3263,10 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg = params->args[0];
     struct hlsl_type *arg_type = arg->data_type;
+    struct hlsl_ir_load *var_load;
     struct hlsl_deref var_deref;
     struct hlsl_type *mat_type;
-    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *load;
     struct hlsl_ir_var *var;
     unsigned int i, j;
 
@@ -3306,15 +3304,15 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
             if (!(load = add_load_component(ctx, params->instrs, arg, j * arg->data_type->dimx + i, loc)))
                 return false;
 
-            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, i * var->data_type->dimx + j, &load->node)))
+            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, i * var->data_type->dimx + j, load)))
                 return false;
             list_move_tail(params->instrs, &block.instrs);
         }
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, loc)))
+    if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
         return false;
-    list_add_tail(params->instrs, &load->node.entry);
+    list_add_tail(params->instrs, &var_load->node.entry);
 
     return true;
 }
