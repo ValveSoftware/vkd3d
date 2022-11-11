@@ -458,8 +458,8 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
 static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
         struct list *iter, struct list *body, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_loop *loop = NULL;
     struct hlsl_block body_block;
+    struct hlsl_ir_node *loop;
     unsigned int i;
 
     if (attribute_list_has_duplicates(attributes))
@@ -513,14 +513,13 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
 
     if (!(loop = hlsl_new_loop(ctx, &body_block, loc)))
         goto oom;
-    list_add_tail(init, &loop->node.entry);
+    list_add_tail(init, &loop->entry);
 
     vkd3d_free(cond);
     vkd3d_free(body);
     return init;
 
 oom:
-    vkd3d_free(loop);
     destroy_instr_list(init);
     destroy_instr_list(cond);
     destroy_instr_list(iter);
