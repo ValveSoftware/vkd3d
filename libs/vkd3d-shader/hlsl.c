@@ -1128,14 +1128,14 @@ struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_typ
     return c;
 }
 
-struct hlsl_ir_constant *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc)
+struct hlsl_ir_node *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_constant *c;
 
     if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), loc)))
         c->value[0].u = b ? ~0u : 0;
 
-    return c;
+    return &c->node;
 }
 
 struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx, float f,
@@ -1711,7 +1711,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
         const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_function_decl *decl;
-    struct hlsl_ir_constant *constant;
+    struct hlsl_ir_node *constant;
     struct hlsl_ir_store *store;
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
@@ -1737,9 +1737,9 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 
     if (!(constant = hlsl_new_bool_constant(ctx, false, loc)))
         return decl;
-    hlsl_block_add_instr(&decl->body, &constant->node);
+    hlsl_block_add_instr(&decl->body, constant);
 
-    if (!(store = hlsl_new_simple_store(ctx, decl->early_return_var, &constant->node)))
+    if (!(store = hlsl_new_simple_store(ctx, decl->early_return_var, constant)))
         return decl;
     hlsl_block_add_instr(&decl->body, &store->node);
 

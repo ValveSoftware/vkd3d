@@ -628,18 +628,18 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         else if (instr->type == HLSL_IR_JUMP)
         {
             struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
-            struct hlsl_ir_constant *constant;
+            struct hlsl_ir_node *constant;
             struct hlsl_ir_store *store;
 
             if (jump->type == HLSL_IR_JUMP_RETURN)
             {
                 if (!(constant = hlsl_new_bool_constant(ctx, true, &jump->node.loc)))
                     return false;
-                list_add_before(&jump->node.entry, &constant->node.entry);
+                list_add_before(&jump->node.entry, &constant->entry);
 
-                if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, &constant->node)))
+                if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, constant)))
                     return false;
-                list_add_after(&constant->node.entry, &store->node.entry);
+                list_add_after(&constant->entry, &store->node.entry);
 
                 has_early_return = true;
                 if (in_loop)

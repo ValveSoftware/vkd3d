@@ -5350,13 +5350,13 @@ primary_expr:
         }
     | boolean
         {
-            struct hlsl_ir_constant *c;
+            struct hlsl_ir_node *c;
 
             if (!(c = hlsl_new_bool_constant(ctx, $1, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, &c->node)))
+            if (!($$ = make_list(ctx, c)))
             {
-                hlsl_free_instr(&c->node);
+                hlsl_free_instr(c);
                 YYABORT;
             }
         }
