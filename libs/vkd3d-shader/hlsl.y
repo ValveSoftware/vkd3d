@@ -280,7 +280,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
-    struct hlsl_ir_expr *cast;
+    struct hlsl_ir_node *cast;
 
     if (hlsl_types_are_equal(src_type, dst_type))
         return node;
@@ -338,9 +338,9 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
 
             if (!(cast = hlsl_new_cast(ctx, &load->node, dst_comp_type, loc)))
                 return NULL;
-            list_add_tail(instrs, &cast->node.entry);
+            list_add_tail(instrs, &cast->entry);
 
-            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, dst_idx, &cast->node)))
+            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, dst_idx, cast)))
                 return NULL;
             list_move_tail(instrs, &block.instrs);
         }
@@ -355,8 +355,8 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
     {
         if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
             return NULL;
-        list_add_tail(instrs, &cast->node.entry);
-        return &cast->node;
+        list_add_tail(instrs, &cast->entry);
+        return cast;
     }
 }
 
@@ -705,8 +705,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
-    struct hlsl_ir_node *return_index;
-    struct hlsl_ir_expr *cast;
+    struct hlsl_ir_node *return_index, *cast;
 
     if (expr_type->class == HLSL_CLASS_OBJECT
             && (expr_type->base_type == HLSL_TYPE_TEXTURE || expr_type->base_type == HLSL_TYPE_UAV)
@@ -752,8 +751,8 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
 
     if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
         return false;
-    list_add_tail(instrs, &cast->node.entry);
-    index = &cast->node;
+    list_add_tail(instrs, &cast->entry);
+    index = cast;
 
     if (expr_type->class != HLSL_CLASS_ARRAY && expr_type->class != HLSL_CLASS_VECTOR && expr_type->class != HLSL_CLASS_MATRIX)
     {
@@ -1670,7 +1669,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
-    struct hlsl_ir_expr *copy;
+    struct hlsl_ir_node *copy;
     unsigned int writemask = 0;
 
     if (assign_op == ASSIGN_OP_SUB)
@@ -1829,8 +1828,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
      * the last instruction in the list, we do need to copy. */
     if (!(copy = hlsl_new_copy(ctx, rhs)))
         return NULL;
-    list_add_tail(instrs, &copy->node.entry);
-    return &copy->node;
+    list_add_tail(instrs, &copy->entry);
+    return copy;
 }
 
 static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, bool post,
@@ -1852,14 +1851,14 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
 
     if (post)
     {
-        struct hlsl_ir_expr *copy;
+        struct hlsl_ir_node *copy;
 
         if (!(copy = hlsl_new_copy(ctx, lhs)))
             return false;
-        list_add_tail(instrs, &copy->node.entry);
+        list_add_tail(instrs, &copy->entry);
 
         /* Post increment/decrement expressions are considered const. */
-        if (!(copy->node.data_type = hlsl_type_clone(ctx, copy->node.data_type, 0, HLSL_MODIFIER_CONST)))
+        if (!(copy->data_type = hlsl_type_clone(ctx, copy->data_type, 0, HLSL_MODIFIER_CONST)))
             return false;
     }
 

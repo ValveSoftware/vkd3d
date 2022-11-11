@@ -916,7 +916,7 @@ bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type)
     return true;
 }
 
-struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
+struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *cast;
@@ -924,10 +924,10 @@ struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
     cast = hlsl_new_unary_expr(ctx, HLSL_OP1_CAST, node, *loc);
     if (cast)
         cast->data_type = type;
-    return hlsl_ir_expr(cast);
+    return cast;
 }
 
-struct hlsl_ir_expr *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
+struct hlsl_ir_node *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
 {
     /* Use a cast to the same type as a makeshift identity expression. */
     return hlsl_new_cast(ctx, node, node->data_type, &node->loc);

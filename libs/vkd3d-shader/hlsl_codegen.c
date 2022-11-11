@@ -823,23 +823,22 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
 
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && src_type->dimx == 1)
     {
-        struct hlsl_ir_node *replacement;
+        struct hlsl_ir_node *replacement, *new_cast;
         struct hlsl_ir_swizzle *swizzle;
-        struct hlsl_ir_expr *new_cast;
 
         dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->base_type);
         /* We need to preserve the cast since it might be doing more than just
          * turning the scalar into a vector. */
         if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_scalar_type, &cast->node.loc)))
             return false;
-        list_add_after(&cast->node.entry, &new_cast->node.entry);
-        replacement = &new_cast->node;
+        list_add_after(&cast->node.entry, &new_cast->entry);
+        replacement = new_cast;
 
         if (dst_type->dimx != 1)
         {
             if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), dst_type->dimx, replacement, &cast->node.loc)))
                 return false;
-            list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+            list_add_after(&new_cast->entry, &swizzle->node.entry);
             replacement = &swizzle->node;
         }
 
@@ -1727,17 +1726,17 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && dst_type->dimx < src_type->dimx)
     {
         struct hlsl_ir_swizzle *swizzle;
-        struct hlsl_ir_expr *new_cast;
+        struct hlsl_ir_node *new_cast;
 
         dst_vector_type = hlsl_get_vector_type(ctx, dst_type->base_type, src_type->dimx);
         /* We need to preserve the cast since it might be doing more than just
          * narrowing the vector. */
         if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_vector_type, &cast->node.loc)))
             return false;
-        list_add_after(&cast->node.entry, &new_cast->node.entry);
-        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dst_type->dimx, &new_cast->node, &cast->node.loc)))
+        list_add_after(&cast->node.entry, &new_cast->entry);
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dst_type->dimx, new_cast, &cast->node.loc)))
             return false;
-        list_add_after(&new_cast->node.entry, &swizzle->node.entry);
+        list_add_after(&new_cast->entry, &swizzle->node.entry);
 
         hlsl_replace_node(&cast->node, &swizzle->node);
         return true;
@@ -2033,9 +2032,8 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
 
 static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_node *arg1, *arg2, *xor, *and, *abs1, *abs2, *div, *neg;
+    struct hlsl_ir_node *arg1, *arg2, *xor, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3;
     struct hlsl_type *type = instr->data_type, *utype;
-    struct hlsl_ir_expr *cast1, *cast2, *cast3;
     struct hlsl_ir_constant *high_bit;
     struct hlsl_ir_expr *expr;
     struct hlsl_ir_load *cond;
@@ -2074,7 +2072,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
     if (!(cast1 = hlsl_new_cast(ctx, abs1, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast1->node.entry);
+    list_add_before(&instr->entry, &cast1->entry);
 
     if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, instr->loc)))
         return false;
@@ -2082,21 +2080,21 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
     if (!(cast2 = hlsl_new_cast(ctx, abs2, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast2->node.entry);
+    list_add_before(&instr->entry, &cast2->entry);
 
-    if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_DIV, &cast1->node, &cast2->node)))
+    if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_DIV, cast1, cast2)))
         return false;
     list_add_before(&instr->entry, &div->entry);
 
     if (!(cast3 = hlsl_new_cast(ctx, div, type, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast3->node.entry);
+    list_add_before(&instr->entry, &cast3->entry);
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, &cast3->node, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
-    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
+    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, cast3)))
         return false;
     hlsl_replace_node(instr, &cond->node);
 
@@ -2105,9 +2103,8 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 
 static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg;
+    struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3;
     struct hlsl_type *type = instr->data_type, *utype;
-    struct hlsl_ir_expr *cast1, *cast2, *cast3;
     struct hlsl_ir_constant *high_bit;
     struct hlsl_ir_expr *expr;
     struct hlsl_ir_load *cond;
@@ -2142,7 +2139,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
     if (!(cast1 = hlsl_new_cast(ctx, abs1, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast1->node.entry);
+    list_add_before(&instr->entry, &cast1->entry);
 
     if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, instr->loc)))
         return false;
@@ -2150,21 +2147,21 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
     if (!(cast2 = hlsl_new_cast(ctx, abs2, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast2->node.entry);
+    list_add_before(&instr->entry, &cast2->entry);
 
-    if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_MOD, &cast1->node, &cast2->node)))
+    if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_MOD, cast1, cast2)))
         return false;
     list_add_before(&instr->entry, &div->entry);
 
     if (!(cast3 = hlsl_new_cast(ctx, div, type, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast3->node.entry);
+    list_add_before(&instr->entry, &cast3->entry);
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, &cast3->node, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
-    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
+    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, cast3)))
         return false;
     hlsl_replace_node(instr, &cond->node);
 
