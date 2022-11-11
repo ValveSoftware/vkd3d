@@ -635,14 +635,14 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
     {
         if (return_value)
         {
-            struct hlsl_ir_store *store;
+            struct hlsl_ir_node *store;
 
             if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, loc)))
                 return false;
 
             if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
                 return false;
-            list_add_after(&return_value->entry, &store->node.entry);
+            list_add_after(&return_value->entry, &store->entry);
         }
         else
         {
@@ -666,22 +666,20 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
 static struct hlsl_ir_node *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         unsigned int comp, const struct vkd3d_shader_location *loc)
 {
-    const struct hlsl_deref *src;
-    struct hlsl_ir_store *store;
-    struct hlsl_ir_node *load;
+    struct hlsl_ir_node *load, *store;
     struct hlsl_block block;
     struct hlsl_ir_var *var;
+    struct hlsl_deref src;
 
     if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
         return NULL;
 
     if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
         return NULL;
-    list_add_tail(instrs, &store->node.entry);
+    list_add_tail(instrs, &store->entry);
 
-    src = &store->lhs;
-
-    if (!(load = hlsl_new_load_component(ctx, &block, src, comp, loc)))
+    hlsl_init_simple_deref_from_var(&src, var);
+    if (!(load = hlsl_new_load_component(ctx, &block, &src, comp, loc)))
         return NULL;
     list_move_tail(instrs, &block.instrs);
 
@@ -2164,9 +2162,8 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
+            struct hlsl_ir_node *cast, *store;
             struct hlsl_ir_constant *zero;
-            struct hlsl_ir_store *store;
-            struct hlsl_ir_node *cast;
 
             /* Initialize statics to zero by default. */
 
@@ -2194,7 +2191,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 vkd3d_free(v);
                 continue;
             }
-            list_add_tail(&ctx->static_initializers, &store->node.entry);
+            list_add_tail(&ctx->static_initializers, &store->entry);
         }
         vkd3d_free(v);
     }
@@ -2826,9 +2823,8 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *n_l_neg, *n_h_neg, *specular_or, *specular_pow;
-    struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero;
+    struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero, *store;
     struct hlsl_ir_constant *init;
-    struct hlsl_ir_store *store;
     struct hlsl_deref var_deref;
     struct hlsl_type *ret_type;
     struct hlsl_ir_load *load;
@@ -2868,7 +2864,7 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
 
     if (!(store = hlsl_new_simple_store(ctx, var, &init->node)))
         return false;
-    list_add_tail(params->instrs, &store->node.entry);
+    list_add_tail(params->instrs, &store->entry);
 
     if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
         return false;
@@ -3561,11 +3557,11 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
 
             if (param->storage_modifiers & HLSL_STORAGE_IN)
             {
-                struct hlsl_ir_store *store;
+                struct hlsl_ir_node *store;
 
                 if (!(store = hlsl_new_simple_store(ctx, param, arg)))
                     goto fail;
-                list_add_tail(args->instrs, &store->node.entry);
+                list_add_tail(args->instrs, &store->entry);
             }
         }
 

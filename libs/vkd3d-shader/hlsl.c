@@ -1065,12 +1065,15 @@ static void init_node(struct hlsl_ir_node *node, enum hlsl_ir_node_type type,
     list_init(&node->uses);
 }
 
-struct hlsl_ir_store *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
+struct hlsl_ir_node *hlsl_new_simple_store(struct hlsl_ctx *ctx, struct hlsl_ir_var *lhs, struct hlsl_ir_node *rhs)
 {
+    struct hlsl_ir_store *store;
     struct hlsl_deref lhs_deref;
 
     hlsl_init_simple_deref_from_var(&lhs_deref, lhs);
-    return hlsl_new_store_index(ctx, &lhs_deref, NULL, rhs, 0, &rhs->loc);
+    if (!(store = hlsl_new_store_index(ctx, &lhs_deref, NULL, rhs, 0, &rhs->loc)))
+        return NULL;
+    return &store->node;
 }
 
 struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hlsl_deref *lhs,
@@ -1765,9 +1768,8 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
         struct hlsl_type *return_type, const struct hlsl_func_parameters *parameters,
         const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_ir_node *constant, *store;
     struct hlsl_ir_function_decl *decl;
-    struct hlsl_ir_node *constant;
-    struct hlsl_ir_store *store;
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
         return NULL;
@@ -1796,7 +1798,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 
     if (!(store = hlsl_new_simple_store(ctx, decl->early_return_var, constant)))
         return decl;
-    hlsl_block_add_instr(&decl->body, &store->node);
+    hlsl_block_add_instr(&decl->body, store);
 
     return decl;
 }

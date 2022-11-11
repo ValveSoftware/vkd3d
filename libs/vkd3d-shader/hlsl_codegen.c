@@ -191,7 +191,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
 {
     struct vkd3d_string_buffer *name;
     struct hlsl_ir_var *uniform;
-    struct hlsl_ir_store *store;
+    struct hlsl_ir_node *store;
     struct hlsl_ir_load *load;
 
     /* Use the synthetic name for the temp, rather than the uniform, so that we
@@ -218,7 +218,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
 
     if (!(store = hlsl_new_simple_store(ctx, temp, &load->node)))
         return;
-    list_add_after(&load->node.entry, &store->node.entry);
+    list_add_after(&load->node.entry, &store->entry);
 }
 
 static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_field *field)
@@ -480,7 +480,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        struct hlsl_ir_store *store;
+        struct hlsl_ir_node *store;
         struct hlsl_ir_var *output;
         struct hlsl_ir_load *load;
 
@@ -508,7 +508,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
         if (!(store = hlsl_new_simple_store(ctx, output, &load->node)))
             return;
-        list_add_tail(instrs, &store->node.entry);
+        list_add_tail(instrs, &store->entry);
     }
 }
 
@@ -760,8 +760,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         else if (instr->type == HLSL_IR_JUMP)
         {
             struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
-            struct hlsl_ir_node *constant;
-            struct hlsl_ir_store *store;
+            struct hlsl_ir_node *constant, *store;
 
             if (jump->type == HLSL_IR_JUMP_RETURN)
             {
@@ -771,7 +770,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
 
                 if (!(store = hlsl_new_simple_store(ctx, func->early_return_var, constant)))
                     return false;
-                list_add_after(&constant->entry, &store->node.entry);
+                list_add_after(&constant->entry, &store->entry);
 
                 has_early_return = true;
                 if (in_loop)
@@ -906,11 +905,10 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
  * resource access. */
 static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
+    struct hlsl_ir_node *val, *store;
     struct hlsl_deref var_deref;
     struct hlsl_ir_index *index;
-    struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_node *val;
     struct hlsl_ir_var *var;
 
     if (instr->type != HLSL_IR_INDEX)
@@ -950,7 +948,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
     if (!(store = hlsl_new_simple_store(ctx, var, val)))
         return false;
-    list_add_before(&instr->entry, &store->node.entry);
+    list_add_before(&instr->entry, &store->entry);
 
     if (hlsl_index_is_noncontiguous(index))
     {
@@ -966,6 +964,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         for (i = 0; i < mat->data_type->dimx; ++i)
         {
+            struct hlsl_ir_store *store;
             struct hlsl_ir_constant *c;
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &instr->loc)))
@@ -2192,9 +2191,8 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
     struct hlsl_block then_block, else_block;
-    struct hlsl_ir_store *store;
+    struct hlsl_ir_node *iff, *store;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_node *iff;
     struct hlsl_ir_var *var;
 
     assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
@@ -2207,11 +2205,11 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_true)))
         return NULL;
-    hlsl_block_add_instr(&then_block, &store->node);
+    hlsl_block_add_instr(&then_block, store);
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_false)))
         return NULL;
-    hlsl_block_add_instr(&else_block, &store->node);
+    hlsl_block_add_instr(&else_block, store);
 
     if (!(iff = hlsl_new_if(ctx, condition, &then_block, &else_block, &condition->loc)))
         return NULL;
