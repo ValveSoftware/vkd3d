@@ -3967,11 +3967,8 @@ func_prototype_no_attrs:
             struct hlsl_type *type;
 
             if (modifiers & ~HLSL_MODIFIERS_MAJORITY_MASK)
-            {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Only majority modifiers are allowed on functions.");
-                YYABORT;
-            }
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
             if ((var = hlsl_get_var(ctx->globals, $3)))
@@ -3980,7 +3977,6 @@ func_prototype_no_attrs:
                         "\"%s\" is already declared as a variable.", $3);
                 hlsl_note(ctx, &var->loc, VKD3D_SHADER_LOG_ERROR,
                         "\"%s\" was previously declared here.", $3);
-                YYABORT;
             }
             if (hlsl_types_are_equal(type, ctx->builtin_types.Void) && $7.semantic.name)
             {
