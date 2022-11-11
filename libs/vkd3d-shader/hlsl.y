@@ -85,8 +85,8 @@ struct parse_function
 
 struct parse_if_body
 {
-    struct list *then_instrs;
-    struct list *else_instrs;
+    struct list *then_block;
+    struct list *else_block;
 };
 
 enum parse_assign_op
@@ -407,6 +407,7 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_list)
 {
     struct hlsl_ir_node *condition, *not;
+    struct hlsl_block then_block;
     struct hlsl_ir_jump *jump;
     struct hlsl_ir_if *iff;
 
@@ -419,13 +420,15 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
         return false;
     list_add_tail(cond_list, &not->entry);
 
-    if (!(iff = hlsl_new_if(ctx, not, condition->loc)))
-        return false;
-    list_add_tail(cond_list, &iff->node.entry);
+    hlsl_block_init(&then_block);
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, condition->loc)))
         return false;
-    hlsl_block_add_instr(&iff->then_instrs, &jump->node);
+    hlsl_block_add_instr(&then_block, &jump->node);
+
+    if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
+        return false;
+    list_add_tail(cond_list, &iff->node.entry);
     return true;
 }
 
@@ -5241,15 +5244,19 @@ selection_statement:
       KW_IF '(' expr ')' if_body
         {
             struct hlsl_ir_node *condition = node_from_list($3);
+            struct hlsl_block then_block, else_block;
             struct hlsl_ir_if *instr;
 
-            if (!(instr = hlsl_new_if(ctx, condition, @1)))
+            hlsl_block_init(&then_block);
+            list_move_tail(&then_block.instrs, $5.then_block);
+            hlsl_block_init(&else_block);
+            if ($5.else_block)
+                list_move_tail(&else_block.instrs, $5.else_block);
+            vkd3d_free($5.then_block);
+            vkd3d_free($5.else_block);
+
+            if (!(instr = hlsl_new_if(ctx, condition, &then_block, &else_block, &@1)))
                 YYABORT;
-            list_move_tail(&instr->then_instrs.instrs, $5.then_instrs);
-            if ($5.else_instrs)
-                list_move_tail(&instr->else_instrs.instrs, $5.else_instrs);
-            vkd3d_free($5.then_instrs);
-            vkd3d_free($5.else_instrs);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
             {
                 struct vkd3d_string_buffer *string;
@@ -5266,13 +5273,13 @@ selection_statement:
 if_body:
       statement
         {
-            $$.then_instrs = $1;
-            $$.else_instrs = NULL;
+            $$.then_block = $1;
+            $$.else_block = NULL;
         }
     | statement KW_ELSE statement
         {
-            $$.then_instrs = $1;
-            $$.else_instrs = $3;
+            $$.then_block = $1;
+            $$.else_block = $3;
         }
 
 loop_statement:

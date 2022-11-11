@@ -1208,16 +1208,20 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
     return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
 }
 
-struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc)
+struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition,
+        struct hlsl_block *then_block, struct hlsl_block *else_block, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_if *iff;
 
     if (!(iff = hlsl_alloc(ctx, sizeof(*iff))))
         return NULL;
-    init_node(&iff->node, HLSL_IR_IF, NULL, &loc);
+    init_node(&iff->node, HLSL_IR_IF, NULL, loc);
     hlsl_src_from_node(&iff->condition, condition);
-    hlsl_block_init(&iff->then_instrs);
-    hlsl_block_init(&iff->else_instrs);
+    hlsl_block_init(&iff->then_block);
+    hlsl_block_add_block(&iff->then_block, then_block);
+    hlsl_block_init(&iff->else_block);
+    if (else_block)
+        hlsl_block_add_block(&iff->else_block, else_block);
     return iff;
 }
 
@@ -1516,17 +1520,24 @@ static struct hlsl_ir_node *clone_expr(struct hlsl_ctx *ctx, struct clone_instr_
 
 static struct hlsl_ir_node *clone_if(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_if *src)
 {
+    struct hlsl_block then_block, else_block;
     struct hlsl_ir_if *dst;
 
-    if (!(dst = hlsl_new_if(ctx, map_instr(map, src->condition.node), src->node.loc)))
+    if (!clone_block(ctx, &then_block, &src->then_block, map))
         return NULL;
-
-    if (!clone_block(ctx, &dst->then_instrs, &src->then_instrs, map)
-            || !clone_block(ctx, &dst->else_instrs, &src->else_instrs, map))
+    if (!clone_block(ctx, &else_block, &src->else_block, map))
     {
-        hlsl_free_instr(&dst->node);
+        hlsl_block_cleanup(&then_block);
         return NULL;
     }
+
+    if (!(dst = hlsl_new_if(ctx, map_instr(map, src->condition.node), &then_block, &else_block, &src->node.loc)))
+    {
+        hlsl_block_cleanup(&then_block);
+        hlsl_block_cleanup(&else_block);
+        return NULL;
+    }
+
     return &dst->node;
 }
 
@@ -2334,9 +2345,9 @@ static void dump_ir_if(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
     vkd3d_string_buffer_printf(buffer, "if (");
     dump_src(buffer, &if_node->condition);
     vkd3d_string_buffer_printf(buffer, ") {\n");
-    dump_instr_list(ctx, buffer, &if_node->then_instrs.instrs);
+    dump_instr_list(ctx, buffer, &if_node->then_block.instrs);
     vkd3d_string_buffer_printf(buffer, "      %10s   } else {\n", "");
-    dump_instr_list(ctx, buffer, &if_node->else_instrs.instrs);
+    dump_instr_list(ctx, buffer, &if_node->else_block.instrs);
     vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
 }
 
@@ -2605,8 +2616,8 @@ static void free_ir_expr(struct hlsl_ir_expr *expr)
 
 static void free_ir_if(struct hlsl_ir_if *if_node)
 {
-    hlsl_block_cleanup(&if_node->then_instrs);
-    hlsl_block_cleanup(&if_node->else_instrs);
+    hlsl_block_cleanup(&if_node->then_block);
+    hlsl_block_cleanup(&if_node->else_block);
     hlsl_src_remove(&if_node->condition);
     vkd3d_free(if_node);
 }

@@ -2118,15 +2118,15 @@ static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     sm4_src_from_node(&instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
     write_sm4_instruction(buffer, &instr);
 
-    write_sm4_block(ctx, buffer, &iff->then_instrs);
+    write_sm4_block(ctx, buffer, &iff->then_block);
 
-    if (!list_empty(&iff->else_instrs.instrs))
+    if (!list_empty(&iff->else_block.instrs))
     {
         instr.opcode = VKD3D_SM4_OP_ELSE;
         instr.src_count = 0;
         write_sm4_instruction(buffer, &instr);
 
-        write_sm4_block(ctx, buffer, &iff->else_instrs);
+        write_sm4_block(ctx, buffer, &iff->else_block);
     }
 
     instr.opcode = VKD3D_SM4_OP_ENDIF;

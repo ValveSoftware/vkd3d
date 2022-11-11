@@ -459,8 +459,8 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            progress |= transform_ir(ctx, func, &iff->then_instrs, context);
-            progress |= transform_ir(ctx, func, &iff->else_instrs, context);
+            progress |= transform_ir(ctx, func, &iff->then_block, context);
+            progress |= transform_ir(ctx, func, &iff->else_block, context);
         }
         else if (instr->type == HLSL_IR_LOOP)
             progress |= transform_ir(ctx, func, &hlsl_ir_loop(instr)->body, context);
@@ -516,21 +516,24 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 static void insert_early_return_break(struct hlsl_ctx *ctx,
         struct hlsl_ir_function_decl *func, struct hlsl_ir_node *cf_instr)
 {
+    struct hlsl_block then_block;
     struct hlsl_ir_jump *jump;
     struct hlsl_ir_load *load;
     struct hlsl_ir_if *iff;
+
+    hlsl_block_init(&then_block);
 
     if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
         return;
     list_add_after(&cf_instr->entry, &load->node.entry);
 
-    if (!(iff = hlsl_new_if(ctx, &load->node, cf_instr->loc)))
-        return;
-    list_add_after(&load->node.entry, &iff->node.entry);
-
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, cf_instr->loc)))
         return;
-    hlsl_block_add_instr(&iff->then_instrs, &jump->node);
+    hlsl_block_add_instr(&then_block, &jump->node);
+
+    if (!(iff = hlsl_new_if(ctx, &load->node, &then_block, NULL, &cf_instr->loc)))
+        return;
+    list_add_after(&load->node.entry, &iff->node.entry);
 }
 
 /* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
@@ -591,8 +594,8 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            has_early_return |= lower_return(ctx, func, &iff->then_instrs, in_loop);
-            has_early_return |= lower_return(ctx, func, &iff->else_instrs, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->then_block, in_loop);
+            has_early_return |= lower_return(ctx, func, &iff->else_block, in_loop);
 
             if (has_early_return)
             {
@@ -675,6 +678,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     else if (cf_instr)
     {
         struct list *tail = list_tail(&block->instrs);
+        struct hlsl_block then_block;
         struct hlsl_ir_load *load;
         struct hlsl_ir_node *not;
         struct hlsl_ir_if *iff;
@@ -685,6 +689,10 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         if (tail == &cf_instr->entry)
             return has_early_return;
 
+        hlsl_block_init(&then_block);
+        list_move_slice_tail(&then_block.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
+        lower_return(ctx, func, &then_block, in_loop);
+
         if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
             return false;
         hlsl_block_add_instr(block, &load->node);
@@ -693,13 +701,9 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
             return false;
         hlsl_block_add_instr(block, not);
 
-        if (!(iff = hlsl_new_if(ctx, not, cf_instr->loc)))
+        if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &cf_instr->loc)))
             return false;
-        hlsl_block_add_instr(block, &iff->node);
-
-        list_move_slice_tail(&iff->then_instrs.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
-
-        lower_return(ctx, func, &iff->then_instrs, in_loop);
+        list_add_tail(&block->instrs, &iff->node.entry);
     }
 
     return has_early_return;
@@ -1343,8 +1347,8 @@ static void copy_propagation_invalidate_from_block(struct hlsl_ctx *ctx, struct 
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-                copy_propagation_invalidate_from_block(ctx, state, &iff->then_instrs);
-                copy_propagation_invalidate_from_block(ctx, state, &iff->else_instrs);
+                copy_propagation_invalidate_from_block(ctx, state, &iff->then_block);
+                copy_propagation_invalidate_from_block(ctx, state, &iff->else_block);
 
                 break;
             }
@@ -1374,19 +1378,19 @@ static bool copy_propagation_process_if(struct hlsl_ctx *ctx, struct hlsl_ir_if 
     bool progress = false;
 
     copy_propagation_state_init(ctx, &inner_state, state);
-    progress |= copy_propagation_transform_block(ctx, &iff->then_instrs, &inner_state);
+    progress |= copy_propagation_transform_block(ctx, &iff->then_block, &inner_state);
     copy_propagation_state_destroy(&inner_state);
 
     copy_propagation_state_init(ctx, &inner_state, state);
-    progress |= copy_propagation_transform_block(ctx, &iff->else_instrs, &inner_state);
+    progress |= copy_propagation_transform_block(ctx, &iff->else_block, &inner_state);
     copy_propagation_state_destroy(&inner_state);
 
     /* Ideally we'd invalidate the outer state looking at what was
      * touched in the two inner states, but this doesn't work for
      * loops (because we need to know what is invalidated in advance),
      * so we need copy_propagation_invalidate_from_block() anyway. */
-    copy_propagation_invalidate_from_block(ctx, state, &iff->then_instrs);
-    copy_propagation_invalidate_from_block(ctx, state, &iff->else_instrs);
+    copy_propagation_invalidate_from_block(ctx, state, &iff->then_block);
+    copy_propagation_invalidate_from_block(ctx, state, &iff->else_block);
 
     return progress;
 }
@@ -1999,6 +2003,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
+    struct hlsl_block then_block, else_block;
     struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
@@ -2009,17 +2014,20 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
     if (!(var = hlsl_new_synthetic_var(ctx, "conditional", if_true->data_type, &condition->loc)))
         return NULL;
 
-    if (!(iff = hlsl_new_if(ctx, condition, condition->loc)))
-        return NULL;
-    list_add_tail(instrs, &iff->node.entry);
+    hlsl_block_init(&then_block);
+    hlsl_block_init(&else_block);
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_true)))
         return NULL;
-    hlsl_block_add_instr(&iff->then_instrs, &store->node);
+    hlsl_block_add_instr(&then_block, &store->node);
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_false)))
         return NULL;
-    hlsl_block_add_instr(&iff->else_instrs, &store->node);
+    hlsl_block_add_instr(&else_block, &store->node);
+
+    if (!(iff = hlsl_new_if(ctx, condition, &then_block, &else_block, &condition->loc)))
+        return NULL;
+    list_add_tail(instrs, &iff->node.entry);
 
     if (!(load = hlsl_new_var_load(ctx, var, condition->loc)))
         return NULL;
@@ -2320,8 +2328,8 @@ static unsigned int index_instructions(struct hlsl_block *block, unsigned int in
         if (instr->type == HLSL_IR_IF)
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-            index = index_instructions(&iff->then_instrs, index);
-            index = index_instructions(&iff->else_instrs, index);
+            index = index_instructions(&iff->then_block, index);
+            index = index_instructions(&iff->else_block, index);
         }
         else if (instr->type == HLSL_IR_LOOP)
         {
@@ -2446,8 +2454,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            compute_liveness_recurse(&iff->then_instrs, loop_first, loop_last);
-            compute_liveness_recurse(&iff->else_instrs, loop_first, loop_last);
+            compute_liveness_recurse(&iff->then_block, loop_first, loop_last);
+            compute_liveness_recurse(&iff->else_block, loop_first, loop_last);
             iff->condition.node->last_read = instr->index;
             break;
         }
@@ -2724,8 +2732,8 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_temp_registers_recurse(ctx, &iff->then_instrs, liveness);
-                allocate_temp_registers_recurse(ctx, &iff->else_instrs, liveness);
+                allocate_temp_registers_recurse(ctx, &iff->then_block, liveness);
+                allocate_temp_registers_recurse(ctx, &iff->else_block, liveness);
                 break;
             }
 
@@ -2839,8 +2847,8 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_const_registers_recurse(ctx, &iff->then_instrs, liveness);
-                allocate_const_registers_recurse(ctx, &iff->else_instrs, liveness);
+                allocate_const_registers_recurse(ctx, &iff->then_block, liveness);
+                allocate_const_registers_recurse(ctx, &iff->else_block, liveness);
                 break;
             }
 
