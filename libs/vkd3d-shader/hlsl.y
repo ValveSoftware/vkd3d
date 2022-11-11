@@ -406,10 +406,9 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, con
 
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_list)
 {
-    struct hlsl_ir_node *condition, *not;
+    struct hlsl_ir_node *condition, *not, *iff;
     struct hlsl_block then_block;
     struct hlsl_ir_jump *jump;
-    struct hlsl_ir_if *iff;
 
     /* E.g. "for (i = 0; ; ++i)". */
     if (list_empty(cond_list))
@@ -428,7 +427,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
         return false;
-    list_add_tail(cond_list, &iff->node.entry);
+    list_add_tail(cond_list, &iff->entry);
     return true;
 }
 
@@ -5245,7 +5244,7 @@ selection_statement:
         {
             struct hlsl_ir_node *condition = node_from_list($3);
             struct hlsl_block then_block, else_block;
-            struct hlsl_ir_if *instr;
+            struct hlsl_ir_node *instr;
 
             hlsl_block_init(&then_block);
             list_move_tail(&then_block.instrs, $5.then_block);
@@ -5262,12 +5261,12 @@ selection_statement:
                 struct vkd3d_string_buffer *string;
 
                 if ((string = hlsl_type_to_string(ctx, condition->data_type)))
-                    hlsl_error(ctx, &instr->node.loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                             "if condition type %s is not scalar.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
             $$ = $3;
-            list_add_tail($$, &instr->node.entry);
+            list_add_tail($$, &instr->entry);
         }
 
 if_body:

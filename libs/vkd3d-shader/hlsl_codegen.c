@@ -519,7 +519,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
     struct hlsl_block then_block;
     struct hlsl_ir_jump *jump;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_if *iff;
+    struct hlsl_ir_node *iff;
 
     hlsl_block_init(&then_block);
 
@@ -533,7 +533,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 
     if (!(iff = hlsl_new_if(ctx, &load->node, &then_block, NULL, &cf_instr->loc)))
         return;
-    list_add_after(&load->node.entry, &iff->node.entry);
+    list_add_after(&load->node.entry, &iff->entry);
 }
 
 /* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
@@ -678,10 +678,9 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
     else if (cf_instr)
     {
         struct list *tail = list_tail(&block->instrs);
+        struct hlsl_ir_node *not, *iff;
         struct hlsl_block then_block;
         struct hlsl_ir_load *load;
-        struct hlsl_ir_node *not;
-        struct hlsl_ir_if *iff;
 
         /* If we're in a loop, we should have used "break" instead. */
         assert(!in_loop);
@@ -703,7 +702,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
 
         if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &cf_instr->loc)))
             return false;
-        list_add_tail(&block->instrs, &iff->node.entry);
+        list_add_tail(&block->instrs, &iff->entry);
     }
 
     return has_early_return;
@@ -2006,8 +2005,8 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
     struct hlsl_block then_block, else_block;
     struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
+    struct hlsl_ir_node *iff;
     struct hlsl_ir_var *var;
-    struct hlsl_ir_if *iff;
 
     assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
 
@@ -2027,7 +2026,7 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
 
     if (!(iff = hlsl_new_if(ctx, condition, &then_block, &else_block, &condition->loc)))
         return NULL;
-    list_add_tail(instrs, &iff->node.entry);
+    list_add_tail(instrs, &iff->entry);
 
     if (!(load = hlsl_new_var_load(ctx, var, condition->loc)))
         return NULL;

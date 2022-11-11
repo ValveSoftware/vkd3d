@@ -1208,7 +1208,7 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
     return hlsl_new_expr(ctx, op, operands, arg1->data_type, &arg1->loc);
 }
 
-struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition,
+struct hlsl_ir_node *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition,
         struct hlsl_block *then_block, struct hlsl_block *else_block, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_if *iff;
@@ -1222,7 +1222,7 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condit
     hlsl_block_init(&iff->else_block);
     if (else_block)
         hlsl_block_add_block(&iff->else_block, else_block);
-    return iff;
+    return &iff->node;
 }
 
 struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
@@ -1521,7 +1521,7 @@ static struct hlsl_ir_node *clone_expr(struct hlsl_ctx *ctx, struct clone_instr_
 static struct hlsl_ir_node *clone_if(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_if *src)
 {
     struct hlsl_block then_block, else_block;
-    struct hlsl_ir_if *dst;
+    struct hlsl_ir_node *dst;
 
     if (!clone_block(ctx, &then_block, &src->then_block, map))
         return NULL;
@@ -1538,7 +1538,7 @@ static struct hlsl_ir_node *clone_if(struct hlsl_ctx *ctx, struct clone_instr_ma
         return NULL;
     }
 
-    return &dst->node;
+    return dst;
 }
 
 static struct hlsl_ir_node *clone_jump(struct hlsl_ctx *ctx, struct hlsl_ir_jump *src)
