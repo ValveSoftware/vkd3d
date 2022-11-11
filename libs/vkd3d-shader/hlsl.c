@@ -1298,7 +1298,7 @@ struct hlsl_ir_node *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     return &load->node;
 }
 
-struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
+struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_resource_load *load;
@@ -1327,7 +1327,7 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     hlsl_src_from_node(&load->coords, params->coords);
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
-    return load;
+    return &load->node;
 }
 
 struct hlsl_ir_resource_store *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct hlsl_deref *resource,

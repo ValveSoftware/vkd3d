@@ -757,7 +757,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
     {
         struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
         unsigned int dim_count = hlsl_sampler_dim_count(expr_type->sampler_dim);
-        struct hlsl_ir_resource_load *resource_load;
+        struct hlsl_ir_node *resource_load;
 
         if (index_type->class > HLSL_CLASS_VECTOR || index_type->dimx != dim_count)
         {
@@ -783,7 +783,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
 
         if (!(resource_load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
-        list_add_tail(instrs, &resource_load->node.entry);
+        list_add_tail(instrs, &resource_load->entry);
         return true;
     }
 
@@ -3300,8 +3300,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 {
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_resource_load *load;
-    struct hlsl_ir_node *coords;
+    struct hlsl_ir_node *coords, *load;
 
     if (params->args_count != 2 && params->args_count != 4)
     {
@@ -3338,7 +3337,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(params->instrs, &load->node.entry);
+    list_add_tail(params->instrs, &load->entry);
     return true;
 }
 
@@ -3731,7 +3730,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
     const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
-    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_node *load;
     bool multisampled;
 
     multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
@@ -3771,7 +3770,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->node.entry);
+    list_add_tail(instrs, &load->entry);
     return true;
 }
 
@@ -3783,7 +3782,7 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_node *load;
 
     if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
     {
@@ -3828,7 +3827,7 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->node.entry);
+    list_add_tail(instrs, &load->entry);
 
     return true;
 }
@@ -3841,7 +3840,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {0};
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_node *load;
     unsigned int read_channel;
 
     if (!strcmp(name, "GatherGreen"))
@@ -3927,7 +3926,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->node.entry);
+    list_add_tail(instrs, &load->entry);
     return true;
 }
 
@@ -3939,7 +3938,7 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs
     const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_node *load;
 
     if (!strcmp(name, "SampleLevel"))
         load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
@@ -3991,7 +3990,7 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->node.entry);
+    list_add_tail(instrs, &load->entry);
     return true;
 }
 
