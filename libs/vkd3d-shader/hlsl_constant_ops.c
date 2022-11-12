@@ -257,12 +257,12 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
-        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
     unsigned int k;
 
-    assert(dst->node.data_type->base_type == HLSL_TYPE_BOOL);
+    assert(dst_type->base_type == HLSL_TYPE_BOOL);
     assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
     for (k = 0; k < 4; ++k)
@@ -271,24 +271,24 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value.u[k].u = src1->value.u[k].f != src2->value.u[k].f;
+                dst->u[k].u = src1->value.u[k].f != src2->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value.u[k].u = src1->value.u[k].d != src2->value.u[k].d;
+                dst->u[k].u = src1->value.u[k].d != src2->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
-                dst->value.u[k].u = src1->value.u[k].u != src2->value.u[k].u;
+                dst->u[k].u = src1->value.u[k].u != src2->value.u[k].u;
                 break;
 
             default:
                 vkd3d_unreachable();
         }
 
-        dst->value.u[k].u *= ~0u;
+        dst->u[k].u *= ~0u;
     }
     return true;
 }
@@ -596,7 +596,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             break;
 
         case HLSL_OP2_NEQUAL:
-            success = fold_nequal(ctx, res, arg1, arg2);
+            success = fold_nequal(ctx, &res->value, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:
