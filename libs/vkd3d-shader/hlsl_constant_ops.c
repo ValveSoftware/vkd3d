@@ -151,9 +151,10 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
     return true;
 }
 
-static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
+static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
+        const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
-    enum hlsl_base_type type = dst->node.data_type->base_type;
+    enum hlsl_base_type type = dst_type->base_type;
     unsigned int k;
 
     assert(type == src->node.data_type->base_type);
@@ -164,20 +165,20 @@ static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct 
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value.u[k].f = -src->value.u[k].f;
+                dst->u[k].f = -src->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value.u[k].d = -src->value.u[k].d;
+                dst->u[k].d = -src->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value.u[k].u = -src->value.u[k].u;
+                dst->u[k].u = -src->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold negation for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                FIXME("Fold negation for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
@@ -583,7 +584,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             break;
 
         case HLSL_OP1_NEG:
-            success = fold_neg(ctx, res, arg1);
+            success = fold_neg(ctx, &res->value, instr->data_type, arg1);
             break;
 
         case HLSL_OP2_ADD:
