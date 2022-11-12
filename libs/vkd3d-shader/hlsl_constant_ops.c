@@ -62,7 +62,8 @@ static bool fold_abs(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct 
     return true;
 }
 
-static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
+static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
+        const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
     unsigned int k;
     uint32_t u;
@@ -70,11 +71,11 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
     double d;
     float f;
 
-    if (dst->node.data_type->dimx != src->node.data_type->dimx
-            || dst->node.data_type->dimy != src->node.data_type->dimy)
+    if (dst_type->dimx != src->node.data_type->dimx
+            || dst_type->dimy != src->node.data_type->dimy)
     {
         FIXME("Cast from %s to %s.\n", debug_hlsl_type(ctx, src->node.data_type),
-                debug_hlsl_type(ctx, dst->node.data_type));
+                debug_hlsl_type(ctx, dst_type));
         return false;
     }
 
@@ -122,23 +123,23 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
                 vkd3d_unreachable();
         }
 
-        switch (dst->node.data_type->base_type)
+        switch (dst_type->base_type)
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value.u[k].f = f;
+                dst->u[k].f = f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value.u[k].d = d;
+                dst->u[k].d = d;
                 break;
 
             case HLSL_TYPE_INT:
-                dst->value.u[k].i = i;
+                dst->u[k].i = i;
                 break;
 
             case HLSL_TYPE_UINT:
-                dst->value.u[k].u = u;
+                dst->u[k].u = u;
                 break;
 
             case HLSL_TYPE_BOOL:
@@ -578,7 +579,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             break;
 
         case HLSL_OP1_CAST:
-            success = fold_cast(ctx, res, arg1);
+            success = fold_cast(ctx, &res->value, instr->data_type, arg1);
             break;
 
         case HLSL_OP1_NEG:
