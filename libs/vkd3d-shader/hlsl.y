@@ -2696,9 +2696,8 @@ static bool intrinsic_floor(struct hlsl_ctx *ctx,
 static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer *params,
         const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *x, *y, *div, *abs, *frac, *neg_frac, *ge, *select;
+    struct hlsl_ir_node *x, *y, *div, *abs, *frac, *neg_frac, *ge, *select, *zero;
     static const struct hlsl_constant_value zero_value;
-    struct hlsl_ir_constant *zero;
 
     if (!(x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
         return false;
@@ -2711,7 +2710,7 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
 
     if (!(zero = hlsl_new_constant(ctx, div->data_type, &zero_value, loc)))
         return false;
-    list_add_tail(params->instrs, &zero->node.entry);
+    list_add_tail(params->instrs, &zero->entry);
 
     if (!(abs = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, div, loc)))
         return false;
@@ -2722,7 +2721,7 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     if (!(neg_frac = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, frac, loc)))
         return false;
 
-    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, &zero->node, loc)))
+    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, zero, loc)))
         return false;
 
     if (!(select = hlsl_add_conditional(ctx, params->instrs, ge, frac, neg_frac)))
@@ -2820,9 +2819,8 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *n_l_neg, *n_h_neg, *specular_or, *specular_pow, *load;
-    struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero, *store;
+    struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero, *store, *init;
     struct hlsl_constant_value init_value;
-    struct hlsl_ir_constant *init;
     struct hlsl_ir_load *var_load;
     struct hlsl_deref var_deref;
     struct hlsl_type *ret_type;
@@ -2858,9 +2856,9 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
     init_value.u[3].f = 1.0f;
     if (!(init = hlsl_new_constant(ctx, ret_type, &init_value, loc)))
         return false;
-    list_add_tail(params->instrs, &init->node.entry);
+    list_add_tail(params->instrs, &init->entry);
 
-    if (!(store = hlsl_new_simple_store(ctx, var, &init->node)))
+    if (!(store = hlsl_new_simple_store(ctx, var, init)))
         return false;
     list_add_tail(params->instrs, &store->entry);
 
@@ -3158,20 +3156,19 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
 static bool intrinsic_sign(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *lt, *neg, *op1, *op2, *arg = params->args[0];
+    struct hlsl_ir_node *lt, *neg, *op1, *op2, *zero, *arg = params->args[0];
     static const struct hlsl_constant_value zero_value;
-    struct hlsl_ir_constant *zero;
 
     struct hlsl_type *int_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_INT,
             arg->data_type->dimx, arg->data_type->dimy);
 
     if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->base_type), &zero_value, loc)))
         return false;
-    list_add_tail(params->instrs, &zero->node.entry);
+    list_add_tail(params->instrs, &zero->entry);
 
     /* Check if 0 < arg, cast bool to int */
 
-    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, &zero->node, arg, loc)))
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, zero, arg, loc)))
         return false;
 
     if (!(op1 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))
@@ -3179,7 +3176,7 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
 
     /* Check if arg < 0, cast bool to int and invert (meaning true is -1) */
 
-    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, arg, &zero->node, loc)))
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, arg, zero, loc)))
         return false;
 
     if (!(op2 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))

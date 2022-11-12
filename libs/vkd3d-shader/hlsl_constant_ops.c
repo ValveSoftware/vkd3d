@@ -544,8 +544,9 @@ static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
 
 bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_constant *arg1, *arg2 = NULL, *res_node;
+    struct hlsl_ir_constant *arg1, *arg2 = NULL;
     struct hlsl_constant_value res = {0};
+    struct hlsl_ir_node *res_node;
     struct hlsl_ir_expr *expr;
     unsigned int i;
     bool success;
@@ -636,18 +637,18 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     {
         if (!(res_node = hlsl_new_constant(ctx, instr->data_type, &res, &instr->loc)))
             return false;
-
-        list_add_before(&expr->node.entry, &res_node->node.entry);
-        hlsl_replace_node(&expr->node, &res_node->node);
+        list_add_before(&expr->node.entry, &res_node->entry);
+        hlsl_replace_node(&expr->node, res_node);
     }
     return success;
 }
 
 bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_constant *src, *dst;
     struct hlsl_constant_value value;
     struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_ir_constant *src;
+    struct hlsl_ir_node *dst;
     unsigned int i;
 
     if (instr->type != HLSL_IR_SWIZZLE)
@@ -663,7 +664,7 @@ bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     if (!(dst = hlsl_new_constant(ctx, instr->data_type, &value, &instr->loc)))
         return false;
 
-    list_add_before(&swizzle->node.entry, &dst->node.entry);
-    hlsl_replace_node(&swizzle->node, &dst->node);
+    list_add_before(&swizzle->node.entry, &dst->entry);
+    hlsl_replace_node(&swizzle->node, dst);
     return true;
 }
