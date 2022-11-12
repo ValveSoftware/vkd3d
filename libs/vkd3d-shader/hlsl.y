@@ -1403,17 +1403,6 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     return add_expr(ctx, instrs, op, args, common_type, loc);
 }
 
-static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
-
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
-    add_binary_arithmetic_expr(ctx, list1, op, arg1, arg2, loc);
-    return list1;
-}
-
 static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
@@ -1422,18 +1411,6 @@ static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct
     check_integer_type(ctx, arg2);
 
     return add_binary_arithmetic_expr(ctx, instrs, op, arg1, arg2, loc);
-}
-
-static struct list *add_binary_bitwise_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
-
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
-    add_binary_bitwise_expr(ctx, list1, op, arg1, arg2, loc);
-
-    return list1;
 }
 
 static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
@@ -1461,17 +1438,6 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
     return add_expr(ctx, instrs, op, args, return_type, loc);
 }
 
-static struct list *add_binary_comparison_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
-
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
-    add_binary_comparison_expr(ctx, list1, op, arg1, arg2, loc);
-    return list1;
-}
-
 static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
@@ -1493,18 +1459,6 @@ static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct
         return NULL;
 
     return add_expr(ctx, instrs, op, args, common_type, loc);
-}
-
-static struct list *add_binary_logical_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
-
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
-    add_binary_logical_expr(ctx, list1, op, arg1, arg2, loc);
-
-    return list1;
 }
 
 static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct list *instrs,
@@ -1536,18 +1490,6 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct l
         return NULL;
 
     return add_expr(ctx, instrs, op, args, return_type, loc);
-}
-
-static struct list *add_binary_shift_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
-
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
-    add_binary_shift_expr(ctx, list1, op, arg1, arg2, loc);
-
-    return list1;
 }
 
 static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct list *instrs,
@@ -1601,6 +1543,53 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct lis
         return NULL;
 
     return add_expr(ctx, instrs, op, args, ret_type, loc);
+}
+
+static struct list *add_binary_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
+
+    list_move_tail(list1, list2);
+    vkd3d_free(list2);
+
+    switch (op)
+    {
+        case HLSL_OP2_ADD:
+        case HLSL_OP2_DIV:
+        case HLSL_OP2_MOD:
+        case HLSL_OP2_MUL:
+            add_binary_arithmetic_expr(ctx, list1, op, arg1, arg2, loc);
+            break;
+
+        case HLSL_OP2_BIT_AND:
+        case HLSL_OP2_BIT_OR:
+        case HLSL_OP2_BIT_XOR:
+            add_binary_bitwise_expr(ctx, list1, op, arg1, arg2, loc);
+            break;
+
+        case HLSL_OP2_LESS:
+        case HLSL_OP2_GEQUAL:
+        case HLSL_OP2_EQUAL:
+        case HLSL_OP2_NEQUAL:
+            add_binary_comparison_expr(ctx, list1, op, arg1, arg2, loc);
+            break;
+
+        case HLSL_OP2_LOGIC_AND:
+        case HLSL_OP2_LOGIC_OR:
+            add_binary_logical_expr(ctx, list1, op, arg1, arg2, loc);
+            break;
+
+        case HLSL_OP2_LSHIFT:
+        case HLSL_OP2_RSHIFT:
+            add_binary_shift_expr(ctx, list1, op, arg1, arg2, loc);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    return list1;
 }
 
 static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
@@ -6174,22 +6163,22 @@ mul_expr:
       unary_expr
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, &@2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, &@2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, &@2);
         }
 
 add_expr:
       mul_expr
     | add_expr '+' mul_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
     | add_expr '-' mul_expr
         {
@@ -6198,83 +6187,83 @@ add_expr:
             if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), &@2)))
                 YYABORT;
             list_add_tail($3, &neg->entry);
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
 
 shift_expr:
       add_expr
     | shift_expr OP_LEFTSHIFT add_expr
         {
-            $$ = add_binary_shift_expr_merge(ctx, $1, $3, HLSL_OP2_LSHIFT, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_LSHIFT, &@2);
         }
     | shift_expr OP_RIGHTSHIFT add_expr
         {
-            $$ = add_binary_shift_expr_merge(ctx, $1, $3, HLSL_OP2_RSHIFT, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_RSHIFT, &@2);
         }
 
 relational_expr:
       shift_expr
     | relational_expr '<' shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_LESS, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_LESS, &@2);
         }
     | relational_expr '>' shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_LESS, &@2);
+            $$ = add_binary_expr_merge(ctx, $3, $1, HLSL_OP2_LESS, &@2);
         }
     | relational_expr OP_LE shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_GEQUAL, &@2);
+            $$ = add_binary_expr_merge(ctx, $3, $1, HLSL_OP2_GEQUAL, &@2);
         }
     | relational_expr OP_GE shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_GEQUAL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_GEQUAL, &@2);
         }
 
 equality_expr:
       relational_expr
     | equality_expr OP_EQ relational_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_EQUAL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_EQUAL, &@2);
         }
     | equality_expr OP_NE relational_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_NEQUAL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_NEQUAL, &@2);
         }
 
 bitand_expr:
       equality_expr
     | bitand_expr '&' equality_expr
         {
-            $$ = add_binary_bitwise_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_AND, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_AND, &@2);
         }
 
 bitxor_expr:
       bitand_expr
     | bitxor_expr '^' bitand_expr
         {
-            $$ = add_binary_bitwise_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_XOR, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_XOR, &@2);
         }
 
 bitor_expr:
       bitxor_expr
     | bitor_expr '|' bitxor_expr
         {
-            $$ = add_binary_bitwise_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_OR, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_BIT_OR, &@2);
         }
 
 logicand_expr:
       bitor_expr
     | logicand_expr OP_AND bitor_expr
         {
-            $$ = add_binary_logical_expr_merge(ctx, $1, $3, HLSL_OP2_LOGIC_AND, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_LOGIC_AND, &@2);
         }
 
 logicor_expr:
       logicand_expr
     | logicor_expr OP_OR logicand_expr
         {
-            $$ = add_binary_logical_expr_merge(ctx, $1, $3, HLSL_OP2_LOGIC_OR, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_LOGIC_OR, &@2);
         }
 
 conditional_expr:
