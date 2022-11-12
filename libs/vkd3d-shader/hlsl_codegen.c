@@ -31,7 +31,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
     list_init(&block->instrs);
 
-    switch (type->type)
+    switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
             idx_offset = idx;
@@ -140,7 +140,7 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
 
     /* Instructions that directly refer to structs or arrays (instead of single-register components)
      * are removed later by dce. So it is not a problem to just cleanup their derefs. */
-    if (type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_STRUCT || type->class == HLSL_CLASS_ARRAY)
     {
         hlsl_cleanup_deref(deref);
         return;
@@ -282,7 +282,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
             return;
         list_add_after(&lhs->node.entry, &load->node.entry);
 
-        if (type->type == HLSL_CLASS_MATRIX)
+        if (type->class == HLSL_CLASS_MATRIX)
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
@@ -324,7 +324,7 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
             return;
         list_add_after(&c->node.entry, &field_load->node.entry);
 
-        if (field->type->type == HLSL_CLASS_STRUCT)
+        if (field->type->class == HLSL_CLASS_STRUCT)
             prepend_input_struct_copy(ctx, instrs, field_load);
         else if (field->semantic.name)
             prepend_input_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
@@ -345,7 +345,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
         return;
     list_add_head(instrs, &load->node.entry);
 
-    if (var->data_type->type == HLSL_CLASS_STRUCT)
+    if (var->data_type->class == HLSL_CLASS_STRUCT)
         prepend_input_struct_copy(ctx, instrs, load);
     else if (var->semantic.name)
         prepend_input_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
@@ -373,7 +373,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         if (!(output = add_semantic_var(ctx, var, vector_type, modifiers, &semantic_copy, true)))
             return;
 
-        if (type->type == HLSL_CLASS_MATRIX)
+        if (type->class == HLSL_CLASS_MATRIX)
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
@@ -419,7 +419,7 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
             return;
         list_add_tail(instrs, &field_load->node.entry);
 
-        if (field->type->type == HLSL_CLASS_STRUCT)
+        if (field->type->class == HLSL_CLASS_STRUCT)
             append_output_struct_copy(ctx, instrs, field_load);
         else if (field->semantic.name)
             append_output_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
@@ -441,7 +441,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
         return;
     list_add_tail(instrs, &load->node.entry);
 
-    if (var->data_type->type == HLSL_CLASS_STRUCT)
+    if (var->data_type->class == HLSL_CLASS_STRUCT)
         append_output_struct_copy(ctx, instrs, load);
     else if (var->semantic.name)
         append_output_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
@@ -746,7 +746,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
     src_type = cast->operands[0].node->data_type;
     dst_type = cast->node.data_type;
 
-    if (src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR && src_type->dimx == 1)
+    if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && src_type->dimx == 1)
     {
         struct hlsl_ir_node *replacement;
         struct hlsl_ir_swizzle *swizzle;
@@ -949,7 +949,7 @@ static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_
     path_node = deref->path[depth].node;
     subtype = hlsl_get_element_type_from_path_index(ctx, type, path_node);
 
-    if (type->type == HLSL_CLASS_STRUCT)
+    if (type->class == HLSL_CLASS_STRUCT)
     {
         unsigned int idx = hlsl_ir_constant(path_node)->value[0].u;
 
@@ -1041,7 +1041,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
             var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count),
             new_instr, debug_hlsl_swizzle(ret_swizzle, instr_component_count));
 
-    if (instr->data_type->type != HLSL_CLASS_OBJECT)
+    if (instr->data_type->class != HLSL_CLASS_OBJECT)
     {
         struct hlsl_ir_swizzle *swizzle_node;
 
@@ -1099,7 +1099,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
 {
     struct hlsl_type *type = load->node.data_type;
 
-    switch (type->type)
+    switch (type->class)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
@@ -1220,7 +1220,7 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
     {
         unsigned int writemask = store->writemask;
 
-        if (store->rhs.node->data_type->type == HLSL_CLASS_OBJECT)
+        if (store->rhs.node->data_type->class == HLSL_CLASS_OBJECT)
             writemask = VKD3DSP_WRITEMASK_0;
         copy_propagation_set_value(var_def, start, writemask, store->rhs.node);
     }
@@ -1471,7 +1471,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
 
 static bool is_vec1(const struct hlsl_type *type)
 {
-    return (type->type == HLSL_CLASS_SCALAR) || (type->type == HLSL_CLASS_VECTOR && type->dimx == 1);
+    return (type->class == HLSL_CLASS_SCALAR) || (type->class == HLSL_CLASS_VECTOR && type->dimx == 1);
 }
 
 static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -1538,7 +1538,7 @@ static bool split_array_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     store = hlsl_ir_store(instr);
     rhs = store->rhs.node;
     type = rhs->data_type;
-    if (type->type != HLSL_CLASS_ARRAY)
+    if (type->class != HLSL_CLASS_ARRAY)
         return false;
     element_type = type->e.array.type;
 
@@ -1575,7 +1575,7 @@ static bool split_struct_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     store = hlsl_ir_store(instr);
     rhs = store->rhs.node;
     type = rhs->data_type;
-    if (type->type != HLSL_CLASS_STRUCT)
+    if (type->class != HLSL_CLASS_STRUCT)
         return false;
 
     if (rhs->type != HLSL_IR_LOAD)
@@ -1614,7 +1614,7 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     store = hlsl_ir_store(instr);
     rhs = store->rhs.node;
     type = rhs->data_type;
-    if (type->type != HLSL_CLASS_MATRIX)
+    if (type->class != HLSL_CLASS_MATRIX)
         return false;
     element_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
@@ -1649,7 +1649,7 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     src_type = cast->operands[0].node->data_type;
     dst_type = cast->node.data_type;
 
-    if (src_type->type <= HLSL_CLASS_VECTOR && dst_type->type <= HLSL_CLASS_VECTOR && dst_type->dimx < src_type->dimx)
+    if (src_type->class <= HLSL_CLASS_VECTOR && dst_type->class <= HLSL_CLASS_VECTOR && dst_type->dimx < src_type->dimx)
     {
         struct hlsl_ir_swizzle *swizzle;
         struct hlsl_ir_expr *new_cast;
@@ -1860,7 +1860,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     if (expr->op != HLSL_OP1_CAST)
         return false;
     arg_type = expr->operands[0].node->data_type;
-    if (type->type > HLSL_CLASS_VECTOR || arg_type->type > HLSL_CLASS_VECTOR)
+    if (type->class > HLSL_CLASS_VECTOR || arg_type->class > HLSL_CLASS_VECTOR)
         return false;
     if (type->base_type != HLSL_TYPE_BOOL)
         return false;
@@ -1928,11 +1928,11 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     arg2 = expr->operands[1].node;
     if (expr->op != HLSL_OP2_DIV)
         return false;
-    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+    if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
     if (type->base_type != HLSL_TYPE_INT)
         return false;
-    utype = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_UINT, type->dimx, type->dimy);
+    utype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->dimx, type->dimy);
 
     if (!(xor = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_XOR, arg1, arg2)))
         return false;
@@ -2000,11 +2000,11 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     arg2 = expr->operands[1].node;
     if (expr->op != HLSL_OP2_MOD)
         return false;
-    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+    if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
     if (type->base_type != HLSL_TYPE_INT)
         return false;
-    utype = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_UINT, type->dimx, type->dimy);
+    utype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->dimx, type->dimy);
 
     if (!(high_bit = hlsl_new_constant(ctx, type, &instr->loc)))
         return false;
@@ -2063,7 +2063,7 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
 
     if (expr->op != HLSL_OP1_ABS)
         return false;
-    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+    if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
     if (type->base_type != HLSL_TYPE_INT)
         return false;
@@ -2096,11 +2096,11 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     arg2 = expr->operands[1].node;
     if (expr->op != HLSL_OP2_MOD)
         return false;
-    if (type->type != HLSL_CLASS_SCALAR && type->type != HLSL_CLASS_VECTOR)
+    if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
     if (type->base_type != HLSL_TYPE_FLOAT)
         return false;
-    btype = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_BOOL, type->dimx, type->dimy);
+    btype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_BOOL, type->dimx, type->dimy);
 
     if (!(mul1 = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, arg2, arg1)))
         return false;
@@ -2543,7 +2543,7 @@ static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx,
 {
     unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
-    if (type->type <= HLSL_CLASS_VECTOR)
+    if (type->class <= HLSL_CLASS_VECTOR)
         return allocate_register(ctx, liveness, first_write, last_read, reg_size, type->dimx);
     else
         return allocate_range(ctx, liveness, first_write, last_read, reg_size);
@@ -2662,7 +2662,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                     defs->count = end_reg;
                 }
 
-                assert(type->type <= HLSL_CLASS_LAST_NUMERIC);
+                assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
 
                 if (!(writemask = constant->reg.writemask))
                     writemask = (1u << type->dimx) - 1;
@@ -2880,7 +2880,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_uniform && var->data_type->type != HLSL_CLASS_OBJECT)
+        if (var->is_uniform && var->data_type->class != HLSL_CLASS_OBJECT)
         {
             if (var->is_param)
                 var->buffer = ctx->params_buffer;
@@ -3034,12 +3034,12 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
             return false;
 
         /* We should always have generated a cast to UINT. */
-        assert(path_node->data_type->type == HLSL_CLASS_SCALAR
+        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
                 && path_node->data_type->base_type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value[0].u;
 
-        switch (type->type)
+        switch (type->class)
         {
             case HLSL_CLASS_VECTOR:
                 if (idx >= type->dimx)
@@ -3102,7 +3102,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     }
 
     /* We should always have generated a cast to UINT. */
-    assert(offset_node->data_type->type == HLSL_CLASS_SCALAR
+    assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
             && offset_node->data_type->base_type == HLSL_TYPE_UINT);
 
     if (offset_node->type != HLSL_IR_CONSTANT)
@@ -3170,7 +3170,7 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
         const struct hlsl_type *type = instr->data_type;
         const struct hlsl_ir_constant *constant;
 
-        if (type->type != HLSL_CLASS_SCALAR
+        if (type->class != HLSL_CLASS_SCALAR
                 || (type->base_type != HLSL_TYPE_INT && type->base_type != HLSL_TYPE_UINT))
         {
             struct vkd3d_string_buffer *string;
@@ -3234,13 +3234,13 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         var = entry_func->parameters.vars[i];
 
-        if (var->data_type->type == HLSL_CLASS_OBJECT || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        if (var->data_type->class == HLSL_CLASS_OBJECT || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
             prepend_uniform_copy(ctx, &body->instrs, var);
         }
         else
         {
-            if (var->data_type->type != HLSL_CLASS_STRUCT && !var->semantic.name)
+            if (var->data_type->class != HLSL_CLASS_STRUCT && !var->semantic.name)
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                         "Parameter \"%s\" is missing a semantic.", var->name);
 
@@ -3252,7 +3252,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
     if (entry_func->return_var)
     {
-        if (entry_func->return_var->data_type->type != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic.name)
+        if (entry_func->return_var->data_type->class != HLSL_CLASS_STRUCT && !entry_func->return_var->semantic.name)
             hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 

@@ -139,7 +139,7 @@ static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, uns
 
 static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
 {
-    switch (type->type)
+    switch (type->class)
     {
         case HLSL_CLASS_ARRAY:
             return sm1_class(type->e.array.type);
@@ -158,7 +158,7 @@ static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_VECTOR:
             return D3DXPC_VECTOR;
         default:
-            ERR("Invalid class %#x.\n", type->type);
+            ERR("Invalid class %#x.\n", type->class);
             vkd3d_unreachable();
     }
 }
@@ -226,14 +226,14 @@ static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
 
 static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_ARRAY)
         return get_array_type(type->e.array.type);
     return type;
 }
 
 static unsigned int get_array_size(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_ARRAY)
         return get_array_size(type->e.array.type) * type->e.array.elements_count;
     return 1;
 }
@@ -249,7 +249,7 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
     if (type->bytecode_offset)
         return;
 
-    if (array_type->type == HLSL_CLASS_STRUCT)
+    if (array_type->class == HLSL_CLASS_STRUCT)
     {
         field_count = array_type->e.record.field_count;
 
@@ -360,7 +360,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
         if (!var->semantic.name && var->regs[regset].allocated)
         {
             put_u32(buffer, 0); /* name */
-            if (var->data_type->type == HLSL_CLASS_OBJECT
+            if (var->data_type->class == HLSL_CLASS_OBJECT
                     && (var->data_type->base_type == HLSL_TYPE_SAMPLER
                     || var->data_type->base_type == HLSL_TYPE_TEXTURE))
             {
@@ -849,7 +849,7 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
         .src_count = 1,
     };
 
-    if (store->lhs.var->data_type->type == HLSL_CLASS_MATRIX)
+    if (store->lhs.var->data_type->class == HLSL_CLASS_MATRIX)
     {
         FIXME("Matrix writemasks need to be lowered.\n");
         return;
@@ -910,19 +910,19 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     {
         if (instr->data_type)
         {
-            if (instr->data_type->type == HLSL_CLASS_MATRIX)
+            if (instr->data_type->class == HLSL_CLASS_MATRIX)
             {
                 /* These need to be lowered. */
                 hlsl_fixme(ctx, &instr->loc, "SM1 matrix expression.");
                 continue;
             }
-            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
+            else if (instr->data_type->class == HLSL_CLASS_OBJECT)
             {
                 hlsl_fixme(ctx, &instr->loc, "Object copy.");
                 break;
             }
 
-            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
+            assert(instr->data_type->class == HLSL_CLASS_SCALAR || instr->data_type->class == HLSL_CLASS_VECTOR);
         }
 
         switch (instr->type)

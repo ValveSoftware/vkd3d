@@ -257,21 +257,21 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
 
 static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_ARRAY)
         return get_array_type(type->e.array.type);
     return type;
 }
 
 static unsigned int get_array_size(const struct hlsl_type *type)
 {
-    if (type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_ARRAY)
         return get_array_size(type->e.array.type) * type->e.array.elements_count;
     return 1;
 }
 
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
 {
-    switch (type->type)
+    switch (type->class)
     {
         case HLSL_CLASS_ARRAY:
             return sm4_class(type->e.array.type);
@@ -290,7 +290,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_VECTOR:
             return D3D_SVC_VECTOR;
         default:
-            ERR("Invalid class %#x.\n", type->type);
+            ERR("Invalid class %#x.\n", type->class);
             vkd3d_unreachable();
     }
 }
@@ -372,10 +372,10 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     if (profile->major_version >= 5)
         name_offset = put_string(buffer, name);
 
-    if (type->type == HLSL_CLASS_ARRAY)
+    if (type->class == HLSL_CLASS_ARRAY)
         array_size = get_array_size(type);
 
-    if (array_type->type == HLSL_CLASS_STRUCT)
+    if (array_type->class == HLSL_CLASS_STRUCT)
     {
         field_count = array_type->e.record.field_count;
 
@@ -858,7 +858,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
     if (var->is_uniform)
     {
-        if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_TEXTURE)
+        if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_TEXTURE)
         {
             reg->type = VKD3D_SM4_RT_RESOURCE;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
@@ -868,7 +868,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
-        else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_UAV)
+        else if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_UAV)
         {
             reg->type = VKD3D_SM5_RT_UAV;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
@@ -878,7 +878,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
-        else if (data_type->type == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
+        else if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
         {
             reg->type = VKD3D_SM4_RT_SAMPLER;
             reg->dim = VKD3D_SM4_DIMENSION_NONE;
@@ -892,7 +892,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref) + var->buffer_offset;
 
-            assert(data_type->type <= HLSL_CLASS_VECTOR);
+            assert(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3D_SM4_RT_CONSTBUFFER;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
@@ -2231,9 +2231,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
 
-    if (resource_type->type != HLSL_CLASS_OBJECT)
+    if (resource_type->class != HLSL_CLASS_OBJECT)
     {
-        assert(resource_type->type == HLSL_CLASS_ARRAY || resource_type->type == HLSL_CLASS_STRUCT);
+        assert(resource_type->class == HLSL_CLASS_ARRAY || resource_type->class == HLSL_CLASS_STRUCT);
         hlsl_fixme(ctx, &load->node.loc, "Resource being a component of another variable.");
         return;
     }
@@ -2242,9 +2242,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     {
         const struct hlsl_type *sampler_type = load->sampler.var->data_type;
 
-        if (sampler_type->type != HLSL_CLASS_OBJECT)
+        if (sampler_type->class != HLSL_CLASS_OBJECT)
         {
-            assert(sampler_type->type == HLSL_CLASS_ARRAY || sampler_type->type == HLSL_CLASS_STRUCT);
+            assert(sampler_type->class == HLSL_CLASS_ARRAY || sampler_type->class == HLSL_CLASS_STRUCT);
             hlsl_fixme(ctx, &load->node.loc, "Sampler being a component of another variable.");
             return;
         }
@@ -2312,9 +2312,9 @@ static void write_sm4_resource_store(struct hlsl_ctx *ctx,
 {
     const struct hlsl_type *resource_type = store->resource.var->data_type;
 
-    if (resource_type->type != HLSL_CLASS_OBJECT)
+    if (resource_type->class != HLSL_CLASS_OBJECT)
     {
-        assert(resource_type->type == HLSL_CLASS_ARRAY || resource_type->type == HLSL_CLASS_STRUCT);
+        assert(resource_type->class == HLSL_CLASS_ARRAY || resource_type->class == HLSL_CLASS_STRUCT);
         hlsl_fixme(ctx, &store->node.loc, "Resource being a component of another variable.");
         return;
     }
@@ -2377,18 +2377,18 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
     {
         if (instr->data_type)
         {
-            if (instr->data_type->type == HLSL_CLASS_MATRIX)
+            if (instr->data_type->class == HLSL_CLASS_MATRIX)
             {
                 hlsl_fixme(ctx, &instr->loc, "Matrix operations need to be lowered.");
                 break;
             }
-            else if (instr->data_type->type == HLSL_CLASS_OBJECT)
+            else if (instr->data_type->class == HLSL_CLASS_OBJECT)
             {
                 hlsl_fixme(ctx, &instr->loc, "Object copy.");
                 break;
             }
 
-            assert(instr->data_type->type == HLSL_CLASS_SCALAR || instr->data_type->type == HLSL_CLASS_VECTOR);
+            assert(instr->data_type->class == HLSL_CLASS_SCALAR || instr->data_type->class == HLSL_CLASS_VECTOR);
         }
 
         switch (instr->type)

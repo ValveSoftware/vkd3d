@@ -512,7 +512,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     if (!expr->operands[0].node)
         return false;
 
-    if (instr->data_type->type > HLSL_CLASS_VECTOR)
+    if (instr->data_type->class > HLSL_CLASS_VECTOR)
         return false;
 
     for (i = 0; i < ARRAY_SIZE(expr->operands); ++i)
@@ -521,7 +521,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         {
             if (expr->operands[i].node->type != HLSL_IR_CONSTANT)
                 return false;
-            assert(expr->operands[i].node->data_type->type <= HLSL_CLASS_VECTOR);
+            assert(expr->operands[i].node->data_type->class <= HLSL_CLASS_VECTOR);
         }
     }
     arg1 = hlsl_ir_constant(expr->operands[0].node);

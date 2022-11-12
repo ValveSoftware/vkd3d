@@ -134,7 +134,7 @@ struct hlsl_type
     /* Item entry in hlsl_scope->types. hlsl_type->name is used as key (if not NULL). */
     struct rb_entry scope_entry;
 
-    enum hlsl_type_class type;
+    enum hlsl_type_class class;
     /* If type is <= HLSL_CLASS_LAST_NUMERIC, then base_type is <= HLSL_TYPE_LAST_SCALAR.
      * If type is HLSL_CLASS_OBJECT, then base_type is > HLSL_TYPE_LAST_SCALAR.
      * Otherwise, base_type is not used. */
