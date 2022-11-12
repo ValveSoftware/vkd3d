@@ -2697,8 +2697,8 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *x, *y, *div, *abs, *frac, *neg_frac, *ge, *select;
+    static const struct hlsl_constant_value zero_value;
     struct hlsl_ir_constant *zero;
-    unsigned int count, i;
 
     if (!(x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
         return false;
@@ -2709,13 +2709,9 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     if (!(div = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, x, y, loc)))
         return false;
 
-    if (!(zero = hlsl_new_constant(ctx, div->data_type, loc)))
+    if (!(zero = hlsl_new_constant(ctx, div->data_type, &zero_value, loc)))
         return false;
     list_add_tail(params->instrs, &zero->node.entry);
-
-    count = hlsl_type_element_count(div->data_type);
-    for (i = 0; i < count; ++i)
-        zero->value.u[i].f = 0.0f;
 
     if (!(abs = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, div, loc)))
         return false;
@@ -2825,6 +2821,7 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *n_l_neg, *n_h_neg, *specular_or, *specular_pow, *load;
     struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero, *store;
+    struct hlsl_constant_value init_value;
     struct hlsl_ir_constant *init;
     struct hlsl_ir_load *var_load;
     struct hlsl_deref var_deref;
@@ -2855,12 +2852,12 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
         return false;
     hlsl_init_simple_deref_from_var(&var_deref, var);
 
-    if (!(init = hlsl_new_constant(ctx, ret_type, loc)))
+    init_value.u[0].f = 1.0f;
+    init_value.u[1].f = 0.0f;
+    init_value.u[2].f = 0.0f;
+    init_value.u[3].f = 1.0f;
+    if (!(init = hlsl_new_constant(ctx, ret_type, &init_value, loc)))
         return false;
-    init->value.u[0].f = 1.0f;
-    init->value.u[1].f = 0.0f;
-    init->value.u[2].f = 0.0f;
-    init->value.u[3].f = 1.0f;
     list_add_tail(params->instrs, &init->node.entry);
 
     if (!(store = hlsl_new_simple_store(ctx, var, &init->node)))
@@ -3162,12 +3159,13 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *lt, *neg, *op1, *op2, *arg = params->args[0];
+    static const struct hlsl_constant_value zero_value;
     struct hlsl_ir_constant *zero;
 
     struct hlsl_type *int_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_INT,
             arg->data_type->dimx, arg->data_type->dimy);
 
-    if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->base_type), loc)))
+    if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->base_type), &zero_value, loc)))
         return false;
     list_add_tail(params->instrs, &zero->node.entry);
 

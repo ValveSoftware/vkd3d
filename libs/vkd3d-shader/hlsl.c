@@ -1147,7 +1147,7 @@ struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function
 }
 
 struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        const struct vkd3d_shader_location *loc)
+        const struct hlsl_constant_value *value, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_constant *c;
 
@@ -1157,53 +1157,54 @@ struct hlsl_ir_constant *hlsl_new_constant(struct hlsl_ctx *ctx, struct hlsl_typ
         return NULL;
 
     init_node(&c->node, HLSL_IR_CONSTANT, type, loc);
+    c->value = *value;
 
     return c;
 }
 
 struct hlsl_ir_node *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_constant_value value;
     struct hlsl_ir_constant *c;
 
-    if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), loc)))
-        c->value.u[0].u = b ? ~0u : 0;
-
+    value.u[0].u = b ? ~0u : 0;
+    if (!(c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &value, loc)))
+        return NULL;
     return &c->node;
 }
 
 struct hlsl_ir_node *hlsl_new_float_constant(struct hlsl_ctx *ctx, float f,
         const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_constant_value value;
     struct hlsl_ir_constant *c;
 
-    if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-        c->value.u[0].f = f;
-
+    value.u[0].f = f;
+    if (!(c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), &value, loc)))
+        return NULL;
     return &c->node;
 }
 
 struct hlsl_ir_node *hlsl_new_int_constant(struct hlsl_ctx *ctx, int32_t n, const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_constant_value value;
     struct hlsl_ir_constant *c;
 
-    c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc);
-
-    if (c)
-        c->value.u[0].i = n;
-
+    value.u[0].i = n;
+    if (!(c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), &value, loc)))
+        return NULL;
     return &c->node;
 }
 
 struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location *loc)
 {
+    struct hlsl_constant_value value;
     struct hlsl_ir_constant *c;
 
-    c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
-
-    if (c)
-        c->value.u[0].u = n;
-
+    value.u[0].u = n;
+    if (!(c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &value, loc)))
+        return NULL;
     return &c->node;
 }
 
@@ -1561,9 +1562,8 @@ static struct hlsl_ir_node *clone_constant(struct hlsl_ctx *ctx, struct hlsl_ir_
 {
     struct hlsl_ir_constant *dst;
 
-    if (!(dst = hlsl_new_constant(ctx, src->node.data_type, &src->node.loc)))
+    if (!(dst = hlsl_new_constant(ctx, src->node.data_type, &src->value, &src->node.loc)))
         return NULL;
-    dst->value = src->value;
     return &dst->node;
 }
 

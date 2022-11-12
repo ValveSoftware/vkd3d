@@ -1353,9 +1353,8 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
         values.u[i] = hlsl_ir_constant(value->node)->value.u[value->component];
     }
 
-    if (!(cons = hlsl_new_constant(ctx, instr->data_type, &instr->loc)))
+    if (!(cons = hlsl_new_constant(ctx, instr->data_type, &values, &instr->loc)))
         return false;
-    cons->value = values;
     list_add_before(&instr->entry, &cons->node.entry);
 
     TRACE("Load from %s[%u-%u]%s turned into a constant %p.\n",
@@ -2017,6 +2016,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
     if (type->class == HLSL_CLASS_VECTOR && idx->type != HLSL_IR_CONSTANT)
     {
         struct hlsl_ir_node *eq, *swizzle, *dot, *operands[HLSL_MAX_OPERANDS] = {0};
+        struct hlsl_constant_value value;
         struct hlsl_ir_load *vector_load;
         struct hlsl_ir_constant *c;
         enum hlsl_ir_expr_op op;
@@ -2029,12 +2029,12 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
             return false;
         list_add_before(&instr->entry, &swizzle->entry);
 
-        if (!(c = hlsl_new_constant(ctx, hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, type->dimx), &instr->loc)))
+        value.u[0].u = 0;
+        value.u[1].u = 1;
+        value.u[2].u = 2;
+        value.u[3].u = 3;
+        if (!(c = hlsl_new_constant(ctx, hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, type->dimx), &value, &instr->loc)))
             return false;
-        c->value.u[0].u = 0;
-        c->value.u[1].u = 1;
-        c->value.u[2].u = 2;
-        c->value.u[3].u = 3;
         list_add_before(&instr->entry, &c->node.entry);
 
         operands[0] = swizzle;
@@ -2193,6 +2193,7 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
 {
     struct hlsl_ir_node *arg, *neg, *sum, *frc, *replacement;
     struct hlsl_type *type = instr->data_type;
+    struct hlsl_constant_value half_value;
     unsigned int i, component_count;
     struct hlsl_ir_constant *half;
     struct hlsl_ir_expr *expr;
@@ -2205,12 +2206,12 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
     if (expr->op != HLSL_OP1_ROUND)
         return false;
 
-    if (!(half = hlsl_new_constant(ctx, type, &expr->node.loc)))
-        return false;
-
     component_count = hlsl_type_component_count(type);
     for (i = 0; i < component_count; ++i)
-        half->value.u[i].f = 0.5f;
+        half_value.u[i].f = 0.5f;
+    if (!(half = hlsl_new_constant(ctx, type, &half_value, &expr->node.loc)))
+        return false;
+
     list_add_before(&instr->entry, &half->node.entry);
 
     if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, &half->node)))
@@ -2236,6 +2237,7 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
+    static const struct hlsl_constant_value zero_value;
     struct hlsl_ir_constant *zero;
     struct hlsl_ir_expr *expr;
 
@@ -2253,7 +2255,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     /* Narrowing casts should have already been lowered. */
     assert(type->dimx == arg_type->dimx);
 
-    zero = hlsl_new_constant(ctx, arg_type, &instr->loc);
+    zero = hlsl_new_constant(ctx, arg_type, &zero_value, &instr->loc);
     if (!zero)
         return false;
     list_add_before(&instr->entry, &zero->node.entry);
@@ -2303,6 +2305,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
 {
     struct hlsl_ir_node *arg1, *arg2, *xor, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *cond;
     struct hlsl_type *type = instr->data_type, *utype;
+    struct hlsl_constant_value high_bit_value;
     struct hlsl_ir_constant *high_bit;
     struct hlsl_ir_expr *expr;
     unsigned int i;
@@ -2324,10 +2327,10 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     list_add_before(&instr->entry, &xor->entry);
 
-    if (!(high_bit = hlsl_new_constant(ctx, type, &instr->loc)))
-        return false;
     for (i = 0; i < type->dimx; ++i)
-        high_bit->value.u[i].u = 0x80000000;
+        high_bit_value.u[i].u = 0x80000000;
+    if (!(high_bit = hlsl_new_constant(ctx, type, &high_bit_value, &instr->loc)))
+        return false;
     list_add_before(&instr->entry, &high_bit->node.entry);
 
     if (!(and = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, xor, &high_bit->node)))
@@ -2373,6 +2376,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 {
     struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *cond;
     struct hlsl_type *type = instr->data_type, *utype;
+    struct hlsl_constant_value high_bit_value;
     struct hlsl_ir_constant *high_bit;
     struct hlsl_ir_expr *expr;
     unsigned int i;
@@ -2390,10 +2394,10 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     utype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->dimx, type->dimy);
 
-    if (!(high_bit = hlsl_new_constant(ctx, type, &instr->loc)))
-        return false;
     for (i = 0; i < type->dimx; ++i)
-        high_bit->value.u[i].u = 0x80000000;
+        high_bit_value.u[i].u = 0x80000000;
+    if (!(high_bit = hlsl_new_constant(ctx, type, &high_bit_value, &instr->loc)))
+        return false;
     list_add_before(&instr->entry, &high_bit->node.entry);
 
     if (!(and = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, arg1, &high_bit->node)))
@@ -2520,6 +2524,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 {
     struct hlsl_ir_node *arg1, *arg2, *mul1, *neg1, *ge, *neg2, *div, *mul2, *frc, *cond;
     struct hlsl_type *type = instr->data_type, *btype;
+    struct hlsl_constant_value one_value;
     struct hlsl_ir_constant *one;
     struct hlsl_ir_expr *expr;
     unsigned int i;
@@ -2557,10 +2562,10 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     if (!(cond = hlsl_add_conditional(ctx, &instr->entry, ge, arg2, neg2)))
         return false;
 
-    if (!(one = hlsl_new_constant(ctx, type, &instr->loc)))
-        return false;
     for (i = 0; i < type->dimx; ++i)
-        one->value.u[i].f = 1.0f;
+        one_value.u[i].f = 1.0f;
+    if (!(one = hlsl_new_constant(ctx, type, &one_value, &instr->loc)))
+        return false;
     list_add_before(&instr->entry, &one->node.entry);
 
     if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_DIV, &one->node, cond)))
