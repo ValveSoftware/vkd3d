@@ -490,7 +490,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
             hlsl_free_instr_list(&block->instrs);
             return false;
         }
-        list_add_tail(&block->instrs, &c->node.entry);
+        hlsl_block_add_instr(block, &c->node);
 
         hlsl_src_from_node(&deref->path[deref_path_len++], &c->node);
     }
@@ -1029,7 +1029,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
     if (type_is_single_reg(rhs->data_type))
         store->writemask = (1 << rhs->data_type->dimx) - 1;
 
-    list_add_tail(&block->instrs, &store->node.entry);
+    hlsl_block_add_instr(block, &store->node);
 
     return store;
 }
@@ -1217,7 +1217,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     }
     list_move_tail(&block->instrs, &comp_path_block.instrs);
 
-    list_add_tail(&block->instrs, &load->node.entry);
+    hlsl_block_add_instr(block, &load->node);
 
     return load;
 }
@@ -1622,11 +1622,11 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 
     if (!(constant = hlsl_new_bool_constant(ctx, false, loc)))
         return decl;
-    list_add_tail(&decl->body.instrs, &constant->node.entry);
+    hlsl_block_add_instr(&decl->body, &constant->node);
 
     if (!(store = hlsl_new_simple_store(ctx, decl->early_return_var, &constant->node)))
         return decl;
-    list_add_tail(&decl->body.instrs, &store->node.entry);
+    hlsl_block_add_instr(&decl->body, &store->node);
 
     return decl;
 }

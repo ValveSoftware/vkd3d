@@ -857,6 +857,11 @@ static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node 
     return CONTAINING_RECORD(node, struct hlsl_ir_swizzle, node);
 }
 
+static inline void hlsl_block_add_instr(struct hlsl_block *block, struct hlsl_ir_node *instr)
+{
+    list_add_tail(&block->instrs, &instr->entry);
+}
+
 static inline void hlsl_src_from_node(struct hlsl_src *src, struct hlsl_ir_node *node)
 {
     src->node = node;

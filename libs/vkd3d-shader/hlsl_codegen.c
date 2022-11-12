@@ -41,11 +41,11 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
         {
             if (!(c = hlsl_new_uint_constant(ctx, 4, loc)))
                 return NULL;
-            list_add_tail(&block->instrs, &c->node.entry);
+            hlsl_block_add_instr(block, &c->node);
 
             if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
                 return NULL;
-            list_add_tail(&block->instrs, &idx_offset->entry);
+            hlsl_block_add_instr(block, idx_offset);
 
             break;
         }
@@ -56,11 +56,11 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
                 return NULL;
-            list_add_tail(&block->instrs, &c->node.entry);
+            hlsl_block_add_instr(block, &c->node);
 
             if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, &c->node, idx)))
                 return NULL;
-            list_add_tail(&block->instrs, &idx_offset->entry);
+            hlsl_block_add_instr(block, idx_offset);
 
             break;
         }
@@ -72,7 +72,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
             if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset[regset], loc)))
                 return NULL;
-            list_add_tail(&block->instrs, &c->node.entry);
+            hlsl_block_add_instr(block, &c->node);
 
             idx_offset = &c->node;
 
@@ -87,7 +87,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
     {
         if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, offset, idx_offset)))
             return NULL;
-        list_add_tail(&block->instrs, &idx_offset->entry);
+        hlsl_block_add_instr(block, idx_offset);
     }
 
     return idx_offset;
@@ -530,7 +530,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, cf_instr->loc)))
         return;
-    list_add_tail(&iff->then_instrs.instrs, &jump->node.entry);
+    hlsl_block_add_instr(&iff->then_instrs, &jump->node);
 }
 
 /* Remove HLSL_IR_JUMP_RETURN calls by altering subsequent control flow. */
@@ -687,15 +687,15 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
 
         if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
             return false;
-        list_add_tail(&block->instrs, &load->node.entry);
+        hlsl_block_add_instr(block, &load->node);
 
         if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, cf_instr->loc)))
             return false;
-        list_add_tail(&block->instrs, &not->entry);
+        hlsl_block_add_instr(block, not);
 
         if (!(iff = hlsl_new_if(ctx, not, cf_instr->loc)))
             return false;
-        list_add_tail(&block->instrs, &iff->node.entry);
+        hlsl_block_add_instr(block, &iff->node);
 
         list_move_slice_tail(&iff->then_instrs.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
 
@@ -1943,11 +1943,11 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_true)))
         return NULL;
-    list_add_tail(&iff->then_instrs.instrs, &store->node.entry);
+    hlsl_block_add_instr(&iff->then_instrs, &store->node);
 
     if (!(store = hlsl_new_simple_store(ctx, var, if_false)))
         return NULL;
-    list_add_tail(&iff->else_instrs.instrs, &store->node.entry);
+    hlsl_block_add_instr(&iff->else_instrs, &store->node);
 
     if (!(load = hlsl_new_var_load(ctx, var, condition->loc)))
         return NULL;

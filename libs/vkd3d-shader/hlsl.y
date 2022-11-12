@@ -425,7 +425,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, condition->loc)))
         return false;
-    list_add_head(&iff->then_instrs.instrs, &jump->node.entry);
+    hlsl_block_add_instr(&iff->then_instrs, &jump->node);
     return true;
 }
 
