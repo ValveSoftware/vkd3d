@@ -6184,9 +6184,8 @@ add_expr:
         {
             struct hlsl_ir_node *neg;
 
-            if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), &@2)))
+            if (!(neg = add_unary_arithmetic_expr(ctx, $3, HLSL_OP1_NEG, node_from_list($3), &@2)))
                 YYABORT;
-            list_add_tail($3, &neg->entry);
             $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
 
