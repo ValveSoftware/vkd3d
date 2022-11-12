@@ -1151,7 +1151,7 @@ static unsigned int evaluate_static_expression(struct hlsl_ir_node *node)
         case HLSL_IR_CONSTANT:
         {
             struct hlsl_ir_constant *constant = hlsl_ir_constant(node);
-            const union hlsl_constant_value *value = &constant->value[0];
+            const union hlsl_constant_value_component *value = &constant->value.u[0];
 
             switch (constant->node.data_type->base_type)
             {
@@ -2863,10 +2863,10 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
 
     if (!(init = hlsl_new_constant(ctx, ret_type, loc)))
         return false;
-    init->value[0].f = 1.0f;
-    init->value[1].f = 0.0f;
-    init->value[2].f = 0.0f;
-    init->value[3].f = 1.0f;
+    init->value.u[0].f = 1.0f;
+    init->value.u[1].f = 0.0f;
+    init->value.u[2].f = 0.0f;
+    init->value.u[3].f = 1.0f;
     list_add_tail(params->instrs, &init->node.entry);
 
     if (!(store = hlsl_new_simple_store(ctx, var, &init->node)))

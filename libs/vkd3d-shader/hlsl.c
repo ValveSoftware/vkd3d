@@ -596,8 +596,8 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
         {
             struct hlsl_ir_constant *c = hlsl_ir_constant(idx);
 
-            assert(c->value[0].u < type->e.record.field_count);
-            return type->e.record.fields[c->value[0].u].type;
+            assert(c->value.u[0].u < type->e.record.field_count);
+            return type->e.record.fields[c->value.u[0].u].type;
         }
 
         default:
@@ -1140,7 +1140,7 @@ struct hlsl_ir_node *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const 
     struct hlsl_ir_constant *c;
 
     if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), loc)))
-        c->value[0].u = b ? ~0u : 0;
+        c->value.u[0].u = b ? ~0u : 0;
 
     return &c->node;
 }
@@ -1151,7 +1151,7 @@ struct hlsl_ir_node *hlsl_new_float_constant(struct hlsl_ctx *ctx, float f,
     struct hlsl_ir_constant *c;
 
     if ((c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-        c->value[0].f = f;
+        c->value.u[0].f = f;
 
     return &c->node;
 }
@@ -1163,7 +1163,7 @@ struct hlsl_ir_node *hlsl_new_int_constant(struct hlsl_ctx *ctx, int32_t n, cons
     c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc);
 
     if (c)
-        c->value[0].i = n;
+        c->value.u[0].i = n;
 
     return &c->node;
 }
@@ -1176,7 +1176,7 @@ struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned i
     c = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc);
 
     if (c)
-        c->value[0].u = n;
+        c->value.u[0].u = n;
 
     return c;
 }
@@ -1510,7 +1510,7 @@ static struct hlsl_ir_node *clone_constant(struct hlsl_ctx *ctx, struct hlsl_ir_
 
     if (!(dst = hlsl_new_constant(ctx, src->node.data_type, &src->node.loc)))
         return NULL;
-    memcpy(dst->value, src->value, sizeof(src->value));
+    dst->value = src->value;
     return &dst->node;
 }
 
@@ -2241,7 +2241,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
         vkd3d_string_buffer_printf(buffer, "{");
     for (x = 0; x < type->dimx; ++x)
     {
-        const union hlsl_constant_value *value = &constant->value[x];
+        const union hlsl_constant_value_component *value = &constant->value.u[x];
 
         switch (type->base_type)
         {

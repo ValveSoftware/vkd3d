@@ -67,7 +67,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
         case HLSL_CLASS_STRUCT:
         {
-            unsigned int field_idx = hlsl_ir_constant(idx)->value[0].u;
+            unsigned int field_idx = hlsl_ir_constant(idx)->value.u[0].u;
             struct hlsl_struct_field *field = &type->e.record.fields[field_idx];
 
             if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset[regset], loc)))
@@ -1152,7 +1152,7 @@ static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_
 
     if (type->class == HLSL_CLASS_STRUCT)
     {
-        unsigned int idx = hlsl_ir_constant(path_node)->value[0].u;
+        unsigned int idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
         for (i = 0; i < idx; ++i)
             comp_start += hlsl_type_component_count(type->e.record.fields[i].type);
@@ -1167,7 +1167,7 @@ static void copy_propagation_invalidate_variable_from_deref_recurse(struct hlsl_
         if (path_node->type == HLSL_IR_CONSTANT)
         {
             copy_propagation_invalidate_variable_from_deref_recurse(ctx, var_def, deref, subtype,
-                    depth + 1, hlsl_ir_constant(path_node)->value[0].u * subtype_comp_count, writemask);
+                    depth + 1, hlsl_ir_constant(path_node)->value.u[0].u * subtype_comp_count, writemask);
         }
         else
         {
@@ -1262,7 +1262,7 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
     const struct hlsl_ir_var *var = deref->var;
-    union hlsl_constant_value values[4] = {0};
+    struct hlsl_constant_value values = {0};
     struct hlsl_ir_constant *cons;
     unsigned int start, count, i;
 
@@ -1277,15 +1277,12 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
                 || value->node->type != HLSL_IR_CONSTANT)
             return false;
 
-        values[i] = hlsl_ir_constant(value->node)->value[value->component];
+        values.u[i] = hlsl_ir_constant(value->node)->value.u[value->component];
     }
 
     if (!(cons = hlsl_new_constant(ctx, instr->data_type, &instr->loc)))
         return false;
-    cons->value[0] = values[0];
-    cons->value[1] = values[1];
-    cons->value[2] = values[2];
-    cons->value[3] = values[3];
+    cons->value = values;
     list_add_before(&instr->entry, &cons->node.entry);
 
     TRACE("Load from %s[%u-%u]%s turned into a constant %p.\n",
@@ -2070,7 +2067,7 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
 
     component_count = hlsl_type_component_count(type);
     for (i = 0; i < component_count; ++i)
-        half->value[i].f = 0.5f;
+        half->value.u[i].f = 0.5f;
     list_add_before(&instr->entry, &half->node.entry);
 
     if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, &half->node)))
@@ -2189,7 +2186,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     if (!(high_bit = hlsl_new_constant(ctx, type, &instr->loc)))
         return false;
     for (i = 0; i < type->dimx; ++i)
-        high_bit->value[i].u = 0x80000000;
+        high_bit->value.u[i].u = 0x80000000;
     list_add_before(&instr->entry, &high_bit->node.entry);
 
     if (!(and = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, xor, &high_bit->node)))
@@ -2256,7 +2253,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     if (!(high_bit = hlsl_new_constant(ctx, type, &instr->loc)))
         return false;
     for (i = 0; i < type->dimx; ++i)
-        high_bit->value[i].u = 0x80000000;
+        high_bit->value.u[i].u = 0x80000000;
     list_add_before(&instr->entry, &high_bit->node.entry);
 
     if (!(and = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, arg1, &high_bit->node)))
@@ -2372,7 +2369,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     if (!(one = hlsl_new_constant(ctx, type, &instr->loc)))
         return false;
     for (i = 0; i < type->dimx; ++i)
-        one->value[i].f = 1.0f;
+        one->value.u[i].f = 1.0f;
     list_add_before(&instr->entry, &one->node.entry);
 
     if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_DIV, &one->node, &cond->node)))
@@ -2928,12 +2925,12 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                 {
                     for (x = 0, i = 0; x < 4; ++x)
                     {
-                        const union hlsl_constant_value *value;
+                        const union hlsl_constant_value_component *value;
                         float f;
 
                         if (!(writemask & (1u << x)))
                             continue;
-                        value = &constant->value[i++];
+                        value = &constant->value.u[i++];
 
                         switch (type->base_type)
                         {
@@ -3389,7 +3386,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
         assert(path_node->data_type->class == HLSL_CLASS_SCALAR
                 && path_node->data_type->base_type == HLSL_TYPE_UINT);
 
-        idx = hlsl_ir_constant(path_node)->value[0].u;
+        idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
         switch (type->class)
         {
@@ -3460,7 +3457,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     if (offset_node->type != HLSL_IR_CONSTANT)
         return false;
 
-    *offset = hlsl_ir_constant(offset_node)->value[0].u;
+    *offset = hlsl_ir_constant(offset_node)->value.u[0].u;
 
     size = deref->var->data_type->reg_size[deref->offset_regset];
     if (*offset >= size)
@@ -3542,12 +3539,12 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
         }
         constant = hlsl_ir_constant(instr);
 
-        if ((type->base_type == HLSL_TYPE_INT && constant->value[0].i <= 0)
-                || (type->base_type == HLSL_TYPE_UINT && !constant->value[0].u))
+        if ((type->base_type == HLSL_TYPE_INT && constant->value.u[0].i <= 0)
+                || (type->base_type == HLSL_TYPE_UINT && !constant->value.u[0].u))
             hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_THREAD_COUNT,
                     "Thread count must be a positive integer.");
 
-        ctx->thread_count[i] = constant->value[0].u;
+        ctx->thread_count[i] = constant->value.u[0].u;
     }
 }
 

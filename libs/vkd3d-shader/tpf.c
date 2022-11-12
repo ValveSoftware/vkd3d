@@ -3297,9 +3297,9 @@ static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
     offset = hlsl_ir_constant(texel_offset);
 
     modif.type = VKD3D_SM4_MODIFIER_AOFFIMMI;
-    modif.u.aoffimmi.u = offset->value[0].i;
-    modif.u.aoffimmi.v = offset->value[1].i;
-    modif.u.aoffimmi.w = offset->value[2].i;
+    modif.u.aoffimmi.u = offset->value.u[0].i;
+    modif.u.aoffimmi.v = offset->value.u[1].i;
+    modif.u.aoffimmi.w = offset->value.u[2].i;
     if (modif.u.aoffimmi.u < -8 || modif.u.aoffimmi.u > 7
             || modif.u.aoffimmi.v < -8 || modif.u.aoffimmi.v > 7
             || modif.u.aoffimmi.w < -8 || modif.u.aoffimmi.w > 7)
@@ -3622,7 +3622,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     if (dimx == 1)
     {
         reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
-        reg->immconst_uint[0] = constant->value[0].u;
+        reg->immconst_uint[0] = constant->value.u[0].u;
     }
     else
     {
@@ -3632,7 +3632,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
         for (i = 0; i < 4; ++i)
         {
             if (instr.dsts[0].writemask & (1u << i))
-                reg->immconst_uint[i] = constant->value[j++].u;
+                reg->immconst_uint[i] = constant->value.u[j++].u;
         }
     }
     instr.src_count = 1,

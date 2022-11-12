@@ -632,13 +632,16 @@ struct hlsl_ir_store
 struct hlsl_ir_constant
 {
     struct hlsl_ir_node node;
-    union hlsl_constant_value
+    struct hlsl_constant_value
     {
-        uint32_t u;
-        int32_t i;
-        float f;
-        double d;
-    } value[4];
+        union hlsl_constant_value_component
+        {
+            uint32_t u;
+            int32_t i;
+            float f;
+            double d;
+        } u[4];
+    } value;
     /* Constant register of type 'c' where the constant value is stored for SM1. */
     struct hlsl_reg reg;
 };

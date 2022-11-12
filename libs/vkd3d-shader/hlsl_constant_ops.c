@@ -44,38 +44,38 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                u = src->value[k].f;
-                i = src->value[k].f;
-                f = src->value[k].f;
-                d = src->value[k].f;
+                u = src->value.u[k].f;
+                i = src->value.u[k].f;
+                f = src->value.u[k].f;
+                d = src->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                u = src->value[k].d;
-                i = src->value[k].d;
-                f = src->value[k].d;
-                d = src->value[k].d;
+                u = src->value.u[k].d;
+                i = src->value.u[k].d;
+                f = src->value.u[k].d;
+                d = src->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
-                u = src->value[k].i;
-                i = src->value[k].i;
-                f = src->value[k].i;
-                d = src->value[k].i;
+                u = src->value.u[k].i;
+                i = src->value.u[k].i;
+                f = src->value.u[k].i;
+                d = src->value.u[k].i;
                 break;
 
             case HLSL_TYPE_UINT:
-                u = src->value[k].u;
-                i = src->value[k].u;
-                f = src->value[k].u;
-                d = src->value[k].u;
+                u = src->value.u[k].u;
+                i = src->value.u[k].u;
+                f = src->value.u[k].u;
+                d = src->value.u[k].u;
                 break;
 
             case HLSL_TYPE_BOOL:
-                u = !!src->value[k].u;
-                i = !!src->value[k].u;
-                f = !!src->value[k].u;
-                d = !!src->value[k].u;
+                u = !!src->value.u[k].u;
+                i = !!src->value.u[k].u;
+                f = !!src->value.u[k].u;
+                d = !!src->value.u[k].u;
                 break;
 
             default:
@@ -86,19 +86,19 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value[k].f = f;
+                dst->value.u[k].f = f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value[k].d = d;
+                dst->value.u[k].d = d;
                 break;
 
             case HLSL_TYPE_INT:
-                dst->value[k].i = i;
+                dst->value.u[k].i = i;
                 break;
 
             case HLSL_TYPE_UINT:
-                dst->value[k].u = u;
+                dst->value.u[k].u = u;
                 break;
 
             case HLSL_TYPE_BOOL:
@@ -123,16 +123,16 @@ static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct 
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value[k].f = -src->value[k].f;
+                dst->value.u[k].f = -src->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value[k].d = -src->value[k].d;
+                dst->value.u[k].d = -src->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = -src->value[k].u;
+                dst->value.u[k].u = -src->value.u[k].u;
                 break;
 
             default:
@@ -158,18 +158,18 @@ static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct 
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value[k].f = src1->value[k].f + src2->value[k].f;
+                dst->value.u[k].f = src1->value.u[k].f + src2->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value[k].d = src1->value[k].d + src2->value[k].d;
+                dst->value.u[k].d = src1->value.u[k].d + src2->value.u[k].d;
                 break;
 
             /* Handling HLSL_TYPE_INT through the unsigned field to avoid
              * undefined behavior with signed integers in C. */
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = src1->value[k].u + src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u + src2->value.u[k].u;
                 break;
 
             default:
@@ -195,16 +195,16 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value[k].f = src1->value[k].f * src2->value[k].f;
+                dst->value.u[k].f = src1->value.u[k].f * src2->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value[k].d = src1->value[k].d * src2->value[k].d;
+                dst->value.u[k].d = src1->value.u[k].d * src2->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = src1->value[k].u * src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u * src2->value.u[k].u;
                 break;
 
             default:
@@ -229,24 +229,24 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                dst->value[k].u = src1->value[k].f != src2->value[k].f;
+                dst->value.u[k].u = src1->value.u[k].f != src2->value.u[k].f;
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                dst->value[k].u = src1->value[k].d != src2->value[k].d;
+                dst->value.u[k].u = src1->value.u[k].d != src2->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
             case HLSL_TYPE_BOOL:
-                dst->value[k].u = src1->value[k].u != src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u != src2->value.u[k].u;
                 break;
 
             default:
                 vkd3d_unreachable();
         }
 
-        dst->value[k].u *= ~0u;
+        dst->value.u[k].u *= ~0u;
     }
     return true;
 }
@@ -266,13 +266,13 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
-                if (ctx->profile->major_version >= 4 && src2->value[k].f == 0)
+                if (ctx->profile->major_version >= 4 && src2->value.u[k].f == 0)
                 {
                     hlsl_warning(ctx, &dst->node.loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
                             "Floating point division by zero.");
                 }
-                dst->value[k].f = src1->value[k].f / src2->value[k].f;
-                if (ctx->profile->major_version < 4 && !isfinite(dst->value[k].f))
+                dst->value.u[k].f = src1->value.u[k].f / src2->value.u[k].f;
+                if (ctx->profile->major_version < 4 && !isfinite(dst->value.u[k].f))
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
                             "Infinities and NaNs are not allowed by the shader model.");
@@ -280,35 +280,35 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                if (src2->value[k].d == 0)
+                if (src2->value.u[k].d == 0)
                 {
                     hlsl_warning(ctx, &dst->node.loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
                             "Floating point division by zero.");
                 }
-                dst->value[k].d = src1->value[k].d / src2->value[k].d;
+                dst->value.u[k].d = src1->value.u[k].d / src2->value.u[k].d;
                 break;
 
             case HLSL_TYPE_INT:
-                if (src2->value[k].i == 0)
+                if (src2->value.u[k].i == 0)
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
                             "Division by zero.");
                     return false;
                 }
-                if (src1->value[k].i == INT_MIN && src2->value[k].i == -1)
-                    dst->value[k].i = INT_MIN;
+                if (src1->value.u[k].i == INT_MIN && src2->value.u[k].i == -1)
+                    dst->value.u[k].i = INT_MIN;
                 else
-                    dst->value[k].i = src1->value[k].i / src2->value[k].i;
+                    dst->value.u[k].i = src1->value.u[k].i / src2->value.u[k].i;
                 break;
 
             case HLSL_TYPE_UINT:
-                if (src2->value[k].u == 0)
+                if (src2->value.u[k].u == 0)
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
                             "Division by zero.");
                     return false;
                 }
-                dst->value[k].u = src1->value[k].u / src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u / src2->value.u[k].u;
                 break;
 
             default:
@@ -333,26 +333,26 @@ static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         switch (type)
         {
             case HLSL_TYPE_INT:
-                if (src2->value[k].i == 0)
+                if (src2->value.u[k].i == 0)
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
                             "Division by zero.");
                     return false;
                 }
-                if (src1->value[k].i == INT_MIN && src2->value[k].i == -1)
-                    dst->value[k].i = 0;
+                if (src1->value.u[k].i == INT_MIN && src2->value.u[k].i == -1)
+                    dst->value.u[k].i = 0;
                 else
-                    dst->value[k].i = src1->value[k].i % src2->value[k].i;
+                    dst->value.u[k].i = src1->value.u[k].i % src2->value.u[k].i;
                 break;
 
             case HLSL_TYPE_UINT:
-                if (src2->value[k].u == 0)
+                if (src2->value.u[k].u == 0)
                 {
                     hlsl_error(ctx, &dst->node.loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
                             "Division by zero.");
                     return false;
                 }
-                dst->value[k].u = src1->value[k].u % src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u % src2->value.u[k].u;
                 break;
 
             default:
@@ -377,11 +377,11 @@ static bool fold_max(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         switch (type)
         {
             case HLSL_TYPE_INT:
-                dst->value[k].i = max(src1->value[k].i, src2->value[k].i);
+                dst->value.u[k].i = max(src1->value.u[k].i, src2->value.u[k].i);
                 break;
 
             case HLSL_TYPE_UINT:
-                dst->value[k].u = max(src1->value[k].u, src2->value[k].u);
+                dst->value.u[k].u = max(src1->value.u[k].u, src2->value.u[k].u);
                 break;
 
             default:
@@ -406,11 +406,11 @@ static bool fold_min(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         switch (type)
         {
             case HLSL_TYPE_INT:
-                dst->value[k].i = min(src1->value[k].i, src2->value[k].i);
+                dst->value.u[k].i = min(src1->value.u[k].i, src2->value.u[k].i);
                 break;
 
             case HLSL_TYPE_UINT:
-                dst->value[k].u = min(src1->value[k].u, src2->value[k].u);
+                dst->value.u[k].u = min(src1->value.u[k].u, src2->value.u[k].u);
                 break;
 
             default:
@@ -436,7 +436,7 @@ static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = src1->value[k].u ^ src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u ^ src2->value.u[k].u;
                 break;
 
             default:
@@ -462,7 +462,7 @@ static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = src1->value[k].u & src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u & src2->value.u[k].u;
                 break;
 
             default:
@@ -488,7 +488,7 @@ static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
         {
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->value[k].u = src1->value[k].u | src2->value[k].u;
+                dst->value.u[k].u = src1->value.u[k].u | src2->value.u[k].u;
                 break;
 
             default:
@@ -616,7 +616,7 @@ bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         return false;
 
     for (i = 0; i < swizzle->node.data_type->dimx; ++i)
-        res->value[i] = value->value[hlsl_swizzle_get_component(swizzle->swizzle, i)];
+        res->value.u[i] = value->value.u[hlsl_swizzle_get_component(swizzle->swizzle, i)];
 
     list_add_before(&swizzle->node.entry, &res->node.entry);
     hlsl_replace_node(&swizzle->node, &res->node);
