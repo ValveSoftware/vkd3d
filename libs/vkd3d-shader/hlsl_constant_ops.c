@@ -405,29 +405,29 @@ static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_max(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst,
-        struct hlsl_ir_constant *src1, struct hlsl_ir_constant *src2)
+static bool fold_max(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
-    enum hlsl_base_type type = dst->node.data_type->base_type;
+    enum hlsl_base_type type = dst_type->base_type;
     unsigned int k;
 
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < dst->node.data_type->dimx; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
             case HLSL_TYPE_INT:
-                dst->value.u[k].i = max(src1->value.u[k].i, src2->value.u[k].i);
+                dst->u[k].i = max(src1->value.u[k].i, src2->value.u[k].i);
                 break;
 
             case HLSL_TYPE_UINT:
-                dst->value.u[k].u = max(src1->value.u[k].u, src2->value.u[k].u);
+                dst->u[k].u = max(src1->value.u[k].u, src2->value.u[k].u);
                 break;
 
             default:
-                FIXME("Fold max for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                FIXME("Fold max for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
@@ -608,7 +608,7 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             break;
 
         case HLSL_OP2_MAX:
-            success = fold_max(ctx, res, arg1, arg2);
+            success = fold_max(ctx, &res->value, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_MIN:
