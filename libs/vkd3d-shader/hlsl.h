@@ -114,33 +114,74 @@ enum hlsl_matrix_majority
     HLSL_ROW_MAJOR
 };
 
+/* An HLSL source-level data type, including anonymous structs and typedefs. */
 struct hlsl_type
 {
+    /* Item entry in hlsl_ctx->types. */
     struct list entry;
+    /* Item entry in hlsl_scope->types. hlsl_type->name is used as key (if not NULL). */
     struct rb_entry scope_entry;
+
     enum hlsl_type_class type;
+    /* If type is <= HLSL_CLASS_LAST_NUMERIC, then base_type is <= HLSL_TYPE_LAST_SCALAR.
+     * If type is HLSL_CLASS_OBJECT, then base_type is > HLSL_TYPE_LAST_SCALAR.
+     * Otherwise, base_type is not used. */
     enum hlsl_base_type base_type;
+
+    /* If base_type is HLSL_TYPE_SAMPLER, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_SAMPLER.
+     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim can have any value of the enum.
+     * If base_type is HLSL_TYPE_UAV, them sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
+     *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, or HLSL_SAMPLER_DIM_2DARRAY.
+     * Otherwise, sampler_dim is not used */
     enum hlsl_sampler_dim sampler_dim;
+    /* Name, in case the type is a named struct or a typedef. */
     const char *name;
+    /* Bitfield for storing type modifiers, subset of HLSL_TYPE_MODIFIERS_MASK.
+     * Modifiers that don't fall inside this mask are to be stored in the variable in
+     *   hlsl_ir_var.modifiers, or in the struct field in hlsl_ir_field.modifiers. */
     unsigned int modifiers;
+    /* Size of the type values on each dimension. For non-numeric types, they are set for the
+     *   convenience of the sm1/sm4 backends.
+     * If type is HLSL_CLASS_SCALAR, then both dimx = 1 and dimy = 1.
+     * If type is HLSL_CLASS_VECTOR, then dimx is the size of the vector, and dimy = 1.
+     * If type is HLSL_CLASS_MATRIX, then dimx is the number of columns, and dimy the number of rows.
+     * If type is HLSL_CLASS_ARRAY, then dimx and dimy have the same value as in the type of the array elements.
+     * If type is HLSL_CLASS_STRUCT, then dimx is the sum of (dimx * dimy) of every component, and dimy = 1.
+     * If type is HLSL_CLASS_OBJECT, dimx and dimy depend on the base_type:
+     *   If base_type is HLSL_TYPE_SAMPLER, then both dimx = 1 and dimy = 1.
+     *   If base_type is HLSL_TYPE_TEXTURE, then dimx = 4 and dimy = 1.
+     *   If base_type is HLSL_TYPE_UAV, then dimx is the dimx of e.resource_format, and dimy = 1.
+     * Otherwise both dimx = 1 and dimy = 1. */
     unsigned int dimx;
     unsigned int dimy;
+
     union
     {
+        /* Additional information if type is HLSL_CLASS_STRUCT. */
         struct
         {
             struct hlsl_struct_field *fields;
             size_t field_count;
         } record;
+        /* Additional information if type is HLSL_CLASS_ARRAY. */
         struct
         {
             struct hlsl_type *type;
+            /* Array lenght, or HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT if it is unknown yet while parsing. */
             unsigned int elements_count;
         } array;
+        /* Format of the data contained within the type if the base_type is HLSL_TYPE_TEXTURE or
+         *   HLSL_TYPE_UAV. */
         struct hlsl_type *resource_format;
     } e;
 
+    /* Number of numeric register components used by one value of this type (4 components make 1
+     *   register).
+     * If type is HLSL_CLASS_STRUCT or HLSL_CLASS_ARRAY, this value includes the reg_size of
+     *   their elements and padding (which varies according to the backend).
+     * This value is 0 for types without numeric components, like objects. */
     unsigned int reg_size;
+    /* Offset where the type's description starts in the output bytecode, in bytes. */
     size_t bytecode_offset;
 };
 
