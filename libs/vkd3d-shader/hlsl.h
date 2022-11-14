@@ -303,13 +303,40 @@ struct hlsl_ir_var
     struct vkd3d_shader_location loc;
     const char *name;
     struct hlsl_semantic semantic;
+    /* Buffer where the variable's value is stored, in case it is uniform. */
     struct hlsl_buffer *buffer;
+    /* Bitfield for storage modifiers (type modifiers are stored in data_type->modifiers). */
     unsigned int storage_modifiers;
+    /* Optional register to be used as a starting point for the variable allocation, specified
+     *   by the user via the register(·) syntax. */
     struct hlsl_reg_reservation reg_reservation;
-    struct list scope_entry, param_entry, extern_entry;
 
+    /* Item entry in hlsl_scope.vars. Specifically hlsl_ctx.globals.vars if the variable is global. */
+    struct list scope_entry;
+    /* Item entry in hlsl_ir_function_decl.parameters, if the variable is a function parameter. */
+    struct list param_entry;
+    /* Item entry in hlsl_ctx.extern_vars, if the variable is extern. */
+    struct list extern_entry;
+
+    /* Indexes of the IR instructions where the variable is first written and last read (liveness
+     *   range). The IR instructions are numerated starting from 2, because 0 means unused, and 1
+     *   means function entry. */
     unsigned int first_write, last_read;
+    /* Offset where the variable's value is stored within its buffer in numeric register components.
+     * This in case the variable is uniform. */
     unsigned int buffer_offset;
+    /* Register to which the variable is allocated during its lifetime.
+     * In case that the variable spans multiple registers, this is set to the start of the register
+     *   range.
+     * The register type is inferred from the data type and the storage of the variable.
+     *   Builtin semantics don't use the field.
+     *   In SM4, uniforms don't use the field because they are located using the buffer's hlsl_reg
+     *     and the buffer_offset instead.
+     *   If the variable is an input semantic copy, the register is 'v'.
+     *   If the variable is an output semantic copy, the register is 'o'.
+     *   Textures are stored on 's' registers in SM1, and 't' registers in SM4.
+     *   Samplers are stored on 's' registers.
+     *   UAVs are stored on 'u' registers. */
     struct hlsl_reg reg;
 
     uint32_t is_input_semantic : 1;
