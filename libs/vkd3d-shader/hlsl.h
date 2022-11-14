@@ -191,15 +191,22 @@ struct hlsl_semantic
     uint32_t index;
 };
 
+/* A field within a struct type declaration, used in hlsl_type.e.fields. */
 struct hlsl_struct_field
 {
     struct vkd3d_shader_location loc;
     struct hlsl_type *type;
     const char *name;
     struct hlsl_semantic semantic;
+
+    /* Bitfield for storing modifiers that are not in HLSL_TYPE_MODIFIERS_MASK (these are stored in
+     *   type->modifiers instead) and that also are specific to the field and not the whole variable.
+     *   In particular, interpolation modifiers. */
     unsigned int storage_modifiers;
+    /* Offset of the field within the type it belongs to, in numeric register components. */
     unsigned int reg_offset;
 
+    /* Offset where the fields's name starts in the output bytecode, in bytes. */
     size_t name_bytecode_offset;
 };
 
