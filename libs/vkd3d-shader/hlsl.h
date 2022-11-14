@@ -573,48 +573,88 @@ struct hlsl_ctx
 
     const char **source_files;
     unsigned int source_files_count;
+    /* Current location being read in the HLSL source, updated while parsing. */
     struct vkd3d_shader_location location;
+    /* Stores the logging messages and logging configuration. */
     struct vkd3d_shader_message_context *message_context;
+    /* Cache for temporary string allocations. */
     struct vkd3d_string_buffer_cache string_buffers;
+    /* A value from enum vkd3d_result with the current success/failure result of the whole
+     *   compilation.
+     * It is initialized to VKD3D_OK and set to an error code in case a call to hlsl_fixme() or
+     *   hlsl_error() is triggered, or in case of a memory allocation error.
+     * The value of this field is checked between compilation stages to stop execution in case of
+     *   failure. */
     int result;
 
+    /* Pointer to an opaque data structure managed by FLEX (during lexing), that encapsulates the
+     *   current state of the scanner. This pointer is required by all FLEX API functions when the
+     *   scanner is declared as reentrant, which is the case. */
     void *scanner;
 
+    /* Pointer to the current scope; changes as the parser reads the code. */
     struct hlsl_scope *cur_scope;
+    /* Scope of global variables. */
     struct hlsl_scope *globals;
+    /* List of all the scopes in the program; linked by the hlsl_scope.entry fields. */
     struct list scopes;
+    /* List of all the extern variables; linked by the hlsl_ir_var.extern_entry fields.
+     * This exists as a convenience because it is often necessary to iterate all extern variables
+     *   and these can be declared in global scope, as function parameters, or as the function
+     *   return value. */
     struct list extern_vars;
 
+    /* List containing both the built-in HLSL buffers ($Globals and $Params) and the ones declared
+     *   in the shader; linked by the hlsl_buffer.entry fields. */
     struct list buffers;
+    /* Current buffer (changes as the parser reads the code), $Globals buffer, and $Params buffer,
+     *   respectively. */
     struct hlsl_buffer *cur_buffer, *globals_buffer, *params_buffer;
+    /* List containing all created hlsl_types, except builtin_types; linked by the hlsl_type.entry
+     *   fields. */
     struct list types;
+    /* Tree map for the declared functions, using hlsl_ir_function.name as key.
+     * The functions are attached through the hlsl_ir_function.entry fields. */
     struct rb_tree functions;
+    /* Pointer to the current function; changes as the parser reads the code. */
     const struct hlsl_ir_function_decl *cur_function;
 
+    /* Default matrix majority for matrix types. Can be set by a pragma within the HLSL source. */
     enum hlsl_matrix_majority matrix_majority;
 
+    /* Basic data types stored for convenience. */
     struct
     {
         struct hlsl_type *scalar[HLSL_TYPE_LAST_SCALAR + 1];
         struct hlsl_type *vector[HLSL_TYPE_LAST_SCALAR + 1][4];
-        /* matrix[float][2][4] is a float4x2, i.e. dimx = 2, dimy = 4 */
+        /* matrix[HLSL_TYPE_FLOAT][1][3] is a float4x2, i.e. dimx = 2, dimy = 4 */
         struct hlsl_type *matrix[HLSL_TYPE_LAST_SCALAR + 1][4][4];
         struct hlsl_type *sampler[HLSL_SAMPLER_DIM_LAST_SAMPLER + 1];
         struct hlsl_type *Void;
     } builtin_types;
 
+    /* List of the instruction nodes for initializing static variables; linked by the
+     *   hlsl_ir_node.entry fields. */
     struct list static_initializers;
 
+    /* Dynamic array of constant values that appear in the shader, associated to the 'c' registers.
+     * Only used for SM1 profiles. */
     struct hlsl_constant_defs
     {
         struct hlsl_vec4 *values;
         size_t count, size;
     } constant_defs;
+    /* Number of temp. registers required for the shader to run, i.e. the largest temp register
+     *   index that will be used in the output bytecode (+1). */
     uint32_t temp_count;
 
+    /* Number of threads to be executed (on the X, Y, and Z dimensions) in a single thread group in
+     *   compute shader profiles. It is set using the numthreads() attribute in the entry point. */
     uint32_t thread_count[3];
 
+    /* Whether the parser is inside an state block (effects' metadata) inside a variable declarition. */
     uint32_t in_state_block : 1;
+    /* Whether the numthreads() attribute has been provided in the entry-point function. */
     uint32_t found_numthreads : 1;
 };
 
