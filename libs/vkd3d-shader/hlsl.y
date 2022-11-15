@@ -487,9 +487,8 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
 }
 
 static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
-        struct list *iter, struct list *body, const struct vkd3d_shader_location *loc)
+        struct list *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_block body_block;
     struct hlsl_ir_node *loop;
     unsigned int i;
 
@@ -529,32 +528,27 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
     if (!append_conditional_break(ctx, cond))
         goto oom;
 
-    hlsl_block_init(&body_block);
-
-    if (type != LOOP_DO_WHILE)
-        list_move_tail(&body_block.instrs, cond);
-
-    list_move_tail(&body_block.instrs, body);
-
     if (iter)
-        list_move_tail(&body_block.instrs, iter);
+        list_move_tail(&body->instrs, iter);
 
     if (type == LOOP_DO_WHILE)
-        list_move_tail(&body_block.instrs, cond);
+        list_move_tail(&body->instrs, cond);
+    else
+        list_move_head(&body->instrs, cond);
 
-    if (!(loop = hlsl_new_loop(ctx, &body_block, loc)))
+    if (!(loop = hlsl_new_loop(ctx, body, loc)))
         goto oom;
     list_add_tail(init, &loop->entry);
 
     vkd3d_free(cond);
-    vkd3d_free(body);
+    destroy_block(body);
     return init;
 
 oom:
     destroy_instr_list(init);
     destroy_instr_list(cond);
     destroy_instr_list(iter);
-    destroy_instr_list(body);
+    destroy_block(body);
     return NULL;
 }
 
@@ -4433,6 +4427,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
     char *name;
     DWORD modifiers;
     struct hlsl_ir_node *instr;
+    struct hlsl_block *block;
     struct list *list;
     struct parse_fields fields;
     struct parse_function function;
@@ -4565,7 +4560,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> bitand_expr
 %type <list> bitor_expr
 %type <list> bitxor_expr
-%type <list> compound_statement
 %type <list> conditional_expr
 %type <list> declaration
 %type <list> declaration_statement
@@ -4584,8 +4578,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> relational_expr
 %type <list> selection_statement
 %type <list> shift_expr
-%type <list> statement
-%type <list> statement_list
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> unary_expr
@@ -4605,6 +4597,10 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 
 %type <attr_list> attribute_list
 %type <attr_list> attribute_list_optional
+
+%type <block> compound_statement
+%type <block> statement
+%type <block> statement_list
 
 %type <boolval> boolean
 
@@ -4913,15 +4909,15 @@ func_declaration:
                          "Function \"%s\" is already defined.", decl->func->name);
                 hlsl_note(ctx, &decl->loc, VKD3D_SHADER_LOG_ERROR,
                          "\"%s\" was previously defined here.", decl->func->name);
-                hlsl_free_instr_list($2);
+                destroy_block($2);
             }
             else
             {
                 size_t i;
 
                 decl->has_body = true;
-                list_move_tail(&decl->body.instrs, $2);
-                vkd3d_free($2);
+                hlsl_block_add_block(&decl->body, $2);
+                destroy_block($2);
 
                 /* Semantics are taken from whichever definition has a body.
                  * We can't just replace the hlsl_ir_var pointers, though: if
@@ -5098,7 +5094,7 @@ func_prototype:
 compound_statement:
       '{' '}'
         {
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
         }
     | '{' scope_start statement_list '}'
@@ -5913,17 +5909,32 @@ statement_list:
     | statement_list statement
         {
             $$ = $1;
-            list_move_tail($$, $2);
-            vkd3d_free($2);
+            hlsl_block_add_block($$, $2);
+            destroy_block($2);
         }
 
 statement:
       declaration_statement
+        {
+            $$ = list_to_block($1);
+        }
     | expr_statement
+        {
+            $$ = list_to_block($1);
+        }
     | compound_statement
     | jump_statement
+        {
+            $$ = list_to_block($1);
+        }
     | selection_statement
+        {
+            $$ = list_to_block($1);
+        }
     | loop_statement
+        {
+            $$ = list_to_block($1);
+        }
 
 jump_statement:
       KW_RETURN expr ';'
@@ -5985,13 +5996,13 @@ selection_statement:
 if_body:
       statement
         {
-            $$.then_block = list_to_block($1);
+            $$.then_block = $1;
             $$.else_block = NULL;
         }
     | statement KW_ELSE statement
         {
-            $$.then_block = list_to_block($1);
-            $$.else_block = list_to_block($3);
+            $$.then_block = $1;
+            $$.else_block = $3;
         }
 
 loop_statement:
