@@ -30,6 +30,7 @@
 
 #include "vkd3d_common.h"
 #include "vkd3d_shader.h"
+#include "vkd3d_shader_utils.h"
 #ifdef HAVE_NCURSES
 #include <term.h>
 #endif
@@ -72,6 +73,10 @@ source_type_info[] =
     {VKD3D_SHADER_SOURCE_D3D_BYTECODE,
         "d3dbc",        "Legacy Direct3D byte-code.\n"
         "                This is the format used for Direct3D shader model 1, 2, and 3 shaders.\n",
+        true, VKD3D_SHADER_TARGET_SPIRV_BINARY},
+    {VKD3D_SHADER_SOURCE_DXBC_DXIL,
+        "dxbc-dxil",    "A 'DirectX Intermediate Language' shader embedded in a DXBC container.\n"
+        "                This is the format used for Direct3D shader model 6 shaders.\n",
         true, VKD3D_SHADER_TARGET_SPIRV_BINARY},
 };
 
@@ -354,6 +359,22 @@ static enum vkd3d_shader_target_type parse_target_type(const char *target)
     }
 
     return VKD3D_SHADER_TARGET_NONE;
+}
+
+static bool parse_dxbc_source_type(const struct vkd3d_shader_code *source, enum vkd3d_shader_source_type *type)
+{
+    char *messages;
+    int ret;
+
+    if ((ret = vkd3d_shader_parse_dxbc_source_type(source, type, &messages)) < 0)
+    {
+        fprintf(stderr, "Failed to detect dxbc source type, ret %d.\n", ret);
+        if (messages)
+            fputs(messages, stderr);
+        vkd3d_shader_free_messages(messages);
+        return false;
+    }
+    return true;
 }
 
 static const struct source_type_info *get_source_type_info(enum vkd3d_shader_source_type type)
@@ -671,7 +692,10 @@ int main(int argc, char **argv)
         {
             memcpy(&token, info.source.code, sizeof(token));
             if (token == TAG_DXBC)
-                options.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+            {
+                if (!parse_dxbc_source_type(&info.source, &options.source_type))
+                    return 1;
+            }
             else if ((token & 0xfffe0000) == 0xfffe0000)
                 options.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
             else
