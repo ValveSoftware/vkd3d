@@ -1417,15 +1417,15 @@ static struct hlsl_ir_node *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
     return add_expr(ctx, block_to_list(block), op, args, arg->data_type, loc);
 }
 
-static struct hlsl_ir_node *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     check_integer_type(ctx, arg);
 
-    return add_unary_arithmetic_expr(ctx, list_to_block(instrs), op, arg, loc);
+    return add_unary_arithmetic_expr(ctx, block, op, arg, loc);
 }
 
-static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
@@ -1434,10 +1434,10 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
     bool_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_BOOL,
             arg->data_type->dimx, arg->data_type->dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg, bool_type, loc)))
+    if (!(args[0] = add_implicit_conversion(ctx, block_to_list(block), arg, bool_type, loc)))
         return NULL;
 
-    return add_expr(ctx, instrs, op, args, bool_type, loc);
+    return add_expr(ctx, block_to_list(block), op, args, bool_type, loc);
 }
 
 static struct hlsl_type *get_common_numeric_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *arg1,
@@ -4579,7 +4579,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> shift_expr
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
-%type <list> unary_expr
 %type <list> variables_def
 %type <list> variables_def_typed
 
@@ -4608,6 +4607,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> selection_statement
 %type <block> statement
 %type <block> statement_list
+%type <block> unary_expr
 
 %type <boolval> boolean
 
@@ -6250,20 +6250,23 @@ postfix_expr:
 
 unary_expr:
       postfix_expr
+        {
+            $$ = list_to_block($1);
+        }
     | OP_INC unary_expr
         {
-            if (!add_increment(ctx, $2, false, false, &@1))
+            if (!add_increment(ctx, block_to_list($2), false, false, &@1))
             {
-                destroy_instr_list($2);
+                destroy_block($2);
                 YYABORT;
             }
             $$ = $2;
         }
     | OP_DEC unary_expr
         {
-            if (!add_increment(ctx, $2, true, false, &@1))
+            if (!add_increment(ctx, block_to_list($2), true, false, &@1))
             {
-                destroy_instr_list($2);
+                destroy_block($2);
                 YYABORT;
             }
             $$ = $2;
@@ -6274,23 +6277,23 @@ unary_expr:
         }
     | '-' unary_expr
         {
-            add_unary_arithmetic_expr(ctx, list_to_block($2), HLSL_OP1_NEG, node_from_list($2), &@1);
+            add_unary_arithmetic_expr(ctx, $2, HLSL_OP1_NEG, node_from_block($2), &@1);
             $$ = $2;
         }
     | '~' unary_expr
         {
-            add_unary_bitwise_expr(ctx, $2, HLSL_OP1_BIT_NOT, node_from_list($2), &@1);
+            add_unary_bitwise_expr(ctx, $2, HLSL_OP1_BIT_NOT, node_from_block($2), &@1);
             $$ = $2;
         }
     | '!' unary_expr
         {
-            add_unary_logical_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, node_from_list($2), &@1);
+            add_unary_logical_expr(ctx, $2, HLSL_OP1_LOGIC_NOT, node_from_block($2), &@1);
             $$ = $2;
         }
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
     | '(' var_modifiers type arrays ')' unary_expr
         {
-            struct hlsl_type *src_type = node_from_list($6)->data_type;
+            struct hlsl_type *src_type = node_from_block($6)->data_type;
             struct hlsl_type *dst_type;
             unsigned int i;
 
@@ -6326,9 +6329,9 @@ unary_expr:
                 YYABORT;
             }
 
-            if (!add_cast(ctx, $6, node_from_list($6), dst_type, &@3))
+            if (!add_cast(ctx, block_to_list($6), node_from_block($6), dst_type, &@3))
             {
-                hlsl_free_instr_list($6);
+                destroy_block($6);
                 YYABORT;
             }
             $$ = $6;
@@ -6336,17 +6339,20 @@ unary_expr:
 
 mul_expr:
       unary_expr
+        {
+            $$ = block_to_list($1);
+        }
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_MUL, &@2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_DIV, &@2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_MOD, &@2);
         }
 
 add_expr:
@@ -6474,15 +6480,15 @@ assignment_expr:
         }
     | unary_expr assign_op assignment_expr
         {
-            struct hlsl_ir_node *lhs = node_from_list($1), *rhs = node_from_block($3);
+            struct hlsl_ir_node *lhs = node_from_block($1), *rhs = node_from_block($3);
 
             if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
-            list_move_tail(&$3->instrs, $1);
-            vkd3d_free($1);
+            hlsl_block_add_block($3, $1);
+            destroy_block($1);
             if (!add_assignment(ctx, block_to_list($3), lhs, $2, rhs))
                 YYABORT;
             $$ = $3;
