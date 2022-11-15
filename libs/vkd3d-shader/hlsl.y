@@ -133,11 +133,6 @@ static void yyerror(YYLTYPE *loc, void *scanner, struct hlsl_ctx *ctx, const cha
     hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "%s", s);
 }
 
-static struct hlsl_ir_node *node_from_list(struct list *list)
-{
-    return LIST_ENTRY(list_tail(list), struct hlsl_ir_node, entry);
-}
-
 static struct hlsl_ir_node *node_from_block(struct hlsl_block *block)
 {
     return LIST_ENTRY(list_tail(&block->instrs), struct hlsl_ir_node, entry);
@@ -719,7 +714,7 @@ struct hlsl_ir_node *hlsl_add_load_component(struct hlsl_ctx *ctx, struct list *
     return load;
 }
 
-static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
+static bool add_record_access(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *record,
         unsigned int idx, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *index, *c;
@@ -728,11 +723,11 @@ static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct 
 
     if (!(c = hlsl_new_uint_constant(ctx, idx, loc)))
         return false;
-    list_add_tail(instrs, &c->entry);
+    hlsl_block_add_instr(block, c);
 
     if (!(index = hlsl_new_index(ctx, record, c, loc)))
         return false;
-    list_add_tail(instrs, &index->entry);
+    hlsl_block_add_instr(block, index);
 
     return true;
 }
@@ -1170,7 +1165,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
         return 0;
     hlsl_block_add_block(&expr, block);
 
-    if (!add_implicit_conversion(ctx, &expr.instrs, node_from_list(&expr.instrs),
+    if (!add_implicit_conversion(ctx, &expr.instrs, node_from_block(&expr),
             hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc))
     {
         hlsl_block_cleanup(&expr);
@@ -1183,7 +1178,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
         progress |= hlsl_copy_propagation_execute(ctx, &expr);
     } while (progress);
 
-    node = node_from_list(&expr.instrs);
+    node = node_from_block(&expr);
     if (node->type == HLSL_IR_CONSTANT)
     {
         constant = hlsl_ir_constant(node);
@@ -1882,10 +1877,10 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     return copy;
 }
 
-static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, bool post,
+static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool decrement, bool post,
         const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *lhs = node_from_list(instrs);
+    struct hlsl_ir_node *lhs = node_from_block(block);
     struct hlsl_ir_node *one;
 
     if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
@@ -1894,9 +1889,9 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
 
     if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
         return false;
-    list_add_tail(instrs, &one->entry);
+    hlsl_block_add_instr(block, one);
 
-    if (!add_assignment(ctx, instrs, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
+    if (!add_assignment(ctx, block_to_list(block), lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
         return false;
 
     if (post)
@@ -1905,7 +1900,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrem
 
         if (!(copy = hlsl_new_copy(ctx, lhs)))
             return false;
-        list_add_tail(instrs, &copy->entry);
+        hlsl_block_add_instr(block, copy);
 
         /* Post increment/decrement expressions are considered const. */
         if (!(copy->data_type = hlsl_type_clone(ctx, copy->data_type, 0, HLSL_MODIFIER_CONST)))
@@ -3824,7 +3819,7 @@ fail:
     return NULL;
 }
 
-static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
+static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
         struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_load *load;
@@ -3857,7 +3852,7 @@ static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type
     hlsl_block_add_instr(params->instrs, &load->node);
 
     vkd3d_free(params->args);
-    return block_to_list(params->instrs);
+    return params->instrs;
 }
 
 static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
@@ -4564,7 +4559,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 
 %type <list> declaration
 %type <list> declaration_statement
-%type <list> postfix_expr
 %type <list> primary_expr
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
@@ -4602,6 +4596,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> logicor_expr
 %type <block> loop_statement
 %type <block> mul_expr
+%type <block> postfix_expr
 %type <block> relational_expr
 %type <block> shift_expr
 %type <block> selection_statement
@@ -6123,11 +6118,14 @@ primary_expr:
 
 postfix_expr:
       primary_expr
+        {
+            $$ = list_to_block($1);
+        }
     | postfix_expr OP_INC
         {
             if (!add_increment(ctx, $1, false, true, &@2))
             {
-                destroy_instr_list($1);
+                destroy_block($1);
                 YYABORT;
             }
             $$ = $1;
@@ -6136,14 +6134,14 @@ postfix_expr:
         {
             if (!add_increment(ctx, $1, true, true, &@2))
             {
-                destroy_instr_list($1);
+                destroy_block($1);
                 YYABORT;
             }
             $$ = $1;
         }
     | postfix_expr '.' any_identifier
         {
-            struct hlsl_ir_node *node = node_from_list($1);
+            struct hlsl_ir_node *node = node_from_block($1);
 
             if (node->data_type->class == HLSL_CLASS_STRUCT)
             {
@@ -6171,7 +6169,7 @@ postfix_expr:
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
                     YYABORT;
                 }
-                list_add_tail($1, &swizzle->entry);
+                hlsl_block_add_instr($1, swizzle);
                 $$ = $1;
             }
             else
@@ -6182,17 +6180,17 @@ postfix_expr:
         }
     | postfix_expr '[' expr ']'
         {
-            struct hlsl_ir_node *array = node_from_list($1), *index = node_from_block($3);
+            struct hlsl_ir_node *array = node_from_block($1), *index = node_from_block($3);
 
-            list_move_head($1, &$3->instrs);
-            destroy_block($3);
+            hlsl_block_add_block($3, $1);
+            destroy_block($1);
 
-            if (!add_array_access(ctx, $1, array, index, &@2))
+            if (!add_array_access(ctx, block_to_list($3), array, index, &@2))
             {
-                destroy_instr_list($1);
+                destroy_block($3);
                 YYABORT;
             }
-            $$ = $1;
+            $$ = $3;
         }
 
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
@@ -6233,14 +6231,14 @@ postfix_expr:
         }
     | postfix_expr '.' any_identifier '(' func_arguments ')'
         {
-            struct hlsl_ir_node *object = node_from_list($1);
+            struct hlsl_ir_node *object = node_from_block($1);
 
-            list_move_tail($1, &$5.instrs->instrs);
+            hlsl_block_add_block($1, $5.instrs);
             vkd3d_free($5.instrs);
 
-            if (!add_method_call(ctx, $1, object, $3, &$5, &@3))
+            if (!add_method_call(ctx, block_to_list($1), object, $3, &$5, &@3))
             {
-                hlsl_free_instr_list($1);
+                destroy_block($1);
                 vkd3d_free($5.args);
                 YYABORT;
             }
@@ -6250,12 +6248,9 @@ postfix_expr:
 
 unary_expr:
       postfix_expr
-        {
-            $$ = list_to_block($1);
-        }
     | OP_INC unary_expr
         {
-            if (!add_increment(ctx, block_to_list($2), false, false, &@1))
+            if (!add_increment(ctx, $2, false, false, &@1))
             {
                 destroy_block($2);
                 YYABORT;
@@ -6264,7 +6259,7 @@ unary_expr:
         }
     | OP_DEC unary_expr
         {
-            if (!add_increment(ctx, block_to_list($2), true, false, &@1))
+            if (!add_increment(ctx, $2, true, false, &@1))
             {
                 destroy_block($2);
                 YYABORT;
@@ -6447,7 +6442,9 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            struct hlsl_ir_node *cond = node_from_block($1), *first = node_from_block($3), *second = node_from_block($5);
+            struct hlsl_ir_node *cond = node_from_block($1);
+            struct hlsl_ir_node *first = node_from_block($3);
+            struct hlsl_ir_node *second = node_from_block($5);
             struct hlsl_type *common_type;
 
             hlsl_block_add_block($1, $3);
