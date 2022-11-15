@@ -1471,17 +1471,17 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     return add_expr(ctx, block_to_list(block), op, args, common_type, loc);
 }
 
-static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
     check_integer_type(ctx, arg1);
     check_integer_type(ctx, arg2);
 
-    return add_binary_arithmetic_expr(ctx, list_to_block(instrs), op, arg1, arg2, loc);
+    return add_binary_arithmetic_expr(ctx, block, op, arg1, arg2, loc);
 }
 
-static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1497,16 +1497,16 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
     common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     return_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
+    if (!(args[0] = add_implicit_conversion(ctx, block_to_list(block), arg1, common_type, loc)))
         return NULL;
 
-    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
+    if (!(args[1] = add_implicit_conversion(ctx, block_to_list(block), arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, instrs, op, args, return_type, loc);
+    return add_expr(ctx, block_to_list(block), op, args, return_type, loc);
 }
 
-static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1520,16 +1520,16 @@ static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct
 
     common_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
+    if (!(args[0] = add_implicit_conversion(ctx, block_to_list(block), arg1, common_type, loc)))
         return NULL;
 
-    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
+    if (!(args[1] = add_implicit_conversion(ctx, block_to_list(block), arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, instrs, op, args, common_type, loc);
+    return add_expr(ctx, block_to_list(block), op, args, common_type, loc);
 }
 
-static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
@@ -1551,13 +1551,13 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct l
     return_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     integer_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_INT, dimx, dimy);
 
-    if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, return_type, loc)))
+    if (!(args[0] = add_implicit_conversion(ctx, block_to_list(block), arg1, return_type, loc)))
         return NULL;
 
-    if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, integer_type, loc)))
+    if (!(args[1] = add_implicit_conversion(ctx, block_to_list(block), arg2, integer_type, loc)))
         return NULL;
 
-    return add_expr(ctx, instrs, op, args, return_type, loc);
+    return add_expr(ctx, block_to_list(block), op, args, return_type, loc);
 }
 
 static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
@@ -1613,13 +1613,13 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hls
     return add_expr(ctx, block_to_list(instrs), op, args, ret_type, loc);
 }
 
-static struct list *add_binary_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
+static struct hlsl_block *add_binary_expr_merge(struct hlsl_ctx *ctx, struct hlsl_block *block1,
+        struct hlsl_block *block2, enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
+    struct hlsl_ir_node *arg1 = node_from_block(block1), *arg2 = node_from_block(block2);
 
-    list_move_tail(list1, list2);
-    vkd3d_free(list2);
+    hlsl_block_add_block(block1, block2);
+    destroy_block(block2);
 
     switch (op)
     {
@@ -1627,37 +1627,37 @@ static struct list *add_binary_expr_merge(struct hlsl_ctx *ctx, struct list *lis
         case HLSL_OP2_DIV:
         case HLSL_OP2_MOD:
         case HLSL_OP2_MUL:
-            add_binary_arithmetic_expr(ctx, list_to_block(list1), op, arg1, arg2, loc);
+            add_binary_arithmetic_expr(ctx, block1, op, arg1, arg2, loc);
             break;
 
         case HLSL_OP2_BIT_AND:
         case HLSL_OP2_BIT_OR:
         case HLSL_OP2_BIT_XOR:
-            add_binary_bitwise_expr(ctx, list1, op, arg1, arg2, loc);
+            add_binary_bitwise_expr(ctx, block1, op, arg1, arg2, loc);
             break;
 
         case HLSL_OP2_LESS:
         case HLSL_OP2_GEQUAL:
         case HLSL_OP2_EQUAL:
         case HLSL_OP2_NEQUAL:
-            add_binary_comparison_expr(ctx, list1, op, arg1, arg2, loc);
+            add_binary_comparison_expr(ctx, block1, op, arg1, arg2, loc);
             break;
 
         case HLSL_OP2_LOGIC_AND:
         case HLSL_OP2_LOGIC_OR:
-            add_binary_logical_expr(ctx, list1, op, arg1, arg2, loc);
+            add_binary_logical_expr(ctx, block1, op, arg1, arg2, loc);
             break;
 
         case HLSL_OP2_LSHIFT:
         case HLSL_OP2_RSHIFT:
-            add_binary_shift_expr(ctx, list1, op, arg1, arg2, loc);
+            add_binary_shift_expr(ctx, block1, op, arg1, arg2, loc);
             break;
 
         default:
             vkd3d_unreachable();
     }
 
-    return list1;
+    return block1;
 }
 
 static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
@@ -2495,7 +2495,7 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
             return false;
     }
 
-    return !!add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_NEQUAL, mul, zero, loc);
+    return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, mul, zero, loc);
 }
 
 static bool intrinsic_any(struct hlsl_ctx *ctx,
@@ -2519,7 +2519,7 @@ static bool intrinsic_any(struct hlsl_ctx *ctx,
         if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
             return false;
 
-        return !!add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_NEQUAL, dot, zero, loc);
+        return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, dot, zero, loc);
     }
     else if (arg->data_type->base_type == HLSL_TYPE_BOOL)
     {
@@ -2535,7 +2535,7 @@ static bool intrinsic_any(struct hlsl_ctx *ctx,
             if (!(load = hlsl_add_load_component(ctx, block_to_list(params->instrs), arg, i, loc)))
                 return false;
 
-            if (!(or = add_binary_bitwise_expr(ctx, block_to_list(params->instrs), HLSL_OP2_BIT_OR, or, load, loc)))
+            if (!(or = add_binary_bitwise_expr(ctx, params->instrs, HLSL_OP2_BIT_OR, or, load, loc)))
                 return false;
         }
 
@@ -2881,7 +2881,7 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     if (!(neg_frac = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, frac, loc)))
         return false;
 
-    if (!(ge = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_GEQUAL, div, zero, loc)))
+    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, zero, loc)))
         return false;
 
     if (!(select = hlsl_add_conditional(ctx, block_to_list(params->instrs), ge, frac, neg_frac)))
@@ -3035,13 +3035,13 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
     hlsl_block_add_block(params->instrs, &block);
 
     /* Specular component. */
-    if (!(n_h_neg = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_LESS, n_h, zero, loc)))
+    if (!(n_h_neg = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, n_h, zero, loc)))
         return false;
 
-    if (!(n_l_neg = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_LESS, n_l, zero, loc)))
+    if (!(n_l_neg = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, n_l, zero, loc)))
         return false;
 
-    if (!(specular_or = add_binary_logical_expr(ctx, block_to_list(params->instrs), HLSL_OP2_LOGIC_OR, n_l_neg, n_h_neg, loc)))
+    if (!(specular_or = add_binary_logical_expr(ctx, params->instrs, HLSL_OP2_LOGIC_OR, n_l_neg, n_h_neg, loc)))
         return false;
 
     if (!(specular_pow = add_pow_expr(ctx, params->instrs, n_h, m, loc)))
@@ -3330,7 +3330,7 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
 
     /* Check if 0 < arg, cast bool to int */
 
-    if (!(lt = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_LESS, zero, arg, loc)))
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, zero, arg, loc)))
         return false;
 
     if (!(op1 = add_implicit_conversion(ctx, block_to_list(params->instrs), lt, int_type, loc)))
@@ -3338,7 +3338,7 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
 
     /* Check if arg < 0, cast bool to int and invert (meaning true is -1) */
 
-    if (!(lt = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_LESS, arg, zero, loc)))
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, arg, zero, loc)))
         return false;
 
     if (!(op2 = add_implicit_conversion(ctx, block_to_list(params->instrs), lt, int_type, loc)))
@@ -3440,7 +3440,7 @@ static bool intrinsic_step(struct hlsl_ctx *ctx,
     if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    if (!(ge = add_binary_comparison_expr(ctx, block_to_list(params->instrs), HLSL_OP2_GEQUAL,
+    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL,
             params->args[1], params->args[0], loc)))
         return false;
 
@@ -4562,21 +4562,10 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token <intval> C_INTEGER
 %token <intval> PRE_LINE
 
-%type <list> add_expr
-%type <list> bitand_expr
-%type <list> bitor_expr
-%type <list> bitxor_expr
-%type <list> conditional_expr
 %type <list> declaration
 %type <list> declaration_statement
-%type <list> equality_expr
-%type <list> logicand_expr
-%type <list> logicor_expr
-%type <list> mul_expr
 %type <list> postfix_expr
 %type <list> primary_expr
-%type <list> relational_expr
-%type <list> shift_expr
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> variables_def
@@ -4596,14 +4585,25 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr_list> attribute_list
 %type <attr_list> attribute_list_optional
 
+%type <block> add_expr
 %type <block> assignment_expr
+%type <block> bitand_expr
+%type <block> bitor_expr
+%type <block> bitxor_expr
 %type <block> compound_statement
+%type <block> conditional_expr
+%type <block> equality_expr
 %type <block> expr
 %type <block> expr_optional
 %type <block> expr_statement
 %type <block> initializer_expr
 %type <block> jump_statement
+%type <block> logicand_expr
+%type <block> logicor_expr
 %type <block> loop_statement
+%type <block> mul_expr
+%type <block> relational_expr
+%type <block> shift_expr
 %type <block> selection_statement
 %type <block> statement
 %type <block> statement_list
@@ -5433,7 +5433,7 @@ type_no_void:
             struct hlsl_block block;
 
             hlsl_block_init(&block);
-            list_move_tail(&block.instrs, $5);
+            hlsl_block_add_block(&block, $5);
 
             sample_count = evaluate_static_expression_as_uint(ctx, &block, &@5);
 
@@ -6339,20 +6339,17 @@ unary_expr:
 
 mul_expr:
       unary_expr
-        {
-            $$ = block_to_list($1);
-        }
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_MUL, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, &@2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_DIV, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, &@2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_expr_merge(ctx, $1, block_to_list($3), HLSL_OP2_MOD, &@2);
+            $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, &@2);
         }
 
 add_expr:
@@ -6365,7 +6362,7 @@ add_expr:
         {
             struct hlsl_ir_node *neg;
 
-            if (!(neg = add_unary_arithmetic_expr(ctx, list_to_block($3), HLSL_OP1_NEG, node_from_list($3), &@2)))
+            if (!(neg = add_unary_arithmetic_expr(ctx, $3, HLSL_OP1_NEG, node_from_block($3), &@2)))
                 YYABORT;
             $$ = add_binary_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
@@ -6450,24 +6447,24 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_block($3), *second = node_from_block($5);
+            struct hlsl_ir_node *cond = node_from_block($1), *first = node_from_block($3), *second = node_from_block($5);
             struct hlsl_type *common_type;
 
-            list_move_tail($1, &$3->instrs);
-            list_move_tail($1, &$5->instrs);
+            hlsl_block_add_block($1, $3);
+            hlsl_block_add_block($1, $5);
             destroy_block($3);
             destroy_block($5);
 
             if (!(common_type = get_common_numeric_type(ctx, first, second, &@3)))
                 YYABORT;
 
-            if (!(first = add_implicit_conversion(ctx, $1, first, common_type, &@3)))
+            if (!(first = add_implicit_conversion(ctx, block_to_list($1), first, common_type, &@3)))
                 YYABORT;
 
-            if (!(second = add_implicit_conversion(ctx, $1, second, common_type, &@5)))
+            if (!(second = add_implicit_conversion(ctx, block_to_list($1), second, common_type, &@5)))
                 YYABORT;
 
-            if (!hlsl_add_conditional(ctx, $1, cond, first, second))
+            if (!hlsl_add_conditional(ctx, block_to_list($1), cond, first, second))
                 YYABORT;
             $$ = $1;
         }
@@ -6475,9 +6472,6 @@ conditional_expr:
 assignment_expr:
 
       conditional_expr
-        {
-            $$ = list_to_block($1);
-        }
     | unary_expr assign_op assignment_expr
         {
             struct hlsl_ir_node *lhs = node_from_block($1), *rhs = node_from_block($3);
