@@ -616,6 +616,11 @@ enum vkd3d_shader_source_type
      * model 1, 2, and 3 shaders. \since 1.3
      */
     VKD3D_SHADER_SOURCE_D3D_BYTECODE,
+    /**
+     * A 'DirectX Intermediate Language' shader embedded in a DXBC container. This is
+     * the format used for Direct3D shader model 6 shaders. \since 1.9
+     */
+    VKD3D_SHADER_SOURCE_DXBC_DXIL,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SOURCE_TYPE),
 };

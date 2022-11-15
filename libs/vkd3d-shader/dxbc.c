@@ -493,8 +493,14 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section,
                 return ret;
             break;
 
+        case TAG_DXIL:
         case TAG_SHDR:
         case TAG_SHEX:
+            if ((section->tag == TAG_DXIL) != desc->is_dxil)
+            {
+                TRACE("Skipping chunk %#x.\n", section->tag);
+                break;
+            }
             if (desc->byte_code)
                 FIXME("Multiple shader code chunks.\n");
             desc->byte_code = section->data.code;
@@ -503,10 +509,6 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section,
 
         case TAG_AON9:
             TRACE("Skipping AON9 shader code chunk.\n");
-            break;
-
-        case TAG_DXIL:
-            FIXME("Skipping DXIL shader model 6+ code chunk.\n");
             break;
 
         default:

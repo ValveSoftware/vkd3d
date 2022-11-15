@@ -2442,6 +2442,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     shader_desc = &sm4->p.shader_desc;
+    shader_desc->is_dxil = false;
     if ((ret = shader_extract_from_dxbc(&compile_info->source,
             message_context, compile_info->source_name, shader_desc)) < 0)
     {
