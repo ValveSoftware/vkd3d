@@ -1117,17 +1117,17 @@ static struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs,
     return NULL;
 }
 
-static struct list *make_list(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
+static struct hlsl_block *make_block(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr)
 {
-    struct list *list;
+    struct hlsl_block *block;
 
-    if (!(list = make_empty_list(ctx)))
+    if (!(block = make_empty_block(ctx)))
     {
-        hlsl_free_instr(node);
+        hlsl_free_instr(instr);
         return NULL;
     }
-    list_add_tail(list, &node->entry);
-    return list;
+    hlsl_block_add_instr(block, instr);
+    return block;
 }
 
 static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -3684,7 +3684,7 @@ static int intrinsic_function_name_compare(const void *a, const void *b)
     return strcmp(a, func->name);
 }
 
-static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
+static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
         struct parse_initializer *args, const struct vkd3d_shader_location *loc)
 {
     struct intrinsic_function *intrinsic;
@@ -3812,7 +3812,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         goto fail;
     }
     vkd3d_free(args->args);
-    return block_to_list(args->instrs);
+    return args->instrs;
 
 fail:
     free_parse_initializer(args);
@@ -4559,7 +4559,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 
 %type <list> declaration
 %type <list> declaration_statement
-%type <list> primary_expr
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> variables_def
@@ -4597,6 +4596,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> loop_statement
 %type <block> mul_expr
 %type <block> postfix_expr
+%type <block> primary_expr
 %type <block> relational_expr
 %type <block> shift_expr
 %type <block> selection_statement
@@ -6042,7 +6042,7 @@ primary_expr:
 
             if (!(c = hlsl_new_float_constant(ctx, $1, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, c)))
+            if (!($$ = make_block(ctx, c)))
                 YYABORT;
         }
     | C_INTEGER
@@ -6051,7 +6051,7 @@ primary_expr:
 
             if (!(c = hlsl_new_int_constant(ctx, $1, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, c)))
+            if (!($$ = make_block(ctx, c)))
                 YYABORT;
         }
     | boolean
@@ -6060,7 +6060,7 @@ primary_expr:
 
             if (!(c = hlsl_new_bool_constant(ctx, $1, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, c)))
+            if (!($$ = make_block(ctx, c)))
             {
                 hlsl_free_instr(c);
                 YYABORT;
@@ -6078,12 +6078,12 @@ primary_expr:
             }
             if (!(load = hlsl_new_var_load(ctx, var, &@1)))
                 YYABORT;
-            if (!($$ = make_list(ctx, &load->node)))
+            if (!($$ = make_block(ctx, &load->node)))
                 YYABORT;
         }
     | '(' expr ')'
         {
-            $$ = block_to_list($2);
+            $$ = $2;
         }
     | var_identifier '(' func_arguments ')'
         {
@@ -6106,7 +6106,7 @@ primary_expr:
                     YYABORT;
                 if (!(load = hlsl_new_var_load(ctx, var, &@1)))
                     YYABORT;
-                if (!($$ = make_list(ctx, &load->node)))
+                if (!($$ = make_block(ctx, &load->node)))
                     YYABORT;
             }
             else
@@ -6118,9 +6118,6 @@ primary_expr:
 
 postfix_expr:
       primary_expr
-        {
-            $$ = list_to_block($1);
-        }
     | postfix_expr OP_INC
         {
             if (!add_increment(ctx, $1, false, true, &@2))
