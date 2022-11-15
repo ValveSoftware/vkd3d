@@ -4563,7 +4563,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token <intval> PRE_LINE
 
 %type <list> add_expr
-%type <list> assignment_expr
 %type <list> bitand_expr
 %type <list> bitor_expr
 %type <list> bitxor_expr
@@ -4599,6 +4598,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr_list> attribute_list
 %type <attr_list> attribute_list_optional
 
+%type <block> assignment_expr
 %type <block> compound_statement
 %type <block> expr
 %type <block> expr_optional
@@ -5865,6 +5865,9 @@ complex_initializer_list:
 
 initializer_expr:
       assignment_expr
+        {
+            $$ = block_to_list($1);
+        }
 
 initializer_expr_list:
       initializer_expr
@@ -6444,13 +6447,13 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_block($3), *second = node_from_list($5);
+            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_block($3), *second = node_from_block($5);
             struct hlsl_type *common_type;
 
             list_move_tail($1, &$3->instrs);
-            list_move_tail($1, $5);
+            list_move_tail($1, &$5->instrs);
             destroy_block($3);
-            vkd3d_free($5);
+            destroy_block($5);
 
             if (!(common_type = get_common_numeric_type(ctx, first, second, &@3)))
                 YYABORT;
@@ -6469,18 +6472,21 @@ conditional_expr:
 assignment_expr:
 
       conditional_expr
+        {
+            $$ = list_to_block($1);
+        }
     | unary_expr assign_op assignment_expr
         {
-            struct hlsl_ir_node *lhs = node_from_list($1), *rhs = node_from_list($3);
+            struct hlsl_ir_node *lhs = node_from_list($1), *rhs = node_from_block($3);
 
             if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
             {
                 hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST, "Statement modifies a const expression.");
                 YYABORT;
             }
-            list_move_tail($3, $1);
+            list_move_tail(&$3->instrs, $1);
             vkd3d_free($1);
-            if (!add_assignment(ctx, $3, lhs, $2, rhs))
+            if (!add_assignment(ctx, block_to_list($3), lhs, $2, rhs))
                 YYABORT;
             $$ = $3;
         }
@@ -6533,12 +6539,9 @@ assign_op:
 
 expr:
       assignment_expr
-        {
-            $$ = list_to_block($1);
-        }
     | expr ',' assignment_expr
         {
             $$ = $1;
-            list_move_tail(&$$->instrs, $3);
-            vkd3d_free($3);
+            hlsl_block_add_block($$, $3);
+            destroy_block($3);
         }
