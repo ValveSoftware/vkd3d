@@ -1309,7 +1309,7 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
     return true;
 }
 
-static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS],
         struct hlsl_type *type, const struct vkd3d_shader_location *loc)
 {
@@ -1333,38 +1333,38 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
         for (i = 0; i < type->dimy * type->dimx; ++i)
         {
             struct hlsl_ir_node *value, *cell_operands[HLSL_MAX_OPERANDS] = { NULL };
-            struct hlsl_block block;
+            struct hlsl_block store_block;
             unsigned int j;
 
             for (j = 0; j < HLSL_MAX_OPERANDS; j++)
             {
                 if (operands[j])
                 {
-                    if (!(load = hlsl_add_load_component(ctx, instrs, operands[j], i, loc)))
+                    if (!(load = hlsl_add_load_component(ctx, block_to_list(block), operands[j], i, loc)))
                         return NULL;
 
                     cell_operands[j] = load;
                 }
             }
 
-            if (!(value = add_expr(ctx, instrs, op, cell_operands, scalar_type, loc)))
+            if (!(value = add_expr(ctx, block, op, cell_operands, scalar_type, loc)))
                 return NULL;
 
-            if (!hlsl_new_store_component(ctx, &block, &var_deref, i, value))
+            if (!hlsl_new_store_component(ctx, &store_block, &var_deref, i, value))
                 return NULL;
-            list_move_tail(instrs, &block.instrs);
+            hlsl_block_add_block(block, &store_block);
         }
 
         if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
             return NULL;
-        list_add_tail(instrs, &var_load->node.entry);
+        hlsl_block_add_instr(block, &var_load->node);
 
         return &var_load->node;
     }
 
     if (!(expr = hlsl_new_expr(ctx, op, operands, type, loc)))
         return NULL;
-    list_add_tail(instrs, &expr->entry);
+    hlsl_block_add_instr(block, expr);
 
     return expr;
 }
@@ -1395,7 +1395,7 @@ static struct hlsl_ir_node *add_unary_arithmetic_expr(struct hlsl_ctx *ctx, stru
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {arg};
 
-    return add_expr(ctx, block_to_list(block), op, args, arg->data_type, loc);
+    return add_expr(ctx, block, op, args, arg->data_type, loc);
 }
 
 static struct hlsl_ir_node *add_unary_bitwise_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1418,7 +1418,7 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
     if (!(args[0] = add_implicit_conversion(ctx, block, arg, bool_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(block), op, args, bool_type, loc);
+    return add_expr(ctx, block, op, args, bool_type, loc);
 }
 
 static struct hlsl_type *get_common_numeric_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *arg1,
@@ -1449,7 +1449,7 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
     if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(block), op, args, common_type, loc);
+    return add_expr(ctx, block, op, args, common_type, loc);
 }
 
 static struct hlsl_ir_node *add_binary_bitwise_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1484,7 +1484,7 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
     if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(block), op, args, return_type, loc);
+    return add_expr(ctx, block, op, args, return_type, loc);
 }
 
 static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1507,7 +1507,7 @@ static struct hlsl_ir_node *add_binary_logical_expr(struct hlsl_ctx *ctx, struct
     if (!(args[1] = add_implicit_conversion(ctx, block, arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(block), op, args, common_type, loc);
+    return add_expr(ctx, block, op, args, common_type, loc);
 }
 
 static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1538,7 +1538,7 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct h
     if (!(args[1] = add_implicit_conversion(ctx, block, arg2, integer_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(block), op, args, return_type, loc);
+    return add_expr(ctx, block, op, args, return_type, loc);
 }
 
 static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
@@ -1591,7 +1591,7 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hls
     if (!(args[1] = add_implicit_conversion(ctx, instrs, arg2, common_type, loc)))
         return NULL;
 
-    return add_expr(ctx, block_to_list(instrs), op, args, ret_type, loc);
+    return add_expr(ctx, instrs, op, args, ret_type, loc);
 }
 
 static struct hlsl_block *add_binary_expr_merge(struct hlsl_ctx *ctx, struct hlsl_block *block1,
@@ -2555,7 +2555,7 @@ static bool intrinsic_asfloat(struct hlsl_ctx *ctx,
     data_type = convert_numeric_type(ctx, data_type, HLSL_TYPE_FLOAT);
 
     operands[0] = params->args[0];
-    return add_expr(ctx, block_to_list(params->instrs), HLSL_OP1_REINTERPRET, operands, data_type, loc);
+    return add_expr(ctx, params->instrs, HLSL_OP1_REINTERPRET, operands, data_type, loc);
 }
 
 static bool intrinsic_asuint(struct hlsl_ctx *ctx,
@@ -2591,7 +2591,7 @@ static bool intrinsic_asuint(struct hlsl_ctx *ctx,
     data_type = convert_numeric_type(ctx, data_type, HLSL_TYPE_UINT);
 
     operands[0] = params->args[0];
-    return add_expr(ctx, block_to_list(params->instrs), HLSL_OP1_REINTERPRET, operands, data_type, loc);
+    return add_expr(ctx, params->instrs, HLSL_OP1_REINTERPRET, operands, data_type, loc);
 }
 
 static bool intrinsic_clamp(struct hlsl_ctx *ctx,
