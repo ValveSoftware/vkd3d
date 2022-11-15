@@ -270,9 +270,16 @@ struct hlsl_block
     struct list instrs;
 };
 
+/* A reference to an instruction node (struct hlsl_ir_node), usable as a field in other structs.
+ *   struct hlsl_src is more powerful than a mere pointer to an hlsl_ir_node because it also
+ *   contains a linked list item entry, which is used by the referenced instruction node to keep
+ *   track of all the hlsl_src·s that reference it.
+ * This allows replacing any hlsl_ir_node with any other in all the places it is used, or checking
+ *   that a node has no uses before it is removed. */
 struct hlsl_src
 {
     struct hlsl_ir_node *node;
+    /* Item entry for node->uses. */
     struct list entry;
 };
 
