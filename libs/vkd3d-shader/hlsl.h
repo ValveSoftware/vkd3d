@@ -217,6 +217,11 @@ struct hlsl_reg
     bool allocated;
 };
 
+/* Types of instruction nodes for the IR.
+ * Each type of instruction node is associated to a struct with the same name in lower case.
+ *   e.g. for HLSL_IR_CONSTANT there exists struct hlsl_ir_constant.
+ * Each one of these structs start with a struct hlsl_ir_node field, so pointers to values of these
+ *   types can be casted seamlessly to (struct hlsl_ir_node *) and vice-versa. */
 enum hlsl_ir_node_type
 {
     HLSL_IR_CONSTANT,
@@ -231,12 +236,22 @@ enum hlsl_ir_node_type
     HLSL_IR_SWIZZLE,
 };
 
+/* Common data for every type of IR instruction node. */
 struct hlsl_ir_node
 {
+    /* Item entry for storing the instruction in a list of instructions. */
     struct list entry;
+
+    /* Type of node, which means that a pointer to this struct hlsl_ir_node can be casted to a
+     *   pointer to the struct with the same name. */
     enum hlsl_ir_node_type type;
+    /* HLSL data type of the node, when used by other nodes as a source (through an hlsl_src).
+     * HLSL_IR_CONSTANT, HLSL_IR_EXPR, HLSL_IR_LOAD, HLSL_IR_RESOURCE_LOAD, and HLSL_IR_SWIZZLE
+     *   have a data type and can be used through an hlsl_src; other types of node don't. */
     struct hlsl_type *data_type;
 
+    /* List containing all the struct hlsl_src·s that point to this node; linked by the
+     *   hlsl_src.entry fields. */
     struct list uses;
 
     struct vkd3d_shader_location loc;
@@ -246,6 +261,7 @@ struct hlsl_ir_node
      * true even for loops, since currently we can't have a reference to a
      * value generated in an earlier iteration of the loop. */
     unsigned int index, last_read;
+    /* Temp. register allocated to store the result of this instruction (if any). */
     struct hlsl_reg reg;
 };
 
