@@ -444,7 +444,6 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struc
 {
     struct list *list = NULL;
     struct hlsl_ir_loop *loop = NULL;
-    struct hlsl_ir_if *cond_jump = NULL;
 
     if (!(list = make_empty_list(ctx)))
         goto oom;
@@ -477,7 +476,6 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struc
 
 oom:
     vkd3d_free(loop);
-    vkd3d_free(cond_jump);
     vkd3d_free(list);
     destroy_instr_list(init);
     destroy_instr_list(cond);
