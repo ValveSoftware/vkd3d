@@ -138,6 +138,11 @@ static struct hlsl_ir_node *node_from_list(struct list *list)
     return LIST_ENTRY(list_tail(list), struct hlsl_ir_node, entry);
 }
 
+static struct hlsl_ir_node *node_from_block(struct hlsl_block *block)
+{
+    return LIST_ENTRY(list_tail(&block->instrs), struct hlsl_ir_node, entry);
+}
+
 static struct list *block_to_list(struct hlsl_block *block)
 {
     /* This is a temporary hack to ease the transition from lists to blocks.
@@ -652,7 +657,7 @@ static struct hlsl_ir_node *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_nod
     return NULL;
 }
 
-static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
+static bool add_return(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *return_value, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *return_type = ctx->cur_function->return_type;
@@ -664,7 +669,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
         {
             struct hlsl_ir_node *store;
 
-            if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, loc)))
+            if (!(return_value = add_implicit_conversion(ctx, block_to_list(block), return_value, return_type, loc)))
                 return false;
 
             if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
@@ -685,7 +690,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, NULL, loc)))
         return false;
-    list_add_tail(instrs, &jump->entry);
+    hlsl_block_add_instr(block, jump);
 
     return true;
 }
@@ -4569,7 +4574,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> expr_optional
 %type <list> expr_statement
 %type <list> initializer_expr
-%type <list> jump_statement
 %type <list> logicand_expr
 %type <list> logicor_expr
 %type <list> mul_expr
@@ -4598,6 +4602,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr_list> attribute_list_optional
 
 %type <block> compound_statement
+%type <block> jump_statement
 %type <block> loop_statement
 %type <block> selection_statement
 %type <block> statement
@@ -5925,22 +5930,19 @@ statement:
         }
     | compound_statement
     | jump_statement
-        {
-            $$ = list_to_block($1);
-        }
     | selection_statement
     | loop_statement
 
 jump_statement:
       KW_RETURN expr ';'
         {
-            if (!add_return(ctx, $2, node_from_list($2), &@1))
+            $$ = list_to_block($2);
+            if (!add_return(ctx, $$, node_from_block($$), &@1))
                 YYABORT;
-            $$ = $2;
         }
     | KW_RETURN ';'
         {
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
             if (!add_return(ctx, $$, NULL, &@1))
                 YYABORT;
@@ -5949,16 +5951,16 @@ jump_statement:
         {
             struct hlsl_ir_node *discard, *c;
 
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
 
             if (!(c = hlsl_new_uint_constant(ctx, ~0u, &@1)))
                 return false;
-            list_add_tail($$, &c->entry);
+            hlsl_block_add_instr($$, c);
 
             if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NZ, c, &@1)))
                 return false;
-            list_add_tail($$, &discard->entry);
+            hlsl_block_add_instr($$, discard);
         }
 
 selection_statement:
