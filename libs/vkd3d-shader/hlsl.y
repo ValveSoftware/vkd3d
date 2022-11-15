@@ -442,19 +442,19 @@ static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod,
     return modifiers | mod;
 }
 
-static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_list)
+static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
 {
     struct hlsl_ir_node *condition, *not, *iff, *jump;
     struct hlsl_block then_block;
 
     /* E.g. "for (i = 0; ; ++i)". */
-    if (list_empty(cond_list))
+    if (list_empty(&cond_block->instrs))
         return true;
 
-    condition = node_from_list(cond_list);
+    condition = node_from_block(cond_block);
     if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, &condition->loc)))
         return false;
-    list_add_tail(cond_list, &not->entry);
+    hlsl_block_add_instr(cond_block, not);
 
     hlsl_block_init(&then_block);
 
@@ -464,7 +464,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     if (!(iff = hlsl_new_if(ctx, not, &then_block, NULL, &condition->loc)))
         return false;
-    list_add_tail(cond_list, &iff->entry);
+    hlsl_block_add_instr(cond_block, iff);
     return true;
 }
 
@@ -492,8 +492,8 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
 }
 
 static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
-        const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
-        struct list *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
+        const struct parse_attribute_list *attributes, struct hlsl_block *init, struct hlsl_block *cond,
+        struct hlsl_block *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *loop;
     unsigned int i;
@@ -528,32 +528,32 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
         }
     }
 
-    if (!init && !(init = make_empty_list(ctx)))
+    if (!init && !(init = make_empty_block(ctx)))
         goto oom;
 
     if (!append_conditional_break(ctx, cond))
         goto oom;
 
     if (iter)
-        list_move_tail(&body->instrs, iter);
+        hlsl_block_add_block(body, iter);
 
     if (type == LOOP_DO_WHILE)
-        list_move_tail(&body->instrs, cond);
+        list_move_tail(&body->instrs, &cond->instrs);
     else
-        list_move_head(&body->instrs, cond);
+        list_move_head(&body->instrs, &cond->instrs);
 
     if (!(loop = hlsl_new_loop(ctx, body, loc)))
         goto oom;
-    list_add_tail(init, &loop->entry);
+    hlsl_block_add_instr(init, loop);
 
-    vkd3d_free(cond);
+    destroy_block(cond);
     destroy_block(body);
-    return list_to_block(init);
+    return init;
 
 oom:
-    destroy_instr_list(init);
-    destroy_instr_list(cond);
-    destroy_instr_list(iter);
+    destroy_block(init);
+    destroy_block(cond);
+    destroy_block(iter);
     destroy_block(body);
     return NULL;
 }
@@ -4570,9 +4570,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> declaration
 %type <list> declaration_statement
 %type <list> equality_expr
-%type <list> expr
-%type <list> expr_optional
-%type <list> expr_statement
 %type <list> initializer_expr
 %type <list> logicand_expr
 %type <list> logicor_expr
@@ -4602,6 +4599,9 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr_list> attribute_list_optional
 
 %type <block> compound_statement
+%type <block> expr
+%type <block> expr_optional
+%type <block> expr_statement
 %type <block> jump_statement
 %type <block> loop_statement
 %type <block> selection_statement
@@ -5639,7 +5639,7 @@ state:
       any_identifier '=' expr ';'
         {
             vkd3d_free($1);
-            hlsl_free_instr_list($3);
+            destroy_block($3);
         }
 
 state_block_start:
@@ -5705,17 +5705,12 @@ arrays:
         }
     | '[' expr ']' arrays
         {
-            struct hlsl_block block;
             uint32_t *new_array;
             unsigned int size;
 
-            hlsl_block_init(&block);
-            list_move_tail(&block.instrs, $2);
+            size = evaluate_static_expression_as_uint(ctx, $2, &@2);
 
-            size = evaluate_static_expression_as_uint(ctx, &block, &@2);
-
-            hlsl_block_cleanup(&block);
-            vkd3d_free($2);
+            destroy_block($2);
 
             $$ = $4;
 
@@ -5925,9 +5920,6 @@ statement:
             $$ = list_to_block($1);
         }
     | expr_statement
-        {
-            $$ = list_to_block($1);
-        }
     | compound_statement
     | jump_statement
     | selection_statement
@@ -5936,7 +5928,7 @@ statement:
 jump_statement:
       KW_RETURN expr ';'
         {
-            $$ = list_to_block($2);
+            $$ = $2;
             if (!add_return(ctx, $$, node_from_block($$), &@1))
                 YYABORT;
         }
@@ -5966,7 +5958,7 @@ jump_statement:
 selection_statement:
       KW_IF '(' expr ')' if_body
         {
-            struct hlsl_ir_node *condition = node_from_list($3);
+            struct hlsl_ir_node *condition = node_from_block($3);
             struct hlsl_ir_node *instr;
 
             if (!(instr = hlsl_new_if(ctx, condition, $5.then_block, $5.else_block, &@1)))
@@ -5986,7 +5978,7 @@ selection_statement:
                             "if condition type %s is not scalar.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
-            $$ = list_to_block($3);
+            $$ = $3;
             hlsl_block_add_instr($$, instr);
         }
 
@@ -6018,14 +6010,14 @@ loop_statement:
         }
     | attribute_list_optional KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
+            $$ = create_loop(ctx, LOOP_FOR, &$1, list_to_block($5), $6, $7, $9, &@2);
             hlsl_pop_scope(ctx);
         }
 
 expr_optional:
       %empty
         {
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
         }
     | expr
@@ -6095,7 +6087,7 @@ primary_expr:
         }
     | '(' expr ')'
         {
-            $$ = $2;
+            $$ = block_to_list($2);
         }
     | var_identifier '(' func_arguments ')'
         {
@@ -6189,10 +6181,10 @@ postfix_expr:
         }
     | postfix_expr '[' expr ']'
         {
-            struct hlsl_ir_node *array = node_from_list($1), *index = node_from_list($3);
+            struct hlsl_ir_node *array = node_from_list($1), *index = node_from_block($3);
 
-            list_move_head($1, $3);
-            vkd3d_free($3);
+            list_move_head($1, &$3->instrs);
+            destroy_block($3);
 
             if (!add_array_access(ctx, $1, array, index, &@2))
             {
@@ -6451,12 +6443,12 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_list($3), *second = node_from_list($5);
+            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_block($3), *second = node_from_list($5);
             struct hlsl_type *common_type;
 
-            list_move_tail($1, $3);
+            list_move_tail($1, &$3->instrs);
             list_move_tail($1, $5);
-            vkd3d_free($3);
+            destroy_block($3);
             vkd3d_free($5);
 
             if (!(common_type = get_common_numeric_type(ctx, first, second, &@3)))
@@ -6540,9 +6532,12 @@ assign_op:
 
 expr:
       assignment_expr
+        {
+            $$ = list_to_block($1);
+        }
     | expr ',' assignment_expr
         {
             $$ = $1;
-            list_move_tail($$, $3);
+            list_move_tail(&$$->instrs, $3);
             vkd3d_free($3);
         }
