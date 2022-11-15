@@ -2177,14 +2177,14 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     }
 }
 
-static struct list *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
+static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
 {
     struct parse_variable_def *v, *v_next;
-    struct list *statements_list;
+    struct hlsl_block *initializers;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
 
-    if (!(statements_list = make_empty_list(ctx)))
+    if (!(initializers = make_empty_block(ctx)))
     {
         LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
         {
@@ -2239,7 +2239,7 @@ static struct list *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
             if (var->storage_modifiers & HLSL_STORAGE_STATIC)
                 hlsl_block_add_block(&ctx->static_initializers, v->initializer.instrs);
             else
-                list_move_tail(statements_list, &v->initializer.instrs->instrs);
+                hlsl_block_add_block(initializers, v->initializer.instrs);
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
@@ -2277,7 +2277,7 @@ static struct list *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
     }
 
     vkd3d_free(var_list);
-    return statements_list;
+    return initializers;
 }
 
 struct find_function_call_args
@@ -4551,8 +4551,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token <intval> C_INTEGER
 %token <intval> PRE_LINE
 
-%type <list> declaration
-%type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> variables_def
 %type <list> variables_def_typed
@@ -4578,6 +4576,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> bitxor_expr
 %type <block> compound_statement
 %type <block> conditional_expr
+%type <block> declaration
 %type <block> declaration_statement
 %type <block> equality_expr
 %type <block> expr
@@ -4596,6 +4595,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> selection_statement
 %type <block> statement
 %type <block> statement_list
+%type <block> struct_declaration_without_vars
 %type <block> unary_expr
 
 %type <boolval> boolean
@@ -4725,7 +4725,7 @@ struct_declaration_without_vars:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Modifiers are not allowed on struct type declarations.");
 
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
         }
 
@@ -5506,13 +5506,7 @@ type:
 
 declaration_statement:
       declaration
-        {
-            $$ = list_to_block($1);
-        }
     | struct_declaration_without_vars
-        {
-            $$ = list_to_block($1);
-        }
     | typedef
         {
             if (!($$ = make_empty_block(ctx)))
@@ -6003,7 +5997,7 @@ loop_statement:
         }
     | attribute_list_optional KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, &$1, list_to_block($5), $6, $7, $9, &@2);
+            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
             hlsl_pop_scope(ctx);
         }
 
