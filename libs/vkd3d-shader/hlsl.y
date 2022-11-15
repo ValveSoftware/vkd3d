@@ -172,12 +172,6 @@ static struct list *make_empty_list(struct hlsl_ctx *ctx)
     return list;
 }
 
-static void destroy_instr_list(struct list *list)
-{
-    hlsl_free_instr_list(list);
-    vkd3d_free(list);
-}
-
 static void destroy_block(struct hlsl_block *block)
 {
     hlsl_block_cleanup(block);
@@ -4558,7 +4552,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token <intval> PRE_LINE
 
 %type <list> declaration
-%type <list> declaration_statement
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> variables_def
@@ -4585,6 +4578,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> bitxor_expr
 %type <block> compound_statement
 %type <block> conditional_expr
+%type <block> declaration_statement
 %type <block> equality_expr
 %type <block> expr
 %type <block> expr_optional
@@ -4661,9 +4655,9 @@ hlsl_prog:
     | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement
         {
-            if (!list_empty($2))
+            if (!list_empty(&$2->instrs))
                 hlsl_fixme(ctx, &@2, "Uniform initializer.");
-            destroy_instr_list($2);
+            destroy_block($2);
         }
     | hlsl_prog preproc_directive
     | hlsl_prog ';'
@@ -5512,10 +5506,16 @@ type:
 
 declaration_statement:
       declaration
+        {
+            $$ = list_to_block($1);
+        }
     | struct_declaration_without_vars
+        {
+            $$ = list_to_block($1);
+        }
     | typedef
         {
-            if (!($$ = make_empty_list(ctx)))
+            if (!($$ = make_empty_block(ctx)))
                 YYABORT;
         }
 
@@ -5912,9 +5912,6 @@ statement_list:
 
 statement:
       declaration_statement
-        {
-            $$ = list_to_block($1);
-        }
     | expr_statement
     | compound_statement
     | jump_statement
