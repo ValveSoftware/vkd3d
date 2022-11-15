@@ -722,7 +722,7 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc);
 
-static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
+static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
@@ -745,13 +745,13 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
             return false;
         }
 
-        if (!(index = add_implicit_conversion(ctx, instrs, index,
+        if (!(index = add_implicit_conversion(ctx, block_to_list(block), index,
                 hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count), &index->loc)))
             return false;
 
         if (!(return_index = hlsl_new_index(ctx, array, index, loc)))
             return false;
-        list_add_tail(instrs, &return_index->entry);
+        hlsl_block_add_instr(block, return_index);
 
         return true;
     }
@@ -764,7 +764,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
 
     if (!(cast = hlsl_new_cast(ctx, index, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &index->loc)))
         return false;
-    list_add_tail(instrs, &cast->entry);
+    hlsl_block_add_instr(block, cast);
     index = cast;
 
     if (expr_type->class != HLSL_CLASS_ARRAY && expr_type->class != HLSL_CLASS_VECTOR && expr_type->class != HLSL_CLASS_MATRIX)
@@ -778,7 +778,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
 
     if (!(return_index = hlsl_new_index(ctx, array, index, loc)))
         return false;
-    list_add_tail(instrs, &return_index->entry);
+    hlsl_block_add_instr(block, return_index);
 
     return true;
 }
@@ -6165,7 +6165,7 @@ postfix_expr:
             hlsl_block_add_block($3, $1);
             destroy_block($1);
 
-            if (!add_array_access(ctx, block_to_list($3), array, index, &@2))
+            if (!add_array_access(ctx, $3, array, index, &@2))
             {
                 destroy_block($3);
                 YYABORT;
