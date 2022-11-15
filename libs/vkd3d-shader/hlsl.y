@@ -4576,7 +4576,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> postfix_expr
 %type <list> primary_expr
 %type <list> relational_expr
-%type <list> selection_statement
 %type <list> shift_expr
 %type <list> struct_declaration_without_vars
 %type <list> type_specs
@@ -4600,6 +4599,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 
 %type <block> compound_statement
 %type <block> loop_statement
+%type <block> selection_statement
 %type <block> statement
 %type <block> statement_list
 
@@ -5929,9 +5929,6 @@ statement:
             $$ = list_to_block($1);
         }
     | selection_statement
-        {
-            $$ = list_to_block($1);
-        }
     | loop_statement
 
 jump_statement:
@@ -5987,8 +5984,8 @@ selection_statement:
                             "if condition type %s is not scalar.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
-            $$ = $3;
-            list_add_tail($$, &instr->entry);
+            $$ = list_to_block($3);
+            hlsl_block_add_instr($$, instr);
         }
 
 if_body:
