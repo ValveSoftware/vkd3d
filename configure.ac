@@ -32,9 +32,11 @@ AS_IF([test "x$WIDL" = "xno"], [AC_MSG_WARN([widl is required to build header fi
 
 AC_CHECK_PROGS([FLEX], [flex], [none])
 AS_IF([test "$FLEX" = "none"], [AC_MSG_ERROR([no suitable flex found. Please install the 'flex' package.])])
+AC_ARG_VAR([LFLAGS], [extra flags for flex])
 
 AC_CHECK_PROGS([BISON], [bison], [none])
 AS_IF([test "$BISON" = "none"], [AC_MSG_ERROR([no suitable bison found. Please install the 'bison' package.])])
+AC_ARG_VAR([YFLAGS], [extra flags for bison])
 
 DX_PS_FEATURE([OFF])
 DX_INIT_DOXYGEN([vkd3d], [Doxyfile], [doc])
