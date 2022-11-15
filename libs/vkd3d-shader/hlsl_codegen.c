@@ -2738,7 +2738,7 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     count = hlsl_type_component_count(cmp_type);
     for (i = 0; i < count; ++i)
     {
-        if (!(load = hlsl_add_load_component(ctx, &block.instrs, cmp, i, &instr->loc)))
+        if (!(load = hlsl_add_load_component(ctx, &block, cmp, i, &instr->loc)))
             return false;
 
         if (!(or = hlsl_new_binary_expr(ctx, HLSL_OP2_LOGIC_OR, or, load)))
