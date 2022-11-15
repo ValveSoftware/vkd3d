@@ -83,6 +83,7 @@ struct dxil_block
     size_t abbrev_capacity;
     size_t abbrev_count;
     unsigned int blockinfo_bid;
+    bool has_bid;
 
     struct dxil_block **child_blocks;
     size_t child_block_capacity;
@@ -101,6 +102,10 @@ struct sm6_parser
     struct dxil_block root_block;
     struct dxil_block *current_block;
 
+    struct dxil_global_abbrev **abbrevs;
+    size_t abbrev_capacity;
+    size_t abbrev_count;
+
     struct vkd3d_shader_parser p;
 };
 
@@ -115,6 +120,12 @@ struct dxil_abbrev
     unsigned int count;
     bool is_array;
     struct dxil_abbrev_operand operands[];
+};
+
+struct dxil_global_abbrev
+{
+    unsigned int block_id;
+    struct dxil_abbrev abbrev;
 };
 
 static struct sm6_parser *sm6_parser(struct vkd3d_shader_parser *parser)
@@ -236,6 +247,7 @@ static bool dxil_block_handle_blockinfo_record(struct dxil_block *block, struct 
             if (record->operands[0] > UINT_MAX)
                 WARN("Truncating block id %"PRIu64".\n", record->operands[0]);
             block->blockinfo_bid = record->operands[0];
+            block->has_bid = true;
             break;
         case BLOCKNAME:
         case SETRECORDNAME:
@@ -403,6 +415,45 @@ static enum vkd3d_result dxil_abbrev_init(struct dxil_abbrev *abbrev, unsigned i
     return sm6->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }
 
+static enum vkd3d_result sm6_parser_add_global_abbrev(struct sm6_parser *sm6)
+{
+    struct dxil_block *block = sm6->current_block;
+    unsigned int count = sm6_parser_read_vbr(sm6, 5);
+    struct dxil_global_abbrev *global_abbrev;
+    enum vkd3d_result ret;
+
+    assert(block->id == BLOCKINFO_BLOCK);
+
+    if (!vkd3d_array_reserve((void **)&sm6->abbrevs, &sm6->abbrev_capacity, sm6->abbrev_count + 1, sizeof(*sm6->abbrevs))
+            || !(global_abbrev = vkd3d_malloc(sizeof(*global_abbrev) + count * sizeof(global_abbrev->abbrev.operands[0]))))
+    {
+        ERR("Failed to allocate global abbreviation.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    if ((ret = dxil_abbrev_init(&global_abbrev->abbrev, count, sm6)) < 0)
+    {
+        vkd3d_free(global_abbrev);
+        return ret;
+    }
+
+    if (!block->has_bid)
+    {
+        WARN("Missing blockinfo block id.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (block->blockinfo_bid == MODULE_BLOCK)
+    {
+        FIXME("Unhandled global abbreviation for module block.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    global_abbrev->block_id = block->blockinfo_bid;
+
+    sm6->abbrevs[sm6->abbrev_count++] = global_abbrev;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_add_block_abbrev(struct sm6_parser *sm6)
 {
     struct dxil_block *block = sm6->current_block;
@@ -411,10 +462,7 @@ static enum vkd3d_result sm6_parser_add_block_abbrev(struct sm6_parser *sm6)
     unsigned int count;
 
     if (block->id == BLOCKINFO_BLOCK)
-    {
-        FIXME("Unhandled global abbreviation.\n");
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
+        return sm6_parser_add_global_abbrev(sm6);
 
     count = sm6_parser_read_vbr(sm6, 5);
     if (!vkd3d_array_reserve((void **)&block->abbrevs, &block->abbrev_capacity, block->abbrev_count + 1, sizeof(*block->abbrevs))
@@ -580,6 +628,17 @@ static enum vkd3d_result dxil_block_read(struct dxil_block *parent, struct sm6_p
     return VKD3D_ERROR_INVALID_SHADER;
 }
 
+static unsigned int sm6_parser_compute_global_abbrev_count_for_block_id(struct sm6_parser *sm6,
+        unsigned int block_id)
+{
+    unsigned int i, count;
+
+    for (i = 0, count = 0; i < sm6->abbrev_count; ++i)
+        count += sm6->abbrevs[i]->block_id == block_id;
+
+    return count;
+}
+
 static void dxil_block_destroy(struct dxil_block *block)
 {
     unsigned int i;
@@ -604,8 +663,8 @@ static void dxil_block_destroy(struct dxil_block *block)
 static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct dxil_block *parent,
         struct sm6_parser *sm6)
 {
+    unsigned int i, abbrev_count = 0;
     enum vkd3d_result ret;
-    unsigned int i;
 
     block->parent = parent;
     block->level = parent ? parent->level + 1 : 0;
@@ -618,10 +677,26 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
     if (sm6->p.failed)
         return VKD3D_ERROR_INVALID_SHADER;
 
+    if ((block->abbrev_count = sm6_parser_compute_global_abbrev_count_for_block_id(sm6, block->id)))
+    {
+        if (!vkd3d_array_reserve((void **)&block->abbrevs, &block->abbrev_capacity,
+                block->abbrev_count, sizeof(*block->abbrevs)))
+        {
+            ERR("Failed to allocate block abbreviations.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        for (i = 0; i < sm6->abbrev_count; ++i)
+            if (sm6->abbrevs[i]->block_id == block->id)
+                block->abbrevs[abbrev_count++] = &sm6->abbrevs[i]->abbrev;
+
+        assert(abbrev_count == block->abbrev_count);
+    }
+
     if ((ret = dxil_block_read(block, sm6)) < 0)
         dxil_block_destroy(block);
 
-    for (i = 0; i < block->abbrev_count; ++i)
+    for (i = abbrev_count; i < block->abbrev_count; ++i)
         vkd3d_free(block->abbrevs[i]);
     vkd3d_free(block->abbrevs);
     block->abbrevs = NULL;
@@ -630,11 +705,21 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
     return ret;
 }
 
+static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, unsigned int count)
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+        vkd3d_free(abbrevs[i]);
+    vkd3d_free(abbrevs);
+}
+
 static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     struct sm6_parser *sm6 = sm6_parser(parser);
 
     dxil_block_destroy(&sm6->root_block);
+    dxil_global_abbrevs_cleanup(sm6->abbrevs, sm6->abbrev_count);
     shader_instruction_array_destroy(&parser->instructions);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
@@ -734,6 +819,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
+    /* Estimate instruction count to avoid reallocation in most shaders. */
     count = max(token_count, 400) - 400;
     vkd3d_shader_parser_init(&sm6->p, message_context, source_name, &version, &sm6_parser_ops,
             (count + (count >> 2)) / 2u + 10);
@@ -753,6 +839,10 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
             vkd3d_unreachable();
         return ret;
     }
+
+    dxil_global_abbrevs_cleanup(sm6->abbrevs, sm6->abbrev_count);
+    sm6->abbrevs = NULL;
+    sm6->abbrev_count = 0;
 
     length = sm6->ptr - sm6->start - block->start;
     if (length != block->length)
