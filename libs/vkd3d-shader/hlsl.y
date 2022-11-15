@@ -146,14 +146,6 @@ static struct list *block_to_list(struct hlsl_block *block)
     return &block->instrs;
 }
 
-static struct hlsl_block *list_to_block(struct list *list)
-{
-    /* This is a temporary hack to ease the transition from lists to blocks.
-     * It takes advantage of the fact that an allocated hlsl_block pointer is
-     * byte-compatible with an allocated list pointer. */
-    return CONTAINING_RECORD(list, struct hlsl_block, instrs);
-}
-
 static struct hlsl_block *make_empty_block(struct hlsl_ctx *ctx)
 {
     struct hlsl_block *block;
@@ -1705,7 +1697,7 @@ static bool invert_swizzle(unsigned int *swizzle, unsigned int *writemask, unsig
     return true;
 }
 
-static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *lhs,
+static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *lhs,
         enum parse_assign_op assign_op, struct hlsl_ir_node *rhs)
 {
     struct hlsl_type *lhs_type = lhs->data_type;
@@ -1714,7 +1706,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     if (assign_op == ASSIGN_OP_SUB)
     {
-        if (!(rhs = add_unary_arithmetic_expr(ctx, list_to_block(instrs), HLSL_OP1_NEG, rhs, &rhs->loc)))
+        if (!(rhs = add_unary_arithmetic_expr(ctx, block, HLSL_OP1_NEG, rhs, &rhs->loc)))
             return NULL;
         assign_op = ASSIGN_OP_ADD;
     }
@@ -1723,14 +1715,14 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         enum hlsl_ir_expr_op op = op_from_assignment(assign_op);
 
         assert(op);
-        if (!(rhs = add_binary_arithmetic_expr(ctx, list_to_block(instrs), op, lhs, rhs, &rhs->loc)))
+        if (!(rhs = add_binary_arithmetic_expr(ctx, block, op, lhs, rhs, &rhs->loc)))
             return NULL;
     }
 
     if (lhs_type->class <= HLSL_CLASS_LAST_NUMERIC)
         writemask = (1 << lhs_type->dimx) - 1;
 
-    if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
+    if (!(rhs = add_implicit_conversion(ctx, block_to_list(block), rhs, lhs_type, &rhs->loc)))
         return NULL;
 
     while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_INDEX)
@@ -1759,7 +1751,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             {
                 return NULL;
             }
-            list_add_tail(instrs, &new_swizzle->entry);
+            hlsl_block_add_instr(block, new_swizzle);
 
             lhs = swizzle->val.node;
             rhs = new_swizzle;
@@ -1805,7 +1797,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             hlsl_cleanup_deref(&resource_deref);
             return NULL;
         }
-        list_add_tail(instrs, &store->entry);
+        hlsl_block_add_instr(block, store);
         hlsl_cleanup_deref(&resource_deref);
     }
     else if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_noncontiguous(hlsl_ir_index(lhs)))
@@ -1824,13 +1816,13 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &lhs->loc)))
                 return NULL;
-            list_add_tail(instrs, &c->entry);
+            hlsl_block_add_instr(block, c);
 
             if (!(cell = hlsl_new_index(ctx, &row->node, c, &lhs->loc)))
                 return NULL;
-            list_add_tail(instrs, &cell->entry);
+            hlsl_block_add_instr(block, cell);
 
-            if (!(load = hlsl_add_load_component(ctx, instrs, rhs, k++, &rhs->loc)))
+            if (!(load = hlsl_add_load_component(ctx, block_to_list(block), rhs, k++, &rhs->loc)))
                 return NULL;
 
             if (!hlsl_init_deref_from_index_chain(ctx, &deref, cell))
@@ -1841,7 +1833,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
                 hlsl_cleanup_deref(&deref);
                 return NULL;
             }
-            list_add_tail(instrs, &store->entry);
+            hlsl_block_add_instr(block, store);
             hlsl_cleanup_deref(&deref);
         }
     }
@@ -1858,7 +1850,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             hlsl_cleanup_deref(&deref);
             return NULL;
         }
-        list_add_tail(instrs, &store->entry);
+        hlsl_block_add_instr(block, store);
         hlsl_cleanup_deref(&deref);
     }
 
@@ -1867,7 +1859,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
      * the last instruction in the list, we do need to copy. */
     if (!(copy = hlsl_new_copy(ctx, rhs)))
         return NULL;
-    list_add_tail(instrs, &copy->entry);
+    hlsl_block_add_instr(block, copy);
     return copy;
 }
 
@@ -1885,7 +1877,7 @@ static bool add_increment(struct hlsl_ctx *ctx, struct hlsl_block *block, bool d
         return false;
     hlsl_block_add_instr(block, one);
 
-    if (!add_assignment(ctx, block_to_list(block), lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
+    if (!add_assignment(ctx, block, lhs, decrement ? ASSIGN_OP_SUB : ASSIGN_OP_ADD, one))
         return false;
 
     if (post)
@@ -2233,7 +2225,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
                 assert(v->initializer.args_count == 1);
                 hlsl_block_add_instr(v->initializer.instrs, &load->node);
-                add_assignment(ctx, block_to_list(v->initializer.instrs), &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
+                add_assignment(ctx, v->initializer.instrs, &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
             }
 
             if (var->storage_modifiers & HLSL_STORAGE_STATIC)
@@ -3737,7 +3729,7 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
                     goto fail;
                 hlsl_block_add_instr(args->instrs, &load->node);
 
-                if (!add_assignment(ctx, block_to_list(args->instrs), arg, ASSIGN_OP_ASSIGN, &load->node))
+                if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node))
                     goto fail;
             }
         }
@@ -6468,7 +6460,7 @@ assignment_expr:
             }
             hlsl_block_add_block($3, $1);
             destroy_block($1);
-            if (!add_assignment(ctx, block_to_list($3), lhs, $2, rhs))
+            if (!add_assignment(ctx, $3, lhs, $2, rhs))
                 YYABORT;
             $$ = $3;
         }
