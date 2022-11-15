@@ -85,8 +85,8 @@ struct parse_function
 
 struct parse_if_body
 {
-    struct list *then_block;
-    struct list *else_block;
+    struct hlsl_block *then_block;
+    struct hlsl_block *else_block;
 };
 
 enum parse_assign_op
@@ -5811,19 +5811,16 @@ selection_statement:
       KW_IF '(' expr ')' if_body
         {
             struct hlsl_ir_node *condition = node_from_list($3);
-            struct hlsl_block then_block, else_block;
             struct hlsl_ir_node *instr;
 
-            hlsl_block_init(&then_block);
-            list_move_tail(&then_block.instrs, $5.then_block);
-            hlsl_block_init(&else_block);
-            if ($5.else_block)
-                list_move_tail(&else_block.instrs, $5.else_block);
-            vkd3d_free($5.then_block);
-            vkd3d_free($5.else_block);
-
-            if (!(instr = hlsl_new_if(ctx, condition, &then_block, &else_block, &@1)))
+            if (!(instr = hlsl_new_if(ctx, condition, $5.then_block, $5.else_block, &@1)))
+            {
+                destroy_block($5.then_block);
+                destroy_block($5.else_block);
                 YYABORT;
+            }
+            destroy_block($5.then_block);
+            destroy_block($5.else_block);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
             {
                 struct vkd3d_string_buffer *string;
@@ -5840,13 +5837,13 @@ selection_statement:
 if_body:
       statement
         {
-            $$.then_block = $1;
+            $$.then_block = list_to_block($1);
             $$.else_block = NULL;
         }
     | statement KW_ELSE statement
         {
-            $$.then_block = $1;
-            $$.else_block = $3;
+            $$.then_block = list_to_block($1);
+            $$.else_block = list_to_block($3);
         }
 
 loop_statement:
