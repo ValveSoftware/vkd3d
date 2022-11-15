@@ -294,7 +294,7 @@ static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_typ
     return hlsl_types_are_componentwise_equal(ctx, src, dst);
 }
 
-static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
+static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *src_type = node->data_type;
@@ -331,7 +331,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
         {
             struct hlsl_ir_node *component_load;
             struct hlsl_type *dst_comp_type;
-            struct hlsl_block block;
+            struct hlsl_block store_block;
             unsigned int src_idx;
 
             if (broadcast)
@@ -351,21 +351,21 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
 
             dst_comp_type = hlsl_type_get_component_type(ctx, dst_type, dst_idx);
 
-            if (!(component_load = hlsl_add_load_component(ctx, instrs, node, src_idx, loc)))
+            if (!(component_load = hlsl_add_load_component(ctx, block_to_list(block), node, src_idx, loc)))
                 return NULL;
 
             if (!(cast = hlsl_new_cast(ctx, component_load, dst_comp_type, loc)))
                 return NULL;
-            list_add_tail(instrs, &cast->entry);
+            hlsl_block_add_instr(block, cast);
 
-            if (!hlsl_new_store_component(ctx, &block, &var_deref, dst_idx, cast))
+            if (!hlsl_new_store_component(ctx, &store_block, &var_deref, dst_idx, cast))
                 return NULL;
-            list_move_tail(instrs, &block.instrs);
+            hlsl_block_add_block(block, &store_block);
         }
 
         if (!(load = hlsl_new_var_load(ctx, var, loc)))
             return NULL;
-        list_add_tail(instrs, &load->node.entry);
+        hlsl_block_add_instr(block, &load->node);
 
         return &load->node;
     }
@@ -373,7 +373,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
     {
         if (!(cast = hlsl_new_cast(ctx, node, dst_type, loc)))
             return NULL;
-        list_add_tail(instrs, &cast->entry);
+        hlsl_block_add_instr(block, cast);
         return cast;
     }
 }
@@ -404,7 +404,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
         hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_IMPLICIT_TRUNCATION, "Implicit truncation of %s type.",
                 src_type->class == HLSL_CLASS_VECTOR ? "vector" : "matrix");
 
-    return add_cast(ctx, &block->instrs, node, dst_type, loc);
+    return add_cast(ctx, block, node, dst_type, loc);
 }
 
 static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod,
@@ -2252,7 +2252,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             }
             hlsl_block_add_instr(&ctx->static_initializers, zero);
 
-            if (!(cast = add_cast(ctx, &ctx->static_initializers.instrs, zero, var->data_type, &var->loc)))
+            if (!(cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc)))
             {
                 free_parse_variable_def(v);
                 continue;
@@ -3692,7 +3692,7 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
             {
                 struct hlsl_ir_node *cast;
 
-                if (!(cast = add_cast(ctx, block_to_list(args->instrs), arg, param->data_type, &arg->loc)))
+                if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
                     goto fail;
                 args->args[i] = cast;
                 arg = cast;
@@ -6304,7 +6304,7 @@ unary_expr:
                 YYABORT;
             }
 
-            if (!add_cast(ctx, block_to_list($6), node_from_block($6), dst_type, &@3))
+            if (!add_cast(ctx, $6, node_from_block($6), dst_type, &@3))
             {
                 destroy_block($6);
                 YYABORT;
