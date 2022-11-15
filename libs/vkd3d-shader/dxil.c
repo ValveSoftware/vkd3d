@@ -53,6 +53,15 @@ enum bitcode_block_abbreviation
     UNABBREV_RECORD = 3,
 };
 
+enum bitcode_abbrev_type
+{
+    ABBREV_FIXED = 1,
+    ABBREV_VBR   = 2,
+    ABBREV_ARRAY = 3,
+    ABBREV_CHAR  = 4,
+    ABBREV_BLOB  = 5,
+};
+
 struct dxil_record
 {
     unsigned int code;
@@ -69,6 +78,10 @@ struct dxil_block
     unsigned int length;
     unsigned int level;
 
+    /* The abbrev, block and record structs are not relocatable. */
+    struct dxil_abbrev **abbrevs;
+    size_t abbrev_capacity;
+    size_t abbrev_count;
     unsigned int blockinfo_bid;
 
     struct dxil_block **child_blocks;
@@ -89,6 +102,19 @@ struct sm6_parser
     struct dxil_block *current_block;
 
     struct vkd3d_shader_parser p;
+};
+
+struct dxil_abbrev_operand
+{
+    uint64_t context;
+    bool (*read_operand)(struct sm6_parser *sm6, uint64_t context, uint64_t *operand);
+};
+
+struct dxil_abbrev
+{
+    unsigned int count;
+    bool is_array;
+    struct dxil_abbrev_operand operands[];
 };
 
 static struct sm6_parser *sm6_parser(struct vkd3d_shader_parser *parser)
@@ -280,6 +306,208 @@ static enum vkd3d_result sm6_parser_read_unabbrev_record(struct sm6_parser *sm6)
     return ret;
 }
 
+static bool sm6_parser_read_literal_operand(struct sm6_parser *sm6, uint64_t context, uint64_t *op)
+{
+    *op = context;
+    return !sm6->p.failed;
+}
+
+static bool sm6_parser_read_fixed_operand(struct sm6_parser *sm6, uint64_t context, uint64_t *op)
+{
+    *op = sm6_parser_read_bits(sm6, context);
+    return !sm6->p.failed;
+}
+
+static bool sm6_parser_read_vbr_operand(struct sm6_parser *sm6, uint64_t context, uint64_t *op)
+{
+    *op = sm6_parser_read_vbr(sm6, context);
+    return !sm6->p.failed;
+}
+
+static bool sm6_parser_read_char6_operand(struct sm6_parser *sm6, uint64_t context, uint64_t *op)
+{
+    *op = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._"[sm6_parser_read_bits(sm6, 6)];
+    return !sm6->p.failed;
+}
+
+static bool sm6_parser_read_blob_operand(struct sm6_parser *sm6, uint64_t context, uint64_t *op)
+{
+    int count = sm6_parser_read_vbr(sm6, 6);
+    sm6_parser_align_32(sm6);
+    for (; count > 0; count -= 4)
+        sm6_parser_read_uint32(sm6);
+    FIXME("Unhandled blob operand.\n");
+    return false;
+}
+
+static enum vkd3d_result dxil_abbrev_init(struct dxil_abbrev *abbrev, unsigned int count, struct sm6_parser *sm6)
+{
+    enum bitcode_abbrev_type prev_type, type;
+    unsigned int i;
+
+    abbrev->is_array = false;
+
+    for (i = 0, prev_type = 0; i < count && !sm6->p.failed; ++i)
+    {
+        if (sm6_parser_read_bits(sm6, 1))
+        {
+            if (prev_type == ABBREV_ARRAY)
+            {
+                WARN("Unexpected literal abbreviation after array.\n");
+                return VKD3D_ERROR_INVALID_SHADER;
+            }
+            abbrev->operands[i].context = sm6_parser_read_vbr(sm6, 8);
+            abbrev->operands[i].read_operand = sm6_parser_read_literal_operand;
+            continue;
+        }
+
+        switch (type = sm6_parser_read_bits(sm6, 3))
+        {
+            case ABBREV_FIXED:
+            case ABBREV_VBR:
+                abbrev->operands[i].context = sm6_parser_read_vbr(sm6, 5);
+                abbrev->operands[i].read_operand = (type == ABBREV_FIXED) ? sm6_parser_read_fixed_operand
+                        : sm6_parser_read_vbr_operand;
+                break;
+
+            case ABBREV_ARRAY:
+                if (prev_type == ABBREV_ARRAY || i != count - 2)
+                {
+                    WARN("Unexpected array abbreviation.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                abbrev->is_array = true;
+                --i;
+                --count;
+                break;
+
+            case ABBREV_CHAR:
+                abbrev->operands[i].read_operand = sm6_parser_read_char6_operand;
+                break;
+
+            case ABBREV_BLOB:
+                if (prev_type == ABBREV_ARRAY || i != count - 1)
+                {
+                    WARN("Unexpected blob abbreviation.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                abbrev->operands[i].read_operand = sm6_parser_read_blob_operand;
+                break;
+        }
+
+        prev_type = type;
+    }
+
+    abbrev->count = count;
+
+    return sm6->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
+}
+
+static enum vkd3d_result sm6_parser_add_block_abbrev(struct sm6_parser *sm6)
+{
+    struct dxil_block *block = sm6->current_block;
+    struct dxil_abbrev *abbrev;
+    enum vkd3d_result ret;
+    unsigned int count;
+
+    if (block->id == BLOCKINFO_BLOCK)
+    {
+        FIXME("Unhandled global abbreviation.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    count = sm6_parser_read_vbr(sm6, 5);
+    if (!vkd3d_array_reserve((void **)&block->abbrevs, &block->abbrev_capacity, block->abbrev_count + 1, sizeof(*block->abbrevs))
+            || !(abbrev = vkd3d_malloc(sizeof(*abbrev) + count * sizeof(abbrev->operands[0]))))
+    {
+        ERR("Failed to allocate block abbreviation.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    if ((ret = dxil_abbrev_init(abbrev, count, sm6)) < 0)
+    {
+        vkd3d_free(abbrev);
+        return ret;
+    }
+
+    block->abbrevs[block->abbrev_count++] = abbrev;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result sm6_parser_read_abbrev_record(struct sm6_parser *sm6, unsigned int abbrev_id)
+{
+    enum vkd3d_result ret = VKD3D_ERROR_INVALID_SHADER;
+    struct dxil_block *block = sm6->current_block;
+    struct dxil_record *temp, *record;
+    unsigned int i, count, array_len;
+    struct dxil_abbrev *abbrev;
+    uint64_t code;
+
+    if (abbrev_id >= block->abbrev_count)
+    {
+        WARN("Invalid abbreviation id %u.\n", abbrev_id);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    abbrev = block->abbrevs[abbrev_id];
+    if (!(count = abbrev->count))
+        return VKD3D_OK;
+    if (count == 1 && abbrev->is_array)
+        return VKD3D_ERROR_INVALID_SHADER;
+
+    /* First operand is the record code. The array is included in the count, but will be done separately. */
+    count -= abbrev->is_array + 1;
+    if (!(record = vkd3d_malloc(sizeof(*record) + count * sizeof(record->operands[0]))))
+    {
+        ERR("Failed to allocate record with %u operands.\n", count);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (!abbrev->operands[0].read_operand(sm6, abbrev->operands[0].context, &code))
+        goto fail;
+    if (code > UINT_MAX)
+        FIXME("Truncating 64-bit record code %#"PRIx64".\n", code);
+    record->code = code;
+
+    for (i = 0; i < count; ++i)
+        if (!abbrev->operands[i + 1].read_operand(sm6, abbrev->operands[i + 1].context, &record->operands[i]))
+            goto fail;
+    record->operand_count = count;
+
+    /* An array can occur only as the last operand. */
+    if (abbrev->is_array)
+    {
+        array_len = sm6_parser_read_vbr(sm6, 6);
+        if (!(temp = vkd3d_realloc(record, sizeof(*record) + (count + array_len) * sizeof(record->operands[0]))))
+        {
+            ERR("Failed to allocate record with %u operands.\n", count + array_len);
+            ret = VKD3D_ERROR_OUT_OF_MEMORY;
+            goto fail;
+        }
+        record = temp;
+
+        for (i = 0; i < array_len; ++i)
+        {
+            if (!abbrev->operands[count + 1].read_operand(sm6, abbrev->operands[count + 1].context,
+                    &record->operands[count + i]))
+            {
+                goto fail;
+            }
+        }
+        record->operand_count += array_len;
+    }
+
+    if ((ret = dxil_block_add_record(block, record)) < 0)
+        goto fail;
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(record);
+    return ret;
+}
+
 static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct dxil_block *parent,
         struct sm6_parser *sm6);
 
@@ -327,8 +555,9 @@ static enum vkd3d_result dxil_block_read(struct dxil_block *parent, struct sm6_p
                 break;
 
             case DEFINE_ABBREV:
-                FIXME("Unhandled abbreviation definition.\n");
-                return VKD3D_ERROR_INVALID_SHADER;
+                if ((ret = sm6_parser_add_block_abbrev(sm6)) < 0)
+                    return ret;
+                break;
 
             case UNABBREV_RECORD:
                 if ((ret = sm6_parser_read_unabbrev_record(sm6)) < 0)
@@ -339,8 +568,12 @@ static enum vkd3d_result dxil_block_read(struct dxil_block *parent, struct sm6_p
                 break;
 
             default:
-                FIXME("Unhandled abbreviated record %u.\n", abbrev_id);
-                return VKD3D_ERROR_INVALID_SHADER;
+                if ((ret = sm6_parser_read_abbrev_record(sm6, abbrev_id - 4)) < 0)
+                {
+                    WARN("Failed to read abbreviated record.\n");
+                    return ret;
+                }
+                break;
         }
     } while (!sm6->p.failed);
 
@@ -372,6 +605,7 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
         struct sm6_parser *sm6)
 {
     enum vkd3d_result ret;
+    unsigned int i;
 
     block->parent = parent;
     block->level = parent ? parent->level + 1 : 0;
@@ -386,6 +620,12 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
 
     if ((ret = dxil_block_read(block, sm6)) < 0)
         dxil_block_destroy(block);
+
+    for (i = 0; i < block->abbrev_count; ++i)
+        vkd3d_free(block->abbrevs[i]);
+    vkd3d_free(block->abbrevs);
+    block->abbrevs = NULL;
+    block->abbrev_count = 0;
 
     return ret;
 }
