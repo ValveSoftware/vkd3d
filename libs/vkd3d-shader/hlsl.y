@@ -4570,7 +4570,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> declaration
 %type <list> declaration_statement
 %type <list> equality_expr
-%type <list> initializer_expr
 %type <list> logicand_expr
 %type <list> logicor_expr
 %type <list> mul_expr
@@ -4603,6 +4602,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <block> expr
 %type <block> expr_optional
 %type <block> expr_statement
+%type <block> initializer_expr
 %type <block> jump_statement
 %type <block> loop_statement
 %type <block> selection_statement
@@ -5824,11 +5824,11 @@ complex_initializer:
             $$.args_count = 1;
             if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
             {
-                destroy_instr_list($1);
+                destroy_block($1);
                 YYABORT;
             }
-            $$.args[0] = node_from_list($1);
-            $$.instrs = list_to_block($1);
+            $$.args[0] = node_from_block($1);
+            $$.instrs = $1;
             $$.braces = false;
         }
     | '{' complex_initializer_list '}'
@@ -5865,9 +5865,6 @@ complex_initializer_list:
 
 initializer_expr:
       assignment_expr
-        {
-            $$ = block_to_list($1);
-        }
 
 initializer_expr_list:
       initializer_expr
@@ -5875,11 +5872,11 @@ initializer_expr_list:
             $$.args_count = 1;
             if (!($$.args = hlsl_alloc(ctx, sizeof(*$$.args))))
             {
-                destroy_instr_list($1);
+                destroy_block($1);
                 YYABORT;
             }
-            $$.args[0] = node_from_list($1);
-            $$.instrs = list_to_block($1);
+            $$.args[0] = node_from_block($1);
+            $$.instrs = $1;
             $$.braces = false;
         }
     | initializer_expr_list ',' initializer_expr
@@ -5890,13 +5887,13 @@ initializer_expr_list:
             if (!(new_args = hlsl_realloc(ctx, $$.args, ($$.args_count + 1) * sizeof(*$$.args))))
             {
                 free_parse_initializer(&$$);
-                destroy_instr_list($3);
+                destroy_block($3);
                 YYABORT;
             }
             $$.args = new_args;
-            $$.args[$$.args_count++] = node_from_list($3);
-            list_move_tail(&$$.instrs->instrs, $3);
-            vkd3d_free($3);
+            $$.args[$$.args_count++] = node_from_block($3);
+            hlsl_block_add_block($$.instrs, $3);
+            destroy_block($3);
         }
 
 boolean:
