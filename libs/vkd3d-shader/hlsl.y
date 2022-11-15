@@ -5001,7 +5001,7 @@ attribute:
                 YYABORT;
             }
             $$->name = $2;
-            list_init(&$$->instrs);
+            hlsl_block_init(&$$->instrs);
             $$->loc = @$;
             $$->args_count = 0;
         }
@@ -5016,8 +5016,8 @@ attribute:
                 YYABORT;
             }
             $$->name = $2;
-            list_init(&$$->instrs);
-            list_move_tail(&$$->instrs, &$4.instrs->instrs);
+            hlsl_block_init(&$$->instrs);
+            hlsl_block_add_block(&$$->instrs, $4.instrs);
             vkd3d_free($4.instrs);
             $$->loc = @$;
             $$->args_count = $4.args_count;

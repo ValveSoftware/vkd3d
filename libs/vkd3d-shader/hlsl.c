@@ -2922,7 +2922,7 @@ void hlsl_free_attribute(struct hlsl_attribute *attr)
 
     for (i = 0; i < attr->args_count; ++i)
         hlsl_src_remove(&attr->args[i]);
-    hlsl_free_instr_list(&attr->instrs);
+    hlsl_block_cleanup(&attr->instrs);
     vkd3d_free((void *)attr->name);
     vkd3d_free(attr);
 }

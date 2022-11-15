@@ -337,7 +337,7 @@ struct hlsl_src
 struct hlsl_attribute
 {
     const char *name;
-    struct list instrs;
+    struct hlsl_block instrs;
     struct vkd3d_shader_location loc;
     unsigned int args_count;
     struct hlsl_src args[];
