@@ -486,7 +486,8 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
     return false;
 }
 
-static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
+static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
+        const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
         struct list *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *loop;
@@ -542,7 +543,7 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
 
     vkd3d_free(cond);
     destroy_block(body);
-    return init;
+    return list_to_block(init);
 
 oom:
     destroy_instr_list(init);
@@ -4571,7 +4572,6 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> jump_statement
 %type <list> logicand_expr
 %type <list> logicor_expr
-%type <list> loop_statement
 %type <list> mul_expr
 %type <list> postfix_expr
 %type <list> primary_expr
@@ -4599,6 +4599,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr_list> attribute_list_optional
 
 %type <block> compound_statement
+%type <block> loop_statement
 %type <block> statement
 %type <block> statement_list
 
@@ -5932,9 +5933,6 @@ statement:
             $$ = list_to_block($1);
         }
     | loop_statement
-        {
-            $$ = list_to_block($1);
-        }
 
 jump_statement:
       KW_RETURN expr ';'
