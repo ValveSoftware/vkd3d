@@ -3876,7 +3876,7 @@ static bool raise_invalid_method_object_type(struct hlsl_ctx *ctx, const struct 
     return false;
 }
 
-static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -3904,7 +3904,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
     }
     if (multisampled)
     {
-        if (!(load_params.sample_index = add_implicit_conversion(ctx, instrs, params->args[1],
+        if (!(load_params.sample_index = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
                 hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc)))
             return false;
     }
@@ -3912,7 +3912,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
     assert(offset_dim);
     if (params->args_count > 1 + multisampled)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[1 + multisampled],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -3922,7 +3922,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
     }
 
     /* +1 for the mipmap level for non-multisampled textures */
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[0],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[0],
             hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + !multisampled), loc)))
         return false;
 
@@ -3931,11 +3931,11 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
     return true;
 }
 
-static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -3972,13 +3972,13 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         return false;
 
     if (offset_dim && params->args_count > 2)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -3994,12 +3994,12 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
 
     return true;
 }
 
-static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -4042,17 +4042,17 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct list *instrs
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         return false;
 
-    if (!(load_params.cmp = add_implicit_conversion(ctx, instrs, params->args[2],
+    if (!(load_params.cmp = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
             hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
         load_params.cmp = params->args[2];
 
     if (offset_dim && params->args_count > 3)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -4068,12 +4068,12 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct list *instrs
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
 
     return true;
 }
 
-static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -4140,7 +4140,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
     }
     else if (offset_dim && params->args_count > 2)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -4165,7 +4165,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         return false;
 
@@ -4175,11 +4175,11 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
     return true;
 }
 
-static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -4221,17 +4221,17 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         load_params.coords = params->args[1];
 
-    if (!(load_params.lod = add_implicit_conversion(ctx, instrs, params->args[2],
+    if (!(load_params.lod = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
             hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
         load_params.lod = params->args[2];
 
     if (offset_dim && params->args_count > 3)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[3],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[3],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -4245,11 +4245,11 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
     return true;
 }
 
-static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -4288,21 +4288,21 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct list *instr
         return false;
     }
 
-    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+    if (!(load_params.coords = add_implicit_conversion(ctx, block_to_list(block), params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         load_params.coords = params->args[1];
 
-    if (!(load_params.ddx = add_implicit_conversion(ctx, instrs, params->args[2],
+    if (!(load_params.ddx = add_implicit_conversion(ctx, block_to_list(block), params->args[2],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         load_params.ddx = params->args[2];
 
-    if (!(load_params.ddy = add_implicit_conversion(ctx, instrs, params->args[3],
+    if (!(load_params.ddy = add_implicit_conversion(ctx, block_to_list(block), params->args[3],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         load_params.ddy = params->args[3];
 
     if (offset_dim && params->args_count > 4)
     {
-        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[4],
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, block_to_list(block), params->args[4],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
@@ -4316,14 +4316,14 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct list *instr
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    list_add_tail(instrs, &load->entry);
+    hlsl_block_add_instr(block, load);
     return true;
 }
 
 static const struct method_function
 {
     const char *name;
-    bool (*handler)(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+    bool (*handler)(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
             const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc);
 }
 object_methods[] =
@@ -4351,7 +4351,7 @@ static int object_method_function_name_compare(const void *a, const void *b)
     return strcmp(a, func->name);
 }
 
-static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
@@ -4372,7 +4372,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     if ((method = bsearch(name, object_methods, ARRAY_SIZE(object_methods),
             sizeof(*method), object_method_function_name_compare)))
     {
-        return method->handler(ctx, instrs, object, name, params, loc);
+        return method->handler(ctx, block, object, name, params, loc);
     }
     else
     {
@@ -6216,7 +6216,7 @@ postfix_expr:
             hlsl_block_add_block($1, $5.instrs);
             vkd3d_free($5.instrs);
 
-            if (!add_method_call(ctx, block_to_list($1), object, $3, &$5, &@3))
+            if (!add_method_call(ctx, $1, object, $3, &$5, &@3))
             {
                 destroy_block($1);
                 vkd3d_free($5.args);
