@@ -210,10 +210,18 @@ struct hlsl_struct_field
     size_t name_bytecode_offset;
 };
 
+/* Information of the register allocated for an instruction node or variable.
+ * These values are initialized at the end of hlsl_emit_bytecode(), after the compilation passes,
+ *   just before writing the bytecode.
+ * For numeric registers, a writemask can be provided to indicate the reservation of only some of the
+ *   4 components.
+ * The type of register (register class) is implied from its use, so it is not stored in this
+ *   struct. */
 struct hlsl_reg
 {
     uint32_t id;
     unsigned int writemask;
+    /* Whether the register has been allocated. */
     bool allocated;
 };
 
@@ -553,6 +561,7 @@ struct hlsl_ir_constant
         float f;
         double d;
     } value[4];
+    /* Constant register of type 'c' where the constant value is stored for SM1. */
     struct hlsl_reg reg;
 };
 
