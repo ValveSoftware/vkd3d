@@ -7745,6 +7745,36 @@ static void spirv_compiler_emit_orderedness_instruction(struct spirv_compiler *c
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
+static void spirv_compiler_emit_float_comparison_instruction(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t src0_id, src1_id, type_id, result_id;
+    unsigned int component_count;
+    SpvOp op;
+
+    switch (instruction->handler_idx)
+    {
+        case VKD3DSIH_SLT: op = SpvOpFOrdLessThan; break;
+        case VKD3DSIH_SGE: op = SpvOpFOrdGreaterThanEqual; break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    component_count = vsir_write_mask_component_count(dst->write_mask);
+
+    src0_id = spirv_compiler_emit_load_src(compiler, &src[0], dst->write_mask);
+    src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst->write_mask);
+
+    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
+    result_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, op, type_id, src0_id, src1_id);
+
+    result_id = spirv_compiler_emit_bool_to_float(compiler, component_count, result_id, false);
+    spirv_compiler_emit_store_reg(compiler, &dst->reg, dst->write_mask, result_id);
+}
+
 static uint32_t spirv_compiler_emit_conditional_branch(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction, uint32_t target_block_id)
 {
@@ -9759,6 +9789,10 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ORD:
         case VKD3DSIH_UNO:
             spirv_compiler_emit_orderedness_instruction(compiler, instruction);
+            break;
+        case VKD3DSIH_SLT:
+        case VKD3DSIH_SGE:
+            spirv_compiler_emit_float_comparison_instruction(compiler, instruction);
             break;
         case VKD3DSIH_BFI:
         case VKD3DSIH_IBFE:
