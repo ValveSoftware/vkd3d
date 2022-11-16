@@ -612,15 +612,25 @@ enum hlsl_buffer_type
     HLSL_BUFFER_TEXTURE,
 };
 
+/* In SM4, uniform variables are organized in different buffers. Besides buffers defined in the
+ *   source code, there is also the implicit $Globals buffer and the implicit $Params buffer,
+ *   to which uniform globals and parameters belong by default. */
 struct hlsl_buffer
 {
     struct vkd3d_shader_location loc;
     enum hlsl_buffer_type type;
     const char *name;
+    /* Register reserved for this buffer, if any.
+     * If provided, it should be of type 'b' if type is HLSL_BUFFER_CONSTANT and 't' if type is
+     *   HLSL_BUFFER_TEXTURE. */
     struct hlsl_reg_reservation reservation;
+    /* Item entry for hlsl_ctx.buffers */
     struct list entry;
 
+    /* The size of the buffer (in register components), and the size of the buffer as determined
+     *   by its last variable that's actually used. */
     unsigned size, used_size;
+    /* Register of type 'b' on which the buffer is allocated. */
     struct hlsl_reg reg;
 };
 
