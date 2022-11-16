@@ -185,6 +185,8 @@ struct hlsl_type
     size_t bytecode_offset;
 };
 
+/* In HLSL, a semantic is a string linked to a variable (or a field) to be recognized across
+ *   different shader stages in the graphics pipeline. */
 struct hlsl_semantic
 {
     const char *name;
@@ -276,6 +278,7 @@ struct hlsl_ir_node
 
 struct hlsl_block
 {
+    /* List containing instruction nodes; linked by the hlsl_ir_node.entry fields. */
     struct list instrs;
 };
 
@@ -323,6 +326,8 @@ struct hlsl_attribute
 
 #define HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT 0
 
+/* Reservation of a specific register to a variable, field, or buffer, written in the HLSL source
+ *   using the register(·) syntax */
 struct hlsl_reg_reservation
 {
     char type;
