@@ -384,21 +384,35 @@ struct hlsl_ir_var
 
 struct hlsl_ir_function
 {
+    /* Item entry in hlsl_ctx.functions */
     struct rb_entry entry;
+
     const char *name;
+    /* Tree containing function definitions, stored as hlsl_ir_function_decl structures, which would
+     *   be more than one in case of function overloading. */
     struct rb_tree overloads;
 };
 
 struct hlsl_ir_function_decl
 {
     struct hlsl_type *return_type;
+    /* Synthetic variable used to store the return value of the function. */
     struct hlsl_ir_var *return_var;
+
     struct vkd3d_shader_location loc;
+    /* Item entry in hlsl_ir_function.overloads. The paremeters' types are used as key. */
     struct rb_entry entry;
+
+    /* Function to which this declaration corresponds. */
     struct hlsl_ir_function *func;
+    /* List containing one variable for each parameter of the function; linked by the
+     *   hlsl_ir_var.param_entry fields. */
     struct list *parameters;
+
     struct hlsl_block body;
     bool has_body;
+    /* Array of attributes (like numthreads) specified just before the function declaration.
+     * Not to be confused with the function parameters! */
     unsigned int attr_count;
     const struct hlsl_attribute *const *attrs;
 };
