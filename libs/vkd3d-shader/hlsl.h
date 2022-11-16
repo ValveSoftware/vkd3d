@@ -598,9 +598,15 @@ struct hlsl_ir_constant
 
 struct hlsl_scope
 {
+    /* Item entry for hlsl_ctx.scopes. */
     struct list entry;
+
+    /* List containing the variables declared in this scope; linked by hlsl_ir_var->scope_entry. */
     struct list vars;
+    /* Tree map containing the types declared in this scope, using hlsl_tree.name as key.
+     * The types are attached through the hlsl_type.scope_entry fields. */
     struct rb_tree types;
+    /* Scope containing this scope. This value is NULL for the global scope. */
     struct hlsl_scope *upper;
 };
 
