@@ -501,13 +501,25 @@ struct hlsl_ir_swizzle
     DWORD swizzle;
 };
 
+/* Reference to a variable, or a part of it (e.g. a vector within a matrix within a struct). */
 struct hlsl_deref
 {
     struct hlsl_ir_var *var;
 
+    /* An array of references to instruction nodes, of data type uint, that are used to reach the
+     *   desired part of the variable.
+     * If path_len is 0, then this is a reference to the whole variable.
+     * The value of each instruction node in the path corresponds to the index of the element/field
+     *   that has to be selected on each nesting level to reach this part.
+     * The path shall not contain additional values once a type that cannot be subdivided
+     *   (a.k.a. "component") is reached. */
     unsigned int path_len;
     struct hlsl_src *path;
 
+    /* Single instruction node of data type uint used to represent the register offset (in register
+     *   components), from the start of the variable, of the part referenced.
+     * The path is lowered to this single offset -- whose value may vary between SM1 and SM4 --
+     *   before writing the bytecode. */
     struct hlsl_src offset;
 };
 
