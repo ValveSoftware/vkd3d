@@ -29,7 +29,7 @@ draw quad
 probe all rgba (0.2, 0.2, 0.2, 0.1)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 
 struct foo
@@ -48,11 +48,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (31.1, 41.1, 51.1, 61.1) 1
+draw quad
+probe all rgba (31.1, 41.1, 51.1, 61.1) 1
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex1;
 Texture2D tex2;
 

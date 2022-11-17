@@ -543,6 +543,52 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
     return false;
 }
 
+/*
+ * Copy propagation. The basic idea is to recognize instruction sequences of the
+ * form:
+ *
+ *   2: <any instruction>
+ *   3: v = @2
+ *   4: load(v)
+ *
+ * and replace the load (@4) with the original instruction (@2).
+ * This works for multiple components, even if they're written using separate
+ * store instructions, as long as the rhs is the same in every case. This basic
+ * detection is implemented by copy_propagation_replace_with_single_instr().
+ *
+ * We use the same infrastructure to implement a more specialized
+ * transformation. We recognize sequences of the form:
+ *
+ *   2: 123
+ *   3: var.x = @2
+ *   4: 345
+ *   5: var.y = @4
+ *   6: load(var.xy)
+ *
+ * where the load (@6) originates from different sources but that are constant,
+ * and transform it into a single constant vector. This latter pass is done
+ * by copy_propagation_replace_with_constant_vector().
+ *
+ * This is a specialized form of vectorization, and begs the question: why does
+ * the load need to be involved? Can we just vectorize the stores into a single
+ * instruction, and then use "normal" copy-prop to convert that into a single
+ * vector?
+ *
+ * In general, the answer is yes, but there is a special case which necessitates
+ * the use of this transformation: non-uniform control flow. Copy-prop can act
+ * across some control flow, and in cases like the following:
+ *
+ *   2: 123
+ *   3: var.x = @2
+ *   4: if (...)
+ *   5:    456
+ *   6:    var.y = @5
+ *   7:    load(var.xy)
+ *
+ * we can copy-prop the load (@7) into a constant vector {123, 456}, but we
+ * cannot easily vectorize the stores @3 and @6.
+ */
+
 enum copy_propagation_value_state
 {
     VALUE_STATE_NOT_WRITTEN = 0,
@@ -772,6 +818,42 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
+        const struct copy_propagation_state *state, struct hlsl_ir_load *load)
+{
+    const struct hlsl_ir_var *var = load->src.var;
+    union hlsl_constant_value values[4] = {0};
+    struct hlsl_ir_node *instr = &load->node;
+    struct hlsl_ir_constant *cons;
+    unsigned int start, count, i;
+
+    if (!hlsl_component_index_range_from_deref(ctx, &load->src, &start, &count))
+        return false;
+
+    for (i = 0; i < count; ++i)
+    {
+        struct copy_propagation_value *value = copy_propagation_get_value(state, var, start + i);
+
+        if (!value || value->node->type != HLSL_IR_CONSTANT)
+            return false;
+
+        values[i] = hlsl_ir_constant(value->node)->value[value->component];
+    }
+
+    if (!(cons = hlsl_new_constant(ctx, instr->data_type, &instr->loc)))
+        return false;
+    cons->value[0] = values[0];
+    cons->value[1] = values[1];
+    cons->value[2] = values[2];
+    cons->value[3] = values[3];
+    list_add_before(&instr->entry, &cons->node.entry);
+
+    TRACE("Load from %s[%u-%u] turned into a constant %p.\n", var->name, start, start + count, cons);
+
+    hlsl_replace_node(instr, &cons->node);
+    return true;
+}
+
 static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         struct hlsl_ir_load *load, struct copy_propagation_state *state)
 {
@@ -791,6 +873,9 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
              * matrices yet. */
             return false;
     }
+
+    if (copy_propagation_replace_with_constant_vector(ctx, state, load))
+        return true;
 
     if (copy_propagation_replace_with_single_instr(ctx, state, load))
         return true;
