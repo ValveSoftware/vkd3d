@@ -2154,11 +2154,19 @@ static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
 
     sm4_src_from_node(&instr.srcs[instr.src_count++], coords, VKD3DSP_WRITEMASK_ALL);
 
-    /* FIXME: Use an aoffimmi modifier if possible. */
     if (texel_offset)
     {
-        instr.opcode = VKD3D_SM5_OP_GATHER4_PO;
-        sm4_src_from_node(&instr.srcs[instr.src_count++], texel_offset, VKD3DSP_WRITEMASK_ALL);
+        if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
+        {
+            if (ctx->profile->major_version < 5)
+            {
+                hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+                    "Offset must resolve to integer literal in the range -8 to 7 for profiles < 5.");
+                return;
+            }
+            instr.opcode = VKD3D_SM5_OP_GATHER4_PO;
+            sm4_src_from_node(&instr.srcs[instr.src_count++], texel_offset, VKD3DSP_WRITEMASK_ALL);
+        }
     }
 
     sm4_src_from_deref(ctx, &instr.srcs[instr.src_count++], resource, resource_type, instr.dsts[0].writemask);
