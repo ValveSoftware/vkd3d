@@ -5864,9 +5864,9 @@ static uint32_t spirv_compiler_get_image_type_id(struct spirv_compiler *compiler
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_descriptor_info *d;
+    bool uav_read, uav_atomics;
     uint32_t sampled_type_id;
     SpvImageFormat format;
-    bool uav_read;
 
     format = SpvImageFormatUnknown;
     if (reg->type == VKD3DSPR_UAV)
@@ -5874,7 +5874,8 @@ static uint32_t spirv_compiler_get_image_type_id(struct spirv_compiler *compiler
         d = spirv_compiler_get_descriptor_info(compiler,
                 VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
         uav_read = !!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
-        if (raw_structured || (uav_read && !compiler->uav_read_without_format))
+        uav_atomics = !!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS);
+        if (raw_structured || uav_atomics || (uav_read && !compiler->uav_read_without_format))
             format = image_format_for_image_read(data_type);
         else if (uav_read)
             vkd3d_spirv_enable_capability(builder, SpvCapabilityStorageImageReadWithoutFormat);

@@ -1263,6 +1263,9 @@ enum vkd3d_shader_descriptor_info_flag
     VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ                = 0x00000002,
     /** The descriptor is a comparison sampler. */
     VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE = 0x00000004,
+    /** The descriptor is a UAV resource, on which the shader performs
+     *  atomic ops. \since 1.6 */
+    VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS             = 0x00000008,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_DESCRIPTOR_INFO_FLAG),
 };
