@@ -1441,7 +1441,8 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 
 static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
-        const struct hlsl_deref *resource, const struct hlsl_ir_node *coords)
+        const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
+        const struct hlsl_ir_node *texel_offset)
 {
     bool uav = (resource_type->base_type == HLSL_TYPE_UAV);
     struct sm4_instruction instr;
@@ -1449,6 +1450,16 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = uav ? VKD3D_SM5_OP_LD_UAV_TYPED : VKD3D_SM4_OP_LD;
+
+    if (texel_offset)
+    {
+        if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
+        {
+            hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+                    "Offset must resolve to integer literal in the range -8 to 7.");
+            return;
+        }
+    }
 
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
@@ -2204,7 +2215,8 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     switch (load->load_type)
     {
         case HLSL_RESOURCE_LOAD:
-            write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource, coords);
+            write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource,
+                    coords, texel_offset);
             break;
 
         case HLSL_RESOURCE_SAMPLE:
