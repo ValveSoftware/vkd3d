@@ -142,6 +142,7 @@ vkd3d_shader_tests = \
 	tests/swizzle-6.shader_test \
 	tests/swizzle-7.shader_test \
 	tests/texture-load.shader_test \
+	tests/texture-load-offset.shader_test \
 	tests/texture-load-typed.shader_test \
 	tests/trigonometry.shader_test \
 	tests/uav.shader_test \

@@ -1,0 +1,51 @@
+[require]
+shader model >= 4.0
+
+[texture 0]
+size (3, 3)
+0 0 0 1     1 0 0 1     2 0 0 1
+0 1 0 1     1 1 0 1     2 1 0 1
+0 2 0 1     1 2 0 1     2 2 0 1
+
+
+[pixel shader]
+Texture2D t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return t.Load(int3(pos.xy, 0), int2(0, 1));
+}
+
+
+[test]
+draw quad
+todo probe (0, 0) rgba (0, 1, 0, 1)
+todo probe (1, 0) rgba (1, 1, 0, 1)
+todo probe (0, 1) rgba (0, 2, 0, 1)
+todo probe (1, 1) rgba (1, 2, 0, 1)
+
+
+[pixel shader]
+Texture2D t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return t.Load(int3(pos.xy, 0), int2(-2, 0));
+}
+
+
+[test]
+draw quad
+todo probe (3, 0) rgba (1, 0, 0, 1)
+todo probe (4, 0) rgba (2, 0, 0, 1)
+todo probe (3, 1) rgba (1, 1, 0, 1)
+todo probe (4, 1) rgba (2, 1, 0, 1)
+
+
+[pixel shader fail todo]
+Texture2D t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return t.Load(int3(pos.xy, 0), int2(8, 1));
+}
