@@ -2520,13 +2520,13 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
     if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
         return;
 
-    if (!var->reg.allocated && var->last_read)
+    if (!var->regs[HLSL_REGSET_NUMERIC].allocated && var->last_read)
     {
-        var->reg = allocate_numeric_registers_for_type(ctx, liveness, var->first_write, var->last_read,
-                var->data_type);
+        var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, liveness,
+                var->first_write, var->last_read, var->data_type);
 
-        TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
-                debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
+        TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name, debug_register('r',
+                var->regs[HLSL_REGSET_NUMERIC], var->data_type), var->first_write, var->last_read);
     }
 }
 
@@ -2693,11 +2693,15 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
     {
         if (var->is_uniform && var->last_read)
         {
-            if (var->data_type->reg_size[HLSL_REGSET_NUMERIC] == 0)
+            unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+
+            if (reg_size == 0)
                 continue;
 
-            var->reg = allocate_numeric_registers_for_type(ctx, &liveness, 1, UINT_MAX, var->data_type);
-            TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
+            var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, &liveness,
+                    1, UINT_MAX, var->data_type);
+            TRACE("Allocated %s to %s.\n", var->name,
+                    debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
 }
@@ -2771,10 +2775,11 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     }
     else
     {
-        var->reg.allocated = true;
-        var->reg.id = (*counter)++;
-        var->reg.writemask = (1 << var->data_type->dimx) - 1;
-        TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v', var->reg, var->data_type));
+        var->regs[HLSL_REGSET_NUMERIC].allocated = true;
+        var->regs[HLSL_REGSET_NUMERIC].id = (*counter)++;
+        var->regs[HLSL_REGSET_NUMERIC].writemask = (1 << var->data_type->dimx) - 1;
+        TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
+                var->regs[HLSL_REGSET_NUMERIC], var->data_type));
     }
 }
 
@@ -2937,9 +2942,13 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        enum hlsl_regset regset;
+
         if (!var->last_read || var->data_type->type != HLSL_CLASS_OBJECT
                 || var->data_type->base_type != type)
             continue;
+
+        regset = hlsl_type_get_regset(var->data_type);
 
         if (var->reg_reservation.type == type_info->reg_name)
         {
@@ -2962,8 +2971,8 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
                         type_info->reg_name, var->reg_reservation.index);
             }
 
-            var->reg.id = var->reg_reservation.index;
-            var->reg.allocated = true;
+            var->regs[regset].id = var->reg_reservation.index;
+            var->regs[regset].allocated = true;
             TRACE("Allocated reserved %s to %c%u.\n", var->name, type_info->reg_name, var->reg_reservation.index);
         }
         else if (!var->reg_reservation.type)
@@ -2971,8 +2980,8 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             while (get_reserved_object(ctx, type_info->reg_name, index))
                 ++index;
 
-            var->reg.id = index;
-            var->reg.allocated = true;
+            var->regs[regset].id = index;
+            var->regs[regset].allocated = true;
             TRACE("Allocated object to %c%u.\n", type_info->reg_name, index);
             ++index;
         }
@@ -3111,7 +3120,7 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
 struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
 {
     const struct hlsl_ir_var *var = deref->var;
-    struct hlsl_reg ret = var->reg;
+    struct hlsl_reg ret = var->regs[HLSL_REGSET_NUMERIC];
     unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
     assert(deref->offset_regset == HLSL_REGSET_NUMERIC);
@@ -3119,8 +3128,8 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     ret.id += offset / 4;
 
     ret.writemask = 0xf & (0xf << (offset % 4));
-    if (var->reg.writemask)
-        ret.writemask = hlsl_combine_writemasks(var->reg.writemask, ret.writemask);
+    if (var->regs[HLSL_REGSET_NUMERIC].writemask)
+        ret.writemask = hlsl_combine_writemasks(var->regs[HLSL_REGSET_NUMERIC].writemask, ret.writemask);
 
     return ret;
 }

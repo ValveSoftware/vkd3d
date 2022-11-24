@@ -315,7 +315,9 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic.name && var->reg.allocated)
+        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+
+        if (!var->semantic.name && var->regs[regset].allocated)
         {
             ++uniform_count;
 
@@ -353,20 +355,24 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic.name && var->reg.allocated)
+        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+
+        if (!var->semantic.name && var->regs[regset].allocated)
         {
             put_u32(buffer, 0); /* name */
             if (var->data_type->type == HLSL_CLASS_OBJECT
                     && (var->data_type->base_type == HLSL_TYPE_SAMPLER
                     || var->data_type->base_type == HLSL_TYPE_TEXTURE))
             {
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->reg.id));
+                assert(regset == HLSL_REGSET_SAMPLERS);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[regset].id));
                 put_u32(buffer, 1);
             }
             else
             {
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->reg.id));
-                put_u32(buffer, var->data_type->reg_size[HLSL_REGSET_NUMERIC] / 4);
+                assert(regset == HLSL_REGSET_NUMERIC);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[regset].id));
+                put_u32(buffer, var->data_type->reg_size[regset] / 4);
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */
@@ -377,7 +383,9 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->semantic.name && var->reg.allocated)
+        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+
+        if (!var->semantic.name && var->regs[regset].allocated)
         {
             size_t var_offset = vars_start + (uniform_count * 5 * sizeof(uint32_t));
             size_t name_offset;
@@ -584,7 +592,7 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         ret = hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx);
         assert(ret);
         reg.type = output ? D3DSPR_OUTPUT : D3DSPR_INPUT;
-        reg.reg = var->reg.id;
+        reg.reg = var->regs[HLSL_REGSET_NUMERIC].id;
     }
 
     token = D3DSIO_DCL;

@@ -380,19 +380,13 @@ struct hlsl_ir_var
     /* Offset where the variable's value is stored within its buffer in numeric register components.
      * This in case the variable is uniform. */
     unsigned int buffer_offset;
-    /* Register to which the variable is allocated during its lifetime.
-     * In case that the variable spans multiple registers, this is set to the start of the register
-     *   range.
-     * The register type is inferred from the data type and the storage of the variable.
+    /* Register to which the variable is allocated during its lifetime, for each register set.
+     * In case that the variable spans multiple registers in one regset, this is set to the
+     *   start of the register range.
      *   Builtin semantics don't use the field.
      *   In SM4, uniforms don't use the field because they are located using the buffer's hlsl_reg
-     *     and the buffer_offset instead.
-     *   If the variable is an input semantic copy, the register is 'v'.
-     *   If the variable is an output semantic copy, the register is 'o'.
-     *   Textures are stored on 's' registers in SM1, and 't' registers in SM4.
-     *   Samplers are stored on 's' registers.
-     *   UAVs are stored on 'u' registers. */
-    struct hlsl_reg reg;
+     *     and the buffer_offset instead. */
+    struct hlsl_reg regs[HLSL_REGSET_LAST + 1];
 
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;

@@ -182,9 +182,9 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         }
         else
         {
-            assert(var->reg.allocated);
+            assert(var->regs[HLSL_REGSET_NUMERIC].allocated);
             type = VKD3D_SM4_RT_INPUT;
-            reg_idx = var->reg.id;
+            reg_idx = var->regs[HLSL_REGSET_NUMERIC].id;
         }
 
         use_mask = width; /* FIXME: accurately report use mask */
@@ -484,33 +484,43 @@ static int sm4_compare_extern_resources(const void *a, const void *b)
 {
     const struct hlsl_ir_var *aa = *(const struct hlsl_ir_var **)a;
     const struct hlsl_ir_var *bb = *(const struct hlsl_ir_var **)b;
+    enum hlsl_regset aa_regset, bb_regset;
 
-    if (aa->data_type->base_type != bb->data_type->base_type)
-        return aa->data_type->base_type - bb->data_type->base_type;
-    return aa->reg.id - bb->reg.id;
+    aa_regset = hlsl_type_get_regset(aa->data_type);
+    bb_regset = hlsl_type_get_regset(bb->data_type);
+
+    if (aa_regset != bb_regset)
+        return aa_regset - bb_regset;
+
+    return aa->regs[aa_regset].id - bb->regs[bb_regset].id;
 }
 
 static const struct hlsl_ir_var **sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
     const struct hlsl_ir_var **extern_resources = NULL;
     const struct hlsl_ir_var *var;
+    enum hlsl_regset regset;
     size_t capacity = 0;
+
     *count = 0;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->reg.allocated && var->data_type->type == HLSL_CLASS_OBJECT)
-        {
-            if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
-                    sizeof(*extern_resources))))
-            {
-                *count = 0;
-                return NULL;
-            }
+        if (!hlsl_type_is_resource(var->data_type))
+            continue;
+        regset = hlsl_type_get_regset(var->data_type);
+        if (!var->regs[regset].allocated)
+            continue;
 
-            extern_resources[*count] = var;
-            ++*count;
+        if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                sizeof(*extern_resources))))
+        {
+            *count = 0;
+            return NULL;
         }
+
+        extern_resources[*count] = var;
+        ++*count;
     }
 
     qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
@@ -578,16 +588,18 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     for (i = 0; i < extern_resources_count; ++i)
     {
+        enum hlsl_regset regset;
         uint32_t flags = 0;
 
         var = extern_resources[i];
+        regset = hlsl_type_get_regset(var->data_type);
 
         if (var->reg_reservation.type)
             flags |= D3D_SIF_USERPACKED;
 
         put_u32(&buffer, 0); /* name */
         put_u32(&buffer, sm4_resource_type(var->data_type));
-        if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
+        if (regset == HLSL_REGSET_SAMPLERS)
         {
             put_u32(&buffer, 0);
             put_u32(&buffer, 0);
@@ -600,7 +612,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             put_u32(&buffer, ~0u); /* FIXME: multisample count */
             flags |= (var->data_type->e.resource_format->dimx - 1) << VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT;
         }
-        put_u32(&buffer, var->reg.id);
+        put_u32(&buffer, var->regs[regset].id);
         put_u32(&buffer, 1); /* bind count */
         put_u32(&buffer, flags);
     }
@@ -852,7 +864,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0] = var->reg.id;
+            reg->idx[0] = var->regs[HLSL_REGSET_TEXTURES].id;
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -862,7 +874,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0] = var->reg.id;
+            reg->idx[0] = var->regs[HLSL_REGSET_UAVS].id;
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -872,7 +884,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_NONE;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-            reg->idx[0] = var->reg.id;
+            reg->idx[0] = var->regs[HLSL_REGSET_SAMPLERS].id;
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -1142,7 +1154,7 @@ static void write_sm4_dcl_sampler(struct vkd3d_bytecode_buffer *buffer, const st
         .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
 
         .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
-        .dsts[0].reg.idx = {var->reg.id},
+        .dsts[0].reg.idx = {var->regs[HLSL_REGSET_SAMPLERS].id},
         .dsts[0].reg.idx_count = 1,
         .dst_count = 1,
     };
@@ -1158,7 +1170,7 @@ static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const st
                 | (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
 
         .dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE,
-        .dsts[0].reg.idx = {var->reg.id},
+        .dsts[0].reg.idx = {uav ? var->regs[HLSL_REGSET_UAVS].id : var->regs[HLSL_REGSET_TEXTURES].id},
         .dsts[0].reg.idx_count = 1,
         .dst_count = 1,
 
@@ -1197,9 +1209,9 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     else
     {
         instr.dsts[0].reg.type = output ? VKD3D_SM4_RT_OUTPUT : VKD3D_SM4_RT_INPUT;
-        instr.dsts[0].reg.idx[0] = var->reg.id;
+        instr.dsts[0].reg.idx[0] = var->regs[HLSL_REGSET_NUMERIC].id;
         instr.dsts[0].reg.idx_count = 1;
-        instr.dsts[0].writemask = var->reg.writemask;
+        instr.dsts[0].writemask = var->regs[HLSL_REGSET_NUMERIC].writemask;
     }
 
     if (instr.dsts[0].reg.type == VKD3D_SM4_RT_DEPTHOUT)
