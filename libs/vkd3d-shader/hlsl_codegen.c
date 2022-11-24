@@ -2250,6 +2250,40 @@ static char get_regset_name(enum hlsl_regset regset)
     vkd3d_unreachable();
 }
 
+static void allocate_register_reservations(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        enum hlsl_regset regset;
+
+        if (!hlsl_type_is_resource(var->data_type))
+            continue;
+        regset = hlsl_type_get_regset(var->data_type);
+
+        if (var->reg_reservation.type)
+        {
+            if (var->reg_reservation.type != get_regset_name(regset))
+            {
+                struct vkd3d_string_buffer *type_string;
+
+                type_string = hlsl_type_to_string(ctx, var->data_type);
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Object of type '%s' must be bound to register type '%c'.",
+                        type_string->buffer, get_regset_name(regset));
+                hlsl_release_string_buffer(ctx, type_string);
+            }
+            else
+            {
+                var->regs[regset].allocated = true;
+                var->regs[regset].id = var->reg_reservation.index;
+                TRACE("Allocated reserved %s to %c%u.\n", var->name, var->reg_reservation.type, var->reg_reservation.index);
+            }
+        }
+    }
+}
+
 /* Compute the earliest and latest liveness for each variable. In the case that
  * a variable is accessed inside of a loop, we promote its liveness to extend
  * to at least the range of the entire loop. Note that we don't need to do this
@@ -2901,15 +2935,17 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, enum hlsl_regset regset,
+static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum hlsl_regset regset,
         uint32_t index)
 {
     const struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->reg_reservation.type == get_regset_name(regset)
-                && var->reg_reservation.index == index)
+        if (!var->regs[regset].allocated)
+            continue;
+
+        if (index == var->regs[regset].id)
             return var;
     }
     return NULL;
@@ -2936,53 +2972,45 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var->last_read || var->data_type->reg_size[regset] == 0)
+        if (!var->last_read || !var->data_type->reg_size[regset])
             continue;
 
-        if (var->reg_reservation.type == regset_name)
+        if (var->regs[regset].allocated)
         {
-            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, regset,
-                    var->reg_reservation.index);
+            const struct hlsl_ir_var *reserved_object;
+            unsigned int index = var->regs[regset].id;
 
-            if (var->reg_reservation.index < min_index)
+            reserved_object = get_allocated_object(ctx, regset, index);
+
+            if (var->regs[regset].id < min_index)
             {
                 assert(regset == HLSL_REGSET_UAVS);
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "UAV index (%u) must be higher than the maximum render target index (%u).",
-                        var->reg_reservation.index, min_index - 1);
+                        var->regs[regset].id, min_index - 1);
             }
             else if (reserved_object && reserved_object != var)
             {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                        "Multiple objects bound to %c%u.", regset_name, var->reg_reservation.index);
+                        "Multiple objects bound to %c%u.", regset_name, index);
                 hlsl_note(ctx, &reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
-                        "Object '%s' is already bound to %c%u.", reserved_object->name, regset_name,
-                        var->reg_reservation.index);
+                        "Object '%s' is already bound to %c%u.", reserved_object->name,
+                        regset_name, index);
             }
 
             var->regs[regset].id = var->reg_reservation.index;
             var->regs[regset].allocated = true;
             TRACE("Allocated reserved %s to %c%u.\n", var->name, regset_name, var->regs[regset].id);
         }
-        else if (!var->reg_reservation.type)
+        else
         {
-            while (get_reserved_object(ctx, regset, index))
+            while (get_allocated_object(ctx, regset, index))
                 ++index;
 
             var->regs[regset].id = index;
             var->regs[regset].allocated = true;
             TRACE("Allocated object to %c%u.\n", regset_name, index);
             ++index;
-        }
-        else
-        {
-            struct vkd3d_string_buffer *type_string;
-
-            type_string = hlsl_type_to_string(ctx, var->data_type);
-            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                    "Object of type '%s' must be bound to register type '%c'.",
-                    type_string->buffer, regset_name);
-            hlsl_release_string_buffer(ctx, type_string);
         }
     }
 }
@@ -3299,6 +3327,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
+    allocate_register_reservations(ctx);
     allocate_temp_registers(ctx, entry_func);
     if (profile->major_version < 4)
     {
