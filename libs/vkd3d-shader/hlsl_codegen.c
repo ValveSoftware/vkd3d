@@ -2903,6 +2903,71 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 
+static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_var *var;
+    enum hlsl_regset regset;
+    unsigned int index;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+
+    load = hlsl_ir_resource_load(instr);
+    var = load->resource.var;
+    regset = hlsl_type_get_regset(hlsl_deref_get_type(ctx, &load->resource));
+
+    if (regset == HLSL_REGSET_SAMPLERS)
+    {
+        assert(!load->sampler.var);
+
+        if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
+            return false;
+
+        var->objects_usage[regset][index].used = true;
+    }
+    else
+    {
+        if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
+            return false;
+
+        var->objects_usage[regset][index].used = true;
+
+        if (load->sampler.var)
+        {
+            var = load->sampler.var;
+            if (!hlsl_regset_index_from_deref(ctx, &load->sampler, HLSL_REGSET_SAMPLERS, &index))
+                return false;
+
+            var->objects_usage[HLSL_REGSET_SAMPLERS][index].used = true;
+        }
+    }
+
+    return false;
+}
+
+static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var;
+    struct hlsl_type *type;
+    unsigned int i, k;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        type = var->data_type;
+
+        for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
+        {
+            for (i = 0; i < type->reg_size[k]; ++i)
+            {
+                /* Samplers are only allocated until the last used one. */
+                if (var->objects_usage[k][i].used)
+                    var->regs[k].bind_count = (k == HLSL_REGSET_SAMPLERS) ? i + 1 : type->reg_size[k];
+            }
+        }
+    }
+}
+
 static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
         struct hlsl_ir_var *var, struct register_allocator *allocator)
 {
@@ -3570,6 +3635,55 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
     return true;
 }
 
+bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        enum hlsl_regset regset, unsigned int *index)
+{
+    struct hlsl_type *type = deref->var->data_type;
+    unsigned int i;
+
+    assert(regset <= HLSL_REGSET_LAST_OBJECT);
+
+    *index = 0;
+
+    for (i = 0; i < deref->path_len; ++i)
+    {
+        struct hlsl_ir_node *path_node = deref->path[i].node;
+        unsigned int idx = 0;
+
+        assert(path_node);
+        if (path_node->type != HLSL_IR_CONSTANT)
+            return false;
+
+        /* We should always have generated a cast to UINT. */
+        assert(path_node->data_type->class == HLSL_CLASS_SCALAR
+                && path_node->data_type->base_type == HLSL_TYPE_UINT);
+
+        idx = hlsl_ir_constant(path_node)->value.u[0].u;
+
+        switch (type->class)
+        {
+            case HLSL_CLASS_ARRAY:
+                if (idx >= type->e.array.elements_count)
+                    return false;
+
+                *index += idx * type->e.array.type->reg_size[regset];
+                break;
+
+            case HLSL_CLASS_STRUCT:
+                *index += type->e.record.fields[idx].reg_offset[regset];
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+
+        type = hlsl_get_element_type_from_path_index(ctx, type, path_node);
+    }
+
+    assert(type->reg_size[regset] == 1);
+    return true;
+}
+
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
@@ -3822,6 +3936,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
+    hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
     hlsl_transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL);
@@ -3838,17 +3953,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     allocate_register_reservations(ctx);
 
-    /* For now, request all the registers for each variable, as long as it is used. */
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        unsigned int k;
-
-        for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
-        {
-            if (!var->regs[k].allocated)
-                var->regs[k].bind_count = var->last_read ? var->data_type->reg_size[k] : 0;
-        }
-    }
+    calculate_resource_register_counts(ctx);
 
     allocate_temp_registers(ctx, entry_func);
     if (profile->major_version < 4)

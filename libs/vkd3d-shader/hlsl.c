@@ -112,8 +112,12 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
 
 void hlsl_free_var(struct hlsl_ir_var *decl)
 {
+    unsigned int k;
+
     vkd3d_free((void *)decl->name);
     hlsl_cleanup_semantic(&decl->semantic);
+    for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
+        vkd3d_free((void *)decl->objects_usage[k]);
     vkd3d_free(decl);
 }
 
@@ -949,6 +953,7 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
         const struct hlsl_reg_reservation *reg_reservation)
 {
     struct hlsl_ir_var *var;
+    unsigned int k;
 
     if (!(var = hlsl_alloc(ctx, sizeof(*var))))
         return NULL;
@@ -961,6 +966,23 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
     var->storage_modifiers = modifiers;
     if (reg_reservation)
         var->reg_reservation = *reg_reservation;
+
+    for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
+    {
+        unsigned int i, obj_count = type->reg_size[k];
+
+        if (obj_count == 0)
+            continue;
+
+        if (!(var->objects_usage[k] = hlsl_alloc(ctx, sizeof(*var->objects_usage[0]) * obj_count)))
+        {
+            for (i = 0; i < k; ++i)
+                vkd3d_free(var->objects_usage[i]);
+            vkd3d_free(var);
+            return NULL;
+        }
+    }
+
     return var;
 }
 

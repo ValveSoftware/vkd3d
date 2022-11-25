@@ -406,6 +406,11 @@ struct hlsl_ir_var
      *     and the buffer_offset instead. */
     struct hlsl_reg regs[HLSL_REGSET_LAST + 1];
 
+    struct
+    {
+        bool used;
+    } *objects_usage[HLSL_REGSET_LAST_OBJECT + 1];
+
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
@@ -1178,6 +1183,8 @@ unsigned int hlsl_swizzle_from_writemask(unsigned int writemask);
 struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
 bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         unsigned int *start, unsigned int *count);
+bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        enum hlsl_regset regset, unsigned int *index);
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset);
 unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
 struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
