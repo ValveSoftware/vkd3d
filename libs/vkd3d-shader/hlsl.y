@@ -3338,6 +3338,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     load_params.coords = coords;
     load_params.resource = params->args[0];
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
+    load_params.sampling_dim = dim;
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;

@@ -1353,6 +1353,9 @@ struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     hlsl_src_from_node(&load->coords, params->coords);
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
+    load->sampling_dim = params->sampling_dim;
+    if (load->sampling_dim == HLSL_SAMPLER_DIM_GENERIC)
+        load->sampling_dim = hlsl_deref_get_type(ctx, &load->resource)->sampler_dim;
     return &load->node;
 }
 
@@ -1641,6 +1644,7 @@ static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
     clone_src(map, &dst->coords, &src->coords);
     clone_src(map, &dst->lod, &src->lod);
     clone_src(map, &dst->texel_offset, &src->texel_offset);
+    dst->sampling_dim = src->sampling_dim;
     return &dst->node;
 }
 

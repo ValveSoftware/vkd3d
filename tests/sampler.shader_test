@@ -54,3 +54,12 @@ float4 main() : sv_target
 {
     return tex3D(s, float3(0.0, 0.0, 0.0));
 }
+
+
+[pixel shader fail]
+sampler s;
+
+float4 main() : sv_target
+{
+    return tex2D(s, float2(0.0, 0.0)) + tex3D(s, float3(0.0, 0.0, 0.0));
+}

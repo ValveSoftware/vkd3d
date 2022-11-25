@@ -409,6 +409,8 @@ struct hlsl_ir_var
     struct
     {
         bool used;
+        enum hlsl_sampler_dim sampler_dim;
+        struct vkd3d_shader_location first_sampler_dim_loc;
     } *objects_usage[HLSL_REGSET_LAST_OBJECT + 1];
 
     uint32_t is_input_semantic : 1;
@@ -622,6 +624,7 @@ struct hlsl_ir_resource_load
     enum hlsl_resource_load_type load_type;
     struct hlsl_deref resource, sampler;
     struct hlsl_src coords, lod, texel_offset;
+    enum hlsl_sampler_dim sampling_dim;
 };
 
 struct hlsl_ir_resource_store
@@ -823,6 +826,7 @@ struct hlsl_resource_load_params
     enum hlsl_resource_load_type type;
     struct hlsl_ir_node *resource, *sampler;
     struct hlsl_ir_node *coords, *lod, *texel_offset;
+    enum hlsl_sampler_dim sampling_dim;
 };
 
 static inline struct hlsl_ir_call *hlsl_ir_call(const struct hlsl_ir_node *node)

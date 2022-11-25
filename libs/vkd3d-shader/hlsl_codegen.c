@@ -2919,12 +2919,30 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
 
     if (regset == HLSL_REGSET_SAMPLERS)
     {
-        assert(!load->sampler.var);
+        enum hlsl_sampler_dim dim;
 
+        assert(!load->sampler.var);
         if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
             return false;
 
+        dim = var->objects_usage[regset][index].sampler_dim;
+        if (dim != load->sampling_dim)
+        {
+            if (dim == HLSL_SAMPLER_DIM_GENERIC)
+            {
+                var->objects_usage[regset][index].first_sampler_dim_loc = instr->loc;
+            }
+            else
+            {
+                hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INCONSISTENT_SAMPLER,
+                        "Inconsistent generic sampler usage dimension.");
+                hlsl_note(ctx, &var->objects_usage[regset][index].first_sampler_dim_loc,
+                        VKD3D_SHADER_LOG_ERROR, "First use is here.");
+                return false;
+            }
+        }
         var->objects_usage[regset][index].used = true;
+        var->objects_usage[regset][index].sampler_dim = load->sampling_dim;
     }
     else
     {
@@ -2932,6 +2950,7 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
             return false;
 
         var->objects_usage[regset][index].used = true;
+        var->objects_usage[regset][index].sampler_dim = load->sampling_dim;
 
         if (load->sampler.var)
         {
