@@ -416,6 +416,8 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
             else
             {
                 field = &type->e.record.fields[i];
+                if (hlsl_type_is_resource(field->type))
+                    continue;
                 validate_field_semantic(ctx, field);
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
@@ -535,6 +537,8 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
             else
             {
                 field = &type->e.record.fields[i];
+                if (hlsl_type_is_resource(field->type))
+                    continue;
                 validate_field_semantic(ctx, field);
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
