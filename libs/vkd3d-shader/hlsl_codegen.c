@@ -313,7 +313,7 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         if (field->type->type == HLSL_CLASS_STRUCT)
             prepend_input_struct_copy(ctx, instrs, field_load);
         else if (field->semantic.name)
-            prepend_input_copy(ctx, instrs, field_load, field->modifiers, &field->semantic);
+            prepend_input_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
         else
             hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
@@ -408,7 +408,7 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
         if (field->type->type == HLSL_CLASS_STRUCT)
             append_output_struct_copy(ctx, instrs, field_load);
         else if (field->semantic.name)
-            append_output_copy(ctx, instrs, field_load, field->modifiers, &field->semantic);
+            append_output_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
         else
             hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Field '%s' is missing a semantic.", field->name);
