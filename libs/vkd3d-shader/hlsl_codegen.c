@@ -184,7 +184,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
      * can write the uniform name into the shader reflection data. */
 
     if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type,
-            temp->loc, NULL, temp->modifiers, &temp->reg_reservation)))
+            temp->loc, NULL, temp->storage_modifiers, &temp->reg_reservation)))
         return;
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
@@ -334,7 +334,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         prepend_input_struct_copy(ctx, instrs, load);
     else if (var->semantic.name)
-        prepend_input_copy(ctx, instrs, load, var->modifiers, &var->semantic);
+        prepend_input_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
@@ -430,7 +430,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     if (var->data_type->type == HLSL_CLASS_STRUCT)
         append_output_struct_copy(ctx, instrs, load);
     else if (var->semantic.name)
-        append_output_copy(ctx, instrs, load, var->modifiers, &var->semantic);
+        append_output_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
 }
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -2610,13 +2610,13 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
-        if (var->modifiers & HLSL_STORAGE_UNIFORM)
+        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
             prepend_uniform_copy(ctx, &body->instrs, var);
     }
 
     LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
     {
-        if (var->data_type->type == HLSL_CLASS_OBJECT || (var->modifiers & HLSL_STORAGE_UNIFORM))
+        if (var->data_type->type == HLSL_CLASS_OBJECT || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
             prepend_uniform_copy(ctx, &body->instrs, var);
         }
@@ -2626,9 +2626,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                         "Parameter \"%s\" is missing a semantic.", var->name);
 
-            if (var->modifiers & HLSL_STORAGE_IN)
+            if (var->storage_modifiers & HLSL_STORAGE_IN)
                 prepend_input_var_copy(ctx, &body->instrs, var);
-            if (var->modifiers & HLSL_STORAGE_OUT)
+            if (var->storage_modifiers & HLSL_STORAGE_OUT)
                 append_output_var_copy(ctx, &body->instrs, var);
         }
     }

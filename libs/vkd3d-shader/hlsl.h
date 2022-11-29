@@ -256,7 +256,7 @@ struct hlsl_ir_var
     const char *name;
     struct hlsl_semantic semantic;
     struct hlsl_buffer *buffer;
-    unsigned int modifiers;
+    unsigned int storage_modifiers;
     struct hlsl_reg_reservation reg_reservation;
     struct list scope_entry, param_entry, extern_entry;
 

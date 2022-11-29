@@ -1232,7 +1232,7 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         {
             enum vkd3d_shader_interpolation_mode mode = VKD3DSIM_LINEAR;
 
-            if ((var->modifiers & HLSL_STORAGE_NOINTERPOLATION) || type_is_integer(var->data_type))
+            if ((var->storage_modifiers & HLSL_STORAGE_NOINTERPOLATION) || type_is_integer(var->data_type))
                 mode = VKD3DSIM_CONSTANT;
 
             instr.opcode |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;

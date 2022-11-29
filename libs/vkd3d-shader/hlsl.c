@@ -778,7 +778,7 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
     var->loc = loc;
     if (semantic)
         var->semantic = *semantic;
-    var->modifiers = modifiers;
+    var->storage_modifiers = modifiers;
     if (reg_reservation)
         var->reg_reservation = *reg_reservation;
     return var;
@@ -1556,11 +1556,11 @@ static void dump_src(struct vkd3d_string_buffer *buffer, const struct hlsl_src *
 
 static void dump_ir_var(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_var *var)
 {
-    if (var->modifiers)
+    if (var->storage_modifiers)
     {
         struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_modifiers_to_string(ctx, var->modifiers)))
+        if ((string = hlsl_modifiers_to_string(ctx, var->storage_modifiers)))
             vkd3d_string_buffer_printf(buffer, "%s ", string->buffer);
         hlsl_release_string_buffer(ctx, string);
     }
