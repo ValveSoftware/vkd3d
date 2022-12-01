@@ -3277,9 +3277,12 @@ static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
         {
             for (i = 0; i < type->reg_size[k]; ++i)
             {
-                /* Samplers are only allocated until the last used one. */
+                bool is_separated = var->is_separated_resource;
+
+                /* Samplers (and textures separated from them) are only allocated until the last
+                 * used one. */
                 if (var->objects_usage[k][i].used)
-                    var->regs[k].bind_count = (k == HLSL_REGSET_SAMPLERS) ? i + 1 : type->reg_size[k];
+                    var->regs[k].bind_count = (k == HLSL_REGSET_SAMPLERS || is_separated) ? i + 1 : type->reg_size[k];
             }
         }
     }
