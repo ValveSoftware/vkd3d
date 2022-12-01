@@ -70,6 +70,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/cbuffer.shader_test \
 	tests/hlsl/clamp.shader_test \
 	tests/hlsl/clip.shader_test \
+	tests/hlsl/combined-samplers.shader_test \
 	tests/hlsl/comma.shader_test \
 	tests/hlsl/compute.shader_test \
 	tests/hlsl/conditional.shader_test \
