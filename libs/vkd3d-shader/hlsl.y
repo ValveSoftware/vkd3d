@@ -2174,6 +2174,41 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             vkd3d_free(v->initializer.args);
             vkd3d_free(v->initializer.instrs);
         }
+        else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
+        {
+            struct hlsl_ir_constant *zero;
+            struct hlsl_ir_store *store;
+            struct hlsl_ir_node *cast;
+
+            /* Initialize statics to zero by default. */
+
+            if (type_has_object_components(var->data_type, false))
+            {
+                hlsl_fixme(ctx, &var->loc, "Uninitialized static objects.");
+                vkd3d_free(v);
+                continue;
+            }
+
+            if (!(zero = hlsl_new_uint_constant(ctx, 0, &var->loc)))
+            {
+                vkd3d_free(v);
+                continue;
+            }
+            list_add_tail(&ctx->static_initializers, &zero->node.entry);
+
+            if (!(cast = add_cast(ctx, &ctx->static_initializers, &zero->node, var->data_type, &var->loc)))
+            {
+                vkd3d_free(v);
+                continue;
+            }
+
+            if (!(store = hlsl_new_simple_store(ctx, var, cast)))
+            {
+                vkd3d_free(v);
+                continue;
+            }
+            list_add_tail(&ctx->static_initializers, &store->node.entry);
+        }
         vkd3d_free(v);
     }
     vkd3d_free(var_list);
