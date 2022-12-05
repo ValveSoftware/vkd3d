@@ -65,7 +65,7 @@ size (1, 1)
 1.0 2.0 3.0 4.0
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 static Texture2D tex;
 sampler sam;
 
@@ -75,7 +75,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 // This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
 static Texture2D tex;
 
@@ -113,7 +113,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 static Texture2D tex1;
 sampler sam;
 
@@ -124,7 +124,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 static Texture2D tex1;
 sampler sam;
 
@@ -150,7 +150,7 @@ draw quad
 probe all rgba (1, 2, 3, 4)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D real_tex;
 static Texture2D tex;
 sampler sam;
@@ -162,8 +162,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (1, 2, 3, 4)
+draw quad
+probe all rgba (1, 2, 3, 4)
 
 
 [require]

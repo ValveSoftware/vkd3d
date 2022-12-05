@@ -2184,7 +2184,6 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
             if (type_has_object_components(var->data_type, false))
             {
-                hlsl_fixme(ctx, &var->loc, "Uninitialized static objects.");
                 vkd3d_free(v);
                 continue;
             }
