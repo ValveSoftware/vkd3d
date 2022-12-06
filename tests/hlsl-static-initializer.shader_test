@@ -53,3 +53,139 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+
+[texture 0]
+size (1, 1)
+1.0 2.0 3.0 4.0
+
+
+[pixel shader fail todo]
+static Texture2D tex;
+sampler sam;
+
+float4 main() : sv_target
+{
+    return tex.Sample(sam, int3(0, 0, 0));
+}
+
+
+[pixel shader todo]
+// This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
+static Texture2D tex;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+
+[pixel shader todo]
+// This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
+static Texture2D tex;
+sampler sam;
+
+float4 main() : sv_target
+{
+    if (0)
+        return tex.Sample(sam, int3(0, 0, 0));
+    else
+        return float4(0, 1, 2, 3);
+}
+
+
+[pixel shader todo]
+// This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
+static Texture2D tex;
+sampler sam;
+uniform uint i;
+
+float4 main() : sv_target
+{
+    float4 unused = tex.Sample(sam, int3(0, 1, 2));
+
+    return 0;
+}
+
+
+[pixel shader fail todo]
+static Texture2D tex1;
+sampler sam;
+
+float4 main() : sv_target
+{
+    static Texture2D tex2 = tex1;
+    return tex2.Sample(sam, int3(0, 0, 0));
+}
+
+
+[pixel shader fail todo]
+static Texture2D tex1;
+sampler sam;
+
+float4 main(Texture2D tex2) : sv_target
+{
+    tex2 = tex1;
+    return tex2.Sample(sam, int3(0, 0, 0));
+}
+
+
+[pixel shader]
+Texture2D real_tex;
+static Texture2D tex = real_tex;
+sampler sam;
+
+float4 main() : sv_target
+{
+    return tex.Sample(sam, int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (1, 2, 3, 4)
+
+
+[pixel shader todo]
+Texture2D real_tex;
+static Texture2D tex;
+sampler sam;
+
+float4 main() : sv_target
+{
+    tex = real_tex;
+    return tex.Sample(sam, int3(0, 0, 0));
+}
+
+[test]
+todo draw quad
+todo probe all rgba (1, 2, 3, 4)
+
+
+[require]
+shader model >= 5.0
+
+
+[uav 1]
+format r32 float
+size (1, 1)
+
+0.5
+
+
+[pixel shader todo]
+// This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
+static RWTexture2D<float> tex;
+
+float4 main() : sv_target
+{
+    if (0)
+    {
+        tex[int2(0, 0)] = 2;
+    }
+    return 0;
+}
