@@ -342,11 +342,11 @@ DEMOS_LDADD = $(LDADD) libvkd3d-shader.la @DL_LIBS@ @DEMO_LIBS@
 DEMOS_CFLAGS = $(AM_CFLAGS) @DEMO_CFLAGS@
 bin_PROGRAMS += $(vkd3d_demos)
 
-demos_vkd3d_gears_SOURCES = demos/gears.c
+demos_vkd3d_gears_SOURCES = demos/gears.c demos/gears_hlsl.h
 demos_vkd3d_gears_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_gears_LDADD = $(DEMOS_LDADD) -lm
 
-demos_vkd3d_triangle_SOURCES = demos/triangle.c
+demos_vkd3d_triangle_SOURCES = demos/triangle.c demos/triangle_hlsl.h
 demos_vkd3d_triangle_CFLAGS = $(DEMOS_CFLAGS)
 demos_vkd3d_triangle_LDADD = $(DEMOS_LDADD)
 endif
