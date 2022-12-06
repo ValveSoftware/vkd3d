@@ -67,7 +67,7 @@ float4 main() : sv_target
 uniform 0 float4 0.0 1.0 0.0 -3.0
 uniform 4 float4 1.0 2.0 3.0 4.0
 uniform 8 float4 5.0 6.0 7.0 8.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (5.0, 2.0, 7.0, 4.0)
 
 
@@ -295,7 +295,7 @@ float4 main() : sv_target
 uniform 0 float4 1.0 0.0 1.0 0.0
 uniform 4 float4 1.0 2.0 3.0 4.0
 uniform 8 float4 5.0 6.0 7.0 8.0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (1.0, 5.0, 1.0, 5.0)
 
 

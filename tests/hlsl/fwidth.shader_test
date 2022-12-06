@@ -18,9 +18,9 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-todo(sm<4 | glsl) draw quad
-probe (10, 10) rgba (8.0, 8.0, 8.0, 8.0)
-probe (11, 10) rgba (8.0, 8.0, 8.0, 8.0)
-probe (12, 10) rgba (10.0, 10.0, 10.0, 10.0)
-probe (16, 16) rgba (12.0, 12.0, 12.0, 12.0)
-probe (150, 150) rgba (92.0, 92.0, 92.0, 92.0)
+todo(glsl) draw quad
+todo(sm<4) probe (10, 10) rgba (8.0, 8.0, 8.0, 8.0)
+todo(sm<4) probe (11, 10) rgba (8.0, 8.0, 8.0, 8.0)
+todo(sm<4) probe (12, 10) rgba (10.0, 10.0, 10.0, 10.0)
+todo(sm<4) probe (16, 16) rgba (12.0, 12.0, 12.0, 12.0)
+todo(sm<4) probe (150, 150) rgba (92.0, 92.0, 92.0, 92.0)

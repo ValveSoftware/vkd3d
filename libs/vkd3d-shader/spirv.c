@@ -7123,6 +7123,7 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
     }
     glsl_insts[] =
     {
+        {VKD3DSIH_ABS,             GLSLstd450FAbs},
         {VKD3DSIH_ACOS,            GLSLstd450Acos},
         {VKD3DSIH_ASIN,            GLSLstd450Asin},
         {VKD3DSIH_ATAN,            GLSLstd450Atan},
@@ -9814,6 +9815,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ISFINITE:
             spirv_compiler_emit_isfinite(compiler, instruction);
             break;
+        case VKD3DSIH_ABS:
         case VKD3DSIH_ACOS:
         case VKD3DSIH_ASIN:
         case VKD3DSIH_ATAN:
