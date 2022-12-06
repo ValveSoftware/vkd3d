@@ -31,15 +31,6 @@ vkd3d_public_headers = \
 	include/vkd3d_utils.h \
 	include/vkd3d_windows.h
 
-vkd3d_demos_shaders = \
-	demos/gears.hlsl \
-	demos/gears_ps_flat.h \
-	demos/gears_ps_smooth.h \
-	demos/gears_vs.h \
-	demos/triangle.hlsl \
-	demos/triangle_ps.h \
-	demos/triangle_vs.h
-
 vkd3d_tests = \
 	tests/vkd3d_api \
 	tests/vkd3d_common \
@@ -377,8 +368,6 @@ if HAVE_WIDL
 else
 	@echo "widl is required to generate $@"
 endif
-
-EXTRA_DIST += $(vkd3d_demos_shaders)
 
 libvkd3d-utils.pc: $(srcdir)/libs/vkd3d-utils/libvkd3d-utils.pc.in Makefile
 	$(AM_V_GEN)$(SED) -e 's![@]prefix[@]!$(prefix)!g' \
