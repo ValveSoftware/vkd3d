@@ -191,6 +191,8 @@ struct hlsl_type
     unsigned int reg_size;
     /* Offset where the type's description starts in the output bytecode, in bytes. */
     size_t bytecode_offset;
+
+    uint32_t is_minimum_precision : 1;
 };
 
 /* In HLSL, a semantic is a string linked to a variable (or a field) to be recognized across

@@ -4197,7 +4197,8 @@ type:
                 YYABORT;
             }
 
-            $$ = hlsl_get_vector_type(ctx, $3->base_type, $5);
+            $$ = hlsl_type_clone(ctx, hlsl_get_vector_type(ctx, $3->base_type, $5), 0, 0);
+            $$->is_minimum_precision = $3->is_minimum_precision;
         }
     | KW_VECTOR
         {
@@ -4229,7 +4230,8 @@ type:
                 YYABORT;
             }
 
-            $$ = hlsl_get_matrix_type(ctx, $3->base_type, $7, $5);
+            $$ = hlsl_type_clone(ctx, hlsl_get_matrix_type(ctx, $3->base_type, $7, $5), 0, 0);
+            $$->is_minimum_precision = $3->is_minimum_precision;
         }
     | KW_MATRIX
         {
@@ -4298,6 +4300,18 @@ type:
     | TYPE_IDENTIFIER
         {
             $$ = hlsl_get_type(ctx->cur_scope, $1, true);
+            if ($$->is_minimum_precision)
+            {
+                if (ctx->profile->major_version < 4)
+                {
+                    hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Target profile doesn't support minimum-precision types.");
+                }
+                else
+                {
+                    FIXME("Reinterpreting type %s.\n", $$->name);
+                }
+            }
             vkd3d_free($1);
         }
     | KW_STRUCT TYPE_IDENTIFIER

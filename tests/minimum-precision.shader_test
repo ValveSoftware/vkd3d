@@ -2,7 +2,7 @@
 shader model >= 4.0
 
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     min16float4 a = {0, 1, 2, 3};
@@ -17,5 +17,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (197.0, 218.0, 238.0, 257.0)
+draw quad
+probe all rgba (197.0, 218.0, 238.0, 257.0)

@@ -680,6 +680,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
     if (!(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK))
         type->modifiers |= default_majority;
     type->sampler_dim = old->sampler_dim;
+    type->is_minimum_precision = old->is_minimum_precision;
     switch (old->type)
     {
         case HLSL_CLASS_ARRAY:
@@ -2392,7 +2393,7 @@ static int compare_function_rb(const void *key, const struct rb_entry *entry)
 
 static void declare_predefined_types(struct hlsl_ctx *ctx)
 {
-    unsigned int x, y, bt, i;
+    unsigned int x, y, bt, i, v;
     struct hlsl_type *type;
 
     static const char * const names[] =
@@ -2404,7 +2405,11 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         "uint",
         "bool",
     };
-    char name[10];
+    char name[15];
+
+    static const char *const variants_float[] = {"min10float", "min16float"};
+    static const char *const variants_int[] = {"min12int", "min16int"};
+    static const char *const variants_uint[] = {"min16uint"};
 
     static const char *const sampler_names[] =
     {
@@ -2458,6 +2463,63 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
                         type = hlsl_new_type(ctx, name, HLSL_CLASS_SCALAR, bt, x, y);
                         hlsl_scope_add_type(ctx->globals, type);
                         ctx->builtin_types.scalar[bt] = type;
+                    }
+                }
+            }
+        }
+    }
+
+    for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
+    {
+        unsigned int n_variants = 0;
+        const char *const *variants;
+
+        switch (bt)
+        {
+            case HLSL_TYPE_FLOAT:
+                variants = variants_float;
+                n_variants = ARRAY_SIZE(variants_float);
+                break;
+
+            case HLSL_TYPE_INT:
+                variants = variants_int;
+                n_variants = ARRAY_SIZE(variants_int);
+                break;
+
+            case HLSL_TYPE_UINT:
+                variants = variants_uint;
+                n_variants = ARRAY_SIZE(variants_uint);
+                break;
+
+            default:
+                break;
+        }
+
+        for (v = 0; v < n_variants; ++v)
+        {
+            for (y = 1; y <= 4; ++y)
+            {
+                for (x = 1; x <= 4; ++x)
+                {
+                    sprintf(name, "%s%ux%u", variants[v], y, x);
+                    type = hlsl_new_type(ctx, name, HLSL_CLASS_MATRIX, bt, x, y);
+                    type->is_minimum_precision = 1;
+                    hlsl_scope_add_type(ctx->globals, type);
+
+                    if (y == 1)
+                    {
+                        sprintf(name, "%s%u", variants[v], x);
+                        type = hlsl_new_type(ctx, name, HLSL_CLASS_VECTOR, bt, x, y);
+                        type->is_minimum_precision = 1;
+                        hlsl_scope_add_type(ctx->globals, type);
+
+                        if (x == 1)
+                        {
+                            sprintf(name, "%s", variants[v]);
+                            type = hlsl_new_type(ctx, name, HLSL_CLASS_SCALAR, bt, x, y);
+                            type->is_minimum_precision = 1;
+                            hlsl_scope_add_type(ctx->globals, type);
+                        }
                     }
                 }
             }
