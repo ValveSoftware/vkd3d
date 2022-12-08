@@ -23,3 +23,33 @@ float4 main() : sv_target
 {
     return 1 / i;
 }
+
+
+[pixel shader]
+static struct
+{
+    float4 x;
+    float4 y;
+} x;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+
+[pixel shader]
+static struct
+{
+    float4 x;
+    float3 y;
+} x;
+
+float4 main() : sv_target
+{
+    return float4(1, 2, 3, 4) + x.x;
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
