@@ -3714,7 +3714,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource(ID3D12Devi
     struct d3d12_resource *object;
     HRESULT hr;
 
-    TRACE("iface %p, heap_properties %p, heap_flags %#x,  desc %p, initial_state %#x, "
+    TRACE("iface %p, heap_properties %p, heap_flags %#x, desc %p, initial_state %#x, "
             "optimized_clear_value %p, iid %s, resource %p.\n",
             iface, heap_properties, heap_flags, desc, initial_state,
             optimized_clear_value, debugstr_guid(iid), resource);
