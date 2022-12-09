@@ -1419,6 +1419,39 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     return false;
 }
 
+static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_ir_node *next_instr;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+
+    next_instr = swizzle->val.node;
+
+    if (next_instr->type == HLSL_IR_SWIZZLE)
+    {
+        struct hlsl_ir_swizzle *new_swizzle;
+        struct hlsl_ir_node *new_instr;
+        unsigned int combined_swizzle;
+
+        combined_swizzle = hlsl_combine_swizzles(hlsl_ir_swizzle(next_instr)->swizzle,
+                swizzle->swizzle, instr->data_type->dimx);
+        next_instr = hlsl_ir_swizzle(next_instr)->val.node;
+
+        if (!(new_swizzle = hlsl_new_swizzle(ctx, combined_swizzle, instr->data_type->dimx, next_instr, &instr->loc)))
+            return false;
+
+        new_instr = &new_swizzle->node;
+        list_add_before(&instr->entry, &new_instr->entry);
+        hlsl_replace_node(instr, new_instr);
+        return true;
+    }
+
+    return false;
+}
+
 static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_swizzle *swizzle;
@@ -2866,6 +2899,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress = transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
         progress |= transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= copy_propagation_execute(ctx, body);
+        progress |= transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }
     while (progress);

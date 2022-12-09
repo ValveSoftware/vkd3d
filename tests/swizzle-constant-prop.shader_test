@@ -29,7 +29,7 @@ draw quad
 probe all rgba (110, 210, 410, 410)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 uniform int i;
 
@@ -43,11 +43,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 int 3
-todo draw quad
-todo probe all rgba (105, 5, 305, 305)
+draw quad
+probe all rgba (105, 5, 305, 305)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 uniform int i;
 
@@ -59,5 +59,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 int 1
-todo draw quad
-todo probe all rgba (14.0, 14.0, 14.0, 14.0)
+draw quad
+probe all rgba (14.0, 14.0, 14.0, 14.0)
