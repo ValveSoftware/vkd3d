@@ -1,0 +1,63 @@
+% The texel offset argument to Load() must resolve to a constant integer;
+% make sure that we can do so.
+
+[require]
+shader model >= 4.0
+
+
+[texture 0]
+size (4, 4)
+ 1  1  1  1    2  2  2  2    3  3  3  3    4  4  4  4
+ 5  5  5  5    6  6  6  6    7  7  7  7    8  8  8  8
+ 9  9  9  9   10 10 10 10   11 11 11 11   12 12 12 12
+13 13 13 13   14 14 14 14   14 15 15 15   16 16 16 16
+
+
+[pixel shader todo]
+Texture2D tex;
+uniform int i;
+
+float4 main() : sv_target
+{
+    int4 a = {1, 2, i, i};
+    return 100 * a + tex.Load(int3(0, 0, 0), a.xy);
+}
+
+[test]
+uniform 0 int 4
+todo draw quad
+todo probe all rgba (110, 210, 410, 410)
+
+
+[pixel shader todo]
+Texture2D tex;
+uniform int i;
+
+float4 main() : sv_target
+{
+    int4 a = {0, 1, 2, i};
+    int4 b = a.yxww;
+    int3 c = b.wyx;
+    return 100 * b + tex.Load(int3(0, 0, 0), c.yz);
+}
+
+[test]
+uniform 0 int 3
+todo draw quad
+todo probe all rgba (105, 5, 305, 305)
+
+
+[pixel shader todo]
+Texture2D tex;
+uniform int i;
+
+float4 main() : sv_target
+{
+    int4 a = {1, 2, 3, i};
+    return tex.Load(int3(0, 0, 0), a.wzxx.yxw.zx);
+}
+
+[test]
+uniform 0 int 1
+todo draw quad
+todo probe all rgba (14.0, 14.0, 14.0, 14.0)
