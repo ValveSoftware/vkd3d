@@ -36196,6 +36196,105 @@ static void test_clock_calibration(void)
     destroy_test_context(&context);
 }
 
+static void test_readback_map_stability(void)
+{
+    D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
+    ID3D12GraphicsCommandList *command_list;
+    unsigned int width, height, row_pitch;
+    D3D12_RESOURCE_DESC resource_desc;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    ID3D12Resource *buffer;
+    D3D12_RANGE read_range;
+    ID3D12Device *device;
+    void *data, *data2;
+    uint32_t colour;
+    HRESULT hr;
+
+    static const float green[] = {0.0f, 1.0f, 0.0f, 1.0f};
+    static const float blue[] = {0.0f, 0.0f, 1.0f, 1.0f};
+
+    if (!init_test_context(&context, NULL))
+        return;
+    device = context.device;
+    queue = context.queue;
+    command_list = context.list;
+
+    resource_desc = ID3D12Resource_GetDesc(context.render_target);
+    width = align(resource_desc.Width, format_block_width(resource_desc.Format));
+    height = align(resource_desc.Height, format_block_height(resource_desc.Format));
+    row_pitch = align(width * format_size(resource_desc.Format), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    buffer = create_readback_buffer(device, row_pitch * height);
+
+    dst_location.pResource = buffer;
+    dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    dst_location.PlacedFootprint.Offset = 0;
+    dst_location.PlacedFootprint.Footprint.Format = resource_desc.Format;
+    dst_location.PlacedFootprint.Footprint.Width = width;
+    dst_location.PlacedFootprint.Footprint.Height = height;
+    dst_location.PlacedFootprint.Footprint.Depth = 1;
+    dst_location.PlacedFootprint.Footprint.RowPitch = row_pitch;
+
+    src_location.pResource = context.render_target;
+    src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    src_location.SubresourceIndex = 0;
+
+    read_range.Begin = 0;
+    read_range.End = row_pitch * height;
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(context.list, context.rtv, green, 0, NULL);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    ID3D12GraphicsCommandList_CopyTextureRegion(command_list, &dst_location, 0, 0, 0, &src_location, NULL);
+
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    assert_that(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+
+    hr = ID3D12Resource_Map(buffer, 0, &read_range, &data);
+    assert_that(hr == S_OK, "Failed to map readback buffer, hr %#x.\n", hr);
+
+    colour = *(uint32_t *)data;
+    ok(colour == 0xff00ff00, "Got colour %08x.\n", colour);
+
+    ID3D12Resource_Unmap(buffer, 0, NULL);
+
+    colour = *(uint32_t *)data;
+    ok(colour == 0xff00ff00, "Got colour %08x.\n", colour);
+
+    reset_command_list(command_list, context.allocator);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(context.list, context.rtv, blue, 0, NULL);
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    ID3D12GraphicsCommandList_CopyTextureRegion(command_list, &dst_location, 0, 0, 0, &src_location, NULL);
+
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    assert_that(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+
+    colour = *(uint32_t *)data;
+    ok(colour == 0xffff0000, "Got colour %08x.\n", colour);
+
+    hr = ID3D12Resource_Map(buffer, 0, &read_range, &data2);
+    assert_that(hr == S_OK, "Failed to map readback buffer, hr %#x.\n", hr);
+
+    ok(data2 == data, "Expected map pointer to be stable.\n");
+    colour = *(uint32_t *)data2;
+    ok(colour == 0xffff0000, "Got colour %08x.\n", colour);
+
+    ID3D12Resource_Unmap(buffer, 0, NULL);
+
+    ID3D12Resource_Release(buffer);
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -36373,4 +36472,5 @@ START_TEST(d3d12)
     run_test(test_unbounded_resource_arrays);
     run_test(test_unbounded_samplers);
     run_test(test_clock_calibration);
+    run_test(test_readback_map_stability);
 }
