@@ -2244,11 +2244,11 @@ const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type)
 
 static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr);
 
-static void dump_instr_list(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct list *list)
+static void dump_block(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_block *block)
 {
     struct hlsl_ir_node *instr;
 
-    LIST_FOR_EACH_ENTRY(instr, list, struct hlsl_ir_node, entry)
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
         dump_instr(ctx, buffer, instr);
         vkd3d_string_buffer_printf(buffer, "\n");
@@ -2490,9 +2490,9 @@ static void dump_ir_if(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
     vkd3d_string_buffer_printf(buffer, "if (");
     dump_src(buffer, &if_node->condition);
     vkd3d_string_buffer_printf(buffer, ") {\n");
-    dump_instr_list(ctx, buffer, &if_node->then_block.instrs);
+    dump_block(ctx, buffer, &if_node->then_block);
     vkd3d_string_buffer_printf(buffer, "      %10s   } else {\n", "");
-    dump_instr_list(ctx, buffer, &if_node->else_block.instrs);
+    dump_block(ctx, buffer, &if_node->else_block);
     vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
 }
 
@@ -2525,7 +2525,7 @@ static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_i
 static void dump_ir_loop(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_loop *loop)
 {
     vkd3d_string_buffer_printf(buffer, "for (;;) {\n");
-    dump_instr_list(ctx, buffer, &loop->body.instrs);
+    dump_block(ctx, buffer, &loop->body);
     vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
 }
 
@@ -2713,7 +2713,7 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
     if (func->has_body)
-        dump_instr_list(ctx, &buffer, &func->body.instrs);
+        dump_block(ctx, &buffer, &func->body);
 
     vkd3d_string_buffer_trace(&buffer);
     vkd3d_string_buffer_cleanup(&buffer);
