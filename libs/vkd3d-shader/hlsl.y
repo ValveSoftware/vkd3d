@@ -3140,7 +3140,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
         if (!strcmp(name, "Gather") || !offset_dim)
         {
-            if (params->args_count < 2 && params->args_count > 3 + !!offset_dim)
+            if (params->args_count < 2 || params->args_count > 3 + !!offset_dim)
             {
                 hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                         "Wrong number of arguments to method '%s': expected from 2 to %u, but got %u.",
