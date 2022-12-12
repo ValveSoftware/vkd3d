@@ -4353,7 +4353,7 @@ var_modifiers:
         }
     | KW_VOLATILE var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_VOLATILE, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_VOLATILE, @1);
         }
     | KW_CONST var_modifiers
         {

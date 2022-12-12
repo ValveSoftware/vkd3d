@@ -1491,7 +1491,7 @@ struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsig
         vkd3d_string_buffer_printf(string, "static ");
     if (modifiers & HLSL_STORAGE_UNIFORM)
         vkd3d_string_buffer_printf(string, "uniform ");
-    if (modifiers & HLSL_STORAGE_VOLATILE)
+    if (modifiers & HLSL_MODIFIER_VOLATILE)
         vkd3d_string_buffer_printf(string, "volatile ");
     if (modifiers & HLSL_MODIFIER_CONST)
         vkd3d_string_buffer_printf(string, "const ");
