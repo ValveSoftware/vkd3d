@@ -2303,6 +2303,19 @@ static bool elementwise_intrinsic_convert_args(struct hlsl_ctx *ctx,
     return convert_args(ctx, params, common_type, loc);
 }
 
+static bool elementwise_intrinsic_float_convert_args(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *type;
+
+    if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+        return false;
+
+    type = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+
+    return convert_args(ctx, params, type, loc);
+}
+
 static bool intrinsic_abs(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2442,13 +2455,10 @@ static bool intrinsic_ldexp(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *arg;
 
-    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
-        return false;
-
-    if (!(arg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, arg, loc)))
+    if (!(arg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, params->args[1], loc)))
         return false;
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[0], arg, loc);
@@ -2482,15 +2492,12 @@ static bool intrinsic_length(struct hlsl_ctx *ctx,
 static bool intrinsic_lerp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg, *neg, *add, *mul;
+    struct hlsl_ir_node *neg, *add, *mul;
 
-    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
-
-    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, arg, loc)))
+    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, params->args[0], loc)))
         return false;
 
     if (!(add = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, params->args[1], neg, loc)))
@@ -2499,7 +2506,7 @@ static bool intrinsic_lerp(struct hlsl_ctx *ctx,
     if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, params->args[2], add, loc)))
         return false;
 
-    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, arg, mul, loc);
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, params->args[0], mul, loc);
 }
 
 static bool intrinsic_max(struct hlsl_ctx *ctx,
@@ -2649,15 +2656,12 @@ static bool intrinsic_normalize(struct hlsl_ctx *ctx,
 static bool intrinsic_pow(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *log, *exp, *arg, *mul;
+    struct hlsl_ir_node *log, *exp, *mul;
 
-    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
-    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
-        return false;
-
-    if (!(log = hlsl_new_unary_expr(ctx, HLSL_OP1_LOG2, arg, *loc)))
+    if (!(log = hlsl_new_unary_expr(ctx, HLSL_OP1_LOG2, params->args[0], *loc)))
         return false;
     list_add_tail(params->instrs, &log->entry);
 
@@ -2698,27 +2702,13 @@ static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
 {
     struct hlsl_ir_node *min_arg, *max_arg, *x_arg, *p, *p_num, *p_denom, *res;
     struct hlsl_ir_constant *one, *minus_two, *three;
-    struct hlsl_type *common_type;
 
-    if (!elementwise_intrinsic_convert_args(ctx, params, loc))
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
         return false;
 
     min_arg = params->args[0];
     max_arg = params->args[1];
     x_arg = params->args[2];
-
-    common_type = x_arg->data_type;
-    common_type = hlsl_get_numeric_type(ctx, common_type->type, HLSL_TYPE_FLOAT, common_type->dimx,
-            common_type->dimy);
-
-    if (!(min_arg = add_implicit_conversion(ctx, params->instrs, min_arg, common_type, loc)))
-        return false;
-
-    if (!(max_arg = add_implicit_conversion(ctx, params->instrs, max_arg, common_type, loc)))
-        return false;
-
-    if (!(x_arg = add_implicit_conversion(ctx, params->instrs, x_arg, common_type, loc)))
-        return false;
 
     if (!(min_arg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, min_arg, loc)))
         return false;
