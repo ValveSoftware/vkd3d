@@ -117,6 +117,7 @@ vkd3d_shader_tests = \
 	tests/math.shader_test \
 	tests/matrix-semantics.shader_test \
 	tests/max.shader_test \
+	tests/minimum-precision.shader_test \
 	tests/multiple-rt.shader_test \
 	tests/nointerpolation.shader_test \
 	tests/object-references.shader_test \
