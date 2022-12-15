@@ -144,6 +144,7 @@ vkd3d_shader_tests = \
 	tests/nointerpolation.shader_test \
 	tests/object-field-offsets.shader_test \
 	tests/object-references.shader_test \
+	tests/object-parameters.shader_test \
 	tests/pow.shader_test \
 	tests/preproc-if.shader_test \
 	tests/preproc-ifdef.shader_test \

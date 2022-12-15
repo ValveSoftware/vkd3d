@@ -1,0 +1,182 @@
+[pixel shader fail todo]
+Texture2D tex0;
+
+float4 main(out Texture2D tex : TEXTURE) : sv_target
+{
+    return float4(1, 2, 3, 4);
+}
+
+
+[pixel shader fail todo]
+struct params
+{
+    Texture2D tex : TEXTURE;
+};
+
+float4 main(inout params x) : sv_target
+{
+    return float4(1, 2, 3, 4);
+}
+
+
+[require]
+shader model >= 5.0
+
+
+[pixel shader todo]
+uniform float global;
+
+struct apple
+{
+    Texture2D tex;
+    float4 pos : sv_position;
+};
+
+float4 main(struct apple input, uniform float param) : sv_target
+{
+    return input.tex.Load(int3(0, 0, 0)) + global + param + input.pos;
+}
+
+
+[texture 0]
+size (2, 2)
+1.0 1.0 1.0 1.0     0.0 0.0 0.0 1.0
+1.0 1.0 1.0 1.0     0.0 0.0 0.0 1.0
+
+[texture 1]
+size (2, 2)
+2.0 2.0 2.0 1.0     0.0 0.0 0.0 1.0
+2.0 2.0 2.0 1.0     0.0 0.0 0.0 1.0
+
+[texture 2]
+size (2, 2)
+3.0 3.0 3.0 1.0     0.0 0.0 0.0 1.0
+3.0 3.0 3.0 1.0     0.0 0.0 0.0 1.0
+
+[texture 3]
+size (2, 2)
+4.0 4.0 4.0 1.0     0.0 0.0 0.0 1.0
+4.0 4.0 4.0 1.0     0.0 0.0 0.0 1.0
+
+[texture 4]
+size (2, 2)
+5.0 5.0 5.0 1.0     0.0 0.0 0.0 1.0
+5.0 5.0 5.0 1.0     0.0 0.0 0.0 1.0
+
+[texture 5]
+size (2, 2)
+6.0 6.0 6.0 1.0     0.0 0.0 0.0 1.0
+6.0 6.0 6.0 1.0     0.0 0.0 0.0 1.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 1]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 2]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 3]
+filter point point point
+address clamp clamp clamp
+
+[sampler 4]
+filter linear linear linear
+address clamp clamp clamp
+
+
+[pixel shader todo]
+struct apple
+{
+    Texture2D unused;   // must reserve t1
+    Texture2D tex[3];   // must reserve t2-t4
+    Texture2D lone;     // must reserve t5
+    float4 pos : sv_position;
+};
+
+Texture2D tex0; // must reserve t0
+sampler sam;
+
+float4 main(struct apple input) : sv_target
+{
+    return 100 * input.tex[1].Sample(sam, float2(0, 0))
+            + 10 * tex0.Sample(sam, float2(0, 0))
+            + input.lone.Sample(sam, float2(0, 0));
+}
+
+[test]
+todo draw quad
+todo probe all rgba (416.0, 416.0, 416.0, 111.0)
+
+
+[pixel shader todo]
+Texture2D tex;
+
+struct apple
+{
+    sampler unused0;  // must reserve s0
+    sampler sam[3];   // must reserve to s1-s2
+    sampler unused1;  // doesn't reserve
+};
+
+float4 main(struct apple input, sampler samp) : sv_target
+{
+    // samp must reserve s3
+
+    return float4(tex.Sample(samp, float2(0.3, 0.3)).xy,
+            tex.Sample(input.sam[1], float2(0.5, 0.5)).xy);
+}
+
+[test]
+todo draw quad
+todo probe all rgba (1.0, 1.0, 0.5, 0.5)
+
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 1]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 2]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 3]
+filter linear linear linear
+address clamp clamp clamp
+
+[sampler 4]
+filter point point point
+address clamp clamp clamp
+
+
+[pixel shader todo]
+Texture2D tex;
+sampler sam0; // must reserve s3
+
+struct apple
+{
+    sampler unused0;  // must reserve s0
+    sampler sam[3];   // must reserve s1-s2
+    sampler unused1;  // doesn't reserve
+};
+
+float4 main(struct apple input, sampler samp) : sv_target
+{
+    // samp must reserve s4
+
+    return float4(tex.Sample(sam0, float2(0.5, 0.5)).x, tex.Sample(samp, float2(0.3, 0.3)).x,
+            tex.Sample(input.sam[1], float2(0.5, 0.5)).xw);
+}
+
+
+[test]
+todo draw quad
+todo probe all rgba (0.5, 1.0, 0.5, 1.0)
