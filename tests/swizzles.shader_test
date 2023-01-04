@@ -1,0 +1,111 @@
+[pixel shader]
+uniform float4 color;
+
+float4 main() : sv_target
+{
+    float4 ret = color;
+    ret.gb = ret.ra;
+    ret.ra = float2(0.0101, 0.0404);
+    return ret;
+}
+
+[test]
+uniform 0 float4 0.0303 0.08 0.07 0.0202
+draw quad
+probe all rgba (0.0101, 0.0303, 0.0202, 0.0404)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret = float4(0.1, 0.2, 0.3, 0.4);
+    ret.wyz.yx = float2(0.5, 0.6).yx;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.6, 0.3, 0.5)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret;
+    ret.zwyx = float4(0.1, 0.2, 0.3, 0.4);
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.4, 0.3, 0.1, 0.2)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret;
+    ret.yw.y = 0.1;
+    ret.xzy.yz.y.x = 0.2;
+    ret.yzwx.yzwx.wz.y = 0.3;
+    ret.zxy.xyz.zxy.xy.y = 0.4;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.3, 0.2, 0.4, 0.1)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret;
+    ret.yxz.yx = float2(0.1, 0.2);
+    ret.w.x = 0.3;
+    ret.wzyx.zyx.yx.x = 0.4;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.2, 0.4, 0.3)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret = float4(0.1, 0.2, 0.3, 0.4).ywxz.zyyz;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.4, 0.4, 0.1)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret = float4(0.1, 0.2, 0.3, 0.4);
+    ret.yxwz = ret;
+    ret = ret.wyzx;
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.3, 0.1, 0.4, 0.2)
+
+
+[pixel shader]
+float4 main() : SV_target
+{
+    float4 ret;
+    ret.xyzw.xyzw = float4(0.1, 0.2, 0.3, 0.4);
+    return ret;
+}
+
+[test]
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)

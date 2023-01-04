@@ -135,15 +135,8 @@ vkd3d_shader_tests = \
 	tests/shader-interstage-interface.shader_test \
 	tests/sqrt.shader_test \
 	tests/step.shader_test \
-	tests/swizzle-0.shader_test \
-	tests/swizzle-1.shader_test \
-	tests/swizzle-2.shader_test \
-	tests/swizzle-3.shader_test \
-	tests/swizzle-4.shader_test \
-	tests/swizzle-5.shader_test \
-	tests/swizzle-6.shader_test \
-	tests/swizzle-7.shader_test \
 	tests/swizzle-constant-prop.shader_test \
+	tests/swizzles.shader_test \
 	tests/texture-load.shader_test \
 	tests/texture-load-offset.shader_test \
 	tests/texture-load-typed.shader_test \
