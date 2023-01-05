@@ -37,7 +37,7 @@ float4 main() : SV_TARGET
 }
 
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : SV_TARGET
 {
     float4 vec = {0, 1, 2, 3};
@@ -47,5 +47,5 @@ float4 main() : SV_TARGET
 }
 
 [test]
-todo draw quad
-todo probe all rgba (2.0, 2.0, 2.0, 2.0)
+draw quad
+probe all rgba (2.0, 2.0, 2.0, 2.0)

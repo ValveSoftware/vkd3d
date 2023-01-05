@@ -1164,11 +1164,15 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_type *type;
 
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
-    init_node(&swizzle->node, HLSL_IR_SWIZZLE,
-            hlsl_get_vector_type(ctx, val->data_type->base_type, components), loc);
+    if (components == 1)
+        type = hlsl_get_scalar_type(ctx, val->data_type->base_type);
+    else
+        type = hlsl_get_vector_type(ctx, val->data_type->base_type, components);
+    init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;
