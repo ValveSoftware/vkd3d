@@ -1,3 +1,15 @@
+[pixel shader fail]
+sampler sam;
+
+float4 main() : sv_target
+{
+    Texture2D tex;
+
+    tex = tex; // Uninitialized assignment to self.
+    return tex.Sample(sam, float2(0, 0));
+}
+
+
 [require]
 shader model >= 4.0
 
@@ -35,7 +47,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (77.77, 77.77, 77.77, 77.77)
+probe all rgba (77.77, 77.77, 77.77, 77.77)
 
 
 [texture 0]
@@ -201,3 +213,28 @@ float4 main(Texture2D tex2) : sv_target
     tex2 = tex1;
     return tex2.Load(int3(0, 0, 0));
 }
+
+
+[require]
+shader model >= 5.0
+
+
+[texture 0]
+size (1, 1)
+1.0 2.0 3.0 4.0
+
+[pixel shader todo]
+struct apple {
+    Texture2D tex;
+    float4 fo : COLOR;
+};
+
+float4 main(struct apple input) : sv_target
+{
+    input.tex = input.tex; // Assignment to self.
+    return input.tex.Load(int3(0, 0, 0));
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)

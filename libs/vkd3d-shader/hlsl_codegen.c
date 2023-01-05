@@ -927,6 +927,26 @@ static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
     /* Only HLSL_IR_LOAD can produce an object. */
     load = hlsl_ir_load(value->node);
 
+    /* As we are replacing the instruction's deref (with the one in the hlsl_ir_load) and not the
+     * instruction itself, we won't be able to rely on the value retrieved by
+     * copy_propagation_get_value() for the new deref in subsequent iterations of copy propagation.
+     * This is because another value may be written to that deref between the hlsl_ir_load and
+     * this instruction.
+     *
+     * For this reason, we only replace the new deref when it corresponds to a uniform variable,
+     * which cannot be written to.
+     *
+     * In a valid shader, all object references must resolve statically to a single uniform object.
+     * If this is the case, we can expect copy propagation on regular store/loads and the other
+     * compilation passes to replace all hlsl_ir_loads with loads to uniform objects, so this
+     * implementation is complete, even with this restriction.
+     */
+    if (!load->src.var->is_uniform)
+    {
+        TRACE("Ignoring load from non-uniform object variable %s\n", load->src.var->name);
+        return false;
+    }
+
     hlsl_cleanup_deref(deref);
     hlsl_copy_deref(ctx, deref, &load->src);
 
