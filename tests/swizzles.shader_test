@@ -135,3 +135,36 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 3.0)
+
+
+[pixel shader]
+uniform float4 color;
+
+float4 main() : sv_target
+{
+    float4 ret = color;
+    ret.xyzw = ret.xyzw; // Assignment to self.
+    return ret;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+[pixel shader]
+uniform float4 color;
+
+float4 main() : sv_target
+{
+    float4 ret = color;
+    ret.xyzw = ret.wxyz; // Assignment to self, shifted.
+    ret.xy = ret.yx;
+    return ret;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (1.0, 4.0, 2.0, 3.0)
