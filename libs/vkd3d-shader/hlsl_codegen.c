@@ -723,61 +723,65 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
     }
 }
 
-static struct hlsl_ir_node *copy_propagation_compute_replacement(struct hlsl_ctx *ctx,
-        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
-        unsigned int *swizzle)
+static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
+        const struct copy_propagation_state *state, struct hlsl_ir_load *load)
 {
+    const struct hlsl_deref *deref = &load->src;
     const struct hlsl_ir_var *var = deref->var;
-    struct hlsl_ir_node *instr = NULL;
+    struct hlsl_ir_node *instr = &load->node;
+    struct hlsl_ir_node *new_instr = NULL;
     unsigned int start, count, i;
+    unsigned int ret_swizzle = 0;
 
     if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
-        return NULL;
-
-    *swizzle = 0;
+        return false;
 
     for (i = 0; i < count; ++i)
     {
         struct copy_propagation_value *value = copy_propagation_get_value(state, var, start + i);
 
         if (!value)
-            return NULL;
+            return false;
 
-        if (!instr)
+        if (!new_instr)
         {
-            instr = value->node;
+            new_instr = value->node;
         }
-        else if (instr != value->node)
+        else if (new_instr != value->node)
         {
             TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, start, start + count);
-            return NULL;
+            return false;
         }
-        *swizzle |= value->component << HLSL_SWIZZLE_SHIFT(i);
+        ret_swizzle |= value->component << HLSL_SWIZZLE_SHIFT(i);
     }
 
     TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
-            var->name, start, start + count, instr, debug_hlsl_swizzle(*swizzle, count));
-    return instr;
+            var->name, start, start + count, new_instr, debug_hlsl_swizzle(ret_swizzle, count));
+
+    if (instr->data_type->type != HLSL_CLASS_OBJECT)
+    {
+        struct hlsl_ir_swizzle *swizzle_node;
+
+        if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, count, new_instr, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &swizzle_node->node.entry);
+        new_instr = &swizzle_node->node;
+    }
+
+    hlsl_replace_node(instr, new_instr);
+    return true;
 }
 
 static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         struct hlsl_ir_load *load, struct copy_propagation_state *state)
 {
-    struct hlsl_ir_node *instr = &load->node, *new_instr;
-    struct hlsl_type *type = instr->data_type;
-    struct hlsl_ir_swizzle *swizzle_node;
-    unsigned int dimx = 0;
-    unsigned int swizzle;
+    struct hlsl_type *type = load->node.data_type;
 
     switch (type->type)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
-            dimx = type->dimx;
-            break;
-
         case HLSL_CLASS_OBJECT:
-            dimx = 1;
             break;
 
         case HLSL_CLASS_MATRIX:
@@ -788,18 +792,10 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             return false;
     }
 
-    if (!(new_instr = copy_propagation_compute_replacement(ctx, state, &load->src, &swizzle)))
-        return false;
+    if (copy_propagation_replace_with_single_instr(ctx, state, load))
+        return true;
 
-    if (type->type != HLSL_CLASS_OBJECT)
-    {
-        if (!(swizzle_node = hlsl_new_swizzle(ctx, swizzle, dimx, new_instr, &instr->loc)))
-            return false;
-        list_add_before(&instr->entry, &swizzle_node->node.entry);
-        new_instr = &swizzle_node->node;
-    }
-    hlsl_replace_node(instr, new_instr);
-    return true;
+    return false;
 }
 
 static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
