@@ -805,15 +805,20 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
 static bool copy_propagation_transform_object_load(struct hlsl_ctx *ctx,
         struct hlsl_deref *deref, struct copy_propagation_state *state)
 {
+    struct copy_propagation_value *value;
     struct hlsl_ir_load *load;
-    struct hlsl_ir_node *instr;
-    unsigned int swizzle;
+    unsigned int start, count;
 
-    if (!(instr = copy_propagation_compute_replacement(ctx, state, deref, &swizzle)))
+    if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
         return false;
+    assert(count == 1);
+
+    if (!(value = copy_propagation_get_value(state, deref->var, start)))
+        return false;
+    assert(value->component == 0);
 
     /* Only HLSL_IR_LOAD can produce an object. */
-    load = hlsl_ir_load(instr);
+    load = hlsl_ir_load(value->node);
 
     hlsl_cleanup_deref(deref);
     hlsl_copy_deref(ctx, deref, &load->src);
