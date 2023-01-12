@@ -556,6 +556,9 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, v
  * store instructions, as long as the rhs is the same in every case. This basic
  * detection is implemented by copy_propagation_replace_with_single_instr().
  *
+ * In some cases, the load itself might not have a single source, but a
+ * subsequent swizzle might; hence we also try to replace swizzles of loads.
+ *
  * We use the same infrastructure to implement a more specialized
  * transformation. We recognize sequences of the form:
  *
@@ -770,11 +773,11 @@ static void copy_propagation_set_value(struct copy_propagation_var_def *var_def,
 }
 
 static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
-        const struct copy_propagation_state *state, struct hlsl_ir_load *load)
+        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
+        unsigned int swizzle, struct hlsl_ir_node *instr)
 {
-    const struct hlsl_deref *deref = &load->src;
+    const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
     const struct hlsl_ir_var *var = deref->var;
-    struct hlsl_ir_node *instr = &load->node;
     struct hlsl_ir_node *new_instr = NULL;
     unsigned int start, count, i;
     unsigned int ret_swizzle = 0;
@@ -782,11 +785,11 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
     if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
         return false;
 
-    for (i = 0; i < count; ++i)
+    for (i = 0; i < instr_component_count; ++i)
     {
-        struct copy_propagation_value *value = copy_propagation_get_value(state, var, start + i);
+        struct copy_propagation_value *value;
 
-        if (!value)
+        if (!(value = copy_propagation_get_value(state, var, start + hlsl_swizzle_get_component(swizzle, i))))
             return false;
 
         if (!new_instr)
@@ -795,14 +798,16 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
         }
         else if (new_instr != value->node)
         {
-            TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, start, start + count);
+            TRACE("No single source for propagating load from %s[%u-%u]%s\n",
+                    var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count));
             return false;
         }
         ret_swizzle |= value->component << HLSL_SWIZZLE_SHIFT(i);
     }
 
-    TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
-            var->name, start, start + count, new_instr, debug_hlsl_swizzle(ret_swizzle, count));
+    TRACE("Load from %s[%u-%u]%s propagated as instruction %p%s.\n",
+            var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count),
+            new_instr, debug_hlsl_swizzle(ret_swizzle, instr_component_count));
 
     if (instr->data_type->type != HLSL_CLASS_OBJECT)
     {
@@ -819,22 +824,24 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
 }
 
 static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
-        const struct copy_propagation_state *state, struct hlsl_ir_load *load)
+        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
+        unsigned int swizzle, struct hlsl_ir_node *instr)
 {
-    const struct hlsl_ir_var *var = load->src.var;
+    const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
+    const struct hlsl_ir_var *var = deref->var;
     union hlsl_constant_value values[4] = {0};
-    struct hlsl_ir_node *instr = &load->node;
     struct hlsl_ir_constant *cons;
     unsigned int start, count, i;
 
-    if (!hlsl_component_index_range_from_deref(ctx, &load->src, &start, &count))
+    if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
         return false;
 
-    for (i = 0; i < count; ++i)
+    for (i = 0; i < instr_component_count; ++i)
     {
-        struct copy_propagation_value *value = copy_propagation_get_value(state, var, start + i);
+        struct copy_propagation_value *value;
 
-        if (!value || value->node->type != HLSL_IR_CONSTANT)
+        if (!(value = copy_propagation_get_value(state, var, start + hlsl_swizzle_get_component(swizzle, i)))
+                || value->node->type != HLSL_IR_CONSTANT)
             return false;
 
         values[i] = hlsl_ir_constant(value->node)->value[value->component];
@@ -848,7 +855,8 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
     cons->value[3] = values[3];
     list_add_before(&instr->entry, &cons->node.entry);
 
-    TRACE("Load from %s[%u-%u] turned into a constant %p.\n", var->name, start, start + count, cons);
+    TRACE("Load from %s[%u-%u]%s turned into a constant %p.\n",
+            var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count), cons);
 
     hlsl_replace_node(instr, &cons->node);
     return true;
@@ -874,10 +882,28 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             return false;
     }
 
-    if (copy_propagation_replace_with_constant_vector(ctx, state, load))
+    if (copy_propagation_replace_with_constant_vector(ctx, state, &load->src, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
         return true;
 
-    if (copy_propagation_replace_with_single_instr(ctx, state, load))
+    if (copy_propagation_replace_with_single_instr(ctx, state, &load->src, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
+        return true;
+
+    return false;
+}
+
+static bool copy_propagation_transform_swizzle(struct hlsl_ctx *ctx,
+        struct hlsl_ir_swizzle *swizzle, struct copy_propagation_state *state)
+{
+    struct hlsl_ir_load *load;
+
+    if (swizzle->val.node->type != HLSL_IR_LOAD)
+        return false;
+    load = hlsl_ir_load(swizzle->val.node);
+
+    if (copy_propagation_replace_with_constant_vector(ctx, state, &load->src, swizzle->swizzle, &swizzle->node))
+        return true;
+
+    if (copy_propagation_replace_with_single_instr(ctx, state, &load->src, swizzle->swizzle, &swizzle->node))
         return true;
 
     return false;
@@ -1079,6 +1105,10 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
 
             case HLSL_IR_STORE:
                 copy_propagation_record_store(ctx, hlsl_ir_store(instr), state);
+                break;
+
+            case HLSL_IR_SWIZZLE:
+                progress |= copy_propagation_transform_swizzle(ctx, hlsl_ir_swizzle(instr), state);
                 break;
 
             case HLSL_IR_IF:

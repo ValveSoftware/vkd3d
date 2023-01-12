@@ -13,7 +13,7 @@ size (4, 4)
 13 13 13 13   14 14 14 14   14 15 15 15   16 16 16 16
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 uniform int i;
 
@@ -25,8 +25,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 int 4
-todo draw quad
-todo probe all rgba (110, 210, 410, 410)
+draw quad
+probe all rgba (110, 210, 410, 410)
 
 
 [pixel shader todo]
