@@ -1641,7 +1641,7 @@ const char *debug_hlsl_swizzle(unsigned int swizzle, unsigned int size)
 
     assert(size <= ARRAY_SIZE(components));
     for (i = 0; i < size; ++i)
-        string[i] = components[(swizzle >> i * 2) & 3];
+        string[i] = components[hlsl_swizzle_get_component(swizzle, i)];
     string[size] = 0;
     return vkd3d_dbg_sprintf(".%s", string);
 }
@@ -2299,8 +2299,8 @@ unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsi
     unsigned int ret = 0, i;
     for (i = 0; i < dim; ++i)
     {
-        unsigned int s = (second >> (i * 2)) & 3;
-        ret |= ((first >> (s * 2)) & 3) << (i * 2);
+        unsigned int s = hlsl_swizzle_get_component(second, i);
+        ret |= hlsl_swizzle_get_component(first, s) << HLSL_SWIZZLE_SHIFT(i);
     }
     return ret;
 }

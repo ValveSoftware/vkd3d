@@ -63,6 +63,14 @@
         | ((HLSL_SWIZZLE_ ## z) << 4) \
         | ((HLSL_SWIZZLE_ ## w) << 6))
 
+#define HLSL_SWIZZLE_MASK (0x3u)
+#define HLSL_SWIZZLE_SHIFT(idx) (2u * (idx))
+
+static inline unsigned int hlsl_swizzle_get_component(unsigned int swizzle, unsigned int idx)
+{
+    return (swizzle >> HLSL_SWIZZLE_SHIFT(idx)) & HLSL_SWIZZLE_MASK;
+}
+
 enum hlsl_type_class
 {
     HLSL_CLASS_SCALAR,

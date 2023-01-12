@@ -752,7 +752,7 @@ static struct hlsl_ir_node *copy_propagation_compute_replacement(struct hlsl_ctx
             TRACE("No single source for propagating load from %s[%u-%u].\n", var->name, start, start + count);
             return NULL;
         }
-        *swizzle |= value->component << i * 2;
+        *swizzle |= value->component << HLSL_SWIZZLE_SHIFT(i);
     }
 
     TRACE("Load from %s[%u-%u] propagated as instruction %p%s.\n",
@@ -1316,7 +1316,7 @@ static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
         return false;
 
     for (i = 0; i < instr->data_type->dimx; ++i)
-        if (((swizzle->swizzle >> (2 * i)) & 3) != i)
+        if (hlsl_swizzle_get_component(swizzle->swizzle, i) != i)
             return false;
 
     hlsl_replace_node(instr, swizzle->val.node);
