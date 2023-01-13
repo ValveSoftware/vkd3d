@@ -132,6 +132,7 @@ vkd3d_shader_tests = \
 	tests/saturate.shader_test \
 	tests/shader-interstage-interface.shader_test \
 	tests/sqrt.shader_test \
+	tests/step.shader_test \
 	tests/swizzle-0.shader_test \
 	tests/swizzle-1.shader_test \
 	tests/swizzle-2.shader_test \
