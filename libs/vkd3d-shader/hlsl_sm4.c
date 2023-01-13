@@ -1698,6 +1698,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_cast(ctx, buffer, expr);
             break;
 
+        case HLSL_OP1_COS:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op_with_two_destinations(buffer, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
+            break;
+
         case HLSL_OP1_EXP2:
             assert(type_is_float(dst_type));
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);

@@ -4,7 +4,7 @@ void main(out float tex : texcoord, inout float4 pos : sv_position)
     tex = (pos.x + 1) * 320;
 }
 
-[pixel shader todo]
+[pixel shader]
 float4 main(float tex : texcoord) : sv_target
 {
     tex = floor(tex + 0.25);
@@ -12,7 +12,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe ( 0, 0) rgba ( 0.00000000,  1.00000000, 0.0, 0.0)
 probe ( 1, 0) rgba ( 0.84147098,  0.54030231, 0.0, 0.0) 1024
 probe ( 2, 0) rgba ( 0.90929743, -0.41614684, 0.0, 0.0) 1024
@@ -45,7 +45,7 @@ draw quad
 probe all rgba (0.0, 500.0, 500.0, 0.0)
 
 
-[pixel shader todo]
+[pixel shader]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -55,5 +55,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.78539816 1.57079632 2.35619449
-todo draw quad
-todo probe all rgba (1000.0, 707.0, -0.0, -707.0)
+draw quad
+probe all rgba (1000.0, 707.0, -0.0, -707.0)
