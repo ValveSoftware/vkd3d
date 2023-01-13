@@ -2736,6 +2736,17 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
 
+static bool intrinsic_sin(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SIN, arg, loc);
+}
+
 /* smoothstep(a, b, x) = p^2 (3 - 2p), where p = saturate((x - a)/(b - a)) */
 static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
@@ -2880,6 +2891,7 @@ intrinsic_functions[] =
     {"pow",                                 2, true,  intrinsic_pow},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
+    {"sin",                                 1, true,  intrinsic_sin},
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"transpose",                           1, true,  intrinsic_transpose},
 };

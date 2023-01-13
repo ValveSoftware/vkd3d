@@ -1319,6 +1319,29 @@ static void write_sm4_unary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_unary_op_with_two_destinations(struct vkd3d_bytecode_buffer *buffer,
+        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned dst_idx,
+        const struct hlsl_ir_node *src)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    assert(dst_idx < ARRAY_SIZE(instr.dsts));
+    sm4_dst_from_node(&instr.dsts[dst_idx], dst);
+    assert(1 - dst_idx >= 0);
+    instr.dsts[1 - dst_idx].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[1 - dst_idx].reg.idx_count = 0;
+    instr.dst_count = 2;
+
+    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[dst_idx].writemask);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -1736,6 +1759,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV
                     | (VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT),
                     &expr->node, arg1, 0);
+            break;
+
+        case HLSL_OP1_SIN:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op_with_two_destinations(buffer, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
             break;
 
         case HLSL_OP1_SQRT:

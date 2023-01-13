@@ -31,7 +31,7 @@ probe (14, 0) rgba ( 0.99060736,  0.13673722, 0.0, 0.0) 1024
 probe (15, 0) rgba ( 0.65028784, -0.75968791, 0.0, 0.0) 1024
 
 
-[pixel shader todo]
+[pixel shader]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -41,8 +41,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.52359877 2.61799387 3.14159265
-todo draw quad
-todo probe all rgba (0.0, 500.0, 500.0, 0.0)
+draw quad
+probe all rgba (0.0, 500.0, 500.0, 0.0)
 
 
 [pixel shader todo]
