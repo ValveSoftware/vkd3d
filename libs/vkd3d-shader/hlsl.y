@@ -1486,7 +1486,7 @@ static struct list *add_binary_bitwise_expr_merge(struct hlsl_ctx *ctx, struct l
 
 static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
-        struct vkd3d_shader_location *loc)
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *common_type, *return_type;
     enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
@@ -1510,7 +1510,7 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
 }
 
 static struct list *add_binary_comparison_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
 
@@ -2828,6 +2828,24 @@ static bool intrinsic_sqrt(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SQRT, arg, loc);
 }
 
+static bool intrinsic_step(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *ge;
+    struct hlsl_type *type;
+
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+        return false;
+
+    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL,
+            params->args[1], params->args[0], loc)))
+        return false;
+
+    type = ge->data_type;
+    type = hlsl_get_numeric_type(ctx, type->type, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+    return !!add_implicit_conversion(ctx, params->instrs, ge, type, loc);
+}
+
 static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2917,6 +2935,7 @@ intrinsic_functions[] =
     {"sin",                                 1, true,  intrinsic_sin},
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
+    {"step",                                2, true,  intrinsic_step},
     {"transpose",                           1, true,  intrinsic_transpose},
 };
 

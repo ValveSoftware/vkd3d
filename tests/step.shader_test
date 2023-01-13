@@ -1,4 +1,4 @@
-[pixel shader todo]
+[pixel shader]
 uniform float4 f, p;
 
 float4 main() : sv_target
@@ -9,11 +9,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 5.0 -2.6 3.0 2.0
 uniform 4 float4 1.0 -4.3 3.0 4.0
-todo draw quad
-todo probe all rgba (0.0, 0.0, 1.0, 1.0)
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 1.0)
 
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float2x2 a = {1, 2, 3, 4};
@@ -23,8 +23,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (1.0, 1.0, 1.0, 0.0)
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 0.0)
 
 
 [pixel shader fail]
@@ -38,7 +38,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float3x2 a = {8, 0,
@@ -51,5 +51,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0.0, 1.0, 1.0, 0.0)
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 0.0)
