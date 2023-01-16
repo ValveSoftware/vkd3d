@@ -931,7 +931,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
     return store;
 }
 
-struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *decl,
+struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *decl,
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_call *call;

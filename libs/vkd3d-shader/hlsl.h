@@ -420,7 +420,7 @@ struct hlsl_ir_function_decl
 struct hlsl_ir_call
 {
     struct hlsl_ir_node node;
-    const struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function_decl *decl;
 };
 
 struct hlsl_ir_if
@@ -983,7 +983,7 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
 struct hlsl_ir_constant *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc);
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
         const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc);
-struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *decl,
+struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *decl,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_expr *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc);

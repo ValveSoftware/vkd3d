@@ -2217,12 +2217,12 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 struct find_function_call_args
 {
     const struct parse_initializer *params;
-    const struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function_decl *decl;
 };
 
 static void find_function_call_exact(struct rb_entry *entry, void *context)
 {
-    const struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, const struct hlsl_ir_function_decl, entry);
+    struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     struct find_function_call_args *args = context;
     const struct hlsl_ir_var *param;
     unsigned int i = 0;
@@ -2237,7 +2237,7 @@ static void find_function_call_exact(struct rb_entry *entry, void *context)
         args->decl = decl;
 }
 
-static const struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
+static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         const char *name, const struct parse_initializer *params)
 {
     struct find_function_call_args args = {.params = params};
@@ -2949,8 +2949,8 @@ static int intrinsic_function_name_compare(const void *a, const void *b)
 static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         struct parse_initializer *args, const struct vkd3d_shader_location *loc)
 {
-    const struct hlsl_ir_function_decl *decl;
     struct intrinsic_function *intrinsic;
+    struct hlsl_ir_function_decl *decl;
 
     if ((decl = find_function_call(ctx, name, args)))
     {
