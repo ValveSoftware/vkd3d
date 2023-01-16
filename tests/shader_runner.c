@@ -82,10 +82,6 @@ enum parse_state
     STATE_SAMPLER,
     STATE_SHADER_COMPUTE,
     STATE_SHADER_COMPUTE_TODO,
-    STATE_SHADER_INVALID_COMPUTE,
-    STATE_SHADER_INVALID_COMPUTE_TODO,
-    STATE_SHADER_INVALID_PIXEL,
-    STATE_SHADER_INVALID_PIXEL_TODO,
     STATE_SHADER_PIXEL,
     STATE_SHADER_PIXEL_TODO,
     STATE_SHADER_VERTEX,
@@ -661,7 +657,7 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
     return stride;
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, bool invalid)
+static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
@@ -678,10 +674,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
 
     sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
     hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
-    if (invalid)
-        ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
-    else
-        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+    ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {
         ID3D10Blob_Release(blob);
@@ -708,6 +701,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
     unsigned int i, line_number = 0;
     const char *filename = NULL;
     char *shader_source = NULL;
+    HRESULT expect_hr = S_OK;
     char line[256];
     FILE *f;
 
@@ -766,7 +760,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
                     todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "cs", false);
+                        compile_shader(runner, shader_source, shader_source_len, "cs", expect_hr);
                     free(runner->cs_source);
                     runner->cs_source = shader_source;
                     shader_source = NULL;
@@ -777,7 +771,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
                     todo_if (state == STATE_SHADER_PIXEL_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "ps", false);
+                        compile_shader(runner, shader_source, shader_source_len, "ps", expect_hr);
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
                     shader_source = NULL;
@@ -786,26 +780,12 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                     break;
 
                 case STATE_SHADER_VERTEX:
-                    compile_shader(runner, shader_source, shader_source_len, "vs", false);
+                    compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
-                    break;
-
-                case STATE_SHADER_INVALID_COMPUTE:
-                case STATE_SHADER_INVALID_COMPUTE_TODO:
-                    todo_if (state == STATE_SHADER_INVALID_COMPUTE_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "cs", true);
-                    shader_source_len = 0;
-                    break;
-
-                case STATE_SHADER_INVALID_PIXEL:
-                case STATE_SHADER_INVALID_PIXEL_TODO:
-                    todo_if (state == STATE_SHADER_INVALID_PIXEL_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "ps", true);
-                    shader_source_len = 0;
                     break;
 
                 case STATE_PREPROC_INVALID:
@@ -872,18 +852,22 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             if (!strcmp(line, "[compute shader]\n"))
             {
                 state = STATE_SHADER_COMPUTE;
+                expect_hr = S_OK;
             }
             else if (!strcmp(line, "[compute shader todo]\n"))
             {
                 state = STATE_SHADER_COMPUTE_TODO;
+                expect_hr = S_OK;
             }
             else if (!strcmp(line, "[compute shader fail]\n"))
             {
-                state = STATE_SHADER_INVALID_COMPUTE;
+                state = STATE_SHADER_COMPUTE;
+                expect_hr = E_FAIL;
             }
             else if (!strcmp(line, "[compute shader fail todo]\n"))
             {
-                state = STATE_SHADER_INVALID_COMPUTE_TODO;
+                state = STATE_SHADER_COMPUTE_TODO;
+                expect_hr = E_FAIL;
             }
             else if (!strcmp(line, "[require]\n"))
             {
@@ -892,18 +876,22 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
             else if (!strcmp(line, "[pixel shader]\n"))
             {
                 state = STATE_SHADER_PIXEL;
+                expect_hr = S_OK;
             }
             else if (!strcmp(line, "[pixel shader todo]\n"))
             {
                 state = STATE_SHADER_PIXEL_TODO;
+                expect_hr = S_OK;
             }
             else if (!strcmp(line, "[pixel shader fail]\n"))
             {
-                state = STATE_SHADER_INVALID_PIXEL;
+                state = STATE_SHADER_PIXEL;
+                expect_hr = E_FAIL;
             }
             else if (!strcmp(line, "[pixel shader fail todo]\n"))
             {
-                state = STATE_SHADER_INVALID_PIXEL_TODO;
+                state = STATE_SHADER_PIXEL_TODO;
+                expect_hr = E_FAIL;
             }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
@@ -1012,10 +1000,6 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
                 case STATE_PREPROC_INVALID:
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
-                case STATE_SHADER_INVALID_COMPUTE:
-                case STATE_SHADER_INVALID_COMPUTE_TODO:
-                case STATE_SHADER_INVALID_PIXEL:
-                case STATE_SHADER_INVALID_PIXEL_TODO:
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
                 case STATE_SHADER_VERTEX:
