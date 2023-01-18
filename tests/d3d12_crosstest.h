@@ -56,7 +56,7 @@ typedef int HRESULT;
 #include <stddef.h>
 #include <time.h>
 
-#ifdef _WIN32
+#ifdef VKD3D_CROSSTEST
 # include "vkd3d_dxgi1_4.h"
 #else
 # define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_2
@@ -261,7 +261,7 @@ static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12Comm
 static bool use_warp_device;
 static unsigned int use_adapter_idx;
 
-#ifdef _WIN32
+#ifdef VKD3D_CROSSTEST
 static IUnknown *create_warp_adapter(IDXGIFactory4 *factory)
 {
     IUnknown *adapter;
