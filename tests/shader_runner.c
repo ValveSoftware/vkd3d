@@ -1058,13 +1058,101 @@ out:
     vkd3d_test_set_context(NULL);
 }
 
+#ifdef _WIN32
+static void print_dll_version(const char *file_name)
+{
+    BOOL (WINAPI *GetFileVersionInfoA)(const char *, DWORD, DWORD, void *);
+    BOOL (WINAPI *VerQueryValueA)(void *, char *, void **, UINT*);
+    DWORD (WINAPI *GetFileVersionInfoSizeA)(const char *, DWORD *);
+    HMODULE version_module;
+    DWORD size, handle;
+    bool done = false;
+
+    version_module = LoadLibraryA("version.dll");
+    if (!version_module)
+        goto out;
+
+#define X(name) name = (void *)GetProcAddress(version_module, #name);
+    X(GetFileVersionInfoSizeA);
+    X(GetFileVersionInfoA);
+    X(VerQueryValueA);
+#undef X
+
+    if (!GetFileVersionInfoSizeA || !GetFileVersionInfoA || !VerQueryValueA)
+    {
+        FreeLibrary(version_module);
+        goto out;
+    }
+
+    size = GetFileVersionInfoSizeA(file_name, &handle);
+    if (size)
+    {
+        char *data = malloc(size);
+
+        if (GetFileVersionInfoA(file_name, handle, size, data))
+        {
+            VS_FIXEDFILEINFO *info;
+            UINT len;
+
+            if (VerQueryValueA(data, "\\", (void **)&info, &len))
+            {
+                trace("%s version: %lu.%lu.%lu.%lu\n", file_name,
+                        info->dwFileVersionMS >> 16, info->dwFileVersionMS & 0xffff,
+                        info->dwFileVersionLS >> 16, info->dwFileVersionLS & 0xffff);
+                done = true;
+            }
+        }
+        free(data);
+    }
+
+    FreeLibrary(version_module);
+
+out:
+    if (!done)
+        trace("%s version: unknown\n", file_name);
+}
+#endif
+
 START_TEST(shader_runner)
 {
-#ifdef _WIN32
+#if defined(VKD3D_CROSSTEST)
+    trace("Running tests from a Windows cross build\n");
+
+    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d9.dll\n");
     run_shader_tests_d3d9(argc, argv);
+
+    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d11.dll\n");
     run_shader_tests_d3d11(argc, argv);
-#else
-    run_shader_tests_vulkan(argc, argv);
-#endif
+
+    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
     run_shader_tests_d3d12(argc, argv);
+
+    print_dll_version("d3dcompiler_47.dll");
+    print_dll_version("dxgi.dll");
+    print_dll_version("d3d9.dll");
+    print_dll_version("d3d11.dll");
+    print_dll_version("d3d12.dll");
+#elif defined(_WIN32)
+    trace("Running tests from a Windows non-cross build\n");
+
+    trace("Compiling shaders with vkd3d-shader and executing with d3d9.dll\n");
+    run_shader_tests_d3d9(argc, argv);
+
+    trace("Compiling shaders with vkd3d-shader and executing with d3d11.dll\n");
+    run_shader_tests_d3d11(argc, argv);
+
+    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
+    run_shader_tests_d3d12(argc, argv);
+
+    print_dll_version("d3d9.dll");
+    print_dll_version("d3d11.dll");
+#else
+    trace("Running tests from a Unix build\n");
+
+    trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
+    run_shader_tests_vulkan(argc, argv);
+
+    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
+    run_shader_tests_d3d12(argc, argv);
+#endif
 }
