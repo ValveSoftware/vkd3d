@@ -16,6 +16,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifdef _WIN32
+
 #define COBJMACROS
 #define CONST_VTABLE
 #define VKD3D_TEST_NO_DEFS
@@ -533,3 +535,5 @@ void run_shader_tests_d3d9(int argc, char **argv)
     }
     FreeLibrary(d3d9_module);
 }
+
+#endif

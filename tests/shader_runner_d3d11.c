@@ -18,8 +18,11 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifdef _WIN32
+
 #define COBJMACROS
 #define CONST_VTABLE
+#define INITGUID
 #define VKD3D_TEST_NO_DEFS
 #include <d3d11_4.h>
 #define __vkd3d_d3dcommon_h__
@@ -28,8 +31,6 @@
 #include "vkd3d_d3dcompiler.h"
 #include "shader_runner.h"
 #include "vkd3d_test.h"
-
-const GUID IID_IDXGIDevice = {0x54ec77fa, 0x1377, 0x44e6, {0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c}};
 
 static HRESULT (WINAPI *pCreateDXGIFactory1)(REFIID iid, void **factory);
 
@@ -711,3 +712,5 @@ void run_shader_tests_d3d11(int argc, char **argv)
     FreeLibrary(d3d11_module);
     FreeLibrary(dxgi_module);
 }
+
+#endif

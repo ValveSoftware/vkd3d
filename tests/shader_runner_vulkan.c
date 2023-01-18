@@ -18,6 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#ifndef _WIN32
+
 #define VK_NO_PROTOTYPES
 #define VKD3D_TEST_NO_DEFS
 #include "config.h"
@@ -1285,3 +1287,5 @@ void run_shader_tests_vulkan(int argc, char **argv)
 
     cleanup_vulkan_runner(&runner);
 }
+
+#endif

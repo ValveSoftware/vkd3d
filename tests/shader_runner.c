@@ -1060,7 +1060,7 @@ out:
 
 START_TEST(shader_runner)
 {
-#ifdef VKD3D_CROSSTEST
+#ifdef _WIN32
     run_shader_tests_d3d9(argc, argv);
     run_shader_tests_d3d11(argc, argv);
 #else

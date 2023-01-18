@@ -333,6 +333,8 @@ tests_hlsl_d3d12_LDADD = $(LDADD) @DL_LIBS@
 tests_shader_runner_LDADD = $(LDADD) @DL_LIBS@
 tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
+	tests/shader_runner_d3d9.c \
+	tests/shader_runner_d3d11.c \
 	tests/shader_runner_d3d12.c \
 	tests/shader_runner_vulkan.c
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
