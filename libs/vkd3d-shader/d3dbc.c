@@ -935,10 +935,9 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     sm1->end = &code[token_count];
 
     /* Estimate instruction count to avoid reallocation in most shaders. */
-    if (!shader_instruction_array_init(&sm1->p.instructions, code_size != ~(size_t)0 ? token_count / 4u + 4: 16))
+    if (!vkd3d_shader_parser_init(&sm1->p, message_context, compile_info->source_name, &version, &shader_sm1_parser_ops,
+            code_size != ~(size_t)0 ? token_count / 4u + 4 : 16))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-
-    vkd3d_shader_parser_init(&sm1->p, message_context, compile_info->source_name, &version, &shader_sm1_parser_ops);
     shader_desc = &sm1->p.shader_desc;
     shader_desc->byte_code = code;
     shader_desc->byte_code_size = code_size;

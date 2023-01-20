@@ -1654,10 +1654,9 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     version.minor = VKD3D_SM4_VERSION_MINOR(version_token);
 
     /* Estimate instruction count to avoid reallocation in most shaders. */
-    if (!shader_instruction_array_init(&sm4->p.instructions, token_count / 7u + 20))
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-
-    vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version, &shader_sm4_parser_ops);
+    if (!vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version, &shader_sm4_parser_ops,
+            token_count / 7u + 20))
+        return false;
     sm4->p.ptr = sm4->start;
 
     memset(sm4->output_map, 0xff, sizeof(sm4->output_map));

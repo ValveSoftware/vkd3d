@@ -427,9 +427,10 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
             shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
-void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
+bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops)
+        const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
+        unsigned int instruction_reserve)
 {
     parser->message_context = message_context;
     parser->location.source_name = source_name;
@@ -437,6 +438,7 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
     parser->location.column = 0;
     parser->shader_version = *version;
     parser->ops = ops;
+    return shader_instruction_array_init(&parser->instructions, instruction_reserve);
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
