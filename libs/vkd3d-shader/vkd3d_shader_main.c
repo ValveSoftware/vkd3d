@@ -1067,9 +1067,10 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
-    struct vkd3d_shader_instruction instruction;
+    struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
-    int ret;
+    int ret = VKD3D_OK;
+    unsigned int i;
 
     if ((scan_descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO)))
     {
@@ -1084,30 +1085,17 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         vkd3d_shader_trace(parser);
     }
 
-    while (!vkd3d_shader_parser_is_end(parser))
+    for (i = 0; i < parser->instructions.count; ++i)
     {
-        vkd3d_shader_parser_read_instruction(parser, &instruction);
-
-        if (instruction.handler_idx == VKD3DSIH_INVALID)
-        {
-            WARN("Encountered unrecognized or invalid instruction.\n");
-            if (scan_descriptor_info)
-                vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
-            ret = VKD3D_ERROR_INVALID_SHADER;
-            goto done;
-        }
-
-        if ((ret = vkd3d_shader_scan_instruction(&context, &instruction)) < 0)
+        instruction = &parser->instructions.elements[i];
+        if ((ret = vkd3d_shader_scan_instruction(&context, instruction)) < 0)
         {
             if (scan_descriptor_info)
                 vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
-            goto done;
+            break;
         }
     }
 
-    ret = parser->failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
-
-done:
     vkd3d_shader_scan_context_cleanup(&context);
     return ret;
 }
