@@ -997,8 +997,6 @@ struct vkd3d_shader_parser
 struct vkd3d_shader_parser_ops
 {
     void (*parser_destroy)(struct vkd3d_shader_parser *parser);
-    void (*parser_read_instruction)(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *instruction);
-    bool (*parser_is_end)(struct vkd3d_shader_parser *parser);
 };
 
 void vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
@@ -1009,8 +1007,6 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         unsigned int instruction_reserve);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
-void shader_parser_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins);
-bool shader_parser_is_end(struct vkd3d_shader_parser *parser);
 
 static inline struct vkd3d_shader_dst_param *shader_parser_get_dst_params(
         struct vkd3d_shader_parser *parser, unsigned int count)
@@ -1027,17 +1023,6 @@ static inline struct vkd3d_shader_src_param *shader_parser_get_src_params(
 static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     parser->ops->parser_destroy(parser);
-}
-
-static inline bool vkd3d_shader_parser_is_end(struct vkd3d_shader_parser *parser)
-{
-    return parser->ops->parser_is_end(parser);
-}
-
-static inline void vkd3d_shader_parser_read_instruction(struct vkd3d_shader_parser *parser,
-        struct vkd3d_shader_instruction *instruction)
-{
-    parser->ops->parser_read_instruction(parser, instruction);
 }
 
 void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);

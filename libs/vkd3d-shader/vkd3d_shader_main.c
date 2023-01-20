@@ -463,16 +463,6 @@ void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_warning(struct vkd3d_shader_par
     va_end(args);
 }
 
-void shader_parser_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
-{
-    *ins = parser->instructions.elements[parser->instruction_idx++];
-}
-
-bool shader_parser_is_end(struct vkd3d_shader_parser *parser)
-{
-    return parser->instruction_idx >= parser->instructions.count;
-}
-
 static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info,
         bool validate_target_type)
 {
@@ -1183,10 +1173,10 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info scan_descriptor_info;
-    struct vkd3d_shader_instruction instruction;
     struct vkd3d_shader_compile_info scan_info;
     struct spirv_compiler *spirv_compiler;
     struct vkd3d_shader_parser *parser;
+    unsigned int i;
     int ret;
 
     scan_info = *compile_info;
@@ -1244,23 +1234,10 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    while (!vkd3d_shader_parser_is_end(parser))
+    for (i = 0; i < parser->instructions.count && ret >= 0; ++i)
     {
-        vkd3d_shader_parser_read_instruction(parser, &instruction);
-
-        if (instruction.handler_idx == VKD3DSIH_INVALID)
-        {
-            WARN("Encountered unrecognized or invalid instruction.\n");
-            ret = VKD3D_ERROR_INVALID_SHADER;
-            break;
-        }
-
-        if ((ret = spirv_compiler_handle_instruction(spirv_compiler, &instruction)) < 0)
-            break;
+        ret = spirv_compiler_handle_instruction(spirv_compiler, &parser->instructions.elements[i]);
     }
-
-    if (parser->failed)
-        ret = VKD3D_ERROR_INVALID_SHADER;
 
     if (ret >= 0)
         ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, out);
