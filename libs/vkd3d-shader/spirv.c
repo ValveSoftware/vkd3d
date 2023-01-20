@@ -9577,7 +9577,7 @@ static bool is_dcl_instruction(enum vkd3d_shader_opcode handler_idx)
             || handler_idx == VKD3DSIH_HS_DECLS;
 }
 
-int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
+static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     int ret = VKD3D_OK;
@@ -9934,12 +9934,22 @@ int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
 }
 
 int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *spirv)
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_code *spirv)
 {
+    const struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_phase *phase;
+    enum vkd3d_result result = VKD3D_OK;
+    unsigned int i;
+
+    for (i = 0; i < instructions->count; ++i)
+    {
+        if ((result = spirv_compiler_handle_instruction(compiler, &instructions->elements[i])) < 0)
+            return result;
+    }
 
     if ((phase = spirv_compiler_get_current_shader_phase(compiler)))
         spirv_compiler_leave_shader_phase(compiler, phase);

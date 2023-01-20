@@ -1144,10 +1144,9 @@ struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location);
-int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction);
 int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *spirv);
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_code *spirv);
 void spirv_compiler_destroy(struct spirv_compiler *compiler);
 
 void vkd3d_compute_dxbc_checksum(const void *dxbc, size_t size, uint32_t checksum[4]);

@@ -1176,7 +1176,6 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     struct vkd3d_shader_compile_info scan_info;
     struct spirv_compiler *spirv_compiler;
     struct vkd3d_shader_parser *parser;
-    unsigned int i;
     int ret;
 
     scan_info = *compile_info;
@@ -1234,13 +1233,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
         return VKD3D_ERROR;
     }
 
-    for (i = 0; i < parser->instructions.count && ret >= 0; ++i)
-    {
-        ret = spirv_compiler_handle_instruction(spirv_compiler, &parser->instructions.elements[i]);
-    }
-
-    if (ret >= 0)
-        ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, out);
+    ret = spirv_compiler_generate_spirv(spirv_compiler, compile_info, parser, out);
 
     spirv_compiler_destroy(spirv_compiler);
     vkd3d_shader_parser_destroy(parser);
