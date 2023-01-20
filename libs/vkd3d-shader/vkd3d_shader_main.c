@@ -1679,9 +1679,24 @@ bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *ins
     return true;
 }
 
+bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
+        struct vkd3d_shader_immediate_constant_buffer *icb)
+{
+    if (!vkd3d_array_reserve((void **)&instructions->icbs, &instructions->icb_capacity, instructions->icb_count + 1,
+            sizeof(*instructions->icbs)))
+        return false;
+    instructions->icbs[instructions->icb_count++] = icb;
+    return true;
+}
+
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions)
 {
+    unsigned int i;
+
     vkd3d_free(instructions->elements);
     shader_param_allocator_destroy(&instructions->dst_params);
     shader_param_allocator_destroy(&instructions->src_params);
+    for (i = 0; i < instructions->icb_count; ++i)
+        vkd3d_free(instructions->icbs[i]);
+    vkd3d_free(instructions->icbs);
 }
