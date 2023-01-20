@@ -1587,7 +1587,6 @@ static bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
 
 static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
 {
-    .parser_reset = shader_parser_reset,
     .parser_destroy = shader_sm4_destroy,
     .parser_read_instruction = shader_parser_read_instruction,
     .parser_is_end = shader_parser_is_end,

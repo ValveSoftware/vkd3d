@@ -463,12 +463,6 @@ void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_warning(struct vkd3d_shader_par
     va_end(args);
 }
 
-void shader_parser_reset(struct vkd3d_shader_parser *parser)
-{
-    parser->instruction_idx = 0;
-    parser->failed = false;
-}
-
 void shader_parser_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
 {
     *ins = parser->instructions.elements[parser->instruction_idx++];
@@ -1088,7 +1082,6 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
     if (TRACE_ON())
     {
         vkd3d_shader_trace(parser);
-        vkd3d_shader_parser_reset(parser);
     }
 
     while (!vkd3d_shader_parser_is_end(parser))

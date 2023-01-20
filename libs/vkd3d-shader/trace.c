@@ -1859,7 +1859,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     struct vkd3d_d3d_asm_compiler compiler;
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
-    unsigned int indent, i;
+    unsigned int indent, i, j;
     const char *indent_str;
     void *code;
 
@@ -1920,21 +1920,11 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    vkd3d_shader_parser_reset(parser);
-    while (!vkd3d_shader_parser_is_end(parser))
+    for (i = 0; i < parser->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction ins;
+        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
 
-        vkd3d_shader_parser_read_instruction(parser, &ins);
-        if (ins.handler_idx == VKD3DSIH_INVALID)
-        {
-            WARN("Skipping unrecognized instruction.\n");
-            vkd3d_string_buffer_printf(buffer, "<unrecognized instruction>\n");
-            result = VKD3D_ERROR;
-            continue;
-        }
-
-        switch (ins.handler_idx)
+        switch (ins->handler_idx)
         {
             case VKD3DSIH_ELSE:
             case VKD3DSIH_ENDIF:
@@ -1947,14 +1937,14 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
                 break;
         }
 
-        for (i = 0; i < indent; ++i)
+        for (j = 0; j < indent; ++j)
         {
             vkd3d_string_buffer_printf(buffer, "%s", indent_str);
         }
 
-        shader_dump_instruction(&compiler, &ins);
+        shader_dump_instruction(&compiler, ins);
 
-        switch (ins.handler_idx)
+        switch (ins->handler_idx)
         {
             case VKD3DSIH_ELSE:
             case VKD3DSIH_IF:
@@ -1967,9 +1957,6 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
                 break;
         }
     }
-
-    if (parser->failed)
-        result = VKD3D_ERROR_INVALID_SHADER;
 
     if ((code = vkd3d_malloc(buffer->content_size)))
     {
