@@ -1690,7 +1690,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
     {
         struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
 
-        if (!(load->resource.var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        if (!load->resource.var->is_uniform)
         {
             hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                     "Loaded resource must have a single uniform source.");
@@ -1705,7 +1705,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
 
         if (load->sampler.var)
         {
-            if (!(load->sampler.var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+            if (!load->sampler.var->is_uniform)
             {
                 hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                         "Resource load sampler must have a single uniform source.");
@@ -1723,7 +1723,7 @@ static bool validate_static_object_references(struct hlsl_ctx *ctx, struct hlsl_
     {
         struct hlsl_ir_resource_store *store = hlsl_ir_resource_store(instr);
 
-        if (!(store->resource.var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        if (!store->resource.var->is_uniform)
         {
             hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_NON_STATIC_OBJECT_REF,
                     "Accessed resource must have a single uniform source.");
