@@ -93,28 +93,18 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
 int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out)
 {
+    unsigned int i;
     void *code;
-    struct vkd3d_shader_instruction ins;
 
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
-    while (!vkd3d_shader_parser_is_end(parser))
+    for (i = 0; i < parser->instructions.count; ++i)
     {
-        vkd3d_shader_parser_read_instruction(parser, &ins);
-
-        if (ins.handler_idx == VKD3DSIH_INVALID)
-        {
-            vkd3d_glsl_compiler_error(generator,
-                    VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                    "Encountered unrecognized or invalid instruction.");
-            break;
-        }
-
-        vkd3d_glsl_handle_instruction(generator, &ins);
+        vkd3d_glsl_handle_instruction(generator, &parser->instructions.elements[i]);
     }
 
-    if (parser->failed || generator->failed)
+    if (generator->failed)
         return VKD3D_ERROR_INVALID_SHADER;
 
     vkd3d_string_buffer_printf(&generator->buffer, "}\n");
