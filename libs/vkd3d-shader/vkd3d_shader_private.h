@@ -133,6 +133,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_D3DBC_INVALID_VERSION_TOKEN      = 7001,
     VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE             = 7002,
     VKD3D_SHADER_ERROR_D3DBC_INVALID_RESOURCE_TYPE      = 7003,
+    VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY              = 7004,
 
     VKD3D_SHADER_WARNING_D3DBC_IGNORED_INSTRUCTION_FLAGS= 7300,
 };
@@ -929,6 +930,51 @@ struct vkd3d_shader_location
     unsigned int line, column;
 };
 
+struct vkd3d_shader_param_node
+{
+    struct vkd3d_shader_param_node *next;
+    uint8_t param[];
+};
+
+struct vkd3d_shader_param_allocator
+{
+    struct vkd3d_shader_param_node *head;
+    struct vkd3d_shader_param_node *current;
+    unsigned int count;
+    unsigned int stride;
+    unsigned int index;
+};
+
+void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, unsigned int count);
+
+static inline struct vkd3d_shader_src_param *shader_src_param_allocator_get(
+        struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+{
+    assert(allocator->stride == sizeof(struct vkd3d_shader_src_param));
+    return shader_param_allocator_get(allocator, count);
+}
+
+static inline struct vkd3d_shader_dst_param *shader_dst_param_allocator_get(
+        struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+{
+    assert(allocator->stride == sizeof(struct vkd3d_shader_dst_param));
+    return shader_param_allocator_get(allocator, count);
+}
+
+struct vkd3d_shader_instruction_array
+{
+    struct vkd3d_shader_instruction *elements;
+    size_t capacity;
+    size_t count;
+
+    struct vkd3d_shader_param_allocator src_params;
+    struct vkd3d_shader_param_allocator dst_params;
+};
+
+bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
+bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
+void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
+
 struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
@@ -939,6 +985,8 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_version shader_version;
     const uint32_t *ptr;
     const struct vkd3d_shader_parser_ops *ops;
+    struct vkd3d_shader_instruction_array instructions;
+    size_t instruction_idx;
 };
 
 struct vkd3d_shader_parser_ops
@@ -956,6 +1004,21 @@ void vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
+void shader_parser_reset(struct vkd3d_shader_parser *parser);
+void shader_parser_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins);
+bool shader_parser_is_end(struct vkd3d_shader_parser *parser);
+
+static inline struct vkd3d_shader_dst_param *shader_parser_get_dst_params(
+        struct vkd3d_shader_parser *parser, unsigned int count)
+{
+    return shader_dst_param_allocator_get(&parser->instructions.dst_params, count);
+}
+
+static inline struct vkd3d_shader_src_param *shader_parser_get_src_params(
+        struct vkd3d_shader_parser *parser, unsigned int count)
+{
+    return shader_src_param_allocator_get(&parser->instructions.src_params, count);
+}
 
 static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {

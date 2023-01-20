@@ -461,6 +461,22 @@ void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_warning(struct vkd3d_shader_par
     va_end(args);
 }
 
+void shader_parser_reset(struct vkd3d_shader_parser *parser)
+{
+    parser->instruction_idx = 0;
+    parser->failed = false;
+}
+
+void shader_parser_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
+{
+    *ins = parser->instructions.elements[parser->instruction_idx++];
+}
+
+bool shader_parser_is_end(struct vkd3d_shader_parser *parser)
+{
+    return parser->instruction_idx >= parser->instructions.count;
+}
+
 static int vkd3d_shader_validate_compile_info(const struct vkd3d_shader_compile_info *compile_info,
         bool validate_target_type)
 {
@@ -1582,4 +1598,90 @@ int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info
 void vkd3d_shader_set_log_callback(PFN_vkd3d_log callback)
 {
     vkd3d_dbg_set_log_callback(callback);
+}
+
+static struct vkd3d_shader_param_node *shader_param_allocator_node_create(
+        struct vkd3d_shader_param_allocator *allocator)
+{
+    struct vkd3d_shader_param_node *node;
+
+    if (!(node = vkd3d_malloc(offsetof(struct vkd3d_shader_param_node, param[allocator->count * allocator->stride]))))
+        return NULL;
+    node->next = NULL;
+    return node;
+}
+
+static void shader_param_allocator_init(struct vkd3d_shader_param_allocator *allocator,
+        unsigned int count, unsigned int stride)
+{
+    allocator->count = max(count, 4);
+    allocator->stride = stride;
+    allocator->head = NULL;
+    allocator->current = NULL;
+    allocator->index = allocator->count;
+}
+
+static void shader_param_allocator_destroy(struct vkd3d_shader_param_allocator *allocator)
+{
+    struct vkd3d_shader_param_node *current = allocator->head;
+
+    while (current)
+    {
+        struct vkd3d_shader_param_node *next = current->next;
+        vkd3d_free(current);
+        current = next;
+    }
+}
+
+void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator, unsigned int count)
+{
+    void *params;
+
+    if (!count)
+        return NULL;
+
+    if (count > allocator->count - allocator->index)
+    {
+        struct vkd3d_shader_param_node *next = shader_param_allocator_node_create(allocator);
+
+        if (!next)
+            return NULL;
+        if (allocator->current)
+            allocator->current->next = next;
+        allocator->current = next;
+        allocator->index = 0;
+    }
+
+    params = &allocator->current->param[allocator->index * allocator->stride];
+    allocator->index += count;
+    return params;
+}
+
+bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve)
+{
+    memset(instructions, 0, sizeof(*instructions));
+    /* Size the parameter initial allocations so they are large enough for most shaders. The
+     * code path for chained allocations will be tested if a few shaders need to use it. */
+    shader_param_allocator_init(&instructions->dst_params, reserve - reserve / 8u,
+            sizeof(*instructions->elements->dst));
+    shader_param_allocator_init(&instructions->src_params, reserve * 2u, sizeof(*instructions->elements->src));
+    return shader_instruction_array_reserve(instructions, reserve);
+}
+
+bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve)
+{
+    if (!vkd3d_array_reserve((void **)&instructions->elements, &instructions->capacity, reserve,
+            sizeof(*instructions->elements)))
+    {
+        ERR("Failed to allocate instructions.\n");
+        return false;
+    }
+    return true;
+}
+
+void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions)
+{
+    vkd3d_free(instructions->elements);
+    shader_param_allocator_destroy(&instructions->dst_params);
+    shader_param_allocator_destroy(&instructions->src_params);
 }
