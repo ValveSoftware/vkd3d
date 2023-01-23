@@ -513,7 +513,7 @@ static struct sampler *get_sampler(struct shader_runner *runner, unsigned int sl
     return NULL;
 }
 
-static void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
+static void run_shader_tests(struct shader_runner *runner, int argc, char **argv)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct resource_params current_resource;
@@ -548,9 +548,6 @@ static void run_shader_tests(struct shader_runner *runner, int argc, char **argv
         fatal_error("Unable to open '%s' for reading: %s\n", argv[1], strerror(errno));
         return;
     }
-
-    memset(runner, 0, sizeof(*runner));
-    runner->ops = ops;
 
     for (;;)
     {

@@ -539,7 +539,8 @@ void run_shader_tests_d3d12(shader_runner_frontend_func func, int argc, char **a
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    func(&runner.r, argc, argv, &d3d12_runner_ops);
+    runner.r.ops = &d3d12_runner_ops;
+    func(&runner.r, argc, argv);
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
     ID3D12CommandAllocator_Release(runner.compute_allocator);

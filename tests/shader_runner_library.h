@@ -58,8 +58,7 @@ struct resource_params
     size_t data_size, data_capacity;
 };
 
-typedef void (*shader_runner_frontend_func)(struct shader_runner *runner,
-        int argc, char **argv, const struct shader_runner_ops *ops);
+typedef void (*shader_runner_frontend_func)(struct shader_runner *runner, int argc, char **argv);
 
 SHADER_RUNNER_API void shader_runner_compile_cs(struct shader_runner *runner, const char *source, HRESULT expect_hr);
 SHADER_RUNNER_API void shader_runner_compile_ps(struct shader_runner *runner, const char *source, HRESULT expect_hr);

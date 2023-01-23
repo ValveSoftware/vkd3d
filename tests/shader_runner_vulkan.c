@@ -1283,7 +1283,8 @@ void run_shader_tests_vulkan(shader_runner_frontend_func func, int argc, char **
     if (!init_vulkan_runner(&runner))
         return;
 
-    func(&runner.r, argc, argv, &vulkan_runner_ops);
+    runner.r.ops = &vulkan_runner_ops;
+    func(&runner.r, argc, argv);
 
     cleanup_vulkan_runner(&runner);
 }

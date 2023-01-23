@@ -530,7 +530,8 @@ void run_shader_tests_d3d9(shader_runner_frontend_func func, int argc, char **ar
         parse_args(argc, argv);
         init_adapter_info();
         init_test_context(&runner);
-        func(&runner.r, argc, argv, &d3d9_runner_ops);
+        runner.r.ops = &d3d9_runner_ops;
+        func(&runner.r, argc, argv);
         destroy_test_context(&runner);
     }
     FreeLibrary(d3d9_module);

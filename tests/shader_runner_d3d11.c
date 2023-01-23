@@ -705,7 +705,8 @@ void run_shader_tests_d3d11(shader_runner_frontend_func func, int argc, char **a
         init_adapter_info();
         if (init_test_context(&runner))
         {
-            func(&runner.r, argc, argv, &d3d11_runner_ops);
+            runner.r.ops = &d3d11_runner_ops;
+            func(&runner.r, argc, argv);
             destroy_test_context(&runner);
         }
     }
