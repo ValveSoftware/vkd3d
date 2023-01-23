@@ -325,22 +325,6 @@ void init_resource(struct resource *resource, const struct resource_params *para
     resource->height = params->height;
 }
 
-static struct resource *get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
-{
-    struct resource *resource;
-    size_t i;
-
-    for (i = 0; i < runner->resource_count; ++i)
-    {
-        resource = runner->resources[i];
-
-        if (resource->type == type && resource->slot == slot)
-            return resource;
-    }
-
-    return NULL;
-}
-
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
     runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
@@ -396,7 +380,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         unsigned int left, top, right, bottom, ulps, slot;
         struct resource_readback *rb;
-        struct resource *resource;
         RECT rect;
         int len;
 
@@ -411,7 +394,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed UAV index '%s'.\n", line);
             line = rest;
 
-            resource = get_resource(runner, RESOURCE_TYPE_UAV, slot);
+            rb = shader_runner_get_uav_readback(runner, slot);
         }
         else if (match_string(line, "render target", &line))
         {
@@ -421,18 +404,16 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed render target index '%s'.\n", line);
             line = rest;
 
-            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot);
+            rb = shader_runner_get_rt_readback(runner, slot);
         }
         else
         {
-            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
+            rb = shader_runner_get_rt_readback(runner, 0);
         }
-
-        rb = runner->ops->get_resource_readback(runner, resource);
 
         if (match_string(line, "all", &line))
         {
-            set_rect(&rect, 0, 0, resource->width, resource->height);
+            set_rect(&rect, 0, 0, rb->width, rb->height);
         }
         else if (sscanf(line, " ( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
         {
@@ -476,7 +457,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             fatal_error("Malformed probe arguments '%s'.\n", line);
         }
 
-        runner->ops->release_readback(runner, rb);
+        shader_runner_release_readback(runner, rb);
     }
     else if (match_string(line, "uniform", &line))
     {

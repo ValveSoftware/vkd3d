@@ -196,6 +196,21 @@ void shader_runner_draw_quad(struct shader_runner *runner)
     shader_runner_draw(runner, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST, 3);
 }
 
+struct resource_readback *shader_runner_get_rt_readback(struct shader_runner *runner, unsigned int slot)
+{
+    return runner->ops->get_resource_readback(runner, get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot));
+}
+
+struct resource_readback *shader_runner_get_uav_readback(struct shader_runner *runner, unsigned int slot)
+{
+    return runner->ops->get_resource_readback(runner, get_resource(runner, RESOURCE_TYPE_UAV, slot));
+}
+
+void shader_runner_release_readback(struct shader_runner *runner, struct resource_readback *rb)
+{
+    runner->ops->release_readback(runner, rb);
+}
+
 void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv)
 {
 #if defined(VKD3D_CROSSTEST)

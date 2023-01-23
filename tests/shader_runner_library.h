@@ -69,6 +69,9 @@ SHADER_RUNNER_API void shader_runner_dispatch(struct shader_runner *runner, unsi
 SHADER_RUNNER_API void shader_runner_draw_quad(struct shader_runner *runner);
 SHADER_RUNNER_API void shader_runner_draw(struct shader_runner *runner,
         D3D_PRIMITIVE_TOPOLOGY topology, unsigned int vertex_count);
+SHADER_RUNNER_API struct resource_readback *shader_runner_get_rt_readback(struct shader_runner *runner, unsigned int slot);
+SHADER_RUNNER_API struct resource_readback *shader_runner_get_uav_readback(struct shader_runner *runner, unsigned int slot);
+SHADER_RUNNER_API void shader_runner_release_readback(struct shader_runner *runner, struct resource_readback *rb);
 SHADER_RUNNER_API void shader_runner_run(shader_runner_frontend_func func, int argc, char **argv);
 
 #endif  /* __SHADER_RUNNER_LIBRARY_H */
