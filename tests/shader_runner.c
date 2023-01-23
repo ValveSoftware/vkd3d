@@ -61,16 +61,6 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
-void fatal_error(const char *format, ...)
-{
-    va_list args;
-
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    exit(1);
-}
-
 enum parse_state
 {
     STATE_NONE,
@@ -314,17 +304,6 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
         element->index = 0;
 }
 
-void init_resource(struct resource *resource, const struct resource_params *params)
-{
-    resource->type = params->type;
-    resource->slot = params->slot;
-    resource->format = params->format;
-    resource->size = params->data_size;
-    resource->texel_size = params->texel_size;
-    resource->width = params->width;
-    resource->height = params->height;
-}
-
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
     runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
@@ -532,24 +511,6 @@ static struct sampler *get_sampler(struct shader_runner *runner, unsigned int sl
     }
 
     return NULL;
-}
-
-unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot)
-{
-    unsigned int stride = 0;
-    size_t i;
-
-    /* We currently don't deal with vertex formats less than 32 bits, so don't
-     * bother with alignment. */
-    for (i = 0; i < runner->input_element_count; ++i)
-    {
-        const struct input_element *element = &runner->input_elements[i];
-
-        if (element->slot == slot)
-            stride += element->texel_size;
-    }
-
-    return stride;
 }
 
 static void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)

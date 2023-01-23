@@ -36,6 +36,45 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
+void fatal_error(const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vfprintf(stderr, format, args);
+    va_end(args);
+    exit(1);
+}
+
+void init_resource(struct resource *resource, const struct resource_params *params)
+{
+    resource->type = params->type;
+    resource->slot = params->slot;
+    resource->format = params->format;
+    resource->size = params->data_size;
+    resource->texel_size = params->texel_size;
+    resource->width = params->width;
+    resource->height = params->height;
+}
+
+unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot)
+{
+    unsigned int stride = 0;
+    size_t i;
+
+    /* We currently don't deal with vertex formats less than 32 bits, so don't
+     * bother with alignment. */
+    for (i = 0; i < runner->input_element_count; ++i)
+    {
+        const struct input_element *element = &runner->input_elements[i];
+
+        if (element->slot == slot)
+            stride += element->texel_size;
+    }
+
+    return stride;
+}
+
 static struct resource *get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
 {
     struct resource *resource;
