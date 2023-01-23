@@ -1,6 +1,43 @@
 [require]
 shader model >= 4.0
 
+
+[texture 0]
+size (1, 1)
+0.77 0.77 0.77 0.77
+
+[texture 1]
+size (1, 1)
+0.64 0.64 0.64 0.64
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[pixel shader]
+Texture2D t_good, t_bad;
+sampler sam;
+
+float4 main() : sv_target
+{
+    Texture2D a, b[1];
+
+    // This is basically a 'b[0] = t_good' but so that the copy-prop is delayed
+    int4 co = {0, 0, 0, 0};
+    b[(int) co.x + (int) co.y] = t_good;
+
+    a = b[0];
+    b[0] = t_bad;
+
+    // 'a' should be 't_good', not 't_bad' at this point
+    return 100 * a.Sample(sam, float2(0, 0)) + t_good.Sample(sam, float2(0, 0));
+}
+
+[test]
+draw quad
+todo probe all rgba (77.77, 77.77, 77.77, 77.77)
+
+
 [texture 0]
 size (2, 2)
 0.1 0.2 0.3 0.4     0.5 0.7 0.6 0.8
