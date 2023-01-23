@@ -56,6 +56,18 @@ float4 main() : SV_TARGET
 
 
 [pixel shader fail]
+float4 fun(float f[7])
+{
+    return f[1];
+}
+
+float4 main() : SV_TARGET
+{
+    return fun(32);
+}
+
+
+[pixel shader fail]
 struct apple
 {
     float4 foo;
@@ -68,3 +80,19 @@ float4 PSMain() : SV_TARGET
     a1 = (struct apple)1;
     return a1.foo;
 }
+
+
+[pixel shader todo]
+float4 fun(float3 f)
+{
+    return f.xyxy;
+}
+
+float4 main() : SV_TARGET
+{
+    return fun(33);
+}
+
+[test]
+todo draw quad
+todo probe all rgba (33.0, 33.0, 33.0, 33.0)
