@@ -139,7 +139,7 @@ float4 main() : sv_target
 
 
 % Arrays with the same number of components are allowed.
-[pixel shader todo]
+[pixel shader]
 float fun(float a[2][3])
 {
     return 100*a[0][0] + 10*a[0][2] + a[1][2];
@@ -153,11 +153,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (136.0, 136.0, 136.0, 136.0)
+draw quad
+probe all rgba (136.0, 136.0, 136.0, 136.0)
 
 
-[pixel shader todo]
+[pixel shader]
 float fun(float a[2][3])
 {
     return 100*a[0][0] + 10*a[1][0] + a[1][2];
@@ -171,5 +171,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (702.0, 702.0, 702.0, 702.0)
+draw quad
+probe all rgba (702.0, 702.0, 702.0, 702.0)

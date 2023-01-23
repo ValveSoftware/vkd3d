@@ -2220,8 +2220,10 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
 struct find_function_call_args
 {
+    struct hlsl_ctx *ctx;
     const struct parse_initializer *params;
     struct hlsl_ir_function_decl *decl;
+    unsigned int compatible_overloads_count;
 };
 
 static void find_function_call_exact(struct rb_entry *entry, void *context)
@@ -2241,10 +2243,31 @@ static void find_function_call_exact(struct rb_entry *entry, void *context)
     args->decl = decl;
 }
 
-static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
-        const char *name, const struct parse_initializer *params)
+static void find_function_call_compatible(struct rb_entry *entry, void *context)
 {
-    struct find_function_call_args args = {.params = params};
+    struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
+    struct find_function_call_args *args = context;
+    unsigned int i;
+
+    if (decl->parameters.count != args->params->args_count)
+        return;
+
+    for (i = 0; i < decl->parameters.count; ++i)
+    {
+        if (!implicit_compatible_data_types(args->ctx, args->params->args[i]->data_type,
+                decl->parameters.vars[i]->data_type))
+            return;
+    }
+
+    args->compatible_overloads_count++;
+    args->decl = decl;
+}
+
+static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
+        const char *name, const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc)
+{
+    struct find_function_call_args args = {.ctx = ctx, .params = params};
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
 
@@ -2254,7 +2277,13 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
 
     rb_for_each_entry(&func->overloads, find_function_call_exact, &args);
     if (!args.decl)
-        FIXME("Search for compatible overloads.\n");
+    {
+        rb_for_each_entry(&func->overloads, find_function_call_compatible, &args);
+        if (args.compatible_overloads_count > 1)
+        {
+            hlsl_fixme(ctx, loc, "Prioritize between multiple compatible function overloads.");
+        }
+    }
     return args.decl;
 }
 
@@ -3055,7 +3084,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
     struct intrinsic_function *intrinsic;
     struct hlsl_ir_function_decl *decl;
 
-    if ((decl = find_function_call(ctx, name, args)))
+    if ((decl = find_function_call(ctx, name, args, loc)))
     {
         struct hlsl_ir_node *call;
         unsigned int i;
@@ -3069,8 +3098,12 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
 
             if (!hlsl_types_are_equal(arg->data_type, param->data_type))
             {
-                hlsl_fixme(ctx, &arg->loc, "Implicit cast of a function argument.");
-                continue;
+                struct hlsl_ir_node *cast;
+
+                if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
+                    goto fail;
+                args->args[i] = cast;
+                arg = cast;
             }
 
             if (param->storage_modifiers & HLSL_STORAGE_IN)
