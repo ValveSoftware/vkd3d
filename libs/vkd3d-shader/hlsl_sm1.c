@@ -658,6 +658,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             write_sm1_binary_op(ctx, buffer, D3DSIO_MUL, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
+        case HLSL_OP1_FRACT:
+            write_sm1_unary_op(ctx, buffer, D3DSIO_FRC, &instr->reg, &arg1->reg, D3DSPSM_NONE);
+            break;
+
         default:
             hlsl_fixme(ctx, &instr->loc, "SM1 \"%s\" expression.", debug_hlsl_expr_op(expr->op));
             break;

@@ -2502,6 +2502,17 @@ static bool intrinsic_floor(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FLOOR, arg, loc);
 }
 
+static bool intrinsic_frac(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FRACT, arg, loc);
+}
+
 static bool intrinsic_ldexp(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2922,6 +2933,7 @@ intrinsic_functions[] =
     {"cross",                               2, true,  intrinsic_cross},
     {"dot",                                 2, true,  intrinsic_dot},
     {"floor",                               1, true,  intrinsic_floor},
+    {"frac",                                1, true,  intrinsic_frac},
     {"ldexp",                               2, true,  intrinsic_ldexp},
     {"length",                              1, true,  intrinsic_length},
     {"lerp",                                3, true,  intrinsic_lerp},
