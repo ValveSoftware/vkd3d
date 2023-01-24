@@ -1494,6 +1494,27 @@ static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     return true;
 }
 
+/* Lower SQRT to RSQ + RCP. */
+static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_expr *expr;
+    struct hlsl_ir_node *rsq;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP1_SQRT)
+        return false;
+
+    if (!(rsq = hlsl_new_unary_expr(ctx, HLSL_OP1_RSQ, expr->operands[0].node, instr->loc)))
+        return false;
+    list_add_before(&expr->node.entry, &rsq->entry);
+    expr->op = HLSL_OP1_RCP;
+    hlsl_src_remove(&expr->operands[0]);
+    hlsl_src_from_node(&expr->operands[0], rsq);
+    return true;
+}
+
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
@@ -2905,7 +2926,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     while (progress);
 
     if (profile->major_version < 4)
+    {
         transform_ir(ctx, lower_division, body, NULL);
+        transform_ir(ctx, lower_sqrt, body, NULL);
+    }
 
     transform_ir(ctx, validate_static_object_references, body, NULL);
 
