@@ -632,13 +632,14 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP1_RCP:
+        case HLSL_OP1_RSQ:
             for (i = 0; i < instr->data_type->dimx; ++i)
             {
                 struct hlsl_reg src = arg1->reg, dst = instr->reg;
 
                 src.writemask = hlsl_combine_writemasks(src.writemask, 1u << i);
                 dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
-                write_sm1_unary_op(ctx, buffer, D3DSIO_RCP, &dst, &src, 0);
+                write_sm1_unary_op(ctx, buffer, expr->op == HLSL_OP1_RCP ? D3DSIO_RCP : D3DSIO_RSQ, &dst, &src, 0);
             }
             break;
 
