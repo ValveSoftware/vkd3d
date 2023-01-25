@@ -609,12 +609,28 @@ static void write_sm1_constant(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     write_sm1_instruction(ctx, buffer, &sm1_instr);
 }
 
+static void write_sm1_per_component_unary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_ir_node *instr, D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode)
+{
+    struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
+    struct hlsl_ir_node *arg1 = expr->operands[0].node;
+    unsigned int i;
+
+    for (i = 0; i < instr->data_type->dimx; ++i)
+    {
+        struct hlsl_reg src = arg1->reg, dst = instr->reg;
+
+        src.writemask = hlsl_combine_writemasks(src.writemask, 1u << i);
+        dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
+        write_sm1_unary_op(ctx, buffer, opcode, &dst, &src, 0);
+    }
+}
+
 static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     struct hlsl_ir_expr *expr = hlsl_ir_expr(instr);
     struct hlsl_ir_node *arg1 = expr->operands[0].node;
     struct hlsl_ir_node *arg2 = expr->operands[1].node;
-    unsigned int i;
 
     assert(instr->reg.allocated);
 
@@ -632,15 +648,11 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP1_RCP:
-        case HLSL_OP1_RSQ:
-            for (i = 0; i < instr->data_type->dimx; ++i)
-            {
-                struct hlsl_reg src = arg1->reg, dst = instr->reg;
+            write_sm1_per_component_unary_op(ctx, buffer, instr, D3DSIO_RCP);
+            break;
 
-                src.writemask = hlsl_combine_writemasks(src.writemask, 1u << i);
-                dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
-                write_sm1_unary_op(ctx, buffer, expr->op == HLSL_OP1_RCP ? D3DSIO_RCP : D3DSIO_RSQ, &dst, &src, 0);
-            }
+        case HLSL_OP1_RSQ:
+            write_sm1_per_component_unary_op(ctx, buffer, instr, D3DSIO_RSQ);
             break;
 
         case HLSL_OP2_ADD:
