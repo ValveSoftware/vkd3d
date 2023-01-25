@@ -2491,6 +2491,26 @@ static bool intrinsic_dot(struct hlsl_ctx *ctx,
     return !!add_binary_dot_expr(ctx, params->instrs, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_exp(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_constant *coeff;
+    struct hlsl_ir_node *arg, *mul;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    /* 1/ln(2) */
+    if (!(coeff = hlsl_new_float_constant(ctx, 1.442695f, loc)))
+        return false;
+    list_add_tail(params->instrs, &coeff->node.entry);
+
+    if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &coeff->node, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_EXP2, mul, loc);
+}
+
 static bool intrinsic_exp2(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2943,6 +2963,7 @@ intrinsic_functions[] =
     {"cos",                                 1, true,  intrinsic_cos},
     {"cross",                               2, true,  intrinsic_cross},
     {"dot",                                 2, true,  intrinsic_dot},
+    {"exp",                                 1, true,  intrinsic_exp},
     {"exp2",                                1, true,  intrinsic_exp2},
     {"floor",                               1, true,  intrinsic_floor},
     {"frac",                                1, true,  intrinsic_frac},
