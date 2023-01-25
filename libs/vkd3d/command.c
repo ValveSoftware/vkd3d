@@ -2802,7 +2802,6 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
     unsigned int variable_binding_size, unbounded_offset, table_index, heap_size, i;
     const struct d3d12_root_signature *root_signature = bindings->root_signature;
     const struct d3d12_descriptor_set_layout *layout;
-    struct d3d12_device *device = list->device;
     const struct d3d12_desc *base_descriptor;
     VkDescriptorSet vk_descriptor_set;
 
@@ -2833,8 +2832,7 @@ static void d3d12_command_list_prepare_descriptors(struct d3d12_command_list *li
                 /* Descriptors may not be set, eg. WoW. */
                 && (base_descriptor = bindings->descriptor_tables[table_index]))
         {
-            heap_size = vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
-                    &device->gpu_descriptor_allocator, base_descriptor);
+            heap_size = d3d12_desc_heap_range_size(base_descriptor);
 
             if (heap_size < unbounded_offset)
                 WARN("Descriptor heap size %u is less than the offset %u of an unbounded range in table %u, "
@@ -2860,11 +2858,11 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
         unsigned int index, bool use_array)
 {
     uint32_t descriptor_range_magic = range->descriptor_magic;
-    const struct vkd3d_view *view = descriptor->u.view_info.view;
+    const struct vkd3d_view *view = descriptor->s.u.view_info.view;
     uint32_t vk_binding = range->binding;
     uint32_t set = range->set;
 
-    if (descriptor->magic != descriptor_range_magic)
+    if (descriptor->s.magic != descriptor_range_magic)
         return false;
 
     vk_descriptor_write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2873,15 +2871,15 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
     vk_descriptor_write->dstBinding = use_array ? vk_binding : vk_binding + index;
     vk_descriptor_write->dstArrayElement = use_array ? index : 0;
     vk_descriptor_write->descriptorCount = 1;
-    vk_descriptor_write->descriptorType = descriptor->vk_descriptor_type;
+    vk_descriptor_write->descriptorType = descriptor->s.vk_descriptor_type;
     vk_descriptor_write->pImageInfo = NULL;
     vk_descriptor_write->pBufferInfo = NULL;
     vk_descriptor_write->pTexelBufferView = NULL;
 
-    switch (descriptor->magic)
+    switch (descriptor->s.magic)
     {
         case VKD3D_DESCRIPTOR_MAGIC_CBV:
-            vk_descriptor_write->pBufferInfo = &descriptor->u.vk_cbv_info;
+            vk_descriptor_write->pBufferInfo = &descriptor->s.u.vk_cbv_info;
             break;
 
         case VKD3D_DESCRIPTOR_MAGIC_SRV:
@@ -2892,8 +2890,8 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
              * in pairs in one set. */
             if (range->descriptor_count == UINT_MAX)
             {
-                if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                        && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                if (descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
                 {
                     vk_descriptor_write->dstSet = vk_descriptor_sets[set + 1];
                     vk_descriptor_write->dstBinding = 0;
@@ -2903,13 +2901,13 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             {
                 if (!use_array)
                     vk_descriptor_write->dstBinding = vk_binding + 2 * index;
-                if (descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                        && descriptor->vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                if (descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
                     ++vk_descriptor_write->dstBinding;
             }
 
-            if (descriptor->vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                    || descriptor->vk_descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+            if (descriptor->s.vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                    || descriptor->s.vk_descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
             {
                 vk_descriptor_write->pTexelBufferView = &view->u.vk_buffer_view;
             }
@@ -2917,7 +2915,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             {
                 vk_image_info->sampler = VK_NULL_HANDLE;
                 vk_image_info->imageView = view->u.vk_image_view;
-                vk_image_info->imageLayout = descriptor->magic == VKD3D_DESCRIPTOR_MAGIC_SRV
+                vk_image_info->imageLayout = descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_SRV
                         ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
 
                 vk_descriptor_write->pImageInfo = vk_image_info;
@@ -2933,7 +2931,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             break;
 
         default:
-            ERR("Invalid descriptor %#x.\n", descriptor->magic);
+            ERR("Invalid descriptor %#x.\n", descriptor->s.magic);
             return false;
     }
 
@@ -2974,8 +2972,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
         descriptor_count = range->descriptor_count;
         if ((unbounded = descriptor_count == UINT_MAX))
         {
-            descriptor_count = vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
-                    &list->device->gpu_descriptor_allocator, descriptor);
+            descriptor_count = d3d12_desc_heap_range_size(descriptor);
 
             if (descriptor_count > range->vk_binding_count)
             {
@@ -2997,8 +2994,8 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
                     if (state->uav_counters.bindings[k].register_space == range->register_space
                             && state->uav_counters.bindings[k].register_index == register_idx)
                     {
-                        VkBufferView vk_counter_view = descriptor->magic == VKD3D_DESCRIPTOR_MAGIC_UAV
-                                ? descriptor->u.view_info.view->vk_counter_view : VK_NULL_HANDLE;
+                        VkBufferView vk_counter_view = descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_UAV
+                                ? descriptor->s.u.view_info.view->vk_counter_view : VK_NULL_HANDLE;
                         if (bindings->vk_uav_counter_views[k] != vk_counter_view)
                             bindings->uav_counters_dirty = true;
                         bindings->vk_uav_counter_views[k] = vk_counter_view;
@@ -3008,7 +3005,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
             }
 
             /* Not all descriptors are necessarily populated if the range is unbounded. */
-            if (descriptor->magic == VKD3D_DESCRIPTOR_MAGIC_FREE)
+            if (descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_FREE)
                 continue;
 
             if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write, current_image_info,
@@ -3242,8 +3239,8 @@ static unsigned int d3d12_command_list_bind_descriptor_table(struct d3d12_comman
     /* AMD, Nvidia and Intel drivers on Windows work if SetDescriptorHeaps()
      * is not called, so we bind heaps from the tables instead. No NULL check is
      * needed here because it's checked when descriptor tables are set. */
-    heap = vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&list->device->gpu_descriptor_allocator, desc);
-    offset = desc - (const struct d3d12_desc *)heap->descriptors;
+    heap = d3d12_desc_get_descriptor_heap(desc);
+    offset = desc->index;
 
     if (heap->desc.Type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
     {
@@ -4517,16 +4514,6 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
     if (bindings->descriptor_tables[index] == desc)
         return;
 
-    if (desc && !vkd3d_gpu_descriptor_allocator_heap_from_descriptor(&list->device->gpu_descriptor_allocator,
-            desc))
-    {
-        /* Failure to find a heap means the descriptor handle is from
-         * the wrong heap type or not a handle at all. */
-        ERR("Invalid heap for base descriptor %"PRIx64".\n", base_descriptor.ptr);
-        /* TODO: Mark list as invalid? */
-        return;
-    }
-
     bindings->descriptor_tables[index] = desc;
     bindings->descriptor_table_dirty_mask |= (uint64_t)1 << index;
     bindings->descriptor_table_active_mask |= (uint64_t)1 << index;
@@ -5457,7 +5444,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view_info.view;
+    view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view_info.view;
     memcpy(colour.uint32, values, sizeof(colour.uint32));
 
     if (view->format->type != VKD3D_FORMAT_TYPE_UINT)
@@ -5516,7 +5503,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewFloat(I
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->u.view_info.view;
+    view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view_info.view;
     memcpy(colour.float32, values, sizeof(colour.float32));
 
     d3d12_command_list_clear_uav(list, resource_impl, view, &colour, rect_count, rects);

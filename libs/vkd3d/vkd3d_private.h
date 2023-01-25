@@ -391,30 +391,6 @@ D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_al
 void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
 void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
 
-struct vkd3d_gpu_descriptor_allocation
-{
-    const struct d3d12_desc *base;
-    size_t count;
-};
-
-struct vkd3d_gpu_descriptor_allocator
-{
-    struct vkd3d_mutex mutex;
-
-    struct vkd3d_gpu_descriptor_allocation *allocations;
-    size_t allocations_size;
-    size_t allocation_count;
-};
-
-size_t vkd3d_gpu_descriptor_allocator_range_size_from_descriptor(
-        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc);
-bool vkd3d_gpu_descriptor_allocator_register_range(struct vkd3d_gpu_descriptor_allocator *allocator,
-        const struct d3d12_desc *base, size_t count);
-bool vkd3d_gpu_descriptor_allocator_unregister_range(
-        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *base);
-struct d3d12_descriptor_heap *vkd3d_gpu_descriptor_allocator_heap_from_descriptor(
-        struct vkd3d_gpu_descriptor_allocator *allocator, const struct d3d12_desc *desc);
-
 struct vkd3d_render_pass_key
 {
     unsigned int attachment_count;
@@ -718,13 +694,17 @@ struct vkd3d_view_info
 
 struct d3d12_desc
 {
-    uint32_t magic;
-    VkDescriptorType vk_descriptor_type;
-    union
+    struct
     {
-        VkDescriptorBufferInfo vk_cbv_info;
-        struct vkd3d_view_info view_info;
-    } u;
+        uint32_t magic;
+        VkDescriptorType vk_descriptor_type;
+        union
+        {
+            VkDescriptorBufferInfo vk_cbv_info;
+            struct vkd3d_view_info view_info;
+        } u;
+    } s;
+    unsigned int index;
 };
 
 static inline struct d3d12_desc *d3d12_desc_from_cpu_handle(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle)
@@ -735,6 +715,11 @@ static inline struct d3d12_desc *d3d12_desc_from_cpu_handle(D3D12_CPU_DESCRIPTOR
 static inline struct d3d12_desc *d3d12_desc_from_gpu_handle(D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
 {
     return (struct d3d12_desc *)(intptr_t)gpu_handle.ptr;
+}
+
+static inline void d3d12_desc_copy_raw(struct d3d12_desc *dst, const struct d3d12_desc *src)
+{
+    dst->s = src->s;
 }
 
 void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src, struct d3d12_device *device);
@@ -856,6 +841,17 @@ struct d3d12_descriptor_heap
 
     BYTE descriptors[];
 };
+
+static inline struct d3d12_descriptor_heap *d3d12_desc_get_descriptor_heap(const struct d3d12_desc *descriptor)
+{
+    return CONTAINING_RECORD(descriptor - descriptor->index, struct d3d12_descriptor_heap, descriptors);
+}
+
+static inline unsigned int d3d12_desc_heap_range_size(const struct d3d12_desc *descriptor)
+{
+    const struct d3d12_descriptor_heap *heap = d3d12_desc_get_descriptor_heap(descriptor);
+    return heap->desc.NumDescriptors - descriptor->index;
+}
 
 HRESULT d3d12_descriptor_heap_create(struct d3d12_device *device,
         const D3D12_DESCRIPTOR_HEAP_DESC *desc, struct d3d12_descriptor_heap **descriptor_heap);
@@ -1465,7 +1461,6 @@ struct d3d12_device
     PFN_vkd3d_signal_event signal_event;
     size_t wchar_size;
 
-    struct vkd3d_gpu_descriptor_allocator gpu_descriptor_allocator;
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
 
     struct vkd3d_mutex mutex;
