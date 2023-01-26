@@ -4317,10 +4317,11 @@ param_list:
         }
 
 parameter:
-      var_modifiers type_no_void any_identifier colon_attribute
+      var_modifiers type_no_void any_identifier arrays colon_attribute
         {
-            struct hlsl_type *type;
             unsigned int modifiers = $1;
+            struct hlsl_type *type;
+            unsigned int i;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, @1)))
                 YYABORT;
@@ -4328,10 +4329,21 @@ parameter:
             $$.modifiers = modifiers;
             if (!($$.modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT)))
                 $$.modifiers |= HLSL_STORAGE_IN;
+
+            for (i = 0; i < $4.count; ++i)
+            {
+                if ($4.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+                {
+                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Implicit size arrays not allowed in function parameters.");
+                }
+                type = hlsl_new_array_type(ctx, type, $4.sizes[i]);
+            }
             $$.type = type;
+
             $$.name = $3;
-            $$.semantic = $4.semantic;
-            $$.reg_reservation = $4.reg_reservation;
+            $$.semantic = $5.semantic;
+            $$.reg_reservation = $5.reg_reservation;
         }
 
 texture_type:

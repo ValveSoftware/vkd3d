@@ -1,4 +1,4 @@
-[pixel shader todo]
+[pixel shader]
 float fun(float a[2])
 {
     return 10 * a[0] + a[1];
@@ -12,8 +12,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (25.0, 25.0, 25.0, 25.0)
+draw quad
+probe all rgba (25.0, 25.0, 25.0, 25.0)
 
 
 [pixel shader fail]
@@ -58,7 +58,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 float4 fun(float a[2][4])
 {
     float4 res;
@@ -78,8 +78,22 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (15.0, 26.0, 37.0, 48.0)
+draw quad
+probe all rgba (15.0, 26.0, 37.0, 48.0)
+
+
+[pixel shader fail]
+float fun(float a[2])
+{
+    return a[2]; // out of bounds.
+}
+
+float4 main() : sv_target
+{
+    float f[2] = {1, 2};
+
+    return fun(f);
+}
 
 
 [pixel shader fail]
