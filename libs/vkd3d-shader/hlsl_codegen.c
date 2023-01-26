@@ -1535,6 +1535,62 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *c
     return true;
 }
 
+/* Lower DP2 to MUL + ADD */
+static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *arg1, *arg2, *mul, *replacement;
+    struct hlsl_ir_swizzle *add_x, *add_y;
+    struct hlsl_ir_constant *zero;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    arg1 = expr->operands[0].node;
+    arg2 = expr->operands[1].node;
+    if (expr->op != HLSL_OP2_DOT)
+        return false;
+    if (arg1->data_type->dimx != 2)
+        return false;
+
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+    {
+        struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
+
+        if (!(zero = hlsl_new_float_constant(ctx, 0.0f, &expr->node.loc)))
+            return false;
+        list_add_before(&instr->entry, &zero->node.entry);
+
+        operands[0] = arg1;
+        operands[1] = arg2;
+        operands[2] = &zero->node;
+
+        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_DP2ADD, operands, instr->data_type, &expr->node.loc)))
+            return false;
+    }
+    else
+    {
+        if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, expr->operands[0].node, expr->operands[1].node)))
+            return false;
+        list_add_before(&instr->entry, &mul->entry);
+
+        if (!(add_x = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), instr->data_type->dimx, mul, &expr->node.loc)))
+            return false;
+        list_add_before(&instr->entry, &add_x->node.entry);
+
+        if (!(add_y = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Y, Y, Y, Y), instr->data_type->dimx, mul, &expr->node.loc)))
+            return false;
+        list_add_before(&instr->entry, &add_y->node.entry);
+
+        if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, &add_x->node, &add_y->node)))
+            return false;
+    }
+    list_add_before(&instr->entry, &replacement->entry);
+
+    hlsl_replace_node(instr, replacement);
+    return true;
+}
+
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
@@ -2949,6 +3005,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         transform_ir(ctx, lower_division, body, NULL);
         transform_ir(ctx, lower_sqrt, body, NULL);
+        transform_ir(ctx, lower_dot, body, NULL);
     }
 
     transform_ir(ctx, validate_static_object_references, body, NULL);
