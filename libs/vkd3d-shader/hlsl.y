@@ -217,7 +217,7 @@ static bool type_contains_only_numerics(struct hlsl_type *type)
     return type->type <= HLSL_CLASS_LAST_NUMERIC;
 }
 
-static bool compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
+static bool explicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
 {
     if (src->type <= HLSL_CLASS_LAST_NUMERIC && src->dimx == 1 && src->dimy == 1 && type_contains_only_numerics(dst))
         return true;
@@ -5240,7 +5240,7 @@ unary_expr:
                 dst_type = hlsl_new_array_type(ctx, dst_type, $4.sizes[i]);
             }
 
-            if (!compatible_data_types(ctx, src_type, dst_type))
+            if (!explicit_compatible_data_types(ctx, src_type, dst_type))
             {
                 struct vkd3d_string_buffer *src_string, *dst_string;
 
