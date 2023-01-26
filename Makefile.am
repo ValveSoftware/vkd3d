@@ -49,6 +49,7 @@ vkd3d_shader_tests = \
 	tests/arithmetic-int.shader_test \
 	tests/arithmetic-int-uniform.shader_test \
 	tests/arithmetic-uint.shader_test \
+	tests/array-parameters.shader_test \
 	tests/bitwise.shader_test \
 	tests/cast-broadcast.shader_test \
 	tests/cast-componentwise-equal.shader_test \
