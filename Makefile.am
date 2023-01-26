@@ -59,6 +59,7 @@ vkd3d_shader_tests = \
 	tests/cbuffer.shader_test \
 	tests/compute.shader_test \
 	tests/conditional.shader_test \
+	tests/exp.shader_test \
 	tests/floor.shader_test \
 	tests/frac.shader_test \
 	tests/hlsl-array-dimension.shader_test \
