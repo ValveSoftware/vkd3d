@@ -150,6 +150,18 @@ enum vkd3d_shader_compile_option_name
     VKD3D_SHADER_COMPILE_OPTION_API_VERSION = 0x00000004,
     /** \a value is a member of enum vkd3d_shader_compile_option_typed_uav. \since 1.5 */
     VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV   = 0x00000005,
+    /**
+     * If \a value is nonzero, write the point size for Vulkan tessellation and
+     * geometry shaders. This option should be enabled if and only if the
+     * shaderTessellationAndGeometryPointSize feature is enabled. The default
+     * value is nonzero, i.e. write the point size.
+     *
+     * This option is supported by vkd3d_shader_compile() for the SPIR-V target
+     * type and Vulkan targets; it should not be enabled otherwise.
+     *
+     * \since 1.6
+     */
+    VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE = 0x00000006,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

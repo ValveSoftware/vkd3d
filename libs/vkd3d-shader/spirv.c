@@ -2285,6 +2285,7 @@ struct spirv_compiler
     struct vkd3d_shader_spec_constant *spec_constants;
     size_t spec_constants_size;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
+    bool write_tess_geom_point_size;
 
     struct vkd3d_string_buffer_cache string_buffers;
 };
@@ -2351,6 +2352,7 @@ struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *
 
     compiler->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
             | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
+    compiler->write_tess_geom_point_size = true;
 
     for (i = 0; i < compile_info->option_count; ++i)
     {
@@ -2388,6 +2390,10 @@ struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *
                     compiler->uav_read_without_format = true;
                 else
                     WARN("Ignoring unrecognised value %#x for option %#x.\n", option->value, option->name);
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE:
+                compiler->write_tess_geom_point_size = option->value;
                 break;
         }
     }
@@ -6348,10 +6354,18 @@ static void spirv_compiler_emit_point_size(struct spirv_compiler *compiler)
     /* Set the point size. Point sprites are not supported in d3d10+, but
      * point primitives can still be used with e.g. stream output. Vulkan
      * requires the point size to always be explicitly defined when outputting
-     * points. */
-    vkd3d_spirv_build_op_store(&compiler->spirv_builder,
-            spirv_compiler_emit_builtin_variable(compiler, &point_size, SpvStorageClassOutput, 0),
-            spirv_compiler_get_constant_float(compiler, 1.0f), SpvMemoryAccessMaskNone);
+     * points.
+     *
+     * If shaderTessellationAndGeometryPointSize is disabled, we must not write
+     * PointSize for tessellation and geometry shaders. In that case the point
+     * size defaults to 1.0. */
+    if (spirv_compiler_is_opengl_target(compiler) || compiler->shader_type == VKD3D_SHADER_TYPE_VERTEX
+            || compiler->write_tess_geom_point_size)
+    {
+        vkd3d_spirv_build_op_store(&compiler->spirv_builder,
+                spirv_compiler_emit_builtin_variable(compiler, &point_size, SpvStorageClassOutput, 0),
+                spirv_compiler_get_constant_float(compiler, 1.0f), SpvMemoryAccessMaskNone);
+    }
 }
 
 static void spirv_compiler_emit_dcl_output_topology(struct spirv_compiler *compiler,
