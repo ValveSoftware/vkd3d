@@ -2941,6 +2941,17 @@ static bool intrinsic_round(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ROUND, arg, loc);
 }
 
+static bool intrinsic_rsqrt(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_RSQ, arg, loc);
+}
+
 static bool intrinsic_saturate(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3208,6 +3219,7 @@ intrinsic_functions[] =
     {"pow",                                 2, true,  intrinsic_pow},
     {"reflect",                             2, true,  intrinsic_reflect},
     {"round",                               1, true,  intrinsic_round},
+    {"rsqrt",                               1, true,  intrinsic_rsqrt},
     {"saturate",                            1, true,  intrinsic_saturate},
     {"sin",                                 1, true,  intrinsic_sin},
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
