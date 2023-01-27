@@ -443,15 +443,8 @@ static HRESULT d3d12_heap_map(struct d3d12_heap *heap, uint64_t offset,
     struct d3d12_device *device = heap->device;
     HRESULT hr = S_OK;
     VkResult vr;
-    int rc;
 
-    if ((rc = vkd3d_mutex_lock(&heap->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        if (data)
-            *data = NULL;
-        return hresult_from_errno(rc);
-    }
+    vkd3d_mutex_lock(&heap->mutex);
 
     assert(!resource->map_count || heap->map_ptr);
 
@@ -501,13 +494,8 @@ static HRESULT d3d12_heap_map(struct d3d12_heap *heap, uint64_t offset,
 static void d3d12_heap_unmap(struct d3d12_heap *heap, struct d3d12_resource *resource)
 {
     struct d3d12_device *device = heap->device;
-    int rc;
 
-    if ((rc = vkd3d_mutex_lock(&heap->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return;
-    }
+    vkd3d_mutex_lock(&heap->mutex);
 
     if (!resource->map_count)
     {
@@ -570,7 +558,6 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
     VkMemoryRequirements memory_requirements;
     VkDeviceSize vk_memory_size;
     HRESULT hr;
-    int rc;
 
     heap->ID3D12Heap_iface.lpVtbl = &d3d12_heap_vtbl;
     heap->refcount = 1;
@@ -596,11 +583,7 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
     if (FAILED(hr = validate_heap_desc(&heap->desc, resource)))
         return hr;
 
-    if ((rc = vkd3d_mutex_init(&heap->mutex)))
-    {
-        ERR("Failed to initialize mutex, error %d.\n", rc);
-        return hresult_from_errno(rc);
-    }
+    vkd3d_mutex_init(&heap->mutex);
 
     if (FAILED(hr = vkd3d_private_store_init(&heap->private_store)))
     {

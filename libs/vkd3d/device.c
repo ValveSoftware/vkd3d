@@ -2052,13 +2052,8 @@ static HRESULT d3d12_device_init_pipeline_cache(struct d3d12_device *device)
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkPipelineCacheCreateInfo cache_info;
     VkResult vr;
-    int rc;
 
-    if ((rc = vkd3d_mutex_init(&device->mutex)))
-    {
-        ERR("Failed to initialize mutex, error %d.\n", rc);
-        return hresult_from_errno(rc);
-    }
+    vkd3d_mutex_init(&device->mutex);
 
     cache_info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
     cache_info.pNext = NULL;
@@ -2149,17 +2144,12 @@ D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_al
         size_t alignment, size_t size, void *ptr)
 {
     D3D12_GPU_VIRTUAL_ADDRESS address;
-    int rc;
 
     if (size > ~(size_t)0 - (alignment - 1))
         return 0;
     size = align(size, alignment);
 
-    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return 0;
-    }
+    vkd3d_mutex_lock(&allocator->mutex);
 
     if (size <= VKD3D_VA_SLAB_SIZE && allocator->free_slab)
         address = vkd3d_gpu_va_allocator_allocate_slab(allocator, size, ptr);
@@ -2225,7 +2215,6 @@ void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocato
         D3D12_GPU_VIRTUAL_ADDRESS address)
 {
     void *ret;
-    int rc;
 
     /* If we land in the non-fallback region, dereferencing VA is lock-less.
      * The base pointer is immutable, and the only way we can have a data race
@@ -2237,11 +2226,7 @@ void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocato
         return vkd3d_gpu_va_allocator_dereference_slab(allocator, address);
 
     /* Slow fallback. */
-    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return NULL;
-    }
+    vkd3d_mutex_lock(&allocator->mutex);
 
     ret = vkd3d_gpu_va_allocator_dereference_fallback(allocator, address);
 
@@ -2298,13 +2283,7 @@ static void vkd3d_gpu_va_allocator_free_fallback(struct vkd3d_gpu_va_allocator *
 
 void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address)
 {
-    int rc;
-
-    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return;
-    }
+    vkd3d_mutex_lock(&allocator->mutex);
 
     if (address < VKD3D_VA_FALLBACK_BASE)
     {
@@ -2321,7 +2300,6 @@ void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12
 static bool vkd3d_gpu_va_allocator_init(struct vkd3d_gpu_va_allocator *allocator)
 {
     unsigned int i;
-    int rc;
 
     memset(allocator, 0, sizeof(*allocator));
     allocator->fallback_floor = VKD3D_VA_FALLBACK_BASE;
@@ -2341,25 +2319,14 @@ static bool vkd3d_gpu_va_allocator_init(struct vkd3d_gpu_va_allocator *allocator
         allocator->slabs[i].ptr = &allocator->slabs[i + 1];
     }
 
-    if ((rc = vkd3d_mutex_init(&allocator->mutex)))
-    {
-        ERR("Failed to initialize mutex, error %d.\n", rc);
-        vkd3d_free(allocator->slabs);
-        return false;
-    }
+    vkd3d_mutex_init(&allocator->mutex);
 
     return true;
 }
 
 static void vkd3d_gpu_va_allocator_cleanup(struct vkd3d_gpu_va_allocator *allocator)
 {
-    int rc;
-
-    if ((rc = vkd3d_mutex_lock(&allocator->mutex)))
-    {
-        ERR("Failed to lock mutex, error %d.\n", rc);
-        return;
-    }
+    vkd3d_mutex_lock(&allocator->mutex);
     vkd3d_free(allocator->slabs);
     vkd3d_free(allocator->fallback_allocations);
     vkd3d_mutex_unlock(&allocator->mutex);
