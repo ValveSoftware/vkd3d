@@ -455,7 +455,7 @@ static void check_buffer_uint_(unsigned int line, ID3D12Resource *buffer,
 
 static bool broken_on_warp(bool condition)
 {
-    return broken(use_warp_device && condition);
+    return broken(test_options.use_warp_device && condition);
 }
 
 static bool is_min_max_filtering_supported(ID3D12Device *device)
@@ -2347,7 +2347,8 @@ static void test_create_reserved_resource(void)
     hr = ID3D12Device_CreateReservedResource(device,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL,
             &IID_ID3D12Resource, (void **)&resource);
-    ok(hr == (standard_swizzle ? S_OK : E_INVALIDARG) || broken(use_warp_device), "Got unexpected hr %#x.\n", hr);
+    ok(hr == (standard_swizzle ? S_OK : E_INVALIDARG) || broken(test_options.use_warp_device),
+            "Got unexpected hr %#x.\n", hr);
     if (SUCCEEDED(hr))
         ID3D12Resource_Release(resource);
 
@@ -5302,7 +5303,7 @@ static void test_draw_instanced(void)
 
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
 
-    if (!use_warp_device)
+    if (!test_options.use_warp_device)
     {
         /* This draw call is ignored. */
         ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
@@ -5347,7 +5348,7 @@ static void test_draw_indexed_instanced(void)
 
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
 
-    if (!use_warp_device)
+    if (!test_options.use_warp_device)
     {
         /* This draw call is ignored. */
         ID3D12GraphicsCommandList_DrawIndexedInstanced(command_list, 3, 1, 0, 0, 0);
@@ -7430,7 +7431,7 @@ static void test_bundle_state_inheritance(void)
         return;
     }
 
-    if (use_warp_device)
+    if (test_options.use_warp_device)
     {
         skip("Bundle state inheritance test crashes on WARP.\n");
         return;
@@ -10430,7 +10431,7 @@ static void test_shader_instructions(void)
     {
         vkd3d_test_set_context("%u:%s", i, tests[i].ps->name);
 
-        if (tests[i].skip_on_warp && use_warp_device)
+        if (tests[i].skip_on_warp && test_options.use_warp_device)
         {
             skip("Skipping shader '%s' test on WARP.\n", tests[i].ps->name);
             continue;
@@ -10483,7 +10484,7 @@ static void test_shader_instructions(void)
     {
         vkd3d_test_set_context("%u:%s", i, uint_tests[i].ps->name);
 
-        if (uint_tests[i].skip_on_warp && use_warp_device)
+        if (uint_tests[i].skip_on_warp && test_options.use_warp_device)
         {
             skip("Skipping shader '%s' test on WARP.\n", uint_tests[i].ps->name);
             continue;
@@ -13652,7 +13653,7 @@ static void test_texture_ld(void)
         {{ 3,  3, 3, 3}, 0x55555555},
     };
 
-    if (use_warp_device)
+    if (test_options.use_warp_device)
     {
         skip("WARP device is removed when ps_ld is used.\n");
         return;
@@ -31927,7 +31928,7 @@ static void test_multisample_rendering(void)
     static const D3D12_SHADER_BYTECODE ps_resolve = {ps_resolve_code, sizeof(ps_resolve_code)};
     static const unsigned int expected_colors[] = {0xff0000ff, 0xff00ff00, 0xffff0000, 0xff000000};
 
-    if (use_warp_device)
+    if (test_options.use_warp_device)
     {
         skip("Sample shading tests fail on WARP.\n");
         return;
@@ -32166,7 +32167,7 @@ static void test_coverage(void)
         { ~0u, 0xff00ff00},
     };
 
-    if (use_warp_device)
+    if (test_options.use_warp_device)
     {
         skip("Sample shading tests fail on WARP.\n");
         return;
@@ -32577,7 +32578,7 @@ static void test_shader_eval_attribute(void)
     static const struct vec4 expected_vec4 = {0.0f, 0.0f, 0.0f, 1.0f};
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-    if (use_warp_device)
+    if (test_options.use_warp_device)
     {
         skip("Sample shading tests fail on WARP.\n");
         return;
@@ -36106,7 +36107,7 @@ static void test_clock_calibration(void)
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
-    enable_d3d12_debug_layer(argc, argv);
+    enable_d3d12_debug_layer();
     init_adapter_info();
 
     pfn_D3D12CreateVersionedRootSignatureDeserializer = get_d3d12_pfn(D3D12CreateVersionedRootSignatureDeserializer);

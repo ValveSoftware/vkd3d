@@ -523,7 +523,7 @@ void run_shader_tests_d3d12(int argc, char **argv)
     HRESULT hr;
 
     parse_args(argc, argv);
-    enable_d3d12_debug_layer(argc, argv);
+    enable_d3d12_debug_layer();
     init_adapter_info();
     init_test_context(&runner.test_context, &desc);
     device = runner.test_context.device;

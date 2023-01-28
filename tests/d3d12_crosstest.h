@@ -258,8 +258,13 @@ static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12Comm
     ID3D12Fence_Release(fence);
 }
 
-static bool use_warp_device;
-static unsigned int use_adapter_idx;
+static struct test_options
+{
+    bool use_warp_device;
+    unsigned int adapter_idx;
+    bool enable_debug_layer;
+    bool enable_gpu_based_validation;
+} test_options;
 
 #ifdef VKD3D_CROSSTEST
 static IUnknown *create_warp_adapter(IDXGIFactory4 *factory)
@@ -283,13 +288,13 @@ static IUnknown *create_adapter(void)
     hr = CreateDXGIFactory1(&IID_IDXGIFactory4, (void **)&factory);
     ok(hr == S_OK, "Failed to create IDXGIFactory4, hr %#x.\n", hr);
 
-    if (use_warp_device && (adapter = create_warp_adapter(factory)))
+    if (test_options.use_warp_device && (adapter = create_warp_adapter(factory)))
     {
         IDXGIFactory4_Release(factory);
         return adapter;
     }
 
-    hr = IDXGIFactory4_EnumAdapters(factory, use_adapter_idx, (IDXGIAdapter **)&adapter);
+    hr = IDXGIFactory4_EnumAdapters(factory, test_options.adapter_idx, (IDXGIAdapter **)&adapter);
     IDXGIFactory4_Release(factory);
     if (FAILED(hr))
         trace("Failed to get adapter, hr %#x.\n", hr);
@@ -302,7 +307,8 @@ static ID3D12Device *create_device(void)
     ID3D12Device *device;
     HRESULT hr;
 
-    if ((use_warp_device || use_adapter_idx) && !(adapter = create_adapter()))
+    if ((test_options.use_warp_device || test_options.adapter_idx)
+            && !(adapter = create_adapter()))
     {
         trace("Failed to create adapter.\n");
         return NULL;
@@ -344,7 +350,7 @@ static void init_adapter_info(void)
     if (desc.VendorId == 0x1414 && desc.DeviceId == 0x008c)
     {
         trace("Using WARP device.\n");
-        use_warp_device = true;
+        test_options.use_warp_device = true;
     }
 
     IDXGIAdapter_Release(dxgi_adapter);
@@ -493,9 +499,9 @@ static VkPhysicalDevice select_physical_device(struct vkd3d_instance *instance)
     vr = vkEnumeratePhysicalDevices(vk_instance, &count, NULL);
     ok(vr == VK_SUCCESS, "Got unexpected VkResult %d.\n", vr);
 
-    if (use_adapter_idx >= count)
+    if (test_options.adapter_idx >= count)
     {
-        trace("Invalid physical device index %u.\n", use_adapter_idx);
+        trace("Invalid physical device index %u.\n", test_options.adapter_idx);
         return VK_NULL_HANDLE;
     }
 
@@ -504,7 +510,7 @@ static VkPhysicalDevice select_physical_device(struct vkd3d_instance *instance)
     vr = vkEnumeratePhysicalDevices(vk_instance, &count, vk_physical_devices);
     ok(vr == VK_SUCCESS, "Got unexpected VkResult %d.\n", vr);
 
-    vk_physical_device = vk_physical_devices[use_adapter_idx];
+    vk_physical_device = vk_physical_devices[test_options.adapter_idx];
 
     free(vk_physical_devices);
 
@@ -676,34 +682,28 @@ static void parse_args(int argc, char **argv)
     for (i = 1; i < argc; ++i)
     {
         if (!strcmp(argv[i], "--warp"))
-            use_warp_device = true;
+            test_options.use_warp_device = true;
         else if (!strcmp(argv[i], "--adapter") && i + 1 < argc)
-            use_adapter_idx = atoi(argv[++i]);
+            test_options.adapter_idx = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--validate"))
+            test_options.enable_debug_layer = true;
+        else if (!strcmp(argv[i], "--gbv"))
+            test_options.enable_gpu_based_validation = true;
     }
 }
 
-static void enable_d3d12_debug_layer(int argc, char **argv)
+static void enable_d3d12_debug_layer(void)
 {
-    bool enable_debug_layer = false, enable_gpu_based_validation = false;
     ID3D12Debug1 *debug1;
     ID3D12Debug *debug;
-    unsigned int i;
 
-    for (i = 1; i < argc; ++i)
-    {
-        if (!strcmp(argv[i], "--validate"))
-            enable_debug_layer = true;
-        else if (!strcmp(argv[i], "--gbv"))
-            enable_gpu_based_validation = true;
-    }
-
-    if (enable_gpu_based_validation)
+    if (test_options.enable_gpu_based_validation)
     {
         if (SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug1, (void **)&debug1)))
         {
             ID3D12Debug1_SetEnableGPUBasedValidation(debug1, true);
             ID3D12Debug1_Release(debug1);
-            enable_debug_layer = true;
+            test_options.enable_debug_layer = true;
         }
         else
         {
@@ -711,7 +711,8 @@ static void enable_d3d12_debug_layer(int argc, char **argv)
         }
     }
 
-    if (enable_debug_layer && SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug, (void **)&debug)))
+    if (test_options.enable_debug_layer
+            && SUCCEEDED(D3D12GetDebugInterface(&IID_ID3D12Debug, (void **)&debug)))
     {
         ID3D12Debug_EnableDebugLayer(debug);
         ID3D12Debug_Release(debug);

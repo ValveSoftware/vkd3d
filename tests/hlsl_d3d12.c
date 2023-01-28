@@ -576,7 +576,7 @@ static void test_thread_id(void)
 START_TEST(hlsl_d3d12)
 {
     parse_args(argc, argv);
-    enable_d3d12_debug_layer(argc, argv);
+    enable_d3d12_debug_layer();
     init_adapter_info();
 
     run_test(test_preprocess);
