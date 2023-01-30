@@ -1,0 +1,23 @@
+[pixel shader]
+uniform float4 x;
+uniform float4 y;
+
+float4 main() : sv_target
+{
+    return distance(x, y);
+}
+
+[test]
+uniform 0 float4 -2.0 3.0 4.0 0.1
+uniform 4 float4 2.0 -1.0 4.0 5.0
+draw quad
+probe all rgba (7.483983, 7.483983, 7.483983, 7.483983) 1
+
+[pixel shader]
+uniform int4 x;
+uniform int4 y;
+
+float4 main() : sv_target
+{
+    return distance(x, y);
+}

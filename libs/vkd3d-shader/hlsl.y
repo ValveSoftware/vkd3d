@@ -2533,6 +2533,29 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, mul2, mul1_neg, loc);
 }
 
+static bool intrinsic_distance(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg1, *arg2, *neg, *add, *dot;
+
+    if (!(arg1 = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    if (!(arg2 = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
+        return false;
+
+    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, arg2, loc)))
+        return false;
+
+    if (!(add = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, arg1, neg, loc)))
+        return false;
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, add, add, loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SQRT, dot, loc);
+}
+
 static bool intrinsic_dot(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3203,6 +3226,7 @@ intrinsic_functions[] =
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cos",                                 1, true,  intrinsic_cos},
     {"cross",                               2, true,  intrinsic_cross},
+    {"distance",                            2, true,  intrinsic_distance},
     {"dot",                                 2, true,  intrinsic_dot},
     {"exp",                                 1, true,  intrinsic_exp},
     {"exp2",                                1, true,  intrinsic_exp2},
