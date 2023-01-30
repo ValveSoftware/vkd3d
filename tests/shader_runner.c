@@ -705,8 +705,6 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
     char line[256];
     FILE *f;
 
-    runner->minimum_shader_model = SHADER_MODEL_2_0;
-
     for (i = 1; i < argc; ++i)
     {
         if (argv[i][0] != '-')
@@ -730,6 +728,7 @@ void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const
 
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
+    runner->minimum_shader_model = SHADER_MODEL_2_0;
 
     for (;;)
     {
