@@ -2234,6 +2234,22 @@ static void dump_function(struct rb_entry *entry, void *context)
     rb_for_each_entry(&func->overloads, dump_function_decl, ctx);
 }
 
+static char get_regset_name(enum hlsl_regset regset)
+{
+    switch (regset)
+    {
+        case HLSL_REGSET_SAMPLERS:
+            return 's';
+        case HLSL_REGSET_TEXTURES:
+            return 't';
+        case HLSL_REGSET_UAVS:
+            return 'u';
+        case HLSL_REGSET_NUMERIC:
+            vkd3d_unreachable();
+    }
+    vkd3d_unreachable();
+}
+
 /* Compute the earliest and latest liveness for each variable. In the case that
  * a variable is accessed inside of a loop, we promote its liveness to extend
  * to at least the range of the entire loop. Note that we don't need to do this
@@ -2885,50 +2901,28 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, char type, uint32_t index)
+static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, enum hlsl_regset regset,
+        uint32_t index)
 {
     const struct hlsl_ir_var *var;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->last_read && var->reg_reservation.type == type && var->reg_reservation.index == index)
+        if (var->last_read && var->reg_reservation.type == get_regset_name(regset)
+                && var->reg_reservation.index == index)
             return var;
     }
     return NULL;
 }
 
-static const struct object_type_info
+static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 {
-    enum hlsl_base_type type;
-    char reg_name;
-}
-object_types[] =
-{
-    { HLSL_TYPE_SAMPLER, 's' },
-    { HLSL_TYPE_TEXTURE, 't' },
-    { HLSL_TYPE_UAV, 'u' },
-};
-
-static const struct object_type_info *get_object_type_info(enum hlsl_base_type type)
-{
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(object_types); ++i)
-        if (type == object_types[i].type)
-            return &object_types[i];
-
-    WARN("No type info for object type %u.\n", type);
-    return NULL;
-}
-
-static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
-{
-    const struct object_type_info *type_info = get_object_type_info(type);
+    char regset_name = get_regset_name(regset);
     struct hlsl_ir_var *var;
     uint32_t min_index = 0;
     uint32_t index;
 
-    if (type == HLSL_TYPE_UAV)
+    if (regset == HLSL_REGSET_UAVS)
     {
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
@@ -2942,21 +2936,17 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        enum hlsl_regset regset;
-
-        if (!var->last_read || var->data_type->type != HLSL_CLASS_OBJECT
-                || var->data_type->base_type != type)
+        if (!var->last_read || var->data_type->reg_size[regset] == 0)
             continue;
 
-        regset = hlsl_type_get_regset(var->data_type);
-
-        if (var->reg_reservation.type == type_info->reg_name)
+        if (var->reg_reservation.type == regset_name)
         {
-            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, type_info->reg_name,
+            const struct hlsl_ir_var *reserved_object = get_reserved_object(ctx, regset,
                     var->reg_reservation.index);
 
             if (var->reg_reservation.index < min_index)
             {
+                assert(regset == HLSL_REGSET_UAVS);
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "UAV index (%u) must be higher than the maximum render target index (%u).",
                         var->reg_reservation.index, min_index - 1);
@@ -2964,25 +2954,24 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             else if (reserved_object && reserved_object != var)
             {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                        "Multiple objects bound to %c%u.", type_info->reg_name,
-                        var->reg_reservation.index);
+                        "Multiple objects bound to %c%u.", regset_name, var->reg_reservation.index);
                 hlsl_note(ctx, &reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
-                        "Object '%s' is already bound to %c%u.", reserved_object->name,
-                        type_info->reg_name, var->reg_reservation.index);
+                        "Object '%s' is already bound to %c%u.", reserved_object->name, regset_name,
+                        var->reg_reservation.index);
             }
 
             var->regs[regset].id = var->reg_reservation.index;
             var->regs[regset].allocated = true;
-            TRACE("Allocated reserved %s to %c%u.\n", var->name, type_info->reg_name, var->reg_reservation.index);
+            TRACE("Allocated reserved %s to %c%u.\n", var->name, regset_name, var->regs[regset].id);
         }
         else if (!var->reg_reservation.type)
         {
-            while (get_reserved_object(ctx, type_info->reg_name, index))
+            while (get_reserved_object(ctx, regset, index))
                 ++index;
 
             var->regs[regset].id = index;
             var->regs[regset].allocated = true;
-            TRACE("Allocated object to %c%u.\n", type_info->reg_name, index);
+            TRACE("Allocated object to %c%u.\n", regset_name, index);
             ++index;
         }
         else
@@ -2992,7 +2981,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_base_type type)
             type_string = hlsl_type_to_string(ctx, var->data_type);
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                     "Object of type '%s' must be bound to register type '%c'.",
-                    type_string->buffer, type_info->reg_name);
+                    type_string->buffer, regset_name);
             hlsl_release_string_buffer(ctx, type_string);
         }
     }
@@ -3318,11 +3307,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     else
     {
         allocate_buffers(ctx);
-        allocate_objects(ctx, HLSL_TYPE_TEXTURE);
-        allocate_objects(ctx, HLSL_TYPE_UAV);
+        allocate_objects(ctx, HLSL_REGSET_TEXTURES);
+        allocate_objects(ctx, HLSL_REGSET_UAVS);
     }
     allocate_semantic_registers(ctx);
-    allocate_objects(ctx, HLSL_TYPE_SAMPLER);
+    allocate_objects(ctx, HLSL_REGSET_SAMPLERS);
 
     if (ctx->result)
         return ctx->result;
