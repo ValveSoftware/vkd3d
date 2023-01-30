@@ -153,7 +153,7 @@ static int x = 1;
     [numthreads((x = 2), 1, 1)]
 void main() {}
 
-[compute shader]
+[compute shader todo]
 
 static int x = 1;
 

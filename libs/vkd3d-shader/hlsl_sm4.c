@@ -2360,6 +2360,10 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
         switch (instr->type)
         {
+            case HLSL_IR_CALL:
+                hlsl_fixme(ctx, &instr->loc, "Inline call instructions.\n");
+                break;
+
             case HLSL_IR_CONSTANT:
                 write_sm4_constant(ctx, buffer, hlsl_ir_constant(instr));
                 break;
