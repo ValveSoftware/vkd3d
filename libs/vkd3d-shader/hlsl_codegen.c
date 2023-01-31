@@ -2908,7 +2908,7 @@ static const struct hlsl_ir_var *get_reserved_object(struct hlsl_ctx *ctx, enum 
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (var->last_read && var->reg_reservation.type == get_regset_name(regset)
+        if (var->reg_reservation.type == get_regset_name(regset)
                 && var->reg_reservation.index == index)
             return var;
     }
