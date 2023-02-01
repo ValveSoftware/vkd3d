@@ -79,6 +79,9 @@ struct parse_function
 {
     char *name;
     struct hlsl_ir_function_decl *decl;
+    struct hlsl_func_parameters parameters;
+    struct hlsl_semantic return_semantic;
+    bool first;
 };
 
 struct parse_if_body
@@ -1109,7 +1112,7 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
     return reservation;
 }
 
-static const struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs,
+static struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs,
         const char *name, const struct hlsl_func_parameters *parameters)
 {
     struct hlsl_ir_function *func;
@@ -3731,28 +3734,15 @@ hlsl_prog:
       %empty
     | hlsl_prog func_declaration
         {
-            const struct hlsl_ir_function_decl *decl;
-
-            decl = get_func_decl(&ctx->functions, $2.name, &$2.decl->parameters);
-            if (decl)
+            if ($2.first)
             {
-                if (decl->has_body && $2.decl->has_body)
-                {
-                    hlsl_error(ctx, &$2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                            "Function \"%s\" is already defined.", $2.name);
-                    hlsl_note(ctx, &decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously defined here.", $2.name);
-                    YYABORT;
-                }
-                else if (!hlsl_types_are_equal(decl->return_type, $2.decl->return_type))
-                {
-                    hlsl_error(ctx, &$2.decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                            "Function \"%s\" was already declared with a different return type.", $2.name);
-                    hlsl_note(ctx, &decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", $2.name);
-                    YYABORT;
-                }
+                hlsl_add_function(ctx, $2.name, $2.decl);
             }
-
-            hlsl_add_function(ctx, $2.name, $2.decl);
+            else
+            {
+                vkd3d_free($2.parameters.vars);
+                hlsl_cleanup_semantic(&$2.return_semantic);
+            }
         }
     | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement
@@ -3997,11 +3987,55 @@ attribute_list:
 func_declaration:
       func_prototype compound_statement
         {
-            $$ = $1;
-            $$.decl->has_body = true;
-            list_move_tail(&$$.decl->body.instrs, $2);
-            vkd3d_free($2);
+            struct hlsl_ir_function_decl *decl = $1.decl;
+
+            if (decl->has_body)
+            {
+                hlsl_error(ctx, &decl->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                         "Function \"%s\" is already defined.", decl->func->name);
+                hlsl_note(ctx, &decl->loc, VKD3D_SHADER_LOG_ERROR,
+                         "\"%s\" was previously defined here.", decl->func->name);
+                hlsl_free_instr_list($2);
+            }
+            else
+            {
+                size_t i;
+
+                decl->has_body = true;
+                list_move_tail(&decl->body.instrs, $2);
+                vkd3d_free($2);
+
+                /* Semantics are taken from whichever definition has a body.
+                 * We can't just replace the hlsl_ir_var pointers, though: if
+                 * the function was already declared but not defined, the
+                 * callers would have used the old declaration's parameters to
+                 * transfer arguments. */
+
+                if (!$1.first)
+                {
+                    assert(decl->parameters.count == $1.parameters.count);
+
+                    for (i = 0; i < $1.parameters.count; ++i)
+                    {
+                        struct hlsl_ir_var *dst = decl->parameters.vars[i];
+                        struct hlsl_ir_var *src = $1.parameters.vars[i];
+
+                        hlsl_cleanup_semantic(&dst->semantic);
+                        dst->semantic = src->semantic;
+                        memset(&src->semantic, 0, sizeof(src->semantic));
+                    }
+
+                    if (decl->return_var)
+                    {
+                        hlsl_cleanup_semantic(&decl->return_var->semantic);
+                        decl->return_var->semantic = $1.return_semantic;
+                        memset(&$1.return_semantic, 0, sizeof($1.return_semantic));
+                    }
+                }
+            }
             hlsl_pop_scope(ctx);
+
+            $$ = $1;
         }
     | func_prototype ';'
         {
@@ -4038,18 +4072,100 @@ func_prototype_no_attrs:
             if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
 
-            if (!($$.decl = hlsl_new_func_decl(ctx, type, &$5, &$7.semantic, &@3)))
-                YYABORT;
-            $$.name = $3;
-            ctx->cur_function = $$.decl;
+            if (($$.decl = get_func_decl(&ctx->functions, $3, &$5)))
+            {
+                const struct hlsl_func_parameters *params = &$$.decl->parameters;
+                size_t i;
+
+                if (!hlsl_types_are_equal($2, $$.decl->return_type))
+                {
+                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                            "\"%s\" was already declared with a different return type.", $3);
+                    hlsl_note(ctx, &$$.decl->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", $3);
+                }
+
+                vkd3d_free($3);
+
+                /* We implement function invocation by copying to input
+                 * parameters, emitting a HLSL_IR_CALL instruction, then copying
+                 * from output parameters. As a result, we need to use the same
+                 * parameter variables for every invocation of this function,
+                 * which means we use the parameters created by the first
+                 * declaration. If we're not the first declaration, the
+                 * parameter variables that just got created will end up being
+                 * mostly ignored—in particular, they won't be used in actual
+                 * IR.
+                 *
+                 * There is a hitch: if this is the actual definition, the
+                 * function body will look up parameter variables by name. We
+                 * must return the original parameters, and not the ones we just
+                 * created, but we're in the wrong scope, and the parameters
+                 * might not even have the same names.
+                 *
+                 * Therefore we need to shuffle the parameters we just created
+                 * into a dummy scope where they'll never be looked up, and
+                 * rename the original parameters so they have the expected
+                 * names. We actually do this for every prototype: we don't know
+                 * whether this is the function definition yet, but it doesn't
+                 * really matter. The variables can only be used in the
+                 * actual definition, and don't do anything in a declaration.
+                 *
+                 * This is complex, and it seems tempting to avoid this logic by
+                 * putting arguments into the HLSL_IR_CALL instruction, letting
+                 * the canonical variables be the ones attached to the function
+                 * definition, and resolving the copies when inlining. The
+                 * problem with this is output parameters. We would have to use
+                 * a lot of parsing logic on already lowered IR, which is
+                 * brittle and ugly.
+                 */
+
+                assert($5.count == params->count);
+                for (i = 0; i < params->count; ++i)
+                {
+                    struct hlsl_ir_var *orig_param = params->vars[i];
+                    struct hlsl_ir_var *new_param = $5.vars[i];
+                    char *new_name;
+
+                    list_remove(&orig_param->scope_entry);
+                    list_add_tail(&ctx->cur_scope->vars, &orig_param->scope_entry);
+
+                    list_remove(&new_param->scope_entry);
+                    list_add_tail(&ctx->dummy_scope->vars, &new_param->scope_entry);
+
+                    if (!(new_name = hlsl_strdup(ctx, new_param->name)))
+                        YYABORT;
+                    vkd3d_free((void *)orig_param->name);
+                    orig_param->name = new_name;
+                }
+
+                $$.first = false;
+                $$.parameters = $5;
+                $$.return_semantic = $7.semantic;
+            }
+            else
+            {
+                if (!($$.decl = hlsl_new_func_decl(ctx, type, &$5, &$7.semantic, &@3)))
+                    YYABORT;
+                $$.name = $3;
+                ctx->cur_function = $$.decl;
+
+                $$.first = true;
+            }
         }
 
 func_prototype:
       func_prototype_no_attrs
     | attribute_list func_prototype_no_attrs
         {
-            $2.decl->attr_count = $1.count;
-            $2.decl->attrs = $1.attrs;
+            if ($2.first)
+            {
+                $2.decl->attr_count = $1.count;
+                $2.decl->attrs = $1.attrs;
+            }
+            else
+            {
+                free($1.attrs);
+            }
             $$ = $2;
         }
 

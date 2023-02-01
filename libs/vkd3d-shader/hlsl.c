@@ -2204,38 +2204,16 @@ static void free_function_rb(struct rb_entry *entry, void *context)
 void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function_decl *decl)
 {
     struct hlsl_ir_function *func;
-    struct rb_entry *func_entry, *old_entry;
+    struct rb_entry *func_entry;
 
     func_entry = rb_get(&ctx->functions, name);
     if (func_entry)
     {
         func = RB_ENTRY_VALUE(func_entry, struct hlsl_ir_function, entry);
         decl->func = func;
-        if ((old_entry = rb_get(&func->overloads, &decl->parameters)))
-        {
-            struct hlsl_ir_function_decl *old_decl =
-                    RB_ENTRY_VALUE(old_entry, struct hlsl_ir_function_decl, entry);
-            unsigned int i;
 
-            if (!decl->has_body)
-            {
-                free_function_decl(decl);
-                vkd3d_free(name);
-                return;
-            }
-
-            for (i = 0; i < decl->attr_count; ++i)
-                hlsl_free_attribute((void *)decl->attrs[i]);
-            vkd3d_free((void *)decl->attrs);
-            decl->attr_count = old_decl->attr_count;
-            decl->attrs = old_decl->attrs;
-            old_decl->attr_count = 0;
-            old_decl->attrs = NULL;
-
-            rb_remove(&func->overloads, old_entry);
-            free_function_decl(old_decl);
-        }
-        rb_put(&func->overloads, &decl->parameters, &decl->entry);
+        if (rb_put(&func->overloads, &decl->parameters, &decl->entry) == -1)
+            ERR("Failed to insert function overload.\n");
         vkd3d_free(name);
         return;
     }
