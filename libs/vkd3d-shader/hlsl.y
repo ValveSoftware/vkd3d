@@ -77,7 +77,6 @@ struct parse_variable_def
 
 struct parse_function
 {
-    char *name;
     struct hlsl_ir_function_decl *decl;
     struct hlsl_func_parameters parameters;
     struct hlsl_semantic return_semantic;
@@ -3690,7 +3689,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <fields> field
 %type <fields> fields_list
 
-%type <function> func_declaration
 %type <function> func_prototype
 %type <function> func_prototype_no_attrs
 
@@ -3733,17 +3731,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 hlsl_prog:
       %empty
     | hlsl_prog func_declaration
-        {
-            if ($2.first)
-            {
-                hlsl_add_function(ctx, $2.name, $2.decl);
-            }
-            else
-            {
-                vkd3d_free($2.parameters.vars);
-                hlsl_cleanup_semantic(&$2.return_semantic);
-            }
-        }
     | hlsl_prog buffer_declaration buffer_body
     | hlsl_prog declaration_statement
         {
@@ -4035,11 +4022,14 @@ func_declaration:
             }
             hlsl_pop_scope(ctx);
 
-            $$ = $1;
+            if (!$1.first)
+            {
+                vkd3d_free($1.parameters.vars);
+                hlsl_cleanup_semantic(&$1.return_semantic);
+            }
         }
     | func_prototype ';'
         {
-            $$ = $1;
             hlsl_pop_scope(ctx);
         }
 
@@ -4146,8 +4136,9 @@ func_prototype_no_attrs:
             {
                 if (!($$.decl = hlsl_new_func_decl(ctx, type, &$5, &$7.semantic, &@3)))
                     YYABORT;
-                $$.name = $3;
                 ctx->cur_function = $$.decl;
+
+                hlsl_add_function(ctx, $3, $$.decl);
 
                 $$.first = true;
             }
