@@ -1200,8 +1200,9 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
     return loop;
 }
 
-struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc)
+struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
+        struct hlsl_type *return_type, const struct hlsl_func_parameters *parameters,
+        const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_function_decl *decl;
 
@@ -1209,7 +1210,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hl
         return NULL;
     list_init(&decl->body.instrs);
     decl->return_type = return_type;
-    decl->parameters = parameters;
+    decl->parameters = *parameters;
     decl->loc = *loc;
 
     if (!hlsl_types_are_equal(return_type, ctx->builtin_types.Void))
@@ -1336,27 +1337,18 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
 
 static int compare_function_decl_rb(const void *key, const struct rb_entry *entry)
 {
-    const struct list *params = key;
     const struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, const struct hlsl_ir_function_decl, entry);
-    int decl_params_count = decl->parameters ? list_count(decl->parameters) : 0;
-    int params_count = params ? list_count(params) : 0;
-    struct list *p1cur, *p2cur;
+    const struct hlsl_func_parameters *parameters = key;
+    size_t i;
     int r;
 
-    if ((r = vkd3d_u32_compare(params_count, decl_params_count)))
+    if ((r = vkd3d_u32_compare(parameters->count, decl->parameters.count)))
         return r;
 
-    p1cur = params ? list_head(params) : NULL;
-    p2cur = decl->parameters ? list_head(decl->parameters) : NULL;
-    while (p1cur && p2cur)
+    for (i = 0; i < parameters->count; ++i)
     {
-        struct hlsl_ir_var *p1, *p2;
-        p1 = LIST_ENTRY(p1cur, struct hlsl_ir_var, param_entry);
-        p2 = LIST_ENTRY(p2cur, struct hlsl_ir_var, param_entry);
-        if ((r = compare_param_hlsl_types(p1->data_type, p2->data_type)))
+        if ((r = compare_param_hlsl_types(parameters->vars[i]->data_type, decl->parameters.vars[i]->data_type)))
             return r;
-        p1cur = list_next(params, p1cur);
-        p2cur = list_next(decl->parameters, p2cur);
     }
     return 0;
 }
@@ -1655,7 +1647,7 @@ static void dump_ir_call(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffe
 {
     const struct hlsl_ir_function_decl *decl = call->decl;
     struct vkd3d_string_buffer *string;
-    const struct hlsl_ir_var *param;
+    size_t i;
 
     if (!(string = hlsl_type_to_string(ctx, decl->return_type)))
         return;
@@ -1663,14 +1655,16 @@ static void dump_ir_call(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffe
     vkd3d_string_buffer_printf(buffer, "call %s %s(", string->buffer, decl->func->name);
     hlsl_release_string_buffer(ctx, string);
 
-    LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+    for (i = 0; i < decl->parameters.count; ++i)
     {
+        const struct hlsl_ir_var *param = decl->parameters.vars[i];
+
         if (!(string = hlsl_type_to_string(ctx, param->data_type)))
             return;
 
-        vkd3d_string_buffer_printf(buffer, "%s", string->buffer);
-        if (list_tail(decl->parameters) != &param->param_entry)
+        if (i)
             vkd3d_string_buffer_printf(buffer, ", ");
+        vkd3d_string_buffer_printf(buffer, "%s", string->buffer);
 
         hlsl_release_string_buffer(ctx, string);
     }
@@ -1960,14 +1954,14 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl *func)
 {
     struct vkd3d_string_buffer buffer;
-    struct hlsl_ir_var *param;
+    size_t i;
 
     vkd3d_string_buffer_init(&buffer);
     vkd3d_string_buffer_printf(&buffer, "Dumping function %s.\n", func->func->name);
     vkd3d_string_buffer_printf(&buffer, "Function parameters:\n");
-    LIST_FOR_EACH_ENTRY(param, func->parameters, struct hlsl_ir_var, param_entry)
+    for (i = 0; i < func->parameters.count; ++i)
     {
-        dump_ir_var(ctx, &buffer, param);
+        dump_ir_var(ctx, &buffer, func->parameters.vars[i]);
         vkd3d_string_buffer_printf(&buffer, "\n");
     }
     if (func->has_body)
@@ -2169,7 +2163,7 @@ static void free_function_decl(struct hlsl_ir_function_decl *decl)
         hlsl_free_attribute((void *)decl->attrs[i]);
     vkd3d_free((void *)decl->attrs);
 
-    vkd3d_free(decl->parameters);
+    vkd3d_free(decl->parameters.vars);
     hlsl_free_instr_list(&decl->body.instrs);
     vkd3d_free(decl);
 }
@@ -2201,7 +2195,7 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     {
         func = RB_ENTRY_VALUE(func_entry, struct hlsl_ir_function, entry);
         decl->func = func;
-        if ((old_entry = rb_get(&func->overloads, decl->parameters)))
+        if ((old_entry = rb_get(&func->overloads, &decl->parameters)))
         {
             struct hlsl_ir_function_decl *old_decl =
                     RB_ENTRY_VALUE(old_entry, struct hlsl_ir_function_decl, entry);
@@ -2225,7 +2219,7 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
             rb_remove(&func->overloads, old_entry);
             free_function_decl(old_decl);
         }
-        rb_put(&func->overloads, decl->parameters, &decl->entry);
+        rb_put(&func->overloads, &decl->parameters, &decl->entry);
         vkd3d_free(name);
         return;
     }
@@ -2233,7 +2227,7 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     func->name = name;
     rb_init(&func->overloads, compare_function_decl_rb);
     decl->func = func;
-    rb_put(&func->overloads, decl->parameters, &decl->entry);
+    rb_put(&func->overloads, &decl->parameters, &decl->entry);
     rb_put(&ctx->functions, func->name, &func->entry);
 }
 

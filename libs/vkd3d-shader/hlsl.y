@@ -1067,7 +1067,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
     return true;
 }
 
-static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
+static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters *parameters,
         struct parse_parameter *param, const struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_var *var;
@@ -1088,7 +1088,11 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct list *list,
         hlsl_free_var(var);
         return false;
     }
-    list_add_tail(list, &var->param_entry);
+
+    if (!hlsl_array_reserve(ctx, (void **)&parameters->vars, &parameters->capacity,
+            parameters->count + 1, sizeof(*parameters->vars)))
+        return false;
+    parameters->vars[parameters->count++] = var;
     return true;
 }
 
@@ -1105,7 +1109,8 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
     return reservation;
 }
 
-static const struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs, char *name, struct list *params)
+static const struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs,
+        const char *name, const struct hlsl_func_parameters *parameters)
 {
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
@@ -1114,7 +1119,7 @@ static const struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs, 
     {
         func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
 
-        if ((entry = rb_get(&func->overloads, params)))
+        if ((entry = rb_get(&func->overloads, parameters)))
             return RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     }
     return NULL;
@@ -2224,17 +2229,17 @@ static void find_function_call_exact(struct rb_entry *entry, void *context)
 {
     struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
     struct find_function_call_args *args = context;
-    const struct hlsl_ir_var *param;
-    unsigned int i = 0;
+    unsigned int i;
 
-    LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+    if (decl->parameters.count != args->params->args_count)
+        return;
+
+    for (i = 0; i < decl->parameters.count; ++i)
     {
-        if (i >= args->params->args_count
-                || !hlsl_types_are_equal(param->data_type, args->params->args[i++]->data_type))
+        if (!hlsl_types_are_equal(decl->parameters.vars[i]->data_type, args->params->args[i]->data_type))
             return;
     }
-    if (i == args->params->args_count)
-        args->decl = decl;
+    args->decl = decl;
 }
 
 static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
@@ -3000,15 +3005,14 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
     if ((decl = find_function_call(ctx, name, args)))
     {
         struct hlsl_ir_node *call;
-        struct hlsl_ir_var *param;
         unsigned int i;
 
-        assert(args->args_count == list_count(decl->parameters));
+        assert(args->args_count == decl->parameters.count);
 
-        i = 0;
-        LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+        for (i = 0; i < decl->parameters.count; ++i)
         {
-            struct hlsl_ir_node *arg = args->args[i++];
+            struct hlsl_ir_var *param = decl->parameters.vars[i];
+            struct hlsl_ir_node *arg = args->args[i];
 
             if (!hlsl_types_are_equal(arg->data_type, param->data_type))
             {
@@ -3030,10 +3034,10 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
             goto fail;
         list_add_tail(args->instrs, &call->entry);
 
-        i = 0;
-        LIST_FOR_EACH_ENTRY(param, decl->parameters, struct hlsl_ir_var, param_entry)
+        for (i = 0; i < decl->parameters.count; ++i)
         {
-            struct hlsl_ir_node *arg = args->args[i++];
+            struct hlsl_ir_var *param = decl->parameters.vars[i];
+            struct hlsl_ir_node *arg = args->args[i];
 
             if (param->storage_modifiers & HLSL_STORAGE_OUT)
             {
@@ -3510,6 +3514,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     struct parse_fields fields;
     struct parse_function function;
     struct parse_parameter parameter;
+    struct hlsl_func_parameters parameters;
     struct parse_initializer initializer;
     struct parse_array_sizes arrays;
     struct parse_variable_def *variable_def;
@@ -3647,8 +3652,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <list> logicor_expr
 %type <list> loop_statement
 %type <list> mul_expr
-%type <list> param_list
-%type <list> parameters
 %type <list> postfix_expr
 %type <list> primary_expr
 %type <list> relational_expr
@@ -3702,6 +3705,9 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <parameter> parameter
 
+%type <parameters> param_list
+%type <parameters> parameters
+
 %type <reg_reservation> register_opt
 
 %type <sampler_dim> texture_type uav_type
@@ -3727,7 +3733,7 @@ hlsl_prog:
         {
             const struct hlsl_ir_function_decl *decl;
 
-            decl = get_func_decl(&ctx->functions, $2.name, $2.decl->parameters);
+            decl = get_func_decl(&ctx->functions, $2.name, &$2.decl->parameters);
             if (decl)
             {
                 if (decl->has_body && $2.decl->has_body)
@@ -4032,7 +4038,7 @@ func_prototype_no_attrs:
             if ($7.reg_reservation.type)
                 FIXME("Unexpected register reservation for a function.\n");
 
-            if (!($$.decl = hlsl_new_func_decl(ctx, type, $5, &$7.semantic, &@3)))
+            if (!($$.decl = hlsl_new_func_decl(ctx, type, &$5, &$7.semantic, &@3)))
                 YYABORT;
             $$.name = $3;
             ctx->cur_function = $$.decl;
@@ -4117,8 +4123,7 @@ register_opt:
 parameters:
       scope_start
         {
-            if (!($$ = make_empty_list(ctx)))
-                YYABORT;
+            memset(&$$, 0, sizeof($$));
         }
     | scope_start param_list
         {
@@ -4128,9 +4133,8 @@ parameters:
 param_list:
       parameter
         {
-            if (!($$ = make_empty_list(ctx)))
-                YYABORT;
-            if (!add_func_parameter(ctx, $$, &$1, @1))
+            memset(&$$, 0, sizeof($$));
+            if (!add_func_parameter(ctx, &$$, &$1, @1))
             {
                 ERR("Error adding function parameter %s.\n", $1.name);
                 YYABORT;
@@ -4139,7 +4143,7 @@ param_list:
     | param_list ',' parameter
         {
             $$ = $1;
-            if (!add_func_parameter(ctx, $$, &$3, @3))
+            if (!add_func_parameter(ctx, &$$, &$3, @3))
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                         "Parameter \"%s\" is already declared.", $3.name);

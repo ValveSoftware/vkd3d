@@ -2933,8 +2933,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             prepend_uniform_copy(ctx, &body->instrs, var);
     }
 
-    LIST_FOR_EACH_ENTRY(var, entry_func->parameters, struct hlsl_ir_var, param_entry)
+    for (i = 0; i < entry_func->parameters.count; ++i)
     {
+        var = entry_func->parameters.vars[i];
+
         if (var->data_type->type == HLSL_CLASS_OBJECT || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
             prepend_uniform_copy(ctx, &body->instrs, var);

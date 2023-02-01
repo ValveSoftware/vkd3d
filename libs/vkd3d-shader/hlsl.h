@@ -360,8 +360,6 @@ struct hlsl_ir_var
 
     /* Item entry in hlsl_scope.vars. Specifically hlsl_ctx.globals.vars if the variable is global. */
     struct list scope_entry;
-    /* Item entry in hlsl_ir_function_decl.parameters, if the variable is a function parameter. */
-    struct list param_entry;
     /* Item entry in hlsl_ctx.extern_vars, if the variable is extern. */
     struct list extern_entry;
 
@@ -392,6 +390,13 @@ struct hlsl_ir_var
     uint32_t is_param : 1;
 };
 
+/* Sized array of variables representing a function's parameters. */
+struct hlsl_func_parameters
+{
+    struct hlsl_ir_var **vars;
+    size_t count, capacity;
+};
+
 struct hlsl_ir_function
 {
     /* Item entry in hlsl_ctx.functions */
@@ -415,9 +420,8 @@ struct hlsl_ir_function_decl
 
     /* Function to which this declaration corresponds. */
     struct hlsl_ir_function *func;
-    /* List containing one variable for each parameter of the function; linked by the
-     *   hlsl_ir_var.param_entry fields. */
-    struct list *parameters;
+
+    struct hlsl_func_parameters parameters;
 
     struct hlsl_block body;
     bool has_body;
@@ -1006,8 +1010,9 @@ struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op
         struct hlsl_type *data_type, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_constant *hlsl_new_float_constant(struct hlsl_ctx *ctx,
         float f, const struct vkd3d_shader_location *loc);
-struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx, struct hlsl_type *return_type,
-        struct list *parameters, const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
+        struct hlsl_type *return_type, const struct hlsl_func_parameters *parameters,
+        const struct hlsl_semantic *semantic, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condition, struct vkd3d_shader_location loc);
 struct hlsl_ir_constant *hlsl_new_int_constant(struct hlsl_ctx *ctx, int n,
         const struct vkd3d_shader_location *loc);
