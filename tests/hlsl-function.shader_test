@@ -106,6 +106,9 @@ float4 main() : sv_target
     return 0;
 }
 
+% The function must have been at least declared before calling it. It may have
+% been declared with a different but compatible type, though.
+
 [pixel shader fail]
 
 float4 main() : sv_target
@@ -117,6 +120,64 @@ float4 main() : sv_target
 void func()
 {
 }
+
+[pixel shader todo]
+
+void func();
+
+float4 main() : sv_target
+{
+    func();
+    return 0;
+}
+
+void func()
+{
+}
+
+[pixel shader fail]
+
+void func(float arg);
+
+float4 main() : sv_target
+{
+    func();
+    return 0;
+}
+
+void func()
+{
+}
+
+[pixel shader todo]
+
+/* This is something of an internal test: we need to make sure that we use the
+ * correct variables for a function's arguments and returns regardless of
+ * whether it's been defined yet.
+ *
+ * Also, make sure that we can handle the case where the argument names differ.
+ */
+
+float2 concat(float x, float y);
+
+float2 func(void)
+{
+    return concat(0.1, 0.2);
+}
+
+float2 concat(float a, float b)
+{
+    return float2(a, b);
+}
+
+float4 main() : sv_target
+{
+    return float4(func(), concat(0.3, 0.4));
+}
+
+[test]
+todo draw quad
+todo probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 [pixel shader todo]
 
