@@ -922,7 +922,7 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     free_parse_initializer(&v->initializer);
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
-    vkd3d_free((void *)v->semantic.name);
+    hlsl_cleanup_semantic(&v->semantic);
     vkd3d_free(v);
 }
 

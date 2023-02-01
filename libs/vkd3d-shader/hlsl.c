@@ -113,7 +113,7 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
 void hlsl_free_var(struct hlsl_ir_var *decl)
 {
     vkd3d_free((void *)decl->name);
-    vkd3d_free((void *)decl->semantic.name);
+    hlsl_cleanup_semantic(&decl->semantic);
     vkd3d_free(decl);
 }
 
@@ -1998,7 +1998,7 @@ void hlsl_free_type(struct hlsl_type *type)
             field = &type->e.record.fields[i];
 
             vkd3d_free((void *)field->name);
-            vkd3d_free((void *)field->semantic.name);
+            hlsl_cleanup_semantic(&field->semantic);
         }
         vkd3d_free((void *)type->e.record.fields);
     }
@@ -2153,6 +2153,12 @@ void hlsl_free_attribute(struct hlsl_attribute *attr)
     hlsl_free_instr_list(&attr->instrs);
     vkd3d_free((void *)attr->name);
     vkd3d_free(attr);
+}
+
+void hlsl_cleanup_semantic(struct hlsl_semantic *semantic)
+{
+    vkd3d_free((void *)semantic->name);
+    memset(semantic, 0, sizeof(*semantic));
 }
 
 static void free_function_decl(struct hlsl_ir_function_decl *decl)

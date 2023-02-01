@@ -227,7 +227,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
             type, var->loc, &new_semantic, modifiers, NULL)))
     {
         hlsl_release_string_buffer(ctx, name);
-        vkd3d_free((void *)new_semantic.name);
+        hlsl_cleanup_semantic(&new_semantic);
         return NULL;
     }
     hlsl_release_string_buffer(ctx, name);

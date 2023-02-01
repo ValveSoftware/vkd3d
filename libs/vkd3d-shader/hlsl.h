@@ -974,7 +974,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
 
 bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struct hlsl_deref *other);
+
 void hlsl_cleanup_deref(struct hlsl_deref *deref);
+void hlsl_cleanup_semantic(struct hlsl_semantic *semantic);
 
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
 
