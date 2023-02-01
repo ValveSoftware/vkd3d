@@ -2897,6 +2897,7 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
     vkd3d_desc.miplevel_count = 1;
     vkd3d_desc.layer_idx = 0;
     vkd3d_desc.layer_count = 1;
+    vkd3d_desc.vk_image_aspect = VK_IMAGE_ASPECT_COLOR_BIT;
     vkd3d_desc.components.r = VK_COMPONENT_SWIZZLE_ZERO;
     vkd3d_desc.components.g = VK_COMPONENT_SWIZZLE_ZERO;
     vkd3d_desc.components.b = VK_COMPONENT_SWIZZLE_ZERO;
