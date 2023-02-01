@@ -698,6 +698,8 @@ struct hlsl_ctx
     struct hlsl_scope *cur_scope;
     /* Scope of global variables. */
     struct hlsl_scope *globals;
+    /* Dummy scope for variables which should never be looked up by name. */
+    struct hlsl_scope *dummy_scope;
     /* List of all the scopes in the program; linked by the hlsl_scope.entry fields. */
     struct list scopes;
     /* List of all the extern variables; linked by the hlsl_ir_var.extern_entry fields.

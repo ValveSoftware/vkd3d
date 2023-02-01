@@ -804,7 +804,7 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *tem
     var = hlsl_new_var(ctx, name, type, *loc, NULL, 0, NULL);
     hlsl_release_string_buffer(ctx, string);
     if (var)
-        list_add_tail(&ctx->globals->vars, &var->scope_entry);
+        list_add_tail(&ctx->dummy_scope->vars, &var->scope_entry);
     return var;
 }
 
@@ -1258,18 +1258,28 @@ static int compare_hlsl_types_rb(const void *key, const struct rb_entry *entry)
     return strcmp(name, type->name);
 }
 
+static struct hlsl_scope *hlsl_new_scope(struct hlsl_ctx *ctx, struct hlsl_scope *upper)
+{
+    struct hlsl_scope *scope;
+
+    if (!(scope = hlsl_alloc(ctx, sizeof(*scope))))
+        return NULL;
+    list_init(&scope->vars);
+    rb_init(&scope->types, compare_hlsl_types_rb);
+    scope->upper = upper;
+    list_add_tail(&ctx->scopes, &scope->entry);
+    return scope;
+}
+
 void hlsl_push_scope(struct hlsl_ctx *ctx)
 {
     struct hlsl_scope *new_scope;
 
-    if (!(new_scope = hlsl_alloc(ctx, sizeof(*new_scope))))
+    if (!(new_scope = hlsl_new_scope(ctx, ctx->cur_scope)))
         return;
+
     TRACE("Pushing a new scope.\n");
-    list_init(&new_scope->vars);
-    rb_init(&new_scope->types, compare_hlsl_types_rb);
-    new_scope->upper = ctx->cur_scope;
     ctx->cur_scope = new_scope;
-    list_add_tail(&ctx->scopes, &new_scope->entry);
 }
 
 void hlsl_pop_scope(struct hlsl_ctx *ctx)
@@ -2572,6 +2582,13 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
     ctx->matrix_majority = HLSL_COLUMN_MAJOR;
 
     list_init(&ctx->scopes);
+
+    if (!(ctx->dummy_scope = hlsl_new_scope(ctx, NULL)))
+    {
+        vkd3d_free((void *)ctx->source_files[0]);
+        vkd3d_free(ctx->source_files);
+        return false;
+    }
     hlsl_push_scope(ctx);
     ctx->globals = ctx->cur_scope;
 
