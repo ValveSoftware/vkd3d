@@ -2231,6 +2231,15 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
     return ret;
 }
 
+static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx, struct liveness *liveness,
+        unsigned int first_write, unsigned int last_read, const struct hlsl_type *type)
+{
+    if (type->type <= HLSL_CLASS_VECTOR)
+        return allocate_register(ctx, liveness, first_write, last_read, type->reg_size, type->dimx);
+    else
+        return allocate_range(ctx, liveness, first_write, last_read, type->reg_size);
+}
+
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
 {
     static const char writemask_offset[] = {'w','x','y','z'};
@@ -2254,12 +2263,9 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
 
     if (!var->reg.allocated && var->last_read)
     {
-        if (var->data_type->reg_size > 4)
-            var->reg = allocate_range(ctx, liveness, var->first_write,
-                    var->last_read, var->data_type->reg_size);
-        else
-            var->reg = allocate_register(ctx, liveness, var->first_write,
-                    var->last_read, var->data_type->reg_size, var->data_type->reg_size);
+        var->reg = allocate_numeric_registers_for_type(ctx, liveness, var->first_write, var->last_read,
+                var->data_type);
+
         TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name,
                 debug_register('r', var->reg, var->data_type), var->first_write, var->last_read);
     }
@@ -2273,12 +2279,8 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
     {
         if (!instr->reg.allocated && instr->last_read)
         {
-            if (instr->data_type->reg_size > 4)
-                instr->reg = allocate_range(ctx, liveness, instr->index,
-                        instr->last_read, instr->data_type->reg_size);
-            else
-                instr->reg = allocate_register(ctx, liveness, instr->index,
-                        instr->last_read, instr->data_type->reg_size, instr->data_type->reg_size);
+            instr->reg = allocate_numeric_registers_for_type(ctx, liveness, instr->index, instr->last_read,
+                    instr->data_type);
             TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
                     debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
         }
@@ -2338,10 +2340,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                 unsigned int x, y, i, writemask, end_reg;
                 unsigned int reg_size = type->reg_size;
 
-                if (reg_size > 4)
-                    constant->reg = allocate_range(ctx, liveness, 1, UINT_MAX, reg_size);
-                else
-                    constant->reg = allocate_register(ctx, liveness, 1, UINT_MAX, reg_size, reg_size);
+                constant->reg = allocate_numeric_registers_for_type(ctx, liveness, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
@@ -2438,10 +2437,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             if (var->data_type->reg_size == 0)
                 continue;
 
-            if (var->data_type->reg_size > 4)
-                var->reg = allocate_range(ctx, &liveness, 1, UINT_MAX, var->data_type->reg_size);
-            else
-                var->reg = allocate_register(ctx, &liveness, 1, UINT_MAX, 4, var->data_type->reg_size);
+            var->reg = allocate_numeric_registers_for_type(ctx, &liveness, 1, UINT_MAX, var->data_type);
             TRACE("Allocated %s to %s.\n", var->name, debug_register('c', var->reg, var->data_type));
         }
     }
