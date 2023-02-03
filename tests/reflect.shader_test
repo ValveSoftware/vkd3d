@@ -1,0 +1,101 @@
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    return reflect(i, n);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+draw quad
+probe all rgba (-0.1, -0.5, 0.5, -0.7) 4
+
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    float i1 = i.x;
+
+    return reflect(i1, n);
+}
+
+[test]
+uniform 0 float4 0.5 0.0 0.0 0.0
+uniform 4 float4 0.6 0.4 -0.3 1.0
+draw quad
+probe all rgba (-0.52, -0.18, 1.01, -1.2) 4
+
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    float n1 = n.x;
+
+    return reflect(i, n1);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.0 0.0 0.0
+draw quad
+probe all rgba (-0.148, -0.748, -0.448, -0.348) 4
+
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    float i1 = i.x;
+    float n1 = n.x;
+
+    return reflect(i1, n1);
+}
+
+[test]
+uniform 0 float4 0.5 0.0 0.0 0.0
+uniform 4 float4 0.6 0.0 0.0 0.0
+draw quad
+probe all rgba (0.14, 0.14, 0.14, 0.14) 4
+
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    float2 i1 = i.xy;
+
+    return float4(reflect(i1, n), 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.0 0.0
+uniform 4 float4 0.6 0.4 -0.3 1.0
+draw quad
+probe all rgba (0.188, -0.308, 0.0, 0.0) 4
+
+[pixel shader]
+uniform float4 i;
+uniform float4 n;
+
+float4 main() : sv_target
+{
+    float3 i1 = i.xyz;
+    float2 n1 = n.xy;
+
+    return float4(reflect(i1, n1), 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.0
+uniform 4 float4 0.6 0.4 0.0 0.0
+draw quad
+probe all rgba (0.188, -0.308, 0.0, 0.0) 4

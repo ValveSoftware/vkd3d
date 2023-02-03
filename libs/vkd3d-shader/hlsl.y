@@ -2774,6 +2774,27 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_reflect(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *i = params->args[0], *n = params->args[1];
+    struct hlsl_ir_node *dot, *mul_n, *two_dot, *neg;
+
+    if (!(dot = add_binary_dot_expr(ctx, params->instrs, i, n, loc)))
+        return false;
+
+    if (!(two_dot = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, dot, dot, loc)))
+        return false;
+
+    if (!(mul_n = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, n, two_dot, loc)))
+        return false;
+
+    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, mul_n, loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, i, neg, loc);
+}
+
 static bool intrinsic_round(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2982,6 +3003,7 @@ intrinsic_functions[] =
     {"mul",                                 2, true,  intrinsic_mul},
     {"normalize",                           1, true,  intrinsic_normalize},
     {"pow",                                 2, true,  intrinsic_pow},
+    {"reflect",                             2, true,  intrinsic_reflect},
     {"round",                               1, true,  intrinsic_round},
     {"saturate",                            1, true,  intrinsic_saturate},
     {"sin",                                 1, true,  intrinsic_sin},
