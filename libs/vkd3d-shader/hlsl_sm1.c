@@ -512,13 +512,14 @@ static void write_sm1_binary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buff
 
 static void write_sm1_unary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
-        const struct hlsl_reg *src, D3DSHADER_PARAM_SRCMOD_TYPE src_mod)
+        const struct hlsl_reg *src, D3DSHADER_PARAM_SRCMOD_TYPE src_mod, D3DSHADER_PARAM_DSTMOD_TYPE dst_mod)
 {
     const struct sm1_instruction instr =
     {
         .opcode = opcode,
 
         .dst.type = D3DSPR_TEMP,
+        .dst.mod = dst_mod,
         .dst.writemask = dst->writemask,
         .dst.reg = dst->id,
         .has_dst = 1,
@@ -649,7 +650,7 @@ static void write_sm1_per_component_unary_op(struct hlsl_ctx *ctx, struct vkd3d_
 
         src.writemask = hlsl_combine_writemasks(src.writemask, 1u << i);
         dst.writemask = hlsl_combine_writemasks(dst.writemask, 1u << i);
-        write_sm1_unary_op(ctx, buffer, opcode, &dst, &src, 0);
+        write_sm1_unary_op(ctx, buffer, opcode, &dst, &src, 0, 0);
     }
 }
 
@@ -676,7 +677,11 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP1_NEG:
-            write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG);
+            write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, D3DSPSM_NEG, 0);
+            break;
+
+        case HLSL_OP1_SAT:
+            write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, 0, D3DSPDM_SATURATE);
             break;
 
         case HLSL_OP1_RCP:
@@ -704,7 +709,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP1_FRACT:
-            write_sm1_unary_op(ctx, buffer, D3DSIO_FRC, &instr->reg, &arg1->reg, D3DSPSM_NONE);
+            write_sm1_unary_op(ctx, buffer, D3DSIO_FRC, &instr->reg, &arg1->reg, D3DSPSM_NONE, 0);
             break;
 
         case HLSL_OP2_DOT:
