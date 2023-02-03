@@ -462,13 +462,13 @@ static void sm1_map_src_swizzle(struct sm1_src_register *src, unsigned int map_w
     src->swizzle = hlsl_map_swizzle(src->swizzle, map_writemask);
 }
 
-static void write_sm1_ternary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
-        const struct hlsl_reg *src1, const struct hlsl_reg *src2, const struct hlsl_reg *src3)
+static void write_sm1_dp2add(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_reg *dst, const struct hlsl_reg *src1, const struct hlsl_reg *src2,
+        const struct hlsl_reg *src3)
 {
     struct sm1_instruction instr =
     {
-        .opcode = opcode,
+        .opcode = D3DSIO_DP2ADD,
 
         .dst.type = D3DSPR_TEMP,
         .dst.writemask = dst->writemask,
@@ -487,9 +487,6 @@ static void write_sm1_ternary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buf
         .src_count = 3,
     };
 
-    sm1_map_src_swizzle(&instr.srcs[0], instr.dst.writemask);
-    sm1_map_src_swizzle(&instr.srcs[1], instr.dst.writemask);
-    sm1_map_src_swizzle(&instr.srcs[2], instr.dst.writemask);
     write_sm1_instruction(ctx, buffer, &instr);
 }
 
@@ -742,7 +739,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP3_DP2ADD:
-            write_sm1_ternary_op(ctx, buffer, D3DSIO_DP2ADD, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
+            write_sm1_dp2add(ctx, buffer, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
 
         default:
