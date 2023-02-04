@@ -244,10 +244,7 @@ static inline void vkd3d_cond_broadcast(struct vkd3d_cond *cond)
 
 static inline void vkd3d_cond_wait(struct vkd3d_cond *cond, struct vkd3d_mutex *lock)
 {
-    BOOL ret;
-
-    ret = SleepConditionVariableCS(&cond->cond, &lock->lock, INFINITE);
-    if (ret)
+    if (!SleepConditionVariableCS(&cond->cond, &lock->lock, INFINITE))
         ERR("Could not sleep on the condition variable, error %u.\n", GetLastError());
 }
 
