@@ -1601,6 +1601,8 @@ void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator,
             return NULL;
         if (allocator->current)
             allocator->current->next = next;
+        else
+            allocator->head = next;
         allocator->current = next;
         allocator->index = 0;
     }
