@@ -1591,6 +1591,31 @@ static bool lower_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *co
     return true;
 }
 
+/* Lower ABS to MAX */
+static bool lower_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *arg, *neg, *replacement;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    arg = expr->operands[0].node;
+    if (expr->op != HLSL_OP1_ABS)
+        return false;
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &neg->entry);
+
+    if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_MAX, neg, arg)))
+        return false;
+    list_add_before(&instr->entry, &replacement->entry);
+
+    hlsl_replace_node(instr, replacement);
+    return true;
+}
+
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
@@ -3007,6 +3032,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         transform_ir(ctx, lower_division, body, NULL);
         transform_ir(ctx, lower_sqrt, body, NULL);
         transform_ir(ctx, lower_dot, body, NULL);
+    }
+
+    if (profile->major_version < 2)
+    {
+        transform_ir(ctx, lower_abs, body, NULL);
     }
 
     transform_ir(ctx, validate_static_object_references, body, NULL);

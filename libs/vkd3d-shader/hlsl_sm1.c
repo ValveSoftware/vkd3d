@@ -682,6 +682,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     switch (expr->op)
     {
+        case HLSL_OP1_ABS:
+            write_sm1_unary_op(ctx, buffer, D3DSIO_ABS, &instr->reg, &arg1->reg, 0, 0);
+            break;
+
         case HLSL_OP1_EXP2:
             write_sm1_per_component_unary_op(ctx, buffer, instr, D3DSIO_EXP);
             break;
