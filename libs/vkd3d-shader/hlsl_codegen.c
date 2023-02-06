@@ -2131,7 +2131,7 @@ struct liveness
 };
 
 static unsigned int get_available_writemask(struct liveness *liveness,
-        unsigned int first_write, unsigned int component_idx, unsigned int component_count)
+        unsigned int first_write, unsigned int component_idx, unsigned int reg_size)
 {
     unsigned int i, writemask = 0, count = 0;
 
@@ -2140,7 +2140,7 @@ static unsigned int get_available_writemask(struct liveness *liveness,
         if (liveness->regs[component_idx + i].last_read <= first_write)
         {
             writemask |= 1u << i;
-            if (++count == component_count)
+            if (++count == reg_size)
                 return writemask;
         }
     }
@@ -2161,21 +2161,21 @@ static bool resize_liveness(struct hlsl_ctx *ctx, struct liveness *liveness, siz
 }
 
 static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *liveness,
-        unsigned int first_write, unsigned int last_read, unsigned int component_count)
+        unsigned int first_write, unsigned int last_read, unsigned int reg_size)
 {
     unsigned int component_idx, writemask, i;
     struct hlsl_reg ret = {0};
 
     for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
     {
-        if ((writemask = get_available_writemask(liveness, first_write, component_idx, component_count)))
+        if ((writemask = get_available_writemask(liveness, first_write, component_idx, reg_size)))
             break;
     }
     if (component_idx == liveness->size)
     {
         if (!resize_liveness(ctx, liveness, component_idx + 4))
             return ret;
-        writemask = (1u << component_count) - 1;
+        writemask = (1u << reg_size) - 1;
     }
     for (i = 0; i < 4; ++i)
     {
@@ -2190,11 +2190,11 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *
 }
 
 static bool is_range_available(struct liveness *liveness, unsigned int first_write,
-        unsigned int component_idx, unsigned int component_count)
+        unsigned int component_idx, unsigned int reg_size)
 {
     unsigned int i;
 
-    for (i = 0; i < component_count; i += 4)
+    for (i = 0; i < reg_size; i += 4)
     {
         if (!get_available_writemask(liveness, first_write, component_idx + i, 4))
             return false;
@@ -2203,7 +2203,7 @@ static bool is_range_available(struct liveness *liveness, unsigned int first_wri
 }
 
 static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liveness,
-        unsigned int first_write, unsigned int last_read, unsigned int component_count)
+        unsigned int first_write, unsigned int last_read, unsigned int reg_size)
 {
     unsigned int i, component_idx;
     struct hlsl_reg ret = {0};
@@ -2211,17 +2211,17 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liv
     for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
     {
         if (is_range_available(liveness, first_write, component_idx,
-                min(component_count, liveness->size - component_idx)))
+                min(reg_size, liveness->size - component_idx)))
             break;
     }
-    if (!resize_liveness(ctx, liveness, component_idx + component_count))
+    if (!resize_liveness(ctx, liveness, component_idx + reg_size))
         return ret;
 
-    for (i = 0; i < component_count; ++i)
+    for (i = 0; i < reg_size; ++i)
         liveness->regs[component_idx + i].last_read = last_read;
     ret.id = component_idx / 4;
     ret.allocated = true;
-    liveness->reg_count = max(liveness->reg_count, ret.id + align(component_count, 4));
+    liveness->reg_count = max(liveness->reg_count, ret.id + align(reg_size, 4));
     return ret;
 }
 
