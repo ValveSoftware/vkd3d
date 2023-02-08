@@ -26,7 +26,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
 static void d3d12_fence_signal_timeline_semaphore(struct d3d12_fence *fence, uint64_t timeline_value);
 static HRESULT d3d12_command_queue_signal(struct d3d12_command_queue *command_queue,
         struct d3d12_fence *fence, uint64_t value);
-static bool d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any);
+static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any);
 
 HRESULT vkd3d_queue_create(struct d3d12_device *device,
         uint32_t family_index, const VkQueueFamilyProperties *properties, struct vkd3d_queue **queue)
@@ -636,26 +636,22 @@ static HRESULT d3d12_fence_update_pending_value(struct d3d12_fence *fence)
     return S_OK;
 }
 
-static HRESULT d3d12_device_add_blocked_command_queues(struct d3d12_device *device,
-        struct d3d12_command_queue * const *command_queues, unsigned int count)
+static HRESULT d3d12_command_queue_record_as_blocked(struct d3d12_command_queue *command_queue)
 {
+    struct d3d12_device *device = command_queue->device;
     HRESULT hr = S_OK;
-    unsigned int i;
-
-    if (count == 0)
-        return S_OK;
 
     vkd3d_mutex_lock(&device->blocked_queues_mutex);
 
-    if ((i = ARRAY_SIZE(device->blocked_queues) - device->blocked_queue_count) < count)
+    if (device->blocked_queue_count < ARRAY_SIZE(device->blocked_queues))
     {
-        FIXME("Failed to add %u blocked command queue(s) to device %p.\n", count - i, device);
-        count = i;
+        device->blocked_queues[device->blocked_queue_count++] = command_queue;
+    }
+    else
+    {
+        WARN("Failed to add blocked command queue %p to device %p.\n", command_queue, device);
         hr = E_FAIL;
     }
-
-    for (i = 0; i < count; ++i)
-        device->blocked_queues[device->blocked_queue_count++] = command_queues[i];
 
     vkd3d_mutex_unlock(&device->blocked_queues_mutex);
     return hr;
@@ -665,6 +661,7 @@ static HRESULT d3d12_device_flush_blocked_queues_once(struct d3d12_device *devic
 {
     struct d3d12_command_queue *blocked_queues[VKD3D_MAX_DEVICE_BLOCKED_QUEUES];
     unsigned int i, blocked_queue_count;
+    HRESULT hr = S_OK;
 
     *flushed_any = false;
 
@@ -679,18 +676,17 @@ static HRESULT d3d12_device_flush_blocked_queues_once(struct d3d12_device *devic
 
     vkd3d_mutex_unlock(&device->blocked_queues_mutex);
 
-    i = 0;
-    while (i < blocked_queue_count)
+    for (i = 0; i < blocked_queue_count; ++i)
     {
-        if (d3d12_command_queue_flush_ops(blocked_queues[i], flushed_any))
-            blocked_queues[i] = blocked_queues[--blocked_queue_count];
-        else
-            ++i;
+        HRESULT new_hr;
+
+        new_hr = d3d12_command_queue_flush_ops(blocked_queues[i], flushed_any);
+
+        if (SUCCEEDED(hr))
+            hr = new_hr;
     }
 
-    /* None of these queues could have been re-added during the above loop because
-     * blocked queues always have a nonzero op count. */
-    return d3d12_device_add_blocked_command_queues(device, blocked_queues, blocked_queue_count);
+    return hr;
 }
 
 static HRESULT d3d12_device_flush_blocked_queues(struct d3d12_device *device)
@@ -6640,7 +6636,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
     /* Add the queue to the blocked list after writing the op to ensure the queue isn't
      * removed again in another thread because it has no ops. */
     if (command_queue->ops_count == 1)
-        hr = d3d12_device_add_blocked_command_queues(command_queue->device, &command_queue, 1);
+        hr = d3d12_command_queue_record_as_blocked(command_queue);
 
     /* The fence must remain locked until the op is created and the queue is added to the blocked list,
      * because if an unblocking d3d12_fence_Signal() call occurs on another thread before the above
@@ -6774,21 +6770,21 @@ static const struct ID3D12CommandQueueVtbl d3d12_command_queue_vtbl =
 };
 
 /* flushed_any is initialised by the caller. */
-static bool d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any)
+static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any)
 {
     struct vkd3d_cs_op_data *op;
     struct d3d12_fence *fence;
-    bool flushed_all = false;
+    HRESULT hr = S_OK;
     unsigned int i;
 
     if (!queue->ops_count)
-        return true;
+        return S_OK;
 
-    /* This function may be re-entered during a call below to d3d12_command_queue_signal().
-     * We return true because the first caller is responsible for re-adding this queue to
-     * the flush list if it ends up returning false. */
+    /* This function may be re-entered when invoking
+     * d3d12_command_queue_signal().  The first call is responsible
+     * for re-adding the queue to the flush list. */
     if (queue->is_flushing)
-        return true;
+        return S_OK;
 
     vkd3d_mutex_lock(&queue->op_mutex);
 
@@ -6808,6 +6804,7 @@ static bool d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, boo
                     vkd3d_mutex_unlock(&fence->mutex);
                     queue->ops_count -= i;
                     memmove(queue->ops, op, queue->ops_count * sizeof(*op));
+                    hr = d3d12_command_queue_record_as_blocked(queue);
                     goto done;
                 }
                 d3d12_command_queue_wait_locked(queue, fence, op->u.wait.value);
@@ -6831,13 +6828,12 @@ static bool d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, boo
     }
 
     queue->ops_count = 0;
-    flushed_all = true;
 
 done:
     queue->is_flushing = false;
 
     vkd3d_mutex_unlock(&queue->op_mutex);
-    return flushed_all;
+    return hr;
 }
 
 static HRESULT d3d12_command_queue_init(struct d3d12_command_queue *queue,
