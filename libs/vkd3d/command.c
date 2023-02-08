@@ -6801,13 +6801,14 @@ static bool d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, boo
         {
             case VKD3D_CS_OP_WAIT:
                 fence = op->u.wait.fence;
+                vkd3d_mutex_lock(&fence->mutex);
                 if (op->u.wait.value > fence->max_pending_value)
                 {
+                    vkd3d_mutex_unlock(&fence->mutex);
                     queue->ops_count -= i;
                     memmove(queue->ops, op, queue->ops_count * sizeof(*op));
                     goto done;
                 }
-                vkd3d_mutex_lock(&fence->mutex);
                 d3d12_command_queue_wait_locked(queue, fence, op->u.wait.value);
                 d3d12_fence_decref(fence);
                 break;
