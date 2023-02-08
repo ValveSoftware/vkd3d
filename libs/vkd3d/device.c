@@ -2462,6 +2462,8 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device *iface)
     {
         const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
 
+        vkd3d_mutex_destroy(&device->blocked_queues_mutex);
+
         vkd3d_private_store_destroy(&device->private_store);
 
         vkd3d_cleanup_format_info(device);
@@ -4119,6 +4121,7 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     vkd3d_time_domains_init(device);
 
     device->blocked_queue_count = 0;
+    vkd3d_mutex_init(&device->blocked_queues_mutex);
 
     for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
         vkd3d_mutex_init(&device->desc_mutex[i]);

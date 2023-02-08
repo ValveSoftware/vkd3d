@@ -645,7 +645,7 @@ static HRESULT d3d12_device_add_blocked_command_queues(struct d3d12_device *devi
     if (count == 0)
         return S_OK;
 
-    vkd3d_mutex_lock(&device->mutex);
+    vkd3d_mutex_lock(&device->blocked_queues_mutex);
 
     if ((i = ARRAY_SIZE(device->blocked_queues) - device->blocked_queue_count) < count)
     {
@@ -657,7 +657,7 @@ static HRESULT d3d12_device_add_blocked_command_queues(struct d3d12_device *devi
     for (i = 0; i < count; ++i)
         device->blocked_queues[device->blocked_queue_count++] = command_queues[i];
 
-    vkd3d_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->blocked_queues_mutex);
     return hr;
 }
 
@@ -668,7 +668,7 @@ static HRESULT d3d12_device_flush_blocked_queues_once(struct d3d12_device *devic
 
     *flushed_any = false;
 
-    vkd3d_mutex_lock(&device->mutex);
+    vkd3d_mutex_lock(&device->blocked_queues_mutex);
 
     /* Flush any ops unblocked by a new pending value. These cannot be flushed
      * with the device locked, so move the queue pointers to a local array. */
@@ -676,7 +676,7 @@ static HRESULT d3d12_device_flush_blocked_queues_once(struct d3d12_device *devic
     memcpy(blocked_queues, device->blocked_queues, blocked_queue_count * sizeof(blocked_queues[0]));
     device->blocked_queue_count = 0;
 
-    vkd3d_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->blocked_queues_mutex);
 
     i = 0;
     while (i < blocked_queue_count)

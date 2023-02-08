@@ -1512,6 +1512,7 @@ struct d3d12_device
     unsigned int queue_family_count;
     VkTimeDomainEXT vk_host_time_domain;
 
+    struct vkd3d_mutex blocked_queues_mutex;
     struct d3d12_command_queue *blocked_queues[VKD3D_MAX_DEVICE_BLOCKED_QUEUES];
     unsigned int blocked_queue_count;
 
