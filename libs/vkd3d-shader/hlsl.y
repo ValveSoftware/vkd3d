@@ -3194,6 +3194,12 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         if (!intrinsic->handler(ctx, args, loc))
             goto fail;
     }
+    else if (rb_get(&ctx->functions, name))
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "No compatible %u parameter declaration for \"%s\" found.",
+                args->args_count, name);
+        goto fail;
+    }
     else
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Function \"%s\" is not defined.", name);
