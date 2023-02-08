@@ -642,6 +642,9 @@ static HRESULT d3d12_device_add_blocked_command_queues(struct d3d12_device *devi
     HRESULT hr = S_OK;
     unsigned int i;
 
+    if (count == 0)
+        return S_OK;
+
     vkd3d_mutex_lock(&device->mutex);
 
     if ((i = ARRAY_SIZE(device->blocked_queues) - device->blocked_queue_count) < count)
@@ -697,8 +700,6 @@ static HRESULT d3d12_device_flush_blocked_queues(struct d3d12_device *device)
     /* Executing an op on one queue may unblock another, so repeat until nothing is flushed. */
     do
     {
-        if (!device->blocked_queue_count)
-            return S_OK;
         if (FAILED(hr = d3d12_device_flush_blocked_queues_once(device, &flushed_any)))
             return hr;
     }
