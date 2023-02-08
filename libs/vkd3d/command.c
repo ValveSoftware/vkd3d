@@ -27,6 +27,7 @@ static void d3d12_fence_signal_timeline_semaphore(struct d3d12_fence *fence, uin
 static HRESULT d3d12_command_queue_signal(struct d3d12_command_queue *command_queue,
         struct d3d12_fence *fence, uint64_t value);
 static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any);
+static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *queue, bool *flushed_any);
 
 HRESULT vkd3d_queue_create(struct d3d12_device *device,
         uint32_t family_index, const VkQueueFamilyProperties *properties, struct vkd3d_queue **queue)
@@ -6147,6 +6148,18 @@ static void d3d12_command_queue_execute(struct d3d12_command_queue *command_queu
     vkd3d_free(buffers);
 }
 
+static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
+{
+    bool flushed_any = false;
+    HRESULT hr;
+
+    if (queue->ops_count == 1)
+    {
+        if (FAILED(hr = d3d12_command_queue_flush_ops_locked(queue, &flushed_any)))
+            ERR("Cannot flush queue, hr %#x.\n", hr);
+    }
+}
+
 static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12CommandQueue *iface,
         UINT command_list_count, ID3D12CommandList * const *command_lists)
 {
@@ -6185,13 +6198,6 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
 
-    if (!command_queue->ops_count)
-    {
-        d3d12_command_queue_execute(command_queue, buffers, command_list_count);
-        vkd3d_mutex_unlock(&command_queue->op_mutex);
-        return;
-    }
-
     if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
     {
         ERR("Failed to add op.\n");
@@ -6200,6 +6206,8 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
     op->opcode = VKD3D_CS_OP_EXECUTE;
     op->u.execute.buffers = buffers;
     op->u.execute.buffer_count = command_list_count;
+
+    d3d12_command_queue_submit_locked(command_queue);
 
     vkd3d_mutex_unlock(&command_queue->op_mutex);
     return;
@@ -6769,13 +6777,9 @@ static const struct ID3D12CommandQueueVtbl d3d12_command_queue_vtbl =
     d3d12_command_queue_GetDesc,
 };
 
-/* flushed_any is initialised by the caller. */
 static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any)
 {
-    struct vkd3d_cs_op_data *op;
-    struct d3d12_fence *fence;
-    HRESULT hr = S_OK;
-    unsigned int i;
+    HRESULT hr;
 
     if (!queue->ops_count)
         return S_OK;
@@ -6787,6 +6791,21 @@ static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, 
         return S_OK;
 
     vkd3d_mutex_lock(&queue->op_mutex);
+
+    hr = d3d12_command_queue_flush_ops_locked(queue, flushed_any);
+
+    vkd3d_mutex_unlock(&queue->op_mutex);
+
+    return hr;
+}
+
+/* flushed_any is initialised by the caller. */
+static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *queue, bool *flushed_any)
+{
+    struct vkd3d_cs_op_data *op;
+    struct d3d12_fence *fence;
+    HRESULT hr = S_OK;
+    unsigned int i;
 
     /* Currently only required for d3d12_command_queue_signal(), but set it here anyway. */
     queue->is_flushing = true;
@@ -6832,7 +6851,6 @@ static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, 
 done:
     queue->is_flushing = false;
 
-    vkd3d_mutex_unlock(&queue->op_mutex);
     return hr;
 }
 
