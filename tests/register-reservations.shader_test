@@ -1,0 +1,51 @@
+[require]
+shader model >= 4.0
+
+
+[texture 0]
+size (1, 1)
+0.0 0.0 0.0 99.0
+
+[texture 1]
+size (1, 1)
+1.0 1.0 1.0 99.0
+
+[texture 2]
+size (1, 1)
+2.0 2.0 2.0 99.0
+
+[texture 3]
+size (1, 1)
+3.0 3.0 3.0 99.0
+
+[texture 4]
+size (1, 1)
+4.0 4.0 4.0 99.0
+
+
+[pixel shader]
+Texture2D unused : register(t0);
+Texture2D tex;
+
+float4 main() : sv_target
+{
+    return tex.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+todo probe all rgba (1.0, 1.0, 1.0, 99.0)
+
+
+[pixel shader]
+Texture2D unused[2][2] : register(t0);
+Texture2D tex;
+
+float4 main() : sv_target
+{
+    return tex.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+todo probe all rgba (4.0, 4.0, 4.0, 99.0)

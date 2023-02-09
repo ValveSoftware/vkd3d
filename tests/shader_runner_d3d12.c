@@ -167,7 +167,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         ID3D12GraphicsCommandList *command_list, unsigned int *uniform_index)
 {
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
-    D3D12_ROOT_PARAMETER root_params[4], *root_param;
+    D3D12_ROOT_PARAMETER root_params[5], *root_param;
     D3D12_STATIC_SAMPLER_DESC static_samplers[1];
     ID3D12RootSignature *root_signature;
     HRESULT hr;
