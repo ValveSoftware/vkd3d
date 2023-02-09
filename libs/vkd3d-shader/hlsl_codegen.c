@@ -125,6 +125,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
+    const struct hlsl_type *type;
     struct hlsl_ir_node *offset;
     struct hlsl_block block;
 
@@ -133,6 +134,16 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
 
     /* register offsets shouldn't be used before this point is reached. */
     assert(!deref->offset.node);
+
+    type = hlsl_deref_get_type(ctx, deref);
+
+    /* Instructions that directly refer to structs or arrays (instead of single-register components)
+     * are removed later by dce. So it is not a problem to just cleanup their derefs. */
+    if (type->type == HLSL_CLASS_STRUCT || type->type == HLSL_CLASS_ARRAY)
+    {
+        hlsl_cleanup_deref(deref);
+        return;
+    }
 
     if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
         return;
