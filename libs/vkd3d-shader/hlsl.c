@@ -2696,8 +2696,13 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         {
             if (!decl->has_body)
                 continue;
+            if (entry_func)
+            {
+                /* Depending on d3dcompiler version, either the first or last is
+                 * selected. */
+                hlsl_fixme(&ctx, &decl->loc, "Multiple valid entry point definitions.");
+            }
             entry_func = decl;
-            break;
         }
     }
 
