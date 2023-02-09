@@ -5999,6 +5999,11 @@ static ULONG STDMETHODCALLTYPE d3d12_command_queue_AddRef(ID3D12CommandQueue *if
     return refcount;
 }
 
+static void d3d12_command_queue_op_array_destroy(struct d3d12_command_queue_op_array *array)
+{
+    vkd3d_free(array->ops);
+}
+
 static ULONG STDMETHODCALLTYPE d3d12_command_queue_Release(ID3D12CommandQueue *iface)
 {
     struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
@@ -6013,7 +6018,8 @@ static ULONG STDMETHODCALLTYPE d3d12_command_queue_Release(ID3D12CommandQueue *i
         vkd3d_fence_worker_stop(&command_queue->fence_worker, device);
 
         vkd3d_mutex_destroy(&command_queue->op_mutex);
-        vkd3d_free(command_queue->ops);
+        d3d12_command_queue_op_array_destroy(&command_queue->op_queue);
+        d3d12_command_queue_op_array_destroy(&command_queue->aux_op_queue);
 
         vkd3d_private_store_destroy(&command_queue->private_store);
 
@@ -6084,12 +6090,12 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_GetDevice(ID3D12CommandQueu
     return d3d12_device_query_interface(command_queue->device, iid, device);
 }
 
-static struct vkd3d_cs_op_data *d3d12_command_queue_require_space_locked(struct d3d12_command_queue *queue)
+static struct vkd3d_cs_op_data *d3d12_command_queue_op_array_require_space(struct d3d12_command_queue_op_array *array)
 {
-    if (!vkd3d_array_reserve((void **)&queue->ops, &queue->ops_size, queue->ops_count + 1, sizeof(*queue->ops)))
+    if (!vkd3d_array_reserve((void **)&array->ops, &array->size, array->count + 1, sizeof(*array->ops)))
         return NULL;
 
-    return &queue->ops[queue->ops_count++];
+    return &array->ops[array->count++];
 }
 
 static void STDMETHODCALLTYPE d3d12_command_queue_UpdateTileMappings(ID3D12CommandQueue *iface,
@@ -6153,7 +6159,7 @@ static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
     bool flushed_any = false;
     HRESULT hr;
 
-    if (queue->ops_count == 1)
+    if (queue->op_queue.count == 1 && !queue->is_flushing)
     {
         if (FAILED(hr = d3d12_command_queue_flush_ops_locked(queue, &flushed_any)))
             ERR("Cannot flush queue, hr %#x.\n", hr);
@@ -6198,7 +6204,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
 
-    if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
         ERR("Failed to add op.\n");
         return;
@@ -6274,7 +6280,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
 
-    if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
         hr = E_OUTOFMEMORY;
         goto done;
@@ -6612,7 +6618,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
 
-    if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
         hr = E_OUTOFMEMORY;
         goto done;
@@ -6751,20 +6757,68 @@ static const struct ID3D12CommandQueueVtbl d3d12_command_queue_vtbl =
     d3d12_command_queue_GetDesc,
 };
 
+static void d3d12_command_queue_swap_queues(struct d3d12_command_queue *queue)
+{
+    struct d3d12_command_queue_op_array array;
+
+    array = queue->op_queue;
+    queue->op_queue = queue->aux_op_queue;
+    queue->aux_op_queue = array;
+}
+
+static bool d3d12_command_queue_op_array_append(struct d3d12_command_queue_op_array *array,
+        size_t count, const struct vkd3d_cs_op_data *new_ops)
+{
+    if (!vkd3d_array_reserve((void **)&array->ops, &array->size, array->count + count, sizeof(*array->ops)))
+    {
+        ERR("Cannot reserve memory for %zu new ops.\n", count);
+        return false;
+    }
+
+    memcpy(&array->ops[array->count], new_ops, count * sizeof(*array->ops));
+    array->count += count;
+
+    return true;
+}
+
+static HRESULT d3d12_command_queue_fixup_after_flush(struct d3d12_command_queue *queue, unsigned int done_count)
+{
+    HRESULT hr;
+
+    queue->aux_op_queue.count -= done_count;
+    memmove(queue->aux_op_queue.ops, &queue->aux_op_queue.ops[done_count],
+            queue->aux_op_queue.count * sizeof(*queue->aux_op_queue.ops));
+
+    vkd3d_mutex_lock(&queue->op_mutex);
+
+    d3d12_command_queue_swap_queues(queue);
+
+    d3d12_command_queue_op_array_append(&queue->op_queue, queue->aux_op_queue.count, queue->aux_op_queue.ops);
+
+    queue->aux_op_queue.count = 0;
+    queue->is_flushing = false;
+
+    hr = d3d12_command_queue_record_as_blocked(queue);
+
+    vkd3d_mutex_unlock(&queue->op_mutex);
+
+    return hr;
+}
+
 static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any)
 {
     HRESULT hr;
 
-    if (!queue->ops_count)
-        return S_OK;
+    vkd3d_mutex_lock(&queue->op_mutex);
 
     /* This function may be re-entered when invoking
      * d3d12_command_queue_signal().  The first call is responsible
      * for re-adding the queue to the flush list. */
     if (queue->is_flushing)
+    {
+        vkd3d_mutex_unlock(&queue->op_mutex);
         return S_OK;
-
-    vkd3d_mutex_lock(&queue->op_mutex);
+    }
 
     hr = d3d12_command_queue_flush_ops_locked(queue, flushed_any);
 
@@ -6778,54 +6832,66 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
 {
     struct vkd3d_cs_op_data *op;
     struct d3d12_fence *fence;
-    HRESULT hr = S_OK;
     unsigned int i;
 
-    /* Currently only required for d3d12_command_queue_signal(), but set it here anyway. */
     queue->is_flushing = true;
 
-    for (i = 0; i < queue->ops_count; ++i)
+    assert(queue->aux_op_queue.count == 0);
+
+    while (queue->op_queue.count != 0)
     {
-        op = &queue->ops[i];
-        switch (op->opcode)
+        d3d12_command_queue_swap_queues(queue);
+
+        vkd3d_mutex_unlock(&queue->op_mutex);
+
+        for (i = 0; i < queue->aux_op_queue.count; ++i)
         {
-            case VKD3D_CS_OP_WAIT:
-                fence = op->u.wait.fence;
-                vkd3d_mutex_lock(&fence->mutex);
-                if (op->u.wait.value > fence->max_pending_value)
-                {
-                    vkd3d_mutex_unlock(&fence->mutex);
-                    queue->ops_count -= i;
-                    memmove(queue->ops, op, queue->ops_count * sizeof(*op));
-                    hr = d3d12_command_queue_record_as_blocked(queue);
-                    goto done;
-                }
-                d3d12_command_queue_wait_locked(queue, fence, op->u.wait.value);
-                d3d12_fence_decref(fence);
-                break;
+            op = &queue->aux_op_queue.ops[i];
+            switch (op->opcode)
+            {
+                case VKD3D_CS_OP_WAIT:
+                    fence = op->u.wait.fence;
+                    vkd3d_mutex_lock(&fence->mutex);
+                    if (op->u.wait.value > fence->max_pending_value)
+                    {
+                        vkd3d_mutex_unlock(&fence->mutex);
+                        return d3d12_command_queue_fixup_after_flush(queue, i);
+                    }
+                    d3d12_command_queue_wait_locked(queue, fence, op->u.wait.value);
+                    d3d12_fence_decref(fence);
+                    break;
 
-            case VKD3D_CS_OP_SIGNAL:
-                d3d12_command_queue_signal(queue, op->u.signal.fence, op->u.signal.value);
-                d3d12_fence_decref(op->u.signal.fence);
-                break;
+                case VKD3D_CS_OP_SIGNAL:
+                    d3d12_command_queue_signal(queue, op->u.signal.fence, op->u.signal.value);
+                    d3d12_fence_decref(op->u.signal.fence);
+                    break;
 
-            case VKD3D_CS_OP_EXECUTE:
-                d3d12_command_queue_execute(queue, op->u.execute.buffers, op->u.execute.buffer_count);
-                break;
+                case VKD3D_CS_OP_EXECUTE:
+                    d3d12_command_queue_execute(queue, op->u.execute.buffers, op->u.execute.buffer_count);
+                    break;
 
-            default:
-                FIXME("Unhandled op type %u.\n", op->opcode);
-                break;
+                default:
+                    vkd3d_unreachable();
+            }
+
+            *flushed_any |= true;
         }
-        *flushed_any |= true;
+
+        queue->aux_op_queue.count = 0;
+
+        vkd3d_mutex_lock(&queue->op_mutex);
     }
 
-    queue->ops_count = 0;
-
-done:
     queue->is_flushing = false;
 
-    return hr;
+    return S_OK;
+}
+
+static void d3d12_command_queue_op_array_init(struct d3d12_command_queue_op_array *array)
+{
+    array->ops = NULL;
+    array->count = 0;
+    array->size = 0;
 }
 
 static HRESULT d3d12_command_queue_init(struct d3d12_command_queue *queue,
@@ -6846,10 +6912,10 @@ static HRESULT d3d12_command_queue_init(struct d3d12_command_queue *queue,
     queue->last_waited_fence = NULL;
     queue->last_waited_fence_value = 0;
 
-    queue->ops = NULL;
-    queue->ops_count = 0;
-    queue->ops_size = 0;
+    d3d12_command_queue_op_array_init(&queue->op_queue);
     queue->is_flushing = false;
+
+    d3d12_command_queue_op_array_init(&queue->aux_op_queue);
 
     if (desc->Priority == D3D12_COMMAND_QUEUE_PRIORITY_GLOBAL_REALTIME)
     {
@@ -6914,8 +6980,10 @@ VkQueue vkd3d_acquire_vk_queue(ID3D12CommandQueue *queue)
     struct d3d12_command_queue *d3d12_queue = impl_from_ID3D12CommandQueue(queue);
     VkQueue vk_queue = vkd3d_queue_acquire(d3d12_queue->vkd3d_queue);
 
-    if (d3d12_queue->ops_count)
-        WARN("Acquired command queue %p with %zu remaining ops.\n", d3d12_queue, d3d12_queue->ops_count);
+    if (d3d12_queue->op_queue.count)
+        WARN("Acquired command queue %p with %zu remaining ops.\n", d3d12_queue, d3d12_queue->op_queue.count);
+    else if (d3d12_queue->is_flushing)
+        WARN("Acquired command queue %p which is flushing.\n", d3d12_queue);
 
     return vk_queue;
 }

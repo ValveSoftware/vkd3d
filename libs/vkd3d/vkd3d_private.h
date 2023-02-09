@@ -1370,6 +1370,13 @@ struct vkd3d_cs_op_data
     } u;
 };
 
+struct d3d12_command_queue_op_array
+{
+    struct vkd3d_cs_op_data *ops;
+    size_t count;
+    size_t size;
+};
+
 /* ID3D12CommandQueue */
 struct d3d12_command_queue
 {
@@ -1387,10 +1394,15 @@ struct d3d12_command_queue
     struct d3d12_device *device;
 
     struct vkd3d_mutex op_mutex;
-    struct vkd3d_cs_op_data *ops;
-    size_t ops_count;
-    size_t ops_size;
+
+    /* These fields are protected by op_mutex. */
+    struct d3d12_command_queue_op_array op_queue;
     bool is_flushing;
+
+    /* This field is not protected by op_mutex, but can only be used
+     * by the thread that set is_flushing; when is_flushing is not
+     * set, aux_op_queue.count must be zero. */
+    struct d3d12_command_queue_op_array aux_op_queue;
 
     struct vkd3d_private_store private_store;
 };
