@@ -1865,7 +1865,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
-static struct hlsl_ir_load *add_conditional(struct hlsl_ctx *ctx, struct list *instrs,
+struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
     struct hlsl_ir_store *store;
@@ -1962,7 +1962,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
-    if (!(cond = add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
+    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
         return false;
     hlsl_replace_node(instr, &cond->node);
 
@@ -2030,7 +2030,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
-    if (!(cond = add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
+    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, &cast3->node)))
         return false;
     hlsl_replace_node(instr, &cond->node);
 
@@ -2105,7 +2105,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     list_add_before(&instr->entry, &neg2->entry);
 
-    if (!(cond = add_conditional(ctx, &instr->entry, ge, arg2, neg2)))
+    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, ge, arg2, neg2)))
         return false;
 
     if (!(one = hlsl_new_constant(ctx, type, &instr->loc)))
