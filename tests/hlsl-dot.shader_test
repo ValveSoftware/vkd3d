@@ -44,6 +44,21 @@ draw quad
 probe all rgba (92.0, 92.0, 92.0, 92.0)
 
 [pixel shader]
+uniform float4 x;
+uniform float y;
+
+float4 main() : SV_TARGET
+{
+    return dot(x, y);
+}
+
+[test]
+uniform 0 float4 10.0 11.0 12.0 13.0
+uniform 4 float4 2.0 0.0 0.0 0.0
+draw quad
+probe all rgba (92.0, 92.0, 92.0, 92.0)
+
+[pixel shader]
 uniform float x;
 uniform float y;
 

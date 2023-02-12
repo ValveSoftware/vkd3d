@@ -1638,7 +1638,7 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct lis
 
     if (arg1->data_type->type == HLSL_CLASS_SCALAR)
         dim = arg2->data_type->dimx;
-    else if (arg1->data_type->type == HLSL_CLASS_SCALAR)
+    else if (arg2->data_type->type == HLSL_CLASS_SCALAR)
         dim = arg1->data_type->dimx;
     else
         dim = min(arg1->data_type->dimx, arg2->data_type->dimx);
