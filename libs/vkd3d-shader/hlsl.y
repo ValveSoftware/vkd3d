@@ -3721,6 +3721,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 %type <type> unnamed_struct_spec
 %type <type> struct_spec
 %type <type> type
+%type <type> type_no_void
 %type <type> typedef_type
 
 %type <variable_def> type_spec
@@ -4233,6 +4234,10 @@ parameters:
         {
             memset(&$$, 0, sizeof($$));
         }
+    | scope_start KW_VOID
+        {
+            memset(&$$, 0, sizeof($$));
+        }
     | scope_start param_list
         {
             $$ = $2;
@@ -4260,7 +4265,7 @@ param_list:
         }
 
 parameter:
-      var_modifiers type any_identifier colon_attribute
+      var_modifiers type_no_void any_identifier colon_attribute
         {
             struct hlsl_type *type;
             unsigned int modifiers = $1;
@@ -4321,7 +4326,7 @@ uav_type:
             $$ = HLSL_SAMPLER_DIM_3D;
         }
 
-type:
+type_no_void:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
             if ($3->type != HLSL_CLASS_SCALAR)
@@ -4381,10 +4386,6 @@ type:
     | KW_MATRIX
         {
             $$ = hlsl_get_matrix_type(ctx, HLSL_TYPE_FLOAT, 4, 4);
-        }
-    | KW_VOID
-        {
-            $$ = ctx->builtin_types.Void;
         }
     | KW_SAMPLER
         {
@@ -4465,6 +4466,13 @@ type:
             if ($$->type != HLSL_CLASS_STRUCT)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" redefined as a structure.", $2);
             vkd3d_free($2);
+        }
+
+type:
+      type_no_void
+    | KW_VOID
+        {
+            $$ = ctx->builtin_types.Void;
         }
 
 declaration_statement:
