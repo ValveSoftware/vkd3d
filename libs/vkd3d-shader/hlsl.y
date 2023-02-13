@@ -4138,12 +4138,13 @@ func_prototype_no_attrs:
             {
                 if (!($$.decl = hlsl_new_func_decl(ctx, type, &$5, &$7.semantic, &@3)))
                     YYABORT;
-                ctx->cur_function = $$.decl;
 
                 hlsl_add_function(ctx, $3, $$.decl);
 
                 $$.first = true;
             }
+
+            ctx->cur_function = $$.decl;
         }
 
 func_prototype:
