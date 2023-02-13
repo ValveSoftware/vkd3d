@@ -149,7 +149,7 @@ void func()
 {
 }
 
-[pixel shader todo]
+[pixel shader]
 
 /* This is something of an internal test: we need to make sure that we use the
  * correct variables for a function's arguments and returns regardless of
@@ -176,7 +176,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 [pixel shader]
