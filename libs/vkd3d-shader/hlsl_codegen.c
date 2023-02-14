@@ -1031,7 +1031,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
     {
         struct hlsl_ir_swizzle *swizzle_node;
 
-        if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, count, new_instr, &instr->loc)))
+        if (!(swizzle_node = hlsl_new_swizzle(ctx, ret_swizzle, instr_component_count, new_instr, &instr->loc)))
             return false;
         list_add_before(&instr->entry, &swizzle_node->node.entry);
         new_instr = &swizzle_node->node;
