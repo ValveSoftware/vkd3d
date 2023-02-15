@@ -30,12 +30,12 @@ extern "C" {
 /**
  * \file vkd3d_shader.h
  *
- * \since 1.2
- *
  * This file contains definitions for the vkd3d-shader library.
  *
  * The vkd3d-shader library provides multiple utilities related to the
  * compilation, transformation, and reflection of GPU shaders.
+ *
+ * \since 1.2
  */
 
 /** \since 1.3 */
