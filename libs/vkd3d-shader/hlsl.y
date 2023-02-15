@@ -2370,6 +2370,37 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], loc);
 }
 
+static bool intrinsic_all(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg = params->args[0], *mul;
+    struct hlsl_ir_constant *one, *zero;
+    struct hlsl_ir_load *load;
+    unsigned int i, count;
+
+    if (!(one = hlsl_new_float_constant(ctx, 1.0f, loc)))
+        return false;
+    list_add_tail(params->instrs, &one->node.entry);
+
+    if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
+        return false;
+    list_add_tail(params->instrs, &zero->node.entry);
+
+    mul = &one->node;
+
+    count = hlsl_type_component_count(arg->data_type);
+    for (i = 0; i < count; ++i)
+    {
+        if (!(load = add_load_component(ctx, params->instrs, arg, i, loc)))
+            return false;
+
+        if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &load->node, mul, loc)))
+            return false;
+    }
+
+    return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, mul, &zero->node, loc);
+}
+
 /* Find the type corresponding to the given source type, with the same
  * dimensions but a different base type. */
 static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
@@ -2986,6 +3017,7 @@ intrinsic_functions[] =
 {
     /* Note: these entries should be kept in alphabetical order. */
     {"abs",                                 1, true,  intrinsic_abs},
+    {"all",                                 1, true,  intrinsic_all},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cos",                                 1, true,  intrinsic_cos},
