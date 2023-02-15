@@ -261,3 +261,37 @@ float4 main() : sv_target
     func(true);
     return 0;
 }
+
+
+[pixel shader]
+float func(float a)
+{
+    return a + 1;
+}
+
+float4 main() : sv_target
+{
+    return float4(func(1.0), func(2.0), func(5.0), func(6.0));
+}
+
+[test]
+draw quad
+todo probe all rgba (2.0, 3.0, 6.0, 7.0)
+
+
+[pixel shader]
+float func(float a)
+{
+    return a + 1;
+}
+
+float4 main() : sv_target
+{
+    float4 a = {func(1.0), func(2.0), func(5.0), func(6.0)};
+
+    return a;
+}
+
+[test]
+draw quad
+todo probe all rgba (2.0, 3.0, 6.0, 7.0)
