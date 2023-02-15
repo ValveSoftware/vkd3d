@@ -480,52 +480,50 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
     }
 }
 
-static int sm4_compare_externs(const struct hlsl_ir_var *a, const struct hlsl_ir_var *b)
+static int sm4_compare_extern_resources(const void *a, const void *b)
 {
-    if (a->data_type->base_type != b->data_type->base_type)
-        return a->data_type->base_type - b->data_type->base_type;
-    if (a->reg.allocated && b->reg.allocated)
-        return a->reg.id - b->reg.id;
-    return strcmp(a->name, b->name);
+    const struct hlsl_ir_var *aa = *(const struct hlsl_ir_var **)a;
+    const struct hlsl_ir_var *bb = *(const struct hlsl_ir_var **)b;
+
+    if (aa->data_type->base_type != bb->data_type->base_type)
+        return aa->data_type->base_type - bb->data_type->base_type;
+    return aa->reg.id - bb->reg.id;
 }
 
-static void sm4_sort_extern(struct list *sorted, struct hlsl_ir_var *to_sort)
+static const struct hlsl_ir_var **sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
-    struct hlsl_ir_var *var;
+    const struct hlsl_ir_var **extern_resources = NULL;
+    const struct hlsl_ir_var *var;
+    size_t capacity = 0;
+    *count = 0;
 
-    list_remove(&to_sort->extern_entry);
-
-    LIST_FOR_EACH_ENTRY(var, sorted, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (sm4_compare_externs(to_sort, var) < 0)
+        if (var->reg.allocated && var->data_type->type == HLSL_CLASS_OBJECT)
         {
-            list_add_before(&var->extern_entry, &to_sort->extern_entry);
-            return;
+            if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                    sizeof(*extern_resources))))
+            {
+                *count = 0;
+                return NULL;
+            }
+
+            extern_resources[*count] = var;
+            ++*count;
         }
     }
 
-    list_add_tail(sorted, &to_sort->extern_entry);
-}
-
-static void sm4_sort_externs(struct hlsl_ctx *ctx)
-{
-    struct list sorted = LIST_INIT(sorted);
-    struct hlsl_ir_var *var, *next;
-
-    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if (var->data_type->type == HLSL_CLASS_OBJECT)
-            sm4_sort_extern(&sorted, var);
-    }
-    list_move_tail(&ctx->extern_vars, &sorted);
+    qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
+    return extern_resources;
 }
 
 static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 {
+    unsigned int cbuffer_count = 0, resource_count = 0, extern_resources_count, i, j;
     size_t cbuffers_offset, resources_offset, creator_offset, string_offset;
     size_t cbuffer_position, resource_position, creator_position;
-    unsigned int cbuffer_count = 0, resource_count = 0, i, j;
     const struct hlsl_profile_info *profile = ctx->profile;
+    const struct hlsl_ir_var **extern_resources;
     struct vkd3d_bytecode_buffer buffer = {0};
     const struct hlsl_buffer *cbuffer;
     const struct hlsl_ir_var *var;
@@ -540,14 +538,9 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         0x4353, /* COMPUTE */
     };
 
-    sm4_sort_externs(ctx);
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if (var->reg.allocated && var->data_type->type == HLSL_CLASS_OBJECT)
-            ++resource_count;
-    }
-
+    resource_count += extern_resources_count;
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
@@ -583,12 +576,11 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     resources_offset = bytecode_get_size(&buffer);
     set_u32(&buffer, resource_position, resources_offset);
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    for (i = 0; i < extern_resources_count; ++i)
     {
         uint32_t flags = 0;
 
-        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
-            continue;
+        var = extern_resources[i];
 
         if (var->reg_reservation.type)
             flags |= D3D_SIF_USERPACKED;
@@ -633,12 +625,9 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         put_u32(&buffer, flags); /* flags */
     }
 
-    i = 0;
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    for (i = 0; i < extern_resources_count; ++i)
     {
-        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
-            continue;
+        var = extern_resources[i];
 
         string_offset = put_string(&buffer, var->name);
         set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
@@ -652,8 +641,6 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         string_offset = put_string(&buffer, cbuffer->name);
         set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
     }
-
-    assert(i == resource_count);
 
     /* Buffers. */
 
@@ -747,6 +734,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     set_u32(&buffer, creator_position, creator_offset);
 
     dxbc_writer_add_section(dxbc, TAG_RDEF, buffer.data, buffer.size);
+
+    vkd3d_free(extern_resources);
 }
 
 static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_type *type)
@@ -2438,7 +2427,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         const struct hlsl_ir_function_decl *entry_func, struct dxbc_writer *dxbc)
 {
     const struct hlsl_profile_info *profile = ctx->profile;
+    const struct hlsl_ir_var **extern_resources;
     struct vkd3d_bytecode_buffer buffer = {0};
+    unsigned int extern_resources_count, i;
     const struct hlsl_buffer *cbuffer;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
@@ -2456,6 +2447,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         VKD3D_SM4_LIB,
     };
 
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
+
     put_u32(&buffer, vkd3d_make_u32((profile->major_version << 4) | profile->minor_version, shader_types[profile->type]));
     token_count_position = put_u32(&buffer, 0);
 
@@ -2465,10 +2458,9 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
             write_sm4_dcl_constant_buffer(&buffer, cbuffer);
     }
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
+    for (i = 0; i < extern_resources_count; ++i)
     {
-        if (!var->reg.allocated || var->data_type->type != HLSL_CLASS_OBJECT)
-            continue;
+        var = extern_resources[i];
 
         if (var->data_type->base_type == HLSL_TYPE_SAMPLER)
             write_sm4_dcl_sampler(&buffer, var);
@@ -2495,6 +2487,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
     dxbc_writer_add_section(dxbc, TAG_SHDR, buffer.data, buffer.size);
+
+    vkd3d_free(extern_resources);
 }
 
 int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
