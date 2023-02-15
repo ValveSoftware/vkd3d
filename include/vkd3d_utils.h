@@ -29,6 +29,17 @@
 extern "C" {
 #endif  /* __cplusplus */
 
+/**
+ * \file vkd3d_utils.h
+ *
+ * This file contains definitions for the vkd3d-utils library.
+ *
+ * The vkd3d-utils library is a collections of routines to ease the
+ * porting of a Direct3D 12 application to vkd3d.
+ *
+ * \since 1.0
+ */
+
 #define VKD3D_WAIT_OBJECT_0 (0)
 #define VKD3D_WAIT_TIMEOUT (1)
 #define VKD3D_WAIT_FAILED (~0u)
