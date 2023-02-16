@@ -128,6 +128,31 @@ float4 main() : sv_target
 }
 
 
+% This applies to arrays as well. Note that struct fields already have latent
+% majority applied (even if there have been no pragmas, as shown below), so the
+% question of typedefs is moot there.
+
+
+[pixel shader]
+#pragma pack_matrix(row_major)
+typedef float2x2 myarray_t[2];
+#pragma pack_matrix(column_major)
+uniform myarray_t a;
+
+float4 main() : sv_target
+{
+    return float4(a[0][0], a[1][1]);
+}
+
+[test]
+uniform  0 float4 0.3 0.4 0.0 0.0
+uniform  4 float4 0.0 0.0 0.0 0.0
+uniform  8 float4 0.0 0.0 0.0 0.0
+uniform 12 float4 0.5 0.6 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.4, 0.5, 0.6)
+
+
 % However, if no pack_matrix directive has been used yet, a typedef has no
 % defined majority, and the majority can be overwritten, including by a
 % subsequent pragma.
@@ -178,3 +203,23 @@ uniform  0 float4 0.2 0.4 0.0 0.0
 uniform  4 float4 0.3 0.5 0.0 0.0
 draw quad
 probe all rgba (0.2, 0.3, 0.4, 0.5)
+
+
+[pixel shader]
+typedef float2x2 myarray_t[2];
+#pragma pack_matrix(row_major)
+typedef myarray_t myarray2_t;
+uniform myarray2_t a;
+
+float4 main() : sv_target
+{
+    return float4(a[0][0], a[1][1]);
+}
+
+[test]
+uniform  0 float4 0.3 0.0 0.0 0.0
+uniform  4 float4 0.4 0.0 0.0 0.0
+uniform  8 float4 0.0 0.5 0.0 0.0
+uniform 12 float4 0.0 0.6 0.0 0.0
+draw quad
+probe all rgba (0.3, 0.4, 0.5, 0.6)

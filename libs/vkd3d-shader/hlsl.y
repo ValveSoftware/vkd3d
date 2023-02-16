@@ -882,12 +882,6 @@ static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_
     unsigned int default_majority = 0;
     struct hlsl_type *new_type;
 
-    /* This function is only used for declarations (i.e. variables and struct
-     * fields), which should inherit the matrix majority. We only explicitly set
-     * the default majority for declarations—typedefs depend on this—but we
-     * want to always set it, so that an hlsl_type object is never used to
-     * represent two different majorities (and thus can be used to store its
-     * register size, etc.) */
     if (!(*modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
             && !(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK)
             && type->type == HLSL_CLASS_MATRIX)
@@ -1003,7 +997,8 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
     return true;
 }
 
-static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type *orig_type, struct list *list)
+static bool add_typedef(struct hlsl_ctx *ctx, const unsigned int modifiers,
+        struct hlsl_type *const orig_type, struct list *list)
 {
     struct parse_variable_def *v, *v_next;
     struct hlsl_type *type;
@@ -1014,15 +1009,26 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
     {
         if (!v->arrays.count)
         {
+            /* Do not use apply_type_modifiers() here. We should not apply the
+             * latent matrix majority to plain matrix types. */
             if (!(type = hlsl_type_clone(ctx, orig_type, 0, modifiers)))
             {
                 free_parse_variable_def(v);
                 continue;
             }
+
+            if (type->type != HLSL_CLASS_MATRIX)
+                check_invalid_matrix_modifiers(ctx, modifiers, v->loc);
         }
         else
         {
-            type = orig_type;
+            unsigned int var_modifiers = modifiers;
+
+            if (!(type = apply_type_modifiers(ctx, orig_type, &var_modifiers, v->loc)))
+            {
+                free_parse_variable_def(v);
+                continue;
+            }
         }
 
         ret = true;
@@ -1047,9 +1053,6 @@ static bool add_typedef(struct hlsl_ctx *ctx, DWORD modifiers, struct hlsl_type 
 
         vkd3d_free((void *)type->name);
         type->name = v->name;
-
-        if (type->type != HLSL_CLASS_MATRIX)
-            check_invalid_matrix_modifiers(ctx, type->modifiers, v->loc);
 
         if ((type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
                 && (type->modifiers & HLSL_MODIFIER_ROW_MAJOR))
