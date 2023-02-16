@@ -29,7 +29,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
     struct hlsl_ir_node *idx_offset = NULL;
     struct hlsl_ir_constant *c;
 
-    list_init(&block->instrs);
+    hlsl_block_init(block);
 
     switch (type->class)
     {
@@ -101,7 +101,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
     struct hlsl_type *type;
     unsigned int i;
 
-    list_init(&block->instrs);
+    hlsl_block_init(block);
 
     assert(deref->var);
     type = deref->var->data_type;
@@ -721,7 +721,7 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
         hlsl_error(ctx, &call->node.loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
                 "Function \"%s\" is not defined.", decl->func->name);
 
-    list_init(&block.instrs);
+    hlsl_block_init(&block);
     if (!hlsl_clone_block(ctx, &block, &decl->body))
         return false;
     list_move_before(&call->node.entry, &block.instrs);

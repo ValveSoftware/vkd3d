@@ -461,7 +461,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
     struct hlsl_type *path_type;
     struct hlsl_ir_constant *c;
 
-    list_init(&block->instrs);
+    hlsl_block_init(block);
 
     path_len = 0;
     path_type = hlsl_deref_get_type(ctx, prefix);
@@ -1012,7 +1012,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
     struct hlsl_block comp_path_block;
     struct hlsl_ir_store *store;
 
-    list_init(&block->instrs);
+    hlsl_block_init(block);
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
@@ -1150,8 +1150,8 @@ struct hlsl_ir_if *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *condit
         return NULL;
     init_node(&iff->node, HLSL_IR_IF, NULL, &loc);
     hlsl_src_from_node(&iff->condition, condition);
-    list_init(&iff->then_instrs.instrs);
-    list_init(&iff->else_instrs.instrs);
+    hlsl_block_init(&iff->then_instrs);
+    hlsl_block_init(&iff->else_instrs);
     return iff;
 }
 
@@ -1201,7 +1201,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
     struct hlsl_block comp_path_block;
     struct hlsl_ir_load *load;
 
-    list_init(&block->instrs);
+    hlsl_block_init(block);
 
     if (!(load = hlsl_alloc(ctx, sizeof(*load))))
         return NULL;
@@ -1298,7 +1298,7 @@ struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_loc
     if (!(loop = hlsl_alloc(ctx, sizeof(*loop))))
         return NULL;
     init_node(&loop->node, HLSL_IR_LOOP, NULL, &loc);
-    list_init(&loop->body.instrs);
+    hlsl_block_init(&loop->body);
     return loop;
 }
 
@@ -1601,7 +1601,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 
     if (!(decl = hlsl_alloc(ctx, sizeof(*decl))))
         return NULL;
-    list_init(&decl->body.instrs);
+    hlsl_block_init(&decl->body);
     decl->return_type = return_type;
     decl->parameters = *parameters;
     decl->loc = *loc;
