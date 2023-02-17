@@ -1023,7 +1023,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
         vkd3d_free(store);
         return NULL;
     }
-    list_move_tail(&block->instrs, &comp_path_block.instrs);
+    hlsl_block_add_block(block, &comp_path_block);
     hlsl_src_from_node(&store->rhs, rhs);
 
     if (type_is_single_reg(rhs->data_type))
@@ -1215,7 +1215,7 @@ struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_b
         vkd3d_free(load);
         return NULL;
     }
-    list_move_tail(&block->instrs, &comp_path_block.instrs);
+    hlsl_block_add_block(block, &comp_path_block);
 
     hlsl_block_add_instr(block, &load->node);
 

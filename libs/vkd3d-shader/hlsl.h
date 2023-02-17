@@ -862,6 +862,11 @@ static inline void hlsl_block_add_instr(struct hlsl_block *block, struct hlsl_ir
     list_add_tail(&block->instrs, &instr->entry);
 }
 
+static inline void hlsl_block_add_block(struct hlsl_block *block, struct hlsl_block *add)
+{
+    list_move_tail(&block->instrs, &add->instrs);
+}
+
 static inline void hlsl_src_from_node(struct hlsl_src *src, struct hlsl_ir_node *node)
 {
     src->node = node;
