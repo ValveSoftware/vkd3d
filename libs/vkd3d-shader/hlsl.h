@@ -1005,7 +1005,7 @@ void hlsl_free_var(struct hlsl_ir_var *decl);
 
 struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *name);
 struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name);
-struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive);
+struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive, bool case_insensitive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
 
 struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, const struct hlsl_type *type,

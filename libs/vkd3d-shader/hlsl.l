@@ -181,7 +181,7 @@ row_major               {return KW_ROW_MAJOR;           }
                             yylval->name = hlsl_strdup(ctx, yytext);
                             if (hlsl_get_var(ctx->cur_scope, yytext) || hlsl_get_function(ctx, yytext))
                                 return VAR_IDENTIFIER;
-                            else if (hlsl_get_type(ctx->cur_scope, yytext, true))
+                            else if (hlsl_get_type(ctx->cur_scope, yytext, true, true))
                                 return TYPE_IDENTIFIER;
                             else
                                 return NEW_IDENTIFIER;

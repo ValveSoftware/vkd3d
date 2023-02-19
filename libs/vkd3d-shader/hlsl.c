@@ -604,15 +604,44 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim 
     return type;
 }
 
-struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive)
+static const char * get_case_insensitive_typename(const char *name)
+{
+    static const char *const names[] =
+    {
+        "dword",
+    };
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(names); ++i)
+    {
+        if (!ascii_strcasecmp(names[i], name))
+            return names[i];
+    }
+
+    return NULL;
+}
+
+struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive, bool case_insensitive)
 {
     struct rb_entry *entry = rb_get(&scope->types, name);
 
     if (entry)
         return RB_ENTRY_VALUE(entry, struct hlsl_type, scope_entry);
 
-    if (recursive && scope->upper)
-        return hlsl_get_type(scope->upper, name, recursive);
+    if (scope->upper)
+    {
+        if (recursive)
+            return hlsl_get_type(scope->upper, name, recursive, case_insensitive);
+    }
+    else
+    {
+        if (case_insensitive && (name = get_case_insensitive_typename(name)))
+        {
+            if ((entry = rb_get(&scope->types, name)))
+                return RB_ENTRY_VALUE(entry, struct hlsl_type, scope_entry);
+        }
+    }
+
     return NULL;
 }
 
@@ -807,7 +836,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
 
 bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type)
 {
-    if (hlsl_get_type(scope, type->name, false))
+    if (hlsl_get_type(scope, type->name, false, false))
         return false;
 
     rb_put(&scope->types, type->name, &type->scope_entry);
@@ -2808,7 +2837,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
     effect_types[] =
     {
-        {"DWORD",           HLSL_CLASS_SCALAR, HLSL_TYPE_INT,           1, 1},
+        {"dword",           HLSL_CLASS_SCALAR, HLSL_TYPE_INT,           1, 1},
         {"FLOAT",           HLSL_CLASS_SCALAR, HLSL_TYPE_FLOAT,         1, 1},
         {"VECTOR",          HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT,         4, 1},
         {"MATRIX",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},

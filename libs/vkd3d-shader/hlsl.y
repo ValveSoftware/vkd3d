@@ -4711,7 +4711,7 @@ type_no_void:
         }
     | TYPE_IDENTIFIER
         {
-            $$ = hlsl_get_type(ctx->cur_scope, $1, true);
+            $$ = hlsl_get_type(ctx->cur_scope, $1, true, true);
             if ($$->is_minimum_precision)
             {
                 if (ctx->profile->major_version < 4)
@@ -4728,7 +4728,7 @@ type_no_void:
         }
     | KW_STRUCT TYPE_IDENTIFIER
         {
-            $$ = hlsl_get_type(ctx->cur_scope, $2, true);
+            $$ = hlsl_get_type(ctx->cur_scope, $2, true, true);
             if ($$->type != HLSL_CLASS_STRUCT)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" redefined as a structure.", $2);
             vkd3d_free($2);
