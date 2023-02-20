@@ -2451,21 +2451,21 @@ static int shader_parse_static_samplers(struct root_signature_parser_context *co
     return VKD3D_OK;
 }
 
-static int shader_parse_root_signature(const char *data, unsigned int data_size,
+static int shader_parse_root_signature(const struct vkd3d_shader_code *data,
         struct vkd3d_shader_versioned_root_signature_desc *desc)
 {
     struct vkd3d_shader_root_signature_desc *v_1_0 = &desc->u.v_1_0;
     struct root_signature_parser_context context;
     unsigned int count, offset, version;
-    const char *ptr = data;
+    const char *ptr = data->code;
     int ret;
 
-    context.data = data;
-    context.data_size = data_size;
+    context.data = data->code;
+    context.data_size = data->size;
 
-    if (!require_space(0, 6, sizeof(DWORD), data_size))
+    if (!require_space(0, 6, sizeof(uint32_t), data->size))
     {
-        WARN("Invalid data size %#x.\n", data_size);
+        WARN("Invalid data size %#zx.\n", data->size);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
@@ -2537,11 +2537,12 @@ static int shader_parse_root_signature(const char *data, unsigned int data_size,
 static int rts0_handler(const char *data, DWORD data_size, DWORD tag, void *context)
 {
     struct vkd3d_shader_versioned_root_signature_desc *desc = context;
+    struct vkd3d_shader_code code = {.code = data, .size = data_size};
 
     if (tag != TAG_RTS0)
         return VKD3D_OK;
 
-    return shader_parse_root_signature(data, data_size, desc);
+    return shader_parse_root_signature(&code, desc);
 }
 
 int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
