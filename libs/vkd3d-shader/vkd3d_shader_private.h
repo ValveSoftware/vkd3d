@@ -1308,7 +1308,7 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define TAG_SHEX VKD3D_MAKE_TAG('S', 'H', 'E', 'X')
 #define TAG_TEXT VKD3D_MAKE_TAG('T', 'E', 'X', 'T')
 
-struct dxbc_writer_section
+struct vkd3d_shader_dxbc_section_desc
 {
     uint32_t tag;
     struct vkd3d_shader_code data;
@@ -1319,7 +1319,7 @@ struct dxbc_writer_section
 struct dxbc_writer
 {
     unsigned int section_count;
-    struct dxbc_writer_section sections[DXBC_MAX_SECTION_COUNT];
+    struct vkd3d_shader_dxbc_section_desc sections[DXBC_MAX_SECTION_COUNT];
 };
 
 void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void *data, size_t size);

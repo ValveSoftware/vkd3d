@@ -33,7 +33,7 @@ void dxbc_writer_init(struct dxbc_writer *dxbc)
 
 void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void *data, size_t size)
 {
-    struct dxbc_writer_section *section;
+    struct vkd3d_shader_dxbc_section_desc *section;
 
     assert(dxbc->section_count < ARRAY_SIZE(dxbc->sections));
 
