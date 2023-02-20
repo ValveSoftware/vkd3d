@@ -1935,13 +1935,13 @@ static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section, vo
     return shader_parse_signature(section, is);
 }
 
-int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
+int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *signature)
 {
     int ret;
 
     memset(signature, 0, sizeof(*signature));
-    if ((ret = parse_dxbc(dxbc, dxbc_length, message_context, NULL, isgn_handler, signature)) < 0)
+    if ((ret = parse_dxbc(dxbc->code, dxbc->size, message_context, NULL, isgn_handler, signature)) < 0)
         ERR("Failed to parse input signature.\n");
 
     return ret;

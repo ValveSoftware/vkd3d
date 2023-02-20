@@ -1402,7 +1402,7 @@ int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         *messages = NULL;
     vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
 
-    ret = shader_parse_input_signature(dxbc->code, dxbc->size, &message_context, signature);
+    ret = shader_parse_input_signature(dxbc, &message_context, signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
