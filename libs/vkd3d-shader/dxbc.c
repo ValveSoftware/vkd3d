@@ -1725,20 +1725,19 @@ static const char *shader_get_string(const char *data, size_t data_size, DWORD o
     return data + offset;
 }
 
-static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
-        struct vkd3d_shader_message_context *message_context, const char *source_name,
-        int (*section_handler)(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx), void *ctx)
+static int parse_dxbc(const struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context,
+        const char *source_name, struct vkd3d_shader_dxbc_desc *desc)
 {
     const struct vkd3d_shader_location location = {.source_name = source_name};
+    struct vkd3d_shader_dxbc_section_desc *sections, *section;
     uint32_t checksum[4], calculated_checksum[4];
     const char *data = dxbc->code;
     size_t data_size = dxbc->size;
     const char *ptr = data;
-    int ret = VKD3D_OK;
     uint32_t chunk_count;
     uint32_t total_size;
-    unsigned int i;
     uint32_t version;
+    unsigned int i;
     uint32_t tag;
 
     if (data_size < VKD3D_DXBC_HEADER_SIZE)
@@ -1792,9 +1791,14 @@ static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
     read_dword(&ptr, &chunk_count);
     TRACE("chunk count: %#x\n", chunk_count);
 
+    if (!(sections = vkd3d_calloc(chunk_count, sizeof(*sections))))
+    {
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_OUT_OF_MEMORY, "Out of memory.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
     for (i = 0; i < chunk_count; ++i)
     {
-        struct vkd3d_shader_dxbc_section_desc section;
         uint32_t chunk_tag, chunk_size;
         const char *chunk_ptr;
         uint32_t chunk_offset;
@@ -1807,6 +1811,7 @@ static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
             WARN("Invalid chunk offset %#x (data size %zu).\n", chunk_offset, data_size);
             vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_OFFSET,
                     "DXBC chunk %u has invalid offset %#x (data size %#zx).", i, chunk_offset, data_size);
+            vkd3d_free(sections);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
 
@@ -1822,15 +1827,79 @@ static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
             vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_SIZE,
                     "DXBC chunk %u has invalid size %#x (data size %#zx, chunk offset %#x).",
                     i, chunk_offset, data_size, chunk_offset);
+            vkd3d_free(sections);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
 
-        section.tag = chunk_tag;
-        section.data.code = chunk_ptr;
-        section.data.size = chunk_size;
-        if ((ret = section_handler(&section, ctx)) < 0)
+        section = &sections[i];
+        section->tag = chunk_tag;
+        section->data.code = chunk_ptr;
+        section->data.size = chunk_size;
+    }
+
+    desc->tag = tag;
+    memcpy(desc->checksum, checksum, sizeof(checksum));
+    desc->version = version;
+    desc->size = total_size;
+    desc->section_count = chunk_count;
+    desc->sections = sections;
+
+    return VKD3D_OK;
+}
+
+void vkd3d_shader_free_dxbc(struct vkd3d_shader_dxbc_desc *dxbc)
+{
+    TRACE("dxbc %p.\n", dxbc);
+
+    vkd3d_free(dxbc->sections);
+}
+
+static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
+        struct vkd3d_shader_message_context *message_context, const char *source_name,
+        int (*section_handler)(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx), void *ctx)
+{
+    struct vkd3d_shader_dxbc_desc desc;
+    unsigned int i;
+    int ret;
+
+    if ((ret = parse_dxbc(dxbc, message_context, source_name, &desc)) < 0)
+        return ret;
+
+    for (i = 0; i < desc.section_count; ++i)
+    {
+        if ((ret = section_handler(&desc.sections[i], ctx)) < 0)
             break;
     }
+
+    vkd3d_shader_free_dxbc(&desc);
+
+    return ret;
+}
+
+int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
+        uint32_t flags, struct vkd3d_shader_dxbc_desc *desc, char **messages)
+{
+    struct vkd3d_shader_message_context message_context;
+    int ret;
+
+    TRACE("dxbc {%p, %zu}, flags %#x, desc %p, messages %p.\n", dxbc->code, dxbc->size, flags, desc, messages);
+
+    if (messages)
+        *messages = NULL;
+    vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
+
+    ret = parse_dxbc(dxbc, &message_context, NULL, desc);
+
+    vkd3d_shader_message_context_trace_messages(&message_context);
+    if (!vkd3d_shader_message_context_copy_messages(&message_context, messages) && ret >= 0)
+    {
+        vkd3d_shader_free_dxbc(desc);
+        ret = VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    vkd3d_shader_message_context_cleanup(&message_context);
+
+    if (ret < 0)
+        memset(desc, 0, sizeof(*desc));
 
     return ret;
 }

@@ -68,6 +68,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_DXBC_INVALID_VERSION             = 4,
     VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_OFFSET        = 5,
     VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_SIZE          = 6,
+    VKD3D_SHADER_ERROR_DXBC_OUT_OF_MEMORY               = 7,
 
     VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF                = 1000,
     VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE       = 1001,
@@ -1307,12 +1308,6 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 #define TAG_SHDR VKD3D_MAKE_TAG('S', 'H', 'D', 'R')
 #define TAG_SHEX VKD3D_MAKE_TAG('S', 'H', 'E', 'X')
 #define TAG_TEXT VKD3D_MAKE_TAG('T', 'E', 'X', 'T')
-
-struct vkd3d_shader_dxbc_section_desc
-{
-    uint32_t tag;
-    struct vkd3d_shader_code data;
-};
 
 #define DXBC_MAX_SECTION_COUNT 5
 

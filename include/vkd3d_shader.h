@@ -1473,6 +1473,46 @@ enum vkd3d_shader_swizzle_component
 };
 
 /**
+ * A description of a DXBC section.
+ *
+ * \since 1.7
+ */
+struct vkd3d_shader_dxbc_section_desc
+{
+    /** The section tag. */
+    uint32_t tag;
+    /** The contents of the section. */
+    struct vkd3d_shader_code data;
+};
+
+/**
+ * A description of a DXBC blob, as returned by vkd3d_shader_parse_dxbc().
+ *
+ * \since 1.7
+ */
+struct vkd3d_shader_dxbc_desc
+{
+    /**
+     * The DXBC tag. This will always be "DXBC" in structures returned by
+     * this version of vkd3d-shader.
+     */
+    uint32_t tag;
+    /** A checksum of the DXBC contents. */
+    uint32_t checksum[4];
+    /**
+     * The DXBC version. This will always be 1 in structures returned by this
+     * version of vkd3d-shader.
+     */
+    unsigned int version;
+    /** The total size of the DXBC blob. */
+    size_t size;
+    /** The number of sections contained in the DXBC. */
+    size_t section_count;
+    /** Descriptions of the sections contained in the DXBC. */
+    struct vkd3d_shader_dxbc_section_desc *sections;
+};
+
+/**
  * A mask selecting one component from a vkd3d-shader swizzle. The component has
  * type \ref vkd3d_shader_swizzle_component.
  */
@@ -1865,6 +1905,47 @@ VKD3D_SHADER_API int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_i
  */
 VKD3D_SHADER_API void vkd3d_shader_set_log_callback(PFN_vkd3d_log callback);
 
+/**
+ * Free the contents of a vkd3d_shader_dxbc_desc structure allocated by
+ * another vkd3d-shader function, such as vkd3d_shader_parse_dxbc().
+ *
+ * This function may free the \ref vkd3d_shader_dxbc_desc.sections member, but
+ * does not free the structure itself.
+ *
+ * \param dxbc The vkd3d_shader_dxbc_desc structure to free.
+ *
+ * \since 1.7
+ */
+VKD3D_SHADER_API void vkd3d_shader_free_dxbc(struct vkd3d_shader_dxbc_desc *dxbc);
+
+/**
+ * Parse a DXBC blob contained in a vkd3d_shader_code structure.
+ *
+ * \param dxbc A vkd3d_shader_code structure containing the DXBC blob to parse.
+ *
+ * \param flags A set of flags modifying the behaviour of the function. No
+ * flags are defined for this version of vkd3d-shader, and this parameter
+ * should be set to 0.
+ *
+ * \param desc A vkd3d_shader_dxbc_desc structure describing the contents of
+ * the DXBC blob. Its vkd3d_shader_dxbc_section_desc structures will contain
+ * pointers into the input blob; its contents are only valid while the input
+ * blob is valid. The contents of this structure should be freed with
+ * vkd3d_shader_free_dxbc() when no longer needed.
+ *
+ * \param messages Optional output location for error or informational messages
+ * produced by the parser.
+ * \n
+ * This parameter behaves identically to the \a messages parameter of
+ * vkd3d_shader_compile().
+ *
+ * \return A member of \ref vkd3d_result.
+ *
+ * \since 1.7
+ */
+VKD3D_SHADER_API int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
+        uint32_t flags, struct vkd3d_shader_dxbc_desc *desc, char **messages);
+
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
 /** Type of vkd3d_shader_get_version(). */
@@ -1920,6 +2001,12 @@ typedef void (*PFN_vkd3d_shader_preprocess)(struct vkd3d_shader_compile_info *co
 
 /** Type of vkd3d_shader_set_log_callback(). \since 1.4 */
 typedef void (*PFN_vkd3d_shader_set_log_callback)(PFN_vkd3d_log callback);
+
+/** Type of vkd3d_shader_free_dxbc(). \since 1.7 */
+typedef void (*PFN_vkd3d_shader_free_dxbc)(struct vkd3d_shader_dxbc_desc *dxbc);
+/** Type of vkd3d_shader_parse_dxbc(). \since 1.7 */
+typedef int (*PFN_vkd3d_shader_parse_dxbc)(const struct vkd3d_shader_code *dxbc,
+        uint32_t flags, struct vkd3d_shader_dxbc_desc *desc, char **messages);
 
 #ifdef __cplusplus
 }
