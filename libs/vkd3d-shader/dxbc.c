@@ -1727,7 +1727,7 @@ static const char *shader_get_string(const char *data, size_t data_size, DWORD o
 
 static int parse_dxbc(const char *data, size_t data_size,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        int (*chunk_handler)(const char *data, DWORD data_size, DWORD tag, void *ctx), void *ctx)
+        int (*section_handler)(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx), void *ctx)
 {
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t checksum[4], calculated_checksum[4];
@@ -1792,6 +1792,7 @@ static int parse_dxbc(const char *data, size_t data_size,
 
     for (i = 0; i < chunk_count; ++i)
     {
+        struct vkd3d_shader_dxbc_section_desc section;
         uint32_t chunk_tag, chunk_size;
         const char *chunk_ptr;
         uint32_t chunk_offset;
@@ -1822,7 +1823,10 @@ static int parse_dxbc(const char *data, size_t data_size,
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
 
-        if ((ret = chunk_handler(chunk_ptr, chunk_size, chunk_tag, ctx)) < 0)
+        section.tag = chunk_tag;
+        section.data.code = chunk_ptr;
+        section.data.size = chunk_size;
+        if ((ret = section_handler(&section, ctx)) < 0)
             break;
     }
 
@@ -1916,12 +1920,11 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     return VKD3D_OK;
 }
 
-static int isgn_handler(const char *data, DWORD data_size, DWORD tag, void *ctx)
+static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx)
 {
-    struct vkd3d_shader_dxbc_section_desc section = {.tag = tag, .data = {.code = data, .size = data_size}};
     struct vkd3d_shader_signature *is = ctx;
 
-    if (tag != TAG_ISGN)
+    if (section->tag != TAG_ISGN)
         return VKD3D_OK;
 
     if (is->elements)
@@ -1929,7 +1932,7 @@ static int isgn_handler(const char *data, DWORD data_size, DWORD tag, void *ctx)
         FIXME("Multiple input signatures.\n");
         vkd3d_shader_free_shader_signature(is);
     }
-    return shader_parse_signature(&section, is);
+    return shader_parse_signature(section, is);
 }
 
 int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
@@ -1944,13 +1947,12 @@ int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
     return ret;
 }
 
-static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *context)
+static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *context)
 {
-    struct vkd3d_shader_dxbc_section_desc section = {.tag = tag, .data = {.code = data, .size = data_size}};
     struct vkd3d_shader_desc *desc = context;
     int ret;
 
-    switch (tag)
+    switch (section->tag)
     {
         case TAG_ISGN:
         case TAG_ISG1:
@@ -1959,7 +1961,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple input signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(&section, &desc->input_signature)) < 0)
+            if ((ret = shader_parse_signature(section, &desc->input_signature)) < 0)
                 return ret;
             break;
 
@@ -1971,7 +1973,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple output signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(&section, &desc->output_signature)) < 0)
+            if ((ret = shader_parse_signature(section, &desc->output_signature)) < 0)
                 return ret;
             break;
 
@@ -1982,7 +1984,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple patch constant signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(&section, &desc->patch_constant_signature)) < 0)
+            if ((ret = shader_parse_signature(section, &desc->patch_constant_signature)) < 0)
                 return ret;
             break;
 
@@ -1990,8 +1992,8 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
         case TAG_SHEX:
             if (desc->byte_code)
                 FIXME("Multiple shader code chunks.\n");
-            desc->byte_code = (const uint32_t *)data;
-            desc->byte_code_size = data_size;
+            desc->byte_code = section->data.code;
+            desc->byte_code_size = section->data.size;
             break;
 
         case TAG_AON9:
@@ -2003,7 +2005,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
             break;
 
         default:
-            TRACE("Skipping chunk %#x.\n", tag);
+            TRACE("Skipping chunk %#x.\n", section->tag);
             break;
     }
 
@@ -2534,15 +2536,14 @@ static int shader_parse_root_signature(const struct vkd3d_shader_code *data,
     return VKD3D_OK;
 }
 
-static int rts0_handler(const char *data, DWORD data_size, DWORD tag, void *context)
+static int rts0_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *context)
 {
     struct vkd3d_shader_versioned_root_signature_desc *desc = context;
-    struct vkd3d_shader_code code = {.code = data, .size = data_size};
 
-    if (tag != TAG_RTS0)
+    if (section->tag != TAG_RTS0)
         return VKD3D_OK;
 
-    return shader_parse_root_signature(&code, desc);
+    return shader_parse_root_signature(&section->data, desc);
 }
 
 int vkd3d_shader_parse_root_signature(const struct vkd3d_shader_code *dxbc,
