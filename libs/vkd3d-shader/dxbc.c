@@ -2019,7 +2019,7 @@ void free_shader_desc(struct vkd3d_shader_desc *desc)
     vkd3d_shader_free_shader_signature(&desc->patch_constant_signature);
 }
 
-static int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
+static int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc)
 {
     int ret;
@@ -2030,7 +2030,7 @@ static int shader_extract_from_dxbc(const void *dxbc, size_t dxbc_length,
     memset(&desc->output_signature, 0, sizeof(desc->output_signature));
     memset(&desc->patch_constant_signature, 0, sizeof(desc->patch_constant_signature));
 
-    ret = parse_dxbc(dxbc, dxbc_length, message_context, source_name, shdr_handler, desc);
+    ret = parse_dxbc(dxbc->code, dxbc->size, message_context, source_name, shdr_handler, desc);
     if (!desc->byte_code)
         ret = VKD3D_ERROR_INVALID_ARGUMENT;
 
@@ -2059,7 +2059,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     shader_desc = &sm4->p.shader_desc;
-    if ((ret = shader_extract_from_dxbc(compile_info->source.code, compile_info->source.size,
+    if ((ret = shader_extract_from_dxbc(&compile_info->source,
             message_context, compile_info->source_name, shader_desc)) < 0)
     {
         WARN("Failed to extract shader, vkd3d result %d.\n", ret);
