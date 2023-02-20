@@ -1311,8 +1311,7 @@ static inline void *vkd3d_find_struct_(const struct vkd3d_struct *chain,
 struct dxbc_writer_section
 {
     uint32_t tag;
-    const uint8_t *data;
-    size_t size;
+    struct vkd3d_shader_code data;
 };
 
 #define DXBC_MAX_SECTION_COUNT 5

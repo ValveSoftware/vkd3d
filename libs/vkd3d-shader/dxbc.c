@@ -39,8 +39,8 @@ void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void 
 
     section = &dxbc->sections[dxbc->section_count++];
     section->tag = tag;
-    section->data = data;
-    section->size = size;
+    section->data.code = data;
+    section->data.size = size;
 }
 
 int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
@@ -67,8 +67,8 @@ int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
     {
         set_u32(&buffer, offsets_position + i * sizeof(uint32_t), bytecode_get_size(&buffer));
         put_u32(&buffer, dxbc->sections[i].tag);
-        put_u32(&buffer, dxbc->sections[i].size);
-        bytecode_put_bytes(&buffer, dxbc->sections[i].data, dxbc->sections[i].size);
+        put_u32(&buffer, dxbc->sections[i].data.size);
+        bytecode_put_bytes(&buffer, dxbc->sections[i].data.code, dxbc->sections[i].data.size);
     }
     set_u32(&buffer, size_position, bytecode_get_size(&buffer));
 

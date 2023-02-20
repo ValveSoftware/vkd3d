@@ -2519,6 +2519,6 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     if (!(ret = ctx->result))
         ret = dxbc_writer_write(&dxbc, out);
     for (i = 0; i < dxbc.section_count; ++i)
-        vkd3d_free((void *)dxbc.sections[i].data);
+        vkd3d_shader_free_shader_code(&dxbc.sections[i].data);
     return ret;
 }
