@@ -1946,6 +1946,34 @@ VKD3D_SHADER_API void vkd3d_shader_free_dxbc(struct vkd3d_shader_dxbc_desc *dxbc
 VKD3D_SHADER_API int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
         uint32_t flags, struct vkd3d_shader_dxbc_desc *desc, char **messages);
 
+/**
+ * Serialise a DXBC description into a blob stored in a vkd3d_shader_code
+ * structure.
+ *
+ * \param section_count The number of DXBC sections to serialise.
+ *
+ * \param sections An array of vkd3d_shader_dxbc_section_desc structures
+ * to serialise.
+ *
+ * \param dxbc A pointer to a vkd3d_shader_code structure in which the
+ * serialised blob will be stored.
+ * \n
+ * The output blob is allocated by vkd3d-shader and should be freed with
+ * vkd3d_shader_free_shader_code() when no longer needed.
+ *
+ * \param messages Optional output location for error or informational messages
+ * produced by the serialiser.
+ * \n
+ * This parameter behaves identically to the \a messages parameter of
+ * vkd3d_shader_compile().
+ *
+ * \return A member of \ref vkd3d_result.
+ *
+ * \since 1.7
+ */
+VKD3D_SHADER_API int vkd3d_shader_serialize_dxbc(size_t section_count,
+        const struct vkd3d_shader_dxbc_section_desc *sections, struct vkd3d_shader_code *dxbc, char **messages);
+
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
 /** Type of vkd3d_shader_get_version(). */
@@ -2007,6 +2035,9 @@ typedef void (*PFN_vkd3d_shader_free_dxbc)(struct vkd3d_shader_dxbc_desc *dxbc);
 /** Type of vkd3d_shader_parse_dxbc(). \since 1.7 */
 typedef int (*PFN_vkd3d_shader_parse_dxbc)(const struct vkd3d_shader_code *dxbc,
         uint32_t flags, struct vkd3d_shader_dxbc_desc *desc, char **messages);
+/** Type of vkd3d_shader_serialize_dxbc(). \since 1.7 */
+typedef int (*PFN_vkd3d_shader_serialize_dxbc)(size_t section_count,
+        const struct vkd3d_shader_dxbc_section_desc *sections, struct vkd3d_shader_code *dxbc, char **messages);
 
 #ifdef __cplusplus
 }

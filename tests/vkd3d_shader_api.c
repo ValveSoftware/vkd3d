@@ -318,6 +318,89 @@ static void test_d3dbc(void)
     ok(rc == VKD3D_ERROR_INVALID_SHADER, "Got unexpected error code %d.\n", rc);
 }
 
+static void test_dxbc(void)
+{
+    PFN_vkd3d_shader_serialize_dxbc pfn_vkd3d_shader_serialize_dxbc;
+    PFN_vkd3d_shader_parse_dxbc pfn_vkd3d_shader_parse_dxbc;
+    PFN_vkd3d_shader_free_dxbc pfn_vkd3d_shader_free_dxbc;
+    struct vkd3d_shader_dxbc_desc dxbc_desc;
+    const uint8_t *dxbc_start, *dxbc_end;
+    struct vkd3d_shader_code dxbc;
+    size_t expected_size;
+    unsigned int i;
+    int ret;
+
+    static const uint32_t section_0[] =
+    {
+        0x00000000, 0x00000001, 0x00000001, 0x00000002,
+        0x00000003, 0x00000005, 0x00000008, 0x0000000d,
+        0x00000015, 0x00000022, 0x00000037, 0x00000059,
+        0x00000090, 0x000000e9, 0x00000179, 0x00000262,
+    };
+    static const uint8_t section_1[] =
+    {
+        0x1, 0x4, 0x1, 0x5, 0x9, 0x2, 0x6, 0x5, 0x3, 0x5, 0x8, 0x9, 0x7, 0x9, 0x3, 0x2,
+        0x3, 0x8, 0x4, 0x6, 0x2, 0x6, 0x4, 0x3, 0x3, 0x8, 0x3, 0x2, 0x7, 0x9, 0x5, 0x0,
+        0x2, 0x8, 0x8, 0x4, 0x1, 0x9, 0x7, 0x1, 0x6, 0x9, 0x3, 0x9, 0x9, 0x3, 0x7, 0x5,
+        0x1, 0x0, 0x5, 0x8, 0x2, 0x0, 0x9, 0x7, 0x4, 0x9, 0x4, 0x4, 0x5, 0x9, 0x2, 0x3,
+    };
+    static const struct vkd3d_shader_dxbc_section_desc sections[] =
+    {
+        {.tag = 0x00424946, .data = {.code = section_0, .size = sizeof(section_0)}},
+        {.tag = 0x49504950, .data = {.code = section_1, .size = sizeof(section_1)}},
+    };
+    static const uint32_t checksum[] = {0x7cfc687d, 0x7e8f4cff, 0x72a4739a, 0xd75c3703};
+
+    pfn_vkd3d_shader_serialize_dxbc = vkd3d_shader_serialize_dxbc;
+    pfn_vkd3d_shader_parse_dxbc = vkd3d_shader_parse_dxbc;
+    pfn_vkd3d_shader_free_dxbc = vkd3d_shader_free_dxbc;
+
+    /* 8 * u32 for the DXBC header */
+    expected_size = 8 * sizeof(uint32_t);
+    for (i = 0; i < ARRAY_SIZE(sections); ++i)
+    {
+        /* 1 u32 for the section offset + 2 u32 for the section header. */
+        expected_size += 3 * sizeof(uint32_t) + sections[i].data.size;
+    }
+
+    ret = pfn_vkd3d_shader_serialize_dxbc(ARRAY_SIZE(sections), sections, &dxbc, NULL);
+    ok(ret == VKD3D_OK, "Got unexpected ret %d.\n", ret);
+    ok(dxbc.size == expected_size, "Got unexpected size %zu, expected %zu.\n", dxbc_desc.size, expected_size);
+
+    ret = pfn_vkd3d_shader_parse_dxbc(&dxbc, 0, &dxbc_desc, NULL);
+    ok(ret == VKD3D_OK, "Got unexpected ret %d.\n", ret);
+    ok(dxbc_desc.tag == 0x43425844, "Got unexpected tag 0x%08x.\n", dxbc_desc.tag);
+    ok(!memcmp(dxbc_desc.checksum, checksum, sizeof(dxbc_desc.checksum)),
+            "Got unexpected checksum 0x%08x 0x%08x 0x%08x 0x%08x.\n",
+            dxbc_desc.checksum[0], dxbc_desc.checksum[1], dxbc_desc.checksum[2], dxbc_desc.checksum[3]);
+    ok(dxbc_desc.version == 1, "Got unexpected version %#x.\n", dxbc_desc.version);
+    ok(dxbc_desc.size == expected_size, "Got unexpected size %zu, expected %zu.\n", dxbc_desc.size, expected_size);
+    ok(dxbc_desc.section_count == ARRAY_SIZE(sections), "Got unexpected section count %zu, expected %zu.\n",
+            dxbc_desc.section_count, ARRAY_SIZE(sections));
+
+    dxbc_start = dxbc.code;
+    dxbc_end = dxbc_start + dxbc.size;
+    for (i = 0; i < dxbc_desc.section_count; ++i)
+    {
+        const struct vkd3d_shader_dxbc_section_desc *section = &dxbc_desc.sections[i];
+        const uint8_t *data = section->data.code;
+
+        vkd3d_test_set_context("Section %u", i);
+        ok(section->tag == sections[i].tag, "Got unexpected tag 0x%08x, expected 0x%08x.\n",
+                section->tag, sections[i].tag);
+        ok(section->data.size == sections[i].data.size, "Got unexpected size %zu, expected %zu.\n",
+                section->data.size, sections[i].data.size);
+        ok(!memcmp(data, sections[i].data.code, section->data.size), "Got unexpected section data.\n");
+        ok(data > dxbc_start && data <= dxbc_end - section->data.size,
+                "Data {%p, %zu} is not contained within blob {%p, %zu}.\n",
+                data, section->data.size, dxbc_start, dxbc_end - dxbc_start);
+    }
+    vkd3d_test_set_context(NULL);
+
+    pfn_vkd3d_shader_free_dxbc(&dxbc_desc);
+    vkd3d_shader_free_shader_code(&dxbc);
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -326,4 +409,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_vkd3d_shader_pfns);
     run_test(test_version);
     run_test(test_d3dbc);
+    run_test(test_dxbc);
 }

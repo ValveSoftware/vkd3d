@@ -43,11 +43,17 @@ void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void 
     section->data.size = size;
 }
 
-int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
+int vkd3d_shader_serialize_dxbc(size_t section_count, const struct vkd3d_shader_dxbc_section_desc *sections,
+        struct vkd3d_shader_code *dxbc, char **messages)
 {
     size_t size_position, offsets_position, checksum_position, i;
     struct vkd3d_bytecode_buffer buffer = {0};
     uint32_t checksum[4];
+
+    TRACE("section_count %zu, sections %p, dxbc %p, messages %p.\n", section_count, sections, dxbc, messages);
+
+    if (messages)
+        *messages = NULL;
 
     put_u32(&buffer, TAG_DXBC);
 
@@ -57,18 +63,18 @@ int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
 
     put_u32(&buffer, 1); /* version */
     size_position = put_u32(&buffer, 0);
-    put_u32(&buffer, dxbc->section_count);
+    put_u32(&buffer, section_count);
 
     offsets_position = bytecode_get_size(&buffer);
-    for (i = 0; i < dxbc->section_count; ++i)
+    for (i = 0; i < section_count; ++i)
         put_u32(&buffer, 0);
 
-    for (i = 0; i < dxbc->section_count; ++i)
+    for (i = 0; i < section_count; ++i)
     {
         set_u32(&buffer, offsets_position + i * sizeof(uint32_t), bytecode_get_size(&buffer));
-        put_u32(&buffer, dxbc->sections[i].tag);
-        put_u32(&buffer, dxbc->sections[i].data.size);
-        bytecode_put_bytes(&buffer, dxbc->sections[i].data.code, dxbc->sections[i].data.size);
+        put_u32(&buffer, sections[i].tag);
+        put_u32(&buffer, sections[i].data.size);
+        bytecode_put_bytes(&buffer, sections[i].data.code, sections[i].data.size);
     }
     set_u32(&buffer, size_position, bytecode_get_size(&buffer));
 
@@ -78,10 +84,15 @@ int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
 
     if (!buffer.status)
     {
-        out->code = buffer.data;
-        out->size = buffer.size;
+        dxbc->code = buffer.data;
+        dxbc->size = buffer.size;
     }
     return buffer.status;
+}
+
+int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
+{
+    return vkd3d_shader_serialize_dxbc(dxbc->section_count, dxbc->sections, out, NULL);
 }
 
 struct vkd3d_shader_src_param_entry
