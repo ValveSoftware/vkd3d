@@ -1829,18 +1829,19 @@ static int parse_dxbc(const char *data, size_t data_size,
     return ret;
 }
 
-static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
+static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *section,
         struct vkd3d_shader_signature *s)
 {
     bool has_stream_index, has_min_precision;
     struct vkd3d_shader_signature_element *e;
+    const char *data = section->data.code;
     const char *ptr = data;
     unsigned int i;
     uint32_t count;
 
-    if (!require_space(0, 2, sizeof(DWORD), data_size))
+    if (!require_space(0, 2, sizeof(uint32_t), section->data.size))
     {
-        WARN("Invalid data size %#x.\n", data_size);
+        WARN("Invalid data size %#zx.\n", section->data.size);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
@@ -1849,9 +1850,9 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
 
     skip_dword_unknown(&ptr, 1); /* It seems to always be 0x00000008. */
 
-    if (!require_space(ptr - data, count, 6 * sizeof(DWORD), data_size))
+    if (!require_space(ptr - data, count, 6 * sizeof(uint32_t), section->data.size))
     {
-        WARN("Invalid count %#x (data size %#x).\n", count, data_size);
+        WARN("Invalid count %#x (data size %#zx).\n", count, section->data.size);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
@@ -1861,8 +1862,8 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    has_min_precision = tag == TAG_OSG1 || tag == TAG_PSG1 || tag == TAG_ISG1;
-    has_stream_index = tag == TAG_OSG5 || has_min_precision;
+    has_min_precision = section->tag == TAG_OSG1 || section->tag == TAG_PSG1 || section->tag == TAG_ISG1;
+    has_stream_index = section->tag == TAG_OSG5 || has_min_precision;
 
     for (i = 0; i < count; ++i)
     {
@@ -1874,9 +1875,9 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
             e[i].stream_index = 0;
 
         read_dword(&ptr, &name_offset);
-        if (!(e[i].semantic_name = shader_get_string(data, data_size, name_offset)))
+        if (!(e[i].semantic_name = shader_get_string(data, section->data.size, name_offset)))
         {
-            WARN("Invalid name offset %#x (data size %#x).\n", name_offset, data_size);
+            WARN("Invalid name offset %#x (data size %#zx).\n", name_offset, section->data.size);
             vkd3d_free(e);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
@@ -1887,7 +1888,7 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
         read_dword(&ptr, &mask);
         e[i].mask = mask & 0xff;
         e[i].used_mask = (mask >> 8) & 0xff;
-        switch (tag)
+        switch (section->tag)
         {
             case TAG_OSGN:
             case TAG_OSG1:
@@ -1917,6 +1918,7 @@ static int shader_parse_signature(DWORD tag, const char *data, DWORD data_size,
 
 static int isgn_handler(const char *data, DWORD data_size, DWORD tag, void *ctx)
 {
+    struct vkd3d_shader_dxbc_section_desc section = {.tag = tag, .data = {.code = data, .size = data_size}};
     struct vkd3d_shader_signature *is = ctx;
 
     if (tag != TAG_ISGN)
@@ -1927,7 +1929,7 @@ static int isgn_handler(const char *data, DWORD data_size, DWORD tag, void *ctx)
         FIXME("Multiple input signatures.\n");
         vkd3d_shader_free_shader_signature(is);
     }
-    return shader_parse_signature(tag, data, data_size, is);
+    return shader_parse_signature(&section, is);
 }
 
 int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
@@ -1944,6 +1946,7 @@ int shader_parse_input_signature(const void *dxbc, size_t dxbc_length,
 
 static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *context)
 {
+    struct vkd3d_shader_dxbc_section_desc section = {.tag = tag, .data = {.code = data, .size = data_size}};
     struct vkd3d_shader_desc *desc = context;
     int ret;
 
@@ -1956,7 +1959,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple input signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(tag, data, data_size, &desc->input_signature)) < 0)
+            if ((ret = shader_parse_signature(&section, &desc->input_signature)) < 0)
                 return ret;
             break;
 
@@ -1968,7 +1971,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple output signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(tag, data, data_size, &desc->output_signature)) < 0)
+            if ((ret = shader_parse_signature(&section, &desc->output_signature)) < 0)
                 return ret;
             break;
 
@@ -1979,7 +1982,7 @@ static int shdr_handler(const char *data, DWORD data_size, DWORD tag, void *cont
                 FIXME("Multiple patch constant signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(tag, data, data_size, &desc->patch_constant_signature)) < 0)
+            if ((ret = shader_parse_signature(&section, &desc->patch_constant_signature)) < 0)
                 return ret;
             break;
 
