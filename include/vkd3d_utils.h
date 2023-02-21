@@ -51,6 +51,9 @@ extern "C" {
 # define VKD3D_UTILS_API VKD3D_IMPORT
 #endif
 
+/** \since 1.10 */
+typedef enum D3D_BLOB_PART D3D_BLOB_PART;
+
 /* 1.0 */
 VKD3D_UTILS_API HANDLE vkd3d_create_event(void);
 VKD3D_UTILS_API HRESULT vkd3d_signal_event(HANDLE event);
@@ -100,6 +103,10 @@ VKD3D_UTILS_API HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, cons
  * \since 1.4
  */
 VKD3D_UTILS_API void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback);
+
+/** \since 1.10 */
+VKD3D_UTILS_API HRESULT WINAPI D3DGetBlobPart(const void *data,
+        SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob);
 
 #ifdef __cplusplus
 }

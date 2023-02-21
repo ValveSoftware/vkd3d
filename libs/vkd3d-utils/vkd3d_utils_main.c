@@ -21,6 +21,35 @@
 
 VKD3D_DEBUG_ENV_NAME("VKD3D_DEBUG");
 
+static const char *debug_d3d_blob_part(D3D_BLOB_PART part)
+{
+    switch (part)
+    {
+#define TO_STR(x) case x: return #x
+        TO_STR(D3D_BLOB_INPUT_SIGNATURE_BLOB);
+        TO_STR(D3D_BLOB_OUTPUT_SIGNATURE_BLOB);
+        TO_STR(D3D_BLOB_INPUT_AND_OUTPUT_SIGNATURE_BLOB);
+        TO_STR(D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB);
+        TO_STR(D3D_BLOB_ALL_SIGNATURE_BLOB);
+        TO_STR(D3D_BLOB_DEBUG_INFO);
+        TO_STR(D3D_BLOB_LEGACY_SHADER);
+        TO_STR(D3D_BLOB_XNA_PREPASS_SHADER);
+        TO_STR(D3D_BLOB_XNA_SHADER);
+        TO_STR(D3D_BLOB_PDB);
+        TO_STR(D3D_BLOB_PRIVATE_DATA);
+        TO_STR(D3D_BLOB_ROOT_SIGNATURE);
+        TO_STR(D3D_BLOB_DEBUG_NAME);
+
+        TO_STR(D3D_BLOB_TEST_ALTERNATE_SHADER);
+        TO_STR(D3D_BLOB_TEST_COMPILE_DETAILS);
+        TO_STR(D3D_BLOB_TEST_COMPILE_PERF);
+        TO_STR(D3D_BLOB_TEST_COMPILE_REPORT);
+#undef TO_STR
+        default:
+            return vkd3d_dbg_sprintf("<D3D_BLOB_PART %#x>", part);
+    }
+}
+
 HRESULT WINAPI D3D12GetDebugInterface(REFIID iid, void **debug)
 {
     FIXME("iid %s, debug %p stub!\n", debugstr_guid(iid), debug);
@@ -552,6 +581,182 @@ HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
         vkd3d_free(data);
     }
     return hr;
+}
+
+static bool check_blob_part(uint32_t tag, D3D_BLOB_PART part)
+{
+    bool add = false;
+
+    switch (part)
+    {
+        case D3D_BLOB_INPUT_SIGNATURE_BLOB:
+            if (tag == TAG_ISGN)
+                add = true;
+            break;
+
+        case D3D_BLOB_OUTPUT_SIGNATURE_BLOB:
+            if (tag == TAG_OSGN || tag == TAG_OSG5)
+                add = true;
+            break;
+
+        case D3D_BLOB_INPUT_AND_OUTPUT_SIGNATURE_BLOB:
+            if (tag == TAG_ISGN || tag == TAG_OSGN || tag == TAG_OSG5)
+                add = true;
+            break;
+
+        case D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB:
+            if (tag == TAG_PCSG)
+                add = true;
+            break;
+
+        case D3D_BLOB_ALL_SIGNATURE_BLOB:
+            if (tag == TAG_ISGN || tag == TAG_OSGN || tag == TAG_OSG5 || tag == TAG_PCSG)
+                add = true;
+            break;
+
+        case D3D_BLOB_DEBUG_INFO:
+            if (tag == TAG_SDBG)
+                add = true;
+            break;
+
+        case D3D_BLOB_LEGACY_SHADER:
+            if (tag == TAG_AON9)
+                add = true;
+            break;
+
+        case D3D_BLOB_XNA_PREPASS_SHADER:
+            if (tag == TAG_XNAP)
+                add = true;
+            break;
+
+        case D3D_BLOB_XNA_SHADER:
+            if (tag == TAG_XNAS)
+                add = true;
+            break;
+
+        default:
+            FIXME("Unhandled D3D_BLOB_PART %s.\n", debug_d3d_blob_part(part));
+            break;
+    }
+
+    TRACE("%s tag %s.\n", add ? "Add" : "Skip", debugstr_an((const char *)&tag, 4));
+
+    return add;
+}
+
+static HRESULT get_blob_part(const void *data, SIZE_T data_size,
+        D3D_BLOB_PART part, unsigned int flags, ID3DBlob **blob)
+{
+    const struct vkd3d_shader_code src_dxbc = {.code = data, .size = data_size};
+    struct vkd3d_shader_dxbc_section_desc *sections;
+    struct vkd3d_shader_dxbc_desc src_dxbc_desc;
+    struct vkd3d_shader_code dst_dxbc;
+    unsigned int section_count, i;
+    HRESULT hr;
+    int ret;
+
+    if (!data || !data_size || flags || !blob)
+    {
+        WARN("Invalid arguments: data %p, data_size %lu, flags %#x, blob %p.\n", data, data_size, flags, blob);
+        return D3DERR_INVALIDCALL;
+    }
+
+    if (part > D3D_BLOB_TEST_COMPILE_PERF
+            || (part < D3D_BLOB_TEST_ALTERNATE_SHADER && part > D3D_BLOB_XNA_SHADER))
+    {
+        WARN("Invalid D3D_BLOB_PART %s.\n", debug_d3d_blob_part(part));
+        return D3DERR_INVALIDCALL;
+    }
+
+    if ((ret = vkd3d_shader_parse_dxbc(&src_dxbc, 0, &src_dxbc_desc, NULL)) < 0)
+    {
+        WARN("Failed to parse source data, ret %d.\n", ret);
+        return D3DERR_INVALIDCALL;
+    }
+
+    if (!(sections = vkd3d_calloc(src_dxbc_desc.section_count, sizeof(*sections))))
+    {
+        ERR("Failed to allocate sections memory.\n");
+        vkd3d_shader_free_dxbc(&src_dxbc_desc);
+        return E_OUTOFMEMORY;
+    }
+
+    for (i = 0, section_count = 0; i < src_dxbc_desc.section_count; ++i)
+    {
+        const struct vkd3d_shader_dxbc_section_desc *src_section = &src_dxbc_desc.sections[i];
+
+        if (check_blob_part(src_section->tag, part))
+            sections[section_count++] = *src_section;
+    }
+
+    switch (part)
+    {
+        case D3D_BLOB_INPUT_SIGNATURE_BLOB:
+        case D3D_BLOB_OUTPUT_SIGNATURE_BLOB:
+        case D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB:
+        case D3D_BLOB_DEBUG_INFO:
+        case D3D_BLOB_LEGACY_SHADER:
+        case D3D_BLOB_XNA_PREPASS_SHADER:
+        case D3D_BLOB_XNA_SHADER:
+            if (section_count != 1)
+                section_count = 0;
+            break;
+
+        case D3D_BLOB_INPUT_AND_OUTPUT_SIGNATURE_BLOB:
+            if (section_count != 2)
+                section_count = 0;
+            break;
+
+        case D3D_BLOB_ALL_SIGNATURE_BLOB:
+            if (section_count != 3)
+                section_count = 0;
+            break;
+
+        default:
+            FIXME("Unhandled D3D_BLOB_PART %s.\n", debug_d3d_blob_part(part));
+            break;
+    }
+
+    if (!section_count)
+    {
+        WARN("Nothing to write into the blob.\n");
+        hr = E_FAIL;
+        goto done;
+    }
+
+    /* Some parts aren't full DXBCs, they contain only the data. */
+    if (section_count == 1 && (part == D3D_BLOB_DEBUG_INFO || part == D3D_BLOB_LEGACY_SHADER
+            || part == D3D_BLOB_XNA_PREPASS_SHADER || part == D3D_BLOB_XNA_SHADER))
+    {
+        dst_dxbc = sections[0].data;
+    }
+    else if ((ret = vkd3d_shader_serialize_dxbc(section_count, sections, &dst_dxbc, NULL) < 0))
+    {
+        WARN("Failed to serialise DXBC, ret %d.\n", ret);
+        hr = hresult_from_vkd3d_result(ret);
+        goto done;
+    }
+
+    if (FAILED(hr = D3DCreateBlob(dst_dxbc.size, blob)))
+        WARN("Failed to create blob, hr %#x.\n", hr);
+    else
+        memcpy(ID3D10Blob_GetBufferPointer(*blob), dst_dxbc.code, dst_dxbc.size);
+    if (dst_dxbc.code != sections[0].data.code)
+        vkd3d_shader_free_shader_code(&dst_dxbc);
+
+done:
+    vkd3d_free(sections);
+    vkd3d_shader_free_dxbc(&src_dxbc_desc);
+
+    return hr;
+}
+
+HRESULT WINAPI D3DGetBlobPart(const void *data, SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob)
+{
+    TRACE("data %p, data_size %lu, part %s, flags %#x, blob %p.\n", data,
+           data_size, debug_d3d_blob_part(part), flags, blob);
+
+    return get_blob_part(data, data_size, part, flags, blob);
 }
 
 void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback)

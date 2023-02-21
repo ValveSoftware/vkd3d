@@ -58,6 +58,27 @@
 #define D3DCOMPILE_SECDATA_PRESERVE_TEMPLATE_SLOTS      0x00000002
 #define D3DCOMPILE_SECDATA_REQUIRE_TEMPLATE_MATCH       0x00000004
 
+typedef enum D3D_BLOB_PART
+{
+    D3D_BLOB_INPUT_SIGNATURE_BLOB,
+    D3D_BLOB_OUTPUT_SIGNATURE_BLOB,
+    D3D_BLOB_INPUT_AND_OUTPUT_SIGNATURE_BLOB,
+    D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB,
+    D3D_BLOB_ALL_SIGNATURE_BLOB,
+    D3D_BLOB_DEBUG_INFO,
+    D3D_BLOB_LEGACY_SHADER,
+    D3D_BLOB_XNA_PREPASS_SHADER,
+    D3D_BLOB_XNA_SHADER,
+    D3D_BLOB_PDB,
+    D3D_BLOB_PRIVATE_DATA,
+    D3D_BLOB_ROOT_SIGNATURE,
+    D3D_BLOB_DEBUG_NAME,
+    D3D_BLOB_TEST_ALTERNATE_SHADER = 0x8000,
+    D3D_BLOB_TEST_COMPILE_DETAILS,
+    D3D_BLOB_TEST_COMPILE_PERF,
+    D3D_BLOB_TEST_COMPILE_REPORT
+} D3D_BLOB_PART;
+
 HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entrypoint,
         const char *profile, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages);
@@ -67,6 +88,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
         ID3DBlob **error_messages);
 HRESULT WINAPI D3DCreateBlob(SIZE_T size, ID3DBlob **blob);
+HRESULT WINAPI D3DGetBlobPart(const void *data, SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob);
 HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename, const D3D_SHADER_MACRO *macros,
         ID3DInclude *include, ID3DBlob **shader, ID3DBlob **error_messages);
 

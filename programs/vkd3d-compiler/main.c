@@ -52,8 +52,6 @@ enum
     OPTION_TEXT_FORMATTING,
 };
 
-#define TAG_DXBC VKD3D_MAKE_TAG('D', 'X', 'B', 'C')
-
 static const struct source_type_info
 {
     enum vkd3d_shader_source_type type;
