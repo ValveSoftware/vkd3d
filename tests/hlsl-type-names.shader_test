@@ -1,20 +1,25 @@
 [pixel shader]
 typedef float2 Dword;
 typedef float3 dWord;
+typedef float2 fLoat;
 
 float4 f()
 {
     typedef Dword dword;
+    typedef fLoat float;
     dword v1 = {1, 2};
+    float v2 = {2, 3};
     DWORD v4 = 4;
-    return float4(v1.x, v1.y, 3, v4);
+    return float4(v1.x, v2.x, v2.y, v4);
 }
 
 float4 f2()
 {
     typedef dword dword;
-    dword v = 1;
-    return float4(v, v, v, v);
+    typedef float float;
+    dword v1 = 1;
+    float v2 = 1;
+    return float4(v1, v2, v1, v1);
 }
 
 float4 main() : SV_TARGET
@@ -37,6 +42,14 @@ float4 main() : sv_target
 
 [pixel shader fail]
 struct DWORD s;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+typedef float2 float;
 
 float4 main() : sv_target
 {
