@@ -1,0 +1,12 @@
+[pixel shader]
+uniform float4 x;
+
+float4 main() : sv_target
+{
+    return log2(x);
+}
+
+[test]
+uniform 0 float4 2.0 4.0 5.0 0.4
+draw quad
+probe all rgba (1.0, 2.0, 2.32192802, -1.32192802) 1
