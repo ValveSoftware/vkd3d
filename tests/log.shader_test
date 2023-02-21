@@ -23,3 +23,16 @@ float4 main() : sv_target
 uniform 0 float4 10.0 100.0 1.0 0.1
 draw quad
 probe all rgba (1.0, 2.0, 0.0, -1.0) 1
+
+[pixel shader]
+uniform float4 x;
+
+float4 main() : sv_target
+{
+    return log(x);
+}
+
+[test]
+uniform 0 float4 3.0 10.0 1.0 0.1
+draw quad
+probe all rgba (1.0986123, 2.302585, 0.0, -2.302585) 2
