@@ -15,3 +15,80 @@ float4 main() : sv_target
 uniform 0 float4 1.0 2.0 3.0 4.0
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+
+% SM1 buffer offset allocation follows different rules than SM4.
+% Those would have to be tested separately.
+[require]
+shader model >= 4.0
+
+
+% Respect register boundaries
+[pixel shader]
+cbuffer buffer
+{
+    float2 a;
+    float2 b;
+    float2 c;
+    float3 d;
+}
+
+float4 main() : sv_target
+{
+    return float4(a.x, b.x, c.x, d.x);
+}
+
+[test]
+uniform 0 float4 0.0 1.0 2.0 3.0
+uniform 4 float4 4.0 5.0 6.0 7.0
+uniform 8 float4 8.0 9.0 10.0 11.0
+uniform 12 float4 12.0 13.0 14.0 15.0
+draw quad
+probe all rgba (0.0, 2.0, 4.0, 8.0)
+
+
+[pixel shader]
+cbuffer buffer
+{
+    float a;
+    float b[2];
+    float c;
+}
+
+float4 main() : sv_target
+{
+    return float4(a, b[0], b[1], c);
+}
+
+[test]
+uniform 0 float4 0.0 1.0 2.0 3.0
+uniform 4 float4 4.0 5.0 6.0 7.0
+uniform 8 float4 8.0 9.0 10.0 11.0
+draw quad
+probe all rgba (0.0, 4.0, 8.0, 9.0)
+
+
+[pixel shader]
+cbuffer buffer
+{
+    float a;
+    struct
+    {
+        float b;
+        float c;
+    } p;
+    float d;
+}
+
+float4 main() : sv_target
+{
+    return float4(a, p.b, p.c, d);
+}
+
+[test]
+uniform 0 float4 0.0 1.0 2.0 3.0
+uniform 4 float4 4.0 5.0 6.0 7.0
+uniform 8 float4 8.0 9.0 10.0 11.0
+uniform 12 float4 12.0 13.0 14.0 15.0
+draw quad
+probe all rgba (0.0, 4.0, 5.0, 6.0)
