@@ -113,6 +113,8 @@ VKD3D_UTILS_API HRESULT WINAPI D3DGetDebugInfo(const void *data, SIZE_T data_siz
 VKD3D_UTILS_API HRESULT WINAPI D3DGetInputAndOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
 /** \since 1.10 */
 VKD3D_UTILS_API HRESULT WINAPI D3DGetInputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
+/** \since 1.10 */
+VKD3D_UTILS_API HRESULT WINAPI D3DGetOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
 
 #ifdef __cplusplus
 }

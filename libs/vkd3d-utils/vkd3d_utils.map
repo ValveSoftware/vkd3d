@@ -15,6 +15,7 @@ global:
     D3DGetDebugInfo;
     D3DGetInputAndOutputSignatureBlob;
     D3DGetInputSignatureBlob;
+    D3DGetOutputSignatureBlob;
     D3DPreprocess;
     vkd3d_create_event;
     vkd3d_destroy_event;
