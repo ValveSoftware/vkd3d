@@ -107,6 +107,8 @@ VKD3D_UTILS_API void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback);
 /** \since 1.10 */
 VKD3D_UTILS_API HRESULT WINAPI D3DGetBlobPart(const void *data,
         SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob);
+/** \since 1.10 */
+VKD3D_UTILS_API HRESULT WINAPI D3DGetDebugInfo(const void *data, SIZE_T data_size, ID3DBlob **blob);
 
 #ifdef __cplusplus
 }

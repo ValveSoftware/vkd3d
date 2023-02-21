@@ -759,6 +759,13 @@ HRESULT WINAPI D3DGetBlobPart(const void *data, SIZE_T data_size, D3D_BLOB_PART 
     return get_blob_part(data, data_size, part, flags, blob);
 }
 
+HRESULT WINAPI D3DGetDebugInfo(const void *data, SIZE_T data_size, ID3DBlob **blob)
+{
+    TRACE("data %p, data_size %lu, blob %p.\n", data, data_size, blob);
+
+    return get_blob_part(data, data_size, D3D_BLOB_DEBUG_INFO, 0, blob);
+}
+
 void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback)
 {
     vkd3d_set_log_callback(callback);

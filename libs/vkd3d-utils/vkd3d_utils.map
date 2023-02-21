@@ -12,6 +12,7 @@ global:
     D3DCompile2;
     D3DCreateBlob;
     D3DGetBlobPart;
+    D3DGetDebugInfo;
     D3DPreprocess;
     vkd3d_create_event;
     vkd3d_destroy_event;
