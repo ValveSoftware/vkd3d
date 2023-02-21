@@ -2905,17 +2905,51 @@ static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint3
     return NULL;
 }
 
-static void calculate_buffer_offset(struct hlsl_ir_var *var)
+static void calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_var *var)
 {
+    unsigned int var_reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+    enum hlsl_type_class var_class = var->data_type->class;
     struct hlsl_buffer *buffer = var->buffer;
 
-    buffer->size = hlsl_type_get_sm4_offset(var->data_type, buffer->size);
+    if (var->reg_reservation.offset_type == 'c')
+    {
+        if (var->reg_reservation.offset_index % 4)
+        {
+            if (var_class == HLSL_CLASS_MATRIX)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "packoffset() reservations with matrix types must be aligned with the beginning of a register.");
+            }
+            else if (var_class == HLSL_CLASS_ARRAY)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "packoffset() reservations with array types must be aligned with the beginning of a register.");
+            }
+            else if (var_class == HLSL_CLASS_STRUCT)
+            {
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "packoffset() reservations with struct types must be aligned with the beginning of a register.");
+            }
+            else if (var_class == HLSL_CLASS_VECTOR)
+            {
+                unsigned int aligned_offset = hlsl_type_get_sm4_offset(var->data_type, var->reg_reservation.offset_index);
 
-    var->buffer_offset = buffer->size;
+                if (var->reg_reservation.offset_index != aligned_offset)
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                            "packoffset() reservations with vector types cannot span multiple registers.");
+            }
+        }
+        var->buffer_offset = var->reg_reservation.offset_index;
+    }
+    else
+    {
+        var->buffer_offset = hlsl_type_get_sm4_offset(var->data_type, buffer->size);
+    }
+
     TRACE("Allocated buffer offset %u to %s.\n", var->buffer_offset, var->name);
-    buffer->size += var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+    buffer->size = max(buffer->size, var->buffer_offset + var_reg_size);
     if (var->last_read)
-        buffer->used_size = buffer->size;
+        buffer->used_size = max(buffer->used_size, var->buffer_offset + var_reg_size);
 }
 
 static void allocate_buffers(struct hlsl_ctx *ctx)
@@ -2931,7 +2965,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             if (var->is_param)
                 var->buffer = ctx->params_buffer;
 
-            calculate_buffer_offset(var);
+            calculate_buffer_offset(ctx, var);
         }
     }
 
