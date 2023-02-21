@@ -56,8 +56,6 @@ static struct d3d9_shader_runner *d3d9_shader_runner(struct shader_runner *r)
 
 static IDirect3D9 *(WINAPI *pDirect3DCreate9)(UINT sdk_version);
 
-static unsigned int use_adapter_idx;
-
 static ID3D10Blob *compile_shader(const char *source, const char *profile)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -74,17 +72,6 @@ static ID3D10Blob *compile_shader(const char *source, const char *profile)
     return blob;
 }
 
-static void parse_args(int argc, char **argv)
-{
-    unsigned int i;
-
-    for (i = 1; i < argc; ++i)
-    {
-        if (!strcmp(argv[i], "--adapter") && i + 1 < argc)
-            use_adapter_idx = atoi(argv[++i]);
-    }
-}
-
 static void init_adapter_info(void)
 {
     D3DADAPTER_IDENTIFIER9 identifier;
@@ -94,7 +81,7 @@ static void init_adapter_info(void)
     d3d = pDirect3DCreate9(D3D_SDK_VERSION);
     ok(!!d3d, "Failed to create a D3D object.\n");
 
-    hr = IDirect3D9_GetAdapterIdentifier(d3d, use_adapter_idx, 0, &identifier);
+    hr = IDirect3D9_GetAdapterIdentifier(d3d, test_options.adapter_idx, 0, &identifier);
     ok(hr == S_OK, "Failed to get adapter identifier, hr %#lx.\n", hr);
 
     trace("Driver string: %s.\n", identifier.Driver);
@@ -517,7 +504,7 @@ static const struct shader_runner_ops d3d9_runner_ops =
     .release_readback = d3d9_runner_release_readback,
 };
 
-void run_shader_tests_d3d9(int argc, char **argv)
+void run_shader_tests_d3d9(void)
 {
     struct d3d9_shader_runner runner;
     HMODULE d3d9_module;
@@ -527,10 +514,9 @@ void run_shader_tests_d3d9(int argc, char **argv)
     {
         pDirect3DCreate9 = (void *)GetProcAddress(d3d9_module, "Direct3DCreate9");
 
-        parse_args(argc, argv);
         init_adapter_info();
         init_test_context(&runner);
-        run_shader_tests(&runner.r, argc, argv, &d3d9_runner_ops);
+        run_shader_tests(&runner.r, &d3d9_runner_ops);
         destroy_test_context(&runner);
     }
     FreeLibrary(d3d9_module);

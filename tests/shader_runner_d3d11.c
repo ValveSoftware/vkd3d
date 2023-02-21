@@ -70,10 +70,6 @@ static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d11_shader_runner, r);
 }
 
-static bool enable_debug_layer;
-static bool use_warp_adapter;
-static unsigned int use_adapter_idx;
-
 static ID3D10Blob *compile_shader(const char *source, const char *type, enum shader_model shader_model)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -101,30 +97,6 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
     return blob;
 }
 
-static void parse_args(int argc, char **argv)
-{
-    unsigned int i;
-
-    for (i = 1; i < argc; ++i)
-    {
-        if (!strcmp(argv[i], "--warp"))
-            use_warp_adapter = true;
-        else if (!strcmp(argv[i], "--adapter") && i + 1 < argc)
-            use_adapter_idx = atoi(argv[++i]);
-    }
-}
-
-static void enable_d3d11_debug_layer(int argc, char **argv)
-{
-    unsigned int i;
-
-    for (i = 1; i < argc; ++i)
-    {
-        if (!strcmp(argv[i], "--validate"))
-            enable_debug_layer = true;
-    }
-}
-
 static IDXGIAdapter *create_adapter(void)
 {
     IDXGIFactory4 *factory4;
@@ -145,7 +117,7 @@ static IDXGIAdapter *create_adapter(void)
     }
 
     adapter = NULL;
-    if (use_warp_adapter)
+    if (test_options.use_warp_device)
     {
         if (SUCCEEDED(hr = IDXGIFactory_QueryInterface(factory, &IID_IDXGIFactory4, (void **)&factory4)))
         {
@@ -159,7 +131,7 @@ static IDXGIAdapter *create_adapter(void)
     }
     else
     {
-        hr = IDXGIFactory_EnumAdapters(factory, use_adapter_idx, &adapter);
+        hr = IDXGIFactory_EnumAdapters(factory, test_options.adapter_idx, &adapter);
     }
     IDXGIFactory_Release(factory);
     if (FAILED(hr))
@@ -191,7 +163,7 @@ static void init_adapter_info(void)
     if (desc.VendorId == 0x1414 && desc.DeviceId == 0x008c)
     {
         trace("Using WARP device.\n");
-        use_warp_adapter = true;
+        test_options.use_warp_device = true;
     }
 
     IDXGIAdapter_Release(adapter);
@@ -210,7 +182,7 @@ static ID3D11Device *create_device(void)
     UINT flags = 0;
     HRESULT hr;
 
-    if (enable_debug_layer)
+    if (test_options.enable_debug_layer)
         flags |= D3D11_CREATE_DEVICE_DEBUG;
 
     if ((adapter = create_adapter()))
@@ -688,7 +660,7 @@ static const struct shader_runner_ops d3d11_runner_ops =
     .release_readback = d3d11_runner_release_readback,
 };
 
-void run_shader_tests_d3d11(int argc, char **argv)
+void run_shader_tests_d3d11(void)
 {
     struct d3d11_shader_runner runner;
     HMODULE dxgi_module, d3d11_module;
@@ -700,12 +672,10 @@ void run_shader_tests_d3d11(int argc, char **argv)
         pCreateDXGIFactory1 = (void *)GetProcAddress(dxgi_module, "CreateDXGIFactory1");
         pD3D11CreateDevice = (void *)GetProcAddress(d3d11_module, "D3D11CreateDevice");
 
-        parse_args(argc, argv);
-        enable_d3d11_debug_layer(argc, argv);
         init_adapter_info();
         if (init_test_context(&runner))
         {
-            run_shader_tests(&runner.r, argc, argv, &d3d11_runner_ops);
+            run_shader_tests(&runner.r, &d3d11_runner_ops);
             destroy_test_context(&runner);
         }
     }

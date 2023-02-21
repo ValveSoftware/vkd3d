@@ -258,14 +258,6 @@ static void wait_queue_idle_(unsigned int line, ID3D12Device *device, ID3D12Comm
     ID3D12Fence_Release(fence);
 }
 
-static struct test_options
-{
-    bool use_warp_device;
-    unsigned int adapter_idx;
-    bool enable_debug_layer;
-    bool enable_gpu_based_validation;
-} test_options;
-
 #ifdef VKD3D_CROSSTEST
 static IUnknown *create_warp_adapter(IDXGIFactory4 *factory)
 {
@@ -674,23 +666,6 @@ static inline bool is_depth_clip_enable_supported(ID3D12Device *device)
     return check_device_extension(vk_physical_device, VK_EXT_DEPTH_CLIP_ENABLE_EXTENSION_NAME);
 }
 #endif
-
-static void parse_args(int argc, char **argv)
-{
-    unsigned int i;
-
-    for (i = 1; i < argc; ++i)
-    {
-        if (!strcmp(argv[i], "--warp"))
-            test_options.use_warp_device = true;
-        else if (!strcmp(argv[i], "--adapter") && i + 1 < argc)
-            test_options.adapter_idx = atoi(argv[++i]);
-        else if (!strcmp(argv[i], "--validate"))
-            test_options.enable_debug_layer = true;
-        else if (!strcmp(argv[i], "--gbv"))
-            test_options.enable_gpu_based_validation = true;
-    }
-}
 
 static void enable_d3d12_debug_layer(void)
 {

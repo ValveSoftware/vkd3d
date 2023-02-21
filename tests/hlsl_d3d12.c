@@ -20,6 +20,8 @@
 #include "d3d12_crosstest.h"
 #include "vkd3d_common.h"
 
+struct test_options test_options = {0};
+
 #define check_preprocess(a, b, c, d, e) check_preprocess_(__LINE__, a, b, c, d, e)
 static void check_preprocess_(int line, const char *source, const D3D_SHADER_MACRO *macros,
         ID3DInclude *include, const char *present, const char *absent)

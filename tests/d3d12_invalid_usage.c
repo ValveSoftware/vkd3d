@@ -18,6 +18,8 @@
 
 #include "d3d12_crosstest.h"
 
+struct test_options test_options = {0};
+
 #define recreate_command_list(a, b, c) recreate_command_list_(__LINE__, a, b, c)
 static void recreate_command_list_(unsigned int line, ID3D12Device *device,
         ID3D12CommandAllocator *allocator, ID3D12GraphicsCommandList **command_list)

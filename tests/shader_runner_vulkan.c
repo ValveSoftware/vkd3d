@@ -1276,14 +1276,14 @@ static void cleanup_vulkan_runner(struct vulkan_shader_runner *runner)
     VK_CALL(vkDestroyInstance(runner->instance, NULL));
 }
 
-void run_shader_tests_vulkan(int argc, char **argv)
+void run_shader_tests_vulkan(void)
 {
     struct vulkan_shader_runner runner = {0};
 
     if (!init_vulkan_runner(&runner))
         return;
 
-    run_shader_tests(&runner.r, argc, argv, &vulkan_runner_ops);
+    run_shader_tests(&runner.r, &vulkan_runner_ops);
 
     cleanup_vulkan_runner(&runner);
 }

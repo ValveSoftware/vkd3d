@@ -509,7 +509,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .release_readback = d3d12_runner_release_readback,
 };
 
-void run_shader_tests_d3d12(int argc, char **argv)
+void run_shader_tests_d3d12(void)
 {
     static const struct test_context_desc desc =
     {
@@ -522,7 +522,6 @@ void run_shader_tests_d3d12(int argc, char **argv)
     ID3D12Device *device;
     HRESULT hr;
 
-    parse_args(argc, argv);
     enable_d3d12_debug_layer();
     init_adapter_info();
     init_test_context(&runner.test_context, &desc);
@@ -539,7 +538,7 @@ void run_shader_tests_d3d12(int argc, char **argv)
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    run_shader_tests(&runner.r, argc, argv, &d3d12_runner_ops);
+    run_shader_tests(&runner.r, &d3d12_runner_ops);
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
     ID3D12CommandAllocator_Release(runner.compute_allocator);

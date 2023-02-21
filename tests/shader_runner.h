@@ -139,12 +139,12 @@ void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2)
 unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot);
 void init_resource(struct resource *resource, const struct resource_params *params);
 
-void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops);
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops);
 
 #ifdef _WIN32
-void run_shader_tests_d3d9(int argc, char **argv);
-void run_shader_tests_d3d11(int argc, char **argv);
+void run_shader_tests_d3d9(void);
+void run_shader_tests_d3d11(void);
 #else
-void run_shader_tests_vulkan(int argc, char **argv);
+void run_shader_tests_vulkan(void);
 #endif
-void run_shader_tests_d3d12(int argc, char **argv);
+void run_shader_tests_d3d12(void);

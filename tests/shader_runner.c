@@ -61,6 +61,8 @@ typedef int HRESULT;
 #include "vkd3d_test.h"
 #include "shader_runner.h"
 
+struct test_options test_options = {0};
+
 void fatal_error(const char *format, ...)
 {
     va_list args;
@@ -692,39 +694,23 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     }
 }
 
-void run_shader_tests(struct shader_runner *runner, int argc, char **argv, const struct shader_runner_ops *ops)
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct resource_params current_resource;
     struct sampler *current_sampler = NULL;
     enum parse_state state = STATE_NONE;
     unsigned int i, line_number = 0;
-    const char *filename = NULL;
     char *shader_source = NULL;
     HRESULT expect_hr = S_OK;
     char line[256];
     FILE *f;
 
-    for (i = 1; i < argc; ++i)
-    {
-        if (argv[i][0] != '-')
-        {
-            filename = argv[i];
-            break;
-        }
-    }
+    if (!test_options.filename)
+        fatal_error("No filename specified.\n");
 
-    if (!filename)
-    {
-        fprintf(stderr, "Usage: %s [file]\n", argv[0]);
-        return;
-    }
-
-    if (!(f = fopen(filename, "r")))
-    {
-        fatal_error("Unable to open '%s' for reading: %s\n", argv[1], strerror(errno));
-        return;
-    }
+    if (!(f = fopen(test_options.filename, "r")))
+        fatal_error("Unable to open '%s' for reading: %s\n", test_options.filename, strerror(errno));
 
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
@@ -1114,17 +1100,19 @@ out:
 
 START_TEST(shader_runner)
 {
+    parse_args(argc, argv);
+
 #if defined(VKD3D_CROSSTEST)
     trace("Running tests from a Windows cross build\n");
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(argc, argv);
+    run_shader_tests_d3d9();
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(argc, argv);
+    run_shader_tests_d3d11();
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12();
 
     print_dll_version("d3dcompiler_47.dll");
     print_dll_version("dxgi.dll");
@@ -1135,13 +1123,13 @@ START_TEST(shader_runner)
     trace("Running tests from a Windows non-cross build\n");
 
     trace("Compiling shaders with vkd3d-shader and executing with d3d9.dll\n");
-    run_shader_tests_d3d9(argc, argv);
+    run_shader_tests_d3d9();
 
     trace("Compiling shaders with vkd3d-shader and executing with d3d11.dll\n");
-    run_shader_tests_d3d11(argc, argv);
+    run_shader_tests_d3d11();
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12();
 
     print_dll_version("d3d9.dll");
     print_dll_version("d3d11.dll");
@@ -1149,9 +1137,9 @@ START_TEST(shader_runner)
     trace("Running tests from a Unix build\n");
 
     trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests_vulkan(argc, argv);
+    run_shader_tests_vulkan();
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(argc, argv);
+    run_shader_tests_d3d12();
 #endif
 }

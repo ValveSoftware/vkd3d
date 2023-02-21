@@ -199,4 +199,34 @@ static inline void check_readback_data_vec4_(unsigned int line, const struct res
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
+struct test_options
+{
+    bool use_warp_device;
+    unsigned int adapter_idx;
+    bool enable_debug_layer;
+    bool enable_gpu_based_validation;
+    const char *filename;
+};
+
+extern struct test_options test_options;
+
+static inline void parse_args(int argc, char **argv)
+{
+    unsigned int i;
+
+    for (i = 1; i < argc; ++i)
+    {
+        if (!strcmp(argv[i], "--warp"))
+            test_options.use_warp_device = true;
+        else if (!strcmp(argv[i], "--adapter") && i + 1 < argc)
+            test_options.adapter_idx = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--validate"))
+            test_options.enable_debug_layer = true;
+        else if (!strcmp(argv[i], "--gbv"))
+            test_options.enable_gpu_based_validation = true;
+        else if (argv[i][0] != '-')
+            test_options.filename = argv[i];
+    }
+}
+
 #endif
