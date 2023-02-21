@@ -79,6 +79,16 @@ typedef enum D3D_BLOB_PART
     D3D_BLOB_TEST_COMPILE_REPORT
 } D3D_BLOB_PART;
 
+typedef enum D3DCOMPILER_STRIP_FLAGS
+{
+    D3DCOMPILER_STRIP_REFLECTION_DATA = 0x00000001,
+    D3DCOMPILER_STRIP_DEBUG_INFO      = 0x00000002,
+    D3DCOMPILER_STRIP_TEST_BLOBS      = 0x00000004,
+    D3DCOMPILER_STRIP_PRIVATE_DATA    = 0x00000008,
+    D3DCOMPILER_STRIP_ROOT_SIGNATURE  = 0x00000010,
+    D3DCOMPILER_STRIP_FORCE_DWORD     = 0x7fffffff,
+} D3DCOMPILER_STRIP_FLAGS;
+
 HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filename,
         const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entrypoint,
         const char *profile, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages);
@@ -95,6 +105,7 @@ HRESULT WINAPI D3DGetInputSignatureBlob(const void *data, SIZE_T data_size, ID3D
 HRESULT WINAPI D3DGetOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
 HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename, const D3D_SHADER_MACRO *macros,
         ID3DInclude *include, ID3DBlob **shader, ID3DBlob **error_messages);
+HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID3DBlob **blob);
 
 #endif /* __D3DCOMPILER_H__ */
 #endif /* __VKD3D_D3DCOMPILER_H */

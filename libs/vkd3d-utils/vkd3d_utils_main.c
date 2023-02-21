@@ -794,6 +794,100 @@ HRESULT WINAPI D3DGetOutputSignatureBlob(const void *data, SIZE_T data_size, ID3
     return get_blob_part(data, data_size, D3D_BLOB_OUTPUT_SIGNATURE_BLOB, 0, blob);
 }
 
+static bool check_blob_strip(uint32_t tag, uint32_t flags)
+{
+    bool add = true;
+
+    switch (tag)
+    {
+        case TAG_RDEF:
+        case TAG_STAT:
+            if (flags & D3DCOMPILER_STRIP_REFLECTION_DATA)
+                add = false;
+            break;
+
+        case TAG_SDBG:
+            if (flags & D3DCOMPILER_STRIP_DEBUG_INFO)
+                add = false;
+            break;
+
+        default:
+            break;
+    }
+
+    TRACE("%s tag %s.\n", add ? "Add" : "Skip", debugstr_an((const char *)&tag, 4));
+
+    return add;
+}
+
+HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID3DBlob **blob)
+{
+    const struct vkd3d_shader_code src_dxbc = {.code = data, .size = data_size};
+    struct vkd3d_shader_dxbc_section_desc *sections;
+    struct vkd3d_shader_dxbc_desc src_dxbc_desc;
+    struct vkd3d_shader_code dst_dxbc;
+    unsigned int section_count, i;
+    HRESULT hr;
+    int ret;
+
+    TRACE("data %p, data_size %lu, flags %#x, blob %p.\n", data, data_size, flags, blob);
+
+    if (!blob)
+    {
+        WARN("Invalid 'blob' pointer specified.\n");
+        return E_FAIL;
+    }
+
+    if (!data || !data_size)
+    {
+        WARN("Invalid arguments: data %p, data_size %lu.\n", data, data_size);
+        return D3DERR_INVALIDCALL;
+    }
+
+    if ((ret = vkd3d_shader_parse_dxbc(&src_dxbc, 0, &src_dxbc_desc, NULL)) < 0)
+    {
+        WARN("Failed to parse source data, ret %d.\n", ret);
+        return D3DERR_INVALIDCALL;
+    }
+
+    if (!(sections = vkd3d_calloc(src_dxbc_desc.section_count, sizeof(*sections))))
+    {
+        ERR("Failed to allocate sections memory.\n");
+        vkd3d_shader_free_dxbc(&src_dxbc_desc);
+        return E_OUTOFMEMORY;
+    }
+
+    if (flags & ~(D3DCOMPILER_STRIP_REFLECTION_DATA | D3DCOMPILER_STRIP_DEBUG_INFO))
+        FIXME("Unhandled flags %#x.\n", flags);
+
+    for (i = 0, section_count = 0; i < src_dxbc_desc.section_count; ++i)
+    {
+        const struct vkd3d_shader_dxbc_section_desc *src_section = &src_dxbc_desc.sections[i];
+
+        if (check_blob_strip(src_section->tag, flags))
+            sections[section_count++] = *src_section;
+    }
+
+    if ((ret = vkd3d_shader_serialize_dxbc(section_count, sections, &dst_dxbc, NULL) < 0))
+    {
+        WARN("Failed to serialise DXBC, ret %d.\n", ret);
+        hr = hresult_from_vkd3d_result(ret);
+        goto done;
+    }
+
+    if (FAILED(hr = D3DCreateBlob(dst_dxbc.size, blob)))
+        WARN("Failed to create blob, hr %#x.\n", hr);
+    else
+        memcpy(ID3D10Blob_GetBufferPointer(*blob), dst_dxbc.code, dst_dxbc.size);
+    vkd3d_shader_free_shader_code(&dst_dxbc);
+
+done:
+    vkd3d_free(sections);
+    vkd3d_shader_free_dxbc(&src_dxbc_desc);
+
+    return hr;
+}
+
 void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback)
 {
     vkd3d_set_log_callback(callback);

@@ -1095,6 +1095,80 @@ static void test_get_blob_part(void)
     refcount = ID3D10Blob_Release(blob);
     ok(!refcount, "Got refcount %u.\n", refcount);
 
+    /* D3DStripShader() corner cases. */
+    hr = D3DStripShader(test_blob_part, test_blob_part[6], 0xffffffff, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+
+    hr = D3DStripShader(test_blob_part, test_blob_part[6], 0, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+
+    hr = D3DStripShader(NULL, test_blob_part[6], 0, &blob);
+    ok(hr == D3DERR_INVALIDCALL, "Got hr %#x.\n", hr);
+
+    hr = D3DStripShader(test_blob_part, 7 * sizeof(DWORD), 0, &blob);
+    ok(hr == D3DERR_INVALIDCALL, "Got hr %#x.\n", hr);
+
+    hr = D3DStripShader(test_blob_part, 8 * sizeof(DWORD), 0, &blob);
+    ok(hr == D3DERR_INVALIDCALL, "Got hr %#x.\n", hr);
+
+    hr = D3DStripShader(test_blob_part, test_blob_part[6], 0, NULL);
+    ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    hr = D3DStripShader(NULL, test_blob_part[6], 0, NULL);
+    ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    hr = D3DStripShader(test_blob_part, 0, 0, NULL);
+    ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    /* D3DCOMPILER_STRIP_DEBUG_INFO */
+    hr = D3DStripShader(test_blob_part, test_blob_part[6], D3DCOMPILER_STRIP_DEBUG_INFO, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    size = ID3D10Blob_GetBufferSize(blob);
+    ok(size == 736, "Got size %u.\n", size);
+
+    u32 = ID3D10Blob_GetBufferPointer(blob);
+    ok(u32[0] == TAG_DXBC, "Got u32[0] 0x%08x, expected 0x%08x.\n", u32[0], TAG_DXBC);
+    ok(u32[16] == TAG_XNAS, "Got u32[16] 0x%08x, expected 0x%08x.\n", u32[16], TAG_XNAS);
+    ok(u32[35] == TAG_XNAP, "Got u32[35] 0x%08x, expected 0x%08x.\n", u32[35], TAG_XNAP);
+    ok(u32[54] == TAG_AON9, "Got u32[54] 0x%08x, expected 0x%08x.\n", u32[54], TAG_AON9);
+    ok(u32[79] == TAG_SHDR, "Got u32[79] 0x%08x, expected 0x%08x.\n", u32[79], TAG_SHDR);
+    ok(u32[96] == TAG_STAT, "Got u32[96] 0x%08x, expected 0x%08x.\n", u32[96], TAG_STAT);
+    ok(u32[127] == TAG_RDEF, "Got u32[127] 0x%08x, expected 0x%08x.\n", u32[127], TAG_RDEF);
+    ok(u32[149] == TAG_ISGN, "Got u32[149] 0x%08x, expected 0x%08x.\n", u32[149], TAG_ISGN);
+    ok(u32[171] == TAG_OSGN, "Got u32[171] 0x%08x, expected 0x%08x.\n", u32[171], TAG_OSGN);
+
+    hr = D3DGetBlobPart(u32, size, D3D_BLOB_DEBUG_INFO, 0, &blob2);
+    ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+
+    /* D3DCOMPILER_STRIP_REFLECTION_DATA */
+    hr = D3DStripShader(test_blob_part, test_blob_part[6], D3DCOMPILER_STRIP_REFLECTION_DATA, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    size = ID3D10Blob_GetBufferSize(blob);
+    ok(size == 516, "Got size %u.\n", size);
+
+    u32 = ID3D10Blob_GetBufferPointer(blob);
+    ok(u32[0] == TAG_DXBC, "Got u32[0] 0x%08x, expected 0x%08x.\n", u32[0], TAG_DXBC);
+    ok(u32[14] == TAG_XNAS, "Got u32[14] 0x%08x, expected 0x%08x.\n", u32[14], TAG_XNAS);
+    ok(u32[33] == TAG_XNAP, "Got u32[33] 0x%08x, expected 0x%08x.\n", u32[33], TAG_XNAP);
+    ok(u32[52] == TAG_AON9, "Got u32[52] 0x%08x, expected 0x%08x.\n", u32[52], TAG_AON9);
+    ok(u32[77] == TAG_SHDR, "Got u32[77] 0x%08x, expected 0x%08x.\n", u32[77], TAG_SHDR);
+    ok(u32[94] == TAG_ISGN, "Got u32[94] 0x%08x, expected 0x%08x.\n", u32[94], TAG_ISGN);
+    ok(u32[116] == TAG_OSGN, "Got u32[116] 0x%08x, expected 0x%08x.\n", u32[116], TAG_OSGN);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+
     /* D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB */
     hr = D3DGetBlobPart(test_blob_part2, test_blob_part2[6], D3D_BLOB_PATCH_CONSTANT_SIGNATURE_BLOB, 0, &blob);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -1200,6 +1274,46 @@ static void test_get_blob_part(void)
     /* D3D_BLOB_XNA_SHADER */
     hr = D3DGetBlobPart(test_blob_part2, test_blob_part2[6], D3D_BLOB_XNA_SHADER, 0, &blob);
     ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    /* D3DCOMPILER_STRIP_DEBUG_INFO */
+    hr = D3DStripShader(test_blob_part2, test_blob_part2[6], D3DCOMPILER_STRIP_DEBUG_INFO, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    size = ID3D10Blob_GetBufferSize(blob);
+    ok(size == 952, "Got size %u.\n", size);
+
+    u32 = ID3D10Blob_GetBufferPointer(blob);
+    ok(u32[0] == TAG_DXBC, "Got u32[0] 0x%08x, expected 0x%08x.\n", u32[0], TAG_DXBC);
+    ok(u32[14] == TAG_RDEF, "Got u32[14] 0x%08x, expected 0x%08x.\n", u32[14], TAG_RDEF);
+    ok(u32[44] == TAG_ISGN, "Got u32[44] 0x%08x, expected 0x%08x.\n", u32[44], TAG_ISGN);
+    ok(u32[57] == TAG_OSGN, "Got u32[57] 0x%08x, expected 0x%08x.\n", u32[57], TAG_OSGN);
+    ok(u32[70] == TAG_PCSG, "Got u32[70] 0x%08x, expected 0x%08x.\n", u32[70], TAG_PCSG);
+    ok(u32[119] == TAG_SHEX, "Got u32[119] 0x%08x, expected 0x%08x.\n", u32[119], TAG_SHEX);
+    ok(u32[199] == TAG_STAT, "Got u32[199] 0x%08x, expected 0x%08x.\n", u32[199], TAG_STAT);
+
+    hr = D3DGetBlobPart(u32, size, D3D_BLOB_DEBUG_INFO, 0, &blob2);
+    ok(hr == E_FAIL, "Got hr %#x.\n", hr);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+
+    /* D3DCOMPILER_STRIP_REFLECTION_DATA */
+    hr = D3DStripShader(test_blob_part2, test_blob_part2[6], D3DCOMPILER_STRIP_REFLECTION_DATA, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    size = ID3D10Blob_GetBufferSize(blob);
+    ok(size == 4735, "Got size %u.\n", size);
+
+    u32 = ID3D10Blob_GetBufferPointer(blob);
+    ok(u32[0] == TAG_DXBC, "Got u32[0] 0x%08x, expected 0x%08x.\n", u32[0], TAG_DXBC);
+    ok(u32[13] == TAG_ISGN, "Got u32[13] 0x%08x, expected 0x%08x.\n", u32[13], TAG_ISGN);
+    ok(u32[26] == TAG_OSGN, "Got u32[26] 0x%08x, expected 0x%08x.\n", u32[26], TAG_OSGN);
+    ok(u32[39] == TAG_PCSG, "Got u32[39] 0x%08x, expected 0x%08x.\n", u32[39], TAG_PCSG);
+    ok(u32[88] == TAG_SHEX, "Got u32[88] 0x%08x, expected 0x%08x.\n", u32[88], TAG_SHEX);
+    ok(u32[168] == TAG_SDBG, "Got u32[168] 0x%08x, expected 0x%08x.\n", u32[168], TAG_SDBG);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
 }
 
 START_TEST(hlsl_d3d12)

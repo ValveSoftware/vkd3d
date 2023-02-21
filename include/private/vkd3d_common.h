@@ -65,6 +65,7 @@
 #define TAG_SDBG VKD3D_MAKE_TAG('S', 'D', 'B', 'G')
 #define TAG_SHDR VKD3D_MAKE_TAG('S', 'H', 'D', 'R')
 #define TAG_SHEX VKD3D_MAKE_TAG('S', 'H', 'E', 'X')
+#define TAG_STAT VKD3D_MAKE_TAG('S', 'T', 'A', 'T')
 #define TAG_TEXT VKD3D_MAKE_TAG('T', 'E', 'X', 'T')
 #define TAG_XNAP VKD3D_MAKE_TAG('X', 'N', 'A', 'P')
 #define TAG_XNAS VKD3D_MAKE_TAG('X', 'N', 'A', 'S')
