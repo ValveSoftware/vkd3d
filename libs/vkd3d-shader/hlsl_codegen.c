@@ -2990,6 +2990,25 @@ static void validate_buffer_offsets(struct hlsl_ctx *ctx)
                         var1->name, var2->name);
         }
     }
+
+    LIST_FOR_EACH_ENTRY(var1, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        buffer = var1->buffer;
+        if (!buffer)
+            continue;
+
+        if (var1->reg_reservation.offset_type == 'c')
+            buffer->manually_packed_elements = true;
+        else
+            buffer->automatically_packed_elements = true;
+
+        if (buffer->manually_packed_elements && buffer->automatically_packed_elements)
+        {
+            hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "packoffset() must be specified for all the buffer elements, or none of them.");
+            break;
+        }
+    }
 }
 
 static void allocate_buffers(struct hlsl_ctx *ctx)

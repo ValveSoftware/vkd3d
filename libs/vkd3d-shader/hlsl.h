@@ -678,6 +678,9 @@ struct hlsl_buffer
     unsigned size, used_size;
     /* Register of type 'b' on which the buffer is allocated. */
     struct hlsl_reg reg;
+
+    bool manually_packed_elements;
+    bool automatically_packed_elements;
 };
 
 struct hlsl_ctx

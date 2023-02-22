@@ -305,7 +305,7 @@ draw quad
 probe all rgba (512.0, 612.0, 712.0, 812.0)
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 // packoffset cannot be used unless all elements use it.
 cbuffer buffer
 {
