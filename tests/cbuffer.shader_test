@@ -23,6 +23,18 @@ probe all rgba (1.0, 2.0, 3.0, 4.0)
 shader model >= 4.0
 
 
+[pixel shader fail]
+cbuffer buffer
+{
+    float4 a : packoffset(c1invalid_extra_chars);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+
 % Respect register boundaries
 [pixel shader]
 cbuffer buffer
@@ -94,7 +106,7 @@ draw quad
 probe all rgba (0.0, 4.0, 5.0, 6.0)
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Elements cannot overlap if buffer is used.
 cbuffer buffer
 {
@@ -109,7 +121,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 // Elements can overlap if buffer is not used.
 cbuffer buffer
 {
@@ -123,7 +135,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 cbuffer buffer
 {
     float4 a : packoffset(c1);
@@ -139,11 +151,11 @@ float4 main() : sv_target
 uniform 0 float4 1.0 2.0 3.0 4.0
 uniform 4 float4 5.0 6.0 7.0 8.0
 uniform 8 float4 9.0 10.0 11.0 12.0
-todo draw quad
+draw quad
 todo probe all rgba (509, 610, 711, 812)
 
 
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float2 a;
@@ -167,11 +179,11 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo draw quad
+draw quad
 todo probe all rgba (12468.0, 13509.0, 14010.0, 15011.0)
 
 
-[pixel shader todo]
+[pixel shader]
 cbuffer buffer
 {
     float2 c : packoffset(c0.y);
@@ -184,11 +196,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo draw quad
+draw quad
 todo probe all rgba (2.0, 3.0, 2.0, 3.0)
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Elements must respect register boundaries.
 cbuffer buffer
 {
@@ -201,7 +213,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Matrices must be aligned.
 cbuffer buffer
 {
@@ -214,7 +226,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Arrays must be aligned.
 cbuffer buffer
 {
@@ -227,7 +239,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Structs must be aligned.
 struct apple
 {
@@ -245,7 +257,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Invalid offset on unused buffer.
 cbuffer buffer
 {
@@ -258,7 +270,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // Invalid offset on unused variable.
 cbuffer buffer
 {
@@ -272,7 +284,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 cbuffer buffer
 {
     float4 a : packoffset(c1);
@@ -289,11 +301,11 @@ float4 main() : sv_target
 uniform 0 float 1.0
 uniform 1 float 2.0
 uniform 4 float4 5.0 6.0 7.0 8.0
-todo draw quad
+draw quad
 todo probe all rgba (512.0, 612.0, 712.0, 812.0)
 
 
-[pixel shader fail]
+[pixel shader fail todo]
 // packoffset cannot be used unless all elements use it.
 cbuffer buffer
 {
@@ -307,7 +319,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 cbuffer buffer
 {
     float2 c : packoffset(c0.b);
@@ -320,7 +332,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo draw quad
+draw quad
 todo probe all rgba (3.0, 4.0, 3.0, 4.0)
 
 

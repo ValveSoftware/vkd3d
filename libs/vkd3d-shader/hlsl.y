@@ -983,6 +983,9 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
             hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Illegal initializer on a struct field.");
             free_parse_initializer(&v->initializer);
         }
+        if (v->reg_reservation.offset_type)
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                "packoffset() is not allowed inside struct definitions.");
         vkd3d_free(v);
     }
     vkd3d_free(defs);
@@ -1063,7 +1066,12 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
 
-    if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers, &param->reg_reservation)))
+    if (param->reg_reservation.offset_type)
+        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                "packoffset() is not allowed on function parameters.");
+
+    if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers,
+            &param->reg_reservation)))
         return false;
     var->is_param = 1;
 
@@ -1090,6 +1098,52 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
         return reservation;
     }
     reservation.reg_type = reg_string[0];
+    return reservation;
+}
+
+static struct hlsl_reg_reservation parse_packoffset(struct hlsl_ctx *ctx, const char *reg_string,
+        const char *swizzle, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_reg_reservation reservation = {0};
+    char *endptr;
+
+    reservation.offset_index = strtoul(reg_string + 1, &endptr, 10);
+    if (*endptr)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                "Invalid packoffset() syntax.");
+        return reservation;
+    }
+
+    reservation.offset_type = reg_string[0];
+    if (reservation.offset_type != 'c')
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                "Only 'c' registers are allowed in packoffset().");
+        return reservation;
+    }
+
+    reservation.offset_index *= 4;
+
+    if (swizzle)
+    {
+        if (strlen(swizzle) != 1)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "Invalid packoffset() component \"%s\".", swizzle);
+
+        if (swizzle[0] == 'x' || swizzle[0] == 'r')
+            reservation.offset_index += 0;
+        else if (swizzle[0] == 'y' || swizzle[0] == 'g')
+            reservation.offset_index += 1;
+        else if (swizzle[0] == 'z' || swizzle[0] == 'b')
+            reservation.offset_index += 2;
+        else if (swizzle[0] == 'w' || swizzle[0] == 'a')
+            reservation.offset_index += 3;
+        else
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "Invalid packoffset() component \"%s\".", swizzle);
+    }
+
     return reservation;
 }
 
@@ -2042,6 +2096,13 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         }
 
         var->buffer = ctx->cur_buffer;
+
+        if (var->buffer == ctx->globals_buffer)
+        {
+            if (var->reg_reservation.offset_type)
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "packoffset() is only allowed inside constant buffer declarations.");
+        }
 
         if (ctx->cur_scope == ctx->globals)
         {
@@ -3846,6 +3907,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token KW_NAMESPACE
 %token KW_NOINTERPOLATION
 %token KW_OUT
+%token KW_PACKOFFSET
 %token KW_PASS
 %token KW_PIXELSHADER
 %token KW_PRECISE
@@ -3999,6 +4061,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <parameters> parameters
 
 %type <reg_reservation> register_opt
+%type <reg_reservation> packoffset_opt
 
 %type <sampler_dim> texture_type texture_ms_type uav_type
 
@@ -4351,6 +4414,9 @@ func_prototype_no_attrs:
 
             if ($7.reg_reservation.reg_type)
                 FIXME("Unexpected register reservation for a function.\n");
+            if ($7.reg_reservation.offset_type)
+                hlsl_error(ctx, &@5, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "packoffset() is not allowed on functions.");
 
             if (($$.decl = get_func_decl(&ctx->functions, $3, &$5)))
             {
@@ -4478,13 +4544,20 @@ colon_attribute:
         {
             $$.semantic.name = NULL;
             $$.reg_reservation.reg_type = 0;
+            $$.reg_reservation.offset_type = 0;
         }
     | semantic
         {
             $$.semantic = $1;
             $$.reg_reservation.reg_type = 0;
+            $$.reg_reservation.offset_type = 0;
         }
     | register_opt
+        {
+            $$.semantic.name = NULL;
+            $$.reg_reservation = $1;
+        }
+    | packoffset_opt
         {
             $$.semantic.name = NULL;
             $$.reg_reservation = $1;
@@ -4515,6 +4588,21 @@ register_opt:
             vkd3d_free($4);
 
             $$ = parse_reg_reservation($6);
+            vkd3d_free($6);
+        }
+
+packoffset_opt:
+      ':' KW_PACKOFFSET '(' any_identifier ')'
+        {
+            $$ = parse_packoffset(ctx, $4, NULL, &@$);
+
+            vkd3d_free($4);
+        }
+    | ':' KW_PACKOFFSET '(' any_identifier '.' any_identifier ')'
+        {
+            $$ = parse_packoffset(ctx, $4, $6, &@$);
+
+            vkd3d_free($4);
             vkd3d_free($6);
         }
 

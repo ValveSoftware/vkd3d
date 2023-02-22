@@ -342,12 +342,17 @@ struct hlsl_attribute
 
 #define HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT 0
 
-/* Reservation of a specific register to a variable, field, or buffer, written in the HLSL source
- *   using the register(·) syntax */
+/* Reservation of a register and/or an offset for objects inside constant buffers, to be used as a
+ *   starting point of their allocation. They are available through the register(·) and the
+ *   packoffset(·) syntaxes, respectivelly.
+ * The costant buffer offset is measured register components. */
 struct hlsl_reg_reservation
 {
     char reg_type;
     unsigned int reg_index;
+
+    char offset_type;
+    unsigned int offset_index;
 };
 
 struct hlsl_ir_var
@@ -360,8 +365,7 @@ struct hlsl_ir_var
     struct hlsl_buffer *buffer;
     /* Bitfield for storage modifiers (type modifiers are stored in data_type->modifiers). */
     unsigned int storage_modifiers;
-    /* Optional register to be used as a starting point for the variable allocation, specified
-     *   by the user via the register(·) syntax. */
+    /* Optional reservations of registers and/or offsets for variables within constant buffers. */
     struct hlsl_reg_reservation reg_reservation;
 
     /* Item entry in hlsl_scope.vars. Specifically hlsl_ctx.globals.vars if the variable is global. */
