@@ -2952,6 +2952,46 @@ static void calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_var *va
         buffer->used_size = max(buffer->used_size, var->buffer_offset + var_reg_size);
 }
 
+static void validate_buffer_offsets(struct hlsl_ctx *ctx)
+{
+    struct hlsl_ir_var *var1, *var2;
+    struct hlsl_buffer *buffer;
+
+    LIST_FOR_EACH_ENTRY(var1, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var1->is_uniform || var1->data_type->class == HLSL_CLASS_OBJECT)
+            continue;
+
+        buffer = var1->buffer;
+        if (!buffer->used_size)
+            continue;
+
+        LIST_FOR_EACH_ENTRY(var2, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+        {
+            unsigned int var1_reg_size, var2_reg_size;
+
+            if (!var2->is_uniform || var2->data_type->class == HLSL_CLASS_OBJECT)
+                continue;
+
+            if (var1 == var2 || var1->buffer != var2->buffer)
+                continue;
+
+            /* This is to avoid reporting the error twice for the same pair of overlapping variables. */
+            if (strcmp(var1->name, var2->name) >= 0)
+                continue;
+
+            var1_reg_size = var1->data_type->reg_size[HLSL_REGSET_NUMERIC];
+            var2_reg_size = var2->data_type->reg_size[HLSL_REGSET_NUMERIC];
+
+            if (var1->buffer_offset < var2->buffer_offset + var2_reg_size
+                    && var2->buffer_offset < var1->buffer_offset + var1_reg_size)
+                hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                        "Invalid packoffset() reservation: Variables %s and %s overlap.",
+                        var1->name, var2->name);
+        }
+    }
+}
+
 static void allocate_buffers(struct hlsl_ctx *ctx)
 {
     struct hlsl_buffer *buffer;
@@ -2968,6 +3008,8 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             calculate_buffer_offset(ctx, var);
         }
     }
+
+    validate_buffer_offsets(ctx);
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
