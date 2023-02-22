@@ -1839,6 +1839,9 @@ VKD3D_SHADER_API void vkd3d_shader_free_scan_descriptor_info(
  * Members of \a signature may be allocated by vkd3d-shader. The signature
  * should be freed with vkd3d_shader_free_shader_signature() when no longer
  * needed.
+ * \n
+ * The signature may contain pointers into the input shader, and should only be
+ * accessed while the input shader remains valid.
  *
  * \param messages Optional output location for error or informational messages
  * produced by the parser.
