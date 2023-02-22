@@ -2310,7 +2310,25 @@ static const char *spirv_compiler_get_entry_point_name(const struct spirv_compil
     return info && info->entry_point ? info->entry_point : "main";
 }
 
-static void spirv_compiler_destroy(struct spirv_compiler *compiler);
+static void spirv_compiler_destroy(struct spirv_compiler *compiler)
+{
+    vkd3d_free(compiler->control_flow_info);
+
+    vkd3d_free(compiler->output_info);
+
+    vkd3d_free(compiler->push_constants);
+    vkd3d_free(compiler->descriptor_offset_ids);
+
+    vkd3d_spirv_builder_free(&compiler->spirv_builder);
+
+    rb_destroy(&compiler->symbol_table, vkd3d_symbol_free, NULL);
+
+    vkd3d_free(compiler->spec_constants);
+
+    vkd3d_string_buffer_cache_cleanup(&compiler->string_buffers);
+
+    vkd3d_free(compiler);
+}
 
 static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
         const struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
@@ -9937,24 +9955,4 @@ int spirv_compile(struct vkd3d_shader_parser *parser,
 
     spirv_compiler_destroy(spirv_compiler);
     return ret;
-}
-
-static void spirv_compiler_destroy(struct spirv_compiler *compiler)
-{
-    vkd3d_free(compiler->control_flow_info);
-
-    vkd3d_free(compiler->output_info);
-
-    vkd3d_free(compiler->push_constants);
-    vkd3d_free(compiler->descriptor_offset_ids);
-
-    vkd3d_spirv_builder_free(&compiler->spirv_builder);
-
-    rb_destroy(&compiler->symbol_table, vkd3d_symbol_free, NULL);
-
-    vkd3d_free(compiler->spec_constants);
-
-    vkd3d_string_buffer_cache_cleanup(&compiler->string_buffers);
-
-    vkd3d_free(compiler);
 }
