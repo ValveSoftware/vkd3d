@@ -525,6 +525,31 @@ static void write_sm1_binary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buff
     write_sm1_instruction(ctx, buffer, &instr);
 }
 
+static void write_sm1_binary_op_dot(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
+        const struct hlsl_reg *src1, const struct hlsl_reg *src2)
+{
+    struct sm1_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.writemask = dst->writemask,
+        .dst.reg = dst->id,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
+        .srcs[0].reg = src1->id,
+        .srcs[1].type = D3DSPR_TEMP,
+        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
+        .srcs[1].reg = src2->id,
+        .src_count = 2,
+    };
+
+    write_sm1_instruction(ctx, buffer, &instr);
+}
+
 static void write_sm1_unary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
         const struct hlsl_reg *src, D3DSHADER_PARAM_SRCMOD_TYPE src_mod, D3DSHADER_PARAM_DSTMOD_TYPE dst_mod)
@@ -738,11 +763,11 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             switch (arg1->data_type->dimx)
             {
                 case 4:
-                    write_sm1_binary_op(ctx, buffer, D3DSIO_DP4, &instr->reg, &arg1->reg, &arg2->reg);
+                    write_sm1_binary_op_dot(ctx, buffer, D3DSIO_DP4, &instr->reg, &arg1->reg, &arg2->reg);
                     break;
 
                 case 3:
-                    write_sm1_binary_op(ctx, buffer, D3DSIO_DP3, &instr->reg, &arg1->reg, &arg2->reg);
+                    write_sm1_binary_op_dot(ctx, buffer, D3DSIO_DP3, &instr->reg, &arg1->reg, &arg2->reg);
                     break;
 
                 default:
