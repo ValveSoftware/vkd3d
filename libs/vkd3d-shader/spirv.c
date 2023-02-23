@@ -1767,7 +1767,7 @@ static void vkd3d_spirv_builder_init(struct vkd3d_spirv_builder *builder, const 
     rb_init(&builder->declarations, vkd3d_spirv_declaration_compare);
 
     builder->main_function_id = vkd3d_spirv_alloc_id(builder);
-    vkd3d_spirv_build_op_name(builder, builder->main_function_id, entry_point);
+    vkd3d_spirv_build_op_name(builder, builder->main_function_id, "%s", entry_point);
 }
 
 static void vkd3d_spirv_builder_begin_main_function(struct vkd3d_spirv_builder *builder)
