@@ -1857,11 +1857,11 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     shader_addline(buffer, "\n");
 }
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out)
+enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
+        const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out)
 {
     enum vkd3d_shader_compile_option_formatting_flags formatting;
-    struct vkd3d_shader_version *shader_version;
     struct vkd3d_d3d_asm_compiler compiler;
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
@@ -1919,16 +1919,16 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     buffer = &compiler.buffer;
     vkd3d_string_buffer_init(buffer);
 
+    compiler.shader_version = *shader_version;
     shader_version = &compiler.shader_version;
-    *shader_version = parser->shader_version;
     vkd3d_string_buffer_printf(buffer, "%s%s_%u_%u%s\n", compiler.colours.version,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    for (i = 0; i < parser->instructions.count; ++i)
+    for (i = 0; i < instructions->count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &instructions->elements[i];
 
         switch (ins->handler_idx)
         {
@@ -1981,12 +1981,13 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
     return result;
 }
 
-void vkd3d_shader_trace(struct vkd3d_shader_parser *parser)
+void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instructions,
+        const struct vkd3d_shader_version *shader_version)
 {
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(parser, NULL, &code) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(instructions, shader_version, NULL, &code) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;

@@ -9892,6 +9892,9 @@ int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         shader_normaliser_init(&normaliser, instructions);
         result = shader_normaliser_flatten_hull_shader_phases(&normaliser);
         instructions = &normaliser.instructions;
+
+        if (result >= 0 && TRACE_ON())
+            vkd3d_shader_trace(instructions, &parser->shader_version);
     }
 
     for (i = 0; i < instructions->count && result >= 0; ++i)

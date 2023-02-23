@@ -1072,7 +1072,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
 
     if (TRACE_ON())
     {
-        vkd3d_shader_trace(parser);
+        vkd3d_shader_trace(&parser->instructions, &parser->shader_version);
     }
 
     for (i = 0; i < parser->instructions.count; ++i)
@@ -1198,7 +1198,7 @@ static int compile_dxbc_tpf(const struct vkd3d_shader_compile_info *compile_info
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
-        ret = vkd3d_dxbc_binary_to_text(parser, compile_info, out);
+        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
         vkd3d_shader_parser_destroy(parser);
         return ret;
     }
@@ -1272,7 +1272,7 @@ static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
-        ret = vkd3d_dxbc_binary_to_text(parser, compile_info, out);
+        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
         vkd3d_shader_parser_destroy(parser);
         return ret;
     }

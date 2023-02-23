@@ -1030,7 +1030,8 @@ static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parse
     parser->ops->parser_destroy(parser);
 }
 
-void vkd3d_shader_trace(struct vkd3d_shader_parser *parser);
+void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instructions,
+        const struct vkd3d_shader_version *shader_version);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 
@@ -1046,8 +1047,9 @@ struct vkd3d_string_buffer_cache
     size_t count, max_count, capacity;
 };
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out);
+enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
+        const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out);
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);
 struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list);
 void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer);
