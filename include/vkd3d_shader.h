@@ -85,6 +85,11 @@ enum vkd3d_shader_structure_type
      * \since 1.3
      */
     VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO,
+    /**
+     * The structure is a vkd3d_shader_scan_signature_info structure.
+     * \since 1.9
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -1551,6 +1556,44 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
             | ((w & VKD3D_SHADER_SWIZZLE_MASK) << VKD3D_SHADER_SWIZZLE_SHIFT(3));
 }
 
+/**
+ * A chained structure containing descriptions of shader inputs and outputs.
+ *
+ * This structure is currently implemented only for DXBC source types. For DXBC
+ * shaders, the returned information is parsed directly from the signatures
+ * embedded in the DXBC shader. For all other shader types, the structure is
+ * zeroed.
+ *
+ * All members (except for \ref type and \ref next) are output-only.
+ *
+ * This structure is passed to vkd3d_shader_scan() and extends
+ * vkd3d_shader_compile_info.
+ *
+ * Members of this structure are allocated by vkd3d-shader and should be freed
+ * with vkd3d_shader_free_scan_signature_info() when no longer needed.
+ *
+ * All signatures may contain pointers into the input shader, and should only
+ * be accessed while the input shader remains valid.
+ *
+ * \since 1.9
+ */
+struct vkd3d_shader_scan_signature_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /** The shader input varyings. */
+    struct vkd3d_shader_signature input;
+
+    /** The shader output varyings. */
+    struct vkd3d_shader_signature output;
+
+    /** The shader patch constant varyings. */
+    struct vkd3d_shader_signature patch_constant;
+};
+
 #ifdef LIBVKD3D_SHADER_SOURCE
 # define VKD3D_SHADER_API VKD3D_EXPORT
 #else
@@ -1625,6 +1668,7 @@ VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported
  * following chained structures:
  * - vkd3d_shader_interface_info
  * - vkd3d_shader_scan_descriptor_info
+ * - vkd3d_shader_scan_signature_info
  * - vkd3d_shader_spirv_domain_shader_target_info
  * - vkd3d_shader_spirv_target_info
  * - vkd3d_shader_transform_feedback_info
@@ -1811,6 +1855,7 @@ VKD3D_SHADER_API int vkd3d_shader_convert_root_signature(struct vkd3d_shader_ver
  * \n
  * The DXBC_TPF scanner supports the following chained structures:
  * - vkd3d_shader_scan_descriptor_info
+ * - vkd3d_shader_scan_signature_info
  * \n
  * Although the \a compile_info parameter is read-only, chained structures
  * passed to this function need not be, and may serve as output parameters,
@@ -1847,11 +1892,17 @@ VKD3D_SHADER_API void vkd3d_shader_free_scan_descriptor_info(
         struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info);
 
 /**
- * Read the input signature of a compiled shader, returning a structural
+ * Read the input signature of a compiled DXBC shader, returning a structural
  * description which can be easily parsed by C code.
  *
  * This function parses a compiled shader. To parse a standalone root signature,
  * use vkd3d_shader_parse_root_signature().
+ *
+ * This function only parses DXBC shaders, and only retrieves the input
+ * signature. To retrieve signatures from other shader types, or other signature
+ * types, use vkd3d_shader_scan() and struct vkd3d_shader_scan_signature_info.
+ * This function returns the same input signature that is returned in
+ * struct vkd3d_shader_scan_signature_info.
  *
  * \param dxbc Compiled byte code, in DXBC format.
  *
@@ -2042,6 +2093,19 @@ VKD3D_SHADER_API int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxb
 VKD3D_SHADER_API int vkd3d_shader_serialize_dxbc(size_t section_count,
         const struct vkd3d_shader_dxbc_section_desc *sections, struct vkd3d_shader_code *dxbc, char **messages);
 
+/**
+ * Free members of struct vkd3d_shader_scan_signature_info allocated by
+ * vkd3d_shader_scan().
+ *
+ * This function may free members of vkd3d_shader_scan_signature_info, but
+ * does not free the structure itself.
+ *
+ * \param info Scan information to free.
+ *
+ * \since 1.9
+ */
+VKD3D_SHADER_API void vkd3d_shader_free_scan_signature_info(struct vkd3d_shader_scan_signature_info *info);
+
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
 /** Type of vkd3d_shader_get_version(). */
@@ -2106,6 +2170,9 @@ typedef int (*PFN_vkd3d_shader_parse_dxbc)(const struct vkd3d_shader_code *dxbc,
 /** Type of vkd3d_shader_serialize_dxbc(). \since 1.7 */
 typedef int (*PFN_vkd3d_shader_serialize_dxbc)(size_t section_count,
         const struct vkd3d_shader_dxbc_section_desc *sections, struct vkd3d_shader_code *dxbc, char **messages);
+
+/** Type of vkd3d_shader_free_scan_signature_info(). \since 1.9 */
+typedef void (*PFN_vkd3d_shader_free_scan_signature_info)(struct vkd3d_shader_scan_signature_info *info);
 
 #ifdef __cplusplus
 }

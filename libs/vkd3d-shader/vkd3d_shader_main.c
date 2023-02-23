@@ -440,6 +440,18 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
             shader_get_source_type_suffix(source_type), shader->code, shader->size);
 }
 
+static void init_scan_signature_info(const struct vkd3d_shader_compile_info *info)
+{
+    struct vkd3d_shader_scan_signature_info *signature_info;
+
+    if ((signature_info = vkd3d_find_struct(info->next, SCAN_SIGNATURE_INFO)))
+    {
+        memset(&signature_info->input, 0, sizeof(signature_info->input));
+        memset(&signature_info->output, 0, sizeof(signature_info->output));
+        memset(&signature_info->patch_constant, 0, sizeof(signature_info->patch_constant));
+    }
+}
+
 bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
         const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
@@ -524,6 +536,43 @@ void vkd3d_shader_free_messages(char *messages)
     TRACE("messages %p.\n", messages);
 
     vkd3d_free(messages);
+}
+
+static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_signature *signature,
+        const struct shader_signature *src)
+{
+    unsigned int i;
+
+    signature->element_count = src->element_count;
+    if (!src->elements)
+    {
+        assert(!signature->element_count);
+        signature->elements = NULL;
+        return true;
+    }
+
+    if (!(signature->elements = vkd3d_calloc(signature->element_count, sizeof(*signature->elements))))
+        return false;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        struct vkd3d_shader_signature_element *d = &signature->elements[i];
+        struct signature_element *e = &src->elements[i];
+
+        d->semantic_name = e->semantic_name;
+        d->semantic_index = e->semantic_index;
+        d->stream_index = e->stream_index;
+        d->sysval_semantic = e->sysval_semantic;
+        d->component_type = e->component_type;
+        d->register_index = e->register_index;
+        if (e->register_count > 1)
+            FIXME("Arrayed elements are not supported yet.\n");
+        d->mask = e->mask;
+        d->used_mask = e->used_mask;
+        d->min_precision = e->min_precision;
+    }
+
+    return true;
 }
 
 struct vkd3d_shader_scan_context
@@ -1070,6 +1119,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
+    struct vkd3d_shader_scan_signature_info *signature_info;
     struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
     int ret = VKD3D_OK;
@@ -1080,6 +1130,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         scan_descriptor_info->descriptors = NULL;
         scan_descriptor_info->descriptor_count = 0;
     }
+    signature_info = vkd3d_find_struct(compile_info->next, SCAN_SIGNATURE_INFO);
 
     vkd3d_shader_scan_context_init(&context, compile_info, scan_descriptor_info, message_context);
 
@@ -1096,6 +1147,21 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
             if (scan_descriptor_info)
                 vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
             break;
+        }
+    }
+
+    if (!ret && signature_info)
+    {
+        if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &parser->shader_desc.input_signature)
+                || !vkd3d_shader_signature_from_shader_signature(&signature_info->output,
+                        &parser->shader_desc.output_signature)
+                || !vkd3d_shader_signature_from_shader_signature(&signature_info->patch_constant,
+                        &parser->shader_desc.patch_constant_signature))
+        {
+            vkd3d_shader_free_scan_signature_info(signature_info);
+            if (scan_descriptor_info)
+                vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
+            ret = VKD3D_ERROR_OUT_OF_MEMORY;
         }
     }
 
@@ -1151,6 +1217,8 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
 
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, false)) < 0)
         return ret;
+
+    init_scan_signature_info(compile_info);
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
@@ -1305,6 +1373,8 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     if ((ret = vkd3d_shader_validate_compile_info(compile_info, true)) < 0)
         return ret;
 
+    init_scan_signature_info(compile_info);
+
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
     switch (compile_info->source_type)
@@ -1337,6 +1407,15 @@ void vkd3d_shader_free_scan_descriptor_info(struct vkd3d_shader_scan_descriptor_
     TRACE("scan_descriptor_info %p.\n", scan_descriptor_info);
 
     vkd3d_free(scan_descriptor_info->descriptors);
+}
+
+void vkd3d_shader_free_scan_signature_info(struct vkd3d_shader_scan_signature_info *info)
+{
+    TRACE("info %p.\n", info);
+
+    vkd3d_shader_free_shader_signature(&info->input);
+    vkd3d_shader_free_shader_signature(&info->output);
+    vkd3d_shader_free_shader_signature(&info->patch_constant);
 }
 
 void vkd3d_shader_free_shader_code(struct vkd3d_shader_code *shader_code)
@@ -1399,43 +1478,6 @@ void vkd3d_shader_free_root_signature(struct vkd3d_shader_versioned_root_signatu
     }
 
     desc->version = 0;
-}
-
-static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_signature *signature,
-        const struct shader_signature *src)
-{
-    unsigned int i;
-
-    signature->element_count = src->element_count;
-    if (!src->elements)
-    {
-        assert(!signature->element_count);
-        signature->elements = NULL;
-        return true;
-    }
-
-    if (!(signature->elements = vkd3d_calloc(signature->element_count, sizeof(*signature->elements))))
-        return false;
-
-    for (i = 0; i < signature->element_count; ++i)
-    {
-        struct vkd3d_shader_signature_element *d = &signature->elements[i];
-        struct signature_element *e = &src->elements[i];
-
-        d->semantic_name = e->semantic_name;
-        d->semantic_index = e->semantic_index;
-        d->stream_index = e->stream_index;
-        d->sysval_semantic = e->sysval_semantic;
-        d->component_type = e->component_type;
-        d->register_index = e->register_index;
-        if (e->register_count > 1)
-            FIXME("Arrayed elements are not supported yet.\n");
-        d->mask = e->mask;
-        d->used_mask = e->used_mask;
-        d->min_precision = e->min_precision;
-    }
-
-    return true;
 }
 
 void shader_signature_cleanup(struct shader_signature *signature)

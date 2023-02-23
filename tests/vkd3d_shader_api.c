@@ -401,6 +401,192 @@ static void test_dxbc(void)
     vkd3d_shader_free_shader_code(&dxbc);
 }
 
+static void check_signature_element(const struct vkd3d_shader_signature_element *element,
+        const struct vkd3d_shader_signature_element *expect)
+{
+    ok(!strcmp(element->semantic_name, expect->semantic_name), "Got semantic name %s.\n", element->semantic_name);
+    ok(element->semantic_index == expect->semantic_index, "Got semantic index %u.\n", element->semantic_index);
+    ok(element->stream_index == expect->stream_index, "Got stream index %u.\n", element->stream_index);
+    ok(element->sysval_semantic == expect->sysval_semantic, "Got sysval semantic %#x.\n", element->sysval_semantic);
+    ok(element->component_type == expect->component_type, "Got component type %#x.\n", element->component_type);
+    ok(element->register_index == expect->register_index, "Got register index %u.\n", element->register_index);
+    ok(element->mask == expect->mask, "Got mask %#x.\n", element->mask);
+    todo_if (expect->used_mask != expect->mask)
+        ok(element->used_mask == expect->used_mask, "Got used mask %#x.\n", element->used_mask);
+    ok(element->min_precision == expect->min_precision, "Got minimum precision %#x.\n", element->min_precision);
+}
+
+static void test_scan_signatures(void)
+{
+    struct vkd3d_shader_scan_signature_info signature_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO};
+    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
+    struct vkd3d_shader_compile_info compile_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_code dxbc;
+    size_t i, j;
+    int rc;
+
+    static const char vs1_source[] =
+        "void main(\n"
+        "        in float4 a : apple,\n"
+        "        out float4 b : banana2,\n"
+        "        inout float4 c : color,\n"
+        "        inout float4 d : depth,\n"
+        "        inout float4 e : sv_position,\n"
+        "        in uint3 f : fruit,\n"
+        "        inout bool2 g : grape,\n"
+        "        in int h : honeydew,\n"
+        "        in uint i : sv_vertexid)\n"
+        "{\n"
+        "    b.yw = a.xz;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element vs1_inputs[] =
+    {
+        {"apple",       0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0x5},
+        {"color",       0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"depth",       0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"sv_position", 0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"fruit",       0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_UINT,  4, 0x7},
+        {"grape",       0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_UINT,  5, 0x3, 0x3},
+        {"honeydew",    0, 0, VKD3D_SHADER_SV_NONE,      VKD3D_SHADER_COMPONENT_INT,   6, 0x1},
+        {"sv_vertexid", 0, 0, VKD3D_SHADER_SV_VERTEX_ID, VKD3D_SHADER_COMPONENT_UINT,  7, 0x1},
+    };
+
+    static const struct vkd3d_shader_signature_element vs1_outputs[] =
+    {
+        {"banana",      2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xa},
+        {"color",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"depth",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"sv_position", 0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"grape",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_UINT,  4, 0x3, 0x3},
+    };
+
+    static const char vs2_source[] =
+        "void main(inout float4 pos : position)\n"
+        "{\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element vs2_inputs[] =
+    {
+        {"position",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element vs2_outputs[] =
+    {
+        {"position",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+    };
+
+    static const char ps1_source[] =
+        "void main(\n"
+        "        in float2 a : apple,\n"
+        "        out float4 b : sv_target2,\n"
+        "        out float c : sv_depth,\n"
+        "        in float4 d : position,\n"
+        "        in float4 e : sv_position)\n"
+        "{\n"
+        "    b = d;\n"
+        "    c = 0;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element ps1_inputs[] =
+    {
+        {"apple",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x3},
+        {"position",    0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"sv_position", 0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element ps1_outputs[] =
+    {
+        {"sv_target",   2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2,   0xf, 0xf},
+        {"sv_depth",    0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, ~0u, 0x1, 0x1},
+    };
+
+    static const char cs1_source[] =
+        "[numthreads(1, 1, 1)]\n"
+        "void main(\n"
+        "        in uint a : sv_dispatchthreadid,\n"
+        "        in uint b : sv_groupid,\n"
+        "        in uint c : sv_groupthreadid)\n"
+        "{\n"
+        "}";
+
+    static const struct
+    {
+        const char *source;
+        const char *profile;
+        const struct vkd3d_shader_signature_element *inputs;
+        size_t input_count;
+        const struct vkd3d_shader_signature_element *outputs;
+        size_t output_count;
+        const struct vkd3d_shader_signature_element *patch_constants;
+        size_t patch_constant_count;
+    }
+    tests[] =
+    {
+        {vs1_source, "vs_4_0", vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs2_source, "vs_4_0", vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
+        {ps1_source, "ps_4_0", ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
+        {cs1_source, "cs_5_0", NULL, 0, NULL, 0},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        vkd3d_test_push_context("test %u", i);
+
+        compile_info.source.code = tests[i].source;
+        compile_info.source.size = strlen(tests[i].source);
+        compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+        compile_info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+        compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+
+        compile_info.next = &hlsl_info;
+        hlsl_info.profile = tests[i].profile;
+
+        rc = vkd3d_shader_compile(&compile_info, &dxbc, NULL);
+        ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+
+        compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+        compile_info.source = dxbc;
+
+        compile_info.next = &signature_info;
+
+        rc = vkd3d_shader_scan(&compile_info, NULL);
+        ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+
+        ok(signature_info.input.element_count == tests[i].input_count,
+                "Got input count %u.\n", signature_info.input.element_count);
+        for (j = 0; j < signature_info.input.element_count; ++j)
+        {
+            vkd3d_test_push_context("input %u", j);
+            check_signature_element(&signature_info.input.elements[j], &tests[i].inputs[j]);
+            vkd3d_test_pop_context();
+        }
+
+        ok(signature_info.output.element_count == tests[i].output_count,
+                "Got output count %u.\n", signature_info.output.element_count);
+        for (j = 0; j < signature_info.output.element_count; ++j)
+        {
+            vkd3d_test_push_context("output %u", j);
+            check_signature_element(&signature_info.output.elements[j], &tests[i].outputs[j]);
+            vkd3d_test_pop_context();
+        }
+
+        ok(signature_info.patch_constant.element_count == tests[i].patch_constant_count,
+                "Got patch constant count %u.\n", signature_info.patch_constant.element_count);
+        for (j = 0; j < signature_info.patch_constant.element_count; ++j)
+        {
+            vkd3d_test_push_context("patch constant %u", j);
+            check_signature_element(&signature_info.patch_constant.elements[j], &tests[i].patch_constants[j]);
+            vkd3d_test_pop_context();
+        }
+
+        vkd3d_shader_free_scan_signature_info(&signature_info);
+        vkd3d_shader_free_shader_code(&dxbc);
+
+        vkd3d_test_pop_context();
+    }
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -410,4 +596,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_version);
     run_test(test_d3dbc);
     run_test(test_dxbc);
+    run_test(test_scan_signatures);
 }
