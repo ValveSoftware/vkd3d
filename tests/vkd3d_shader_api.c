@@ -385,7 +385,7 @@ static void test_dxbc(void)
         const struct vkd3d_shader_dxbc_section_desc *section = &dxbc_desc.sections[i];
         const uint8_t *data = section->data.code;
 
-        vkd3d_test_set_context("Section %u", i);
+        vkd3d_test_push_context("Section %u", i);
         ok(section->tag == sections[i].tag, "Got unexpected tag 0x%08x, expected 0x%08x.\n",
                 section->tag, sections[i].tag);
         ok(section->data.size == sections[i].data.size, "Got unexpected size %zu, expected %zu.\n",
@@ -394,8 +394,8 @@ static void test_dxbc(void)
         ok(data > dxbc_start && data <= dxbc_end - section->data.size,
                 "Data {%p, %zu} is not contained within blob {%p, %zu}.\n",
                 data, section->data.size, dxbc_start, dxbc_end - dxbc_start);
+        vkd3d_test_pop_context();
     }
-    vkd3d_test_set_context(NULL);
 
     pfn_vkd3d_shader_free_dxbc(&dxbc_desc);
     vkd3d_shader_free_shader_code(&dxbc);

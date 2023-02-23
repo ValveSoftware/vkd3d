@@ -780,6 +780,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
         if (!ret || line[0] == '[')
         {
+            if (state != STATE_NONE)
+                vkd3d_test_pop_context();
+
             switch (state)
             {
                 case STATE_INPUT_LAYOUT:
@@ -1033,7 +1036,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 runner->input_element_count = 0;
             }
 
-            vkd3d_test_set_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
+            vkd3d_test_push_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
@@ -1082,6 +1085,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
         }
     }
 
+    vkd3d_test_pop_context();
+
 out:
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
@@ -1095,8 +1100,6 @@ out:
     }
 
     fclose(f);
-
-    vkd3d_test_set_context(NULL);
 }
 
 #ifdef _WIN32

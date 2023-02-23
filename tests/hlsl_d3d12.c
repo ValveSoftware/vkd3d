@@ -351,10 +351,10 @@ static void test_preprocess(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        vkd3d_test_set_context("Source \"%s\"", tests[i].source);
+        vkd3d_test_push_context("Source \"%s\"", tests[i].source);
         check_preprocess(tests[i].source, NULL, NULL, tests[i].present, tests[i].absent);
+        vkd3d_test_pop_context();
     }
-    vkd3d_test_set_context(NULL);
 
     macros[0].Name = "KEY";
     macros[0].Definition = "value";

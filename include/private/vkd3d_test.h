@@ -118,7 +118,8 @@ struct vkd3d_test_state
     bool bug_enabled;
 
     const char *test_name_filter;
-    char context[1024];
+    char context[8][128];
+    unsigned int context_count;
 };
 extern struct vkd3d_test_state vkd3d_test_state;
 
@@ -136,7 +137,12 @@ broken(bool condition)
 
 static void vkd3d_test_printf(unsigned int line, const char *msg)
 {
-    printf("%s:%u%s: %s", vkd3d_test_name, line, vkd3d_test_state.context, msg);
+    unsigned int i;
+
+    printf("%s:%u: ", vkd3d_test_name, line);
+    for (i = 0; i < vkd3d_test_state.context_count; ++i)
+        printf("%s: ", vkd3d_test_state.context[i]);
+    printf("%s", msg);
 }
 
 static void
@@ -399,21 +405,25 @@ static inline void vkd3d_test_end_bug(void)
     vkd3d_test_state.bug_level >>= 1;
 }
 
-static inline void vkd3d_test_set_context(const char *fmt, ...)
+static inline void vkd3d_test_push_context(const char *fmt, ...)
 {
     va_list args;
 
-    if (!fmt)
+    if (vkd3d_test_state.context_count < ARRAY_SIZE(vkd3d_test_state.context))
     {
-        vkd3d_test_state.context[0] = '\0';
-        return;
+        va_start(args, fmt);
+        vsnprintf(vkd3d_test_state.context[vkd3d_test_state.context_count],
+                sizeof(vkd3d_test_state.context), fmt, args);
+        va_end(args);
+        vkd3d_test_state.context[vkd3d_test_state.context_count][sizeof(vkd3d_test_state.context[0]) - 1] = '\0';
     }
+    ++vkd3d_test_state.context_count;
+}
 
-    vkd3d_test_state.context[0] = ':';
-    va_start(args, fmt);
-    vsnprintf(&vkd3d_test_state.context[1], sizeof(vkd3d_test_state.context) - 1, fmt, args);
-    va_end(args);
-    vkd3d_test_state.context[sizeof(vkd3d_test_state.context) - 1] = '\0';
+static inline void vkd3d_test_pop_context(void)
+{
+    if (vkd3d_test_state.context_count)
+        --vkd3d_test_state.context_count;
 }
 
 #define run_test(test_pfn) \
