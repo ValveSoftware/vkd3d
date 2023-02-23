@@ -134,6 +134,11 @@ broken(bool condition)
     return condition && vkd3d_test_platform_is_windows();
 }
 
+static void vkd3d_test_printf(unsigned int line, const char *msg)
+{
+    printf("%s:%u%s: %s", vkd3d_test_name, line, vkd3d_test_state.context, msg);
+}
+
 static void
 vkd3d_test_check_assert_that(unsigned int line, bool result, const char *fmt, va_list args)
 {
@@ -141,12 +146,12 @@ vkd3d_test_check_assert_that(unsigned int line, bool result, const char *fmt, va
     {
         InterlockedIncrement(&vkd3d_test_state.success_count);
         if (vkd3d_test_state.debug_level > 1)
-            printf("%s:%d%s: Test succeeded.\n", vkd3d_test_name, line, vkd3d_test_state.context);
+            vkd3d_test_printf(line, "Test succeeded.\n");
     }
     else
     {
         InterlockedIncrement(&vkd3d_test_state.failure_count);
-        printf("%s:%d%s: Test failed: ", vkd3d_test_name, line, vkd3d_test_state.context);
+        vkd3d_test_printf(line, "Test failed: ");
         vprintf(fmt, args);
     }
 }
@@ -173,9 +178,9 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
         if (is_todo)
             result = !result;
         if (result)
-            printf("%s:%d%s: Fixed bug: ", vkd3d_test_name, line, vkd3d_test_state.context);
+            vkd3d_test_printf(line, "Fixed bug: ");
         else
-            printf("%s:%d%s: Bug: ", vkd3d_test_name, line, vkd3d_test_state.context);
+            vkd3d_test_printf(line, "Bug: ");
         vprintf(fmt, args);
     }
     else if (is_todo)
@@ -183,12 +188,12 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
         if (result)
         {
             InterlockedIncrement(&vkd3d_test_state.todo_success_count);
-            printf("%s:%d%s: Todo succeeded: ", vkd3d_test_name, line, vkd3d_test_state.context);
+            vkd3d_test_printf(line, "Todo succeeded: ");
         }
         else
         {
             InterlockedIncrement(&vkd3d_test_state.todo_count);
-            printf("%s:%d%s: Todo: ", vkd3d_test_name, line, vkd3d_test_state.context);
+            vkd3d_test_printf(line, "Todo: ");
         }
         vprintf(fmt, args);
     }
@@ -213,7 +218,7 @@ vkd3d_test_skip(unsigned int line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf("%s:%d%s: Test skipped: ", vkd3d_test_name, line, vkd3d_test_state.context);
+    vkd3d_test_printf(line, "Test skipped: ");
     vprintf(fmt, args);
     va_end(args);
     InterlockedIncrement(&vkd3d_test_state.skip_count);
@@ -224,7 +229,7 @@ vkd3d_test_trace(unsigned int line, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    printf("%s:%d%s: ", vkd3d_test_name, line, vkd3d_test_state.context);
+    vkd3d_test_printf(line, "");
     vprintf(fmt, args);
     va_end(args);
 }
