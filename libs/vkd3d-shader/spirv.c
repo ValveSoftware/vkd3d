@@ -4330,38 +4330,13 @@ static void spirv_compiler_emit_shader_phase_name(struct spirv_compiler *compile
     vkd3d_spirv_build_op_name(builder, id, "%s%s", name, suffix);
 }
 
-static void spirv_compiler_begin_shader_phase(struct spirv_compiler *compiler,
-        struct vkd3d_shader_phase *phase)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t void_id, function_type_id;
-    uint32_t param_type_id;
-
-    phase->function_id = vkd3d_spirv_alloc_id(builder);
-
-    void_id = vkd3d_spirv_get_op_type_void(builder);
-    function_type_id = vkd3d_spirv_get_op_type_function(builder, void_id, &param_type_id, 0);
-    vkd3d_spirv_build_op_function(builder, void_id, phase->function_id,
-            SpvFunctionControlMaskNone, function_type_id);
-
-    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
-    phase->function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
-
-    spirv_compiler_emit_shader_phase_name(compiler, phase->function_id, NULL);
-}
-
 static const struct vkd3d_shader_phase *spirv_compiler_get_current_shader_phase(
         struct spirv_compiler *compiler)
 {
-    struct vkd3d_shader_phase *phase;
-
     if (is_in_default_phase(compiler))
         return NULL;
 
-    phase = is_in_control_point_phase(compiler) ? &compiler->control_point_phase : &compiler->patch_constant_phase;
-    if (!phase->function_id)
-        spirv_compiler_begin_shader_phase(compiler, phase);
-    return phase;
+    return is_in_control_point_phase(compiler) ? &compiler->control_point_phase : &compiler->patch_constant_phase;
 }
 
 static void spirv_compiler_decorate_xfb_output(struct spirv_compiler *compiler,
@@ -6533,12 +6508,31 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    uint32_t function_id, void_id, function_type_id;
+    struct vkd3d_shader_phase *phase;
+
     assert(compiler->phase != instruction->handler_idx);
 
-    if (spirv_compiler_get_current_shader_phase(compiler))
+    if (!is_in_default_phase(compiler))
         spirv_compiler_leave_shader_phase(compiler);
 
+    function_id = vkd3d_spirv_alloc_id(builder);
+
+    void_id = vkd3d_spirv_get_op_type_void(builder);
+    function_type_id = vkd3d_spirv_get_op_type_function(builder, void_id, NULL, 0);
+    vkd3d_spirv_build_op_function(builder, void_id, function_id,
+            SpvFunctionControlMaskNone, function_type_id);
+
+    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
+
     compiler->phase = instruction->handler_idx;
+    spirv_compiler_emit_shader_phase_name(compiler, function_id, NULL);
+
+    phase = (instruction->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+        ? &compiler->control_point_phase : &compiler->patch_constant_phase;
+    phase->function_id = function_id;
+    phase->function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
 }
 
 static void spirv_compiler_emit_default_control_point_phase(struct spirv_compiler *compiler)
