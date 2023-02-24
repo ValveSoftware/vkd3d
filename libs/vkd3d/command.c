@@ -670,8 +670,9 @@ static HRESULT d3d12_device_flush_blocked_queues_once(struct d3d12_device *devic
 
     vkd3d_mutex_lock(&device->blocked_queues_mutex);
 
-    /* Flush any ops unblocked by a new pending value. These cannot be flushed
-     * with the device locked, so move the queue pointers to a local array. */
+    /* Flush any ops unblocked by a new pending value. These cannot be
+     * flushed while holding blocked_queue_mutex, so move the queue
+     * pointers to a local array. */
     blocked_queue_count = device->blocked_queue_count;
     memcpy(blocked_queues, device->blocked_queues, blocked_queue_count * sizeof(blocked_queues[0]));
     device->blocked_queue_count = 0;
