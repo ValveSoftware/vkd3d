@@ -37,6 +37,9 @@ bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
     }
     register_table[] =
     {
+        {"color",       false, VKD3D_SHADER_TYPE_PIXEL, 1, D3DSPR_INPUT},
+        {"texcoord",    false, VKD3D_SHADER_TYPE_PIXEL, 1, D3DSPR_TEXTURE},
+
         {"color",       true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_COLOROUT},
         {"depth",       true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_DEPTHOUT},
         {"sv_depth",    true,  VKD3D_SHADER_TYPE_PIXEL, 2, D3DSPR_DEPTHOUT},
