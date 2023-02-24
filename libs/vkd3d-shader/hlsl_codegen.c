@@ -3268,16 +3268,15 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
             {
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
                 const struct hlsl_type *type = instr->data_type;
-                unsigned int x, y, i, writemask, end_reg;
-                unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
+                unsigned int x, i, end_reg;
 
                 constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
-                        constant->reg.id + reg_size / 4, sizeof(*defs->values)))
+                        constant->reg.id + 1, sizeof(*defs->values)))
                     return;
-                end_reg = constant->reg.id + reg_size / 4;
+                end_reg = constant->reg.id + 1;
                 if (end_reg > defs->count)
                 {
                     memset(&defs->values[defs->count], 0, sizeof(*defs->values) * (end_reg - defs->count));
@@ -3285,49 +3284,45 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                 }
 
                 assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
+                assert(type->dimy == 1);
+                assert(constant->reg.writemask);
 
-                if (!(writemask = constant->reg.writemask))
-                    writemask = (1u << type->dimx) - 1;
-
-                for (y = 0; y < type->dimy; ++y)
+                for (x = 0, i = 0; x < 4; ++x)
                 {
-                    for (x = 0, i = 0; x < 4; ++x)
+                    const union hlsl_constant_value_component *value;
+                    float f;
+
+                    if (!(constant->reg.writemask & (1u << x)))
+                        continue;
+                    value = &constant->value.u[i++];
+
+                    switch (type->base_type)
                     {
-                        const union hlsl_constant_value_component *value;
-                        float f;
+                        case HLSL_TYPE_BOOL:
+                            f = !!value->u;
+                            break;
 
-                        if (!(writemask & (1u << x)))
-                            continue;
-                        value = &constant->value.u[i++];
+                        case HLSL_TYPE_FLOAT:
+                        case HLSL_TYPE_HALF:
+                            f = value->f;
+                            break;
 
-                        switch (type->base_type)
-                        {
-                            case HLSL_TYPE_BOOL:
-                                f = !!value->u;
-                                break;
+                        case HLSL_TYPE_INT:
+                            f = value->i;
+                            break;
 
-                            case HLSL_TYPE_FLOAT:
-                            case HLSL_TYPE_HALF:
-                                f = value->f;
-                                break;
+                        case HLSL_TYPE_UINT:
+                            f = value->u;
+                            break;
 
-                            case HLSL_TYPE_INT:
-                                f = value->i;
-                                break;
+                        case HLSL_TYPE_DOUBLE:
+                            FIXME("Double constant.\n");
+                            return;
 
-                            case HLSL_TYPE_UINT:
-                                f = value->u;
-                                break;
-
-                            case HLSL_TYPE_DOUBLE:
-                                FIXME("Double constant.\n");
-                                return;
-
-                            default:
-                                vkd3d_unreachable();
-                        }
-                        defs->values[constant->reg.id + y].f[x] = f;
+                        default:
+                            vkd3d_unreachable();
                     }
+                    defs->values[constant->reg.id].f[x] = f;
                 }
 
                 break;
