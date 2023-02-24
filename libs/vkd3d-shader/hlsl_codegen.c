@@ -2921,7 +2921,8 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         D3DDECLUSAGE usage;
         uint32_t usage_idx;
 
-        if (!hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
+        builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
+        if (!builtin && !hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Invalid semantic '%s'.", var->semantic.name);
@@ -2930,8 +2931,6 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         if ((!output && !var->last_read) || (output && !var->first_write))
             return;
-
-        builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
     }
     else
     {
