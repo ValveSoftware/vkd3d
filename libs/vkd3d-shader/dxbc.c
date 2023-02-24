@@ -531,12 +531,6 @@ int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
 {
     int ret;
 
-    desc->byte_code = NULL;
-    desc->byte_code_size = 0;
-    memset(&desc->input_signature, 0, sizeof(desc->input_signature));
-    memset(&desc->output_signature, 0, sizeof(desc->output_signature));
-    memset(&desc->patch_constant_signature, 0, sizeof(desc->patch_constant_signature));
-
     ret = for_each_dxbc_section(dxbc, message_context, source_name, shdr_handler, desc);
     if (!desc->byte_code)
         ret = VKD3D_ERROR_INVALID_ARGUMENT;
