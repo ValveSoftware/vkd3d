@@ -3254,10 +3254,33 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
     }
 }
 
+static void record_constant(struct hlsl_ctx *ctx, unsigned int component_index, float f)
+{
+    struct hlsl_constant_defs *defs = &ctx->constant_defs;
+    struct hlsl_constant_register *reg;
+    size_t i;
+
+    for (i = 0; i < defs->count; ++i)
+    {
+        reg = &defs->regs[i];
+        if (reg->index == (component_index / 4))
+        {
+            reg->value.f[component_index % 4] = f;
+            return;
+        }
+    }
+
+    if (!hlsl_array_reserve(ctx, (void **)&defs->regs, &defs->size, defs->count + 1, sizeof(*defs->regs)))
+        return;
+    reg = &defs->regs[defs->count++];
+    memset(reg, 0, sizeof(*reg));
+    reg->index = component_index / 4;
+    reg->value.f[component_index % 4] = f;
+}
+
 static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
         struct hlsl_block *block, struct register_allocator *allocator)
 {
-    struct hlsl_constant_defs *defs = &ctx->constant_defs;
     struct hlsl_ir_node *instr;
 
     LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
@@ -3268,20 +3291,10 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
             {
                 struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
                 const struct hlsl_type *type = instr->data_type;
-                unsigned int x, i, end_reg;
+                unsigned int x, i;
 
                 constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
-
-                if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
-                        constant->reg.id + 1, sizeof(*defs->values)))
-                    return;
-                end_reg = constant->reg.id + 1;
-                if (end_reg > defs->count)
-                {
-                    memset(&defs->values[defs->count], 0, sizeof(*defs->values) * (end_reg - defs->count));
-                    defs->count = end_reg;
-                }
 
                 assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
                 assert(type->dimy == 1);
@@ -3322,7 +3335,8 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                         default:
                             vkd3d_unreachable();
                     }
-                    defs->values[constant->reg.id].f[x] = f;
+
+                    record_constant(ctx, constant->reg.id * 4 + x, f);
                 }
 
                 break;

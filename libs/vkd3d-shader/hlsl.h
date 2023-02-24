@@ -810,7 +810,11 @@ struct hlsl_ctx
      * Only used for SM1 profiles. */
     struct hlsl_constant_defs
     {
-        struct hlsl_vec4 *values;
+        struct hlsl_constant_register
+        {
+            uint32_t index;
+            struct hlsl_vec4 value;
+        } *regs;
         size_t count, size;
     } constant_defs;
     /* Number of temp. registers required for the shader to run, i.e. the largest temp register

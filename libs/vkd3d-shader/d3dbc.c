@@ -1818,12 +1818,13 @@ static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
     for (i = 0; i < ctx->constant_defs.count; ++i)
     {
+        const struct hlsl_constant_register *constant_reg = &ctx->constant_defs.regs[i];
         uint32_t token = D3DSIO_DEF;
         const struct sm1_dst_register reg =
         {
             .type = D3DSPR_CONST,
             .writemask = VKD3DSP_WRITEMASK_ALL,
-            .reg = i,
+            .reg = constant_reg->index,
         };
 
         if (ctx->profile->major_version > 1)
@@ -1832,7 +1833,7 @@ static void write_sm1_constant_defs(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
         write_sm1_dst_register(buffer, &reg);
         for (x = 0; x < 4; ++x)
-            put_f32(buffer, ctx->constant_defs.values[i].f[x]);
+            put_f32(buffer, constant_reg->value.f[x]);
     }
 }
 
