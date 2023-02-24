@@ -1210,6 +1210,7 @@ static unsigned int evaluate_static_expression(struct hlsl_ir_node *node)
         }
 
         case HLSL_IR_EXPR:
+        case HLSL_IR_INDEX:
         case HLSL_IR_LOAD:
         case HLSL_IR_RESOURCE_LOAD:
         case HLSL_IR_SWIZZLE:

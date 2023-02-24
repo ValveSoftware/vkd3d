@@ -1281,6 +1281,28 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     return swizzle;
 }
 
+struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
+        struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *type = val->data_type;
+    struct hlsl_ir_index *index;
+
+    if (!(index = hlsl_alloc(ctx, sizeof(*index))))
+        return NULL;
+
+    if (type->class == HLSL_CLASS_OBJECT)
+        type = type->e.resource_format;
+    else if (type->class == HLSL_CLASS_MATRIX)
+        type = hlsl_get_vector_type(ctx, type->base_type, type->dimx);
+    else
+        type = hlsl_get_element_type_from_path_index(ctx, type, idx);
+
+    init_node(&index->node, HLSL_IR_INDEX, type, loc);
+    hlsl_src_from_node(&index->val, val);
+    hlsl_src_from_node(&index->idx, idx);
+    return &index->node;
+}
+
 struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc)
 {
     struct hlsl_ir_jump *jump;
@@ -1540,6 +1562,17 @@ static struct hlsl_ir_node *clone_swizzle(struct hlsl_ctx *ctx,
     return &dst->node;
 }
 
+static struct hlsl_ir_node *clone_index(struct hlsl_ctx *ctx, struct clone_instr_map *map,
+        struct hlsl_ir_index *src)
+{
+    struct hlsl_ir_node *dst;
+
+    if (!(dst = hlsl_new_index(ctx, map_instr(map, src->val.node), map_instr(map, src->idx.node),
+            &src->node.loc)))
+        return NULL;
+    return dst;
+}
+
 static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, const struct hlsl_ir_node *instr)
 {
@@ -1556,6 +1589,9 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_IF:
             return clone_if(ctx, map, hlsl_ir_if(instr));
+
+        case HLSL_IR_INDEX:
+            return clone_index(ctx, map, hlsl_ir_index(instr));
 
         case HLSL_IR_JUMP:
             return clone_jump(ctx, hlsl_ir_jump(instr));
@@ -1946,6 +1982,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
         "HLSL_IR_CONSTANT",
         "HLSL_IR_EXPR",
         "HLSL_IR_IF",
+        "HLSL_IR_INDEX",
         "HLSL_IR_LOAD",
         "HLSL_IR_LOOP",
         "HLSL_IR_JUMP",
@@ -2324,6 +2361,14 @@ static void dump_ir_swizzle(struct vkd3d_string_buffer *buffer, const struct hls
     }
 }
 
+static void dump_ir_index(struct vkd3d_string_buffer *buffer, const struct hlsl_ir_index *index)
+{
+    dump_src(buffer, &index->val);
+    vkd3d_string_buffer_printf(buffer, "[idx:");
+    dump_src(buffer, &index->idx);
+    vkd3d_string_buffer_printf(buffer, "]");
+}
+
 static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     if (instr->index)
@@ -2349,6 +2394,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_IF:
             dump_ir_if(ctx, buffer, hlsl_ir_if(instr));
+            break;
+
+        case HLSL_IR_INDEX:
+            dump_ir_index(buffer, hlsl_ir_index(instr));
             break;
 
         case HLSL_IR_JUMP:
@@ -2525,6 +2574,13 @@ static void free_ir_swizzle(struct hlsl_ir_swizzle *swizzle)
     vkd3d_free(swizzle);
 }
 
+static void free_ir_index(struct hlsl_ir_index *index)
+{
+    hlsl_src_remove(&index->val);
+    hlsl_src_remove(&index->idx);
+    vkd3d_free(index);
+}
+
 void hlsl_free_instr(struct hlsl_ir_node *node)
 {
     assert(list_empty(&node->uses));
@@ -2545,6 +2601,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_IF:
             free_ir_if(hlsl_ir_if(node));
+            break;
+
+        case HLSL_IR_INDEX:
+            free_ir_index(hlsl_ir_index(node));
             break;
 
         case HLSL_IR_JUMP:

@@ -2200,6 +2200,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
     {
         case HLSL_IR_CONSTANT:
         case HLSL_IR_EXPR:
+        case HLSL_IR_INDEX:
         case HLSL_IR_LOAD:
         case HLSL_IR_RESOURCE_LOAD:
         case HLSL_IR_SWIZZLE:
@@ -2438,6 +2439,14 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(instr);
 
             swizzle->val.node->last_read = instr->index;
+            break;
+        }
+        case HLSL_IR_INDEX:
+        {
+            struct hlsl_ir_index *index = hlsl_ir_index(instr);
+
+            index->val.node->last_read = instr->index;
+            index->idx.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_CONSTANT:

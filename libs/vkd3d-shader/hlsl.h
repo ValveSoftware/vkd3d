@@ -254,6 +254,7 @@ enum hlsl_ir_node_type
     HLSL_IR_CONSTANT,
     HLSL_IR_EXPR,
     HLSL_IR_IF,
+    HLSL_IR_INDEX,
     HLSL_IR_LOAD,
     HLSL_IR_LOOP,
     HLSL_IR_JUMP,
@@ -542,6 +543,12 @@ struct hlsl_ir_swizzle
     struct hlsl_ir_node node;
     struct hlsl_src val;
     DWORD swizzle;
+};
+
+struct hlsl_ir_index
+{
+    struct hlsl_ir_node node;
+    struct hlsl_src val, idx;
 };
 
 /* Reference to a variable, or a part of it (e.g. a vector within a matrix within a struct). */
@@ -857,6 +864,12 @@ static inline struct hlsl_ir_swizzle *hlsl_ir_swizzle(const struct hlsl_ir_node 
     return CONTAINING_RECORD(node, struct hlsl_ir_swizzle, node);
 }
 
+static inline struct hlsl_ir_index *hlsl_ir_index(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_INDEX);
+    return CONTAINING_RECORD(node, struct hlsl_ir_index, node);
+}
+
 static inline void hlsl_block_init(struct hlsl_block *block)
 {
     list_init(&block->instrs);
@@ -1072,6 +1085,8 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
 struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs);
 
+struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
+        struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_location loc);
 struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         const struct hlsl_resource_load_params *params, const struct vkd3d_shader_location *loc);
