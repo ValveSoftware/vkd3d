@@ -64,6 +64,8 @@ struct vulkan_shader_runner
     VkCommandBuffer cmd_buffer;
     VkDescriptorPool descriptor_pool;
 
+    struct vkd3d_shader_scan_signature_info vs_signatures;
+
     struct vulkan_sampler
     {
         VkSampler vk_sampler;
@@ -392,7 +394,7 @@ static void vulkan_runner_destroy_resource(struct shader_runner *r, struct resou
     free(resource);
 }
 
-static bool compile_shader(const struct vulkan_shader_runner *runner, const char *source, const char *type,
+static bool compile_shader(struct vulkan_shader_runner *runner, const char *source, const char *type,
         struct vkd3d_shader_code *dxbc, struct vkd3d_shader_code *spirv)
 {
     struct vkd3d_shader_spirv_target_info spirv_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO};
@@ -528,6 +530,14 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     interface_info.push_constant_buffer_count = 1;
     interface_info.push_constant_buffers = &push_constants;
 
+    if (!strcmp(type, "vs"))
+    {
+        interface_info.next = &runner->vs_signatures;
+
+        runner->vs_signatures.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
+        runner->vs_signatures.next = NULL;
+    }
+
     ret = vkd3d_shader_compile(&info, spirv, &messages);
     if (messages && vkd3d_test_state.debug_level)
         trace("%s\n", messages);
@@ -538,7 +548,7 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     return true;
 }
 
-static bool create_shader_stage(const struct vulkan_shader_runner *runner,
+static bool create_shader_stage(struct vulkan_shader_runner *runner,
         VkPipelineShaderStageCreateInfo *stage_info, const char *type, enum VkShaderStageFlagBits stage,
         const char *source, struct vkd3d_shader_code *dxbc_ptr)
 {
@@ -606,7 +616,7 @@ static VkPipelineLayout create_pipeline_layout(const struct vulkan_shader_runner
     return pipeline_layout;
 }
 
-static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *runner, VkRenderPass render_pass,
+static VkPipeline create_graphics_pipeline(struct vulkan_shader_runner *runner, VkRenderPass render_pass,
         VkPipelineLayout pipeline_layout, D3D_PRIMITIVE_TOPOLOGY primitive_topology)
 {
     VkPipelineInputAssemblyStateCreateInfo ia_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
@@ -622,7 +632,6 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     VkPipelineColorBlendAttachmentState attachment_desc[MAX_RESOURCES] = {0};
     VkVertexInputAttributeDescription input_attributes[32];
     VkVertexInputBindingDescription input_bindings[32];
-    struct vkd3d_shader_signature vs_input_signature;
     VkPipelineShaderStageCreateInfo stage_desc[2];
     struct vkd3d_shader_code vs_dxbc;
     VkDevice device = runner->device;
@@ -642,9 +651,6 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
         return VK_NULL_HANDLE;
     }
 
-    ret = vkd3d_shader_parse_input_signature(&vs_dxbc, &vs_input_signature, NULL);
-    ok(!ret, "Failed to parse input signature, error %d.\n", ret);
-
     if (runner->r.input_element_count > ARRAY_SIZE(input_attributes))
         fatal_error("Input element count %zu is too high.\n", runner->r.input_element_count);
 
@@ -654,7 +660,8 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
         const struct input_element *element = &runner->r.input_elements[i];
         const struct vkd3d_shader_signature_element *signature_element;
 
-        signature_element = vkd3d_shader_find_signature_element(&vs_input_signature, element->name, element->index, 0);
+        signature_element = vkd3d_shader_find_signature_element(&runner->vs_signatures.input, element->name, element->index, 0);
+        ok(signature_element, "Cannot find signature element %s%u.\n", element->name, element->index);
 
         attribute->location = signature_element->register_index;
         attribute->binding = element->slot;
@@ -737,13 +744,13 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
 
     VK_CALL(vkDestroyShaderModule(device, stage_desc[0].module, NULL));
     VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
-    vkd3d_shader_free_shader_signature(&vs_input_signature);
+    vkd3d_shader_free_scan_signature_info(&runner->vs_signatures);
     vkd3d_shader_free_shader_code(&vs_dxbc);
 
     return pipeline;
 }
 
-static VkPipeline create_compute_pipeline(const struct vulkan_shader_runner *runner, VkPipelineLayout pipeline_layout)
+static VkPipeline create_compute_pipeline(struct vulkan_shader_runner *runner, VkPipelineLayout pipeline_layout)
 {
     VkComputePipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
     VkPipeline pipeline;
