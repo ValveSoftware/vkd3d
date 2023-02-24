@@ -729,6 +729,16 @@ static bool add_signature_element_from_semantic(struct vkd3d_shader_sm1_parser *
             semantic->usage_idx, sysval, reg->idx[0].offset, true, mask);
 }
 
+static void shader_sm1_scan_register(struct vkd3d_shader_sm1_parser *sm1, const struct vkd3d_shader_register *reg, unsigned int mask)
+{
+    uint32_t register_index = reg->idx[0].offset;
+
+    if (reg->type == VKD3DSPR_TEMP)
+        sm1->p.shader_desc.temp_count = max(sm1->p.shader_desc.temp_count, register_index + 1);
+
+    add_signature_element_from_register(sm1, reg, false, mask);
+}
+
 /* Read a parameter token from the input stream, and possibly a relative
  * addressing token. */
 static void shader_sm1_read_param(struct vkd3d_shader_sm1_parser *sm1,
@@ -1083,7 +1093,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         if (ins->dst_count)
         {
             shader_sm1_read_dst_param(sm1, &p, dst_param);
-            add_signature_element_from_register(sm1, &dst_param->reg, false, dst_param->write_mask);
+            shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask);
         }
 
         /* Predication token */
@@ -1094,8 +1104,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         for (i = 0; i < ins->src_count; ++i)
         {
             shader_sm1_read_src_param(sm1, &p, &src_params[i]);
-            add_signature_element_from_register(sm1, &src_params[i].reg,
-                    false, mask_from_swizzle(src_params[i].swizzle));
+            shader_sm1_scan_register(sm1, &src_params[i].reg, mask_from_swizzle(src_params[i].swizzle));
         }
     }
 
