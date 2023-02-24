@@ -645,7 +645,7 @@ static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
     bool write_in = false, write_out = false;
     struct hlsl_ir_var *var;
 
-    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+    if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL && ctx->profile->major_version >= 2)
         write_in = true;
     else if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX && ctx->profile->major_version == 3)
         write_in = write_out = true;
