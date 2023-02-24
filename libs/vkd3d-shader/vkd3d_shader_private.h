@@ -145,6 +145,8 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE             = 7002,
     VKD3D_SHADER_ERROR_D3DBC_INVALID_RESOURCE_TYPE      = 7003,
     VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY              = 7004,
+    VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_INDEX     = 7005,
+    VKD3D_SHADER_ERROR_D3DBC_UNDECLARED_SEMANTIC        = 7006,
 
     VKD3D_SHADER_WARNING_D3DBC_IGNORED_INSTRUCTION_FLAGS= 7300,
 };
@@ -802,6 +804,7 @@ struct signature_element
 struct shader_signature
 {
     struct signature_element *elements;
+    size_t elements_capacity;
     unsigned int element_count;
 };
 

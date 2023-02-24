@@ -476,6 +476,75 @@ static void test_scan_signatures(void)
         {"position",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
     };
 
+    static const char vs3_source[] =
+        "void main(\n"
+        "        in float4 c : position,\n"
+        "        out float4 b : position,\n"
+        "        in float4 a : binormal,\n"
+        "        in float4 d : blendindices,\n"
+        "        inout float4 e : texcoord2,\n"
+        "        inout float4 f : color,\n"
+        "        inout float g : fog,\n"
+        "        inout float h : psize)\n"
+        "{\n"
+        "    b = a + c + d;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element vs3_inputs[] =
+    {
+        {"POSITION",        0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"BINORMAL",        0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"BLENDINDICES",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 4, 0xf, 0xf},
+        {"FOG",             0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 5, 0xf, 0xf},
+        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 6, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element vs3_outputs[] =
+    {
+        {"POSITION",        0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"FOG",             0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0x1, 0x1},
+        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0x1, 0x1},
+    };
+
+    static const char vs4_source[] =
+        "void main(\n"
+        "        inout float4 c : position,\n"
+        "        inout float4 a : binormal,\n"
+        "        inout float4 d : blendindices,\n"
+        "        inout float4 e : texcoord2,\n"
+        "        inout float4 f : color,\n"
+        "        inout float4 g : fog,\n"
+        "        inout float h : psize)\n"
+        "{\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element vs4_inputs[] =
+    {
+        {"POSITION",        0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"BINORMAL",        0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"BLENDINDICES",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 4, 0xf, 0xf},
+        {"FOG",             0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 5, 0xf, 0xf},
+        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 6, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element vs4_outputs[] =
+    {
+        {"POSITION",        0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"BINORMAL",        0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"BLENDINDICES",    0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 4, 0xf, 0xf},
+        {"FOG",             0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 5, 0xf, 0xf},
+        /* FIXME: This doesn't match native, which always declares and writes all 4 components. */
+        {"PSIZE",           0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 6, 0x1, 0x1},
+    };
+
     static const char ps1_source[] =
         "void main(\n"
         "        in float2 a : apple,\n"
@@ -501,6 +570,72 @@ static void test_scan_signatures(void)
         {"sv_depth",    0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, ~0u, 0x1, 0x1},
     };
 
+    static const char ps2_source[] =
+        "void main(\n"
+                "in float4 c : color,\n"
+                "in float4 a : texcoord2,\n"
+                "out float4 b : color)\n"
+        "{\n"
+            "b = a.x + c;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element ps2_inputs[] =
+    {
+        {"TEXCOORD",    2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element ps2_outputs[] =
+    {
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+    };
+
+    static const char ps3_source[] =
+        "void main(\n"
+                "in float4 c : color,\n"
+                "in float4 a : texcoord2,\n"
+                "out float4 b : color,\n"
+                "out float d : depth)\n"
+        "{\n"
+            "b = c;\n"
+            "d = a;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element ps3_inputs[] =
+    {
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"TEXCOORD",    2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element ps3_outputs[] =
+    {
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"DEPTH",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x1, 0x1},
+    };
+
+    static const char ps4_source[] =
+        "void main(\n"
+        "        in float4 c : color,\n"
+        "        in float4 a : texcoord2,\n"
+        "        out float4 b : color,\n"
+        "        inout float d : depth,\n"
+        "        in float4 e : blendindices,\n"
+        "        in float4 f : vpos,\n"
+        "        in float g : vface)\n"
+        "{\n"
+        "    b = c + a + e + f + g;\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element ps4_inputs[] =
+    {
+        {"COLOR",           0, 0, VKD3D_SHADER_SV_NONE,             VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"TEXCOORD",        2, 0, VKD3D_SHADER_SV_NONE,             VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"DEPTH",           0, 0, VKD3D_SHADER_SV_NONE,             VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+        {"BLENDINDICES",    0, 0, VKD3D_SHADER_SV_NONE,             VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"VPOS",            0, 0, VKD3D_SHADER_SV_POSITION,         VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"VFACE",           0, 0, VKD3D_SHADER_SV_IS_FRONT_FACE,    VKD3D_SHADER_COMPONENT_FLOAT, 1, 0x1, 0x1},
+    };
+
     static const char cs1_source[] =
         "[numthreads(1, 1, 1)]\n"
         "void main(\n"
@@ -513,6 +648,7 @@ static void test_scan_signatures(void)
     static const struct
     {
         const char *source;
+        bool sm4;
         const char *profile;
         const struct vkd3d_shader_signature_element *inputs;
         size_t input_count;
@@ -523,10 +659,16 @@ static void test_scan_signatures(void)
     }
     tests[] =
     {
-        {vs1_source, "vs_4_0", vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
-        {vs2_source, "vs_4_0", vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
-        {ps1_source, "ps_4_0", ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
-        {cs1_source, "cs_5_0", NULL, 0, NULL, 0},
+        {vs1_source, true,  "vs_4_0", vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs2_source, true,  "vs_4_0", vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
+        {vs3_source, false, "vs_1_1", vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
+        {vs3_source, false, "vs_2_0", vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
+        {vs4_source, false, "vs_3_0", vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs)},
+        {ps1_source, true,  "ps_4_0", ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
+        {ps2_source, false, "ps_1_1", ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
+        {ps3_source, false, "ps_2_0", ps3_inputs, ARRAY_SIZE(ps3_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
+        {ps4_source, false, "ps_3_0", ps4_inputs, ARRAY_SIZE(ps4_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
+        {cs1_source, true,  "cs_5_0", NULL, 0, NULL, 0},
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -536,7 +678,7 @@ static void test_scan_signatures(void)
         compile_info.source.code = tests[i].source;
         compile_info.source.size = strlen(tests[i].source);
         compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
-        compile_info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+        compile_info.target_type = tests[i].sm4 ? VKD3D_SHADER_TARGET_DXBC_TPF : VKD3D_SHADER_TARGET_D3D_BYTECODE;
         compile_info.log_level = VKD3D_SHADER_LOG_INFO;
 
         compile_info.next = &hlsl_info;
@@ -545,7 +687,7 @@ static void test_scan_signatures(void)
         rc = vkd3d_shader_compile(&compile_info, &dxbc, NULL);
         ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
 
-        compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+        compile_info.source_type = tests[i].sm4 ? VKD3D_SHADER_SOURCE_DXBC_TPF : VKD3D_SHADER_SOURCE_D3D_BYTECODE;
         compile_info.source = dxbc;
 
         compile_info.next = &signature_info;

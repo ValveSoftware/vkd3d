@@ -1559,10 +1559,13 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
 /**
  * A chained structure containing descriptions of shader inputs and outputs.
  *
- * This structure is currently implemented only for DXBC source types. For DXBC
- * shaders, the returned information is parsed directly from the signatures
- * embedded in the DXBC shader. For all other shader types, the structure is
- * zeroed.
+ * This structure is currently implemented only for DXBC and legacy D3D bytecode
+ * source types.
+ * For DXBC shaders, the returned information is parsed directly from the
+ * signatures embedded in the DXBC shader.
+ * For legacy D3D shaders, the returned information is synthesized based on
+ * registers declared or used by shader instructions.
+ * For all other shader types, the structure is zeroed.
  *
  * All members (except for \ref type and \ref next) are output-only.
  *
@@ -1574,6 +1577,23 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
  *
  * All signatures may contain pointers into the input shader, and should only
  * be accessed while the input shader remains valid.
+ *
+ * Signature elements are synthesized from legacy Direct3D bytecode as follows:
+ * - The \ref vkd3d_shader_signature_element.semantic_name field is set to an
+ *   uppercase string corresponding to the HLSL name for the usage, e.g.
+ *   "POSITION", "BLENDWEIGHT", "COLOR", "PSIZE", etc.
+ * - The \ref vkd3d_shader_signature_element.semantic_index field is set to the
+ *   usage index.
+ * - The \ref vkd3d_shader_signature_element.stream_index is always 0.
+ *
+ * Signature elements are synthesized for any input or output register declared
+ * or used in a legacy Direct3D bytecode shader, including the following:
+ * - Shader model 1 and 2 colour and texture coordinate registers.
+ * - The shader model 1 pixel shader output register.
+ * - Shader model 1 and 2 vertex shader output registers (position, fog, and
+ *   point size).
+ * - Shader model 3 pixel shader system value input registers (pixel position
+ *   and face).
  *
  * \since 1.9
  */
