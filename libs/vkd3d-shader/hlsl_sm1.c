@@ -302,7 +302,10 @@ static void sm1_sort_externs(struct hlsl_ctx *ctx)
     struct hlsl_ir_var *var, *next;
 
     LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-        sm1_sort_extern(&sorted, var);
+    {
+        if (var->is_uniform)
+            sm1_sort_extern(&sorted, var);
+    }
     list_move_tail(&ctx->extern_vars, &sorted);
 }
 
