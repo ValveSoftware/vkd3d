@@ -3,6 +3,7 @@ typedef float2 Dword;
 typedef float3 dWord;
 typedef float2 fLoat;
 typedef float2 mAtrix;
+typedef float2 vEctor;
 
 float4 f()
 {
@@ -14,6 +15,10 @@ float4 f()
     mAtrix v5 = {1, 2};
     maTrix v6 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
     matrix v7 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    vector v8 = {1, 2, 3, 4};
+    vEctor v9 = {1, 2};
+    Vector v10 = {1, 2, 3, 4};
+    vectoR v11 = {1, 2, 3, 4};
     return float4(v1.x, v2.x, v2.y, v4);
 }
 
@@ -81,7 +86,27 @@ float4 main() : SV_TARGET
 }
 
 [pixel shader fail]
+float4 f()
+{
+    typedef float2 vector;
+    return float4(0, 0, 0, 0);
+}
+
+float4 main() : SV_TARGET
+{
+    return f();
+}
+
+[pixel shader fail]
 Matrix<float, 2, 2> m;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail]
+Vector<float, 2> v;
 
 float4 main() : sv_target
 {
