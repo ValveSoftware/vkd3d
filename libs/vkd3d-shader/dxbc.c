@@ -1539,6 +1539,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
     if (opcode_info->read_opcode_func)
     {
         ins->dst = NULL;
+        ins->dst_count = 0;
         opcode_info->read_opcode_func(ins, opcode, opcode_token, p, len, sm4);
     }
     else
