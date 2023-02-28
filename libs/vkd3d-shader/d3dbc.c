@@ -214,6 +214,9 @@ struct vkd3d_shader_sm1_parser
     bool abort;
 
     struct vkd3d_shader_parser p;
+
+#define MAX_CONSTANT_COUNT 8192
+    uint32_t constant_def_mask[3][MAX_CONSTANT_COUNT / 32];
 };
 
 /* This table is not order or position dependent. */
@@ -729,12 +732,60 @@ static bool add_signature_element_from_semantic(struct vkd3d_shader_sm1_parser *
             semantic->usage_idx, sysval, reg->idx[0].offset, true, mask);
 }
 
-static void shader_sm1_scan_register(struct vkd3d_shader_sm1_parser *sm1, const struct vkd3d_shader_register *reg, unsigned int mask)
+static void record_constant_register(struct vkd3d_shader_sm1_parser *sm1,
+        enum vkd3d_shader_d3dbc_constant_register set, uint32_t index, bool from_def)
 {
+    struct vkd3d_shader_desc *desc = &sm1->p.shader_desc;
+
+    desc->flat_constant_count[set].used = max(desc->flat_constant_count[set].used, index + 1);
+    if (from_def)
+    {
+        /* d3d shaders have a maximum of 8192 constants; we should not overrun
+         * this array. */
+        assert((index / 32) <= ARRAY_SIZE(sm1->constant_def_mask[set]));
+        bitmap_set(sm1->constant_def_mask[set], index);
+    }
+}
+
+static void shader_sm1_scan_register(struct vkd3d_shader_sm1_parser *sm1,
+        const struct vkd3d_shader_register *reg, unsigned int mask, bool from_def)
+{
+    struct vkd3d_shader_desc *desc = &sm1->p.shader_desc;
     uint32_t register_index = reg->idx[0].offset;
 
-    if (reg->type == VKD3DSPR_TEMP)
-        sm1->p.shader_desc.temp_count = max(sm1->p.shader_desc.temp_count, register_index + 1);
+    switch (reg->type)
+    {
+        case VKD3DSPR_TEMP:
+            desc->temp_count = max(desc->temp_count, register_index + 1);
+            break;
+
+        case VKD3DSPR_CONST:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, register_index, from_def);
+            break;
+
+        case VKD3DSPR_CONST2:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 2048 + register_index, from_def);
+            break;
+
+        case VKD3DSPR_CONST3:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 4096 + register_index, from_def);
+            break;
+
+        case VKD3DSPR_CONST4:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 6144 + register_index, from_def);
+            break;
+
+        case VKD3DSPR_CONSTINT:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER, register_index, from_def);
+            break;
+
+        case VKD3DSPR_CONSTBOOL:
+            record_constant_register(sm1, VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER, register_index, from_def);
+            break;
+
+        default:
+            break;
+    }
 
     add_signature_element_from_register(sm1, reg, false, mask);
 }
@@ -1076,16 +1127,19 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_VEC4, VKD3D_DATA_FLOAT);
+        shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else if (ins->handler_idx == VKD3DSIH_DEFB)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_SCALAR, VKD3D_DATA_UINT);
+        shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else if (ins->handler_idx == VKD3DSIH_DEFI)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
         shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_VEC4, VKD3D_DATA_INT);
+        shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else
     {
@@ -1093,7 +1147,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         if (ins->dst_count)
         {
             shader_sm1_read_dst_param(sm1, &p, dst_param);
-            shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask);
+            shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, false);
         }
 
         /* Predication token */
@@ -1104,7 +1158,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         for (i = 0; i < ins->src_count; ++i)
         {
             shader_sm1_read_src_param(sm1, &p, &src_params[i]);
-            shader_sm1_scan_register(sm1, &src_params[i].reg, mask_from_swizzle(src_params[i].swizzle));
+            shader_sm1_scan_register(sm1, &src_params[i].reg, mask_from_swizzle(src_params[i].swizzle), false);
         }
     }
 
@@ -1212,12 +1266,30 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     return VKD3D_OK;
 }
 
+static uint32_t get_external_constant_count(struct vkd3d_shader_sm1_parser *sm1,
+        enum vkd3d_shader_d3dbc_constant_register set)
+{
+    unsigned int j;
+
+    /* Find the highest constant index which is not written by a DEF
+     * instruction. We can't (easily) use an FFZ function for this since it
+     * needs to be limited by the highest used register index. */
+    for (j = sm1->p.shader_desc.flat_constant_count[set].used; j > 0; --j)
+    {
+        if (!bitmap_is_set(sm1->constant_def_mask[set], j - 1))
+            return j;
+    }
+
+    return 0;
+}
+
 int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
     struct vkd3d_shader_instruction_array *instructions;
     struct vkd3d_shader_instruction *ins;
     struct vkd3d_shader_sm1_parser *sm1;
+    unsigned int i;
     int ret;
 
     if (!(sm1 = vkd3d_calloc(1, sizeof(*sm1))))
@@ -1256,6 +1328,9 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     *parser = &sm1->p;
+
+    for (i = 0; i < ARRAY_SIZE(sm1->p.shader_desc.flat_constant_count); ++i)
+        sm1->p.shader_desc.flat_constant_count[i].external = get_external_constant_count(sm1, i);
 
     return sm1->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }

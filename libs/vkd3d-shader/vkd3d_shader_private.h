@@ -840,6 +840,11 @@ struct vkd3d_shader_desc
     struct shader_signature patch_constant_signature;
 
     uint32_t temp_count;
+
+    struct
+    {
+        uint32_t used, external;
+    } flat_constant_count[3];
 };
 
 struct vkd3d_shader_register_semantic

@@ -193,6 +193,21 @@ static inline int vkd3d_u32_compare(uint32_t x, uint32_t y)
     return (x > y) - (x < y);
 }
 
+static inline bool bitmap_clear(uint32_t *map, unsigned int idx)
+{
+    return map[idx >> 5] &= ~(1u << (idx & 0x1f));
+}
+
+static inline bool bitmap_set(uint32_t *map, unsigned int idx)
+{
+    return map[idx >> 5] |= (1u << (idx & 0x1f));
+}
+
+static inline bool bitmap_is_set(const uint32_t *map, unsigned int idx)
+{
+    return map[idx >> 5] & (1u << (idx & 0x1f));
+}
+
 static inline int ascii_isupper(int c)
 {
     return 'A' <= c && c <= 'Z';

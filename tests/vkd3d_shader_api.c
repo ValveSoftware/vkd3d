@@ -729,6 +729,100 @@ static void test_scan_signatures(void)
     }
 }
 
+static void test_scan_descriptors(void)
+{
+    struct vkd3d_shader_scan_descriptor_info descriptor_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO};
+    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
+    struct vkd3d_shader_compile_info compile_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_code dxbc;
+    size_t i, j;
+    int rc;
+
+    static const char ps1_source[] =
+        "float4 main(uniform float4 u, uniform float4 v) : sv_target\n"
+        "{\n"
+        "    return u * v + 1.0;\n"
+        "}";
+
+    static const char ps2_source[] =
+        "float4 main() : sv_target\n"
+        "{\n"
+        "    return 1.0;\n"
+        "}";
+
+    static const struct vkd3d_shader_descriptor_info ps1_descriptors[] =
+    {
+        {VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, 0, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER,
+                VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0, 1},
+    };
+
+    static const struct
+    {
+        const char *source;
+        bool sm4;
+        const char *profile;
+        const struct vkd3d_shader_descriptor_info *descriptors;
+        size_t descriptor_count;
+    }
+    tests[] =
+    {
+        {ps1_source, false, "ps_2_0", ps1_descriptors, ARRAY_SIZE(ps1_descriptors)},
+        {ps2_source, false, "ps_2_0", NULL, 0},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        vkd3d_test_push_context("test %u", i);
+
+        compile_info.source.code = tests[i].source;
+        compile_info.source.size = strlen(tests[i].source);
+        compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+        compile_info.target_type = tests[i].sm4 ? VKD3D_SHADER_TARGET_DXBC_TPF : VKD3D_SHADER_TARGET_D3D_BYTECODE;
+        compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+
+        compile_info.next = &hlsl_info;
+        hlsl_info.profile = tests[i].profile;
+
+        rc = vkd3d_shader_compile(&compile_info, &dxbc, NULL);
+        ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+
+        compile_info.source_type = tests[i].sm4 ? VKD3D_SHADER_SOURCE_DXBC_TPF : VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+        compile_info.source = dxbc;
+
+        compile_info.next = &descriptor_info;
+
+        rc = vkd3d_shader_scan(&compile_info, NULL);
+        ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+
+        ok(descriptor_info.descriptor_count == tests[i].descriptor_count,
+                "Got descriptor count %u.\n", descriptor_info.descriptor_count);
+        for (j = 0; j < descriptor_info.descriptor_count; ++j)
+        {
+            const struct vkd3d_shader_descriptor_info *descriptor = &descriptor_info.descriptors[j];
+            const struct vkd3d_shader_descriptor_info *expect = &tests[i].descriptors[j];
+
+            vkd3d_test_push_context("descriptor %u", j);
+
+            ok(descriptor->type == expect->type, "Got type %#x.\n", descriptor->type);
+            ok(descriptor->register_space == expect->register_space, "Got space %u.\n", descriptor->register_space);
+            ok(descriptor->register_index == expect->register_index, "Got index %u.\n", descriptor->register_index);
+            ok(descriptor->resource_type == expect->resource_type,
+                    "Got resource type %#x.\n", descriptor->resource_type);
+            ok(descriptor->resource_data_type == expect->resource_data_type,
+                    "Got data type %#x.\n", descriptor->resource_data_type);
+            ok(descriptor->flags == expect->flags, "Got flags %#x.\n", descriptor->flags);
+            ok(descriptor->count == expect->count, "Got count %u.\n", descriptor->count);
+
+            vkd3d_test_pop_context();
+        }
+
+        vkd3d_shader_free_scan_descriptor_info(&descriptor_info);
+        vkd3d_shader_free_shader_code(&dxbc);
+
+        vkd3d_test_pop_context();
+    }
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -739,4 +833,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_d3dbc);
     run_test(test_dxbc);
     run_test(test_scan_signatures);
+    run_test(test_scan_descriptors);
 }

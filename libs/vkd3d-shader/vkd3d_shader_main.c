@@ -1152,6 +1152,15 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         }
     }
 
+    for (i = 0; i < ARRAY_SIZE(parser->shader_desc.flat_constant_count); ++i)
+    {
+        struct vkd3d_shader_register_range range = {.space = 0, .first = i, .last = i};
+
+        if (parser->shader_desc.flat_constant_count[i].external)
+            vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV,
+                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
+    }
+
     if (!ret && signature_info)
     {
         if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &parser->shader_desc.input_signature)
