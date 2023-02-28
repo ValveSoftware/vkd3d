@@ -333,6 +333,25 @@ struct vkd3d_shader_parameter
 };
 
 /**
+ * Symbolic register indices for mapping uniform constant register sets in
+ * legacy Direct3D bytecode to constant buffer views in the target environment.
+ *
+ * Members of this enumeration are used in
+ * \ref vkd3d_shader_resource_binding.register_index.
+ *
+ * \since 1.9
+ */
+enum vkd3d_shader_d3dbc_constant_register
+{
+    /** The float constant register set, c# in Direct3D assembly. */
+    VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER  = 0x0,
+    /** The integer constant register set, i# in Direct3D assembly. */
+    VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER    = 0x1,
+    /** The boolean constant register set, b# in Direct3D assembly. */
+    VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER   = 0x2,
+};
+
+/**
  * Describes the mapping of a single resource or resource array to its binding
  * point in the target environment.
  *
@@ -356,7 +375,14 @@ struct vkd3d_shader_resource_binding
      * support multiple register spaces, this parameter must be set to 0.
      */
     unsigned int register_space;
-    /** Register index of the DXBC resource. */
+    /**
+     * Register index of the Direct3D resource.
+     *
+     * For legacy Direct3D shaders, vkd3d-shader maps each constant register
+     * set to a single constant buffer view. This parameter names the register
+     * set to map, and must be a member of
+     * enum vkd3d_shader_d3dbc_constant_register.
+     */
     unsigned int register_index;
     /** Shader stage(s) to which the resource is visible. */
     enum vkd3d_shader_visibility shader_visibility;
@@ -1330,6 +1356,20 @@ struct vkd3d_shader_descriptor_info
  * A chained structure enumerating the descriptors declared by a shader.
  *
  * This structure extends vkd3d_shader_compile_info.
+ *
+ * When scanning a legacy Direct3D shader, vkd3d-shader enumerates each
+ * constant register set used by the shader as a single constant buffer
+ * descriptor, as follows:
+ * - The \ref vkd3d_shader_descriptor_info.type field is set to
+ *   VKD3D_SHADER_DESCRIPTOR_TYPE_CBV.
+ * - The \ref vkd3d_shader_descriptor_info.register_space field is set to zero.
+ * - The \ref vkd3d_shader_descriptor_info.register_index field is set to a
+ *   member of enum vkd3d_shader_d3dbc_constant_register denoting which set
+ *   is used.
+ * - The \ref vkd3d_shader_descriptor_info.count field is set to one.
+ *
+ * In summary, there may be up to three such descriptors, one for each register
+ * set used by the shader: float, integer, and boolean.
  */
 struct vkd3d_shader_scan_descriptor_info
 {
