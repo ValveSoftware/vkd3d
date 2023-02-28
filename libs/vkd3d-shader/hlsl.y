@@ -1107,6 +1107,9 @@ static struct hlsl_reg_reservation parse_packoffset(struct hlsl_ctx *ctx, const 
     struct hlsl_reg_reservation reservation = {0};
     char *endptr;
 
+    if (ctx->profile->major_version < 4)
+        return reservation;
+
     reservation.offset_index = strtoul(reg_string + 1, &endptr, 10);
     if (*endptr)
     {
