@@ -2199,9 +2199,7 @@ struct vkd3d_shader_phase
 {
     enum vkd3d_shader_opcode type;
     unsigned int idx;
-    unsigned int instance_count;
     uint32_t function_id;
-    uint32_t instance_id;
     size_t function_location;
 };
 
@@ -2886,12 +2884,6 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
         case VKD3DSPR_DEPTHOUTGE:
         case VKD3DSPR_DEPTHOUTLE:
             snprintf(buffer, buffer_size, "oDepth");
-            break;
-        case VKD3DSPR_FORKINSTID:
-            snprintf(buffer, buffer_size, "vForkInstanceId");
-            break;
-        case VKD3DSPR_JOININSTID:
-            snprintf(buffer, buffer_size, "vJoinInstanceId");
             break;
         case VKD3DSPR_GSINSTID:
             snprintf(buffer, buffer_size, "vGSInstanceID");
@@ -4333,28 +4325,14 @@ static void spirv_compiler_begin_shader_phase(struct spirv_compiler *compiler,
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t void_id, function_type_id;
-    unsigned int param_count;
     uint32_t param_type_id;
-
-    if (phase->instance_count)
-    {
-        param_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
-        param_count = 1;
-    }
-    else
-    {
-        param_count = 0;
-    }
 
     phase->function_id = vkd3d_spirv_alloc_id(builder);
 
     void_id = vkd3d_spirv_get_op_type_void(builder);
-    function_type_id = vkd3d_spirv_get_op_type_function(builder, void_id, &param_type_id, param_count);
+    function_type_id = vkd3d_spirv_get_op_type_function(builder, void_id, &param_type_id, 0);
     vkd3d_spirv_build_op_function(builder, void_id, phase->function_id,
             SpvFunctionControlMaskNone, function_type_id);
-
-    if (phase->instance_count)
-        phase->instance_id = vkd3d_spirv_build_op_function_parameter(builder, param_type_id);
 
     vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
     phase->function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
@@ -4772,10 +4750,7 @@ static void spirv_compiler_emit_input_register(struct spirv_compiler *compiler,
 static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compiler,
         const struct vkd3d_shader_phase *phase, const struct vkd3d_shader_dst_param *dst)
 {
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &dst->reg;
-    struct vkd3d_symbol reg_symbol;
-    uint32_t val_id;
 
     switch (reg->type)
     {
@@ -4787,10 +4762,6 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
         case VKD3DSPR_PRIMID:
             spirv_compiler_emit_input_register(compiler, dst);
             return;
-        case VKD3DSPR_FORKINSTID:
-        case VKD3DSPR_JOININSTID:
-            val_id = phase->instance_id;
-            break;
         case VKD3DSPR_OUTPOINTID: /* Emitted in spirv_compiler_emit_initial_declarations(). */
         case VKD3DSPR_OUTCONTROLPOINT: /* See spirv_compiler_leave_shader_phase(). */
             return;
@@ -4798,13 +4769,6 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
             FIXME("Unhandled shader phase input register %#x.\n", reg->type);
             return;
     }
-
-    vkd3d_symbol_make_register(&reg_symbol, reg);
-    vkd3d_symbol_set_register_info(&reg_symbol, val_id,
-            SpvStorageClassMax /* Intermediate value */,
-            VKD3D_SHADER_COMPONENT_UINT, VKD3DSP_WRITEMASK_0);
-    spirv_compiler_put_symbol(compiler, &reg_symbol);
-    spirv_compiler_emit_register_debug_name(builder, val_id, reg);
 }
 
 static unsigned int spirv_compiler_get_output_variable_index(
@@ -6560,20 +6524,6 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler,
             }
         }
     }
-
-    if (phase->instance_count)
-    {
-        memset(&reg, 0, sizeof(reg));
-        reg.type = phase->type == VKD3DSIH_HS_FORK_PHASE ? VKD3DSPR_FORKINSTID : VKD3DSPR_JOININSTID;
-        reg.idx[0].offset = ~0u;
-        reg.idx[1].offset = ~0u;
-        vkd3d_symbol_make_register(&reg_symbol, &reg);
-        if ((entry = rb_get(&compiler->symbol_table, &reg_symbol)))
-        {
-            rb_remove(&compiler->symbol_table, entry);
-            vkd3d_symbol_free(entry, NULL);
-        }
-    }
 }
 
 static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
@@ -6592,32 +6542,10 @@ static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
 
     phase->type = instruction->handler_idx;
     phase->idx = compiler->shader_phase_count;
-    phase->instance_count = 0;
     phase->function_id = 0;
-    phase->instance_id = 0;
     phase->function_location = 0;
 
     ++compiler->shader_phase_count;
-}
-
-static int spirv_compiler_emit_shader_phase_instance_count(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    struct vkd3d_shader_phase *phase = &compiler->shader_phases[compiler->shader_phase_count - 1];
-
-    if (!compiler->shader_phase_count
-            || (phase->type != VKD3DSIH_HS_FORK_PHASE && phase->type != VKD3DSIH_HS_JOIN_PHASE)
-            || phase->function_id)
-    {
-        WARN("Unexpected dcl_hs_{fork,join}_phase_instance_count instruction.\n");
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
-
-    phase->instance_count = instruction->declaration.count;
-
-    spirv_compiler_begin_shader_phase(compiler, phase);
-
-    return VKD3D_OK;
 }
 
 static const struct vkd3d_shader_phase *spirv_compiler_get_control_point_phase(
@@ -6851,12 +6779,27 @@ static void spirv_compiler_emit_shader_epilogue_invocation(struct spirv_compiler
     }
 }
 
+static const struct vkd3d_shader_phase *spirv_compiler_get_fork_or_join_phase(
+        struct spirv_compiler *compiler)
+{
+    const struct vkd3d_shader_phase *phase;
+
+    assert(compiler->shader_phase_count);
+
+    phase = &compiler->shader_phases[0];
+    if (is_control_point_phase(phase))
+    {
+        assert(compiler->shader_phase_count > 1);
+        phase = &compiler->shader_phases[1];
+    }
+
+    return phase;
+}
+
 static void spirv_compiler_emit_hull_shader_main(struct spirv_compiler *compiler)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_phase *control_point_phase, *phase;
-    uint32_t phase_instance_id;
-    unsigned int i, j;
+    const struct vkd3d_shader_phase *control_point_phase;
     uint32_t void_id;
 
     vkd3d_spirv_builder_begin_main_function(builder);
@@ -6873,26 +6816,11 @@ static void spirv_compiler_emit_hull_shader_main(struct spirv_compiler *compiler
     if (compiler->use_vocp)
         spirv_compiler_emit_hull_shader_barrier(compiler);
 
-    for (i = 0; i < compiler->shader_phase_count; ++i)
-    {
-        phase = &compiler->shader_phases[i];
-        if (is_control_point_phase(phase))
-            continue;
-
-        if (phase->instance_count)
-        {
-            for (j = 0; j < phase->instance_count; ++j)
-            {
-                phase_instance_id = spirv_compiler_get_constant_uint(compiler, j);
-                vkd3d_spirv_build_op_function_call(builder,
-                        void_id, phase->function_id, &phase_instance_id, 1);
-            }
-        }
-        else
-        {
-            vkd3d_spirv_build_op_function_call(builder, void_id, phase->function_id, NULL, 0);
-        }
-    }
+    /* TODO: only call the patch constant function for invocation 0. The simplest way
+     * is to avoid use of private variables there, otherwise we would need a separate
+     * patch constant epilogue also only called from invocation 0. */
+    vkd3d_spirv_build_op_function_call(builder, void_id, spirv_compiler_get_fork_or_join_phase(compiler)->function_id,
+            NULL, 0);
 
     spirv_compiler_emit_shader_epilogue_invocation(compiler);
     vkd3d_spirv_build_op_return(builder);
@@ -9699,10 +9627,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_THREAD_GROUP:
             spirv_compiler_emit_dcl_thread_group(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_HS_FORK_PHASE_INSTANCE_COUNT:
-        case VKD3DSIH_DCL_HS_JOIN_PHASE_INSTANCE_COUNT:
-            ret = spirv_compiler_emit_shader_phase_instance_count(compiler, instruction);
-            break;
         case VKD3DSIH_HS_CONTROL_POINT_PHASE:
         case VKD3DSIH_HS_FORK_PHASE:
         case VKD3DSIH_HS_JOIN_PHASE:
@@ -9951,21 +9875,36 @@ int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_code *spirv)
 {
-    const struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
+    struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    struct vkd3d_shader_normaliser normaliser;
     const struct vkd3d_shader_phase *phase;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
     compiler->location.column = 0;
-    for (i = 0; i < instructions->count; ++i)
+    compiler->location.line = 1;
+
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL)
+    {
+        shader_normaliser_init(&normaliser, instructions);
+        result = shader_normaliser_flatten_hull_shader_phases(&normaliser);
+        instructions = &normaliser.instructions;
+    }
+
+    for (i = 0; i < instructions->count && result >= 0; ++i)
     {
         compiler->location.line = i + 1;
-        if ((result = spirv_compiler_handle_instruction(compiler, &instructions->elements[i])) < 0)
-            return result;
+        result = spirv_compiler_handle_instruction(compiler, &instructions->elements[i]);
     }
+
+    if (instructions == &normaliser.instructions)
+        shader_normaliser_destroy(&normaliser);
+
+    if (result < 0)
+        return result;
 
     if ((phase = spirv_compiler_get_current_shader_phase(compiler)))
         spirv_compiler_leave_shader_phase(compiler, phase);
@@ -10036,7 +9975,6 @@ void spirv_compiler_destroy(struct spirv_compiler *compiler)
 
     rb_destroy(&compiler->symbol_table, vkd3d_symbol_free, NULL);
 
-    vkd3d_free(compiler->shader_phases);
     vkd3d_free(compiler->spec_constants);
 
     vkd3d_string_buffer_cache_cleanup(&compiler->string_buffers);

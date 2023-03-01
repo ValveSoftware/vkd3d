@@ -1644,6 +1644,84 @@ bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *ins
     return true;
 }
 
+static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(
+        struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_src_param *params,
+        unsigned int count);
+
+static bool shader_register_clone_relative_addresses(struct vkd3d_shader_register *reg,
+        struct vkd3d_shader_instruction_array *instructions)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(reg->idx) && reg->idx[i].offset != ~0u; ++i)
+    {
+        if (!reg->idx[i].rel_addr)
+            continue;
+
+        if (!(reg->idx[i].rel_addr = shader_instruction_array_clone_src_params(instructions, reg->idx[i].rel_addr, 1)))
+            return false;
+    }
+
+    return true;
+}
+
+static struct vkd3d_shader_dst_param *shader_instruction_array_clone_dst_params(
+        struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_dst_param *params,
+        unsigned int count)
+{
+    struct vkd3d_shader_dst_param *dst_params;
+    unsigned int i;
+
+    if (!(dst_params = shader_dst_param_allocator_get(&instructions->dst_params, count)))
+        return NULL;
+
+    memcpy(dst_params, params, count * sizeof(*params));
+    for (i = 0; i < count; ++i)
+    {
+        if (!shader_register_clone_relative_addresses(&dst_params[i].reg, instructions))
+            return NULL;
+    }
+
+    return dst_params;
+}
+
+static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(
+        struct vkd3d_shader_instruction_array *instructions, const struct vkd3d_shader_src_param *params,
+        unsigned int count)
+{
+    struct vkd3d_shader_src_param *src_params;
+    unsigned int i;
+
+    if (!(src_params = shader_src_param_allocator_get(&instructions->src_params, count)))
+        return NULL;
+
+    memcpy(src_params, params, count * sizeof(*params));
+    for (i = 0; i < count; ++i)
+    {
+        if (!shader_register_clone_relative_addresses(&src_params[i].reg, instructions))
+            return NULL;
+    }
+
+    return src_params;
+}
+
+/* NOTE: Immediate constant buffers are not cloned, so the source must not be destroyed while the
+ * destination is in use. This seems like a reasonable requirement given how this is currently used. */
+bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
+        unsigned int dst, unsigned int src)
+{
+    struct vkd3d_shader_instruction *ins = &instructions->elements[dst];
+
+    *ins = instructions->elements[src];
+
+    if (ins->dst_count && ins->dst && !(ins->dst = shader_instruction_array_clone_dst_params(instructions,
+            ins->dst, ins->dst_count)))
+        return false;
+
+    return !ins->src_count || !!(ins->src = shader_instruction_array_clone_src_params(instructions,
+            ins->src, ins->src_count));
+}
+
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions)
 {
     unsigned int i;

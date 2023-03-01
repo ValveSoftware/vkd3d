@@ -981,6 +981,8 @@ bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instru
 bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
 bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
         struct vkd3d_shader_immediate_constant_buffer *icb);
+bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
+        unsigned int dst, unsigned int src);
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
 
 struct vkd3d_shader_parser
@@ -1322,5 +1324,22 @@ struct dxbc_writer
 void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void *data, size_t size);
 void dxbc_writer_init(struct dxbc_writer *dxbc);
 int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
+
+struct vkd3d_shader_normaliser
+{
+    struct vkd3d_shader_instruction_array instructions;
+
+    unsigned int max_temp_count;
+    unsigned int temp_dcl_idx;
+
+    unsigned int instance_count;
+    unsigned int phase_body_idx;
+    enum vkd3d_shader_opcode phase;
+};
+
+void shader_normaliser_init(struct vkd3d_shader_normaliser *normaliser,
+        struct vkd3d_shader_instruction_array *instructions);
+enum vkd3d_result shader_normaliser_flatten_hull_shader_phases(struct vkd3d_shader_normaliser *normaliser);
+void shader_normaliser_destroy(struct vkd3d_shader_normaliser *normaliser);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */
