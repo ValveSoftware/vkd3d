@@ -444,3 +444,262 @@ float4 main() : sv_target
 {
     return 0;
 }
+
+
+[texture 0]
+size (1, 1)
+0.0 0.0 0.0 4.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+
+[pixel shader]
+// Resources are allowed inside constant buffers but they behave as regular resources.
+cbuffer buffer
+{
+    float4 a;
+    Texture2D tex;
+    sampler sam;
+    float4 b;
+}
+
+float4 main() : sv_target
+{
+    return a + b + tex.Sample(sam, float2(0, 0));
+}
+
+[test]
+uniform 0 float4 1.0 0.0 0.0 0.0
+uniform 4 float4 0.0 2.0 0.0 0.0
+uniform 8 float4 0.0 0.0 3.0 0.0
+draw quad
+probe all rgba (1.0, 2.0, 0.0, 4.0)
+
+
+% packoffset() cannot be used to specify other types of registers
+[pixel shader fail]
+cbuffer buffer
+{
+    sampler sam : packoffset(s0);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+cbuffer buffer
+{
+    Texture2D tex : packoffset(t0);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+
+[texture 0]
+size (1, 1)
+1.0 1.0 1.0 1.0
+
+[texture 1]
+size (1, 1)
+2.0 2.0 2.0 2.0
+
+
+[pixel shader]
+// packoffset() can be used in Textures, doesn't change the allocated t register.
+cbuffer buffer
+{
+    Texture2D tex : packoffset(c1);
+}
+
+float4 main() : sv_target
+{
+    return tex.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+% Samplers cannot have packoffset(), unless register() is also specified, or they are not used.
+% Note: In SM1 the rules are different: packoffset() is allowed for samplers, but they cannot be
+% used together with other numeric fields, which seems like a bug.
+[pixel shader fail todo]
+Texture2D tex;
+
+cbuffer buffer
+{
+    sampler sam : packoffset(c1);
+}
+
+float4 main() : sv_target
+{
+    return tex.Sample(sam, float2(0, 0));
+}
+
+[pixel shader todo]
+Texture2D tex;
+
+cbuffer buffer
+{
+    sampler sam : packoffset(c1) : register(s0);
+}
+
+float4 main() : sv_target
+{
+    return tex.Sample(sam, float2(0, 0));
+}
+
+[pixel shader]
+cbuffer buffer
+{
+    sampler sam : packoffset(c1);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader]
+cbuffer buffer
+{
+    sampler sam : packoffset(c1);
+    float4 a : packoffset(c0);
+}
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+
+% When packoffset is used in one field, resources are also expected to have a reservation.
+[pixel shader fail]
+cbuffer buffer
+{
+    float4 foo : packoffset(c0);
+    Texture2D tex;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+cbuffer buffer
+{
+    float4 foo : packoffset(c0);
+    sampler sam;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+% register() can be used instead of packoffset().
+[pixel shader todo]
+cbuffer buffer
+{
+    float4 foo : packoffset(c0);
+    Texture2D tex : register(t1);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader todo]
+cbuffer buffer
+{
+    float4 foo : packoffset(c0);
+    sampler sam : register(s1);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+% Using register() alone is considered manual packing for resources, so the other fields expect packoffset().
+[pixel shader fail todo]
+cbuffer buffer
+{
+    float4 foo;
+    Texture2D tex : register(t1);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+cbuffer buffer
+{
+    float4 foo;
+    sampler sam : register(s1);
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+% Using register() alone is not considered manual packing for non-resources.
+[pixel shader]
+cbuffer buffer
+{
+    float4 foo : register(c0);
+    Texture2D tex;
+}
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+
+[require]
+shader model >= 5.0
+
+[texture 0]
+size (1, 1)
+0.0 0.0 0.0 0.5
+
+[pixel shader todo]
+struct apple
+{
+    float2 a;
+    Texture2D tex;
+    float b;
+};
+
+cbuffer buffer
+{
+    float4 foo : packoffset(c3);
+    struct apple bar : packoffset(c1);
+}
+
+float4 main() : sv_target
+{
+    return 10 * foo + float4(bar.a, 0, 0) + float4(0, 0, bar.b, 0) + bar.tex.Load(int3(0, 0, 0));
+}
+
+[test]
+uniform 0 float4 0.0 1.0 2.0 3.0
+uniform 4 float4 4.0 5.0 6.0 7.0
+uniform 8 float4 8.0 9.0 10.0 11.0
+uniform 12 float4 12.0 13.0 14.0 15.0
+todo draw quad
+todo probe all rgba (124.0, 135.0, 146.0, 150.5)
