@@ -6274,12 +6274,6 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
 
-    if (!command_queue->ops_count)
-    {
-        hr = d3d12_command_queue_signal(command_queue, fence, value);
-        goto done;
-    }
-
     if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
     {
         hr = E_OUTOFMEMORY;
@@ -6290,6 +6284,8 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
     op->u.signal.value = value;
 
     d3d12_fence_incref(fence);
+
+    d3d12_command_queue_submit_locked(command_queue);
 
 done:
     vkd3d_mutex_unlock(&command_queue->op_mutex);
