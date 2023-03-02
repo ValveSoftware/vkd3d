@@ -6611,23 +6611,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
     TRACE("iface %p, fence %p, value %#"PRIx64".\n", iface, fence_iface, value);
 
     vkd3d_mutex_lock(&command_queue->op_mutex);
-    vkd3d_mutex_lock(&fence->mutex);
-
-    if (!command_queue->ops_count && value <= fence->max_pending_value)
-    {
-        hr = d3d12_command_queue_wait_locked(command_queue, fence, value);
-        goto done;
-    }
-
-    /* This is the critical part required to support out-of-order signal.
-     * Normally we would be able to submit waits and signals out of order, but
-     * we don't have virtualized queues in Vulkan, so we need to handle the case
-     * where multiple queues alias over the same physical queue, so effectively,
-     * we need to manage out-of-order submits ourselves. */
 
     if (!(op = d3d12_command_queue_require_space_locked(command_queue)))
     {
-        vkd3d_mutex_unlock(&fence->mutex);
         hr = E_OUTOFMEMORY;
         goto done;
     }
@@ -6637,15 +6623,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
 
     d3d12_fence_incref(fence);
 
-    /* Add the queue to the blocked list after writing the op to ensure the queue isn't
-     * removed again in another thread because it has no ops. */
-    if (command_queue->ops_count == 1)
-        hr = d3d12_command_queue_record_as_blocked(command_queue);
-
-    /* The fence must remain locked until the op is created and the queue is added to the blocked list,
-     * because if an unblocking d3d12_fence_Signal() call occurs on another thread before the above
-     * work is done, flushing will be delayed until the next signal, if one occurs at all. */
-    vkd3d_mutex_unlock(&fence->mutex);
+    d3d12_command_queue_submit_locked(command_queue);
 
 done:
     vkd3d_mutex_unlock(&command_queue->op_mutex);
