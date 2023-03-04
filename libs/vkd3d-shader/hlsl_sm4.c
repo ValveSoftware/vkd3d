@@ -1164,7 +1164,7 @@ static void write_sm4_dcl_sampler(struct vkd3d_bytecode_buffer *buffer, const st
 static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
 {
     bool uav = (var->data_type->base_type == HLSL_TYPE_UAV);
-    const struct sm4_instruction instr =
+    struct sm4_instruction instr =
     {
         .opcode = (uav ? VKD3D_SM5_OP_DCL_UAV_TYPED : VKD3D_SM4_OP_DCL_RESOURCE)
                 | (sm4_resource_dimension(var->data_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
@@ -1177,6 +1177,13 @@ static void write_sm4_dcl_texture(struct vkd3d_bytecode_buffer *buffer, const st
         .idx[0] = sm4_resource_format(var->data_type) * 0x1111,
         .idx_count = 1,
     };
+
+    if (var->data_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+            || var->data_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
+    {
+        instr.opcode |= var->data_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
+    }
+
     write_sm4_instruction(buffer, &instr);
 }
 
