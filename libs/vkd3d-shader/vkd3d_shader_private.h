@@ -742,6 +742,7 @@ struct vkd3d_shader_semantic
     enum vkd3d_decl_usage usage;
     unsigned int usage_idx;
     enum vkd3d_shader_resource_type resource_type;
+    unsigned int sample_count;
     enum vkd3d_data_type resource_data_type[VKD3D_VEC4_SIZE];
     struct vkd3d_shader_resource resource;
 };

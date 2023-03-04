@@ -663,8 +663,14 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
             shader_addline(buffer, "_resource_");
 
         shader_dump_resource_type(compiler, semantic->resource_type);
+        if (semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
+                || semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
+        {
+            shader_addline(buffer, "(%u)", semantic->sample_count);
+        }
         if (semantic->resource.reg.reg.type == VKD3DSPR_UAV)
             shader_dump_uav_flags(compiler, flags);
+        shader_addline(buffer, " ");
         shader_dump_data_type(compiler, semantic->resource_data_type);
     }
     else

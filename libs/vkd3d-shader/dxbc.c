@@ -288,6 +288,13 @@ static void shader_sm4_read_dcl_resource(struct vkd3d_shader_instruction *ins, u
     {
         semantic->resource_type = resource_type_table[resource_type];
     }
+
+    if (semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
+            || semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
+    {
+        semantic->sample_count = (opcode_token & VKD3D_SM4_RESOURCE_SAMPLE_COUNT_MASK) >> VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
+    }
+
     reg_data_type = opcode == VKD3D_SM4_OP_DCL_RESOURCE ? VKD3D_DATA_RESOURCE : VKD3D_DATA_UAV;
     shader_sm4_read_dst_param(priv, &tokens, end, reg_data_type, &semantic->resource.reg);
     shader_sm4_set_descriptor_register_range(priv, &semantic->resource.reg.reg, &semantic->resource.range);
