@@ -166,6 +166,8 @@ struct hlsl_type
      * Otherwise both dimx = 1 and dimy = 1. */
     unsigned int dimx;
     unsigned int dimy;
+    /* Sample count for HLSL_SAMPLER_DIM_2DMS or HLSL_SAMPLER_DIM_2DMSARRAY. */
+    unsigned int sample_count;
 
     union
     {
@@ -1059,7 +1061,8 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *template,
         struct hlsl_type *type, const struct vkd3d_shader_location *loc);
-struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format);
+struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format,
+        unsigned int sample_count);
 struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format);
 struct hlsl_ir_constant *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location *loc);

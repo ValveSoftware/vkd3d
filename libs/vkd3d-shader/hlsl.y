@@ -1122,7 +1122,7 @@ static struct list *make_list(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
     return list;
 }
 
-static unsigned int evaluate_array_dimension(struct hlsl_ir_node *node)
+static unsigned int evaluate_static_expression(struct hlsl_ir_node *node)
 {
     if (node->data_type->type != HLSL_CLASS_SCALAR)
         return 0;
@@ -3765,6 +3765,21 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
     }
 }
 
+static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type *format,
+        const struct vkd3d_shader_location *loc)
+{
+    if (format->type > HLSL_CLASS_VECTOR)
+    {
+        struct vkd3d_string_buffer *string;
+
+        string = hlsl_type_to_string(ctx, format);
+        if (string)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Texture data type %s is not scalar or vector.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+}
+
 }
 
 %locations
@@ -3985,7 +4000,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
 
 %type <reg_reservation> register_opt
 
-%type <sampler_dim> texture_type uav_type
+%type <sampler_dim> texture_type texture_ms_type uav_type
 
 %type <semantic> semantic
 
@@ -4598,6 +4613,16 @@ texture_type:
             $$ = HLSL_SAMPLER_DIM_CUBEARRAY;
         }
 
+texture_ms_type:
+      KW_TEXTURE2DMS
+        {
+            $$ = HLSL_SAMPLER_DIM_2DMS;
+        }
+    | KW_TEXTURE2DMSARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_2DMSARRAY;
+        }
+
 uav_type:
       KW_RWTEXTURE1D
         {
@@ -4695,25 +4720,30 @@ type_no_void:
         }
     | KW_TEXTURE
         {
-            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_GENERIC, NULL);
+            $$ = hlsl_new_texture_type(ctx, HLSL_SAMPLER_DIM_GENERIC, NULL, 0);
         }
     | texture_type
         {
-            $$ = hlsl_new_texture_type(ctx, $1, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4));
+            $$ = hlsl_new_texture_type(ctx, $1, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), 0);
         }
     | texture_type '<' type '>'
         {
-            if ($3->type > HLSL_CLASS_VECTOR)
-            {
-                struct vkd3d_string_buffer *string;
+            validate_texture_format_type(ctx, $3, &@3);
+            $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
+        }
+    | texture_ms_type '<' type '>'
+        {
+            validate_texture_format_type(ctx, $3, &@3);
 
-                string = hlsl_type_to_string(ctx, $3);
-                if (string)
-                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "Texture data type %s is not scalar or vector.", string->buffer);
-                hlsl_release_string_buffer(ctx, string);
-            }
-            $$ = hlsl_new_texture_type(ctx, $1, $3);
+            /* TODO: unspecified sample count is not allowed for all targets */
+            $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
+        }
+    | texture_ms_type '<' type ',' shift_expr '>'
+        {
+            unsigned int sample_count = evaluate_static_expression(node_from_list($5));
+            destroy_instr_list($5);
+
+            $$ = hlsl_new_texture_type(ctx, $1, $3, sample_count);
         }
     | uav_type '<' type '>'
         {
@@ -4904,7 +4934,7 @@ arrays:
         }
     | '[' expr ']' arrays
         {
-            unsigned int size = evaluate_array_dimension(node_from_list($2));
+            unsigned int size = evaluate_static_expression(node_from_list($2));
             uint32_t *new_array;
 
             destroy_instr_list($2);
