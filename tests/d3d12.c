@@ -36303,6 +36303,164 @@ static void test_readback_map_stability(void)
     ID3D12Resource_Unmap(buffer, 0, NULL);
 
     ID3D12Resource_Release(buffer);
+}
+
+static void test_vs_ps_relative_addressing(void)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    D3D12_ROOT_PARAMETER root_parameters[1];
+    ID3D12GraphicsCommandList *command_list;
+    D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct test_context_desc desc;
+    D3D12_VERTEX_BUFFER_VIEW vbv;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    ID3D12Resource *vb;
+    HRESULT hr;
+
+    static const struct
+    {
+        struct vec4 position;
+        uint32_t color[3];
+    }
+    vertices[] =
+    {
+        {{-1.0f, -1.0f, 0.0f, 1.0f}, {0xffffff00, 0xff00, 0xff00ff00}},
+        {{-1.0f,  1.0f, 0.0f, 1.0f}, {0xffffff00, 0xff00, 0xff00ff00}},
+        {{ 1.0f, -1.0f, 0.0f, 1.0f}, {0xffffff00, 0xff00, 0xff00ff00}},
+        {{ 1.0f,  1.0f, 0.0f, 1.0f}, {0xffffff00, 0xff00, 0xff00ff00}},
+    };
+    static const D3D12_INPUT_ELEMENT_DESC layout_desc[] =
+    {
+        {"SV_POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR",       0, DXGI_FORMAT_R8G8B8A8_UNORM,     0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR",       1, DXGI_FORMAT_R8G8B8A8_UNORM,     0, 20, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR",       2, DXGI_FORMAT_R8G8B8A8_UNORM,     0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    };
+    static const DWORD vs_code[] =
+    {
+#if 0
+        uint3 index;
+
+        struct vs_data
+        {
+            float4 pos : SV_Position;
+            float4 color[3] : COLOR;
+        };
+
+        void main(in struct vs_data vs_input, out struct vs_data vs_output)
+        {
+            vs_output.pos = vs_input.pos;
+            vs_output.color[0] = vs_input.color[index.x];
+            vs_output.color[1] = vs_input.color[index.y];
+            vs_output.color[2] = vs_input.color[index.z];
+        }
+#endif
+        0x43425844, 0x313cf242, 0x30e9b93c, 0xf8d3ed69, 0x0feecdca, 0x00000001, 0x00000288, 0x00000003,
+        0x0000002c, 0x000000b0, 0x00000134, 0x4e475349, 0x0000007c, 0x00000004, 0x00000008, 0x00000068,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000074, 0x00000000, 0x00000000,
+        0x00000003, 0x00000001, 0x00000f0f, 0x00000074, 0x00000001, 0x00000000, 0x00000003, 0x00000002,
+        0x00000f0f, 0x00000074, 0x00000002, 0x00000000, 0x00000003, 0x00000003, 0x00000f0f, 0x505f5653,
+        0x5449534f, 0x004e4f49, 0x4f4c4f43, 0xabab0052, 0x4e47534f, 0x0000007c, 0x00000004, 0x00000008,
+        0x00000068, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x00000074, 0x00000000,
+        0x00000000, 0x00000003, 0x00000001, 0x0000000f, 0x00000074, 0x00000001, 0x00000000, 0x00000003,
+        0x00000002, 0x0000000f, 0x00000074, 0x00000002, 0x00000000, 0x00000003, 0x00000003, 0x0000000f,
+        0x505f5653, 0x5449534f, 0x004e4f49, 0x4f4c4f43, 0xabab0052, 0x58454853, 0x0000014c, 0x00010050,
+        0x00000053, 0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x0300005f, 0x001010f2,
+        0x00000000, 0x0300005f, 0x001010f2, 0x00000001, 0x0300005f, 0x001010f2, 0x00000002, 0x0300005f,
+        0x001010f2, 0x00000003, 0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
+        0x00000001, 0x03000065, 0x001020f2, 0x00000002, 0x03000065, 0x001020f2, 0x00000003, 0x02000068,
+        0x00000001, 0x0400005b, 0x001010f2, 0x00000001, 0x00000003, 0x05000036, 0x001020f2, 0x00000000,
+        0x00101e46, 0x00000000, 0x06000036, 0x00100012, 0x00000000, 0x0020800a, 0x00000000, 0x00000000,
+        0x07000036, 0x001020f2, 0x00000001, 0x00d01e46, 0x00000001, 0x0010000a, 0x00000000, 0x06000036,
+        0x00100012, 0x00000000, 0x0020801a, 0x00000000, 0x00000000, 0x07000036, 0x001020f2, 0x00000002,
+        0x00d01e46, 0x00000001, 0x0010000a, 0x00000000, 0x06000036, 0x00100012, 0x00000000, 0x0020802a,
+        0x00000000, 0x00000000, 0x07000036, 0x001020f2, 0x00000003, 0x00d01e46, 0x00000001, 0x0010000a,
+        0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE vs = {vs_code, sizeof(vs_code)};
+    static const DWORD ps_code[] =
+    {
+#if 0
+        uint4 index;
+
+        struct ps_data
+        {
+            float4 pos : SV_Position;
+            float4 color[3] : COLOR;
+        };
+
+        float4 main(struct ps_data ps_input) : SV_Target
+        {
+            return ps_input.color[index.w];
+        }
+#endif
+        0x43425844, 0x2b11c807, 0xf4f69d91, 0x983d18c9, 0x99ff2a5e, 0x00000001, 0x00000188, 0x00000003,
+        0x0000002c, 0x000000b0, 0x000000e4, 0x4e475349, 0x0000007c, 0x00000004, 0x00000008, 0x00000068,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x00000074, 0x00000000, 0x00000000,
+        0x00000003, 0x00000001, 0x00000f0f, 0x00000074, 0x00000001, 0x00000000, 0x00000003, 0x00000002,
+        0x00000f0f, 0x00000074, 0x00000002, 0x00000000, 0x00000003, 0x00000003, 0x00000f0f, 0x505f5653,
+        0x5449534f, 0x004e4f49, 0x4f4c4f43, 0xabab0052, 0x4e47534f, 0x0000002c, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x0000000f, 0x545f5653, 0x65677261,
+        0xabab0074, 0x58454853, 0x0000009c, 0x00000050, 0x00000027, 0x0100086a, 0x04000059, 0x00208e46,
+        0x00000000, 0x00000001, 0x03001062, 0x001010f2, 0x00000001, 0x03001062, 0x001010f2, 0x00000002,
+        0x03001062, 0x001010f2, 0x00000003, 0x03000065, 0x001020f2, 0x00000000, 0x02000068, 0x00000001,
+        0x0400005b, 0x001010f2, 0x00000001, 0x00000003, 0x06000036, 0x00100012, 0x00000000, 0x0020803a,
+        0x00000000, 0x00000000, 0x07000036, 0x001020f2, 0x00000000, 0x00d01e46, 0x00000001, 0x0010000a,
+        0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const uint32_t indices[] = {1, 2, 0, 1};
+    static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    memset(&desc, 0, sizeof(desc));
+    desc.no_root_signature = true;
+    desc.no_pipeline = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    command_list = context.list;
+    queue = context.queue;
+
+    root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+    root_parameters[0].Constants.ShaderRegister = 0;
+    root_parameters[0].Constants.RegisterSpace = 0;
+    root_parameters[0].Constants.Num32BitValues = 4;
+    root_parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    memset(&root_signature_desc, 0, sizeof(root_signature_desc));
+    root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
+    root_signature_desc.pParameters = root_parameters;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    hr = create_root_signature(context.device, &root_signature_desc, &context.root_signature);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    input_layout.pInputElementDescs = layout_desc;
+    input_layout.NumElements = ARRAY_SIZE(layout_desc);
+    context.pipeline_state = create_pipeline_state(context.device,
+            context.root_signature, context.render_target_desc.Format, &vs, &ps, &input_layout);
+
+    vb = create_upload_buffer(context.device, sizeof(vertices), vertices);
+    vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(vb);
+    vbv.StrideInBytes = sizeof(*vertices);
+    vbv.SizeInBytes = sizeof(vertices);
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, 0, 4, &indices, 0);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, &vbv);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    todo
+    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
+
+    ID3D12Resource_Release(vb);
     destroy_test_context(&context);
 }
 
@@ -36484,4 +36642,5 @@ START_TEST(d3d12)
     run_test(test_unbounded_samplers);
     run_test(test_clock_calibration);
     run_test(test_readback_map_stability);
+    run_test(test_vs_ps_relative_addressing);
 }
