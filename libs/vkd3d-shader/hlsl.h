@@ -346,8 +346,8 @@ struct hlsl_attribute
  *   using the register(·) syntax */
 struct hlsl_reg_reservation
 {
-    char type;
-    unsigned int index;
+    char reg_type;
+    unsigned int reg_index;
 };
 
 struct hlsl_ir_var

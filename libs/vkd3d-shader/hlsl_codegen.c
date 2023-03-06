@@ -2307,9 +2307,9 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
             continue;
         regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.type)
+        if (var->reg_reservation.reg_type)
         {
-            if (var->reg_reservation.type != get_regset_name(regset))
+            if (var->reg_reservation.reg_type != get_regset_name(regset))
             {
                 struct vkd3d_string_buffer *type_string;
 
@@ -2322,8 +2322,9 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
             else
             {
                 var->regs[regset].allocated = true;
-                var->regs[regset].id = var->reg_reservation.index;
-                TRACE("Allocated reserved %s to %c%u.\n", var->name, var->reg_reservation.type, var->reg_reservation.index);
+                var->regs[regset].id = var->reg_reservation.reg_index;
+                TRACE("Allocated reserved %s to %c%u.\n", var->name, var->reg_reservation.reg_type,
+                        var->reg_reservation.reg_index);
             }
         }
     }
@@ -2898,7 +2899,7 @@ static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint3
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, const struct hlsl_buffer, entry)
     {
-        if (buffer->used_size && buffer->reservation.type == 'b' && buffer->reservation.index == index)
+        if (buffer->used_size && buffer->reservation.reg_type == 'b' && buffer->reservation.reg_index == index)
             return buffer;
     }
     return NULL;
@@ -2941,23 +2942,23 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
         if (buffer->type == HLSL_BUFFER_CONSTANT)
         {
-            if (buffer->reservation.type == 'b')
+            if (buffer->reservation.reg_type == 'b')
             {
-                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx, buffer->reservation.index);
+                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx, buffer->reservation.reg_index);
 
                 if (reserved_buffer && reserved_buffer != buffer)
                 {
                     hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                            "Multiple buffers bound to cb%u.", buffer->reservation.index);
+                            "Multiple buffers bound to cb%u.", buffer->reservation.reg_index);
                     hlsl_note(ctx, &reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
-                            "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.index);
+                            "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.reg_index);
                 }
 
-                buffer->reg.id = buffer->reservation.index;
+                buffer->reg.id = buffer->reservation.reg_index;
                 buffer->reg.allocated = true;
                 TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
             }
-            else if (!buffer->reservation.type)
+            else if (!buffer->reservation.reg_type)
             {
                 while (get_reserved_buffer(ctx, index))
                     ++index;
@@ -3043,7 +3044,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
                         regset_name, index);
             }
 
-            var->regs[regset].id = var->reg_reservation.index;
+            var->regs[regset].id = var->reg_reservation.reg_index;
             var->regs[regset].allocated = true;
             TRACE("Allocated reserved %s to %c%u.\n", var->name, regset_name, var->regs[regset].id);
         }

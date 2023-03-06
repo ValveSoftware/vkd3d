@@ -594,7 +594,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         var = extern_resources[i];
         regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.type)
+        if (var->reg_reservation.reg_type)
             flags |= D3D_SIF_USERPACKED;
 
         put_u32(&buffer, 0); /* name */
@@ -624,7 +624,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         if (!cbuffer->reg.allocated)
             continue;
 
-        if (cbuffer->reservation.type)
+        if (cbuffer->reservation.reg_type)
             flags |= D3D_SIF_USERPACKED;
 
         put_u32(&buffer, 0); /* name */

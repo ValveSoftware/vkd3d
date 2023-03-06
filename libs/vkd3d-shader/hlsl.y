@@ -1084,12 +1084,12 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
 {
     struct hlsl_reg_reservation reservation = {0};
 
-    if (!sscanf(reg_string + 1, "%u", &reservation.index))
+    if (!sscanf(reg_string + 1, "%u", &reservation.reg_index))
     {
         FIXME("Unsupported register reservation syntax.\n");
         return reservation;
     }
-    reservation.type = reg_string[0];
+    reservation.reg_type = reg_string[0];
     return reservation;
 }
 
@@ -4349,7 +4349,7 @@ func_prototype_no_attrs:
                         "Semantics are not allowed on void functions.");
             }
 
-            if ($7.reg_reservation.type)
+            if ($7.reg_reservation.reg_type)
                 FIXME("Unexpected register reservation for a function.\n");
 
             if (($$.decl = get_func_decl(&ctx->functions, $3, &$5)))
@@ -4477,12 +4477,12 @@ colon_attribute:
       %empty
         {
             $$.semantic.name = NULL;
-            $$.reg_reservation.type = 0;
+            $$.reg_reservation.reg_type = 0;
         }
     | semantic
         {
             $$.semantic = $1;
-            $$.reg_reservation.type = 0;
+            $$.reg_reservation.reg_type = 0;
         }
     | register_opt
         {
