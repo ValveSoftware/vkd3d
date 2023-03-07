@@ -2488,9 +2488,9 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     return hlsl_add_conditional(ctx, &block->instrs, and, neg, cast3);
 }
 
-static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *cond, *high_bit;
+    struct hlsl_ir_node *arg1, *arg2, *and, *abs1, *abs2, *div, *neg, *cast1, *cast2, *cast3, *high_bit;
     struct hlsl_type *type = instr->data_type, *utype;
     struct hlsl_constant_value high_bit_value;
     struct hlsl_ir_expr *expr;
@@ -2513,45 +2513,41 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         high_bit_value.u[i].u = 0x80000000;
     if (!(high_bit = hlsl_new_constant(ctx, type, &high_bit_value, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &high_bit->entry);
+    hlsl_block_add_instr(block, high_bit);
 
     if (!(and = hlsl_new_binary_expr(ctx, HLSL_OP2_BIT_AND, arg1, high_bit)))
         return false;
-    list_add_before(&instr->entry, &and->entry);
+    hlsl_block_add_instr(block, and);
 
     if (!(abs1 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg1, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &abs1->entry);
+    hlsl_block_add_instr(block, abs1);
 
     if (!(cast1 = hlsl_new_cast(ctx, abs1, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast1->entry);
+    hlsl_block_add_instr(block, cast1);
 
     if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &abs2->entry);
+    hlsl_block_add_instr(block, abs2);
 
     if (!(cast2 = hlsl_new_cast(ctx, abs2, utype, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast2->entry);
+    hlsl_block_add_instr(block, cast2);
 
     if (!(div = hlsl_new_binary_expr(ctx, HLSL_OP2_MOD, cast1, cast2)))
         return false;
-    list_add_before(&instr->entry, &div->entry);
+    hlsl_block_add_instr(block, div);
 
     if (!(cast3 = hlsl_new_cast(ctx, div, type, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &cast3->entry);
+    hlsl_block_add_instr(block, cast3);
 
     if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &neg->entry);
+    hlsl_block_add_instr(block, neg);
 
-    if (!(cond = hlsl_add_conditional(ctx, &instr->entry, and, neg, cast3)))
-        return false;
-    hlsl_replace_node(instr, cond);
-
-    return true;
+    return hlsl_add_conditional(ctx, &block->instrs, and, neg, cast3);
 }
 
 static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -4296,7 +4292,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
     hlsl_transform_ir(ctx, lower_int_dot, body, NULL);
     lower_ir(ctx, lower_int_division, body);
-    hlsl_transform_ir(ctx, lower_int_modulus, body, NULL);
+    lower_ir(ctx, lower_int_modulus, body);
     hlsl_transform_ir(ctx, lower_int_abs, body, NULL);
     hlsl_transform_ir(ctx, lower_float_modulus, body, NULL);
     hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
