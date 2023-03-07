@@ -1709,6 +1709,9 @@ static void skip_dword_unknown(const char **ptr, unsigned int count)
     unsigned int i;
     uint32_t d;
 
+    if (!count)
+        return;
+
     WARN("Skipping %u unknown DWORDs:\n", count);
     for (i = 0; i < count; ++i)
     {
@@ -1922,9 +1925,9 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     bool has_stream_index, has_min_precision;
     struct vkd3d_shader_signature_element *e;
     const char *data = section->data.code;
+    uint32_t count, header_size;
     const char *ptr = data;
     unsigned int i;
-    uint32_t count;
 
     if (!require_space(0, 2, sizeof(uint32_t), section->data.size))
     {
@@ -1937,7 +1940,17 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     read_dword(&ptr, &count);
     TRACE("%u elements.\n", count);
 
-    skip_dword_unknown(&ptr, 1); /* It seems to always be 0x00000008. */
+    read_dword(&ptr, &header_size);
+    i = header_size / sizeof(uint32_t);
+    if (align(header_size, sizeof(uint32_t)) != header_size || i < 2
+            || !require_space(2, i - 2, sizeof(uint32_t), section->data.size))
+    {
+        WARN("Invalid header size %#x.\n", header_size);
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_DXBC_INVALID_SIGNATURE,
+                "Signature header size %#x is invalid.\n", header_size);
+        return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+    skip_dword_unknown(&ptr, i - 2);
 
     if (!require_space(ptr - data, count, 6 * sizeof(uint32_t), section->data.size))
     {
