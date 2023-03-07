@@ -76,3 +76,65 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe all rgba (1.0, 5.0, 7.0, 12.0)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float3x2 m = {1, 2, 3, 4, 5, 6};
+
+    m[1] = float2(30, 40);
+
+    return float4(m[1], m[2]);
+}
+
+[test]
+draw quad
+todo probe all rgba (30.0, 40.0, 5.0, 6.0)
+
+
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    row_major float3x2 m = {1, 2, 3, 4, 5, 6};
+
+    m[2] = float2(50, 60);
+
+    return float4(m[1], m[2]);
+}
+
+[test]
+draw quad
+probe all rgba (3.0, 4.0, 50.0, 60.0)
+
+
+[pixel shader todo]
+uniform float i;
+
+float4 main() : sv_target
+{
+    float4x4 mat = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
+    return mat[i];
+}
+
+[test]
+uniform 0 float 2
+todo draw quad
+todo probe all rgba (8, 9, 10, 11)
+
+
+[pixel shader todo]
+uniform float i;
+
+float4 main() : sv_target
+{
+    row_major float4x4 mat = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
+    return mat[i];
+}
+
+[test]
+uniform 0 float 3
+todo draw quad
+todo probe all rgba (12, 13, 14, 15)
