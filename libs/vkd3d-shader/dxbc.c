@@ -1867,7 +1867,8 @@ void vkd3d_shader_free_dxbc(struct vkd3d_shader_dxbc_desc *dxbc)
 
 static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
-        int (*section_handler)(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx), void *ctx)
+        int (*section_handler)(const struct vkd3d_shader_dxbc_section_desc *section,
+        struct vkd3d_shader_message_context *message_context, void *ctx), void *ctx)
 {
     struct vkd3d_shader_dxbc_desc desc;
     unsigned int i;
@@ -1878,7 +1879,7 @@ static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
 
     for (i = 0; i < desc.section_count; ++i)
     {
-        if ((ret = section_handler(&desc.sections[i], ctx)) < 0)
+        if ((ret = section_handler(&desc.sections[i], message_context, ctx)) < 0)
             break;
     }
 
@@ -1916,7 +1917,7 @@ int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
 }
 
 static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *section,
-        struct vkd3d_shader_signature *s)
+        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *s)
 {
     bool has_stream_index, has_min_precision;
     struct vkd3d_shader_signature_element *e;
@@ -2002,7 +2003,8 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     return VKD3D_OK;
 }
 
-static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *ctx)
+static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section,
+        struct vkd3d_shader_message_context *message_context, void *ctx)
 {
     struct vkd3d_shader_signature *is = ctx;
 
@@ -2014,7 +2016,7 @@ static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section, vo
         FIXME("Multiple input signatures.\n");
         vkd3d_shader_free_shader_signature(is);
     }
-    return shader_parse_signature(section, is);
+    return shader_parse_signature(section, message_context, is);
 }
 
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
@@ -2029,7 +2031,8 @@ int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
     return ret;
 }
 
-static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *context)
+static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section,
+        struct vkd3d_shader_message_context *message_context, void *context)
 {
     struct vkd3d_shader_desc *desc = context;
     int ret;
@@ -2043,7 +2046,7 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section, vo
                 FIXME("Multiple input signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(section, &desc->input_signature)) < 0)
+            if ((ret = shader_parse_signature(section, message_context, &desc->input_signature)) < 0)
                 return ret;
             break;
 
@@ -2055,7 +2058,7 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section, vo
                 FIXME("Multiple output signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(section, &desc->output_signature)) < 0)
+            if ((ret = shader_parse_signature(section, message_context, &desc->output_signature)) < 0)
                 return ret;
             break;
 
@@ -2066,7 +2069,7 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section, vo
                 FIXME("Multiple patch constant signatures.\n");
                 break;
             }
-            if ((ret = shader_parse_signature(section, &desc->patch_constant_signature)) < 0)
+            if ((ret = shader_parse_signature(section, message_context, &desc->patch_constant_signature)) < 0)
                 return ret;
             break;
 
@@ -2618,7 +2621,8 @@ static int shader_parse_root_signature(const struct vkd3d_shader_code *data,
     return VKD3D_OK;
 }
 
-static int rts0_handler(const struct vkd3d_shader_dxbc_section_desc *section, void *context)
+static int rts0_handler(const struct vkd3d_shader_dxbc_section_desc *section,
+        struct vkd3d_shader_message_context *message_context, void *context)
 {
     struct vkd3d_shader_versioned_root_signature_desc *desc = context;
 
