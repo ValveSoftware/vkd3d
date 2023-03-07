@@ -1929,6 +1929,8 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     if (!require_space(0, 2, sizeof(uint32_t), section->data.size))
     {
         WARN("Invalid data size %#zx.\n", section->data.size);
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_DXBC_INVALID_SIGNATURE,
+                "Section size %zu is smaller than the minimum signature header size.\n", section->data.size);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
