@@ -2387,7 +2387,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
-struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *instrs,
+struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
     struct hlsl_block then_block, else_block;
@@ -2413,11 +2413,11 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
 
     if (!(iff = hlsl_new_if(ctx, condition, &then_block, &else_block, &condition->loc)))
         return NULL;
-    list_add_tail(instrs, &iff->entry);
+    hlsl_block_add_instr(instrs, iff);
 
     if (!(load = hlsl_new_var_load(ctx, var, &condition->loc)))
         return NULL;
-    list_add_tail(instrs, &load->node.entry);
+    hlsl_block_add_instr(instrs, &load->node);
 
     return &load->node;
 }
@@ -2485,7 +2485,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     hlsl_block_add_instr(block, neg);
 
-    return hlsl_add_conditional(ctx, &block->instrs, and, neg, cast3);
+    return hlsl_add_conditional(ctx, block, and, neg, cast3);
 }
 
 static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
@@ -2547,7 +2547,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     hlsl_block_add_instr(block, neg);
 
-    return hlsl_add_conditional(ctx, &block->instrs, and, neg, cast3);
+    return hlsl_add_conditional(ctx, block, and, neg, cast3);
 }
 
 static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
@@ -2669,7 +2669,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     hlsl_block_add_instr(block, neg2);
 
-    if (!(cond = hlsl_add_conditional(ctx, &block->instrs, ge, arg2, neg2)))
+    if (!(cond = hlsl_add_conditional(ctx, block, ge, arg2, neg2)))
         return false;
 
     for (i = 0; i < type->dimx; ++i)

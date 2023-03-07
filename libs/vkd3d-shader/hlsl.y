@@ -2873,7 +2873,7 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, zero, loc)))
         return false;
 
-    if (!(select = hlsl_add_conditional(ctx, block_to_list(params->instrs), ge, frac, neg_frac)))
+    if (!(select = hlsl_add_conditional(ctx, params->instrs, ge, frac, neg_frac)))
         return false;
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, select, y, loc);
@@ -3036,7 +3036,7 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
     if (!(specular_pow = add_pow_expr(ctx, params->instrs, n_h, m, loc)))
         return false;
 
-    if (!(load = hlsl_add_conditional(ctx, block_to_list(params->instrs), specular_or, zero, specular_pow)))
+    if (!(load = hlsl_add_conditional(ctx, params->instrs, specular_or, zero, specular_pow)))
         return false;
 
     if (!hlsl_new_store_component(ctx, &block, &var_deref, 2, load))
@@ -6449,7 +6449,7 @@ conditional_expr:
             if (!(second = add_implicit_conversion(ctx, block_to_list($1), second, common_type, &@5)))
                 YYABORT;
 
-            if (!hlsl_add_conditional(ctx, block_to_list($1), cond, first, second))
+            if (!hlsl_add_conditional(ctx, $1, cond, first, second))
                 YYABORT;
             $$ = $1;
         }
