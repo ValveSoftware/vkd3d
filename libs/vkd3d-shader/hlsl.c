@@ -203,6 +203,8 @@ enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
                 vkd3d_unreachable();
         }
     }
+    else if (type->type == HLSL_CLASS_ARRAY)
+        return hlsl_type_get_regset(type->e.array.type);
 
     vkd3d_unreachable();
 }
