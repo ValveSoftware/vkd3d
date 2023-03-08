@@ -947,7 +947,7 @@ void hlsl_cleanup_deref(struct hlsl_deref *deref)
     hlsl_src_remove(&deref->offset);
 }
 
-/* Initializes a simple variable derefence, so that it can be passed to load/store functions. */
+/* Initializes a simple variable dereference, so that it can be passed to load/store functions. */
 void hlsl_init_simple_deref_from_var(struct hlsl_deref *deref, struct hlsl_ir_var *var)
 {
     memset(deref, 0, sizeof(*deref));

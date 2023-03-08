@@ -181,7 +181,7 @@ struct hlsl_type
         struct
         {
             struct hlsl_type *type;
-            /* Array lenght, or HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT if it is unknown yet while parsing. */
+            /* Array length, or HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT if it is not known yet at parse time. */
             unsigned int elements_count;
         } array;
         /* Format of the data contained within the type if the base_type is HLSL_TYPE_TEXTURE or
@@ -224,7 +224,7 @@ struct hlsl_struct_field
     /* Offset of the field within the type it belongs to, in register components, for each regset. */
     unsigned int reg_offset[HLSL_REGSET_LAST + 1];
 
-    /* Offset where the fields's name starts in the output bytecode, in bytes. */
+    /* Offset where the field name starts in the output bytecode, in bytes. */
     size_t name_bytecode_offset;
 };
 
@@ -415,7 +415,7 @@ struct hlsl_ir_function_decl
     struct hlsl_ir_var *return_var;
 
     struct vkd3d_shader_location loc;
-    /* Item entry in hlsl_ir_function.overloads. The paremeters' types are used as key. */
+    /* Item entry in hlsl_ir_function.overloads. The parameters' types are used as key. */
     struct rb_entry entry;
 
     /* Function to which this declaration corresponds. */
@@ -763,7 +763,7 @@ struct hlsl_ctx
      *   compute shader profiles. It is set using the numthreads() attribute in the entry point. */
     uint32_t thread_count[3];
 
-    /* Whether the parser is inside an state block (effects' metadata) inside a variable declarition. */
+    /* Whether the parser is inside a state block (effects' metadata) inside a variable declaration. */
     uint32_t in_state_block : 1;
     /* Whether the numthreads() attribute has been provided in the entry-point function. */
     uint32_t found_numthreads : 1;

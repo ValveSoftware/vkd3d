@@ -319,7 +319,7 @@ static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
             return;
         list_add_after(&lhs->node.entry, &c->node.entry);
 
-        /* This redudant load is expected to be deleted later by DCE */
+        /* This redundant load is expected to be deleted later by DCE. */
         if (!(field_load = hlsl_new_load_index(ctx, &lhs->src, &c->node, &var->loc)))
             return;
         list_add_after(&c->node.entry, &field_load->node.entry);
@@ -340,7 +340,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 {
     struct hlsl_ir_load *load;
 
-    /* This redudant load is expected to be deleted later by DCE */
+    /* This redundant load is expected to be deleted later by DCE. */
     if (!(load = hlsl_new_var_load(ctx, var, var->loc)))
         return;
     list_add_head(instrs, &load->node.entry);
@@ -414,7 +414,7 @@ static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs,
             return;
         list_add_tail(instrs, &c->node.entry);
 
-        /* This redudant load is expected to be deleted later by DCE */
+        /* This redundant load is expected to be deleted later by DCE. */
         if (!(field_load = hlsl_new_load_index(ctx, &rhs->src, &c->node, &var->loc)))
             return;
         list_add_tail(instrs, &field_load->node.entry);
@@ -436,7 +436,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
 {
     struct hlsl_ir_load *load;
 
-    /* This redudant load is expected to be deleted later by DCE */
+    /* This redundant load is expected to be deleted later by DCE. */
     if (!(load = hlsl_new_var_load(ctx, var, var->loc)))
         return;
     list_add_tail(instrs, &load->node.entry);
