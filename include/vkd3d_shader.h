@@ -1383,16 +1383,30 @@ struct vkd3d_shader_descriptor_info
  *
  * This structure extends vkd3d_shader_compile_info.
  *
- * When scanning a legacy Direct3D shader, vkd3d-shader enumerates each
- * constant register set used by the shader as a single constant buffer
- * descriptor, as follows:
- * - The \ref vkd3d_shader_descriptor_info.type field is set to
- *   VKD3D_SHADER_DESCRIPTOR_TYPE_CBV.
- * - The \ref vkd3d_shader_descriptor_info.register_space field is set to zero.
- * - The \ref vkd3d_shader_descriptor_info.register_index field is set to a
- *   member of enum vkd3d_shader_d3dbc_constant_register denoting which set
- *   is used.
- * - The \ref vkd3d_shader_descriptor_info.count field is set to one.
+ * When scanning a legacy Direct3D shader, vkd3d-shader enumerates descriptors
+ * as follows:
+ *
+ * - Each constant register set used by the shader is scanned as a single
+ *   constant buffer descriptor, as follows:
+ *   * The \ref vkd3d_shader_descriptor_info.type field is set to
+ *     VKD3D_SHADER_DESCRIPTOR_TYPE_CBV.
+ *   * The \ref vkd3d_shader_descriptor_info.register_space field is set to zero.
+ *   * The \ref vkd3d_shader_descriptor_info.register_index field is set to a
+ *     member of enum vkd3d_shader_d3dbc_constant_register denoting which set
+ *     is used.
+ *   * The \ref vkd3d_shader_descriptor_info.count field is set to one.
+ * - Each sampler used by the shader is scanned as two separate descriptors,
+ *   one representing the texture, and one representing the sampler state.
+ *   If desired, these may be mapped back into a single combined sampler using
+ *   struct vkd3d_shader_combined_resource_sampler.
+ *   The fields are set as follows:
+ *   * The \ref vkd3d_shader_descriptor_info.type field is set to
+ *     VKD3D_SHADER_DESCRIPTOR_TYPE_SRV and VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER
+ *     respectively.
+ *   * The \ref vkd3d_shader_descriptor_info.register_space field is set to zero.
+ *   * The \ref vkd3d_shader_descriptor_info.register_index field is set to the
+ *     binding index of the original sampler, for both descriptors.
+ *   * The \ref vkd3d_shader_descriptor_info.count field is set to one.
  *
  * In summary, there may be up to three such descriptors, one for each register
  * set used by the shader: float, integer, and boolean.
