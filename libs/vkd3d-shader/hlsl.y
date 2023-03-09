@@ -624,27 +624,19 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
         unsigned int comp, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_deref *src;
+    struct hlsl_ir_store *store;
     struct hlsl_ir_load *load;
     struct hlsl_block block;
+    struct hlsl_ir_var *var;
 
-    if (var_instr->type == HLSL_IR_LOAD)
-    {
-        src = &hlsl_ir_load(var_instr)->src;
-    }
-    else
-    {
-        struct hlsl_ir_store *store;
-        struct hlsl_ir_var *var;
+    if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
+        return NULL;
 
-        if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
-            return NULL;
+    if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
+        return NULL;
+    list_add_tail(instrs, &store->node.entry);
 
-        if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
-            return NULL;
-        list_add_tail(instrs, &store->node.entry);
-
-        src = &store->lhs;
-    }
+    src = &store->lhs;
 
     if (!(load = hlsl_new_load_component(ctx, &block, src, comp, loc)))
         return NULL;
