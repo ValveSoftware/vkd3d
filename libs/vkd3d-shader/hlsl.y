@@ -620,38 +620,6 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
     return jump;
 }
 
-static struct hlsl_ir_load *add_load_index(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
-        struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
-{
-    const struct hlsl_deref *src;
-    struct hlsl_ir_load *load;
-
-    if (var_instr->type == HLSL_IR_LOAD)
-    {
-        src = &hlsl_ir_load(var_instr)->src;
-    }
-    else
-    {
-        struct hlsl_ir_store *store;
-        struct hlsl_ir_var *var;
-
-        if (!(var = hlsl_new_synthetic_var(ctx, "deref", var_instr->data_type, &var_instr->loc)))
-            return NULL;
-
-        if (!(store = hlsl_new_simple_store(ctx, var, var_instr)))
-            return NULL;
-        list_add_tail(instrs, &store->node.entry);
-
-        src = &store->lhs;
-    }
-
-    if (!(load = hlsl_new_load_index(ctx, src, idx, loc)))
-        return NULL;
-    list_add_tail(instrs, &load->node.entry);
-
-    return load;
-}
-
 static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *var_instr,
         unsigned int comp, const struct vkd3d_shader_location *loc)
 {
@@ -1321,46 +1289,41 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
 
     if (type->class == HLSL_CLASS_MATRIX)
     {
-        struct hlsl_type *vector_type;
+        struct hlsl_type *scalar_type;
         struct hlsl_deref var_deref;
         struct hlsl_ir_load *load;
         struct hlsl_ir_var *var;
 
-        vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+        scalar_type = hlsl_get_scalar_type(ctx, type->base_type);
 
         if (!(var = hlsl_new_synthetic_var(ctx, "split_op", type, loc)))
             return NULL;
         hlsl_init_simple_deref_from_var(&var_deref, var);
 
-        for (i = 0; i < hlsl_type_major_size(type); ++i)
+        for (i = 0; i < type->dimy * type->dimx; ++i)
         {
-            struct hlsl_ir_node *value, *vector_operands[HLSL_MAX_OPERANDS] = { NULL };
+            struct hlsl_ir_node *value, *cell_operands[HLSL_MAX_OPERANDS] = { NULL };
             struct hlsl_ir_store *store;
-            struct hlsl_ir_constant *c;
+            struct hlsl_block block;
             unsigned int j;
-
-            if (!(c = hlsl_new_uint_constant(ctx, i, loc)))
-                return NULL;
-            list_add_tail(instrs, &c->node.entry);
 
             for (j = 0; j < HLSL_MAX_OPERANDS; j++)
             {
                 if (operands[j])
                 {
-                    struct hlsl_ir_load *load;
-
-                    if (!(load = add_load_index(ctx, instrs, operands[j], &c->node, loc)))
+                    if (!(load = add_load_component(ctx, instrs, operands[j], i, loc)))
                         return NULL;
-                    vector_operands[j] = &load->node;
+
+                    cell_operands[j] = &load->node;
                 }
             }
 
-            if (!(value = add_expr(ctx, instrs, op, vector_operands, vector_type, loc)))
+            if (!(value = add_expr(ctx, instrs, op, cell_operands, scalar_type, loc)))
                 return NULL;
 
-            if (!(store = hlsl_new_store_index(ctx, &var_deref, &c->node, value, 0, loc)))
+            if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, i, value)))
                 return NULL;
-            list_add_tail(instrs, &store->node.entry);
+            list_move_tail(instrs, &block.instrs);
         }
 
         if (!(load = hlsl_new_var_load(ctx, var, *loc)))
