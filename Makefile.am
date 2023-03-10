@@ -65,6 +65,7 @@ vkd3d_shader_tests = \
 	tests/distance.shader_test \
 	tests/entry-point-semantics.shader_test \
 	tests/exp.shader_test \
+	tests/expr-indexing.shader_test \
 	tests/floor.shader_test \
 	tests/frac.shader_test \
 	tests/function-return.shader_test \

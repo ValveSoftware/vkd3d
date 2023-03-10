@@ -1,0 +1,103 @@
+[pixel shader]
+float4 a, b;
+
+float4 main() : sv_target
+{
+    return (a + b)[1];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+probe all rgba (8.0, 8.0, 8.0, 8.0)
+
+
+[pixel shader todo]
+float4 a, b;
+float i;
+
+float4 main() : sv_target
+{
+    return (a + b)[i];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+uniform 8 float 2
+todo draw quad
+todo probe all rgba (10.0, 10.0, 10.0, 10.0)
+
+
+[pixel shader]
+float4 a;
+
+float4 main() : sv_target
+{
+    return a.wyxz[3];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (3.0, 3.0, 3.0, 3.0)
+
+
+[pixel shader todo]
+float4 a;
+float i;
+
+float4 main() : sv_target
+{
+    return a.wyxz[i];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float 0
+todo draw quad
+todo probe all rgba (4.0, 4.0, 4.0, 4.0)
+uniform 4 float 2
+todo draw quad
+todo probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+[pixel shader]
+float4 a;
+
+float4 foo()
+{
+    return a;
+}
+
+float4 main() : sv_target
+{
+    return foo()[3];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (4.0, 4.0, 4.0, 4.0)
+
+
+[pixel shader todo]
+float4 a;
+float i;
+
+float4 foo()
+{
+    return a;
+}
+
+float4 main() : sv_target
+{
+    return foo()[i];
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float 1
+todo draw quad
+todo probe all rgba (2.0, 2.0, 2.0, 2.0)
