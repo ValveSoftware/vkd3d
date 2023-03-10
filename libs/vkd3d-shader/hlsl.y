@@ -1769,8 +1769,43 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     }
     else if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_noncontiguous(hlsl_ir_index(lhs)))
     {
-        hlsl_fixme(ctx, &lhs->loc, "Column-major matrix index store.");
-        return NULL;
+        struct hlsl_ir_index *row = hlsl_ir_index(lhs);
+        struct hlsl_ir_node *mat = row->val.node;
+        unsigned int i, k = 0;
+
+        for (i = 0; i < mat->data_type->dimx; ++i)
+        {
+            struct hlsl_ir_store *store;
+            struct hlsl_ir_constant *c;
+            struct hlsl_ir_node *cell;
+            struct hlsl_ir_load *load;
+            struct hlsl_deref deref;
+
+            if (!(writemask & (1 << i)))
+                continue;
+
+            if (!(c = hlsl_new_uint_constant(ctx, i, &lhs->loc)))
+                return NULL;
+            list_add_tail(instrs, &c->node.entry);
+
+            if (!(cell = hlsl_new_index(ctx, &row->node, &c->node, &lhs->loc)))
+                return NULL;
+            list_add_tail(instrs, &cell->entry);
+
+            if (!(load = add_load_component(ctx, instrs, rhs, k++, &rhs->loc)))
+                return NULL;
+
+            if (!hlsl_init_deref_from_index_chain(ctx, &deref, cell))
+                return NULL;
+
+            if (!(store = hlsl_new_store_index(ctx, &deref, NULL, &load->node, 0, &rhs->loc)))
+            {
+                hlsl_cleanup_deref(&deref);
+                return NULL;
+            }
+            list_add_tail(instrs, &store->node.entry);
+            hlsl_cleanup_deref(&deref);
+        }
     }
     else
     {
