@@ -161,7 +161,7 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
-static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *temp)
+static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *temp)
 {
     struct vkd3d_string_buffer *name;
     struct hlsl_ir_var *uniform;
@@ -188,7 +188,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
 
     if (!(load = hlsl_new_var_load(ctx, uniform, &temp->loc)))
         return;
-    list_add_head(instrs, &load->node.entry);
+    list_add_head(&block->instrs, &load->node.entry);
 
     if (!(store = hlsl_new_simple_store(ctx, temp, &load->node)))
         return;
@@ -4256,7 +4256,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
         if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, &body->instrs, var);
+            prepend_uniform_copy(ctx, body, var);
     }
 
     for (i = 0; i < entry_func->parameters.count; ++i)
@@ -4265,7 +4265,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
         if (hlsl_type_is_resource(var->data_type) || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
-            prepend_uniform_copy(ctx, &body->instrs, var);
+            prepend_uniform_copy(ctx, body, var);
         }
         else
         {
