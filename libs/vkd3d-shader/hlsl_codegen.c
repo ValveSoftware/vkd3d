@@ -429,7 +429,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     prepend_input_copy_recurse(ctx, block, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
-static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
+static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *rhs,
         unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
@@ -464,11 +464,11 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_tail(instrs, &c->entry);
+            hlsl_block_add_instr(block, c);
 
             if (!(load = hlsl_new_load_index(ctx, &rhs->src, c, &var->loc)))
                 return;
-            list_add_tail(instrs, &load->node.entry);
+            hlsl_block_add_instr(block, &load->node);
         }
         else
         {
@@ -476,16 +476,16 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
 
             if (!(load = hlsl_new_load_index(ctx, &rhs->src, NULL, &var->loc)))
                 return;
-            list_add_tail(instrs, &load->node.entry);
+            hlsl_block_add_instr(block, &load->node);
         }
 
         if (!(store = hlsl_new_simple_store(ctx, output, &load->node)))
             return;
-        list_add_tail(instrs, &store->entry);
+        hlsl_block_add_instr(block, store);
     }
 }
 
-static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
+static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *rhs,
         unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct vkd3d_shader_location *loc = &rhs->node.loc;
@@ -520,34 +520,34 @@ static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_tail(instrs, &c->entry);
+            hlsl_block_add_instr(block, c);
 
             if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, c, loc)))
                 return;
-            list_add_tail(instrs, &element_load->node.entry);
+            hlsl_block_add_instr(block, &element_load->node);
 
-            append_output_copy_recurse(ctx, instrs, element_load, modifiers, semantic, elem_semantic_index);
+            append_output_copy_recurse(ctx, block, element_load, modifiers, semantic, elem_semantic_index);
         }
     }
     else
     {
-        append_output_copy(ctx, instrs, rhs, modifiers, semantic, semantic_index);
+        append_output_copy(ctx, block, rhs, modifiers, semantic, semantic_index);
     }
 }
 
 /* Split outputs into two variables representing the temp and semantic
  * registers, and copy the former to the latter, so that reads from output
  * variables work. */
-static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
+static void append_output_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *var)
 {
     struct hlsl_ir_load *load;
 
     /* This redundant load is expected to be deleted later by DCE. */
     if (!(load = hlsl_new_var_load(ctx, var, &var->loc)))
         return;
-    list_add_tail(instrs, &load->node.entry);
+    hlsl_block_add_instr(block, &load->node);
 
-    append_output_copy_recurse(ctx, instrs, load, var->storage_modifiers, &var->semantic, var->semantic.index);
+    append_output_copy_recurse(ctx, block, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
 bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -4283,7 +4283,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             if (var->storage_modifiers & HLSL_STORAGE_IN)
                 prepend_input_var_copy(ctx, body, var);
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
-                append_output_var_copy(ctx, &body->instrs, var);
+                append_output_var_copy(ctx, body, var);
         }
     }
     if (entry_func->return_var)
@@ -4292,7 +4292,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                     "Entry point \"%s\" is missing a return value semantic.", entry_func->func->name);
 
-        append_output_var_copy(ctx, &body->instrs, entry_func->return_var);
+        append_output_var_copy(ctx, body, entry_func->return_var);
     }
 
     for (i = 0; i < entry_func->attr_count; ++i)
