@@ -862,7 +862,8 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
  * record access before knowing if they will be used in the lhs of an assignment --in which case
  * they are lowered into a deref-- or as the load of an element within a larger value.
  * For the latter case, this pass takes care of lowering hlsl_ir_indexes into individual
- * hlsl_ir_loads. */
+ * hlsl_ir_loads, or individual hlsl_ir_resource_loads, in case the indexing is a
+ * resource access. */
 static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_deref var_deref;
@@ -876,6 +877,23 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     index = hlsl_ir_index(instr);
     val = index->val.node;
+
+    if (hlsl_index_is_resource_access(index))
+    {
+        struct hlsl_resource_load_params params = {0};
+        struct hlsl_ir_node *load;
+
+        params.type = HLSL_RESOURCE_LOAD;
+        params.resource = val;
+        params.coords = index->idx.node;
+        params.format = val->data_type->e.resource_format;
+
+        if (!(load = hlsl_new_resource_load(ctx, &params, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &load->entry);
+        hlsl_replace_node(instr, load);
+        return true;
+    }
 
     if (!(var = hlsl_new_synthetic_var(ctx, "index-val", val->data_type, &instr->loc)))
         return false;

@@ -755,9 +755,7 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
             && (expr_type->base_type == HLSL_TYPE_TEXTURE || expr_type->base_type == HLSL_TYPE_UAV)
             && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
-        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
         unsigned int dim_count = hlsl_sampler_dim_count(expr_type->sampler_dim);
-        struct hlsl_ir_node *resource_load;
 
         if (index_type->class > HLSL_CLASS_VECTOR || index_type->dimx != dim_count)
         {
@@ -777,13 +775,10 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
         if (!(index = add_zero_mipmap_level(ctx, instrs, index, dim_count, loc)))
             return false;
 
-        load_params.format = expr_type->e.resource_format;
-        load_params.resource = array;
-        load_params.coords = index;
-
-        if (!(resource_load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        if (!(return_index = hlsl_new_index(ctx, array, index, loc)))
             return false;
-        list_add_tail(instrs, &resource_load->entry);
+        list_add_tail(instrs, &return_index->entry);
+
         return true;
     }
 
@@ -1716,7 +1711,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
         return NULL;
 
-    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_RESOURCE_LOAD && lhs->type != HLSL_IR_INDEX)
+    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_INDEX)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
@@ -1753,17 +1748,19 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
         }
     }
 
-    if (lhs->type == HLSL_IR_RESOURCE_LOAD)
+    if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
     {
-        struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(lhs);
+        struct hlsl_ir_node *load_coords = hlsl_ir_index(lhs)->idx.node;
+        struct hlsl_deref resource_deref;
         struct hlsl_type *resource_type;
         struct hlsl_ir_swizzle *coords;
         struct hlsl_ir_node *store;
         unsigned int dim_count;
 
-        /* Such an lvalue was produced by an index expression. */
-        assert(load->load_type == HLSL_RESOURCE_LOAD);
-        resource_type = hlsl_deref_get_type(ctx, &load->resource);
+        if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, hlsl_ir_index(lhs)->val.node))
+            return NULL;
+
+        resource_type = hlsl_deref_get_type(ctx, &resource_deref);
         assert(resource_type->class == HLSL_CLASS_OBJECT);
         assert(resource_type->base_type == HLSL_TYPE_TEXTURE || resource_type->base_type == HLSL_TYPE_UAV);
 
@@ -1778,16 +1775,23 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
                     "Resource store expressions must write to all components.");
 
         /* Remove the (implicit) mipmap level from the load expression. */
-        assert(load->coords.node->data_type->class == HLSL_CLASS_VECTOR);
-        assert(load->coords.node->data_type->base_type == HLSL_TYPE_UINT);
-        assert(load->coords.node->data_type->dimx == dim_count + 1);
-        if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dim_count, load->coords.node, &lhs->loc)))
+        assert(load_coords->data_type->class == HLSL_CLASS_VECTOR);
+        assert(load_coords->data_type->base_type == HLSL_TYPE_UINT);
+        assert(load_coords->data_type->dimx == dim_count + 1);
+        if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dim_count, load_coords, &lhs->loc)))
+        {
+            hlsl_cleanup_deref(&resource_deref);
             return NULL;
+        }
         list_add_tail(instrs, &coords->node.entry);
 
-        if (!(store = hlsl_new_resource_store(ctx, &load->resource, &coords->node, rhs, &lhs->loc)))
+        if (!(store = hlsl_new_resource_store(ctx, &resource_deref, &coords->node, rhs, &lhs->loc)))
+        {
+            hlsl_cleanup_deref(&resource_deref);
             return NULL;
+        }
         list_add_tail(instrs, &store->entry);
+        hlsl_cleanup_deref(&resource_deref);
     }
     else if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_noncontiguous(hlsl_ir_index(lhs)))
     {

@@ -1106,6 +1106,7 @@ struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs);
 
 bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index);
+bool hlsl_index_is_resource_access(struct hlsl_ir_index *index);
 
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);
