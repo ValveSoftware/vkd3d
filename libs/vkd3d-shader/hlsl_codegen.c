@@ -301,7 +301,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     return ext_var;
 }
 
-static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs,
+static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *lhs,
         unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
@@ -364,7 +364,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
 }
 
-static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs,
+static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *lhs,
         unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -406,27 +406,27 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs
                 return;
             list_add_after(&c->entry, &element_load->node.entry);
 
-            prepend_input_copy_recurse(ctx, instrs, element_load, modifiers, semantic, elem_semantic_index);
+            prepend_input_copy_recurse(ctx, block, element_load, modifiers, semantic, elem_semantic_index);
         }
     }
     else
     {
-        prepend_input_copy(ctx, instrs, lhs, modifiers, semantic, semantic_index);
+        prepend_input_copy(ctx, block, lhs, modifiers, semantic, semantic_index);
     }
 }
 
 /* Split inputs into two variables representing the semantic and temp registers,
  * and copy the former to the latter, so that writes to input variables work. */
-static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_var *var)
+static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *var)
 {
     struct hlsl_ir_load *load;
 
     /* This redundant load is expected to be deleted later by DCE. */
     if (!(load = hlsl_new_var_load(ctx, var, &var->loc)))
         return;
-    list_add_head(instrs, &load->node.entry);
+    list_add_head(&block->instrs, &load->node.entry);
 
-    prepend_input_copy_recurse(ctx, instrs, load, var->storage_modifiers, &var->semantic, var->semantic.index);
+    prepend_input_copy_recurse(ctx, block, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
@@ -4281,7 +4281,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
             }
 
             if (var->storage_modifiers & HLSL_STORAGE_IN)
-                prepend_input_var_copy(ctx, &body->instrs, var);
+                prepend_input_var_copy(ctx, body, var);
             if (var->storage_modifiers & HLSL_STORAGE_OUT)
                 append_output_var_copy(ctx, &body->instrs, var);
         }
