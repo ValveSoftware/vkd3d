@@ -438,6 +438,71 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
     return true;
 }
 
+bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_node *chain)
+{
+    struct hlsl_ir_index *index;
+    struct hlsl_ir_load *load;
+    unsigned int chain_len, i;
+    struct hlsl_ir_node *ptr;
+
+    deref->path = NULL;
+    deref->path_len = 0;
+    deref->offset.node = NULL;
+
+    assert(chain);
+    if (chain->type == HLSL_IR_INDEX)
+        assert(!hlsl_index_is_noncontiguous(hlsl_ir_index(chain)));
+
+    /* Find the length of the index chain */
+    chain_len = 0;
+    ptr = chain;
+    while (ptr->type == HLSL_IR_INDEX)
+    {
+        index = hlsl_ir_index(ptr);
+
+        chain_len++;
+        ptr = index->val.node;
+    }
+
+    if (ptr->type != HLSL_IR_LOAD)
+    {
+        hlsl_error(ctx, &chain->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_LVALUE, "Invalid l-value.");
+        return false;
+    }
+    load = hlsl_ir_load(ptr);
+
+    if (!init_deref(ctx, deref, load->src.var, load->src.path_len + chain_len))
+        return false;
+
+    for (i = 0; i < load->src.path_len; ++i)
+        hlsl_src_from_node(&deref->path[i], load->src.path[i].node);
+
+    chain_len = 0;
+    ptr = chain;
+    while (ptr->type == HLSL_IR_INDEX)
+    {
+        unsigned int p = deref->path_len - 1 - chain_len;
+
+        index = hlsl_ir_index(ptr);
+        if (hlsl_index_is_noncontiguous(index))
+        {
+            hlsl_src_from_node(&deref->path[p], deref->path[p + 1].node);
+            hlsl_src_remove(&deref->path[p + 1]);
+            hlsl_src_from_node(&deref->path[p + 1], index->idx.node);
+        }
+        else
+        {
+            hlsl_src_from_node(&deref->path[p], index->idx.node);
+        }
+
+        chain_len++;
+        ptr = index->val.node;
+    }
+    assert(deref->path_len == load->src.path_len + chain_len);
+
+    return true;
+}
+
 struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
 {
     struct hlsl_type *type;
@@ -1232,17 +1297,23 @@ struct hlsl_ir_resource_load *hlsl_new_resource_load(struct hlsl_ctx *ctx,
         return NULL;
     init_node(&load->node, HLSL_IR_RESOURCE_LOAD, params->format, loc);
     load->load_type = params->type;
-    if (!hlsl_copy_deref(ctx, &load->resource, &params->resource))
+
+    if (!hlsl_init_deref_from_index_chain(ctx, &load->resource, params->resource))
     {
         vkd3d_free(load);
         return NULL;
     }
-    if (!hlsl_copy_deref(ctx, &load->sampler, &params->sampler))
+
+    if (params->sampler)
     {
-        hlsl_cleanup_deref(&load->resource);
-        vkd3d_free(load);
-        return NULL;
+        if (!hlsl_init_deref_from_index_chain(ctx, &load->sampler, params->sampler))
+        {
+            hlsl_cleanup_deref(&load->resource);
+            vkd3d_free(load);
+            return NULL;
+        }
     }
+
     hlsl_src_from_node(&load->coords, params->coords);
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
@@ -1279,6 +1350,13 @@ struct hlsl_ir_swizzle *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
     return swizzle;
+}
+
+bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index)
+{
+    struct hlsl_type *type = index->val.node->data_type;
+
+    return type->class == HLSL_CLASS_MATRIX && !hlsl_type_is_row_major(type);
 }
 
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,

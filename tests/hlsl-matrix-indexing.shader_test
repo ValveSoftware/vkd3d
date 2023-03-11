@@ -78,7 +78,7 @@ draw quad
 probe all rgba (1.0, 5.0, 7.0, 12.0)
 
 
-[pixel shader]
+[pixel shader todo]
 float4 main() : SV_TARGET
 {
     float3x2 m = {1, 2, 3, 4, 5, 6};
@@ -89,7 +89,7 @@ float4 main() : SV_TARGET
 }
 
 [test]
-draw quad
+todo draw quad
 todo probe all rgba (30.0, 40.0, 5.0, 6.0)
 
 

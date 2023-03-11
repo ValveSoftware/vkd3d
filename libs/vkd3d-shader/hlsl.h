@@ -794,7 +794,7 @@ struct hlsl_resource_load_params
 {
     struct hlsl_type *format;
     enum hlsl_resource_load_type type;
-    struct hlsl_deref resource, sampler;
+    struct hlsl_ir_node *resource, *sampler;
     struct hlsl_ir_node *coords, *lod, *texel_offset;
 };
 
@@ -1021,6 +1021,7 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
 
+bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_node *chain);
 bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struct hlsl_deref *other);
 
 void hlsl_cleanup_deref(struct hlsl_deref *deref);
@@ -1084,6 +1085,8 @@ struct hlsl_ir_store *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hl
         struct hlsl_ir_node *idx, struct hlsl_ir_node *rhs, unsigned int writemask, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_store *hlsl_new_store_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *lhs, unsigned int comp, struct hlsl_ir_node *rhs);
+
+bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index);
 
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc);

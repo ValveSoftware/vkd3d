@@ -731,6 +731,81 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
     return true;
 }
 
+/* hlsl_ir_index nodes are a parse-time construct used to represent array indexing and struct
+ * record access before knowing if they will be used in the lhs of an assignment --in which case
+ * they are lowered into a deref-- or as the load of an element within a larger value.
+ * For the latter case, this pass takes care of lowering hlsl_ir_indexes into individual
+ * hlsl_ir_loads. */
+static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_deref var_deref;
+    struct hlsl_ir_index *index;
+    struct hlsl_ir_store *store;
+    struct hlsl_ir_load *load;
+    struct hlsl_ir_node *val;
+    struct hlsl_ir_var *var;
+
+    if (instr->type != HLSL_IR_INDEX)
+        return false;
+    index = hlsl_ir_index(instr);
+    val = index->val.node;
+
+    if (!(var = hlsl_new_synthetic_var(ctx, "index-val", val->data_type, &instr->loc)))
+        return false;
+    hlsl_init_simple_deref_from_var(&var_deref, var);
+
+    if (!(store = hlsl_new_simple_store(ctx, var, val)))
+        return false;
+    list_add_before(&instr->entry, &store->node.entry);
+
+    if (hlsl_index_is_noncontiguous(index))
+    {
+        struct hlsl_ir_node *mat = index->val.node;
+        struct hlsl_deref row_deref;
+        unsigned int i;
+
+        assert(!hlsl_type_is_row_major(mat->data_type));
+
+        if (!(var = hlsl_new_synthetic_var(ctx, "row", instr->data_type, &instr->loc)))
+            return false;
+        hlsl_init_simple_deref_from_var(&row_deref, var);
+
+        for (i = 0; i < mat->data_type->dimx; ++i)
+        {
+            struct hlsl_ir_constant *c;
+
+            if (!(c = hlsl_new_uint_constant(ctx, i, &instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &c->node.entry);
+
+            if (!(load = hlsl_new_load_index(ctx, &var_deref, &c->node, &instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &load->node.entry);
+
+            if (!(load = hlsl_new_load_index(ctx, &load->src, index->idx.node, &instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &load->node.entry);
+
+            if (!(store = hlsl_new_store_index(ctx, &row_deref, &c->node, &load->node, 0, &instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &store->node.entry);
+        }
+
+        if (!(load = hlsl_new_var_load(ctx, var, instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &load->node.entry);
+        hlsl_replace_node(instr, &load->node);
+    }
+    else
+    {
+        if (!(load = hlsl_new_load_index(ctx, &var_deref, index->idx.node, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &load->node.entry);
+        hlsl_replace_node(instr, &load->node);
+    }
+    return true;
+}
+
 /* Lower casts from vec1 to vecN to swizzles. */
 static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -3374,6 +3449,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_return(ctx, entry_func, body, false);
 
     while (transform_ir(ctx, lower_calls, body, NULL));
+
+    transform_ir(ctx, lower_index_loads, body, NULL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {

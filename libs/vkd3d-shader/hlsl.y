@@ -685,9 +685,10 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
     return load;
 }
 
-static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
+static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
         unsigned int idx, const struct vkd3d_shader_location loc)
 {
+    struct hlsl_ir_node *index;
     struct hlsl_ir_constant *c;
 
     assert(idx < record->data_type->e.record.field_count);
@@ -696,59 +697,16 @@ static bool add_record_load(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         return false;
     list_add_tail(instrs, &c->node.entry);
 
-    return !!add_load_index(ctx, instrs, record, &c->node, &loc);
+    if (!(index = hlsl_new_index(ctx, record, &c->node, &loc)))
+        return false;
+    list_add_tail(instrs, &index->entry);
+
+    return true;
 }
 
 static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc);
-
-static bool add_matrix_index(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *matrix, struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_type *mat_type = matrix->data_type, *ret_type;
-    struct hlsl_deref var_deref;
-    struct hlsl_ir_load *load;
-    struct hlsl_ir_var *var;
-    unsigned int i;
-
-    if (hlsl_type_is_row_major(mat_type))
-        return add_load_index(ctx, instrs, matrix, index, loc);
-
-    ret_type = hlsl_get_vector_type(ctx, mat_type->base_type, mat_type->dimx);
-
-    if (!(var = hlsl_new_synthetic_var(ctx, "index", ret_type, loc)))
-        return false;
-    hlsl_init_simple_deref_from_var(&var_deref, var);
-
-    for (i = 0; i < mat_type->dimx; ++i)
-    {
-        struct hlsl_ir_load *column, *value;
-        struct hlsl_ir_store *store;
-        struct hlsl_ir_constant *c;
-        struct hlsl_block block;
-
-        if (!(c = hlsl_new_uint_constant(ctx, i, loc)))
-            return false;
-        list_add_tail(instrs, &c->node.entry);
-
-        if (!(column = add_load_index(ctx, instrs, matrix, &c->node, loc)))
-            return false;
-
-        if (!(value = add_load_index(ctx, instrs, &column->node, index, loc)))
-            return false;
-
-        if (!(store = hlsl_new_store_component(ctx, &block, &var_deref, i, &value->node)))
-            return false;
-        list_move_tail(instrs, &block.instrs);
-    }
-
-    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
-        return false;
-    list_add_tail(instrs, &load->node.entry);
-
-    return true;
-}
 
 static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct list *instrs,
         struct hlsl_ir_node *index, unsigned int dim_count, const struct vkd3d_shader_location *loc)
@@ -783,10 +741,11 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct l
     return &coords_load->node;
 }
 
-static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
+static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
+    struct hlsl_ir_node *return_index;
     struct hlsl_ir_expr *cast;
 
     if (expr_type->class == HLSL_CLASS_OBJECT
@@ -795,8 +754,6 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     {
         struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
         unsigned int dim_count = hlsl_sampler_dim_count(expr_type->sampler_dim);
-        /* Only HLSL_IR_LOAD can return an object. */
-        struct hlsl_ir_load *object_load = hlsl_ir_load(array);
         struct hlsl_ir_resource_load *resource_load;
 
         if (index_type->class > HLSL_CLASS_VECTOR || index_type->dimx != dim_count)
@@ -818,7 +775,7 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
             return false;
 
         load_params.format = expr_type->e.resource_format;
-        load_params.resource = object_load->src;
+        load_params.resource = array;
         load_params.coords = index;
 
         if (!(resource_load = hlsl_new_resource_load(ctx, &load_params, loc)))
@@ -838,10 +795,7 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
     list_add_tail(instrs, &cast->node.entry);
     index = &cast->node;
 
-    if (expr_type->class == HLSL_CLASS_MATRIX)
-        return add_matrix_index(ctx, instrs, array, index, loc);
-
-    if (expr_type->class != HLSL_CLASS_ARRAY && expr_type->class != HLSL_CLASS_VECTOR)
+    if (expr_type->class != HLSL_CLASS_ARRAY && expr_type->class != HLSL_CLASS_VECTOR && expr_type->class != HLSL_CLASS_MATRIX)
     {
         if (expr_type->class == HLSL_CLASS_SCALAR)
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX, "Scalar expressions cannot be array-indexed.");
@@ -850,8 +804,9 @@ static bool add_array_load(struct hlsl_ctx *ctx, struct list *instrs, struct hls
         return false;
     }
 
-    if (!add_load_index(ctx, instrs, array, index, loc))
+    if (!(return_index = hlsl_new_index(ctx, array, index, loc)))
         return false;
+    list_add_tail(instrs, &return_index->entry);
 
     return true;
 }
@@ -1784,7 +1739,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
     if (!(rhs = add_implicit_conversion(ctx, instrs, rhs, lhs_type, &rhs->loc)))
         return NULL;
 
-    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_RESOURCE_LOAD)
+    while (lhs->type != HLSL_IR_LOAD && lhs->type != HLSL_IR_RESOURCE_LOAD && lhs->type != HLSL_IR_INDEX)
     {
         if (lhs->type == HLSL_IR_EXPR && hlsl_ir_expr(lhs)->op == HLSL_OP1_CAST)
         {
@@ -1857,13 +1812,26 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             return NULL;
         list_add_tail(instrs, &store->node.entry);
     }
+    else if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_noncontiguous(hlsl_ir_index(lhs)))
+    {
+        hlsl_fixme(ctx, &lhs->loc, "Column-major matrix index store.");
+        return NULL;
+    }
     else
     {
         struct hlsl_ir_store *store;
+        struct hlsl_deref deref;
 
-        if (!(store = hlsl_new_store_index(ctx, &hlsl_ir_load(lhs)->src, NULL, rhs, writemask, &rhs->loc)))
+        if (!hlsl_init_deref_from_index_chain(ctx, &deref, lhs))
             return NULL;
+
+        if (!(store = hlsl_new_store_index(ctx, &deref, NULL, rhs, writemask, &rhs->loc)))
+        {
+            hlsl_cleanup_deref(&deref);
+            return NULL;
+        }
         list_add_tail(instrs, &store->node.entry);
+        hlsl_cleanup_deref(&deref);
     }
 
     /* Don't use the instruction itself as a source, as this makes structure
@@ -3205,7 +3173,6 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_resource_load *load;
-    struct hlsl_ir_load *sampler_load;
     struct hlsl_ir_node *coords;
 
     if (params->args_count != 2 && params->args_count != 4)
@@ -3234,10 +3201,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     }
     else
     {
-        /* Only HLSL_IR_LOAD can return an object. */
-        sampler_load = hlsl_ir_load(params->args[0]);
-
-        load_params.resource = sampler_load->src;
+        load_params.resource = params->args[0];
     }
 
     if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
@@ -3576,7 +3540,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    struct hlsl_ir_load *object_load;
 
     if (object_type->class != HLSL_CLASS_OBJECT || object_type->base_type != HLSL_TYPE_TEXTURE
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
@@ -3589,9 +3552,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         hlsl_release_string_buffer(ctx, string);
         return false;
     }
-
-    /* Only HLSL_IR_LOAD can return an object. */
-    object_load = hlsl_ir_load(object);
 
     if (!strcmp(name, "Load")
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBE
@@ -3636,7 +3596,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
 
         load_params.format = object_type->e.resource_format;
-        load_params.resource = object_load->src;
+        load_params.resource = object;
 
         if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
@@ -3652,7 +3612,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_load *sampler_load;
 
         if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
         {
@@ -3675,9 +3634,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
 
-        /* Only HLSL_IR_LOAD can return an object. */
-        sampler_load = hlsl_ir_load(params->args[0]);
-
         if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
@@ -3695,8 +3651,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         load_params.format = object_type->e.resource_format;
-        load_params.resource = object_load->src;
-        load_params.sampler = sampler_load->src;
+        load_params.resource = object;
+        load_params.sampler = params->args[0];
 
         if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
@@ -3716,7 +3672,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         struct hlsl_resource_load_params load_params = {0};
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_load *sampler_load;
         unsigned int read_channel;
 
         if (!strcmp(name, "GatherGreen"))
@@ -3792,16 +3747,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
 
-        /* Only HLSL_IR_LOAD can return an object. */
-        sampler_load = hlsl_ir_load(params->args[0]);
-
         if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             return false;
 
         load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
-        load_params.resource = object_load->src;
-        load_params.sampler = sampler_load->src;
+        load_params.resource = object;
+        load_params.sampler = params->args[0];
 
         if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
@@ -3817,7 +3769,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
         const struct hlsl_type *sampler_type;
         struct hlsl_ir_resource_load *load;
-        struct hlsl_ir_load *sampler_load;
 
         if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
         {
@@ -3840,9 +3791,6 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             return false;
         }
 
-        /* Only HLSL_IR_LOAD can return an object. */
-        sampler_load = hlsl_ir_load(params->args[0]);
-
         if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
             load_params.coords = params->args[1];
@@ -3862,8 +3810,8 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
         load_params.format = object_type->e.resource_format;
-        load_params.resource = object_load->src;
-        load_params.sampler = sampler_load->src;
+        load_params.resource = object;
+        load_params.sampler = params->args[0];
 
         if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
             return false;
@@ -5509,7 +5457,7 @@ postfix_expr:
                 }
 
                 field_idx = field - type->e.record.fields;
-                if (!add_record_load(ctx, $1, node, field_idx, @2))
+                if (!add_record_access(ctx, $1, node, field_idx, @2))
                     YYABORT;
                 $$ = $1;
             }
@@ -5538,7 +5486,7 @@ postfix_expr:
             list_move_tail($1, $3);
             vkd3d_free($3);
 
-            if (!add_array_load(ctx, $1, array, index, &@2))
+            if (!add_array_access(ctx, $1, array, index, &@2))
             {
                 destroy_instr_list($1);
                 YYABORT;
