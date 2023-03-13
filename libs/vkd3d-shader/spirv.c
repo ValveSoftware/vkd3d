@@ -2223,7 +2223,7 @@ struct spirv_compiler
     struct vkd3d_spirv_builder spirv_builder;
 
     struct vkd3d_shader_message_context *message_context;
-    const struct vkd3d_shader_location *location;
+    struct vkd3d_shader_location location;
     bool failed;
 
     bool strip_debug;
@@ -2323,7 +2323,7 @@ struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *
 
     memset(compiler, 0, sizeof(*compiler));
     compiler->message_context = message_context;
-    compiler->location = location;
+    compiler->location = *location;
 
     if ((target_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)))
     {
@@ -2566,7 +2566,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) spirv_compiler_error(struct spirv_compiler *
     va_list args;
 
     va_start(args, format);
-    vkd3d_shader_verror(compiler->message_context, compiler->location, error, format, args);
+    vkd3d_shader_verror(compiler->message_context, &compiler->location, error, format, args);
     va_end(args);
     compiler->failed = true;
 }
@@ -9959,8 +9959,10 @@ int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
+    compiler->location.column = 0;
     for (i = 0; i < instructions->count; ++i)
     {
+        compiler->location.line = i + 1;
         if ((result = spirv_compiler_handle_instruction(compiler, &instructions->elements[i])) < 0)
             return result;
     }
