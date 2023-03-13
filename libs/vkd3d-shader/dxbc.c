@@ -710,7 +710,7 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM4_OP_USHR,                             VKD3DSIH_USHR,                             "u",    "uu"},
     {VKD3D_SM4_OP_UTOF,                             VKD3DSIH_UTOF,                             "f",    "u"},
     {VKD3D_SM4_OP_XOR,                              VKD3DSIH_XOR,                              "u",    "uu"},
-    {VKD3D_SM4_OP_DCL_RESOURCE,                     VKD3DSIH_DCL,                              "R",    "",
+    {VKD3D_SM4_OP_DCL_RESOURCE,                     VKD3DSIH_DCL,                              "",     "",
             shader_sm4_read_dcl_resource},
     {VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,              VKD3DSIH_DCL_CONSTANT_BUFFER,              "",     "",
             shader_sm4_read_dcl_constant_buffer},
