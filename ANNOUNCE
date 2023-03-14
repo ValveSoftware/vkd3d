@@ -1,16 +1,17 @@
-The Wine team is proud to announce that release 1.6 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.7 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Initial support for HLSL compute shaders.
-  - More support for HLSL features and intrinsics.
+  - Support for many more HLSL features and intrinsics.
+  - Much improved support for the Direct3D shader model 1/2/3 HLSL profiles.
+  - Public vkd3d-shader API for parsing and serialising DXBC blobs.
   - Miscellaneous bug fixes.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.6.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.7.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -21,40 +22,49 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.6
+What's new in vkd3d 1.7
 =======================
 
 
 *** libvkd3d-shader
 
 - New features for the HLSL source type:
-  - Initial support for compute shaders.
-  - Improved support for initialisation and assignment of compound objects
-    like structures and arrays, including casts and implicit conversions.
-  - Support for loads and stores of texture resource unordered-access views.
-  - Support for function attributes. In particular, the required "numthreads"
-    attribute for compute shader entry points is now supported.
-  - Support for the asuint() intrinsic function.
-  - Support for the length() intrinsic function.
-  - Support for the normalize() intrinsic function.
-  - Support for integer division and modulus.
-  - Support for taking the absolute value of integers.
-  - Support for floating-point modulus.
+  - Support for calling user-defined functions.
+  - Support for array parameters to user-defined functions.
+  - Much improved support for the Direct3D shader model 1/2/3 profiles.
+  - Support for the SV_DispatchThreadID, SV_GroupID, and SV_GroupThreadID
+    compute shader system-value semantics.
+  - Support for the optional "offset" parameter of the texture object Load()
+    method.
+  - Support for the all() intrinsic function.
+  - Support for the distance() intrinsic function.
+  - Support for the exp() and exp2() intrinsic functions.
+  - Support for the frac() intrinsic function.
+  - Support for the lit() intrinsic function.
+  - Support for the reflect() intrinsic function.
+  - Support for the sin() and cos() intrinsic functions.
+  - Support for the smoothstep() intrinsic function.
+  - Support for the sqrt() and rsqrt() intrinsic functions.
+  - Support for the step() intrinsic function.
+  - Support for the transpose() intrinsic function.
+  - Support for the case-insensitive variants of the "float" and "dword" data
+    types.
+  - Partial support for minimum precision data types like "min16float". These
+    are currently interpreted as their regular counterparts.
+  - Improved constant propagation support, in particular to constant
+    propagation through swizzles.
 
+- HLSL static variables are now properly zero-initialised.
+
+- The Direct3D shader model 4 and 5 disassembler outputs sample counts for
+  multi-sampled resource declarations.
 
 - New interfaces:
-  - The VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS descriptor info flag is
-    used to indicate that atomic operations are used on unordered-access view
-    descriptors.
-
-
-*** libvkd3d-common
-
-- vkd3d debug output is prefixed with "vkd3d:" in order to make it easier to
-  distinguish from output produced by applications or other libraries.
-
-
-*** demos
-
-- The demos now use libvkd3d-shader to compile HLSL shaders at run-time.
-
+  - vkd3d_shader_parse_dxbc() provides support for parsing DXBC blobs.
+  - vkd3d_shader_serialize_dxbc() provides support for serialising DXBC blobs.
+  - vkd3d_shader_free_dxbc() is used to free vkd3d_shader_dxbc_desc
+    structures, as returned by vkd3d_shader_parse_dxbc().
+  - The VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE compile option
+    can be used to specify whether SPIR-V shaders targeting Vulkan
+    environments should write point sizes for geometry and tessellation
+    shaders. If left unspecified, point sizes will be written.
