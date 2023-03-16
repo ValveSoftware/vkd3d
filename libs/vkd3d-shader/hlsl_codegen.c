@@ -1848,6 +1848,51 @@ static bool lower_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *co
     return true;
 }
 
+/* Lower ROUND using FRC, ROUND(x) -> ((x + 0.5) - FRC(x + 0.5)). */
+static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *arg, *neg, *sum, *frc, *replacement;
+    struct hlsl_type *type = instr->data_type;
+    unsigned int i, component_count;
+    struct hlsl_ir_constant *half;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+
+    expr = hlsl_ir_expr(instr);
+    arg = expr->operands[0].node;
+    if (expr->op != HLSL_OP1_ROUND)
+        return false;
+
+    if (!(half = hlsl_new_constant(ctx, type, &expr->node.loc)))
+        return false;
+
+    component_count = hlsl_type_component_count(type);
+    for (i = 0; i < component_count; ++i)
+        half->value[i].f = 0.5f;
+    list_add_before(&instr->entry, &half->node.entry);
+
+    if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg, &half->node)))
+        return false;
+    list_add_before(&instr->entry, &sum->entry);
+
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, sum, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &frc->entry);
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, frc, instr->loc)))
+        return false;
+    list_add_before(&instr->entry, &neg->entry);
+
+    if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, sum, neg)))
+        return false;
+    list_add_before(&instr->entry, &replacement->entry);
+
+    hlsl_replace_node(instr, replacement);
+    return true;
+}
+
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
@@ -3305,6 +3350,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         transform_ir(ctx, lower_division, body, NULL);
         transform_ir(ctx, lower_sqrt, body, NULL);
         transform_ir(ctx, lower_dot, body, NULL);
+        transform_ir(ctx, lower_round, body, NULL);
     }
 
     if (profile->major_version < 2)
