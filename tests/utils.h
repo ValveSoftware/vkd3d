@@ -35,6 +35,11 @@ struct vec4
     float x, y, z, w;
 };
 
+struct ivec4
+{
+    int x, y, z, w;
+};
+
 struct uvec4
 {
     unsigned int x, y, z, w;

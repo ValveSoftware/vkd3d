@@ -371,6 +371,58 @@ static void set_uniforms(struct shader_runner *runner, size_t offset, size_t cou
     memcpy(runner->uniforms + offset, uniforms, count * sizeof(*runner->uniforms));
 }
 
+static void read_int(const char **line, int *i)
+{
+    char *rest;
+    long val;
+
+    errno = 0;
+    val = strtol(*line, &rest, 0);
+
+    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+        fatal_error("Malformed int constant '%s'.\n", *line);
+
+    *i = val;
+    if (*i != val)
+        fatal_error("Out of range int constant '%.*s'.\n", (int)(rest - *line), *line);
+
+    *line = rest;
+}
+
+static void read_uint(const char **line, unsigned int *u)
+{
+    char *rest;
+    unsigned long val;
+
+    errno = 0;
+    val = strtoul(*line, &rest, 0);
+
+    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+        fatal_error("Malformed uint constant '%s'.\n", *line);
+
+    *u = val;
+    if (*u != val)
+        fatal_error("Out of range uint constant '%.*s'.\n", (int)(rest - *line), *line);
+
+    *line = rest;
+}
+
+static void read_int4(const char **line, struct ivec4 *v)
+{
+    read_int(line, &v->x);
+    read_int(line, &v->y);
+    read_int(line, &v->z);
+    read_int(line, &v->w);
+}
+
+static void read_uint4(const char **line, struct uvec4 *v)
+{
+    read_uint(line, &v->x);
+    read_uint(line, &v->y);
+    read_uint(line, &v->z);
+    read_uint(line, &v->w);
+}
+
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     char *rest;
@@ -590,28 +642,32 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed float constant '%s'.\n", line);
             set_uniforms(runner, offset, 1, &f);
         }
-        else if (match_string(line, "int4", &line) || match_string(line, "uint4", &line))
+        else if (match_string(line, "int4", &line))
         {
-            int v[4];
+            struct ivec4 v;
 
-            if (sscanf(line, "%i %i %i %i", &v[0], &v[1], &v[2], &v[3]) < 4)
-                fatal_error("Malformed (u)int4 constant '%s'.\n", line);
-            set_uniforms(runner, offset, 4, v);
+            read_int4(&line, &v);
+            set_uniforms(runner, offset, 4, &v);
+        }
+        else if (match_string(line, "uint4", &line))
+        {
+            struct uvec4 v;
+
+            read_uint4(&line, &v);
+            set_uniforms(runner, offset, 4, &v);
         }
         else if (match_string(line, "int", &line))
         {
             int i;
 
-            if (sscanf(line, "%i", &i) < 1)
-                fatal_error("Malformed int constant '%s'.\n", line);
+            read_int(&line, &i);
             set_uniforms(runner, offset, 1, &i);
         }
         else if (match_string(line, "uint", &line))
         {
             unsigned int u;
 
-            if (sscanf(line, "%u", &u) < 1)
-                fatal_error("Malformed uint constant '%s'.\n", line);
+            read_uint(&line, &u);
             set_uniforms(runner, offset, 1, &u);
         }
         else
