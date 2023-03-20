@@ -159,7 +159,7 @@ enum vkd3d_shader_compile_option_name
      * This option is supported by vkd3d_shader_compile() for the SPIR-V target
      * type and Vulkan targets; it should not be enabled otherwise.
      *
-     * \since 1.6
+     * \since 1.7
      */
     VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE = 0x00000006,
 
