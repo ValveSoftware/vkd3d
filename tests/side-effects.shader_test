@@ -1,0 +1,47 @@
+[pixel shader]
+float4 main() : sv_target
+{
+    float x[3] = {0, 2, 3};
+
+    return x[x[1] = 1];
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+[pixel shader]
+uint4 func(uint t)
+{
+    return uint4(t + 0, t + 1, t + 2, t + 3);
+}
+
+float4 main() : sv_target
+{
+    return func(10)[func(0).y];
+}
+
+[test]
+draw quad
+todo probe all rgba (11.0, 11.0, 11.0, 11.0)
+
+
+[pixel shader]
+float4 func(void)
+{
+    static uint i;
+
+    i += 1;
+
+    return float4(0.1, 0.2, 0.3, 0.4) + i;
+}
+
+float4 main() : sv_target
+{
+    return func()[func().x];
+}
+
+[test]
+draw quad
+todo probe all rgba (2.2, 2.2, 2.2, 2.2)
