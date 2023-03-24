@@ -5473,7 +5473,7 @@ postfix_expr:
         {
             struct hlsl_ir_node *array = node_from_list($1), *index = node_from_list($3);
 
-            list_move_tail($1, $3);
+            list_move_head($1, $3);
             vkd3d_free($3);
 
             if (!add_array_access(ctx, $1, array, index, &@2))
