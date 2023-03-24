@@ -23822,15 +23822,37 @@ static void test_query_pipeline_statistics(void)
     ID3D12Device *device;
     D3D12_QUERY_HEAP_DESC heap_desc;
     ID3D12QueryHeap *query_heap;
+    ID3D12PipelineState *pso;
     ID3D12Resource *resource;
     unsigned int pixel_count, i;
     HRESULT hr;
+
+    static const uint32_t ps_code[] =
+    {
+#if 0
+        float4 main(float4 pos : sv_position) : sv_target
+        {
+            return pos;
+        }
+#endif
+        0x43425844, 0xac408178, 0x2ca4213f, 0x4f2551e1, 0x1626b422, 0x00000001, 0x000000d8, 0x00000003,
+        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x00000f0f, 0x705f7673, 0x7469736f, 0x006e6f69,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x0000000f, 0x745f7673, 0x65677261, 0xabab0074, 0x52444853, 0x0000003c, 0x00000040,
+        0x0000000f, 0x04002064, 0x001010f2, 0x00000000, 0x00000001, 0x03000065, 0x001020f2, 0x00000000,
+        0x05000036, 0x001020f2, 0x00000000, 0x00101e46, 0x00000000, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
 
     if (!init_test_context(&context, NULL))
         return;
     device = context.device;
     command_list = context.list;
     queue = context.queue;
+
+    pso = create_pipeline_state(context.device,
+            context.root_signature, context.render_target_desc.Format, NULL, &ps, NULL);
 
     heap_desc.Type = D3D12_QUERY_HEAP_TYPE_PIPELINE_STATISTICS;
     heap_desc.Count = 2;
@@ -23853,7 +23875,7 @@ static void test_query_pipeline_statistics(void)
 
     ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
-    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
@@ -23907,6 +23929,7 @@ static void test_query_pipeline_statistics(void)
             pipeline_statistics->CSInvocations);
 
     release_resource_readback(&rb);
+    ID3D12PipelineState_Release(pso);
     ID3D12QueryHeap_Release(query_heap);
     ID3D12Resource_Release(resource);
     destroy_test_context(&context);
