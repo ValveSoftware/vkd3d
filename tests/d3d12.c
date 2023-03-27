@@ -2081,12 +2081,12 @@ done:
 static void test_create_placed_resource(void)
 {
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
+    ID3D12Resource *resource, *resource2;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
     D3D12_HEAP_DESC heap_desc;
-    ID3D12Resource *resource;
     ID3D12Heap *heap;
     unsigned int i;
     ULONG refcount;
@@ -2112,7 +2112,7 @@ static void test_create_placed_resource(void)
         return;
     }
 
-    heap_desc.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+    heap_desc.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT * 2;
     memset(&heap_desc.Properties, 0, sizeof(heap_desc.Properties));
     heap_desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
     heap_desc.Alignment = 0;
@@ -2181,7 +2181,21 @@ static void test_create_placed_resource(void)
             &IID_ID3D12Resource, (void **)&resource);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
 
+    /* Test heap peristence when its resource count is non-zero. */
+    hr = ID3D12Device_CreatePlacedResource(device, heap, 0,
+            &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource, (void **)&resource);
+    ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
     ID3D12Heap_Release(heap);
+    refcount = get_refcount(heap);
+    ok(!refcount, "Got unexpected refcount %u.\n", (unsigned int)refcount);
+
+    hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+            &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource, (void **)&resource2);
+    ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
+    ID3D12Resource_Release(resource);
+    ID3D12Resource_Release(resource2);
 
     for (i = 0; i < ARRAY_SIZE(invalid_buffer_desc_tests); ++i)
     {
