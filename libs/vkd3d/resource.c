@@ -346,10 +346,17 @@ static ULONG STDMETHODCALLTYPE d3d12_heap_Release(ID3D12Heap *iface)
 
     TRACE("%p decreasing refcount to %u.\n", heap, refcount);
 
-    if (!refcount)
+    /* A heap must not be destroyed until all contained resources are destroyed. */
+    if (!refcount && !heap->resource_count)
         d3d12_heap_destroy(heap);
 
     return refcount;
+}
+
+static void d3d12_heap_resource_destroyed(struct d3d12_heap *heap)
+{
+    if (!InterlockedDecrement(&heap->resource_count) && (!heap->refcount || heap->is_private))
+        d3d12_heap_destroy(heap);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_heap_GetPrivateData(ID3D12Heap *iface,
@@ -561,6 +568,7 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
 
     heap->ID3D12Heap_iface.lpVtbl = &d3d12_heap_vtbl;
     heap->refcount = 1;
+    heap->resource_count = 0;
 
     heap->is_private = !!resource;
 
@@ -628,6 +636,8 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
     heap->device = device;
     if (!heap->is_private)
         d3d12_device_add_ref(heap->device);
+    else
+        heap->resource_count = 1;
 
     return S_OK;
 }
@@ -1027,8 +1037,8 @@ static void d3d12_resource_destroy(struct d3d12_resource *resource, struct d3d12
     else
         VK_CALL(vkDestroyImage(device->vk_device, resource->u.vk_image, NULL));
 
-    if (resource->flags & VKD3D_RESOURCE_DEDICATED_HEAP)
-        d3d12_heap_destroy(resource->heap);
+    if (resource->heap)
+        d3d12_heap_resource_destroyed(resource->heap);
 }
 
 static ULONG d3d12_resource_incref(struct d3d12_resource *resource)
@@ -1941,6 +1951,7 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
     {
         resource->heap = heap;
         resource->heap_offset = heap_offset;
+        InterlockedIncrement(&heap->resource_count);
     }
     else
     {

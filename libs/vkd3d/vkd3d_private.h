@@ -563,6 +563,7 @@ struct d3d12_heap
 {
     ID3D12Heap ID3D12Heap_iface;
     LONG refcount;
+    LONG resource_count;
 
     bool is_private;
     D3D12_HEAP_DESC desc;
