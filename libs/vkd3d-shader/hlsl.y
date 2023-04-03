@@ -5743,7 +5743,16 @@ conditional_expr:
       logicor_expr
     | logicor_expr '?' expr ':' assignment_expr
         {
-            hlsl_fixme(ctx, &@$, "Ternary operator.");
+            struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_list($3), *second = node_from_list($5);
+
+            list_move_tail($1, $3);
+            list_move_tail($1, $5);
+            vkd3d_free($3);
+            vkd3d_free($5);
+
+            if (!hlsl_add_conditional(ctx, $1, cond, first, second))
+                YYABORT;
+            $$ = $1;
         }
 
 assignment_expr:

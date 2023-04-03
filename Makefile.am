@@ -116,6 +116,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-struct-array.shader_test \
 	tests/hlsl-struct-assignment.shader_test \
 	tests/hlsl-struct-semantics.shader_test \
+	tests/hlsl-ternary.shader_test \
 	tests/hlsl-transpose.shader_test \
 	tests/hlsl-type-names.shader_test \
 	tests/hlsl-vector-indexing.shader_test \
