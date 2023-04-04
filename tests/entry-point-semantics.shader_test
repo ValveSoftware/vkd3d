@@ -50,3 +50,155 @@ float4 main(float tex : bogus) : bogus;
 [test]
 draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
+
+
+[vertex shader todo]
+void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
+{
+    tex[0] = float4(10.0, 11.0, 12.0, 13.0);
+    tex[1] = float4(20.0, 21.0, 22.0, 23.0);
+    tex[2] = float4(30.0, 31.0, 32.0, 33.0);
+    tex[3] = float4(40.0, 41.0, 42.0, 43.0);
+}
+
+
+% Array parameters of non-struct elements must have a semantic.
+[pixel shader fail]
+float4 main(in float2 arr[2]) : sv_target
+{
+    return 0.0;
+}
+
+
+% Array elements with a semantic get successive indexes.
+[pixel shader todo]
+struct apple
+{
+    float3 tp[4] : TEXCOORD0;
+};
+
+float4 main(in apple a) : sv_target
+{
+    return float4(a.tp[0].x, a.tp[1].x, a.tp[2].x, a.tp[3].x);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
+
+
+% Arrays of matrices get successive indexes.
+[pixel shader todo]
+struct apple
+{
+    float4x2 tp[2] : TEXCOORD0;
+};
+
+float4 main(in apple a) : sv_target
+{
+    return float4(a.tp[0][0].x, a.tp[0][1].x, a.tp[1][0].x, a.tp[1][1].x);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
+
+
+% Arrays (even multi-dimensional) of struct elements are allowed. The fields in the different struct
+% elements get the same indexes.
+[pixel shader todo]
+struct apple
+{
+    float4 tc0 : TEXCOORD0;
+    float4 tc1 : TEXCOORD1;
+};
+
+float4 main(in apple aps[2][2]) : sv_target
+{
+    return float4(aps[0][0].tc0.x, aps[1][1].tc0.x, aps[0][0].tc1.x, aps[1][1].tc1.x);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (10.0, 10.0, 20.0, 20.0)
+
+
+[pixel shader todo]
+struct apple
+{
+    float4 tc0 : TEXCOORD0;
+};
+
+struct banana
+{
+    apple apl;
+    float4 tc1 : TEXCOORD1;
+};
+
+float4 main(in banana bans[2]) : sv_target
+{
+    return float4(bans[0].apl.tc0.xy, bans[1].tc1.xy);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+
+
+[pixel shader fail]
+struct apple
+{
+    float2 miss; // missing semantic.
+};
+
+struct banana
+{
+    apple apl[2];
+    float4 arb : UNUSED;
+};
+
+float4 main(in banana bans[2]) : sv_target
+{
+    return 0.0;
+}
+
+
+[vertex shader fail]
+struct apple
+{
+    float2 miss; // missing semantic.
+};
+
+struct banana
+{
+    apple apl[2];
+    float4 arb : UNUSED;
+};
+
+void main(out banana bans[2])
+{
+    return 0.0;
+}
+
+
+[vertex shader todo]
+struct apple
+{
+    float4 tex[2] : TEXCOORD0;
+};
+
+void main(out apple apl, inout float4 pos : sv_position)
+{
+    apl.tex[0] = float4(1, 2, 3, 4);
+    apl.tex[1] = float4(10, 20, 30, 40);
+}
+
+[pixel shader]
+float4 main(in float4 tex0 : TEXCOORD0, in float4 tex1 : TEXCOORD1) : sv_target
+{
+    return float4(tex0.xy, tex1.xy);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
