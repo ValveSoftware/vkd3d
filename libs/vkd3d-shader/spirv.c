@@ -1971,7 +1971,6 @@ struct vkd3d_symbol_register_data
     unsigned int structure_stride;
     unsigned int binding_base_idx;
     bool is_aggregate; /* An aggregate, i.e. a structure or an array. */
-    bool is_dynamically_indexed; /* If member_idx is a variable ID instead of a constant. */
 };
 
 struct vkd3d_symbol_resource_data
@@ -2064,7 +2063,7 @@ static void vkd3d_symbol_make_register(struct vkd3d_symbol *symbol,
     symbol->type = VKD3D_SYMBOL_REGISTER;
     memset(&symbol->key, 0, sizeof(symbol->key));
     symbol->key.reg.type = reg->type;
-    if (vkd3d_shader_register_is_input(reg) && reg->idx[1].offset != ~0u)
+    if ((vkd3d_shader_register_is_input(reg) || vkd3d_shader_register_is_output(reg)) && reg->idx[1].offset != ~0u)
         symbol->key.reg.idx = reg->idx[1].offset;
     else if (reg->type != VKD3DSPR_IMMCONSTBUFFER)
         symbol->key.reg.idx = reg->idx[0].offset;
@@ -2084,7 +2083,6 @@ static void vkd3d_symbol_set_register_info(struct vkd3d_symbol *symbol,
     symbol->info.reg.structure_stride = 0;
     symbol->info.reg.binding_base_idx = 0;
     symbol->info.reg.is_aggregate = false;
-    symbol->info.reg.is_dynamically_indexed = false;
 }
 
 static void vkd3d_symbol_make_resource(struct vkd3d_symbol *symbol,
@@ -3191,7 +3189,6 @@ struct vkd3d_shader_register_info
     unsigned int structure_stride;
     unsigned int binding_base_idx;
     bool is_aggregate;
-    bool is_dynamically_indexed;
 };
 
 static bool spirv_compiler_get_register_info(const struct spirv_compiler *compiler,
@@ -3214,7 +3211,6 @@ static bool spirv_compiler_get_register_info(const struct spirv_compiler *compil
         register_info->structure_stride = 0;
         register_info->binding_base_idx = 0;
         register_info->is_aggregate = false;
-        register_info->is_dynamically_indexed = false;
         return true;
     }
 
@@ -3236,7 +3232,6 @@ static bool spirv_compiler_get_register_info(const struct spirv_compiler *compil
     register_info->structure_stride = symbol->info.reg.structure_stride;
     register_info->binding_base_idx = symbol->info.reg.binding_base_idx;
     register_info->is_aggregate = symbol->info.reg.is_aggregate;
-    register_info->is_dynamically_indexed = symbol->info.reg.is_dynamically_indexed;
 
     return true;
 }
@@ -3381,17 +3376,8 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
             if (reg->idx[1].rel_addr)
                 FIXME("Relative addressing not implemented.\n");
 
-            if (register_info->is_dynamically_indexed)
-            {
-                indexes[index_count++] = vkd3d_spirv_build_op_load(builder,
-                        vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_INT, 1),
-                        register_info->member_idx, SpvMemoryAccessMaskNone);
-            }
-            else
-            {
-                reg_idx.offset = register_info->member_idx;
-                indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg_idx);
-            }
+            reg_idx.offset = register_info->member_idx;
+            indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg_idx);
         }
     }
     else
@@ -5110,12 +5096,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
                 use_private_variable ? VKD3D_SHADER_COMPONENT_FLOAT : component_type,
                 use_private_variable ? VKD3DSP_WRITEMASK_ALL : write_mask);
         reg_symbol.info.reg.is_aggregate = use_private_variable ? is_patch_constant : array_size;
-        if (!use_private_variable && is_in_control_point_phase(compiler))
-        {
-            reg_symbol.info.reg.member_idx = spirv_compiler_get_invocation_id(compiler);
-            reg_symbol.info.reg.is_dynamically_indexed = true;
-        }
-        else if (is_patch_constant)
+        if (is_patch_constant)
         {
             reg_symbol.info.reg.member_idx = reg->idx[0].offset;
         }
@@ -6487,7 +6468,6 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
         }
 
         memset(&reg, 0, sizeof(reg));
-        reg.idx[1].offset = ~0u;
 
         /* Fork and join phases share output registers (patch constants).
          * Control point phase has separate output registers. */
@@ -6502,6 +6482,7 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 
             reg.type = VKD3DSPR_OUTPUT;
             reg.idx[0].offset = e->register_index;
+            reg.idx[1].offset = ~0u;
             vkd3d_symbol_make_register(&reg_symbol, &reg);
             if ((entry = rb_get(&compiler->symbol_table, &reg_symbol)))
             {
@@ -9861,7 +9842,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL)
     {
         shader_normaliser_init(&normaliser, instructions);
-        result = shader_normaliser_flatten_hull_shader_phases(&normaliser);
+        if ((result = shader_normaliser_flatten_hull_shader_phases(&normaliser)) >= 0)
+            result = shader_normaliser_normalise_hull_shader_control_point_io(&normaliser);
         instructions = &normaliser.instructions;
 
         if (result >= 0 && TRACE_ON())
