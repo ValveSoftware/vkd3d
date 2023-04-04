@@ -1029,6 +1029,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             else if (!strcmp(line, "[vertex shader]\n"))
             {
                 state = STATE_SHADER_VERTEX;
+                expect_hr = S_OK;
             }
             else if (!strcmp(line, "[input layout]\n"))
             {
