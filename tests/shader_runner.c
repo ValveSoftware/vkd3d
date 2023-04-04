@@ -87,6 +87,7 @@ enum parse_state
     STATE_SHADER_PIXEL,
     STATE_SHADER_PIXEL_TODO,
     STATE_SHADER_VERTEX,
+    STATE_SHADER_VERTEX_TODO,
     STATE_TEST,
 };
 
@@ -824,7 +825,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_SHADER_VERTEX:
-                    compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
+                case STATE_SHADER_VERTEX_TODO:
+                    todo_if (state == STATE_SHADER_VERTEX_TODO)
+                        compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
                     shader_source = NULL;
@@ -1031,6 +1034,21 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 state = STATE_SHADER_VERTEX;
                 expect_hr = S_OK;
             }
+            else if (!strcmp(line, "[vertex shader todo]\n"))
+            {
+                state = STATE_SHADER_VERTEX_TODO;
+                expect_hr = S_OK;
+            }
+            else if (!strcmp(line, "[vertex shader fail]\n"))
+            {
+                state = STATE_SHADER_VERTEX;
+                expect_hr = E_FAIL;
+            }
+            else if (!strcmp(line, "[vertex shader fail todo]\n"))
+            {
+                state = STATE_SHADER_VERTEX_TODO;
+                expect_hr = E_FAIL;
+            }
             else if (!strcmp(line, "[input layout]\n"))
             {
                 state = STATE_INPUT_LAYOUT;
@@ -1061,6 +1079,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
                 case STATE_SHADER_VERTEX:
+                case STATE_SHADER_VERTEX_TODO:
                 {
                     size_t len = strlen(line);
 
