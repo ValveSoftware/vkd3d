@@ -1094,6 +1094,11 @@ static inline size_t bytecode_get_size(struct vkd3d_bytecode_buffer *buffer)
     return buffer->size;
 }
 
+static inline size_t bytecode_get_next_offset(struct vkd3d_bytecode_buffer *buffer)
+{
+    return align(buffer->size, 4);
+}
+
 uint32_t vkd3d_parse_integer(const char *s);
 
 struct vkd3d_shader_message_context

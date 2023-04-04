@@ -57,7 +57,7 @@ int vkd3d_shader_serialize_dxbc(size_t section_count, const struct vkd3d_shader_
 
     put_u32(&buffer, TAG_DXBC);
 
-    checksum_position = bytecode_get_size(&buffer);
+    checksum_position = bytecode_get_next_offset(&buffer);
     for (i = 0; i < 4; ++i)
         put_u32(&buffer, 0);
 
@@ -65,13 +65,13 @@ int vkd3d_shader_serialize_dxbc(size_t section_count, const struct vkd3d_shader_
     size_position = put_u32(&buffer, 0);
     put_u32(&buffer, section_count);
 
-    offsets_position = bytecode_get_size(&buffer);
+    offsets_position = bytecode_get_next_offset(&buffer);
     for (i = 0; i < section_count; ++i)
         put_u32(&buffer, 0);
 
     for (i = 0; i < section_count; ++i)
     {
-        set_u32(&buffer, offsets_position + i * sizeof(uint32_t), bytecode_get_size(&buffer));
+        set_u32(&buffer, offsets_position + i * sizeof(uint32_t), bytecode_get_next_offset(&buffer));
         put_u32(&buffer, sections[i].tag);
         put_u32(&buffer, sections[i].data.size);
         bytecode_put_bytes(&buffer, sections[i].data.code, sections[i].data.size);
@@ -2754,7 +2754,7 @@ struct root_signature_writer_context
 
 static size_t get_chunk_offset(struct root_signature_writer_context *context)
 {
-    return bytecode_get_size(&context->buffer) - context->chunk_position;
+    return bytecode_get_next_offset(&context->buffer) - context->chunk_position;
 }
 
 static void shader_write_root_signature_header(struct root_signature_writer_context *context)
@@ -2770,10 +2770,10 @@ static void shader_write_root_signature_header(struct root_signature_writer_cont
     put_u32(buffer, 1);
     context->total_size_position = put_u32(buffer, 0xffffffff);
     put_u32(buffer, 1); /* chunk count */
-    put_u32(buffer, bytecode_get_size(buffer) + sizeof(uint32_t)); /* chunk offset */
+    put_u32(buffer, bytecode_get_next_offset(buffer) + sizeof(uint32_t)); /* chunk offset */
     put_u32(buffer, TAG_RTS0);
     put_u32(buffer, 0xffffffff);
-    context->chunk_position = bytecode_get_size(buffer);
+    context->chunk_position = bytecode_get_next_offset(buffer);
 }
 
 static void shader_write_descriptor_ranges(struct vkd3d_bytecode_buffer *buffer,
@@ -2862,7 +2862,7 @@ static int shader_write_root_parameters(struct root_signature_writer_context *co
     size_t parameters_position;
     unsigned int i;
 
-    parameters_position = bytecode_get_size(buffer);
+    parameters_position = bytecode_get_next_offset(buffer);
     for (i = 0; i < parameter_count; ++i)
     {
         put_u32(buffer, versioned_root_signature_get_parameter_type(desc, i));

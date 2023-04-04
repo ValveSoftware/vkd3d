@@ -261,7 +261,7 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
             write_sm1_type(buffer, field->type, ctab_start);
         }
 
-        fields_offset = bytecode_get_size(buffer) - ctab_start;
+        fields_offset = bytecode_get_next_offset(buffer) - ctab_start;
 
         for (i = 0; i < field_count; ++i)
         {
@@ -351,7 +351,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     put_u32(buffer, 0); /* FIXME: flags */
     put_u32(buffer, 0); /* FIXME: target string */
 
-    vars_start = bytecode_get_size(buffer);
+    vars_start = bytecode_get_next_offset(buffer);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -402,7 +402,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
     offset = put_string(buffer, vkd3d_shader_get_version(NULL, NULL));
     set_u32(buffer, creator_offset, offset - ctab_start);
 
-    ctab_end = bytecode_get_size(buffer);
+    ctab_end = bytecode_get_next_offset(buffer);
     set_u32(buffer, size_offset, vkd3d_make_u32(D3DSIO_COMMENT, (ctab_end - ctab_offset) / sizeof(uint32_t)));
 }
 
