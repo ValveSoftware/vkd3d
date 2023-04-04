@@ -1401,10 +1401,54 @@ void vkd3d_shader_free_root_signature(struct vkd3d_shader_versioned_root_signatu
     desc->version = 0;
 }
 
+static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_signature *signature,
+        const struct shader_signature *src)
+{
+    unsigned int i;
+
+    signature->element_count = src->element_count;
+    if (!src->elements)
+    {
+        assert(!signature->element_count);
+        signature->elements = NULL;
+        return true;
+    }
+
+    if (!(signature->elements = vkd3d_calloc(signature->element_count, sizeof(*signature->elements))))
+        return false;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        struct vkd3d_shader_signature_element *d = &signature->elements[i];
+        struct signature_element *e = &src->elements[i];
+
+        d->semantic_name = e->semantic_name;
+        d->semantic_index = e->semantic_index;
+        d->stream_index = e->stream_index;
+        d->sysval_semantic = e->sysval_semantic;
+        d->component_type = e->component_type;
+        d->register_index = e->register_index;
+        if (e->register_count > 1)
+            FIXME("Arrayed elements are not supported yet.\n");
+        d->mask = e->mask;
+        d->used_mask = e->used_mask;
+        d->min_precision = e->min_precision;
+    }
+
+    return true;
+}
+
+void shader_signature_cleanup(struct shader_signature *signature)
+{
+    vkd3d_free(signature->elements);
+    signature->elements = NULL;
+}
+
 int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_signature *signature, char **messages)
 {
     struct vkd3d_shader_message_context message_context;
+    struct shader_signature shader_signature;
     int ret;
 
     TRACE("dxbc {%p, %zu}, signature %p, messages %p.\n", dxbc->code, dxbc->size, signature, messages);
@@ -1413,13 +1457,17 @@ int vkd3d_shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         *messages = NULL;
     vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
 
-    ret = shader_parse_input_signature(dxbc, &message_context, signature);
+    ret = shader_parse_input_signature(dxbc, &message_context, &shader_signature);
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages))
         ret = VKD3D_ERROR_OUT_OF_MEMORY;
 
     vkd3d_shader_message_context_cleanup(&message_context);
 
+    if (!vkd3d_shader_signature_from_shader_signature(signature, &shader_signature))
+        ret = VKD3D_ERROR_OUT_OF_MEMORY;
+
+    shader_signature_cleanup(&shader_signature);
     return ret;
 }
 

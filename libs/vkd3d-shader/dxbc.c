@@ -322,12 +322,12 @@ int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
 }
 
 static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *section,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *s)
+        struct vkd3d_shader_message_context *message_context, struct shader_signature *s)
 {
     bool has_stream_index, has_min_precision;
-    struct vkd3d_shader_signature_element *e;
     const char *data = section->data.code;
     uint32_t count, header_size;
+    struct signature_element *e;
     const char *ptr = data;
     unsigned int i;
 
@@ -389,6 +389,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
         read_dword(&ptr, &e[i].sysval_semantic);
         read_dword(&ptr, &e[i].component_type);
         read_dword(&ptr, &e[i].register_index);
+        e[i].register_count = 1;
         read_dword(&ptr, &mask);
         e[i].mask = mask & 0xff;
         e[i].used_mask = (mask >> 8) & 0xff;
@@ -423,7 +424,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
 static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section,
         struct vkd3d_shader_message_context *message_context, void *ctx)
 {
-    struct vkd3d_shader_signature *is = ctx;
+    struct shader_signature *is = ctx;
 
     if (section->tag != TAG_ISGN)
         return VKD3D_OK;
@@ -431,13 +432,13 @@ static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section,
     if (is->elements)
     {
         FIXME("Multiple input signatures.\n");
-        vkd3d_shader_free_shader_signature(is);
+        shader_signature_cleanup(is);
     }
     return shader_parse_signature(section, message_context, is);
 }
 
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *signature)
+        struct vkd3d_shader_message_context *message_context, struct shader_signature *signature)
 {
     int ret;
 
@@ -516,9 +517,9 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section,
 
 void free_shader_desc(struct vkd3d_shader_desc *desc)
 {
-    vkd3d_shader_free_shader_signature(&desc->input_signature);
-    vkd3d_shader_free_shader_signature(&desc->output_signature);
-    vkd3d_shader_free_shader_signature(&desc->patch_constant_signature);
+    shader_signature_cleanup(&desc->input_signature);
+    shader_signature_cleanup(&desc->output_signature);
+    shader_signature_cleanup(&desc->patch_constant_signature);
 }
 
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,

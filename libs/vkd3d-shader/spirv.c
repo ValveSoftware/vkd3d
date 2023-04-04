@@ -2243,9 +2243,9 @@ struct spirv_compiler
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
 
     bool after_declarations_section;
-    const struct vkd3d_shader_signature *input_signature;
-    const struct vkd3d_shader_signature *output_signature;
-    const struct vkd3d_shader_signature *patch_constant_signature;
+    const struct shader_signature *input_signature;
+    const struct shader_signature *output_signature;
+    const struct shader_signature *patch_constant_signature;
     const struct vkd3d_shader_transform_feedback_info *xfb_info;
     struct vkd3d_shader_output_info
     {
@@ -2329,8 +2329,8 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
         const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
 {
-    const struct vkd3d_shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
-    const struct vkd3d_shader_signature *output_signature = &shader_desc->output_signature;
+    const struct shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
+    const struct shader_signature *output_signature = &shader_desc->output_signature;
     const struct vkd3d_shader_interface_info *shader_interface;
     const struct vkd3d_shader_descriptor_offset_info *offset_info;
     const struct vkd3d_shader_spirv_target_info *target_info;
@@ -4258,8 +4258,8 @@ static const struct vkd3d_spirv_builtin *vkd3d_get_spirv_builtin(const struct sp
     return NULL;
 }
 
-static const struct vkd3d_shader_signature_element *vkd3d_find_signature_element_for_reg(
-        const struct vkd3d_shader_signature *signature, unsigned int *signature_element_index,
+static const struct signature_element *vkd3d_find_signature_element_for_reg(
+        const struct shader_signature *signature, unsigned int *signature_element_index,
         unsigned int reg_idx, DWORD write_mask)
 {
     unsigned int signature_idx;
@@ -4342,7 +4342,7 @@ static const struct vkd3d_shader_phase *spirv_compiler_get_current_shader_phase(
 }
 
 static void spirv_compiler_decorate_xfb_output(struct spirv_compiler *compiler,
-        uint32_t id, unsigned int component_count, const struct vkd3d_shader_signature_element *signature_element)
+        uint32_t id, unsigned int component_count, const struct signature_element *signature_element)
 {
     const struct vkd3d_shader_transform_feedback_info *xfb_info = compiler->xfb_info;
     const struct vkd3d_shader_transform_feedback_element *xfb_element;
@@ -4423,7 +4423,7 @@ static uint32_t spirv_compiler_emit_builtin_variable(struct spirv_compiler *comp
     return id;
 }
 
-static bool needs_private_io_variable(const struct vkd3d_shader_signature *signature,
+static bool needs_private_io_variable(const struct shader_signature *signature,
         unsigned int reg_idx, const struct vkd3d_spirv_builtin *builtin,
         unsigned int *component_count, unsigned int *out_write_mask)
 {
@@ -4443,7 +4443,7 @@ static bool needs_private_io_variable(const struct vkd3d_shader_signature *signa
 
     for (i = 0, count = 0; i < signature->element_count; ++i)
     {
-        const struct vkd3d_shader_signature_element *current = &signature->elements[i];
+        const struct signature_element *current = &signature->elements[i];
 
         if (current->register_index != reg_idx)
             continue;
@@ -4478,10 +4478,10 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         enum vkd3d_shader_interpolation_mode interpolation_mode)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_signature_element *signature_element;
-    const struct vkd3d_shader_signature *shader_signature;
     const struct vkd3d_shader_register *reg = &dst->reg;
     unsigned int component_idx, input_component_count;
+    const struct signature_element *signature_element;
+    const struct shader_signature *shader_signature;
     enum vkd3d_shader_component_type component_type;
     uint32_t type_id, ptr_type_id, float_type_id;
     const struct vkd3d_spirv_builtin *builtin;
@@ -4786,8 +4786,7 @@ static bool is_dual_source_blending(const struct spirv_compiler *compiler)
     return compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL && info && info->dual_source_blending;
 }
 
-static void calculate_clip_or_cull_distance_mask(const struct vkd3d_shader_signature_element *e,
-        uint32_t *mask)
+static void calculate_clip_or_cull_distance_mask(const struct signature_element *e, uint32_t *mask)
 {
     if (e->semantic_index >= sizeof(*mask) * CHAR_BIT / VKD3D_VEC4_SIZE)
     {
@@ -4799,11 +4798,11 @@ static void calculate_clip_or_cull_distance_mask(const struct vkd3d_shader_signa
 }
 
 static uint32_t calculate_sysval_array_mask(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_signature *signature, enum vkd3d_shader_input_sysval_semantic sysval)
+        const struct shader_signature *signature, enum vkd3d_shader_input_sysval_semantic sysval)
 {
-    const struct vkd3d_shader_signature_element *e;
     const struct vkd3d_spirv_builtin *sig_builtin;
     const struct vkd3d_spirv_builtin *builtin;
+    const struct signature_element *e;
     uint32_t signature_idx, mask = 0;
 
     if (!(builtin = get_spirv_builtin_for_sysval(compiler, sysval)))
@@ -4829,7 +4828,7 @@ static uint32_t calculate_sysval_array_mask(struct spirv_compiler *compiler,
 /* Emits arrayed SPIR-V built-in variables. */
 static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *compiler)
 {
-    const struct vkd3d_shader_signature *output_signature = compiler->output_signature;
+    const struct shader_signature *output_signature = compiler->output_signature;
     uint32_t clip_distance_mask = 0, clip_distance_id = 0;
     uint32_t cull_distance_mask = 0, cull_distance_id = 0;
     const struct vkd3d_spirv_builtin *builtin;
@@ -4837,7 +4836,7 @@ static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *
 
     for (i = 0; i < output_signature->element_count; ++i)
     {
-        const struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
+        const struct signature_element *e = &output_signature->elements[i];
 
         switch (e->sysval_semantic)
         {
@@ -4872,7 +4871,7 @@ static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *
 
     for (i = 0; i < output_signature->element_count; ++i)
     {
-        const struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
+        const struct signature_element *e = &output_signature->elements[i];
 
         switch (e->sysval_semantic)
         {
@@ -4956,11 +4955,11 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
         const struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_input_sysval_semantic sysval)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_signature_element *signature_element;
-    const struct vkd3d_shader_signature *shader_signature;
     const struct vkd3d_shader_register *reg = &dst->reg;
     unsigned int component_idx, output_component_count;
+    const struct signature_element *signature_element;
     enum vkd3d_shader_component_type component_type;
+    const struct shader_signature *shader_signature;
     const struct vkd3d_spirv_builtin *builtin;
     struct vkd3d_symbol *symbol = NULL;
     bool use_private_variable = false;
@@ -5123,7 +5122,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 }
 
 static uint32_t spirv_compiler_get_output_array_index(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_signature_element *e)
+        const struct signature_element *e)
 {
     enum vkd3d_shader_input_sysval_semantic sysval;
     const struct vkd3d_spirv_builtin *builtin;
@@ -5142,14 +5141,14 @@ static uint32_t spirv_compiler_get_output_array_index(struct spirv_compiler *com
 }
 
 static void spirv_compiler_emit_store_shader_output(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_signature *signature, const struct vkd3d_shader_signature_element *output,
+        const struct shader_signature *signature, const struct signature_element *output,
         const struct vkd3d_shader_output_info *output_info,
         uint32_t output_index_id, uint32_t val_id, unsigned int write_mask)
 {
     unsigned int dst_write_mask, use_mask, uninit_mask, swizzle, mask;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, zero_id, ptr_type_id, chain_id, object_id;
-    const struct vkd3d_shader_signature_element *element;
+    const struct signature_element *element;
     unsigned int i, index, array_idx;
     uint32_t output_id;
 
@@ -5238,7 +5237,7 @@ static void spirv_compiler_emit_shader_epilogue_function(struct spirv_compiler *
     uint32_t param_type_id[MAX_REG_OUTPUT + 1], param_id[MAX_REG_OUTPUT + 1] = {0};
     uint32_t void_id, type_id, ptr_type_id, function_type_id, function_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_signature *signature;
+    const struct shader_signature *signature;
     uint32_t output_index_id = 0;
     bool is_patch_constant;
     unsigned int i, count;
@@ -5323,7 +5322,7 @@ static void spirv_compiler_emit_hull_shader_builtins(struct spirv_compiler *comp
 
 static void spirv_compiler_emit_hull_shader_patch_constants(struct spirv_compiler *compiler)
 {
-    const struct vkd3d_shader_signature *signature = compiler->patch_constant_signature;
+    const struct shader_signature *signature = compiler->patch_constant_signature;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t register_count = 0;
     unsigned int signature_idx;
@@ -6446,7 +6445,7 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
 
 static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 {
-    const struct vkd3d_shader_signature *signature = compiler->output_signature;
+    const struct shader_signature *signature = compiler->output_signature;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_symbol reg_symbol, *symbol;
     struct vkd3d_shader_register reg;
@@ -6485,7 +6484,7 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 
         for (i = 0; i < signature->element_count; ++i)
         {
-            const struct vkd3d_shader_signature_element *e = &signature->elements[i];
+            const struct signature_element *e = &signature->elements[i];
 
             reg.type = VKD3DSPR_OUTPUT;
             reg.idx[0].offset = e->register_index;
@@ -6548,8 +6547,8 @@ static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
 
 static void spirv_compiler_emit_default_control_point_phase(struct spirv_compiler *compiler)
 {
-    const struct vkd3d_shader_signature *output_signature = compiler->output_signature;
-    const struct vkd3d_shader_signature *input_signature = compiler->input_signature;
+    const struct shader_signature *output_signature = compiler->output_signature;
+    const struct shader_signature *input_signature = compiler->input_signature;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     enum vkd3d_shader_component_type component_type;
     struct vkd3d_shader_src_param invocation;
@@ -6580,8 +6579,8 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
     assert(input_signature->element_count == output_signature->element_count);
     for (i = 0; i < output_signature->element_count; ++i)
     {
-        const struct vkd3d_shader_signature_element *output = &output_signature->elements[i];
-        const struct vkd3d_shader_signature_element *input = &input_signature->elements[i];
+        const struct signature_element *output = &output_signature->elements[i];
+        const struct signature_element *input = &input_signature->elements[i];
 
         assert(input->mask == output->mask);
         assert(input->component_type == output->component_type);

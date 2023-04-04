@@ -775,13 +775,35 @@ enum vkd3d_shader_input_sysval_semantic
     VKD3D_SIV_LINE_DENSITY_TESS_FACTOR     = 22,
 };
 
+struct signature_element
+{
+    const char *semantic_name;
+    unsigned int semantic_index;
+    unsigned int stream_index;
+    enum vkd3d_shader_sysval_semantic sysval_semantic;
+    enum vkd3d_shader_component_type component_type;
+    unsigned int register_index;
+    unsigned int register_count;
+    unsigned int mask;
+    unsigned int used_mask;
+    enum vkd3d_shader_minimum_precision min_precision;
+};
+
+struct shader_signature
+{
+    struct signature_element *elements;
+    unsigned int element_count;
+};
+
+void shader_signature_cleanup(struct shader_signature *signature);
+
 struct vkd3d_shader_desc
 {
     const uint32_t *byte_code;
     size_t byte_code_size;
-    struct vkd3d_shader_signature input_signature;
-    struct vkd3d_shader_signature output_signature;
-    struct vkd3d_shader_signature patch_constant_signature;
+    struct shader_signature input_signature;
+    struct shader_signature output_signature;
+    struct shader_signature patch_constant_signature;
 };
 
 struct vkd3d_shader_register_semantic
@@ -1136,7 +1158,7 @@ void free_shader_desc(struct vkd3d_shader_desc *desc);
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_signature *signature);
+        struct vkd3d_shader_message_context *message_context, struct shader_signature *signature);
 
 struct vkd3d_glsl_generator;
 
@@ -1350,7 +1372,7 @@ void shader_normaliser_init(struct vkd3d_shader_normaliser *normaliser,
         struct vkd3d_shader_instruction_array *instructions);
 enum vkd3d_result shader_normaliser_flatten_hull_shader_phases(struct vkd3d_shader_normaliser *normaliser);
 enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
-        const struct vkd3d_shader_signature *input_signature);
+        const struct shader_signature *input_signature);
 void shader_normaliser_destroy(struct vkd3d_shader_normaliser *normaliser);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */

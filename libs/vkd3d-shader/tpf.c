@@ -2060,7 +2060,7 @@ static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
 };
 
 static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code,
-        size_t byte_code_size, const char *source_name, const struct vkd3d_shader_signature *output_signature,
+        size_t byte_code_size, const char *source_name, const struct shader_signature *output_signature,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_version version;
@@ -2128,7 +2128,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
     for (i = 0; i < output_signature->element_count; ++i)
     {
-        struct vkd3d_shader_signature_element *e = &output_signature->elements[i];
+        struct signature_element *e = &output_signature->elements[i];
 
         if (version.type == VKD3D_SHADER_TYPE_PIXEL
                 && ascii_strcasecmp(e->semantic_name, "SV_Target"))

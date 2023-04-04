@@ -320,7 +320,7 @@ static bool shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param 
 }
 
 static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param,
-        const struct vkd3d_shader_signature_element *e, enum vkd3d_shader_register_type reg_type)
+        const struct signature_element *e, enum vkd3d_shader_register_type reg_type)
 {
     param->write_mask = e->mask;
     param->modifiers = 0;
@@ -329,11 +329,11 @@ static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param,
 }
 
 static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_normaliser *normaliser,
-        const struct vkd3d_shader_signature *s, unsigned int input_control_point_count, unsigned int dst)
+        const struct shader_signature *s, unsigned int input_control_point_count, unsigned int dst)
 {
-    const struct vkd3d_shader_signature_element *e;
     struct vkd3d_shader_instruction *ins;
     struct vkd3d_shader_dst_param *param;
+    const struct signature_element *e;
     unsigned int i, count;
 
     for (i = 0, count = 1; i < s->element_count; ++i)
@@ -380,7 +380,7 @@ static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_nor
 }
 
 enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
-        const struct vkd3d_shader_signature *input_signature)
+        const struct shader_signature *input_signature)
 {
     struct vkd3d_shader_instruction_array *instructions = &normaliser->instructions;
     unsigned int input_control_point_count;
