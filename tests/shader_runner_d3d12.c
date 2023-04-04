@@ -524,7 +524,8 @@ void run_shader_tests_d3d12(void)
 
     enable_d3d12_debug_layer();
     init_adapter_info();
-    init_test_context(&runner.test_context, &desc);
+    if (!init_test_context(&runner.test_context, &desc))
+        return;
     device = runner.test_context.device;
 
     runner.compute_queue = create_command_queue(device,
