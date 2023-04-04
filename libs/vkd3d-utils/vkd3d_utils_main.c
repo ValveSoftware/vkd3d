@@ -85,7 +85,7 @@ HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL minim
     return vkd3d_create_device(&device_create_info, iid, device);
 }
 
-HRESULT WINAPI D3D12CreateDevice(IUnknown *adapter,
+VKD3D_UTILS_API HRESULT WINAPI D3D12CreateDevice(IUnknown *adapter,
         D3D_FEATURE_LEVEL minimum_feature_level, REFIID iid, void **device)
 {
     return D3D12CreateDeviceVKD3D(adapter, minimum_feature_level, iid, device, VKD3D_API_VERSION_1_0);
