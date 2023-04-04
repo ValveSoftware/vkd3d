@@ -1581,6 +1581,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
 
     switch (dst_type->base_type)
     {
+        case HLSL_TYPE_HALF:
         case HLSL_TYPE_FLOAT:
             switch (src_type->base_type)
             {
@@ -1660,10 +1661,6 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
                 default:
                     vkd3d_unreachable();
             }
-            break;
-
-        case HLSL_TYPE_HALF:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to half.");
             break;
 
         case HLSL_TYPE_DOUBLE:
