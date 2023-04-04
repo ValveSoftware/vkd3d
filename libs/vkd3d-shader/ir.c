@@ -319,9 +319,71 @@ static bool shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param 
     return true;
 }
 
-enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser)
+static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param,
+        const struct vkd3d_shader_signature_element *e, enum vkd3d_shader_register_type reg_type)
+{
+    param->write_mask = e->mask;
+    param->modifiers = 0;
+    param->shift = 0;
+    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type));
+}
+
+static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_normaliser *normaliser,
+        const struct vkd3d_shader_signature *s, unsigned int input_control_point_count, unsigned int dst)
+{
+    const struct vkd3d_shader_signature_element *e;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_dst_param *param;
+    unsigned int i, count;
+
+    for (i = 0, count = 1; i < s->element_count; ++i)
+        count += !!s->elements[i].used_mask;
+
+    if (!shader_instruction_array_reserve(&normaliser->instructions, normaliser->instructions.count + count))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    memmove(&normaliser->instructions.elements[dst + count], &normaliser->instructions.elements[dst],
+            (normaliser->instructions.count - dst) * sizeof(*normaliser->instructions.elements));
+    normaliser->instructions.count += count;
+
+    ins = &normaliser->instructions.elements[dst];
+    shader_instruction_init(ins, VKD3DSIH_HS_CONTROL_POINT_PHASE);
+    ins->flags = 1;
+    ++ins;
+
+    for (i = 0; i < s->element_count; ++i)
+    {
+        e = &s->elements[i];
+        if (!e->used_mask)
+            continue;
+
+        if (e->sysval_semantic != VKD3D_SHADER_SV_NONE)
+        {
+            shader_instruction_init(ins, VKD3DSIH_DCL_INPUT_SIV);
+            param = &ins->declaration.register_semantic.reg;
+            ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
+        }
+        else
+        {
+            shader_instruction_init(ins, VKD3DSIH_DCL_INPUT);
+            param = &ins->declaration.dst;
+        }
+
+        shader_dst_param_io_init(param, e, VKD3DSPR_INPUT);
+        param->reg.idx[0].offset = input_control_point_count;
+        param->reg.idx[1].offset = i;
+
+        ++ins;
+    }
+
+    return VKD3D_OK;
+}
+
+enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
+        const struct vkd3d_shader_signature *input_signature)
 {
     struct vkd3d_shader_instruction_array *instructions = &normaliser->instructions;
+    unsigned int input_control_point_count;
     struct vkd3d_shader_instruction *ins;
     unsigned int i, j;
 
@@ -352,6 +414,28 @@ enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struc
                             normaliser))
                         return VKD3D_ERROR_INVALID_ARGUMENT;
                 }
+                break;
+        }
+    }
+
+    normaliser->phase = VKD3DSIH_INVALID;
+    input_control_point_count = 1;
+
+    for (i = 0; i < instructions->count; ++i)
+    {
+        ins = &instructions->elements[i];
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_DCL_INPUT_CONTROL_POINT_COUNT:
+                input_control_point_count = ins->declaration.count;
+                break;
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+                return VKD3D_OK;
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                return shader_normaliser_emit_hs_input(normaliser, input_signature, input_control_point_count, i);
+            default:
                 break;
         }
     }

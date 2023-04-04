@@ -1202,6 +1202,14 @@ static inline enum vkd3d_data_type vkd3d_data_type_from_component_type(
     }
 }
 
+enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d_shader_sysval_semantic sysval,
+        unsigned int index);
+
+static inline enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval(enum vkd3d_shader_sysval_semantic sysval)
+{
+    return vkd3d_siv_from_sysval_indexed(sysval, 0);
+}
+
 static inline unsigned int vkd3d_write_mask_get_component_idx(DWORD write_mask)
 {
     unsigned int i;
@@ -1340,7 +1348,8 @@ struct vkd3d_shader_normaliser
 void shader_normaliser_init(struct vkd3d_shader_normaliser *normaliser,
         struct vkd3d_shader_instruction_array *instructions);
 enum vkd3d_result shader_normaliser_flatten_hull_shader_phases(struct vkd3d_shader_normaliser *normaliser);
-enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser);
+enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
+        const struct vkd3d_shader_signature *input_signature);
 void shader_normaliser_destroy(struct vkd3d_shader_normaliser *normaliser);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */
