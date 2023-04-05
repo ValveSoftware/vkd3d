@@ -2743,7 +2743,7 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     compute_liveness_recurse(&entry_func->body, 0, 0);
 }
 
-struct liveness
+struct register_allocator
 {
     size_t size;
     uint32_t reg_count;
@@ -2754,14 +2754,14 @@ struct liveness
     } *regs;
 };
 
-static unsigned int get_available_writemask(struct liveness *liveness,
+static unsigned int get_available_writemask(struct register_allocator *allocator,
         unsigned int first_write, unsigned int component_idx, unsigned int reg_size)
 {
     unsigned int i, writemask = 0, count = 0;
 
     for (i = 0; i < 4; ++i)
     {
-        if (liveness->regs[component_idx + i].last_read <= first_write)
+        if (allocator->regs[component_idx + i].last_read <= first_write)
         {
             writemask |= 1u << i;
             if (++count == reg_size)
@@ -2772,22 +2772,22 @@ static unsigned int get_available_writemask(struct liveness *liveness,
     return 0;
 }
 
-static bool resize_liveness(struct hlsl_ctx *ctx, struct liveness *liveness, size_t new_count)
+static bool resize_liveness(struct hlsl_ctx *ctx, struct register_allocator *allocator, size_t new_count)
 {
-    size_t old_capacity = liveness->size;
+    size_t old_capacity = allocator->size;
 
-    if (!hlsl_array_reserve(ctx, (void **)&liveness->regs, &liveness->size, new_count, sizeof(*liveness->regs)))
+    if (!hlsl_array_reserve(ctx, (void **)&allocator->regs, &allocator->size, new_count, sizeof(*allocator->regs)))
         return false;
 
-    if (liveness->size > old_capacity)
-        memset(liveness->regs + old_capacity, 0, (liveness->size - old_capacity) * sizeof(*liveness->regs));
+    if (allocator->size > old_capacity)
+        memset(allocator->regs + old_capacity, 0, (allocator->size - old_capacity) * sizeof(*allocator->regs));
     return true;
 }
 
 /* reg_size is the number of register components to be reserved, while component_count is the number
  * of components for the register's writemask. In SM1, floats and vectors allocate the whole
  * register, even if they don't use it completely. */
-static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *liveness,
+static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_allocator *allocator,
         unsigned int first_write, unsigned int last_read, unsigned int reg_size,
         unsigned int component_count)
 {
@@ -2796,74 +2796,74 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct liveness *
 
     assert(component_count <= reg_size);
 
-    for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
+    for (component_idx = 0; component_idx < allocator->size; component_idx += 4)
     {
-        if ((writemask = get_available_writemask(liveness, first_write, component_idx, reg_size)))
+        if ((writemask = get_available_writemask(allocator, first_write, component_idx, reg_size)))
             break;
     }
-    if (component_idx == liveness->size)
+    if (component_idx == allocator->size)
     {
-        if (!resize_liveness(ctx, liveness, component_idx + 4))
+        if (!resize_liveness(ctx, allocator, component_idx + 4))
             return ret;
         writemask = (1u << reg_size) - 1;
     }
     for (i = 0; i < 4; ++i)
     {
         if (writemask & (1u << i))
-            liveness->regs[component_idx + i].last_read = last_read;
+            allocator->regs[component_idx + i].last_read = last_read;
     }
     ret.id = component_idx / 4;
     ret.writemask = hlsl_combine_writemasks(writemask, (1u << component_count) - 1);
     ret.allocated = true;
-    liveness->reg_count = max(liveness->reg_count, ret.id + 1);
+    allocator->reg_count = max(allocator->reg_count, ret.id + 1);
     return ret;
 }
 
-static bool is_range_available(struct liveness *liveness, unsigned int first_write,
+static bool is_range_available(struct register_allocator *allocator, unsigned int first_write,
         unsigned int component_idx, unsigned int reg_size)
 {
     unsigned int i;
 
     for (i = 0; i < reg_size; i += 4)
     {
-        if (!get_available_writemask(liveness, first_write, component_idx + i, 4))
+        if (!get_available_writemask(allocator, first_write, component_idx + i, 4))
             return false;
     }
     return true;
 }
 
-static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct liveness *liveness,
+static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allocator *allocator,
         unsigned int first_write, unsigned int last_read, unsigned int reg_size)
 {
     unsigned int i, component_idx;
     struct hlsl_reg ret = {0};
 
-    for (component_idx = 0; component_idx < liveness->size; component_idx += 4)
+    for (component_idx = 0; component_idx < allocator->size; component_idx += 4)
     {
-        if (is_range_available(liveness, first_write, component_idx,
-                min(reg_size, liveness->size - component_idx)))
+        if (is_range_available(allocator, first_write, component_idx,
+                min(reg_size, allocator->size - component_idx)))
             break;
     }
-    if (!resize_liveness(ctx, liveness, component_idx + reg_size))
+    if (!resize_liveness(ctx, allocator, component_idx + reg_size))
         return ret;
 
     for (i = 0; i < reg_size; ++i)
-        liveness->regs[component_idx + i].last_read = last_read;
+        allocator->regs[component_idx + i].last_read = last_read;
     ret.id = component_idx / 4;
     ret.allocated = true;
-    liveness->reg_count = max(liveness->reg_count, ret.id + align(reg_size, 4));
+    allocator->reg_count = max(allocator->reg_count, ret.id + align(reg_size, 4));
     return ret;
 }
 
-static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx, struct liveness *liveness,
+static struct hlsl_reg allocate_numeric_registers_for_type(struct hlsl_ctx *ctx, struct register_allocator *allocator,
         unsigned int first_write, unsigned int last_read, const struct hlsl_type *type)
 {
     unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
     if (type->class <= HLSL_CLASS_VECTOR)
-        return allocate_register(ctx, liveness, first_write, last_read, reg_size, type->dimx);
+        return allocate_register(ctx, allocator, first_write, last_read, reg_size, type->dimx);
     else
-        return allocate_range(ctx, liveness, first_write, last_read, reg_size);
+        return allocate_range(ctx, allocator, first_write, last_read, reg_size);
 }
 
 static const char *debug_register(char class, struct hlsl_reg reg, const struct hlsl_type *type)
@@ -2882,14 +2882,15 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 
-static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, struct liveness *liveness)
+static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
+        struct hlsl_ir_var *var, struct register_allocator *allocator)
 {
     if (var->is_input_semantic || var->is_output_semantic || var->is_uniform)
         return;
 
     if (!var->regs[HLSL_REGSET_NUMERIC].allocated && var->last_read)
     {
-        var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, liveness,
+        var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, allocator,
                 var->first_write, var->last_read, var->data_type);
 
         TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name, debug_register('r',
@@ -2897,7 +2898,8 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx, struct hlsl_ir
     }
 }
 
-static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct liveness *liveness)
+static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, struct register_allocator *allocator)
 {
     struct hlsl_ir_node *instr;
 
@@ -2905,7 +2907,7 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
     {
         if (!instr->reg.allocated && instr->last_read)
         {
-            instr->reg = allocate_numeric_registers_for_type(ctx, liveness, instr->index, instr->last_read,
+            instr->reg = allocate_numeric_registers_for_type(ctx, allocator, instr->index, instr->last_read,
                     instr->data_type);
             TRACE("Allocated anonymous expression @%u to %s (liveness %u-%u).\n", instr->index,
                     debug_register('r', instr->reg, instr->data_type), instr->index, instr->last_read);
@@ -2916,8 +2918,8 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_temp_registers_recurse(ctx, &iff->then_block, liveness);
-                allocate_temp_registers_recurse(ctx, &iff->else_block, liveness);
+                allocate_temp_registers_recurse(ctx, &iff->then_block, allocator);
+                allocate_temp_registers_recurse(ctx, &iff->else_block, allocator);
                 break;
             }
 
@@ -2926,21 +2928,21 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
                 struct hlsl_ir_load *load = hlsl_ir_load(instr);
                 /* We need to at least allocate a variable for undefs.
                  * FIXME: We should probably find a way to remove them instead. */
-                allocate_variable_temp_register(ctx, load->src.var, liveness);
+                allocate_variable_temp_register(ctx, load->src.var, allocator);
                 break;
             }
 
             case HLSL_IR_LOOP:
             {
                 struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
-                allocate_temp_registers_recurse(ctx, &loop->body, liveness);
+                allocate_temp_registers_recurse(ctx, &loop->body, allocator);
                 break;
             }
 
             case HLSL_IR_STORE:
             {
                 struct hlsl_ir_store *store = hlsl_ir_store(instr);
-                allocate_variable_temp_register(ctx, store->lhs.var, liveness);
+                allocate_variable_temp_register(ctx, store->lhs.var, allocator);
                 break;
             }
 
@@ -2950,7 +2952,8 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_bl
     }
 }
 
-static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct liveness *liveness)
+static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
+        struct hlsl_block *block, struct register_allocator *allocator)
 {
     struct hlsl_constant_defs *defs = &ctx->constant_defs;
     struct hlsl_ir_node *instr;
@@ -2966,7 +2969,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
                 unsigned int x, y, i, writemask, end_reg;
                 unsigned int reg_size = type->reg_size[HLSL_REGSET_NUMERIC];
 
-                constant->reg = allocate_numeric_registers_for_type(ctx, liveness, 1, UINT_MAX, type);
+                constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
                 if (!hlsl_array_reserve(ctx, (void **)&defs->values, &defs->size,
@@ -3031,15 +3034,15 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
             case HLSL_IR_IF:
             {
                 struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-                allocate_const_registers_recurse(ctx, &iff->then_block, liveness);
-                allocate_const_registers_recurse(ctx, &iff->else_block, liveness);
+                allocate_const_registers_recurse(ctx, &iff->then_block, allocator);
+                allocate_const_registers_recurse(ctx, &iff->else_block, allocator);
                 break;
             }
 
             case HLSL_IR_LOOP:
             {
                 struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
-                allocate_const_registers_recurse(ctx, &loop->body, liveness);
+                allocate_const_registers_recurse(ctx, &loop->body, allocator);
                 break;
             }
 
@@ -3051,10 +3054,10 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx, struct hlsl_b
 
 static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
-    struct liveness liveness = {0};
+    struct register_allocator allocator = {0};
     struct hlsl_ir_var *var;
 
-    allocate_const_registers_recurse(ctx, &entry_func->body, &liveness);
+    allocate_const_registers_recurse(ctx, &entry_func->body, &allocator);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -3065,7 +3068,7 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
             if (reg_size == 0)
                 continue;
 
-            var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, &liveness,
+            var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, &allocator,
                     1, UINT_MAX, var->data_type);
             TRACE("Allocated %s to %s.\n", var->name,
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
@@ -3079,10 +3082,10 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
  * does not handle constants. */
 static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
-    struct liveness liveness = {0};
-    allocate_temp_registers_recurse(ctx, &entry_func->body, &liveness);
-    ctx->temp_count = liveness.reg_count;
-    vkd3d_free(liveness.regs);
+    struct register_allocator allocator = {0};
+    allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
+    ctx->temp_count = allocator.reg_count;
+    vkd3d_free(allocator.regs);
 }
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
