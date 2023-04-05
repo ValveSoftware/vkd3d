@@ -263,6 +263,16 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_ir_var *var = lhs->src.var;
     unsigned int i;
 
+    if (type->class > HLSL_CLASS_LAST_NUMERIC)
+    {
+        struct vkd3d_string_buffer *string;
+        if (!(string = hlsl_type_to_string(ctx, type)))
+            return;
+        hlsl_fixme(ctx, &var->loc, "Input semantics for type %s.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return;
+    }
+
     vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
@@ -357,6 +367,16 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct hlsl_ir_var *var = rhs->src.var;
     unsigned int i;
+
+    if (type->class > HLSL_CLASS_LAST_NUMERIC)
+    {
+        struct vkd3d_string_buffer *string;
+        if (!(string = hlsl_type_to_string(ctx, type)))
+            return;
+        hlsl_fixme(ctx, &var->loc, "Output semantics for type %s.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return;
+    }
 
     vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
