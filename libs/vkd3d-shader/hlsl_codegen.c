@@ -231,6 +231,16 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     if (!(name = hlsl_get_string_buffer(ctx)))
         return NULL;
     vkd3d_string_buffer_printf(name, "<%s-%s%u>", output ? "output" : "input", semantic->name, semantic->index);
+
+    LIST_FOR_EACH_ENTRY(ext_var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!ascii_strcasecmp(ext_var->name, name->buffer))
+        {
+            hlsl_release_string_buffer(ctx, name);
+            return ext_var;
+        }
+    }
+
     if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
         hlsl_release_string_buffer(ctx, name);
