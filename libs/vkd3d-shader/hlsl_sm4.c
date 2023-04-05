@@ -387,7 +387,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             write_sm4_type(ctx, buffer, field->type);
         }
 
-        fields_offset = bytecode_get_next_offset(buffer);
+        fields_offset = bytecode_align(buffer);
 
         for (i = 0; i < field_count; ++i)
         {
@@ -583,7 +583,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     /* Bound resources. */
 
-    resources_offset = bytecode_get_next_offset(&buffer);
+    resources_offset = bytecode_align(&buffer);
     set_u32(&buffer, resource_position, resources_offset);
 
     for (i = 0; i < extern_resources_count; ++i)
@@ -656,7 +656,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
     /* Buffers. */
 
-    cbuffers_offset = bytecode_get_next_offset(&buffer);
+    cbuffers_offset = bytecode_align(&buffer);
     set_u32(&buffer, cbuffer_position, cbuffers_offset);
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
@@ -692,7 +692,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     i = 0;
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
-        size_t vars_start = bytecode_get_next_offset(&buffer);
+        size_t vars_start = bytecode_align(&buffer);
 
         if (!cbuffer->reg.allocated)
             continue;

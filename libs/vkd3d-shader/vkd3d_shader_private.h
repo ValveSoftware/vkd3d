@@ -1071,6 +1071,8 @@ struct vkd3d_bytecode_buffer
     int status;
 };
 
+/* Align to the next 4-byte offset, and return that offset. */
+size_t bytecode_align(struct vkd3d_bytecode_buffer *buffer);
 size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size);
 void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value);
 
@@ -1092,11 +1094,6 @@ static inline size_t put_string(struct vkd3d_bytecode_buffer *buffer, const char
 static inline size_t bytecode_get_size(struct vkd3d_bytecode_buffer *buffer)
 {
     return buffer->size;
-}
-
-static inline size_t bytecode_get_next_offset(struct vkd3d_bytecode_buffer *buffer)
-{
-    return align(buffer->size, 4);
 }
 
 uint32_t vkd3d_parse_integer(const char *s);
