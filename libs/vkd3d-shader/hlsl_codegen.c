@@ -2816,7 +2816,7 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
 
 static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, unsigned int *counter, bool output)
 {
-    static const char *shader_names[] =
+    static const char *const shader_names[] =
     {
         [VKD3D_SHADER_TYPE_PIXEL] = "Pixel",
         [VKD3D_SHADER_TYPE_VERTEX] = "Vertex",
