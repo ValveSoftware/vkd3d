@@ -3074,6 +3074,8 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
                     debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
         }
     }
+
+    vkd3d_free(allocator.regs);
 }
 
 /* Simple greedy temporary register allocation pass that just assigns a unique
