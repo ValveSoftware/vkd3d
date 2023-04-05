@@ -209,6 +209,9 @@ struct hlsl_semantic
 {
     const char *name;
     uint32_t index;
+
+    /* If the variable or field that stores this hlsl_semantic has already reported that it is missing. */
+    bool reported_missing;
 };
 
 /* A field within a struct type declaration, used in hlsl_type.e.fields. */

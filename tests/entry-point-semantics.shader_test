@@ -52,7 +52,7 @@ draw quad
 probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 
 
-[vertex shader todo]
+[vertex shader]
 void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
 {
     tex[0] = float4(10.0, 11.0, 12.0, 13.0);
@@ -71,7 +71,7 @@ float4 main(in float2 arr[2]) : sv_target
 
 
 % Array elements with a semantic get successive indexes.
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float3 tp[4] : TEXCOORD0;
@@ -83,12 +83,12 @@ float4 main(in apple a) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
+draw quad
+probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
 
 
 % Arrays of matrices get successive indexes.
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float4x2 tp[2] : TEXCOORD0;
@@ -100,13 +100,13 @@ float4 main(in apple a) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
+draw quad
+probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
 
 
 % Arrays (even multi-dimensional) of struct elements are allowed. The fields in the different struct
 % elements get the same indexes.
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float4 tc0 : TEXCOORD0;
@@ -119,11 +119,11 @@ float4 main(in apple aps[2][2]) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (10.0, 10.0, 20.0, 20.0)
+draw quad
+probe (0, 0) rgba (10.0, 10.0, 20.0, 20.0)
 
 
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float4 tc0 : TEXCOORD0;
@@ -141,8 +141,8 @@ float4 main(in banana bans[2]) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+draw quad
+probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
 
 
 [pixel shader fail]
@@ -181,7 +181,7 @@ void main(out banana bans[2])
 }
 
 
-[vertex shader todo]
+[vertex shader]
 struct apple
 {
     float4 tex[2] : TEXCOORD0;
@@ -200,12 +200,12 @@ float4 main(in float4 tex0 : TEXCOORD0, in float4 tex1 : TEXCOORD1) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
+draw quad
+probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
 
 
 % Output semantics cannot be mapped to more than one value.
-[vertex shader fail]
+[vertex shader fail todo]
 struct apple
 {
     float2 tex : TEXCOORD0;
@@ -240,7 +240,7 @@ void main(out float2 a : sem0, out float2 b : SEM, inout float4 pos : sv_positio
 }
 
 
-[vertex shader todo]
+[vertex shader]
 void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
 {
     tex[0] = float4(10.0, 11.0, 12.0, 13.0);
@@ -259,8 +259,8 @@ float4 main(in float4 t1 : TEXCOORD0, in float4 t2 : TEXCOORD0) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (99.0, 99.0, 10.0, 11.0)
+draw quad
+probe (0, 0) rgba (99.0, 99.0, 10.0, 11.0)
 
 
 % Different indexes of the same semantic can have different types.
@@ -271,8 +271,8 @@ float4 main(in float4 a : TEXCOORD0, in float3 b : TEXCOORD1) : sv_target
 }
 
 [test]
-todo draw quad
-todo probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+draw quad
+probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
 
 
 % In SM4, duplicated input semantics can only have different types if they have the same layout and

@@ -4753,7 +4753,7 @@ var_identifier:
 colon_attribute:
       %empty
         {
-            $$.semantic.name = NULL;
+            $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation.reg_type = 0;
             $$.reg_reservation.offset_type = 0;
         }
@@ -4765,12 +4765,12 @@ colon_attribute:
         }
     | register_opt
         {
-            $$.semantic.name = NULL;
+            $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation = $1;
         }
     | packoffset_opt
         {
-            $$.semantic.name = NULL;
+            $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation = $1;
         }
 
@@ -4783,6 +4783,7 @@ semantic:
                 ;
             $$.name = $2;
             $$.index = atoi(p);
+            $$.reported_missing = false;
             *p = 0;
         }
 

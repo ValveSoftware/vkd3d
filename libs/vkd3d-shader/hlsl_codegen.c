@@ -221,8 +221,20 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     list_add_after(&load->node.entry, &store->node.entry);
 }
 
+static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_field *field)
+{
+    if (!field->semantic.name && hlsl_get_multiarray_element_type(field->type)->class <= HLSL_CLASS_LAST_NUMERIC
+            && !field->semantic.reported_missing)
+    {
+        hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
+                "Field '%s' is missing a semantic.", field->name);
+        field->semantic.reported_missing = true;
+    }
+}
+
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int modifiers, const struct hlsl_semantic *semantic, bool output)
+        struct hlsl_type *type, unsigned int modifiers, const struct hlsl_semantic *semantic,
+        uint32_t index, bool output)
 {
     struct hlsl_semantic new_semantic;
     struct vkd3d_string_buffer *name;
@@ -230,7 +242,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return NULL;
-    vkd3d_string_buffer_printf(name, "<%s-%s%u>", output ? "output" : "input", semantic->name, semantic->index);
+    vkd3d_string_buffer_printf(name, "<%s-%s%u>", output ? "output" : "input", semantic->name, index);
 
     LIST_FOR_EACH_ENTRY(ext_var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -246,7 +258,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
         hlsl_release_string_buffer(ctx, name);
         return NULL;
     }
-    new_semantic.index = semantic->index;
+    new_semantic.index = index;
     if (!(ext_var = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
             type, &var->loc, &new_semantic, modifiers, NULL)))
     {
@@ -267,10 +279,11 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs,
-        unsigned int modifiers, const struct hlsl_semantic *semantic)
+        unsigned int modifiers, const struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type;
     struct hlsl_ir_var *var = lhs->src.var;
+    struct hlsl_ir_constant *c;
     unsigned int i;
 
     if (type->class > HLSL_CLASS_LAST_NUMERIC)
@@ -280,22 +293,19 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
             return;
         hlsl_fixme(ctx, &var->loc, "Input semantics for type %s.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
-        return;
     }
+    if (!semantic->name)
+        return;
 
     vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        struct hlsl_semantic semantic_copy = *semantic;
         struct hlsl_ir_store *store;
-        struct hlsl_ir_constant *c;
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
 
-        semantic_copy.index = semantic->index + i;
-
-        if (!(input = add_semantic_var(ctx, var, vector_type, modifiers, &semantic_copy, false)))
+        if (!(input = add_semantic_var(ctx, var, vector_type, modifiers, semantic, semantic_index + i, false)))
             return;
 
         if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
@@ -323,34 +333,50 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
 }
 
-static void prepend_input_struct_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs)
+static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs,
+        unsigned int modifiers, const struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = lhs->node.data_type;
     struct hlsl_ir_var *var = lhs->src.var;
-    size_t i;
+    struct hlsl_ir_constant *c;
+    unsigned int i;
 
-    for (i = 0; i < type->e.record.field_count; ++i)
+    if (type->class == HLSL_CLASS_ARRAY || type->class == HLSL_CLASS_STRUCT)
     {
-        const struct hlsl_struct_field *field = &type->e.record.fields[i];
-        struct hlsl_ir_load *field_load;
-        struct hlsl_ir_constant *c;
+        struct hlsl_ir_load *element_load;
+        struct hlsl_struct_field *field;
+        uint32_t elem_semantic_index;
 
-        if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-            return;
-        list_add_after(&lhs->node.entry, &c->node.entry);
+        for (i = 0; i < hlsl_type_element_count(type); ++i)
+        {
+            if (type->class == HLSL_CLASS_ARRAY)
+            {
+                elem_semantic_index = semantic_index
+                        + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
+            }
+            else
+            {
+                field = &type->e.record.fields[i];
+                validate_field_semantic(ctx, field);
+                semantic = &field->semantic;
+                elem_semantic_index = semantic->index;
+            }
 
-        /* This redundant load is expected to be deleted later by DCE. */
-        if (!(field_load = hlsl_new_load_index(ctx, &lhs->src, &c->node, &var->loc)))
-            return;
-        list_add_after(&c->node.entry, &field_load->node.entry);
+            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
+                return;
+            list_add_after(&lhs->node.entry, &c->node.entry);
 
-        if (field->type->class == HLSL_CLASS_STRUCT)
-            prepend_input_struct_copy(ctx, instrs, field_load);
-        else if (field->semantic.name)
-            prepend_input_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
-        else
-            hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
-                    "Field '%s' is missing a semantic.", field->name);
+            /* This redundant load is expected to be deleted later by DCE. */
+            if (!(element_load = hlsl_new_load_index(ctx, &lhs->src, &c->node, &var->loc)))
+                return;
+            list_add_after(&c->node.entry, &element_load->node.entry);
+
+            prepend_input_copy_recurse(ctx, instrs, element_load, modifiers, semantic, elem_semantic_index);
+        }
+    }
+    else
+    {
+        prepend_input_copy(ctx, instrs, lhs, modifiers, semantic, semantic_index);
     }
 }
 
@@ -365,17 +391,15 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
         return;
     list_add_head(instrs, &load->node.entry);
 
-    if (var->data_type->class == HLSL_CLASS_STRUCT)
-        prepend_input_struct_copy(ctx, instrs, load);
-    else if (var->semantic.name)
-        prepend_input_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
+    prepend_input_copy_recurse(ctx, instrs, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
-        unsigned int modifiers, const struct hlsl_semantic *semantic)
+        unsigned int modifiers, const struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct hlsl_ir_var *var = rhs->src.var;
+    struct hlsl_ir_constant *c;
     unsigned int i;
 
     if (type->class > HLSL_CLASS_LAST_NUMERIC)
@@ -385,22 +409,19 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
             return;
         hlsl_fixme(ctx, &var->loc, "Output semantics for type %s.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
-        return;
     }
+    if (!semantic->name)
+        return;
 
     vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
-        struct hlsl_semantic semantic_copy = *semantic;
         struct hlsl_ir_store *store;
-        struct hlsl_ir_constant *c;
         struct hlsl_ir_var *output;
         struct hlsl_ir_load *load;
 
-        semantic_copy.index = semantic->index + i;
-
-        if (!(output = add_semantic_var(ctx, var, vector_type, modifiers, &semantic_copy, true)))
+        if (!(output = add_semantic_var(ctx, var, vector_type, modifiers, semantic, semantic_index + i, true)))
             return;
 
         if (type->class == HLSL_CLASS_MATRIX)
@@ -428,34 +449,49 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     }
 }
 
-static void append_output_struct_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs)
+static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *rhs,
+        unsigned int modifiers, const struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = rhs->node.data_type;
     struct hlsl_ir_var *var = rhs->src.var;
-    size_t i;
+    struct hlsl_ir_constant *c;
+    unsigned int i;
 
-    for (i = 0; i < type->e.record.field_count; ++i)
+    if (type->class == HLSL_CLASS_ARRAY || type->class == HLSL_CLASS_STRUCT)
     {
-        const struct hlsl_struct_field *field = &type->e.record.fields[i];
-        struct hlsl_ir_load *field_load;
-        struct hlsl_ir_constant *c;
+        struct hlsl_ir_load *element_load;
+        struct hlsl_struct_field *field;
+        uint32_t elem_semantic_index;
 
-        if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
-            return;
-        list_add_tail(instrs, &c->node.entry);
+        for (i = 0; i < hlsl_type_element_count(type); ++i)
+        {
+            if (type->class == HLSL_CLASS_ARRAY)
+            {
+                elem_semantic_index = semantic_index
+                        + i * hlsl_type_get_array_element_reg_size(type->e.array.type, HLSL_REGSET_NUMERIC) / 4;
+            }
+            else
+            {
+                field = &type->e.record.fields[i];
+                validate_field_semantic(ctx, field);
+                semantic = &field->semantic;
+                elem_semantic_index = semantic->index;
+            }
 
-        /* This redundant load is expected to be deleted later by DCE. */
-        if (!(field_load = hlsl_new_load_index(ctx, &rhs->src, &c->node, &var->loc)))
-            return;
-        list_add_tail(instrs, &field_load->node.entry);
+            if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
+                return;
+            list_add_tail(instrs, &c->node.entry);
 
-        if (field->type->class == HLSL_CLASS_STRUCT)
-            append_output_struct_copy(ctx, instrs, field_load);
-        else if (field->semantic.name)
-            append_output_copy(ctx, instrs, field_load, field->storage_modifiers, &field->semantic);
-        else
-            hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
-                    "Field '%s' is missing a semantic.", field->name);
+            if (!(element_load = hlsl_new_load_index(ctx, &rhs->src, &c->node, &var->loc)))
+                return;
+            list_add_tail(instrs, &element_load->node.entry);
+
+            append_output_copy_recurse(ctx, instrs, element_load, modifiers, semantic, elem_semantic_index);
+        }
+    }
+    else
+    {
+        append_output_copy(ctx, instrs, rhs, modifiers, semantic, semantic_index);
     }
 }
 
@@ -471,10 +507,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
         return;
     list_add_tail(instrs, &load->node.entry);
 
-    if (var->data_type->class == HLSL_CLASS_STRUCT)
-        append_output_struct_copy(ctx, instrs, load);
-    else if (var->semantic.name)
-        append_output_copy(ctx, instrs, load, var->storage_modifiers, &var->semantic);
+    append_output_copy_recurse(ctx, instrs, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
 static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
@@ -3492,15 +3525,19 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         var = entry_func->parameters.vars[i];
 
-        if (var->data_type->class == HLSL_CLASS_OBJECT || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+        if (hlsl_type_is_resource(var->data_type) || (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
         {
             prepend_uniform_copy(ctx, &body->instrs, var);
         }
         else
         {
-            if (var->data_type->class != HLSL_CLASS_STRUCT && !var->semantic.name)
+            if (hlsl_get_multiarray_element_type(var->data_type)->class != HLSL_CLASS_STRUCT
+                    && !var->semantic.name)
+            {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
                         "Parameter \"%s\" is missing a semantic.", var->name);
+                var->semantic.reported_missing = true;
+            }
 
             if (var->storage_modifiers & HLSL_STORAGE_IN)
                 prepend_input_var_copy(ctx, &body->instrs, var);
