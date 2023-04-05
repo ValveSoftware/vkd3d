@@ -40,9 +40,9 @@
 #define VKD3D_DEBUG_BUFFER_COUNT 64
 #define VKD3D_DEBUG_BUFFER_SIZE 512
 
-extern const char *vkd3d_dbg_env_name;
+extern const char *const vkd3d_dbg_env_name;
 
-static const char *debug_level_names[] =
+static const char *const debug_level_names[] =
 {
     /* VKD3D_DBG_LEVEL_NONE  */ "none",
     /* VKD3D_DBG_LEVEL_ERR   */ "err",
