@@ -3098,6 +3098,24 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func)
 {
     struct register_allocator allocator = {0};
+
+    /* ps_1_* outputs are special and go in temp register 0. */
+    if (ctx->profile->major_version == 1 && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+    {
+        size_t i;
+
+        for (i = 0; i < entry_func->parameters.count; ++i)
+        {
+            const struct hlsl_ir_var *var = entry_func->parameters.vars[i];
+
+            if (var->is_output_semantic)
+            {
+                record_allocation(ctx, &allocator, 0, VKD3DSP_WRITEMASK_ALL, var->first_write, var->last_read);
+                break;
+            }
+        }
+    }
+
     allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
     ctx->temp_count = allocator.max_reg + 1;
     vkd3d_free(allocator.allocations);
@@ -3125,6 +3143,10 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     {
         D3DDECLUSAGE usage;
         uint32_t usage_idx;
+
+        /* ps_1_* outputs are special and go in temp register 0. */
+        if (ctx->profile->major_version == 1 && output && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+            return;
 
         builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
         if (!builtin && !hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))

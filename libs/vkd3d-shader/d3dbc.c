@@ -1832,7 +1832,12 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
     if (store->lhs.var->is_output_semantic)
     {
-        if (!hlsl_sm1_register_from_semantic(ctx, &store->lhs.var->semantic,
+        if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL && ctx->profile->major_version == 1)
+        {
+            sm1_instr.dst.type = D3DSPR_TEMP;
+            sm1_instr.dst.reg = 0;
+        }
+        else if (!hlsl_sm1_register_from_semantic(ctx, &store->lhs.var->semantic,
                 true, &sm1_instr.dst.type, &sm1_instr.dst.reg))
         {
             assert(reg.allocated);
