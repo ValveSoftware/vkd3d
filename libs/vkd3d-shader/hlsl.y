@@ -2435,6 +2435,55 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
     return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, mul, zero, loc);
 }
 
+static bool intrinsic_any(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg = params->args[0], *dot, *or, *zero, *bfalse;
+    struct hlsl_ir_load *load;
+    unsigned int i, count;
+
+    if (arg->data_type->class != HLSL_CLASS_VECTOR && arg->data_type->class != HLSL_CLASS_SCALAR)
+    {
+        hlsl_fixme(ctx, loc, "any() implementation for non-vector, non-scalar");
+        return false;
+    }
+
+    if (arg->data_type->base_type == HLSL_TYPE_FLOAT)
+    {
+        if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
+            return false;
+        list_add_tail(params->instrs, &zero->entry);
+
+        if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
+            return false;
+
+        return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, dot, zero, loc);
+    }
+    else if (arg->data_type->base_type == HLSL_TYPE_BOOL)
+    {
+        if (!(bfalse = hlsl_new_bool_constant(ctx, false, loc)))
+            return false;
+        list_add_tail(params->instrs, &bfalse->entry);
+
+        or = bfalse;
+
+        count = hlsl_type_component_count(arg->data_type);
+        for (i = 0; i < count; ++i)
+        {
+            if (!(load = add_load_component(ctx, params->instrs, arg, i, loc)))
+                return false;
+
+            if (!(or = add_binary_bitwise_expr(ctx, params->instrs, HLSL_OP2_BIT_OR, or, &load->node, loc)))
+                return false;
+        }
+
+        return true;
+    }
+
+    hlsl_fixme(ctx, loc, "any() implementation for non-float, non-bool");
+    return false;
+}
+
 /* Find the type corresponding to the given source type, with the same
  * dimensions but a different base type. */
 static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
@@ -3284,6 +3333,7 @@ intrinsic_functions[] =
     /* Note: these entries should be kept in alphabetical order. */
     {"abs",                                 1, true,  intrinsic_abs},
     {"all",                                 1, true,  intrinsic_all},
+    {"any",                                 1, true,  intrinsic_any},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"cos",                                 1, true,  intrinsic_cos},
