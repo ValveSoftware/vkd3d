@@ -63,6 +63,7 @@ struct d3d11_shader_runner
     HWND window;
     IDXGISwapChain *swapchain;
     ID3D11DeviceContext *immediate_context;
+    ID3D11RasterizerState *rasterizer_state;
 };
 
 static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
@@ -250,7 +251,9 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
     unsigned int rt_width, rt_height;
+    D3D11_RASTERIZER_DESC rs_desc;
     D3D11_VIEWPORT vp;
+    HRESULT hr;
     RECT rect;
 
     memset(runner, 0, sizeof(*runner));
@@ -279,6 +282,19 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     vp.MaxDepth = 1.0f;
     ID3D11DeviceContext_RSSetViewports(runner->immediate_context, 1, &vp);
 
+    rs_desc.FillMode = D3D11_FILL_SOLID;
+    rs_desc.CullMode = D3D11_CULL_NONE;
+    rs_desc.FrontCounterClockwise = FALSE;
+    rs_desc.DepthBias = 0;
+    rs_desc.DepthBiasClamp = 0.0f;
+    rs_desc.SlopeScaledDepthBias = 0.0f;
+    rs_desc.DepthClipEnable = TRUE;
+    rs_desc.ScissorEnable = FALSE;
+    rs_desc.MultisampleEnable = FALSE;
+    rs_desc.AntialiasedLineEnable = FALSE;
+    hr = ID3D11Device_CreateRasterizerState(runner->device, &rs_desc, &runner->rasterizer_state);
+    ok(hr == S_OK, "Failed to create rasterizer state.\n");
+
     return TRUE;
 }
 
@@ -286,6 +302,7 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
 {
     ULONG ref;
 
+    ID3D11RasterizerState_Release(runner->rasterizer_state);
     ID3D11DeviceContext_Release(runner->immediate_context);
     IDXGISwapChain_Release(runner->swapchain);
     DestroyWindow(runner->window);
@@ -594,6 +611,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     ID3D11DeviceContext_IASetPrimitiveTopology(context, primitive_topology);
     ID3D11DeviceContext_VSSetShader(context, vs, NULL, 0);
     ID3D11DeviceContext_PSSetShader(context, ps, NULL, 0);
+    ID3D11DeviceContext_RSSetState(context, runner->rasterizer_state);
 
     ID3D11DeviceContext_Draw(context, vertex_count, 0);
 

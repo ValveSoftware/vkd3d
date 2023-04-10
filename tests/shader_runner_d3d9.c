@@ -418,6 +418,8 @@ static bool d3d9_runner_draw(struct shader_runner *r,
     ok(hr == D3D_OK, "Failed to set vertex shader, hr %#lx.\n", hr);
     hr = IDirect3DDevice9_SetPixelShader(device, ps);
     ok(hr == D3D_OK, "Failed to set pixel shader, hr %#lx.\n", hr);
+    hr = IDirect3DDevice9_SetRenderState(device, D3DRS_CULLMODE, D3DCULL_NONE);
+    ok(hr == D3D_OK, "Failed to set cull mode, hr %#lx.\n", hr);
 
     hr = IDirect3DDevice9_BeginScene(device);
     ok(hr == D3D_OK, "Failed to draw, hr %#lx.\n", hr);

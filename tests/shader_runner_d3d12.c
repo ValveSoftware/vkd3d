@@ -380,7 +380,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     pso_desc.PS.pShaderBytecode = ID3D10Blob_GetBufferPointer(ps_code);
     pso_desc.PS.BytecodeLength = ID3D10Blob_GetBufferSize(ps_code);
     pso_desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+    pso_desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
     pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     pso_desc.SampleDesc.Count = 1;
     pso_desc.SampleMask = ~(UINT)0;

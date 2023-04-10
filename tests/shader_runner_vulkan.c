@@ -619,7 +619,7 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     vp_desc.scissorCount = 1;
     vp_desc.pScissors = &rt_rect;
 
-    rs_desc.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rs_desc.cullMode = VK_CULL_MODE_NONE;
     rs_desc.lineWidth = 1.0f;
 
     ms_desc.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
