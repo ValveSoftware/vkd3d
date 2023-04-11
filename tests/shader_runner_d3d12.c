@@ -337,7 +337,6 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     ID3D12CommandQueue *queue = test_context->queue;
     D3D12_INPUT_ELEMENT_DESC *input_element_descs;
     ID3D12Device *device = test_context->device;
-    static const float clear_color[4];
     ID3D10Blob *vs_code, *ps_code;
     unsigned int uniform_index;
     unsigned int rtv_count = 0;
@@ -424,8 +423,6 @@ static bool d3d12_runner_draw(struct shader_runner *r,
         {
             case RESOURCE_TYPE_RENDER_TARGET:
                 rtvs[resource->r.slot] = get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot);
-                ID3D12GraphicsCommandList_ClearRenderTargetView(command_list,
-                        rtvs[resource->r.slot], clear_color, 0, NULL);
                 rtv_count = max(rtv_count, resource->r.slot + 1);
                 break;
 
