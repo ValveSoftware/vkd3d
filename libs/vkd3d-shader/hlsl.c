@@ -216,7 +216,8 @@ unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int
      *  (b) the type would cross a vec4 boundary; i.e. a vec3 and a
      *      vec1 can be packed together, but not a vec3 and a vec2.
      */
-    if (type->class > HLSL_CLASS_LAST_NUMERIC || (offset & 3) + type->reg_size[HLSL_REGSET_NUMERIC] > 4)
+    if (type->class == HLSL_CLASS_STRUCT || type->class == HLSL_CLASS_ARRAY
+            || (offset & 3) + type->reg_size[HLSL_REGSET_NUMERIC] > 4)
         return align(offset, 4);
     return offset;
 }
