@@ -132,6 +132,7 @@ vkd3d_shader_tests = \
 	tests/minimum-precision.shader_test \
 	tests/multiple-rt.shader_test \
 	tests/nointerpolation.shader_test \
+	tests/object-field-offsets.shader_test \
 	tests/object-references.shader_test \
 	tests/pow.shader_test \
 	tests/preproc-if.shader_test \

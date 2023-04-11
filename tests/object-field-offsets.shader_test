@@ -1,0 +1,70 @@
+[require]
+shader model >= 5.0
+
+[pixel shader]
+struct apple {
+    float2 a;
+    Texture2D tex;
+    sampler sam;
+    float b;
+};
+
+uniform apple ap;
+
+float4 main() : sv_target
+{
+    return float4(ap.a, ap.b, 0);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+todo probe all rgba (1.0, 2.0, 3.0, 0.0)
+
+
+[pixel shader]
+struct apple {
+    Texture2D tex;
+    sampler sam;
+};
+
+struct banana {
+    float2 a;
+    apple ap;
+    float b;
+};
+
+uniform banana ba;
+
+float4 main() : sv_target
+{
+    return float4(ba.a, ba.b, 0);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+probe all rgba (1.0, 2.0, 5.0, 0.0)
+
+
+[pixel shader]
+struct apple {
+    float2 a;
+    Texture2D tex[2];
+    float b;
+};
+
+uniform apple ap;
+
+float4 main() : sv_target
+{
+    return float4(ap.a, ap.b, 0);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+probe all rgba (1.0, 2.0, 5.0, 0.0)
