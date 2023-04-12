@@ -738,9 +738,8 @@ static void shader_sm1_validate_instruction(struct vkd3d_shader_sm1_parser *sm1,
     }
 }
 
-static void shader_sm1_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
+static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, struct vkd3d_shader_instruction *ins)
 {
-    struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
     struct vkd3d_shader_src_param *src_params, *predicate;
     const struct vkd3d_sm1_opcode_info *opcode_info;
     struct vkd3d_shader_dst_param *dst_param;
@@ -758,11 +757,11 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_parser *parser, stru
         goto fail;
     }
 
-    ++parser->location.line;
+    ++sm1->p.location.line;
     opcode_token = read_u32(ptr);
     if (!(opcode_info = shader_sm1_get_opcode_info(sm1, opcode_token & VKD3D_SM1_OPCODE_MASK)))
     {
-        vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
+        vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
                 "Invalid opcode %#x (token 0x%08x, shader version %u.%u).",
                 opcode_token & VKD3D_SM1_OPCODE_MASK, opcode_token,
                 sm1->p.shader_version.major, sm1->p.shader_version.minor);
@@ -775,14 +774,14 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_parser *parser, stru
     ins->raw = false;
     ins->structured = false;
     predicated = !!(opcode_token & VKD3D_SM1_INSTRUCTION_PREDICATED);
-    ins->predicate = predicate = predicated ? shader_parser_get_src_params(parser, 1) : NULL;
+    ins->predicate = predicate = predicated ? shader_parser_get_src_params(&sm1->p, 1) : NULL;
     ins->dst_count = opcode_info->dst_count;
-    ins->dst = dst_param = shader_parser_get_dst_params(parser, ins->dst_count);
+    ins->dst = dst_param = shader_parser_get_dst_params(&sm1->p, ins->dst_count);
     ins->src_count = opcode_info->src_count;
-    ins->src = src_params = shader_parser_get_src_params(parser, ins->src_count);
+    ins->src = src_params = shader_parser_get_src_params(&sm1->p, ins->src_count);
     if ((!predicate && predicated) || (!src_params && ins->src_count) || (!dst_param && ins->dst_count))
     {
-        vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");
+        vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");
         goto fail;
     }
 
@@ -975,7 +974,7 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
         ins = &instructions->elements[instructions->count];
-        shader_sm1_read_instruction(&sm1->p, ins);
+        shader_sm1_read_instruction(sm1, ins);
 
         if (ins->handler_idx == VKD3DSIH_INVALID)
         {
