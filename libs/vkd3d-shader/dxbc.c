@@ -1596,13 +1596,6 @@ fail:
     return;
 }
 
-static bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
-{
-    struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
-
-    return sm4->ptr == sm4->end;
-}
-
 static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
 {
     .parser_destroy = shader_sm4_destroy,
@@ -2184,7 +2177,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     instructions = &sm4->p.instructions;
-    while (!shader_sm4_is_end(&sm4->p))
+    while (sm4->ptr != sm4->end)
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
         {
