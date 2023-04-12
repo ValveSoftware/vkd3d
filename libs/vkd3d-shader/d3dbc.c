@@ -851,9 +851,8 @@ fail:
     *ptr = sm1->end;
 }
 
-static bool shader_sm1_is_end(struct vkd3d_shader_parser *parser)
+static bool shader_sm1_is_end(struct vkd3d_shader_sm1_parser *sm1)
 {
-    struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
     const uint32_t **ptr = &sm1->ptr;
 
     shader_sm1_read_comment(sm1);
@@ -964,7 +963,7 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     instructions = &sm1->p.instructions;
-    while (!shader_sm1_is_end(&sm1->p))
+    while (!shader_sm1_is_end(sm1))
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))
         {
