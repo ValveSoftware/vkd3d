@@ -1459,9 +1459,8 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
     }
 }
 
-static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, struct vkd3d_shader_instruction *ins)
+static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_instruction *ins)
 {
-    struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
     const struct vkd3d_sm4_opcode_info *opcode_info;
     uint32_t opcode_token, opcode, previous_token;
     struct vkd3d_shader_dst_param *dst_params;
@@ -1479,7 +1478,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
     }
     remaining = sm4->end - *ptr;
 
-    ++parser->location.line;
+    ++sm4->p.location.line;
 
     opcode_token = *(*ptr)++;
     opcode = opcode_token & VKD3D_SM4_OPCODE_MASK;
@@ -1517,11 +1516,11 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
     ins->predicate = NULL;
     ins->dst_count = strnlen(opcode_info->dst_info, SM4_MAX_DST_COUNT);
     ins->src_count = strnlen(opcode_info->src_info, SM4_MAX_SRC_COUNT);
-    ins->src = src_params = shader_parser_get_src_params(parser, ins->src_count);
+    ins->src = src_params = shader_parser_get_src_params(&sm4->p, ins->src_count);
     if (!src_params && ins->src_count)
     {
         ERR("Failed to allocate src parameters.\n");
-        vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
+        vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
         ins->handler_idx = VKD3DSIH_INVALID;
         return;
     }
@@ -1559,11 +1558,11 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
         precise = (opcode_token & VKD3D_SM5_PRECISE_MASK) >> VKD3D_SM5_PRECISE_SHIFT;
         ins->flags |= precise << VKD3DSI_PRECISE_SHIFT;
 
-        ins->dst = dst_params = shader_parser_get_dst_params(parser, ins->dst_count);
+        ins->dst = dst_params = shader_parser_get_dst_params(&sm4->p, ins->dst_count);
         if (!dst_params && ins->dst_count)
         {
             ERR("Failed to allocate dst parameters.\n");
-            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
+            vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY, "Out of memory.");
             ins->handler_idx = VKD3DSIH_INVALID;
             return;
         }
@@ -2195,7 +2194,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
         ins = &instructions->elements[instructions->count];
-        shader_sm4_read_instruction(&sm4->p, ins);
+        shader_sm4_read_instruction(sm4, ins);
 
         if (ins->handler_idx == VKD3DSIH_INVALID)
         {
