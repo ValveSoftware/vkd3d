@@ -866,7 +866,7 @@ struct d3d12_descriptor_heap
     struct d3d12_descriptor_heap_vk_set vk_descriptor_sets[VKD3D_SET_INDEX_COUNT];
     struct vkd3d_mutex vk_sets_mutex;
 
-    BYTE descriptors[];
+    uint8_t DECLSPEC_ALIGN(sizeof(void *)) descriptors[];
 };
 
 static inline struct d3d12_descriptor_heap *d3d12_desc_get_descriptor_heap(const struct d3d12_desc *descriptor)
