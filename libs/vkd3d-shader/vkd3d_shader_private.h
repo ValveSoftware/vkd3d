@@ -996,7 +996,6 @@ struct vkd3d_shader_parser
     const uint32_t *ptr;
     const struct vkd3d_shader_parser_ops *ops;
     struct vkd3d_shader_instruction_array instructions;
-    size_t instruction_idx;
 };
 
 struct vkd3d_shader_parser_ops
