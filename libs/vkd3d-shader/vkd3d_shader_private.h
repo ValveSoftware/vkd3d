@@ -993,7 +993,6 @@ struct vkd3d_shader_parser
 
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;
-    const uint32_t *ptr;
     const struct vkd3d_shader_parser_ops *ops;
     struct vkd3d_shader_instruction_array instructions;
 };

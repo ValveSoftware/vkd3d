@@ -207,7 +207,7 @@ struct vkd3d_sm1_opcode_info
 struct vkd3d_shader_sm1_parser
 {
     const struct vkd3d_sm1_opcode_info *opcode_table;
-    const uint32_t *start, *end;
+    const uint32_t *start, *end, *ptr;
     bool abort;
 
     struct vkd3d_shader_parser p;
@@ -671,7 +671,7 @@ static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const 
 
 static void shader_sm1_read_comment(struct vkd3d_shader_sm1_parser *sm1)
 {
-    const uint32_t **ptr = &sm1->p.ptr;
+    const uint32_t **ptr = &sm1->ptr;
     const char *comment;
     unsigned int size;
     size_t remaining;
@@ -744,7 +744,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_parser *parser, stru
     struct vkd3d_shader_src_param *src_params, *predicate;
     const struct vkd3d_sm1_opcode_info *opcode_info;
     struct vkd3d_shader_dst_param *dst_param;
-    const uint32_t **ptr = &parser->ptr;
+    const uint32_t **ptr = &sm1->ptr;
     uint32_t opcode_token;
     const uint32_t *p;
     bool predicated;
@@ -855,7 +855,7 @@ fail:
 static bool shader_sm1_is_end(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
-    const uint32_t **ptr = &parser->ptr;
+    const uint32_t **ptr = &sm1->ptr;
 
     shader_sm1_read_comment(sm1);
 
@@ -938,7 +938,7 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     shader_desc = &sm1->p.shader_desc;
     shader_desc->byte_code = code;
     shader_desc->byte_code_size = code_size;
-    sm1->p.ptr = sm1->start;
+    sm1->ptr = sm1->start;
 
     return VKD3D_OK;
 }

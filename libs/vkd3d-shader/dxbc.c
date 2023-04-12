@@ -103,7 +103,7 @@ struct vkd3d_shader_src_param_entry
 
 struct vkd3d_shader_sm4_parser
 {
-    const uint32_t *start, *end;
+    const uint32_t *start, *end, *ptr;
 
     unsigned int output_map[MAX_REG_OUTPUT];
 
@@ -1466,7 +1466,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_parser *parser, stru
     uint32_t opcode_token, opcode, previous_token;
     struct vkd3d_shader_dst_param *dst_params;
     struct vkd3d_shader_src_param *src_params;
-    const uint32_t **ptr = &parser->ptr;
+    const uint32_t **ptr = &sm4->ptr;
     unsigned int i, len;
     size_t remaining;
     const uint32_t *p;
@@ -1601,7 +1601,7 @@ static bool shader_sm4_is_end(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
-    return parser->ptr == sm4->end;
+    return sm4->ptr == sm4->end;
 }
 
 static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
@@ -1673,7 +1673,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     if (!vkd3d_shader_parser_init(&sm4->p, message_context, source_name, &version, &shader_sm4_parser_ops,
             token_count / 7u + 20))
         return false;
-    sm4->p.ptr = sm4->start;
+    sm4->ptr = sm4->start;
 
     memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
     for (i = 0; i < output_signature->element_count; ++i)
