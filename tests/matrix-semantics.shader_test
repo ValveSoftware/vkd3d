@@ -63,7 +63,7 @@ probe render target 1 all r (2.0)
 probe render target 2 all r (3.0)
 probe render target 3 all r (4.0)
 
-[pixel shader fail todo]
+[pixel shader fail]
 void main(out float1x2 x : sv_target0, out float1x2 y : sv_target1)
 {
     x = float2(1.0, 2.0);

@@ -212,6 +212,9 @@ struct hlsl_semantic
 
     /* If the variable or field that stores this hlsl_semantic has already reported that it is missing. */
     bool reported_missing;
+    /* In case the variable or field that stores this semantic has already reported to use a
+     *   duplicated output semantic, this value stores the last reported index + 1. Otherwise it is 0. */
+    uint32_t reported_duplicated_output_next_index;
 };
 
 /* A field within a struct type declaration, used in hlsl_type.e.fields. */

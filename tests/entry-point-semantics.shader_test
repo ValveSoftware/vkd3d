@@ -205,7 +205,7 @@ probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
 
 
 % Output semantics cannot be mapped to more than one value.
-[vertex shader fail todo]
+[vertex shader fail]
 struct apple
 {
     float2 tex : TEXCOORD0;
@@ -218,7 +218,7 @@ void main(out apple apls[2], inout float4 pos : sv_position)
 }
 
 
-[vertex shader fail todo]
+[vertex shader fail]
 struct apple
 {
     float2 f : SEMANTIC;
@@ -232,7 +232,7 @@ void main(out apple a, out apple b, inout float4 pos : sv_position)
 
 
 % Semantic names are case-insensitive.
-[vertex shader fail todo]
+[vertex shader fail]
 void main(out float2 a : sem0, out float2 b : SEM, inout float4 pos : sv_position)
 {
     a = float2(1, 2);
