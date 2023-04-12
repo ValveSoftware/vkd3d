@@ -232,6 +232,27 @@ static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_fie
     }
 }
 
+static enum hlsl_base_type base_type_get_semantic_equivalent(enum hlsl_base_type base)
+{
+    if (base == HLSL_TYPE_BOOL)
+        return HLSL_TYPE_UINT;
+    if (base == HLSL_TYPE_INT)
+        return HLSL_TYPE_UINT;
+    if (base == HLSL_TYPE_HALF)
+        return HLSL_TYPE_FLOAT;
+    return base;
+}
+
+static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hlsl_type *type1,
+        const struct hlsl_type *type2)
+{
+    if (type1->dimx != type2->dimx)
+        return false;
+
+    return base_type_get_semantic_equivalent(type1->base_type)
+            == base_type_get_semantic_equivalent(type2->base_type);
+}
+
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         struct hlsl_type *type, unsigned int modifiers, struct hlsl_semantic *semantic,
         uint32_t index, bool output, const struct vkd3d_shader_location *loc)
@@ -257,6 +278,19 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
                     hlsl_note(ctx, &ext_var->loc, HLSL_LEVEL_ERROR,
                             "First use of \"%s%u\" is here.", semantic->name, index);
                     semantic->reported_duplicated_output_next_index = index + 1;
+                }
+            }
+            else
+            {
+                if (index >= semantic->reported_duplicated_input_incompatible_next_index
+                        && !types_are_semantic_equivalent(ctx, ext_var->data_type, type))
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                            "Input semantic \"%s%u\" is used multiple times with incompatible types.",
+                            semantic->name, index);
+                    hlsl_note(ctx, &ext_var->loc, HLSL_LEVEL_ERROR,
+                            "First declaration of \"%s%u\" is here.", semantic->name, index);
+                    semantic->reported_duplicated_input_incompatible_next_index = index + 1;
                 }
             }
 

@@ -295,14 +295,14 @@ float4 main(in uint2 a : TEXCOORD0, in int2 b : TEXCOORD0, in int2x1 c : TEXCOOR
 shader model >= 4.0
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main(in float2 a : TEXCOORD0, in float3 b : TEXCOORD0) : sv_target
 {
     return 0.0;
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main(in float2 a : TEXCOORD0, in int2 b : TEXCOORD0) : sv_target
 {
     return 0.0;
@@ -317,7 +317,7 @@ float4 main(in float2 a : TEXCOORD0, row_major float1x2 b : TEXCOORD0) : sv_targ
     return 0.0;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main(in float2 a : TEXCOORD0, row_major float2x1 b : TEXCOORD0) : sv_target
 {
     return 0.0;

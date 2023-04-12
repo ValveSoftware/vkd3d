@@ -215,6 +215,10 @@ struct hlsl_semantic
     /* In case the variable or field that stores this semantic has already reported to use a
      *   duplicated output semantic, this value stores the last reported index + 1. Otherwise it is 0. */
     uint32_t reported_duplicated_output_next_index;
+    /* In case the variable or field that stores this semantic has already reported to use a
+     *   duplicated input semantic with incompatible values, this value stores the last reported
+     *   index + 1. Otherwise it is 0. */
+    uint32_t reported_duplicated_input_incompatible_next_index;
 };
 
 /* A field within a struct type declaration, used in hlsl_type.e.fields. */

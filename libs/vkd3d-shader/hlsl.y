@@ -4785,6 +4785,7 @@ semantic:
             $$.index = atoi(p);
             $$.reported_missing = false;
             $$.reported_duplicated_output_next_index = 0;
+            $$.reported_duplicated_input_incompatible_next_index = 0;
             *p = 0;
         }
 
