@@ -887,10 +887,10 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
             if (state != STATE_NONE)
                 vkd3d_test_pop_context();
-        }
 
-        if (!ret)
-            break;
+            if (!ret)
+                break;
+        }
 
         if (line[0] == '[')
         {
@@ -1087,8 +1087,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             }
         }
     }
-
-    vkd3d_test_pop_context();
 
 out:
     for (i = 0; i < runner->input_element_count; ++i)
