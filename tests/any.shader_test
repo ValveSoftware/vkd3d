@@ -1,0 +1,96 @@
+[pixel shader]
+uniform float4 f;
+
+float4 main() : sv_target
+{
+    return any(f);
+}
+
+[test]
+uniform 0 float4 1.0 1.0 1.0 1.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 1.0 0.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 0.0 1.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 0.0 0.0 1.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 0.0 0.0 0.0 1.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 0.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+uniform 0 float4 -1.0 -1.0 -1.0 -1.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+uniform float f;
+
+float4 main() : sv_target
+{
+    return any(f);
+}
+
+[test]
+uniform 0 float4 1.0 0.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 0.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+uniform 0 float4 -1.0 0.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+uniform uint4 b;
+
+float4 main() : sv_target
+{
+    return any((bool4)b);
+}
+
+[test]
+uniform 0 uint4 1 1 1 1
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 1 0 0 0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 0 1 0 0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 0 0 1 0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 0 0 0 1
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 0 0 0 0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader]
+uniform uint b;
+
+float4 main() : sv_target
+{
+    return any((bool)b);
+}
+
+[test]
+uniform 0 uint4 1 0 0 0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 uint4 0 0 0 0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
