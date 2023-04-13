@@ -3177,12 +3177,6 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         bindings->sampler_heap_id = heap->serial_id;
     }
 
-    /* These sets can be shared across multiple command lists, and therefore binding must
-     * be synchronised. On an experimental branch in which caching of Vk descriptor writes
-     * greatly increased the chance of multiple threads arriving here at the same time,
-     * GRID 2019 crashed without the mutex lock. */
-    vkd3d_mutex_lock(&heap->vk_sets_mutex);
-
     for (set = 0; set < ARRAY_SIZE(heap->vk_descriptor_sets); ++set)
     {
         VkDescriptorSet vk_descriptor_set = heap->vk_descriptor_sets[set].vk_set;
@@ -3193,8 +3187,6 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         VK_CALL(vkCmdBindDescriptorSets(list->vk_command_buffer, bindings->vk_bind_point, rs->vk_pipeline_layout,
                 rs->vk_set_count + set, 1, &vk_descriptor_set, 0, NULL));
     }
-
-    vkd3d_mutex_unlock(&heap->vk_sets_mutex);
 }
 
 static void d3d12_command_list_update_heap_descriptors(struct d3d12_command_list *list,
@@ -6182,6 +6174,44 @@ static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
     }
 }
 
+static bool contains_heap(const struct d3d12_descriptor_heap **heap_array, unsigned int count,
+        const struct d3d12_descriptor_heap *query)
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+        if (heap_array[i] == query)
+            return true;
+    return false;
+}
+
+static void pipeline_bindings_flush_vk_heap_updates(struct vkd3d_pipeline_bindings *bindings,
+        struct d3d12_device *device)
+{
+    /* Only two heaps are strictly allowed, but more could be supported with a hack. */
+    const struct d3d12_descriptor_heap *heap_array[3];
+    struct d3d12_descriptor_heap *descriptor_heap;
+    unsigned int i, count;
+    uint64_t mask;
+
+    mask = bindings->descriptor_table_active_mask & bindings->root_signature->descriptor_table_mask;
+
+    for (i = 0, count = 0; i < ARRAY_SIZE(bindings->descriptor_tables); ++i)
+    {
+        if (!(mask & (1ull << i)) || !bindings->descriptor_tables[i])
+            continue;
+
+        descriptor_heap = d3d12_desc_get_descriptor_heap(bindings->descriptor_tables[i]);
+        /* Another thread could be writing unused descriptors, so try to check each heap only once. Flushing
+         * any updates added after the first flush will only delay execution of the command list. */
+        if (contains_heap(heap_array, count, descriptor_heap))
+            continue;
+        if (count < ARRAY_SIZE(heap_array))
+            heap_array[count++] = descriptor_heap;
+        d3d12_desc_flush_vk_heap_updates(descriptor_heap, device);
+    }
+}
+
 static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12CommandQueue *iface,
         UINT command_list_count, ID3D12CommandList * const *command_lists)
 {
@@ -6214,6 +6244,10 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
             vkd3d_free(buffers);
             return;
         }
+
+        if (cmd_list->state)
+            pipeline_bindings_flush_vk_heap_updates(&cmd_list->pipeline_bindings[cmd_list->state->vk_bind_point],
+                    cmd_list->device);
 
         buffers[i] = cmd_list->vk_command_buffer;
     }

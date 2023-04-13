@@ -249,6 +249,7 @@ static inline LONG InterlockedDecrement(LONG volatile *x)
 # else
 #  error "InterlockedDecrement() not implemented for this platform"
 # endif
+
 #endif  /* _WIN32 */
 
 static inline void vkd3d_parse_version(const char *version, int *major, int *minor)

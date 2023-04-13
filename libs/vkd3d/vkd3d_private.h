@@ -252,6 +252,16 @@ static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
 {
 }
 
+static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)
+{
+    return InterlockedCompareExchange((LONG volatile *)x, xchg, cmp) == cmp;
+}
+
+static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
+{
+    return InterlockedExchange((LONG volatile *)x, val);
+}
+
 #else  /* _WIN32 */
 
 #include <pthread.h>
@@ -353,6 +363,34 @@ static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
     if (ret)
         ERR("Could not destroy the condition variable, error %d.\n", ret);
 }
+
+# if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
+static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)
+{
+    return __sync_bool_compare_and_swap(x, cmp, xchg);
+}
+# else
+#  error "vkd3d_atomic_compare_exchange() not implemented for this platform"
+# endif
+
+# if HAVE_ATOMIC_EXCHANGE_N
+static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
+{
+    return __atomic_exchange_n(x, val, __ATOMIC_SEQ_CST);
+}
+# elif HAVE_SYNC_BOOL_COMPARE_AND_SWAP
+static inline unsigned int vkd3d_atomic_exchange(unsigned int volatile *x, unsigned int val)
+{
+    unsigned int i;
+    do
+    {
+        i = *x;
+    } while (!__sync_bool_compare_and_swap(x, i, val));
+    return i;
+}
+# else
+#   error "vkd3d_atomic_exchange() not implemented for this platform"
+# endif
 
 #endif  /* _WIN32 */
 
@@ -732,6 +770,7 @@ struct d3d12_desc
         } u;
     } s;
     unsigned int index;
+    unsigned int next;
 };
 
 static inline struct d3d12_desc *d3d12_desc_from_cpu_handle(D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle)
@@ -838,15 +877,10 @@ struct vkd3d_vk_descriptor_heap_layout
     VkDescriptorSetLayout vk_set_layout;
 };
 
-#define VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE 64
-
 struct d3d12_descriptor_heap_vk_set
 {
     VkDescriptorSet vk_set;
-    VkDescriptorBufferInfo vk_buffer_infos[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
-    VkBufferView vk_buffer_views[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
-    VkDescriptorImageInfo vk_image_infos[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
-    VkWriteDescriptorSet vk_descriptor_writes[VKD3D_DESCRIPTOR_WRITE_BUFFER_SIZE];
+    VkDescriptorType vk_type;
 };
 
 /* ID3D12DescriptorHeap */
@@ -864,10 +898,13 @@ struct d3d12_descriptor_heap
 
     VkDescriptorPool vk_descriptor_pool;
     struct d3d12_descriptor_heap_vk_set vk_descriptor_sets[VKD3D_SET_INDEX_COUNT];
-    struct vkd3d_mutex vk_sets_mutex;
+
+    unsigned int volatile dirty_list_head;
 
     uint8_t DECLSPEC_ALIGN(sizeof(void *)) descriptors[];
 };
+
+void d3d12_desc_flush_vk_heap_updates(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device);
 
 static inline struct d3d12_descriptor_heap *d3d12_desc_get_descriptor_heap(const struct d3d12_desc *descriptor)
 {
