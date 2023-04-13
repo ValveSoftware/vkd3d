@@ -2414,6 +2414,24 @@ static void vkd3d_init_descriptor_pool_sizes(VkDescriptorPoolSize *pool_sizes,
             VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
 };
 
+static void vkd3d_desc_object_cache_init(struct vkd3d_desc_object_cache *cache, size_t size)
+{
+    cache->head = NULL;
+    cache->size = size;
+}
+
+static void vkd3d_desc_object_cache_cleanup(struct vkd3d_desc_object_cache *cache)
+{
+    union d3d12_desc_object u;
+    void *next;
+
+    for (u.object = cache->head; u.object; u.object = next)
+    {
+        next = u.header->next;
+        vkd3d_free(u.object);
+    }
+}
+
 /* ID3D12Device */
 static inline struct d3d12_device *impl_from_ID3D12Device(ID3D12Device *iface)
 {
@@ -2454,7 +2472,6 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device *iface)
 {
     struct d3d12_device *device = impl_from_ID3D12Device(iface);
     ULONG refcount = InterlockedDecrement(&device->refcount);
-    size_t i;
 
     TRACE("%p decreasing refcount to %u.\n", device, refcount);
 
@@ -2474,8 +2491,8 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device *iface)
         vkd3d_render_pass_cache_cleanup(&device->render_pass_cache, device);
         d3d12_device_destroy_pipeline_cache(device);
         d3d12_device_destroy_vkd3d_queues(device);
-        for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
-            vkd3d_mutex_destroy(&device->desc_mutex[i]);
+        vkd3d_desc_object_cache_cleanup(&device->view_desc_cache);
+        vkd3d_desc_object_cache_cleanup(&device->cbuffer_desc_cache);
         VK_CALL(vkDestroyDevice(device->vk_device, NULL));
         if (device->parent)
             IUnknown_Release(device->parent);
@@ -3411,8 +3428,7 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptors(ID3D12Device *iface,
 
         for (; dst_idx < dst_range_size && src_idx < src_range_size; ++dst_idx, ++src_idx)
         {
-            if (dst[dst_idx].s.magic == src[src_idx].s.magic && (dst[dst_idx].s.magic & VKD3D_DESCRIPTOR_MAGIC_HAS_VIEW)
-                    && dst[dst_idx].s.u.view_info.written_serial_id == src[src_idx].s.u.view_info.view->serial_id)
+            if (dst[dst_idx].s.u.object == src[src_idx].s.u.object)
                 continue;
             d3d12_desc_copy(&dst[dst_idx], &src[src_idx], device);
         }
@@ -3939,7 +3955,6 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
 {
     const struct vkd3d_vk_device_procs *vk_procs;
     HRESULT hr;
-    size_t i;
 
     device->ID3D12Device_iface.lpVtbl = &d3d12_device_vtbl;
     device->refcount = 1;
@@ -3982,8 +3997,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     device->blocked_queue_count = 0;
     vkd3d_mutex_init(&device->blocked_queues_mutex);
 
-    for (i = 0; i < ARRAY_SIZE(device->desc_mutex); ++i)
-        vkd3d_mutex_init(&device->desc_mutex[i]);
+    vkd3d_desc_object_cache_init(&device->view_desc_cache, sizeof(struct vkd3d_view));
+    vkd3d_desc_object_cache_init(&device->cbuffer_desc_cache, sizeof(struct vkd3d_cbuffer_desc));
 
     vkd3d_init_descriptor_pool_sizes(device->vk_pool_sizes, &device->vk_info.descriptor_limits);
 

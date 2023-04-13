@@ -2720,12 +2720,15 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
         unsigned int index, bool use_array)
 {
     uint32_t descriptor_range_magic = range->descriptor_magic;
-    const struct vkd3d_view *view = descriptor->s.u.view_info.view;
+    union d3d12_desc_object u = descriptor->s.u;
     uint32_t vk_binding = range->binding;
+    VkDescriptorType vk_descriptor_type;
     uint32_t set = range->set;
 
-    if (descriptor->s.magic != descriptor_range_magic)
+    if (!u.header || u.header->magic != descriptor_range_magic)
         return false;
+
+    vk_descriptor_type = u.header->vk_descriptor_type;
 
     vk_descriptor_write->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_descriptor_write->pNext = NULL;
@@ -2733,15 +2736,15 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
     vk_descriptor_write->dstBinding = use_array ? vk_binding : vk_binding + index;
     vk_descriptor_write->dstArrayElement = use_array ? index : 0;
     vk_descriptor_write->descriptorCount = 1;
-    vk_descriptor_write->descriptorType = descriptor->s.vk_descriptor_type;
+    vk_descriptor_write->descriptorType = vk_descriptor_type;
     vk_descriptor_write->pImageInfo = NULL;
     vk_descriptor_write->pBufferInfo = NULL;
     vk_descriptor_write->pTexelBufferView = NULL;
 
-    switch (descriptor->s.magic)
+    switch (u.header->magic)
     {
         case VKD3D_DESCRIPTOR_MAGIC_CBV:
-            vk_descriptor_write->pBufferInfo = &descriptor->s.u.vk_cbv_info;
+            vk_descriptor_write->pBufferInfo = &u.cb_desc->vk_cbv_info;
             break;
 
         case VKD3D_DESCRIPTOR_MAGIC_SRV:
@@ -2752,8 +2755,8 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
              * in pairs in one set. */
             if (range->descriptor_count == UINT_MAX)
             {
-                if (descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                        && descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                if (vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
                 {
                     vk_descriptor_write->dstSet = vk_descriptor_sets[set + 1];
                     vk_descriptor_write->dstBinding = 0;
@@ -2763,21 +2766,21 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             {
                 if (!use_array)
                     vk_descriptor_write->dstBinding = vk_binding + 2 * index;
-                if (descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                        && descriptor->s.vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+                if (vk_descriptor_type != VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                        && vk_descriptor_type != VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
                     ++vk_descriptor_write->dstBinding;
             }
 
-            if (descriptor->s.vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
-                    || descriptor->s.vk_descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+            if (vk_descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER
+                    || vk_descriptor_type == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
             {
-                vk_descriptor_write->pTexelBufferView = &view->u.vk_buffer_view;
+                vk_descriptor_write->pTexelBufferView = &u.view->v.u.vk_buffer_view;
             }
             else
             {
                 vk_image_info->sampler = VK_NULL_HANDLE;
-                vk_image_info->imageView = view->u.vk_image_view;
-                vk_image_info->imageLayout = descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_SRV
+                vk_image_info->imageView = u.view->v.u.vk_image_view;
+                vk_image_info->imageLayout = u.header->magic == VKD3D_DESCRIPTOR_MAGIC_SRV
                         ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_GENERAL;
 
                 vk_descriptor_write->pImageInfo = vk_image_info;
@@ -2785,7 +2788,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             break;
 
         case VKD3D_DESCRIPTOR_MAGIC_SAMPLER:
-            vk_image_info->sampler = view->u.vk_sampler;
+            vk_image_info->sampler = u.view->v.u.vk_sampler;
             vk_image_info->imageView = VK_NULL_HANDLE;
             vk_image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -2793,7 +2796,7 @@ static bool vk_write_descriptor_set_from_d3d12_desc(VkWriteDescriptorSet *vk_des
             break;
 
         default:
-            ERR("Invalid descriptor %#x.\n", descriptor->s.magic);
+            ERR("Invalid descriptor %#x.\n", u.header->magic);
             return false;
     }
 
@@ -2847,6 +2850,11 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
         for (j = 0; j < descriptor_count; ++j, ++descriptor)
         {
             unsigned int register_idx = range->base_register_idx + j;
+            union d3d12_desc_object u = descriptor->s.u;
+            VkBufferView vk_counter_view;
+
+            vk_counter_view = (u.header && u.header->magic == VKD3D_DESCRIPTOR_MAGIC_UAV)
+                    ? u.view->v.vk_counter_view : VK_NULL_HANDLE;
 
             /* Track UAV counters. */
             if (range->descriptor_magic == VKD3D_DESCRIPTOR_MAGIC_UAV)
@@ -2856,8 +2864,6 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
                     if (state->uav_counters.bindings[k].register_space == range->register_space
                             && state->uav_counters.bindings[k].register_index == register_idx)
                     {
-                        VkBufferView vk_counter_view = descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_UAV
-                                ? descriptor->s.u.view_info.view->vk_counter_view : VK_NULL_HANDLE;
                         if (bindings->vk_uav_counter_views[k] != vk_counter_view)
                             bindings->uav_counters_dirty = true;
                         bindings->vk_uav_counter_views[k] = vk_counter_view;
@@ -2867,7 +2873,7 @@ static void d3d12_command_list_update_descriptor_table(struct d3d12_command_list
             }
 
             /* Not all descriptors are necessarily populated if the range is unbounded. */
-            if (descriptor->s.magic == VKD3D_DESCRIPTOR_MAGIC_FREE)
+            if (!u.header)
                 continue;
 
             if (!vk_write_descriptor_set_from_d3d12_desc(current_descriptor_write, current_image_info,
@@ -4852,7 +4858,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_OMSetRenderTargets(ID3D12Graphi
             WARN("Failed to add view.\n");
         }
 
-        list->rtvs[i] = view->u.vk_image_view;
+        list->rtvs[i] = view->v.u.vk_image_view;
         list->fb_width = max(list->fb_width, rtv_desc->width);
         list->fb_height = max(list->fb_height, rtv_desc->height);
         list->fb_layer_count = max(list->fb_layer_count, rtv_desc->layer_count);
@@ -4876,7 +4882,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_OMSetRenderTargets(ID3D12Graphi
                 list->dsv = VK_NULL_HANDLE;
             }
 
-            list->dsv = view->u.vk_image_view;
+            list->dsv = view->v.u.vk_image_view;
             list->fb_width = max(list->fb_width, dsv_desc->width);
             list->fb_height = max(list->fb_height, dsv_desc->height);
             list->fb_layer_count = max(list->fb_layer_count, dsv_desc->layer_count);
@@ -4968,7 +4974,7 @@ static void d3d12_command_list_clear(struct d3d12_command_list *list,
     fb_desc.flags = 0;
     fb_desc.renderPass = vk_render_pass;
     fb_desc.attachmentCount = 1;
-    fb_desc.pAttachments = &view->u.vk_image_view;
+    fb_desc.pAttachments = &view->v.u.vk_image_view;
     fb_desc.width = width;
     fb_desc.height = height;
     fb_desc.layers = layer_count;
@@ -5171,13 +5177,14 @@ static void vkd3d_uav_clear_state_get_image_pipeline(const struct vkd3d_uav_clea
 }
 
 static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
-        struct d3d12_resource *resource, struct vkd3d_view *view, const VkClearColorValue *clear_colour,
+        struct d3d12_resource *resource, struct vkd3d_view *descriptor, const VkClearColorValue *clear_colour,
         unsigned int rect_count, const D3D12_RECT *rects)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     unsigned int i, miplevel_idx, layer_count;
     struct vkd3d_uav_clear_pipeline pipeline;
     struct vkd3d_uav_clear_args clear_args;
+    const struct vkd3d_resource_view *view;
     VkDescriptorImageInfo image_info;
     D3D12_RECT full_rect, curr_rect;
     VkWriteDescriptorSet write_set;
@@ -5189,8 +5196,9 @@ static void d3d12_command_list_clear_uav(struct d3d12_command_list *list,
     d3d12_command_list_invalidate_bindings(list, list->state);
     d3d12_command_list_invalidate_root_parameters(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE);
 
-    if (!d3d12_command_allocator_add_view(list->allocator, view))
+    if (!d3d12_command_allocator_add_view(list->allocator, descriptor))
         WARN("Failed to add view.\n");
+    view = &descriptor->v;
 
     clear_args.colour = *clear_colour;
 
@@ -5303,10 +5311,11 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
         const UINT values[4], UINT rect_count, const D3D12_RECT *rects)
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList2(iface);
+    struct vkd3d_view *descriptor, *uint_view = NULL;
     struct d3d12_device *device = list->device;
-    struct vkd3d_view *view, *uint_view = NULL;
     struct vkd3d_texture_view_desc view_desc;
     const struct vkd3d_format *uint_format;
+    const struct vkd3d_resource_view *view;
     struct d3d12_resource *resource_impl;
     VkClearColorValue colour;
 
@@ -5314,7 +5323,9 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view_info.view;
+    if (!(descriptor = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))
+        return;
+    view = &descriptor->v;
     memcpy(colour.uint32, values, sizeof(colour.uint32));
 
     if (view->format->type != VKD3D_FORMAT_TYPE_UINT)
@@ -5328,8 +5339,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
 
         if (d3d12_resource_is_buffer(resource_impl))
         {
-            if (!vkd3d_create_buffer_view(device, resource_impl->u.vk_buffer, uint_format,
-                    view->info.buffer.offset, view->info.buffer.size, &uint_view))
+            if (!vkd3d_create_buffer_view(device, VKD3D_DESCRIPTOR_MAGIC_UAV, resource_impl->u.vk_buffer,
+                    uint_format, view->info.buffer.offset, view->info.buffer.size, &uint_view))
             {
                 ERR("Failed to create buffer view.\n");
                 return;
@@ -5345,16 +5356,17 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
             view_desc.layer_idx = view->info.texture.layer_idx;
             view_desc.layer_count = view->info.texture.layer_count;
 
-            if (!vkd3d_create_texture_view(device, resource_impl->u.vk_image, &view_desc, &uint_view))
+            if (!vkd3d_create_texture_view(device, VKD3D_DESCRIPTOR_MAGIC_UAV, resource_impl->u.vk_image, &view_desc,
+                    &uint_view))
             {
                 ERR("Failed to create image view.\n");
                 return;
             }
         }
-        view = uint_view;
+        descriptor = uint_view;
     }
 
-    d3d12_command_list_clear_uav(list, resource_impl, view, &colour, rect_count, rects);
+    d3d12_command_list_clear_uav(list, resource_impl, descriptor, &colour, rect_count, rects);
 
     if (uint_view)
         vkd3d_view_decref(uint_view, device);
@@ -5373,7 +5385,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewFloat(I
             iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
-    view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view_info.view;
+    if (!(view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))
+        return;
     memcpy(colour.float32, values, sizeof(colour.float32));
 
     d3d12_command_list_clear_uav(list, resource_impl, view, &colour, rect_count, rects);
