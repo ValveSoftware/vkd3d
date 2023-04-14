@@ -6039,6 +6039,7 @@ static void spirv_compiler_emit_dcl_resource(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_semantic *semantic = &instruction->declaration.semantic;
+    enum vkd3d_shader_resource_type resource_type = semantic->resource_type;
     uint32_t flags = instruction->flags;
 
     /* We don't distinguish between APPEND and COUNTER UAVs. */
@@ -6046,8 +6047,13 @@ static void spirv_compiler_emit_dcl_resource(struct spirv_compiler *compiler,
     if (flags)
         FIXME("Unhandled UAV flags %#x.\n", flags);
 
+    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS && semantic->sample_count == 1)
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+    else if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY && semantic->sample_count == 1)
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY;
+
     spirv_compiler_emit_resource_declaration(compiler, &semantic->resource,
-            semantic->resource_type, semantic->resource_data_type[0], 0, false);
+            resource_type, semantic->resource_data_type[0], 0, false);
 }
 
 static void spirv_compiler_emit_dcl_resource_raw(struct spirv_compiler *compiler,
@@ -8046,7 +8052,7 @@ static void spirv_compiler_emit_ld(struct spirv_compiler *compiler,
         image_operands[image_operand_count++] = spirv_compiler_emit_texel_offset(compiler,
                 instruction, image.resource_type_info);
     }
-    if (multisample)
+    if (multisample && image.resource_type_info->ms)
     {
         operands_mask |= SpvImageOperandsSampleMask;
         image_operands[image_operand_count++] = spirv_compiler_emit_load_src(compiler,
