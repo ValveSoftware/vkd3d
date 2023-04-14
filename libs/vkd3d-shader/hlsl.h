@@ -492,6 +492,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_SIN,
     HLSL_OP1_SIN_REDUCED,    /* Reduced range [-pi, pi] */
     HLSL_OP1_SQRT,
+    HLSL_OP1_TRUNC,
 
     HLSL_OP2_ADD,
     HLSL_OP2_BIT_AND,

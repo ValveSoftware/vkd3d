@@ -4031,6 +4031,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_SQRT, &expr->node, arg1, 0);
             break;
 
+        case HLSL_OP1_TRUNC:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op(buffer, VKD3D_SM4_OP_ROUND_Z, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP2_ADD:
             switch (dst_type->base_type)
             {

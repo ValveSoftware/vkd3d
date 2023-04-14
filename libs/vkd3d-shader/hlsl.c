@@ -2295,6 +2295,7 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
         [HLSL_OP1_SIN]          = "sin",
         [HLSL_OP1_SIN_REDUCED]  = "sin_reduced",
         [HLSL_OP1_SQRT]         = "sqrt",
+        [HLSL_OP1_TRUNC]        = "trunc",
 
         [HLSL_OP2_ADD]         = "+",
         [HLSL_OP2_BIT_AND]     = "&",

@@ -3384,6 +3384,17 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
     return true;
 }
 
+static bool intrinsic_trunc(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_TRUNC, arg, loc);
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -3433,6 +3444,7 @@ intrinsic_functions[] =
     {"tex2D",                              -1, false, intrinsic_tex2D},
     {"tex3D",                              -1, false, intrinsic_tex3D},
     {"transpose",                           1, true,  intrinsic_transpose},
+    {"trunc",                               1, true,  intrinsic_trunc},
 };
 
 static int intrinsic_function_name_compare(const void *a, const void *b)
