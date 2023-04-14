@@ -45,4 +45,4 @@ float4 main() : sv_target
 [test]
 uniform 0 uint4 0x00000001 0x00000002 0x80000000 0x00000000
 draw quad
-todo probe all rgba (2.0, 2.0, 2.0, 0.0)
+probe all rgba (2.0, 2.0, 2.0, 0.0)

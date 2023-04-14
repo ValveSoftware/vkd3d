@@ -4382,19 +4382,53 @@ static void write_sm4_jump(struct hlsl_ctx *ctx,
     write_sm4_instruction(buffer, &instr);
 }
 
+/* Does this variable's data come directly from the API user, rather than being
+ * temporary or from a previous shader stage?
+ * I.e. is it a uniform or VS input? */
+static bool var_is_user_input(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var)
+{
+    if (var->is_uniform)
+        return true;
+
+    return var->is_input_semantic && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
+}
+
 static void write_sm4_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
 {
+    const struct hlsl_type *type = load->node.data_type;
     struct sm4_instruction instr;
 
     memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_MOV;
 
     sm4_dst_from_node(&instr.dsts[0], &load->node);
     instr.dst_count = 1;
 
-    sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, load->node.data_type, instr.dsts[0].writemask);
-    instr.src_count = 1;
+    assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
+    if (type->base_type == HLSL_TYPE_BOOL && var_is_user_input(ctx, load->src.var))
+    {
+        struct hlsl_constant_value value;
+
+        /* Uniform bools can be specified as anything, but internal bools always
+         * have 0 for false and ~0 for true. Normalize that here. */
+
+        instr.opcode = VKD3D_SM4_OP_MOVC;
+
+        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, type, instr.dsts[0].writemask);
+
+        memset(&value, 0xff, sizeof(value));
+        sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].writemask);
+        memset(&value, 0, sizeof(value));
+        sm4_src_from_constant_value(&instr.srcs[2], &value, type->dimx, instr.dsts[0].writemask);
+        instr.src_count = 3;
+    }
+    else
+    {
+        instr.opcode = VKD3D_SM4_OP_MOV;
+
+        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, type, instr.dsts[0].writemask);
+        instr.src_count = 1;
+    }
 
     write_sm4_instruction(buffer, &instr);
 }
