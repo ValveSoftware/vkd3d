@@ -3199,6 +3199,29 @@ static void sm4_src_from_node(struct sm4_src_register *src,
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
+static void sm4_src_from_constant_value(struct sm4_src_register *src,
+        const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
+{
+    src->swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
+    src->reg.type = VKD3D_SM4_RT_IMMCONST;
+    if (width == 1)
+    {
+        src->reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+        src->reg.immconst_uint[0] = value->u[0].u;
+    }
+    else
+    {
+        unsigned int i, j = 0;
+
+        src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+        for (i = 0; i < 4; ++i)
+        {
+            if (map_writemask & (1u << i))
+                src->reg.immconst_uint[i] = value->u[j++].u;
+        }
+    }
+}
+
 static uint32_t sm4_encode_register(const struct sm4_register *reg)
 {
     return (reg->type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
@@ -3609,7 +3632,6 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 {
     const unsigned int dimx = constant->node.data_type->dimx;
     struct sm4_instruction instr;
-    struct sm4_register *reg = &instr.srcs[0].reg;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
@@ -3617,24 +3639,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     sm4_dst_from_node(&instr.dsts[0], &constant->node);
     instr.dst_count = 1;
 
-    instr.srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-    reg->type = VKD3D_SM4_RT_IMMCONST;
-    if (dimx == 1)
-    {
-        reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
-        reg->immconst_uint[0] = constant->value.u[0].u;
-    }
-    else
-    {
-        unsigned int i, j = 0;
-
-        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
-        for (i = 0; i < 4; ++i)
-        {
-            if (instr.dsts[0].writemask & (1u << i))
-                reg->immconst_uint[i] = constant->value.u[j++].u;
-        }
-    }
+    sm4_src_from_constant_value(&instr.srcs[0], &constant->value, dimx, instr.dsts[0].writemask);
     instr.src_count = 1,
 
     write_sm4_instruction(buffer, &instr);
