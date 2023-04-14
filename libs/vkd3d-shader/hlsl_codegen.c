@@ -327,7 +327,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_load *lhs,
         unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
-    struct hlsl_type *type = lhs->node.data_type, *vector_type;
+    struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_ir_var *var = lhs->src.var;
     struct hlsl_ir_constant *c;
@@ -344,28 +344,36 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
     if (!semantic->name)
         return;
 
-    vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+    vector_type_src = hlsl_get_vector_type(ctx, type->base_type,
+            (ctx->profile->major_version < 4) ? 4 : hlsl_type_minor_size(type));
+    vector_type_dst = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
         struct hlsl_ir_store *store;
         struct hlsl_ir_var *input;
         struct hlsl_ir_load *load;
+        struct hlsl_ir_node *cast;
 
-        if (!(input = add_semantic_var(ctx, var, vector_type, modifiers, semantic, semantic_index + i, false, loc)))
+        if (!(input = add_semantic_var(ctx, var, vector_type_src, modifiers, semantic,
+                semantic_index + i, false, loc)))
             return;
 
         if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
             return;
         list_add_after(&lhs->node.entry, &load->node.entry);
 
+        if (!(cast = hlsl_new_cast(ctx, &load->node, vector_type_dst, &var->loc)))
+            return;
+        list_add_after(&load->node.entry, &cast->entry);
+
         if (type->class == HLSL_CLASS_MATRIX)
         {
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
                 return;
-            list_add_after(&load->node.entry, &c->node.entry);
+            list_add_after(&cast->entry, &c->node.entry);
 
-            if (!(store = hlsl_new_store_index(ctx, &lhs->src, &c->node, &load->node, 0, &var->loc)))
+            if (!(store = hlsl_new_store_index(ctx, &lhs->src, &c->node, cast, 0, &var->loc)))
                 return;
             list_add_after(&c->node.entry, &store->node.entry);
         }
@@ -373,9 +381,9 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         {
             assert(i == 0);
 
-            if (!(store = hlsl_new_store_index(ctx, &lhs->src, NULL, &load->node, 0, &var->loc)))
+            if (!(store = hlsl_new_store_index(ctx, &lhs->src, NULL, cast, 0, &var->loc)))
                 return;
-            list_add_after(&load->node.entry, &store->node.entry);
+            list_add_after(&cast->entry, &store->node.entry);
         }
     }
 }
