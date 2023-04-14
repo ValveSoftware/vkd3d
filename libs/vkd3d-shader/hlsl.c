@@ -1422,6 +1422,8 @@ static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
     const struct hlsl_ir_node *src;
     struct hlsl_ir_node *dst;
 
+    hlsl_block_init(dst_block);
+
     LIST_FOR_EACH_ENTRY(src, &src_block->instrs, struct hlsl_ir_node, entry)
     {
         if (!(dst = clone_instr(ctx, map, src)))

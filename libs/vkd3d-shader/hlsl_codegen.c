@@ -721,7 +721,6 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
         hlsl_error(ctx, &call->node.loc, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED,
                 "Function \"%s\" is not defined.", decl->func->name);
 
-    hlsl_block_init(&block);
     if (!hlsl_clone_block(ctx, &block, &decl->body))
         return false;
     list_move_before(&call->node.entry, &block.instrs);
