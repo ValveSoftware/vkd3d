@@ -202,3 +202,129 @@ float4 main(in float4 tex0 : TEXCOORD0, in float4 tex1 : TEXCOORD1) : sv_target
 [test]
 todo draw quad
 todo probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
+
+
+% Output semantics cannot be mapped to more than one value.
+[vertex shader fail]
+struct apple
+{
+    float2 tex : TEXCOORD0;
+};
+
+void main(out apple apls[2], inout float4 pos : sv_position)
+{
+    apls[0].tex = float2(1, 2);
+    apls[1].tex = float2(3, 4);
+}
+
+
+[vertex shader fail todo]
+struct apple
+{
+    float2 f : SEMANTIC;
+};
+
+void main(out apple a, out apple b, inout float4 pos : sv_position)
+{
+    a.f = float2(1, 2);
+    b.f = float2(3, 4);
+}
+
+
+% Semantic names are case-insensitive.
+[vertex shader fail todo]
+void main(out float2 a : sem0, out float2 b : SEM, inout float4 pos : sv_position)
+{
+    a = float2(1, 2);
+    b = float2(3, 4);
+}
+
+
+[vertex shader todo]
+void main(out float4 tex[4] : texcoord, inout float4 pos : sv_position)
+{
+    tex[0] = float4(10.0, 11.0, 12.0, 13.0);
+    tex[1] = float4(20.0, 21.0, 22.0, 23.0);
+    tex[2] = float4(30.0, 31.0, 32.0, 33.0);
+    tex[3] = float4(40.0, 41.0, 42.0, 43.0);
+}
+
+
+% Arguments with the same semantic aren't aliased.
+[pixel shader]
+float4 main(in float4 t1 : TEXCOORD0, in float4 t2 : TEXCOORD0) : sv_target
+{
+    t1 = 99;
+    return float4(t1.xy, t2.xy);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (99.0, 99.0, 10.0, 11.0)
+
+
+% Different indexes of the same semantic can have different types.
+[pixel shader]
+float4 main(in float4 a : TEXCOORD0, in float3 b : TEXCOORD1) : sv_target
+{
+    return float4(a.xy, b.xy);
+}
+
+[test]
+todo draw quad
+todo probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+
+
+% In SM4, duplicated input semantics can only have different types if they have the same layout and
+% register types. SM1 is permissive in this regard.
+[pixel shader]
+float4 main(in float2 a : TEXCOORD0, in half2 b : TEXCOORD0, in float2x1 c: TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+
+[pixel shader]
+float4 main(in uint2 a : TEXCOORD0, in int2 b : TEXCOORD0, in int2x1 c : TEXCOORD0, in bool2 d : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+
+[require]
+shader model >= 4.0
+
+
+[pixel shader fail todo]
+float4 main(in float2 a : TEXCOORD0, in float3 b : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+
+[pixel shader fail todo]
+float4 main(in float2 a : TEXCOORD0, in int2 b : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+
+% For some reason, vectors from row_major matrices are not considered as having the same layout as
+% regular vectors.
+[pixel shader fail todo]
+float4 main(in float2 a : TEXCOORD0, row_major float1x2 b : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+[pixel shader fail todo]
+float4 main(in float2 a : TEXCOORD0, row_major float2x1 b : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
+
+[pixel shader fail todo]
+float4 main(in float4 a : TEXCOORD0, row_major float1x4 b : TEXCOORD0) : sv_target
+{
+    return 0.0;
+}
