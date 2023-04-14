@@ -198,7 +198,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
      * can write the uniform name into the shader reflection data. */
 
     if (!(uniform = hlsl_new_var(ctx, temp->name, temp->data_type,
-            temp->loc, NULL, temp->storage_modifiers, &temp->reg_reservation)))
+            &temp->loc, NULL, temp->storage_modifiers, &temp->reg_reservation)))
         return;
     list_add_before(&temp->scope_entry, &uniform->scope_entry);
     list_add_tail(&ctx->extern_vars, &uniform->extern_entry);
@@ -212,7 +212,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct list *instrs, stru
     temp->name = hlsl_strdup(ctx, name->buffer);
     hlsl_release_string_buffer(ctx, name);
 
-    if (!(load = hlsl_new_var_load(ctx, uniform, temp->loc)))
+    if (!(load = hlsl_new_var_load(ctx, uniform, &temp->loc)))
         return;
     list_add_head(instrs, &load->node.entry);
 
@@ -238,7 +238,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
     }
     new_semantic.index = semantic->index;
     if (!(ext_var = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer),
-            type, var->loc, &new_semantic, modifiers, NULL)))
+            type, &var->loc, &new_semantic, modifiers, NULL)))
     {
         hlsl_release_string_buffer(ctx, name);
         hlsl_cleanup_semantic(&new_semantic);
@@ -278,7 +278,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct list *instrs, struct
         if (!(input = add_semantic_var(ctx, var, vector_type, modifiers, &semantic_copy, false)))
             return;
 
-        if (!(load = hlsl_new_var_load(ctx, input, var->loc)))
+        if (!(load = hlsl_new_var_load(ctx, input, &var->loc)))
             return;
         list_add_after(&lhs->node.entry, &load->node.entry);
 
@@ -341,7 +341,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     struct hlsl_ir_load *load;
 
     /* This redundant load is expected to be deleted later by DCE. */
-    if (!(load = hlsl_new_var_load(ctx, var, var->loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, &var->loc)))
         return;
     list_add_head(instrs, &load->node.entry);
 
@@ -437,7 +437,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     struct hlsl_ir_load *load;
 
     /* This redundant load is expected to be deleted later by DCE. */
-    if (!(load = hlsl_new_var_load(ctx, var, var->loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, &var->loc)))
         return;
     list_add_tail(instrs, &load->node.entry);
 
@@ -523,11 +523,11 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
 
     hlsl_block_init(&then_block);
 
-    if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
+    if (!(load = hlsl_new_var_load(ctx, func->early_return_var, &cf_instr->loc)))
         return;
     list_add_after(&cf_instr->entry, &load->node.entry);
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, cf_instr->loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &cf_instr->loc)))
         return;
     hlsl_block_add_instr(&then_block, &jump->node);
 
@@ -692,11 +692,11 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
         list_move_slice_tail(&then_block.instrs, list_next(&block->instrs, &cf_instr->entry), tail);
         lower_return(ctx, func, &then_block, in_loop);
 
-        if (!(load = hlsl_new_var_load(ctx, func->early_return_var, cf_instr->loc)))
+        if (!(load = hlsl_new_var_load(ctx, func->early_return_var, &cf_instr->loc)))
             return false;
         hlsl_block_add_instr(block, &load->node);
 
-        if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, cf_instr->loc)))
+        if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, &load->node, &cf_instr->loc)))
             return false;
         hlsl_block_add_instr(block, not);
 
@@ -793,7 +793,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             list_add_before(&instr->entry, &store->node.entry);
         }
 
-        if (!(load = hlsl_new_var_load(ctx, var, instr->loc)))
+        if (!(load = hlsl_new_var_load(ctx, var, &instr->loc)))
             return false;
         list_add_before(&instr->entry, &load->node.entry);
         hlsl_replace_node(instr, &load->node);
@@ -1813,7 +1813,7 @@ static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, voi
     if (expr->op != HLSL_OP2_DIV)
         return false;
 
-    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_OP1_RCP, expr->operands[1].node, instr->loc)))
+    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_OP1_RCP, expr->operands[1].node, &instr->loc)))
         return false;
     list_add_before(&expr->node.entry, &rcp->entry);
     expr->op = HLSL_OP2_MUL;
@@ -1834,7 +1834,7 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *c
     if (expr->op != HLSL_OP1_SQRT)
         return false;
 
-    if (!(rsq = hlsl_new_unary_expr(ctx, HLSL_OP1_RSQ, expr->operands[0].node, instr->loc)))
+    if (!(rsq = hlsl_new_unary_expr(ctx, HLSL_OP1_RSQ, expr->operands[0].node, &instr->loc)))
         return false;
     list_add_before(&expr->node.entry, &rsq->entry);
     expr->op = HLSL_OP1_RCP;
@@ -1911,7 +1911,7 @@ static bool lower_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *co
     if (expr->op != HLSL_OP1_ABS)
         return false;
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
@@ -1952,11 +1952,11 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
         return false;
     list_add_before(&instr->entry, &sum->entry);
 
-    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, sum, instr->loc)))
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, sum, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &frc->entry);
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, frc, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, frc, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
@@ -2028,7 +2028,7 @@ struct hlsl_ir_load *hlsl_add_conditional(struct hlsl_ctx *ctx, struct list *ins
         return NULL;
     list_add_tail(instrs, &iff->entry);
 
-    if (!(load = hlsl_new_var_load(ctx, var, condition->loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, &condition->loc)))
         return NULL;
     list_add_tail(instrs, &load->node.entry);
 
@@ -2071,7 +2071,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     list_add_before(&instr->entry, &and->entry);
 
-    if (!(abs1 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg1, instr->loc)))
+    if (!(abs1 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg1, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &abs1->entry);
 
@@ -2079,7 +2079,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     list_add_before(&instr->entry, &cast1->entry);
 
-    if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, instr->loc)))
+    if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &abs2->entry);
 
@@ -2095,7 +2095,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     list_add_before(&instr->entry, &cast3->entry);
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
@@ -2138,7 +2138,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     list_add_before(&instr->entry, &and->entry);
 
-    if (!(abs1 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg1, instr->loc)))
+    if (!(abs1 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg1, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &abs1->entry);
 
@@ -2146,7 +2146,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     list_add_before(&instr->entry, &cast1->entry);
 
-    if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, instr->loc)))
+    if (!(abs2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, arg2, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &abs2->entry);
 
@@ -2162,7 +2162,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     list_add_before(&instr->entry, &cast3->entry);
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cast3, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
@@ -2192,7 +2192,7 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
 
     arg = expr->operands[0].node;
 
-    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, instr->loc)))
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg->entry);
 
@@ -2228,7 +2228,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     list_add_before(&instr->entry, &mul1->entry);
 
-    if (!(neg1 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, instr->loc)))
+    if (!(neg1 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg1->entry);
 
@@ -2237,7 +2237,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     ge->data_type = btype;
     list_add_before(&instr->entry, &ge->entry);
 
-    if (!(neg2 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg2, instr->loc)))
+    if (!(neg2 = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg2, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &neg2->entry);
 
@@ -2258,7 +2258,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     list_add_before(&instr->entry, &mul2->entry);
 
-    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, mul2, instr->loc)))
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, mul2, &instr->loc)))
         return false;
     list_add_before(&instr->entry, &frc->entry);
 

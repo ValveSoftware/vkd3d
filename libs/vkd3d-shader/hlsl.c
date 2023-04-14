@@ -921,7 +921,7 @@ struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 {
     struct hlsl_ir_node *cast;
 
-    cast = hlsl_new_unary_expr(ctx, HLSL_OP1_CAST, node, *loc);
+    cast = hlsl_new_unary_expr(ctx, HLSL_OP1_CAST, node, loc);
     if (cast)
         cast->data_type = type;
     return cast;
@@ -934,7 +934,7 @@ struct hlsl_ir_node *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 }
 
 struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
-        const struct vkd3d_shader_location loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
+        const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
         const struct hlsl_reg_reservation *reg_reservation)
 {
     struct hlsl_ir_var *var;
@@ -944,7 +944,7 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
 
     var->name = name;
     var->data_type = type;
-    var->loc = loc;
+    var->loc = *loc;
     if (semantic)
         var->semantic = *semantic;
     var->storage_modifiers = modifiers;
@@ -969,7 +969,7 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *tem
         hlsl_release_string_buffer(ctx, string);
         return NULL;
     }
-    var = hlsl_new_var(ctx, name, type, *loc, NULL, 0, NULL);
+    var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL);
     hlsl_release_string_buffer(ctx, string);
     if (var)
         list_add_tail(&ctx->dummy_scope->vars, &var->scope_entry);
@@ -1192,11 +1192,11 @@ struct hlsl_ir_node *hlsl_new_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op
 }
 
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
-        struct hlsl_ir_node *arg, struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {arg};
 
-    return hlsl_new_expr(ctx, op, operands, arg->data_type, &loc);
+    return hlsl_new_expr(ctx, op, operands, arg->data_type, loc);
 }
 
 struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op,
@@ -1256,12 +1256,12 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
 }
 
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct vkd3d_shader_location loc)
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_deref var_deref;
 
     hlsl_init_simple_deref_from_var(&var_deref, var);
-    return hlsl_new_load_index(ctx, &var_deref, NULL, &loc);
+    return hlsl_new_load_index(ctx, &var_deref, NULL, loc);
 }
 
 struct hlsl_ir_load *hlsl_new_load_component(struct hlsl_ctx *ctx, struct hlsl_block *block,
@@ -1385,24 +1385,25 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
     return &index->node;
 }
 
-struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type, struct vkd3d_shader_location loc)
+struct hlsl_ir_jump *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_jump *jump;
 
     if (!(jump = hlsl_alloc(ctx, sizeof(*jump))))
         return NULL;
-    init_node(&jump->node, HLSL_IR_JUMP, NULL, &loc);
+    init_node(&jump->node, HLSL_IR_JUMP, NULL, loc);
     jump->type = type;
     return jump;
 }
 
-struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, struct vkd3d_shader_location loc)
+struct hlsl_ir_loop *hlsl_new_loop(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_loop *loop;
 
     if (!(loop = hlsl_alloc(ctx, sizeof(*loop))))
         return NULL;
-    init_node(&loop->node, HLSL_IR_LOOP, NULL, &loc);
+    init_node(&loop->node, HLSL_IR_LOOP, NULL, loc);
     hlsl_block_init(&loop->body);
     return loop;
 }
@@ -1545,7 +1546,7 @@ static struct hlsl_ir_node *clone_jump(struct hlsl_ctx *ctx, struct hlsl_ir_jump
 {
     struct hlsl_ir_jump *dst;
 
-    if (!(dst = hlsl_new_jump(ctx, src->type, src->node.loc)))
+    if (!(dst = hlsl_new_jump(ctx, src->type, &src->node.loc)))
         return NULL;
     return &dst->node;
 }
@@ -1570,7 +1571,7 @@ static struct hlsl_ir_node *clone_loop(struct hlsl_ctx *ctx, struct clone_instr_
 {
     struct hlsl_ir_loop *dst;
 
-    if (!(dst = hlsl_new_loop(ctx, src->node.loc)))
+    if (!(dst = hlsl_new_loop(ctx, &src->node.loc)))
         return NULL;
     if (!clone_block(ctx, &dst->body, &src->body, map))
     {
@@ -1760,7 +1761,7 @@ struct hlsl_ir_function_decl *hlsl_new_func_decl(struct hlsl_ctx *ctx,
 }
 
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
-        const struct hlsl_reg_reservation *reservation, struct vkd3d_shader_location loc)
+        const struct hlsl_reg_reservation *reservation, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_buffer *buffer;
 
@@ -1770,7 +1771,7 @@ struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type 
     buffer->name = name;
     if (reservation)
         buffer->reservation = *reservation;
-    buffer->loc = loc;
+    buffer->loc = *loc;
     list_add_tail(&ctx->buffers, &buffer->entry);
     return buffer;
 }
@@ -3158,10 +3159,10 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
     list_init(&ctx->buffers);
 
     if (!(ctx->globals_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
-            hlsl_strdup(ctx, "$Globals"), NULL, ctx->location)))
+            hlsl_strdup(ctx, "$Globals"), NULL, &ctx->location)))
         return false;
     if (!(ctx->params_buffer = hlsl_new_buffer(ctx, HLSL_BUFFER_CONSTANT,
-            hlsl_strdup(ctx, "$Params"), NULL, ctx->location)))
+            hlsl_strdup(ctx, "$Params"), NULL, &ctx->location)))
         return false;
     ctx->cur_buffer = ctx->globals_buffer;
 

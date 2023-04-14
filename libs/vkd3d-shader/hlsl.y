@@ -345,7 +345,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct list *instrs,
             list_move_tail(instrs, &block.instrs);
         }
 
-        if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+        if (!(load = hlsl_new_var_load(ctx, var, loc)))
             return NULL;
         list_add_tail(instrs, &load->node.entry);
 
@@ -389,14 +389,15 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return add_cast(ctx, instrs, node, dst_type, loc);
 }
 
-static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod, const struct vkd3d_shader_location loc)
+static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod,
+        const struct vkd3d_shader_location *loc)
 {
     if (modifiers & mod)
     {
         struct vkd3d_string_buffer *string;
 
         if ((string = hlsl_modifiers_to_string(ctx, mod)))
-            hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                     "Modifier '%s' was already specified.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
         return modifiers;
@@ -415,13 +416,13 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
         return true;
 
     condition = node_from_list(cond_list);
-    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, condition->loc)))
+    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, &condition->loc)))
         return false;
     list_add_tail(cond_list, &not->entry);
 
     hlsl_block_init(&then_block);
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, condition->loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &condition->loc)))
         return false;
     hlsl_block_add_instr(&then_block, &jump->node);
 
@@ -439,7 +440,7 @@ enum loop_type
 };
 
 static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struct list *init, struct list *cond,
-        struct list *iter, struct list *body, struct vkd3d_shader_location loc)
+        struct list *iter, struct list *body, const struct vkd3d_shader_location *loc)
 {
     struct list *list = NULL;
     struct hlsl_ir_loop *loop = NULL;
@@ -585,7 +586,7 @@ static struct hlsl_ir_swizzle *get_swizzle(struct hlsl_ctx *ctx, struct hlsl_ir_
 }
 
 static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *return_value, struct vkd3d_shader_location loc)
+        struct hlsl_ir_node *return_value, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *return_type = ctx->cur_function->return_type;
     struct hlsl_ir_jump *jump;
@@ -596,7 +597,7 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
         {
             struct hlsl_ir_store *store;
 
-            if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, &loc)))
+            if (!(return_value = add_implicit_conversion(ctx, instrs, return_value, return_type, loc)))
                 return NULL;
 
             if (!(store = hlsl_new_simple_store(ctx, ctx->cur_function->return_var, return_value)))
@@ -605,14 +606,14 @@ static struct hlsl_ir_jump *add_return(struct hlsl_ctx *ctx, struct list *instrs
         }
         else
         {
-            hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void functions must return a value.");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Non-void functions must return a value.");
             return NULL;
         }
     }
     else
     {
         if (return_value)
-            hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Void functions cannot return a value.");
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Void functions cannot return a value.");
     }
 
     if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, loc)))
@@ -648,18 +649,18 @@ static struct hlsl_ir_load *add_load_component(struct hlsl_ctx *ctx, struct list
 }
 
 static bool add_record_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *record,
-        unsigned int idx, const struct vkd3d_shader_location loc)
+        unsigned int idx, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *index;
     struct hlsl_ir_constant *c;
 
     assert(idx < record->data_type->e.record.field_count);
 
-    if (!(c = hlsl_new_uint_constant(ctx, idx, &loc)))
+    if (!(c = hlsl_new_uint_constant(ctx, idx, loc)))
         return false;
     list_add_tail(instrs, &c->node.entry);
 
-    if (!(index = hlsl_new_index(ctx, record, &c->node, &loc)))
+    if (!(index = hlsl_new_index(ctx, record, &c->node, loc)))
         return false;
     list_add_tail(instrs, &index->entry);
 
@@ -696,7 +697,7 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct l
         return NULL;
     list_add_tail(instrs, &store->node.entry);
 
-    if (!(coords_load = hlsl_new_var_load(ctx, coords, *loc)))
+    if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
         return NULL;
     list_add_tail(instrs, &coords_load->node.entry);
 
@@ -971,7 +972,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
 }
 
 static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters *parameters,
-        struct parse_parameter *param, const struct vkd3d_shader_location loc)
+        struct parse_parameter *param, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
 
@@ -979,11 +980,11 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
         assert(param->type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
     if ((param->modifiers & HLSL_STORAGE_OUT) && (param->modifiers & HLSL_STORAGE_UNIFORM))
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                 "Parameter '%s' is declared as both \"out\" and \"uniform\".", param->name);
 
     if (param->reg_reservation.offset_type)
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                 "packoffset() is not allowed on function parameters.");
 
     if (!(var = hlsl_new_var(ctx, param->name, param->type, loc, &param->semantic, param->modifiers,
@@ -1319,7 +1320,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct list *instrs,
             list_move_tail(instrs, &block.instrs);
         }
 
-        if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+        if (!(load = hlsl_new_var_load(ctx, var, loc)))
             return NULL;
         list_add_tail(instrs, &load->node.entry);
 
@@ -1410,13 +1411,13 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
 }
 
 static struct list *add_binary_arithmetic_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, struct vkd3d_shader_location loc)
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
 
     list_move_tail(list1, list2);
     vkd3d_free(list2);
-    add_binary_arithmetic_expr(ctx, list1, op, arg1, arg2, &loc);
+    add_binary_arithmetic_expr(ctx, list1, op, arg1, arg2, loc);
     return list1;
 }
 
@@ -1468,13 +1469,13 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
 }
 
 static struct list *add_binary_comparison_expr_merge(struct hlsl_ctx *ctx, struct list *list1, struct list *list2,
-        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location loc)
+        enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *arg1 = node_from_list(list1), *arg2 = node_from_list(list2);
 
     list_move_tail(list1, list2);
     vkd3d_free(list2);
-    add_binary_comparison_expr(ctx, list1, op, arg1, arg2, &loc);
+    add_binary_comparison_expr(ctx, list1, op, arg1, arg2, loc);
     return list1;
 }
 
@@ -1835,16 +1836,16 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 }
 
 static bool add_increment(struct hlsl_ctx *ctx, struct list *instrs, bool decrement, bool post,
-        struct vkd3d_shader_location loc)
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *lhs = node_from_list(instrs);
     struct hlsl_ir_constant *one;
 
     if (lhs->data_type->modifiers & HLSL_MODIFIER_CONST)
-        hlsl_error(ctx, &loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                 "Argument to %s%screment operator is const.", post ? "post" : "pre", decrement ? "de" : "in");
 
-    if (!(one = hlsl_new_int_constant(ctx, 1, &loc)))
+    if (!(one = hlsl_new_int_constant(ctx, 1, loc)))
         return false;
     list_add_tail(instrs, &one->node.entry);
 
@@ -2052,7 +2053,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
         }
         vkd3d_free(v->arrays.sizes);
 
-        if (!(var = hlsl_new_var(ctx, v->name, type, v->loc, &v->semantic, modifiers, &v->reg_reservation)))
+        if (!(var = hlsl_new_var(ctx, v->name, type, &v->loc, &v->semantic, modifiers, &v->reg_reservation)))
         {
             free_parse_variable_def(v);
             continue;
@@ -2172,7 +2173,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             }
             else
             {
-                struct hlsl_ir_load *load = hlsl_new_var_load(ctx, var, var->loc);
+                struct hlsl_ir_load *load = hlsl_new_var_load(ctx, var, &var->loc);
 
                 assert(v->initializer.args_count == 1);
                 list_add_tail(v->initializer.instrs, &load->node.entry);
@@ -2537,7 +2538,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
             &arg1_swzl1->node, &arg2_swzl1->node, loc)))
         return false;
 
-    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, *loc)))
+    if (!(mul1_neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, mul1, loc)))
         return false;
     list_add_tail(params->instrs, &mul1_neg->entry);
 
@@ -2791,7 +2792,7 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
         return false;
     list_move_tail(params->instrs, &block.instrs);
 
-    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return false;
     list_add_tail(params->instrs, &load->node.entry);
 
@@ -2954,7 +2955,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         }
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return false;
     list_add_tail(params->instrs, &load->node.entry);
 
@@ -3263,7 +3264,7 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         }
     }
 
-    if (!(load = hlsl_new_var_load(ctx, var, *loc)))
+    if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return false;
     list_add_tail(params->instrs, &load->node.entry);
 
@@ -3380,7 +3381,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
                     hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
                             "Output argument to \"%s\" is const.", decl->func->name);
 
-                if (!(load = hlsl_new_var_load(ctx, param, arg->loc)))
+                if (!(load = hlsl_new_var_load(ctx, param, &arg->loc)))
                     goto fail;
                 list_add_tail(args->instrs, &load->node.entry);
 
@@ -3393,7 +3394,7 @@ static struct list *add_call(struct hlsl_ctx *ctx, const char *name,
         {
             struct hlsl_ir_load *load;
 
-            if (!(load = hlsl_new_var_load(ctx, decl->return_var, *loc)))
+            if (!(load = hlsl_new_var_load(ctx, decl->return_var, loc)))
                 goto fail;
             list_add_tail(args->instrs, &load->node.entry);
         }
@@ -3461,13 +3462,13 @@ fail:
 }
 
 static struct list *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        struct parse_initializer *params, struct vkd3d_shader_location loc)
+        struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_load *load;
     struct hlsl_ir_var *var;
     unsigned int i, idx = 0;
 
-    if (!(var = hlsl_new_synthetic_var(ctx, "constructor", type, &loc)))
+    if (!(var = hlsl_new_synthetic_var(ctx, "constructor", type, loc)))
         return NULL;
 
     for (i = 0; i < params->args_count; ++i)
@@ -4087,7 +4088,7 @@ buffer_declaration:
             if ($3.semantic.name)
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC, "Semantics are not allowed on buffers.");
 
-            if (!(ctx->cur_buffer = hlsl_new_buffer(ctx, $1, $2, &$3.reg_reservation, @2)))
+            if (!(ctx->cur_buffer = hlsl_new_buffer(ctx, $1, $2, &$3.reg_reservation, &@2)))
                 YYABORT;
         }
 
@@ -4611,7 +4612,7 @@ param_list:
       parameter
         {
             memset(&$$, 0, sizeof($$));
-            if (!add_func_parameter(ctx, &$$, &$1, @1))
+            if (!add_func_parameter(ctx, &$$, &$1, &@1))
             {
                 ERR("Error adding function parameter %s.\n", $1.name);
                 YYABORT;
@@ -4620,7 +4621,7 @@ param_list:
     | param_list ',' parameter
         {
             $$ = $1;
-            if (!add_func_parameter(ctx, &$$, &$3, @3))
+            if (!add_func_parameter(ctx, &$$, &$3, &@3))
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                         "Parameter \"%s\" is already declared.", $3.name);
@@ -5063,59 +5064,59 @@ var_modifiers:
         }
     | KW_EXTERN var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_EXTERN, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_EXTERN, &@1);
         }
     | KW_NOINTERPOLATION var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_NOINTERPOLATION, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_NOINTERPOLATION, &@1);
         }
     | KW_PRECISE var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, &@1);
         }
     | KW_SHARED var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_SHARED, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_SHARED, &@1);
         }
     | KW_GROUPSHARED var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_GROUPSHARED, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_GROUPSHARED, &@1);
         }
     | KW_STATIC var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_STATIC, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_STATIC, &@1);
         }
     | KW_UNIFORM var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_UNIFORM, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_UNIFORM, &@1);
         }
     | KW_VOLATILE var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_VOLATILE, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_VOLATILE, &@1);
         }
     | KW_CONST var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_CONST, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_CONST, &@1);
         }
     | KW_ROW_MAJOR var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_ROW_MAJOR, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_ROW_MAJOR, &@1);
         }
     | KW_COLUMN_MAJOR var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_COLUMN_MAJOR, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_COLUMN_MAJOR, &@1);
         }
     | KW_IN var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN, &@1);
         }
     | KW_OUT var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_OUT, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_OUT, &@1);
         }
     | KW_INOUT var_modifiers
         {
-            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN | HLSL_STORAGE_OUT, @1);
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN | HLSL_STORAGE_OUT, &@1);
         }
 
 
@@ -5227,7 +5228,7 @@ statement:
 jump_statement:
       KW_RETURN expr ';'
         {
-            if (!add_return(ctx, $2, node_from_list($2), @1))
+            if (!add_return(ctx, $2, node_from_list($2), &@1))
                 YYABORT;
             $$ = $2;
         }
@@ -5235,7 +5236,7 @@ jump_statement:
         {
             if (!($$ = make_empty_list(ctx)))
                 YYABORT;
-            if (!add_return(ctx, $$, NULL, @1))
+            if (!add_return(ctx, $$, NULL, &@1))
                 YYABORT;
         }
 
@@ -5284,20 +5285,20 @@ if_body:
 loop_statement:
       KW_WHILE '(' expr ')' statement
         {
-            $$ = create_loop(ctx, LOOP_WHILE, NULL, $3, NULL, $5, @1);
+            $$ = create_loop(ctx, LOOP_WHILE, NULL, $3, NULL, $5, &@1);
         }
     | KW_DO statement KW_WHILE '(' expr ')' ';'
         {
-            $$ = create_loop(ctx, LOOP_DO_WHILE, NULL, $5, NULL, $2, @1);
+            $$ = create_loop(ctx, LOOP_DO_WHILE, NULL, $5, NULL, $2, &@1);
         }
     | KW_FOR '(' scope_start expr_statement expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
+            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, &@1);
             hlsl_pop_scope(ctx);
         }
     | KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, @1);
+            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, &@1);
             hlsl_pop_scope(ctx);
         }
 
@@ -5367,7 +5368,7 @@ primary_expr:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Variable \"%s\" is not defined.", $1);
                 YYABORT;
             }
-            if (!(load = hlsl_new_var_load(ctx, var, @1)))
+            if (!(load = hlsl_new_var_load(ctx, var, &@1)))
                 YYABORT;
             if (!($$ = make_list(ctx, &load->node)))
                 YYABORT;
@@ -5395,7 +5396,7 @@ primary_expr:
                 if (!(var = hlsl_new_synthetic_var(ctx, "state_block_expr",
                         hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), &@1)))
                     YYABORT;
-                if (!(load = hlsl_new_var_load(ctx, var, @1)))
+                if (!(load = hlsl_new_var_load(ctx, var, &@1)))
                     YYABORT;
                 if (!($$ = make_list(ctx, &load->node)))
                     YYABORT;
@@ -5411,7 +5412,7 @@ postfix_expr:
       primary_expr
     | postfix_expr OP_INC
         {
-            if (!add_increment(ctx, $1, false, true, @2))
+            if (!add_increment(ctx, $1, false, true, &@2))
             {
                 destroy_instr_list($1);
                 YYABORT;
@@ -5420,7 +5421,7 @@ postfix_expr:
         }
     | postfix_expr OP_DEC
         {
-            if (!add_increment(ctx, $1, true, true, @2))
+            if (!add_increment(ctx, $1, true, true, &@2))
             {
                 destroy_instr_list($1);
                 YYABORT;
@@ -5444,7 +5445,7 @@ postfix_expr:
                 }
 
                 field_idx = field - type->e.record.fields;
-                if (!add_record_access(ctx, $1, node, field_idx, @2))
+                if (!add_record_access(ctx, $1, node, field_idx, &@2))
                     YYABORT;
                 $$ = $1;
             }
@@ -5511,7 +5512,7 @@ postfix_expr:
                 YYABORT;
             }
 
-            if (!($$ = add_constructor(ctx, $2, &$4, @2)))
+            if (!($$ = add_constructor(ctx, $2, &$4, &@2)))
             {
                 free_parse_initializer(&$4);
                 YYABORT;
@@ -5538,7 +5539,7 @@ unary_expr:
       postfix_expr
     | OP_INC unary_expr
         {
-            if (!add_increment(ctx, $2, false, false, @1))
+            if (!add_increment(ctx, $2, false, false, &@1))
             {
                 destroy_instr_list($2);
                 YYABORT;
@@ -5547,7 +5548,7 @@ unary_expr:
         }
     | OP_DEC unary_expr
         {
-            if (!add_increment(ctx, $2, true, false, @1))
+            if (!add_increment(ctx, $2, true, false, &@1))
             {
                 destroy_instr_list($2);
                 YYABORT;
@@ -5624,31 +5625,31 @@ mul_expr:
       unary_expr
     | mul_expr '*' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MUL, &@2);
         }
     | mul_expr '/' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_DIV, &@2);
         }
     | mul_expr '%' unary_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_MOD, &@2);
         }
 
 add_expr:
       mul_expr
     | add_expr '+' mul_expr
         {
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
     | add_expr '-' mul_expr
         {
             struct hlsl_ir_node *neg;
 
-            if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), @2)))
+            if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, node_from_list($3), &@2)))
                 YYABORT;
             list_add_tail($3, &neg->entry);
-            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, @2);
+            $$ = add_binary_arithmetic_expr_merge(ctx, $1, $3, HLSL_OP2_ADD, &@2);
         }
 
 shift_expr:
@@ -5666,30 +5667,30 @@ relational_expr:
       shift_expr
     | relational_expr '<' shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_LESS, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_LESS, &@2);
         }
     | relational_expr '>' shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_LESS, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_LESS, &@2);
         }
     | relational_expr OP_LE shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_GEQUAL, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $3, $1, HLSL_OP2_GEQUAL, &@2);
         }
     | relational_expr OP_GE shift_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_GEQUAL, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_GEQUAL, &@2);
         }
 
 equality_expr:
       relational_expr
     | equality_expr OP_EQ relational_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_EQUAL, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_EQUAL, &@2);
         }
     | equality_expr OP_NE relational_expr
         {
-            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_NEQUAL, @2);
+            $$ = add_binary_comparison_expr_merge(ctx, $1, $3, HLSL_OP2_NEQUAL, &@2);
         }
 
 bitand_expr:
