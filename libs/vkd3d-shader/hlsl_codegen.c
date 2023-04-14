@@ -246,6 +246,9 @@ static enum hlsl_base_type base_type_get_semantic_equivalent(enum hlsl_base_type
 static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hlsl_type *type1,
         const struct hlsl_type *type2)
 {
+    if (ctx->profile->major_version < 4)
+        return true;
+
     if (type1->dimx != type2->dimx)
         return false;
 
