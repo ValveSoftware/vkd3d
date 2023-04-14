@@ -553,7 +553,7 @@ static bool init_deref_from_component_index(struct hlsl_ctx *ctx, struct hlsl_bl
 
         if (!(c = hlsl_new_uint_constant(ctx, next_index, loc)))
         {
-            hlsl_free_instr_list(&block->instrs);
+            hlsl_block_cleanup(block);
             return false;
         }
         hlsl_block_add_instr(block, &c->node);
@@ -1426,7 +1426,7 @@ static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
     {
         if (!(dst = clone_instr(ctx, map, src)))
         {
-            hlsl_free_instr_list(&dst_block->instrs);
+            hlsl_block_cleanup(dst_block);
             return false;
         }
         list_add_tail(&dst_block->instrs, &dst->entry);
@@ -1435,7 +1435,7 @@ static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
         {
             if (!vkd3d_array_reserve((void **)&map->instrs, &map->capacity, map->count + 1, sizeof(*map->instrs)))
             {
-                hlsl_free_instr_list(&dst_block->instrs);
+                hlsl_block_cleanup(dst_block);
                 return false;
             }
 
@@ -2577,6 +2577,11 @@ void hlsl_free_instr_list(struct list *list)
         hlsl_free_instr(node);
 }
 
+void hlsl_block_cleanup(struct hlsl_block *block)
+{
+    hlsl_free_instr_list(&block->instrs);
+}
+
 static void free_ir_call(struct hlsl_ir_call *call)
 {
     vkd3d_free(call);
@@ -2598,8 +2603,8 @@ static void free_ir_expr(struct hlsl_ir_expr *expr)
 
 static void free_ir_if(struct hlsl_ir_if *if_node)
 {
-    hlsl_free_instr_list(&if_node->then_instrs.instrs);
-    hlsl_free_instr_list(&if_node->else_instrs.instrs);
+    hlsl_block_cleanup(&if_node->then_instrs);
+    hlsl_block_cleanup(&if_node->else_instrs);
     hlsl_src_remove(&if_node->condition);
     vkd3d_free(if_node);
 }
@@ -2617,7 +2622,7 @@ static void free_ir_load(struct hlsl_ir_load *load)
 
 static void free_ir_loop(struct hlsl_ir_loop *loop)
 {
-    hlsl_free_instr_list(&loop->body.instrs);
+    hlsl_block_cleanup(&loop->body);
     vkd3d_free(loop);
 }
 
@@ -2741,7 +2746,7 @@ static void free_function_decl(struct hlsl_ir_function_decl *decl)
     vkd3d_free((void *)decl->attrs);
 
     vkd3d_free(decl->parameters.vars);
-    hlsl_free_instr_list(&decl->body.instrs);
+    hlsl_block_cleanup(&decl->body);
     vkd3d_free(decl);
 }
 
