@@ -1035,7 +1035,7 @@ static struct hlsl_reg_reservation parse_packoffset(struct hlsl_ctx *ctx, const 
         return reservation;
     }
 
-    reservation.offset_type = reg_string[0];
+    reservation.offset_type = ascii_tolower(reg_string[0]);
     if (reservation.offset_type != 'c')
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,

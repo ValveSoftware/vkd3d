@@ -156,7 +156,7 @@ float4 main() : sv_target
 cbuffer buffer
 {
     float4 a : packoffset(c1);
-    float4 b : packoffset(c2);
+    float4 b : packoffset(C2);
 }
 
 float4 main() : sv_target
