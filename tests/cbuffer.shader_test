@@ -1,3 +1,21 @@
+% Uppercase register set names
+[pixel shader]
+cbuffer Constants : register(B1)
+{
+};
+Texture2D tex : register(T1);
+float4 foo : register(C0);
+
+float4 main() : sv_target
+{
+    return foo;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
+
 [pixel shader]
 // Test empty constant buffer.
 cbuffer Constants : register(b1)
@@ -15,7 +33,6 @@ float4 main() : sv_target
 uniform 0 float4 1.0 2.0 3.0 4.0
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
-
 
 % SM1 buffer offset allocation follows different rules than SM4.
 % Those would have to be tested separately.
@@ -611,7 +628,7 @@ float4 main() : sv_target
 cbuffer buffer
 {
     float4 foo : packoffset(c0);
-    Texture2D tex : register(t1);
+    Texture2D tex : register(T1);
 }
 
 float4 main() : sv_target

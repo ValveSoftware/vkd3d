@@ -121,6 +121,20 @@ float4 main() : sv_target1
 draw quad
 probe uav 3 (0, 0) rgba (0.9, 0.8, 0.7, 0.6)
 
+% Uppercase register set name
+[pixel shader]
+RWTexture2D<float4> u : register(U3);
+
+float4 main() : sv_target1
+{
+    u[uint2(0, 0)] = float4(0.9, 0.8, 0.7, 0.6);
+    return 0;
+}
+
+[test]
+draw quad
+probe uav 3 (0, 0) rgba (0.9, 0.8, 0.7, 0.6)
+
 % Test that we can declare and use an array of UAVs.
 
 [uav 2]

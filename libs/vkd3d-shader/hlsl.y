@@ -1014,7 +1014,7 @@ static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
         FIXME("Unsupported register reservation syntax.\n");
         return reservation;
     }
-    reservation.reg_type = reg_string[0];
+    reservation.reg_type = ascii_tolower(reg_string[0]);
     return reservation;
 }
 
