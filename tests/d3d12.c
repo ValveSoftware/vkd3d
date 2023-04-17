@@ -16425,7 +16425,7 @@ static void test_update_root_descriptors(void)
 {
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_GPU_VIRTUAL_ADDRESS cb_va, uav_va;
-    D3D12_ROOT_PARAMETER root_parameters[2];
+    D3D12_ROOT_PARAMETER root_parameters[3];
     ID3D12GraphicsCommandList *command_list;
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
@@ -16498,8 +16498,12 @@ static void test_update_root_descriptors(void)
     root_parameters[1].Descriptor.ShaderRegister = 0;
     root_parameters[1].Descriptor.RegisterSpace = 0;
     root_parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    root_parameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+    root_parameters[2].Descriptor.ShaderRegister = 0;
+    root_parameters[2].Descriptor.RegisterSpace = 0;
+    root_parameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
     memset(&root_signature_desc, 0, sizeof(root_signature_desc));
-    root_signature_desc.NumParameters = 2;
+    root_signature_desc.NumParameters = 3;
     root_signature_desc.pParameters = root_parameters;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
     ok(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
@@ -16509,6 +16513,9 @@ static void test_update_root_descriptors(void)
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
+    ID3D12GraphicsCommandList_SetComputeRootConstantBufferView(command_list, 0, 0);
+    ID3D12GraphicsCommandList_SetComputeRootUnorderedAccessView(command_list, 1, 0);
+    ID3D12GraphicsCommandList_SetComputeRootShaderResourceView(command_list, 2, 0);
     for (i = 0; i < ARRAY_SIZE(input); ++i)
     {
         ID3D12GraphicsCommandList_SetComputeRootConstantBufferView(command_list,
