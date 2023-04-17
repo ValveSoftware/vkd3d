@@ -4481,11 +4481,20 @@ static void d3d12_command_list_set_root_cbv(struct d3d12_command_list *list,
     root_parameter = root_signature_get_root_descriptor(root_signature, index);
     assert(root_parameter->parameter_type == D3D12_ROOT_PARAMETER_TYPE_CBV);
 
-    resource = vkd3d_gpu_va_allocator_dereference(&list->device->gpu_va_allocator, gpu_address);
-    buffer_info.buffer = resource->u.vk_buffer;
-    buffer_info.offset = gpu_address - resource->gpu_address;
-    buffer_info.range = resource->desc.Width - buffer_info.offset;
-    buffer_info.range = min(buffer_info.range, vk_info->device_limits.maxUniformBufferRange);
+    if (gpu_address)
+    {
+        resource = vkd3d_gpu_va_allocator_dereference(&list->device->gpu_va_allocator, gpu_address);
+        buffer_info.buffer = resource->u.vk_buffer;
+        buffer_info.offset = gpu_address - resource->gpu_address;
+        buffer_info.range = resource->desc.Width - buffer_info.offset;
+        buffer_info.range = min(buffer_info.range, vk_info->device_limits.maxUniformBufferRange);
+    }
+    else
+    {
+        buffer_info.buffer = list->device->null_resources.vk_buffer;
+        buffer_info.offset = 0;
+        buffer_info.range = VK_WHOLE_SIZE;
+    }
 
     if (vk_info->KHR_push_descriptor)
     {
