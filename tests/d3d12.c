@@ -5013,6 +5013,7 @@ static void test_clear_unordered_access_view_image(void)
     ID3D12Device *device;
     UINT clear_value[4];
     HRESULT hr;
+    bool is_1d;
 
 #define IMAGE_SIZE 16
     static const struct
@@ -5087,6 +5088,7 @@ static void test_clear_unordered_access_view_image(void)
     }
     uav_dimensions[] =
     {
+        {D3D12_RESOURCE_DIMENSION_TEXTURE1D, D3D12_UAV_DIMENSION_TEXTURE1D,      false},
         {D3D12_RESOURCE_DIMENSION_TEXTURE2D, D3D12_UAV_DIMENSION_TEXTURE2D,      false},
         {D3D12_RESOURCE_DIMENSION_TEXTURE2D, D3D12_UAV_DIMENSION_TEXTURE2DARRAY, true },
         /* Expected behaviour with partial layer coverage is unclear. */
@@ -5116,12 +5118,12 @@ static void test_clear_unordered_access_view_image(void)
 
             vkd3d_test_push_context("Dim %u, Test %u", d, i);
 
+            is_1d = uav_dimensions[d].resource_dim == D3D12_RESOURCE_DIMENSION_TEXTURE1D;
+
             resource_desc.Dimension = uav_dimensions[d].resource_dim;
             resource_desc.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
             resource_desc.Width = IMAGE_SIZE;
-            resource_desc.Height = IMAGE_SIZE;
-            if (uav_dimensions[d].resource_dim == D3D12_RESOURCE_DIMENSION_TEXTURE1D)
-                resource_desc.Height = 1;
+            resource_desc.Height = is_1d ? 1 : IMAGE_SIZE;
             resource_desc.DepthOrArraySize = tests[i].image_layers;
             resource_desc.MipLevels = tests[i].image_mips;
             resource_desc.Format = tests[i].format;
@@ -5223,7 +5225,7 @@ static void test_clear_unordered_access_view_image(void)
                         tests[i].mip_level + (layer * tests[i].image_mips),
                         &rb, queue, command_list);
 
-                for (p = 0; p < image_depth * image_size * image_size; ++p)
+                for (p = 0; p < image_depth * (is_1d ? 1 : image_size) * image_size; ++p)
                 {
                     x = p % image_size;
                     y = (p / image_size) % image_size;
@@ -5252,7 +5254,7 @@ static void test_clear_unordered_access_view_image(void)
                     actual_colour = get_readback_uint(&rb.rb, x, y, z);
                     success = compare_color(actual_colour, expected_colour, tests[i].is_float ? 1 : 0);
 
-                    todo_if(tests[i].is_todo && expected_colour)
+                    todo_if((tests[i].is_todo || (is_1d && tests[i].mip_level)) && expected_colour)
                     ok(success, "At layer %u, (%u,%u,%u), expected %#x, got %#x.\n",
                             layer, x, y, z, expected_colour, actual_colour);
 
