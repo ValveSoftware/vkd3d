@@ -5367,7 +5367,6 @@ static void test_draw_indexed_instanced(void)
 
     ib = create_upload_buffer(context.device, sizeof(indices), indices);
 
-    ibv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(ib);
     ibv.SizeInBytes = sizeof(indices);
     ibv.Format = DXGI_FORMAT_R16_UINT;
 
@@ -5384,6 +5383,9 @@ static void test_draw_indexed_instanced(void)
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     ID3D12GraphicsCommandList_IASetIndexBuffer(command_list, NULL);
+    ibv.BufferLocation = 0;
+    ID3D12GraphicsCommandList_IASetIndexBuffer(command_list, &ibv);
+    ibv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(ib);
     ID3D12GraphicsCommandList_IASetIndexBuffer(command_list, &ibv);
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
     ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
