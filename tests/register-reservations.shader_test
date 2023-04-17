@@ -23,6 +23,38 @@ size (1, 1)
 4.0 4.0 4.0 99.0
 
 
+% If a single component in a texture array is used, all registers are reserved.
+[pixel shader todo]
+Texture2D partially_used[2][2];
+Texture2D tex;
+
+float4 main() : sv_target
+{
+    return 10 * tex.Load(int3(0, 0, 0)) + partially_used[0][1].Load(int3(0, 0, 0));
+}
+
+[test]
+todo draw quad
+todo probe all rgba (41.0, 41.0, 41.0, 1089.0)
+
+
+% If no component in a texture array is used, and it doesn't have a register reservation, no
+% register is reserved.
+[pixel shader]
+Texture2D unused[4];
+Texture2D tex;
+
+float4 main() : sv_target
+{
+    return tex.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 99.0)
+
+
+% Register reservations force to reserve all the resource registers. Even if unused.
 [pixel shader]
 Texture2D unused : register(t0);
 Texture2D tex;
