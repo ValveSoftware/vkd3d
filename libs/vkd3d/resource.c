@@ -2985,6 +2985,11 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
 
         switch (desc->ViewDimension)
         {
+            case D3D12_SRV_DIMENSION_TEXTURE1D:
+                vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_1D;
+                vkd3d_desc.miplevel_idx = desc->u.Texture1D.MostDetailedMip;
+                vkd3d_desc.miplevel_count = desc->u.Texture1D.MipLevels;
+                break;
             case D3D12_SRV_DIMENSION_TEXTURE2D:
                 vkd3d_desc.view_type = VK_IMAGE_VIEW_TYPE_2D;
                 vkd3d_desc.miplevel_idx = desc->u.Texture2D.MostDetailedMip;
