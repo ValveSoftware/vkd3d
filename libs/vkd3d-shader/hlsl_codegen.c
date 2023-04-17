@@ -3675,6 +3675,25 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
     }
 }
 
+static bool type_has_object_components(struct hlsl_type *type)
+{
+    if (type->class == HLSL_CLASS_OBJECT)
+        return true;
+    if (type->class == HLSL_CLASS_ARRAY)
+        return type_has_object_components(type->e.array.type);
+    if (type->class == HLSL_CLASS_STRUCT)
+    {
+        unsigned int i;
+
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            if (type_has_object_components(type->e.record.fields[i].type))
+                return true;
+        }
+    }
+    return false;
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -3718,6 +3737,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         }
         else
         {
+            if (type_has_object_components(var->data_type))
+                hlsl_fixme(ctx, &var->loc, "Prepend uniform copies for object components within structs.");
+
             if (hlsl_get_multiarray_element_type(var->data_type)->class != HLSL_CLASS_STRUCT
                     && !var->semantic.name)
             {
