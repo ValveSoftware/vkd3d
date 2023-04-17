@@ -4653,6 +4653,11 @@ static void STDMETHODCALLTYPE d3d12_command_list_IASetIndexBuffer(ID3D12Graphics
         WARN("Ignoring NULL index buffer view.\n");
         return;
     }
+    if (!view->BufferLocation)
+    {
+        WARN("Ignoring index buffer location 0.\n");
+        return;
+    }
 
     vk_procs = &list->device->vk_procs;
 
