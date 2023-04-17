@@ -5254,7 +5254,7 @@ static void test_clear_unordered_access_view_image(void)
                     actual_colour = get_readback_uint(&rb.rb, x, y, z);
                     success = compare_color(actual_colour, expected_colour, tests[i].is_float ? 1 : 0);
 
-                    todo_if((tests[i].is_todo || (is_1d && tests[i].mip_level)) && expected_colour)
+                    todo_if(tests[i].is_todo && expected_colour)
                     ok(success, "At layer %u, (%u,%u,%u), expected %#x, got %#x.\n",
                             layer, x, y, z, expected_colour, actual_colour);
 

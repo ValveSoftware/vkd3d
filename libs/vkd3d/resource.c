@@ -3210,6 +3210,9 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
     {
         switch (desc->ViewDimension)
         {
+            case D3D12_UAV_DIMENSION_TEXTURE1D:
+                vkd3d_desc.miplevel_idx = desc->u.Texture1D.MipSlice;
+                break;
             case D3D12_UAV_DIMENSION_TEXTURE2D:
                 vkd3d_desc.miplevel_idx = desc->u.Texture2D.MipSlice;
                 if (desc->u.Texture2D.PlaneSlice)
