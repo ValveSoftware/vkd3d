@@ -4556,13 +4556,13 @@ static void d3d12_command_list_set_root_descriptor(struct d3d12_command_list *li
     assert(root_parameter->parameter_type != D3D12_ROOT_PARAMETER_TYPE_CBV);
 
     /* FIXME: Re-use buffer views. */
-    if (!vkd3d_create_raw_buffer_view(list->device, gpu_address, &vk_buffer_view))
+    if (!vkd3d_create_raw_buffer_view(list->device, gpu_address, root_parameter->parameter_type, &vk_buffer_view))
     {
         ERR("Failed to create buffer view.\n");
         return;
     }
 
-    if (!(d3d12_command_allocator_add_buffer_view(list->allocator, vk_buffer_view)))
+    if (vk_buffer_view && !(d3d12_command_allocator_add_buffer_view(list->allocator, vk_buffer_view)))
     {
         ERR("Failed to add buffer view.\n");
         VK_CALL(vkDestroyBufferView(vk_device, vk_buffer_view, NULL));
