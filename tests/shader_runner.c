@@ -780,9 +780,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
         if (!ret || line[0] == '[')
         {
-            if (state != STATE_NONE)
-                vkd3d_test_pop_context();
-
             switch (state)
             {
                 case STATE_INPUT_LAYOUT:
@@ -793,7 +790,10 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 case STATE_REQUIRE:
                     if (runner->ops->check_requirements && !runner->ops->check_requirements(runner))
+                    {
+                        vkd3d_test_pop_context();
                         goto out;
+                    }
                     break;
 
                 case STATE_RESOURCE:
@@ -884,6 +884,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
                 }
             }
+
+            if (state != STATE_NONE)
+                vkd3d_test_pop_context();
         }
 
         if (!ret)
