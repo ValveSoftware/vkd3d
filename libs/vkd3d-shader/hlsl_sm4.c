@@ -653,7 +653,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         var = extern_resources[i];
 
         string_offset = put_string(&buffer, var->name);
-        set_u32(&buffer, resources_offset + i++ * 8 * sizeof(uint32_t), string_offset);
+        set_u32(&buffer, resources_offset + i * 8 * sizeof(uint32_t), string_offset);
     }
 
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
