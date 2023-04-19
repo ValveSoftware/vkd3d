@@ -3612,6 +3612,272 @@ static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
     }
 }
 
+static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
+    struct hlsl_ir_resource_load *load;
+    bool multisampled;
+
+    multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
+
+    if (params->args_count < 1 + multisampled || params->args_count > 3 + multisampled)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method 'Load': expected between %u and %u, but got %u.",
+                1 + multisampled, 3 + multisampled, params->args_count);
+        return false;
+    }
+    if (multisampled)
+    {
+        hlsl_fixme(ctx, loc, "Load() sampling index parameter.");
+    }
+
+    assert(offset_dim);
+    if (params->args_count > 1 + multisampled)
+    {
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+            return false;
+    }
+    if (params->args_count > 2 + multisampled)
+    {
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+    }
+
+    /* +1 for the mipmap level */
+    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[0],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
+        return false;
+
+    load_params.format = object_type->e.resource_format;
+    load_params.resource = object;
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+    return true;
+}
+
+static bool add_sample_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
+    const struct hlsl_type *sampler_type;
+    struct hlsl_ir_resource_load *load;
+
+    if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method 'Sample': expected from 2 to %u, but got %u.",
+                4 + !!offset_dim, params->args_count);
+        return false;
+    }
+
+    sampler_type = params->args[0]->data_type;
+    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, sampler_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 0 of Sample(): expected 'sampler', but got '%s'.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
+        return false;
+
+    if (offset_dim && params->args_count > 2)
+    {
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+            return false;
+    }
+
+    if (params->args_count > 2 + !!offset_dim)
+        hlsl_fixme(ctx, loc, "Sample() clamp parameter.");
+    if (params->args_count > 3 + !!offset_dim)
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+
+    load_params.format = object_type->e.resource_format;
+    load_params.resource = object;
+    load_params.sampler = params->args[0];
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+
+    return true;
+}
+
+static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    struct hlsl_resource_load_params load_params = {0};
+    const struct hlsl_type *sampler_type;
+    struct hlsl_ir_resource_load *load;
+    unsigned int read_channel;
+
+    if (!strcmp(name, "GatherGreen"))
+    {
+        load_params.type = HLSL_RESOURCE_GATHER_GREEN;
+        read_channel = 1;
+    }
+    else if (!strcmp(name, "GatherBlue"))
+    {
+        load_params.type = HLSL_RESOURCE_GATHER_BLUE;
+        read_channel = 2;
+    }
+    else if (!strcmp(name, "GatherAlpha"))
+    {
+        load_params.type = HLSL_RESOURCE_GATHER_ALPHA;
+        read_channel = 3;
+    }
+    else
+    {
+        load_params.type = HLSL_RESOURCE_GATHER_RED;
+        read_channel = 0;
+    }
+
+    if (!strcmp(name, "Gather") || !offset_dim)
+    {
+        if (params->args_count < 2 || params->args_count > 3 + !!offset_dim)
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                    "Wrong number of arguments to method '%s': expected from 2 to %u, but got %u.",
+                    name, 3 + !!offset_dim, params->args_count);
+            return false;
+        }
+    }
+    else if (params->args_count < 2 || params->args_count == 5 || params->args_count > 7)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method '%s': expected 2, 3, 4, 6 or 7, but got %u.",
+                name, params->args_count);
+        return false;
+    }
+
+    if (params->args_count == 3 + !!offset_dim || params->args_count == 7)
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+
+    if (params->args_count == 6 || params->args_count == 7)
+    {
+        hlsl_fixme(ctx, loc, "Multiple %s() offset parameters.", name);
+    }
+    else if (offset_dim && params->args_count > 2)
+    {
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+            return false;
+    }
+
+    sampler_type = params->args[0]->data_type;
+    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, sampler_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 1 of %s(): expected 'sampler', but got '%s'.", name, string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (read_channel >= object_type->e.resource_format->dimx)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Method %s() requires at least %u channels.", name, read_channel + 1);
+        return false;
+    }
+
+    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
+        return false;
+
+    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
+    load_params.resource = object;
+    load_params.sampler = params->args[0];
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+    return true;
+}
+
+static bool add_sample_level_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE_LOD};
+    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    const struct hlsl_type *sampler_type;
+    struct hlsl_ir_resource_load *load;
+
+    if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                "Wrong number of arguments to method 'SampleLevel': expected from 3 to %u, but got %u.",
+                4 + !!offset_dim, params->args_count);
+        return false;
+    }
+
+    sampler_type = params->args[0]->data_type;
+    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, sampler_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Wrong type for argument 0 of SampleLevel(): expected 'sampler', but got '%s'.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
+            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
+        load_params.coords = params->args[1];
+
+    if (!(load_params.lod = add_implicit_conversion(ctx, instrs, params->args[2],
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
+        load_params.lod = params->args[2];
+
+    if (offset_dim && params->args_count > 3)
+    {
+        if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[3],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
+            return false;
+    }
+
+    if (params->args_count > 3 + !!offset_dim)
+        hlsl_fixme(ctx, loc, "Tiled resource status argument.");
+
+    load_params.format = object_type->e.resource_format;
+    load_params.resource = object;
+    load_params.sampler = params->args[0];
+
+    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    list_add_tail(instrs, &load->node.entry);
+    return true;
+}
+
 static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3633,108 +3899,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBE
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
     {
-        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
-        struct hlsl_ir_resource_load *load;
-        bool multisampled;
-
-        multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-                || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
-
-        if (params->args_count < 1 + multisampled || params->args_count > 3 + multisampled)
-        {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'Load': expected between %u and %u, but got %u.",
-                    1 + multisampled, 3 + multisampled, params->args_count);
-            return false;
-        }
-        if (multisampled)
-        {
-            hlsl_fixme(ctx, loc, "Load() sampling index parameter.");
-        }
-
-        assert(offset_dim);
-        if (params->args_count > 1 + multisampled)
-        {
-            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[1 + multisampled],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-                return false;
-        }
-        if (params->args_count > 2 + multisampled)
-        {
-            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
-        }
-
-        /* +1 for the mipmap level */
-        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[0],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
-            return false;
-
-        load_params.format = object_type->e.resource_format;
-        load_params.resource = object;
-
-        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-            return false;
-        list_add_tail(instrs, &load->node.entry);
-        return true;
+        return add_load_method_call(ctx, instrs, object, name, params, loc);
     }
     else if (!strcmp(name, "Sample")
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
-        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
-        const struct hlsl_type *sampler_type;
-        struct hlsl_ir_resource_load *load;
-
-        if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
-        {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'Sample': expected from 2 to %u, but got %u.",
-                    4 + !!offset_dim, params->args_count);
-            return false;
-        }
-
-        sampler_type = params->args[0]->data_type;
-        if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-                || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_type_to_string(ctx, sampler_type)))
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Wrong type for argument 0 of Sample(): expected 'sampler', but got '%s'.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-            return false;
-        }
-
-        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-            return false;
-
-        if (offset_dim && params->args_count > 2)
-        {
-            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-                return false;
-        }
-
-        if (params->args_count > 2 + !!offset_dim)
-            hlsl_fixme(ctx, loc, "Sample() clamp parameter.");
-        if (params->args_count > 3 + !!offset_dim)
-            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
-
-        load_params.format = object_type->e.resource_format;
-        load_params.resource = object;
-        load_params.sampler = params->args[0];
-
-        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-            return false;
-        list_add_tail(instrs, &load->node.entry);
-
-        return true;
+        return add_sample_method_call(ctx, instrs, object, name, params, loc);
     }
     else if ((!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
             || !strcmp(name, "GatherGreen") || !strcmp(name, "GatherAlpha"))
@@ -3743,156 +3914,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBE
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY))
     {
-        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-        struct hlsl_resource_load_params load_params = {0};
-        const struct hlsl_type *sampler_type;
-        struct hlsl_ir_resource_load *load;
-        unsigned int read_channel;
-
-        if (!strcmp(name, "GatherGreen"))
-        {
-            load_params.type = HLSL_RESOURCE_GATHER_GREEN;
-            read_channel = 1;
-        }
-        else if (!strcmp(name, "GatherBlue"))
-        {
-            load_params.type = HLSL_RESOURCE_GATHER_BLUE;
-            read_channel = 2;
-        }
-        else if (!strcmp(name, "GatherAlpha"))
-        {
-            load_params.type = HLSL_RESOURCE_GATHER_ALPHA;
-            read_channel = 3;
-        }
-        else
-        {
-            load_params.type = HLSL_RESOURCE_GATHER_RED;
-            read_channel = 0;
-        }
-
-        if (!strcmp(name, "Gather") || !offset_dim)
-        {
-            if (params->args_count < 2 || params->args_count > 3 + !!offset_dim)
-            {
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                        "Wrong number of arguments to method '%s': expected from 2 to %u, but got %u.",
-                        name, 3 + !!offset_dim, params->args_count);
-                return false;
-            }
-        }
-        else if (params->args_count < 2 || params->args_count == 5 || params->args_count > 7)
-        {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method '%s': expected 2, 3, 4, 6 or 7, but got %u.",
-                    name, params->args_count);
-            return false;
-        }
-
-        if (params->args_count == 3 + !!offset_dim || params->args_count == 7)
-            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
-
-        if (params->args_count == 6 || params->args_count == 7)
-        {
-            hlsl_fixme(ctx, loc, "Multiple %s() offset parameters.", name);
-        }
-        else if (offset_dim && params->args_count > 2)
-        {
-            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[2],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-                return false;
-        }
-
-        sampler_type = params->args[0]->data_type;
-        if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-                || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_type_to_string(ctx, sampler_type)))
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Wrong type for argument 1 of %s(): expected 'sampler', but got '%s'.", name, string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-            return false;
-        }
-
-        if (read_channel >= object_type->e.resource_format->dimx)
-        {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Method %s() requires at least %u channels.", name, read_channel + 1);
-            return false;
-        }
-
-        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-            return false;
-
-        load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
-        load_params.resource = object;
-        load_params.sampler = params->args[0];
-
-        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-            return false;
-        list_add_tail(instrs, &load->node.entry);
-        return true;
+        return add_gather_method_call(ctx, instrs, object, name, params, loc);
     }
     else if (!strcmp(name, "SampleLevel")
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
-        struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE_LOD};
-        const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-        const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-        const struct hlsl_type *sampler_type;
-        struct hlsl_ir_resource_load *load;
-
-        if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
-        {
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                    "Wrong number of arguments to method 'SampleLevel': expected from 3 to %u, but got %u.",
-                    4 + !!offset_dim, params->args_count);
-            return false;
-        }
-
-        sampler_type = params->args[0]->data_type;
-        if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-                || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_type_to_string(ctx, sampler_type)))
-                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Wrong type for argument 0 of SampleLevel(): expected 'sampler', but got '%s'.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-            return false;
-        }
-
-        if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[1],
-                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
-            load_params.coords = params->args[1];
-
-        if (!(load_params.lod = add_implicit_conversion(ctx, instrs, params->args[2],
-                hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
-            load_params.lod = params->args[2];
-
-        if (offset_dim && params->args_count > 3)
-        {
-            if (!(load_params.texel_offset = add_implicit_conversion(ctx, instrs, params->args[3],
-                    hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
-                return false;
-        }
-
-        if (params->args_count > 3 + !!offset_dim)
-            hlsl_fixme(ctx, loc, "Tiled resource status argument.");
-
-        load_params.format = object_type->e.resource_format;
-        load_params.resource = object;
-        load_params.sampler = params->args[0];
-
-        if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
-            return false;
-        list_add_tail(instrs, &load->node.entry);
-        return true;
+        return add_sample_level_method_call(ctx, instrs, object, name, params, loc);
     }
     else
     {
