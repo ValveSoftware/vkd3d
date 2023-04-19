@@ -3819,21 +3819,26 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct list *instrs, st
     return true;
 }
 
-static bool add_sample_level_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE_LOD};
+    struct hlsl_resource_load_params load_params = { 0 };
     const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_resource_load *load;
 
+    if (!strcmp(name, "SampleLevel"))
+        load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
+    else
+        load_params.type = HLSL_RESOURCE_SAMPLE_LOD_BIAS;
+
     if (params->args_count < 3 || params->args_count > 4 + !!offset_dim)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                "Wrong number of arguments to method 'SampleLevel': expected from 3 to %u, but got %u.",
-                4 + !!offset_dim, params->args_count);
+                "Wrong number of arguments to method '%s': expected from 3 to %u, but got %u.",
+                name, 4 + !!offset_dim, params->args_count);
         return false;
     }
 
@@ -3845,7 +3850,7 @@ static bool add_sample_level_method_call(struct hlsl_ctx *ctx, struct list *inst
 
         if ((string = hlsl_type_to_string(ctx, sampler_type)))
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Wrong type for argument 0 of SampleLevel(): expected 'sampler', but got '%s'.", string->buffer);
+                    "Wrong type for argument 0 of %s(): expected 'sampler', but got '%s'.", name, string->buffer);
         hlsl_release_string_buffer(ctx, string);
         return false;
     }
@@ -3920,7 +3925,13 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
             && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
     {
-        return add_sample_level_method_call(ctx, instrs, object, name, params, loc);
+        return add_sample_lod_method_call(ctx, instrs, object, name, params, loc);
+    }
+    else if (!strcmp(name, "SampleBias")
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
+            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
+    {
+        return add_sample_lod_method_call(ctx, instrs, object, name, params, loc);
     }
     else
     {
