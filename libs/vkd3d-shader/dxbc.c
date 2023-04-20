@@ -89,12 +89,6 @@ int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *out)
     return vkd3d_shader_serialize_dxbc(dxbc->section_count, dxbc->sections, out, NULL);
 }
 
-struct vkd3d_shader_src_param_entry
-{
-    struct list entry;
-    struct vkd3d_shader_src_param param;
-};
-
 static bool require_space(size_t offset, size_t count, size_t size, size_t data_size)
 {
     return !count || (data_size - offset) / count >= size;
