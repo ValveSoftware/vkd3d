@@ -3963,10 +3963,12 @@ static void STDMETHODCALLTYPE d3d12_command_list_RSSetViewports(ID3D12GraphicsCo
         vk_viewports[i].minDepth = viewports[i].MinDepth;
         vk_viewports[i].maxDepth = viewports[i].MaxDepth;
 
-        if (!vk_viewports[i].width || !vk_viewports[i].height)
+        if (!vk_viewports[i].width)
         {
-            FIXME_ONCE("Invalid viewport %u, ignoring RSSetViewports().\n", i);
-            return;
+            /* Vulkan does not support width <= 0 */
+            FIXME_ONCE("Setting invalid viewport %u to zero height.\n", i);
+            vk_viewports[i].width = 1.0f;
+            vk_viewports[i].height = 0.0f;
         }
     }
 
