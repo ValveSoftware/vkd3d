@@ -2222,7 +2222,7 @@ static bool type_is_integer(const struct hlsl_type *type)
 }
 
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
-        bool output, enum vkd3d_sm4_register_type *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
+        bool output, unsigned int *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
 {
     unsigned int i;
 
