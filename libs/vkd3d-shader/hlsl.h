@@ -24,7 +24,9 @@
 #include "rbtree.h"
 #include "vkd3d_d3dcommon.h"
 #include "vkd3d_d3dx9shader.h"
-#include "sm4.h"
+
+enum vkd3d_sm4_register_type;
+enum vkd3d_sm4_swizzle_type;
 
 /* The general IR structure is inspired by Mesa GLSL hir, even though the code
  * ends up being quite different in practice. Anyway, here comes the relevant
