@@ -255,6 +255,7 @@ libvkd3d_shader_la_SOURCES = \
 	include/private/vkd3d_memory.h \
 	include/vkd3d_shader.h \
 	libs/vkd3d-shader/checksum.c \
+	libs/vkd3d-shader/d3d_asm.c \
 	libs/vkd3d-shader/d3dbc.c \
 	libs/vkd3d-shader/dxbc.c \
 	libs/vkd3d-shader/glsl.c \
@@ -266,7 +267,6 @@ libvkd3d_shader_la_SOURCES = \
 	libs/vkd3d-shader/preproc.h \
 	libs/vkd3d-shader/spirv.c \
 	libs/vkd3d-shader/tpf.c \
-	libs/vkd3d-shader/trace.c \
 	libs/vkd3d-shader/vkd3d_shader.map \
 	libs/vkd3d-shader/vkd3d_shader_main.c \
 	libs/vkd3d-shader/vkd3d_shader_private.h
