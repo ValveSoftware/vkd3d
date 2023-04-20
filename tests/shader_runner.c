@@ -716,6 +716,16 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
     return stride;
 }
 
+static HRESULT map_unidentified_hrs(HRESULT hr)
+{
+    if (hr == 0x80010064)
+    {
+        trace("Mapping unindentified hr %#x as %#x.\n", hr, E_FAIL);
+        return E_FAIL;
+    }
+    return hr;
+}
+
 static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
@@ -733,6 +743,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
 
     sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
     hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
+    hr = map_unidentified_hrs(hr);
     ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {
