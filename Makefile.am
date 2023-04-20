@@ -257,11 +257,11 @@ libvkd3d_shader_la_SOURCES = \
 	libs/vkd3d-shader/hlsl_codegen.c \
 	libs/vkd3d-shader/hlsl_constant_ops.c \
 	libs/vkd3d-shader/hlsl_sm1.c \
-	libs/vkd3d-shader/hlsl_sm4.c \
 	libs/vkd3d-shader/ir.c \
 	libs/vkd3d-shader/preproc.h \
 	libs/vkd3d-shader/sm4.h \
 	libs/vkd3d-shader/spirv.c \
+	libs/vkd3d-shader/tpf.c \
 	libs/vkd3d-shader/trace.c \
 	libs/vkd3d-shader/vkd3d_shader.map \
 	libs/vkd3d-shader/vkd3d_shader_main.c \
