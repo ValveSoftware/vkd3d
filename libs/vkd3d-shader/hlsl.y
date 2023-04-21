@@ -3165,6 +3165,42 @@ static bool intrinsic_saturate(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, arg, loc);
 }
 
+static bool intrinsic_sign(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *lt, *neg, *op1, *op2, *arg = params->args[0];
+    struct hlsl_ir_constant *zero;
+
+    struct hlsl_type *int_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_INT,
+            arg->data_type->dimx, arg->data_type->dimy);
+
+    if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->base_type), loc)))
+        return false;
+    list_add_tail(params->instrs, &zero->node.entry);
+
+    /* Check if 0 < arg, cast bool to int */
+
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, &zero->node, arg, loc)))
+        return false;
+
+    if (!(op1 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))
+        return false;
+
+    /* Check if arg < 0, cast bool to int and invert (meaning true is -1) */
+
+    if (!(lt = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, arg, &zero->node, loc)))
+        return false;
+
+    if (!(op2 = add_implicit_conversion(ctx, params->instrs, lt, int_type, loc)))
+        return false;
+
+    if (!(neg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, op2, loc)))
+        return false;
+
+    /* Adding these two together will make 1 when > 0, -1 when < 0, and 0 when neither */
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, neg, op1, loc);
+}
+
 static bool intrinsic_sin(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3483,6 +3519,7 @@ intrinsic_functions[] =
     {"round",                               1, true,  intrinsic_round},
     {"rsqrt",                               1, true,  intrinsic_rsqrt},
     {"saturate",                            1, true,  intrinsic_saturate},
+    {"sign",                                1, true,  intrinsic_sign},
     {"sin",                                 1, true,  intrinsic_sin},
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
