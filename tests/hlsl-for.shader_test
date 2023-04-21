@@ -9,7 +9,7 @@ float4 main(float tex : texcoord) : sv_target
 {
     int i;
     float x = 0.0;
-    for (i = 0; i < 10; i++)
+    [unroll] for (i = 0; i < 10; i++)
     {
         x += i;
         if (tex > 0.5 && i == 5)
@@ -26,3 +26,31 @@ todo draw quad
 probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
 probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
 probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main(float tex : texcoord) : sv_target
+{
+    int i;
+    float x = 0.0;
+    [unroll] [attr1] for (i = 0; i < 10; i++)
+    {
+        x += i;
+    }
+    return float4(i, x, 0.0, 0.0);
+}
+
+[test]
+draw quad
+probe all rgba (10.0, 45.0, 0.0, 0.0)
+
+[pixel shader fail]
+float4 main(float tex : texcoord) : sv_target
+{
+    int i;
+    float x = 0.0;
+    [unroll] [unroll] for (i = 0; i < 10; i++)
+    {
+        x += i;
+    }
+    return float4(i, x, 0.0, 0.0);
+}

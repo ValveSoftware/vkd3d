@@ -439,11 +439,58 @@ enum loop_type
     LOOP_DO_WHILE
 };
 
-static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, struct list *init, struct list *cond,
+static bool attribute_list_has_duplicates(const struct parse_attribute_list *attrs)
+{
+    unsigned int i, j;
+
+    for (i = 0; i < attrs->count; ++i)
+    {
+        for (j = i + 1; j < attrs->count; ++j)
+        {
+            if (!strcmp(attrs->attrs[i]->name, attrs->attrs[j]->name))
+                 return true;
+        }
+    }
+
+    return false;
+}
+
+static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const struct parse_attribute_list *attributes, struct list *init, struct list *cond,
         struct list *iter, struct list *body, const struct vkd3d_shader_location *loc)
 {
     struct list *list = NULL;
     struct hlsl_ir_loop *loop = NULL;
+    unsigned int i;
+
+    if (attribute_list_has_duplicates(attributes))
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
+
+    /* Ignore unroll(0) attribute, and any invalid attribute. */
+    for (i = 0; i < attributes->count; ++i)
+    {
+        const struct hlsl_attribute *attr = attributes->attrs[i];
+        if (!strcmp(attr->name, "unroll"))
+        {
+            if (attr->args_count)
+            {
+                hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Unroll attribute with iteration count.");
+            }
+            else
+            {
+                hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Loop unrolling is not implemented.\n");
+            }
+        }
+        else if (!strcmp(attr->name, "loop")
+                || !strcmp(attr->name, "fastopt")
+                || !strcmp(attr->name, "allow_uav_condition"))
+        {
+            hlsl_fixme(ctx, loc, "Unhandled attribute %s.", attr->name);
+        }
+        else
+        {
+            hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Unrecognized attribute %s.", attr->name);
+        }
+    }
 
     if (!(list = make_empty_list(ctx)))
         goto oom;
@@ -4063,6 +4110,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <attr> attribute
 
 %type <attr_list> attribute_list
+%type <attr_list> attribute_list_optional
 
 %type <boolval> boolean
 
@@ -4356,6 +4404,14 @@ attribute_list:
             $$.attrs = new_array;
             $$.attrs[$$.count++] = $2;
         }
+
+attribute_list_optional:
+      %empty
+        {
+            $$.count = 0;
+            $$.attrs = NULL;
+        }
+      | attribute_list
 
 func_declaration:
       func_prototype compound_statement
@@ -5328,22 +5384,22 @@ if_body:
         }
 
 loop_statement:
-      KW_WHILE '(' expr ')' statement
+      attribute_list_optional KW_WHILE '(' expr ')' statement
         {
-            $$ = create_loop(ctx, LOOP_WHILE, NULL, $3, NULL, $5, &@1);
+            $$ = create_loop(ctx, LOOP_WHILE, &$1, NULL, $4, NULL, $6, &@2);
         }
-    | KW_DO statement KW_WHILE '(' expr ')' ';'
+    | attribute_list_optional KW_DO statement KW_WHILE '(' expr ')' ';'
         {
-            $$ = create_loop(ctx, LOOP_DO_WHILE, NULL, $5, NULL, $2, &@1);
+            $$ = create_loop(ctx, LOOP_DO_WHILE, &$1, NULL, $6, NULL, $3, &@2);
         }
-    | KW_FOR '(' scope_start expr_statement expr_statement expr_optional ')' statement
+    | attribute_list_optional KW_FOR '(' scope_start expr_statement expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, &@1);
+            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
             hlsl_pop_scope(ctx);
         }
-    | KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
+    | attribute_list_optional KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
         {
-            $$ = create_loop(ctx, LOOP_FOR, $4, $5, $6, $8, &@1);
+            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
             hlsl_pop_scope(ctx);
         }
 
