@@ -930,12 +930,10 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkRenderPassBeginInfo pass_begin_desc = {.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
     VkCommandBuffer cmd_buffer = runner->cmd_buffer;
-    VkClearAttachment clear_attachment;
     VkDescriptorSetLayout set_layout;
     VkPipelineLayout pipeline_layout;
     VkDevice device = runner->device;
     VkRenderPass render_pass;
-    VkClearRect clear_rect;
     VkPipeline pipeline;
     VkFramebuffer fb;
     bool ret = false;
@@ -957,16 +955,6 @@ static bool vulkan_runner_draw(struct shader_runner *r,
     pass_begin_desc.renderArea = rt_rect;
 
     VK_CALL(vkCmdBeginRenderPass(cmd_buffer, &pass_begin_desc, VK_SUBPASS_CONTENTS_INLINE));
-
-    clear_attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    clear_attachment.colorAttachment = 0;
-    memset(&clear_attachment.clearValue.color, 0, sizeof(clear_attachment.clearValue.color));
-
-    clear_rect.rect = rt_rect;
-    clear_rect.baseArrayLayer = 0;
-    clear_rect.layerCount = 1;
-
-    VK_CALL(vkCmdClearAttachments(cmd_buffer, 1, &clear_attachment, 1, &clear_rect));
 
     VK_CALL(vkCmdBindPipeline(cmd_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline));
 
