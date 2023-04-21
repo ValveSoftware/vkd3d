@@ -152,7 +152,9 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     formats[] =
     {
         {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32b32a32 uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
         {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
+        {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
         {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
         {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
         {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
@@ -270,11 +272,11 @@ static void parse_resource_directive(struct resource_params *resource, const cha
                     break;
 
                 case TEXTURE_DATA_SINT:
-                    u.i = strtol(line, &rest, 10);
+                    u.i = strtol(line, &rest, 0);
                     break;
 
                 case TEXTURE_DATA_UINT:
-                    u.u = strtoul(line, &rest, 10);
+                    u.u = strtoul(line, &rest, 0);
                     break;
             }
 

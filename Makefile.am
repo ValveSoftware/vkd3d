@@ -53,6 +53,7 @@ vkd3d_shader_tests = \
 	tests/array-parameters.shader_test \
 	tests/asuint.shader_test \
 	tests/bitwise.shader_test \
+	tests/bool-semantics.shader_test \
 	tests/cast-broadcast.shader_test \
 	tests/cast-componentwise-compatible.shader_test \
 	tests/cast-componentwise-equal.shader_test \

@@ -1,0 +1,53 @@
+[require]
+shader model >= 4.0
+
+[input layout]
+0 r32g32b32a32 uint apple
+0 r32g32 int sv_position
+
+[vertex buffer 0]
+format r32 uint
+0 1 0x80000000 0xffffffff   -2 -2
+0 1 0x80000000 0xffffffff   -2  2
+0 1 0x80000000 0xffffffff    2 -2
+0 1 0x80000000 0xffffffff    2  2
+
+[vertex shader]
+
+struct input
+{
+    bool4 apple : apple;
+    int4 pos : sv_position;
+};
+
+struct output
+{
+    bool4 apple : apple;
+    int4 fapple : apple1;
+    float4 pos : sv_position;
+};
+
+void main(in struct input i, out struct output o, uint id : SV_VertexID)
+{
+    o.apple = i.apple;
+    o.fapple = i.apple;
+    o.pos = i.pos;
+}
+
+[pixel shader]
+
+struct input
+{
+    bool4 apple : apple;
+    int4 fapple : apple1;
+    float4 pos : sv_position;
+};
+
+float4 main(struct input i) : sv_target
+{
+    return i.apple + i.fapple;
+}
+
+[test]
+draw triangle strip 4
+todo probe all rgba (0.0, 2.0, 2.0, 2.0)
