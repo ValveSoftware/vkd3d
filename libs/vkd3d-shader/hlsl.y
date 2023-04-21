@@ -4075,6 +4075,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> conditional_expr
 %type <list> declaration
 %type <list> declaration_statement
+%type <list> discard_statement
 %type <list> equality_expr
 %type <list> expr
 %type <list> expr_optional
@@ -5322,6 +5323,7 @@ statement:
       declaration_statement
     | expr_statement
     | compound_statement
+    | discard_statement
     | jump_statement
     | selection_statement
     | loop_statement
@@ -5339,6 +5341,18 @@ jump_statement:
                 YYABORT;
             if (!add_return(ctx, $$, NULL, &@1))
                 YYABORT;
+        }
+
+discard_statement:
+      KW_DISCARD ';'
+        {
+            struct hlsl_ir_node *discard;
+
+            if (!($$ = make_empty_list(ctx)))
+                YYABORT;
+            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD, &@1)))
+                return false;
+            list_add_tail($$, &discard->entry);
         }
 
 selection_statement:
