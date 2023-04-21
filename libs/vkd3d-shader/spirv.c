@@ -7774,6 +7774,7 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
             spirv_compiler_emit_retc(compiler, instruction);
             break;
 
+        case VKD3DSIH_DISCARD:
         case VKD3DSIH_TEXKILL:
             spirv_compiler_emit_kill(compiler, instruction);
             break;
@@ -9564,6 +9565,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_CONTINUE:
         case VKD3DSIH_CONTINUEP:
         case VKD3DSIH_DEFAULT:
+        case VKD3DSIH_DISCARD:
         case VKD3DSIH_ELSE:
         case VKD3DSIH_ENDIF:
         case VKD3DSIH_ENDLOOP:

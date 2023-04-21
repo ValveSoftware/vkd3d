@@ -109,6 +109,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_DEQ                             ] = "deq",
     [VKD3DSIH_DFMA                            ] = "dfma",
     [VKD3DSIH_DGE                             ] = "dge",
+    [VKD3DSIH_DISCARD                         ] = "discard",
     [VKD3DSIH_DIV                             ] = "div",
     [VKD3DSIH_DLT                             ] = "dlt",
     [VKD3DSIH_DMAX                            ] = "dmax",
@@ -1505,9 +1506,9 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
     {
         case VKD3DSIH_BREAKP:
         case VKD3DSIH_CONTINUEP:
+        case VKD3DSIH_DISCARD:
         case VKD3DSIH_IF:
         case VKD3DSIH_RETP:
-        case VKD3DSIH_TEXKILL:
             switch (ins->flags)
             {
                 case VKD3D_SHADER_CONDITIONAL_OP_NZ: shader_addline(buffer, "_nz"); break;
