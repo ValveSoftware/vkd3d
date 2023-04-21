@@ -3395,6 +3395,51 @@ static bool intrinsic_trunc(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_TRUNC, arg, loc);
 }
 
+static bool intrinsic_d3dcolor_to_ubyte4(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg = params->args[0], *ret, *c;
+    struct hlsl_type *arg_type = arg->data_type;
+    struct hlsl_ir_swizzle *swizzle;
+
+    if (arg_type->class != HLSL_CLASS_SCALAR && !(arg_type->class == HLSL_CLASS_VECTOR && arg_type->dimx == 4))
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, arg_type)))
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Wrong argument type '%s'.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+        }
+
+        return false;
+    }
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
+        return false;
+
+    if (!(c = hlsl_new_float_constant(ctx, 255.0f + (0.5f / 256.0f), loc)))
+        return false;
+    list_add_tail(params->instrs, &c->entry);
+
+    if (arg_type->class == HLSL_CLASS_VECTOR)
+    {
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(Z, Y, X, W), 4, arg, loc)))
+            return false;
+        list_add_tail(params->instrs, &swizzle->node.entry);
+
+        arg = &swizzle->node;
+    }
+
+    if (!(ret = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, c, loc)))
+        return false;
+
+    if (ctx->profile->major_version >= 4)
+        return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_TRUNC, ret, loc);
+
+    return true;
+}
+
 static const struct intrinsic_function
 {
     const char *name;
@@ -3406,6 +3451,7 @@ static const struct intrinsic_function
 intrinsic_functions[] =
 {
     /* Note: these entries should be kept in alphabetical order. */
+    {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
     {"abs",                                 1, true,  intrinsic_abs},
     {"all",                                 1, true,  intrinsic_all},
     {"any",                                 1, true,  intrinsic_any},
