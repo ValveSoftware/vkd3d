@@ -1614,6 +1614,81 @@ static void write_sm1_semantic_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
     }
 }
 
+static void write_sm1_sampler_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        unsigned int reg_id, enum hlsl_sampler_dim sampler_dim)
+{
+    struct sm1_dst_register reg = {0};
+    uint32_t token, res_type = 0;
+
+    token = D3DSIO_DCL;
+    if (ctx->profile->major_version > 1)
+        token |= 2 << D3DSI_INSTLENGTH_SHIFT;
+    put_u32(buffer, token);
+
+    switch (sampler_dim)
+    {
+        case HLSL_SAMPLER_DIM_1D:
+            res_type = VKD3D_SM1_RESOURCE_TEXTURE_1D;
+            break;
+
+        case HLSL_SAMPLER_DIM_2D:
+            res_type = VKD3D_SM1_RESOURCE_TEXTURE_2D;
+            break;
+
+        case HLSL_SAMPLER_DIM_CUBE:
+            res_type = VKD3D_SM1_RESOURCE_TEXTURE_CUBE;
+            break;
+
+        case HLSL_SAMPLER_DIM_3D:
+            res_type = VKD3D_SM1_RESOURCE_TEXTURE_3D;
+            break;
+
+        default:
+            vkd3d_unreachable();
+            break;
+    }
+
+    token = (1u << 31);
+    token |= res_type << VKD3D_SM1_RESOURCE_TYPE_SHIFT;
+    put_u32(buffer, token);
+
+    reg.type = D3DSPR_SAMPLER;
+    reg.writemask = VKD3DSP_WRITEMASK_ALL;
+    reg.reg = reg_id;
+
+    write_sm1_dst_register(buffer, &reg);
+}
+
+static void write_sm1_sampler_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
+{
+    enum hlsl_sampler_dim sampler_dim;
+    unsigned int i, count, reg_id;
+    struct hlsl_ir_var *var;
+
+    if (ctx->profile->major_version < 2)
+        return;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->regs[HLSL_REGSET_SAMPLERS].allocated)
+            continue;
+
+        count = var->regs[HLSL_REGSET_SAMPLERS].bind_count;
+
+        for (i = 0; i < count; ++i)
+        {
+            if (var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
+            {
+                sampler_dim = var->objects_usage[HLSL_REGSET_SAMPLERS][i].sampler_dim;
+                assert(sampler_dim != HLSL_SAMPLER_DIM_GENERIC);
+
+                reg_id = var->regs[HLSL_REGSET_SAMPLERS].id + i;
+                write_sm1_sampler_dcl(ctx, buffer, reg_id, sampler_dim);
+            }
+        }
+    }
+}
+
 static void write_sm1_constant(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_ir_node *instr)
 {
@@ -1943,6 +2018,7 @@ int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     write_sm1_constant_defs(ctx, &buffer);
     write_sm1_semantic_dcls(ctx, &buffer);
+    write_sm1_sampler_dcls(ctx, &buffer);
     write_sm1_instructions(ctx, &buffer, entry_func);
 
     put_u32(&buffer, D3DSIO_END);
