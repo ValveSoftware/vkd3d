@@ -1874,6 +1874,42 @@ static void write_sm1_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     write_sm1_instruction(ctx, buffer, &sm1_instr);
 }
 
+static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_resource_load *load = hlsl_ir_resource_load(instr);
+    struct hlsl_ir_node *coords = load->coords.node;
+    unsigned int sampler_offset, reg_id;
+    struct sm1_instruction sm1_instr;
+
+    sampler_offset = hlsl_offset_from_deref_safe(ctx, &load->resource);
+    reg_id = load->resource.var->regs[HLSL_REGSET_SAMPLERS].id + sampler_offset;
+
+    sm1_instr = (struct sm1_instruction)
+    {
+        .opcode = D3DSIO_TEX,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.reg = instr->reg.id,
+        .dst.writemask = instr->reg.writemask,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].reg = coords->reg.id,
+        .srcs[0].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL),
+
+        .srcs[1].type = D3DSPR_SAMPLER,
+        .srcs[1].reg = reg_id,
+        .srcs[1].swizzle = hlsl_swizzle_from_writemask(VKD3DSP_WRITEMASK_ALL),
+
+        .src_count = 2,
+    };
+
+    assert(instr->reg.allocated);
+
+    write_sm1_instruction(ctx, buffer, &sm1_instr);
+}
+
 static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_ir_node *instr)
 {
@@ -1991,6 +2027,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
             case HLSL_IR_LOAD:
                 write_sm1_load(ctx, buffer, instr);
+                break;
+
+            case HLSL_IR_RESOURCE_LOAD:
+                write_sm1_resource_load(ctx, buffer, instr);
                 break;
 
             case HLSL_IR_STORE:
