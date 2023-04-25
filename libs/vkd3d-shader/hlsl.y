@@ -1137,54 +1137,32 @@ static struct list *make_list(struct hlsl_ctx *ctx, struct hlsl_ir_node *node)
     return list;
 }
 
-static unsigned int evaluate_static_expression(struct hlsl_ir_node *node)
+static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        const struct vkd3d_shader_location *loc)
 {
-    if (node->data_type->class != HLSL_CLASS_SCALAR)
+    struct hlsl_ir_constant *constant;
+    struct hlsl_ir_node *node;
+    unsigned int ret = 0;
+
+    if (!add_implicit_conversion(ctx, &block->instrs, node_from_list(&block->instrs),
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc))
         return 0;
 
-    switch (node->type)
+    while (hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, block, NULL));
+
+    node = node_from_list(&block->instrs);
+    if (node->type == HLSL_IR_CONSTANT)
     {
-        case HLSL_IR_CONSTANT:
-        {
-            struct hlsl_ir_constant *constant = hlsl_ir_constant(node);
-            const union hlsl_constant_value_component *value = &constant->value.u[0];
-
-            switch (constant->node.data_type->base_type)
-            {
-                case HLSL_TYPE_UINT:
-                    return value->u;
-                case HLSL_TYPE_INT:
-                    return value->i;
-                case HLSL_TYPE_FLOAT:
-                case HLSL_TYPE_HALF:
-                    return value->f;
-                case HLSL_TYPE_DOUBLE:
-                    return value->d;
-                case HLSL_TYPE_BOOL:
-                    return !!value->u;
-                default:
-                    vkd3d_unreachable();
-            }
-        }
-
-        case HLSL_IR_EXPR:
-        case HLSL_IR_INDEX:
-        case HLSL_IR_LOAD:
-        case HLSL_IR_RESOURCE_LOAD:
-        case HLSL_IR_SWIZZLE:
-            FIXME("Unhandled type %s.\n", hlsl_node_type_to_string(node->type));
-            return 0;
-
-        case HLSL_IR_CALL:
-        case HLSL_IR_IF:
-        case HLSL_IR_JUMP:
-        case HLSL_IR_LOOP:
-        case HLSL_IR_RESOURCE_STORE:
-        case HLSL_IR_STORE:
-            vkd3d_unreachable();
+        constant = hlsl_ir_constant(node);
+        ret = constant->value.u[0].u;
+    }
+    else
+    {
+        hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                "Failed to evaluate constant expression %d.", node->type);
     }
 
-    vkd3d_unreachable();
+    return ret;
 }
 
 static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
@@ -5071,8 +5049,17 @@ type_no_void:
         }
     | texture_ms_type '<' type ',' shift_expr '>'
         {
-            unsigned int sample_count = evaluate_static_expression(node_from_list($5));
-            destroy_instr_list($5);
+            unsigned int sample_count;
+            struct hlsl_block block;
+
+            hlsl_block_init(&block);
+            list_move_tail(&block.instrs, $5);
+
+            sample_count = evaluate_static_expression_as_uint(ctx, &block, &@5);
+
+            hlsl_block_cleanup(&block);
+
+            vkd3d_free($5);
 
             $$ = hlsl_new_texture_type(ctx, $1, $3, sample_count);
         }
@@ -5265,10 +5252,17 @@ arrays:
         }
     | '[' expr ']' arrays
         {
-            unsigned int size = evaluate_static_expression(node_from_list($2));
+            struct hlsl_block block;
             uint32_t *new_array;
+            unsigned int size;
 
-            destroy_instr_list($2);
+            hlsl_block_init(&block);
+            list_move_tail(&block.instrs, $2);
+
+            size = evaluate_static_expression_as_uint(ctx, &block, &@2);
+
+            hlsl_block_cleanup(&block);
+            vkd3d_free($2);
 
             $$ = $4;
 

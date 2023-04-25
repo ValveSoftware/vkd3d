@@ -73,6 +73,7 @@ vkd3d_shader_tests = \
 	tests/frac.shader_test \
 	tests/function-return.shader_test \
 	tests/hlsl-array-dimension.shader_test \
+	tests/hlsl-array-size-expr.shader_test \
 	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-clamp.shader_test \

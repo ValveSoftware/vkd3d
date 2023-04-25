@@ -573,7 +573,7 @@ static void append_output_var_copy(struct hlsl_ctx *ctx, struct list *instrs, st
     append_output_copy_recurse(ctx, instrs, load, var->storage_modifiers, &var->semantic, var->semantic.index);
 }
 
-static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
+bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
         struct hlsl_block *block, void *context)
 {
     struct hlsl_ir_node *instr, *next;
@@ -585,11 +585,11 @@ static bool transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx
         {
             struct hlsl_ir_if *iff = hlsl_ir_if(instr);
 
-            progress |= transform_ir(ctx, func, &iff->then_block, context);
-            progress |= transform_ir(ctx, func, &iff->else_block, context);
+            progress |= hlsl_transform_ir(ctx, func, &iff->then_block, context);
+            progress |= hlsl_transform_ir(ctx, func, &iff->else_block, context);
         }
         else if (instr->type == HLSL_IR_LOOP)
-            progress |= transform_ir(ctx, func, &hlsl_ir_loop(instr)->body, context);
+            progress |= hlsl_transform_ir(ctx, func, &hlsl_ir_loop(instr)->body, context);
 
         progress |= func(ctx, instr, context);
     }
@@ -632,7 +632,7 @@ static bool find_recursive_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         return false;
     call_ctx->backtrace[call_ctx->count++] = decl;
 
-    transform_ir(ctx, find_recursive_calls, &decl->body, call_ctx);
+    hlsl_transform_ir(ctx, find_recursive_calls, &decl->body, call_ctx);
 
     --call_ctx->count;
 
@@ -694,7 +694,7 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
      *   the CF instruction, shove it into an if block, and then lower that if
      *   block.
      *
-     *   (We could return a "did we make progress" boolean like transform_ir()
+     *   (We could return a "did we make progress" boolean like hlsl_transform_ir()
      *   and run this pass multiple times, but we already know the only block
      *   that still needs to be addressed, so there's not much point.)
      *
@@ -3561,7 +3561,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     list_move_head(&body->instrs, &ctx->static_initializers);
 
     memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
-    transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
+    hlsl_transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);
     vkd3d_free(recursive_call_ctx.backtrace);
 
     /* Avoid going into an infinite loop when processing call instructions.
@@ -3571,9 +3571,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     lower_return(ctx, entry_func, body, false);
 
-    while (transform_ir(ctx, lower_calls, body, NULL));
+    while (hlsl_transform_ir(ctx, lower_calls, body, NULL));
 
-    transform_ir(ctx, lower_index_loads, body, NULL);
+    hlsl_transform_ir(ctx, lower_index_loads, body, NULL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
     {
@@ -3629,54 +3629,54 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
-    transform_ir(ctx, lower_broadcasts, body, NULL);
-    while (transform_ir(ctx, fold_redundant_casts, body, NULL));
+    hlsl_transform_ir(ctx, lower_broadcasts, body, NULL);
+    while (hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
     {
-        progress = transform_ir(ctx, split_array_copies, body, NULL);
-        progress |= transform_ir(ctx, split_struct_copies, body, NULL);
+        progress = hlsl_transform_ir(ctx, split_array_copies, body, NULL);
+        progress |= hlsl_transform_ir(ctx, split_struct_copies, body, NULL);
     }
     while (progress);
-    transform_ir(ctx, split_matrix_copies, body, NULL);
+    hlsl_transform_ir(ctx, split_matrix_copies, body, NULL);
 
-    transform_ir(ctx, lower_narrowing_casts, body, NULL);
-    transform_ir(ctx, lower_casts_to_bool, body, NULL);
-    transform_ir(ctx, lower_int_division, body, NULL);
-    transform_ir(ctx, lower_int_modulus, body, NULL);
-    transform_ir(ctx, lower_int_abs, body, NULL);
-    transform_ir(ctx, lower_float_modulus, body, NULL);
+    hlsl_transform_ir(ctx, lower_narrowing_casts, body, NULL);
+    hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
+    hlsl_transform_ir(ctx, lower_int_division, body, NULL);
+    hlsl_transform_ir(ctx, lower_int_modulus, body, NULL);
+    hlsl_transform_ir(ctx, lower_int_abs, body, NULL);
+    hlsl_transform_ir(ctx, lower_float_modulus, body, NULL);
     do
     {
-        progress = transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
-        progress |= transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
+        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
+        progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
         progress |= copy_propagation_execute(ctx, body);
-        progress |= transform_ir(ctx, fold_swizzle_chains, body, NULL);
-        progress |= transform_ir(ctx, remove_trivial_swizzles, body, NULL);
+        progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
+        progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }
     while (progress);
 
     if (profile->major_version < 4)
     {
-        transform_ir(ctx, lower_division, body, NULL);
-        transform_ir(ctx, lower_sqrt, body, NULL);
-        transform_ir(ctx, lower_dot, body, NULL);
-        transform_ir(ctx, lower_round, body, NULL);
+        hlsl_transform_ir(ctx, lower_division, body, NULL);
+        hlsl_transform_ir(ctx, lower_sqrt, body, NULL);
+        hlsl_transform_ir(ctx, lower_dot, body, NULL);
+        hlsl_transform_ir(ctx, lower_round, body, NULL);
     }
 
     if (profile->major_version < 2)
     {
-        transform_ir(ctx, lower_abs, body, NULL);
+        hlsl_transform_ir(ctx, lower_abs, body, NULL);
     }
 
-    transform_ir(ctx, validate_static_object_references, body, NULL);
+    hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
-    transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL);
-    while (transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL));
+    hlsl_transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL);
+    while (hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL));
 
     do
         compute_liveness(ctx, entry_func);
-    while (transform_ir(ctx, dce, body, NULL));
+    while (hlsl_transform_ir(ctx, dce, body, NULL));
 
     compute_liveness(ctx, entry_func);
 
