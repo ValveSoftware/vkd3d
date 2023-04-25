@@ -24,7 +24,7 @@ size (1, 1)
 
 
 % If a single component in a texture array is used, all registers are reserved.
-[pixel shader todo]
+[pixel shader]
 Texture2D partially_used[2][2];
 Texture2D tex;
 
@@ -34,8 +34,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (41.0, 41.0, 41.0, 1089.0)
+draw quad
+probe all rgba (41.0, 41.0, 41.0, 1089.0)
 
 
 % If no component in a texture array is used, and it doesn't have a register reservation, no
