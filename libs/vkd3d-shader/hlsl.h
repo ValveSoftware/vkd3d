@@ -240,16 +240,21 @@ struct hlsl_struct_field
     size_t name_bytecode_offset;
 };
 
-/* Information of the register allocated for an instruction node or variable.
+/* Information of the register(s) allocated for an instruction node or variable.
  * These values are initialized at the end of hlsl_emit_bytecode(), after the compilation passes,
  *   just before writing the bytecode.
- * For numeric registers, a writemask can be provided to indicate the reservation of only some of the
- *   4 components.
  * The type of register (register class) is implied from its use, so it is not stored in this
  *   struct. */
 struct hlsl_reg
 {
+    /* Index of the first register allocated. */
     uint32_t id;
+    /* Number of registers to be allocated.
+     * Unlike the variable's type's regsize, it is not expressed in register components, but rather
+     *  in whole registers, and may depend on which components are used within the shader. */
+    uint32_t bind_count;
+    /* For numeric registers, a writemask can be provided to indicate the reservation of only some
+     *   of the 4 components. */
     unsigned int writemask;
     /* Whether the register has been allocated. */
     bool allocated;

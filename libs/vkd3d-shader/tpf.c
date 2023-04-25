@@ -2595,6 +2595,9 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
 static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 {
+    if (type->class == HLSL_CLASS_ARRAY)
+        return sm4_resource_type(type->e.array.type);
+
     switch (type->base_type)
     {
         case HLSL_TYPE_SAMPLER:
@@ -2610,6 +2613,9 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 
 static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type)
 {
+    if (type->class == HLSL_CLASS_ARRAY)
+        return sm4_resource_format(type->e.array.type);
+
     switch (type->e.resource_format->base_type)
     {
         case HLSL_TYPE_DOUBLE:
@@ -2634,6 +2640,9 @@ static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type
 
 static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *type)
 {
+    if (type->class == HLSL_CLASS_ARRAY)
+        return sm4_rdef_resource_dimension(type->e.array.type);
+
     switch (type->sampler_dim)
     {
         case HLSL_SAMPLER_DIM_1D:
@@ -3037,7 +3046,9 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
     if (var->is_uniform)
     {
-        if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_TEXTURE)
+        enum hlsl_regset regset = hlsl_type_get_regset(data_type);
+
+        if (regset == HLSL_REGSET_TEXTURES)
         {
             reg->type = VKD3D_SM4_RT_RESOURCE;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
@@ -3047,7 +3058,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
-        else if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_UAV)
+        else if (regset == HLSL_REGSET_UAVS)
         {
             reg->type = VKD3D_SM5_RT_UAV;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
@@ -3057,7 +3068,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
-        else if (data_type->class == HLSL_CLASS_OBJECT && data_type->base_type == HLSL_TYPE_SAMPLER)
+        else if (regset == HLSL_REGSET_SAMPLERS)
         {
             reg->type = VKD3D_SM4_RT_SAMPLER;
             reg->dim = VKD3D_SM4_DIMENSION_NONE;

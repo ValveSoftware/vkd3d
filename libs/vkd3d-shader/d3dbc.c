@@ -1323,19 +1323,15 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
         if (!var->semantic.name && var->regs[regset].allocated)
         {
             put_u32(buffer, 0); /* name */
-            if (var->data_type->class == HLSL_CLASS_OBJECT
-                    && (var->data_type->base_type == HLSL_TYPE_SAMPLER
-                    || var->data_type->base_type == HLSL_TYPE_TEXTURE))
+            if (regset == HLSL_REGSET_NUMERIC)
             {
-                assert(regset == HLSL_REGSET_SAMPLERS);
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[regset].id));
-                put_u32(buffer, 1);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[regset].id));
+                put_u32(buffer, var->data_type->reg_size[regset] / 4);
             }
             else
             {
-                assert(regset == HLSL_REGSET_NUMERIC);
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[regset].id));
-                put_u32(buffer, var->data_type->reg_size[regset] / 4);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[regset].id));
+                put_u32(buffer, var->regs[regset].bind_count);
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */

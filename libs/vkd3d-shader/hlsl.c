@@ -173,6 +173,9 @@ unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type)
 
 bool hlsl_type_is_resource(const struct hlsl_type *type)
 {
+    if (type->class == HLSL_CLASS_ARRAY)
+        return hlsl_type_is_resource(type->e.array.type);
+
     if (type->class == HLSL_CLASS_OBJECT)
     {
         switch (type->base_type)
@@ -193,6 +196,9 @@ enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
     if (type->class <= HLSL_CLASS_LAST_NUMERIC)
         return HLSL_REGSET_NUMERIC;
 
+    if (type->class == HLSL_CLASS_ARRAY)
+        return hlsl_type_get_regset(type->e.array.type);
+
     if (type->class == HLSL_CLASS_OBJECT)
     {
         switch (type->base_type)
@@ -210,8 +216,6 @@ enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
                 vkd3d_unreachable();
         }
     }
-    else if (type->class == HLSL_CLASS_ARRAY)
-        return hlsl_type_get_regset(type->e.array.type);
 
     vkd3d_unreachable();
 }

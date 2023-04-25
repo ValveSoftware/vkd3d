@@ -80,4 +80,4 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (4.0, 4.0, 4.0, 99.0)
+probe all rgba (4.0, 4.0, 4.0, 99.0)
