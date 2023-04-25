@@ -157,10 +157,17 @@ unsigned int hlsl_type_element_count(const struct hlsl_type *type)
     }
 }
 
-static unsigned int get_array_size(const struct hlsl_type *type)
+const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type)
 {
     if (type->class == HLSL_CLASS_ARRAY)
-        return get_array_size(type->e.array.type) * type->e.array.elements_count;
+        return hlsl_get_multiarray_element_type(type->e.array.type);
+    return type;
+}
+
+unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type)
+{
+    if (type->class == HLSL_CLASS_ARRAY)
+        return hlsl_get_multiarray_size(type->e.array.type) * type->e.array.elements_count;
     return 1;
 }
 
@@ -279,7 +286,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
                     type->reg_size[k] += field->type->reg_size[k];
                 }
 
-                type->dimx += field->type->dimx * field->type->dimy * get_array_size(field->type);
+                type->dimx += field->type->dimx * field->type->dimy * hlsl_get_multiarray_size(field->type);
             }
             break;
         }

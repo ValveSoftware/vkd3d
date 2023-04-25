@@ -1198,24 +1198,10 @@ static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
     }
 }
 
-static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
-{
-    if (type->class == HLSL_CLASS_ARRAY)
-        return get_array_type(type->e.array.type);
-    return type;
-}
-
-static unsigned int get_array_size(const struct hlsl_type *type)
-{
-    if (type->class == HLSL_CLASS_ARRAY)
-        return get_array_size(type->e.array.type) * type->e.array.elements_count;
-    return 1;
-}
-
 static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type, unsigned int ctab_start)
 {
-    const struct hlsl_type *array_type = get_array_type(type);
-    unsigned int array_size = get_array_size(type);
+    const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
+    unsigned int array_size = hlsl_get_multiarray_size(type);
     unsigned int field_count = 0;
     size_t fields_offset = 0;
     size_t i;

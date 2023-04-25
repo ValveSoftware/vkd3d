@@ -1147,6 +1147,9 @@ enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
 
+const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type);
+unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type);
+
 unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsigned int dim);
 unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
 unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask);

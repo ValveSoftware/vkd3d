@@ -2448,20 +2448,6 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
     add_section(dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
 }
 
-static const struct hlsl_type *get_array_type(const struct hlsl_type *type)
-{
-    if (type->class == HLSL_CLASS_ARRAY)
-        return get_array_type(type->e.array.type);
-    return type;
-}
-
-static unsigned int get_array_size(const struct hlsl_type *type)
-{
-    if (type->class == HLSL_CLASS_ARRAY)
-        return get_array_size(type->e.array.type) * type->e.array.elements_count;
-    return 1;
-}
-
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
 {
     switch (type->class)
@@ -2552,7 +2538,7 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
 
 static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type)
 {
-    const struct hlsl_type *array_type = get_array_type(type);
+    const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
     const char *name = array_type->name ? array_type->name : "<unnamed>";
     const struct hlsl_profile_info *profile = ctx->profile;
     unsigned int field_count = 0, array_size = 0;
@@ -2566,7 +2552,7 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         name_offset = put_string(buffer, name);
 
     if (type->class == HLSL_CLASS_ARRAY)
-        array_size = get_array_size(type);
+        array_size = hlsl_get_multiarray_size(type);
 
     if (array_type->class == HLSL_CLASS_STRUCT)
     {
