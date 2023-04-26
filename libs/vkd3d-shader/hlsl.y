@@ -3331,16 +3331,13 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
                     name, ctx->builtin_types.sampler[dim]->name, string->buffer);
         hlsl_release_string_buffer(ctx, string);
     }
-    else
-    {
-        load_params.resource = params->args[0];
-    }
 
     if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, hlsl_sampler_dim_count(dim)), loc)))
         coords = params->args[1];
 
     load_params.coords = coords;
+    load_params.resource = params->args[0];
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
