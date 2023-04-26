@@ -373,6 +373,8 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
     {
         uint32_t name_offset, mask;
 
+        e[i].sort_index = i;
+
         if (has_stream_index)
             read_dword(&ptr, &e[i].stream_index);
         else

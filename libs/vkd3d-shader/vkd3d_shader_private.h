@@ -786,6 +786,7 @@ enum vkd3d_shader_input_sysval_semantic
 
 struct signature_element
 {
+    unsigned int sort_index;
     const char *semantic_name;
     unsigned int semantic_index;
     unsigned int stream_index;
@@ -957,6 +958,11 @@ static inline bool vkd3d_shader_register_is_input(const struct vkd3d_shader_regi
 static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_OUTPUT || reg->type == VKD3DSPR_COLOROUT;
+}
+
+static inline bool vkd3d_shader_register_is_patch_constant(const struct vkd3d_shader_register *reg)
+{
+    return reg->type == VKD3DSPR_PATCHCONST;
 }
 
 struct vkd3d_shader_location
@@ -1366,5 +1372,8 @@ int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
 enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *instructions);
 enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
         struct vkd3d_shader_instruction_array *instructions, const struct shader_signature *input_signature);
+enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
+        enum vkd3d_shader_type shader_type, struct shader_signature *input_signature,
+        struct shader_signature *output_signature, struct shader_signature *patch_constant_signature);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */

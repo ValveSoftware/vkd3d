@@ -456,3 +456,618 @@ enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
     *src_instructions = normaliser.instructions;
     return VKD3D_OK;
 }
+
+struct io_normaliser
+{
+    struct vkd3d_shader_instruction_array instructions;
+    enum vkd3d_shader_type shader_type;
+    struct shader_signature *input_signature;
+    struct shader_signature *output_signature;
+    struct shader_signature *patch_constant_signature;
+
+    unsigned int max_temp_count;
+    unsigned int temp_dcl_idx;
+
+    unsigned int instance_count;
+    unsigned int phase_body_idx;
+    enum vkd3d_shader_opcode phase;
+    unsigned int output_control_point_count;
+
+    struct vkd3d_shader_src_param *outpointid_param;
+
+    struct vkd3d_shader_dst_param *input_dcl_params[MAX_REG_OUTPUT];
+    struct vkd3d_shader_dst_param *output_dcl_params[MAX_REG_OUTPUT];
+    struct vkd3d_shader_dst_param *pc_dcl_params[MAX_REG_OUTPUT];
+    uint8_t input_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
+    uint8_t output_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
+    uint8_t pc_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
+};
+
+static bool io_normaliser_is_in_fork_or_join_phase(const struct io_normaliser *normaliser)
+{
+    return normaliser->phase == VKD3DSIH_HS_FORK_PHASE || normaliser->phase == VKD3DSIH_HS_JOIN_PHASE;
+}
+
+static bool io_normaliser_is_in_control_point_phase(const struct io_normaliser *normaliser)
+{
+    return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
+}
+
+static unsigned int shader_signature_find_element_for_reg(const struct shader_signature *signature,
+        unsigned int reg_idx, unsigned int write_mask)
+{
+    unsigned int i;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        struct signature_element *e = &signature->elements[i];
+        if (e->register_index <= reg_idx && e->register_index + e->register_count > reg_idx
+                && (e->mask & write_mask) == write_mask)
+        {
+            return i;
+        }
+    }
+
+    /* Validated in the TPF reader. */
+    vkd3d_unreachable();
+}
+
+static unsigned int range_map_get_register_count(uint8_t range_map[][VKD3D_VEC4_SIZE],
+        unsigned int register_idx, unsigned int write_mask)
+{
+    return range_map[register_idx][vkd3d_write_mask_get_component_idx(write_mask)];
+}
+
+static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], unsigned int register_idx,
+        unsigned int register_count, unsigned int write_mask, bool is_dcl_indexrange)
+{
+    unsigned int i, j, r, c, component_idx, component_count;
+
+    assert(write_mask <= VKD3DSP_WRITEMASK_ALL);
+    component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+    component_count = vkd3d_write_mask_component_count(write_mask);
+
+    assert(register_idx < MAX_REG_OUTPUT && MAX_REG_OUTPUT - register_idx >= register_count);
+
+    if (range_map[register_idx][component_idx] > register_count && is_dcl_indexrange)
+    {
+        /* Validated in the TPF reader. */
+        assert(range_map[register_idx][component_idx] != UINT8_MAX);
+        return;
+    }
+    if (range_map[register_idx][component_idx] == register_count)
+    {
+        /* Already done. This happens when fxc splits a register declaration by
+         * component(s). The dcl_indexrange instructions are split too. */
+        return;
+    }
+    range_map[register_idx][component_idx] = register_count;
+
+    for (i = 0; i < register_count; ++i)
+    {
+        r = register_idx + i;
+        for (j = !i; j < component_count; ++j)
+        {
+            c = component_idx + j;
+            /* A synthetic patch constant range which overlaps an existing range can start upstream of it
+             * for fork/join phase instancing, but ranges declared by dcl_indexrange should not overlap.
+             * The latter is validated in the TPF reader. */
+            assert(!range_map[r][c] || !is_dcl_indexrange);
+            range_map[r][c] = UINT8_MAX;
+        }
+    }
+}
+
+static void io_normaliser_add_index_range(struct io_normaliser *normaliser,
+        const struct vkd3d_shader_instruction *ins)
+{
+    const struct vkd3d_shader_index_range *range = &ins->declaration.index_range;
+    const struct vkd3d_shader_register *reg = &range->dst.reg;
+    unsigned int reg_idx, write_mask, element_idx;
+    const struct shader_signature *signature;
+    uint8_t (*range_map)[VKD3D_VEC4_SIZE];
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_INCONTROLPOINT:
+            range_map = normaliser->input_range_map;
+            signature = normaliser->input_signature;
+            break;
+        case VKD3DSPR_OUTCONTROLPOINT:
+            range_map = normaliser->output_range_map;
+            signature = normaliser->output_signature;
+            break;
+        case VKD3DSPR_OUTPUT:
+            if (!io_normaliser_is_in_fork_or_join_phase(normaliser))
+            {
+                range_map = normaliser->output_range_map;
+                signature = normaliser->output_signature;
+                break;
+            }
+            /* fall through */
+        case VKD3DSPR_PATCHCONST:
+            range_map = normaliser->pc_range_map;
+            signature = normaliser->patch_constant_signature;
+            break;
+        default:
+            /* Validated in the TPF reader. */
+            vkd3d_unreachable();
+    }
+
+    reg_idx = reg->idx[reg->idx_count - 1].offset;
+    write_mask = range->dst.write_mask;
+    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
+    range_map_set_register_range(range_map, reg_idx, range->register_count,
+            signature->elements[element_idx].mask, true);
+}
+
+static int signature_element_mask_compare(const void *a, const void *b)
+{
+    const struct signature_element *e = a, *f = b;
+    int ret;
+
+    return (ret = vkd3d_u32_compare(e->mask, f->mask)) ? ret : vkd3d_u32_compare(e->register_index, f->register_index);
+}
+
+static bool sysval_semantics_should_merge(const struct signature_element *e, const struct signature_element *f)
+{
+    if (e->sysval_semantic < VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE
+            || e->sysval_semantic > VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN)
+        return false;
+
+    return e->sysval_semantic == f->sysval_semantic
+            /* Line detail and density must be merged together to match the SPIR-V array.
+             * This deletes one of the two sysvals, but these are not used. */
+            || (e->sysval_semantic == VKD3D_SHADER_SV_TESS_FACTOR_LINEDET
+            && f->sysval_semantic == VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN)
+            || (e->sysval_semantic == VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN
+            && f->sysval_semantic == VKD3D_SHADER_SV_TESS_FACTOR_LINEDET);
+}
+
+/* Merge tess factor sysvals because they are an array in SPIR-V. */
+static void shader_signature_map_patch_constant_index_ranges(struct shader_signature *s,
+        uint8_t range_map[][VKD3D_VEC4_SIZE])
+{
+    struct signature_element *e, *f;
+    unsigned int i, j, register_count;
+
+    qsort(s->elements, s->element_count, sizeof(s->elements[0]), signature_element_mask_compare);
+
+    for (i = 0; i < s->element_count; i += register_count)
+    {
+        e = &s->elements[i];
+        register_count = 1;
+
+        if (!e->sysval_semantic)
+            continue;
+
+        for (j = i + 1; j < s->element_count; ++j, ++register_count)
+        {
+            f = &s->elements[j];
+            if (f->register_index != e->register_index + register_count || !sysval_semantics_should_merge(e, f))
+                break;
+        }
+        if (register_count < 2)
+            continue;
+
+        range_map_set_register_range(range_map, e->register_index, register_count, e->mask, false);
+    }
+}
+
+static int signature_element_register_compare(const void *a, const void *b)
+{
+    const struct signature_element *e = a, *f = b;
+
+    return vkd3d_u32_compare(e->register_index, f->register_index);
+}
+
+static int signature_element_index_compare(const void *a, const void *b)
+{
+    const struct signature_element *e = a, *f = b;
+
+    return vkd3d_u32_compare(e->sort_index, f->sort_index);
+}
+
+static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map[][VKD3D_VEC4_SIZE],
+        bool is_patch_constant)
+{
+    unsigned int i, j, element_count, new_count, register_count;
+    struct signature_element *elements;
+    struct signature_element *e, *f;
+
+    element_count = s->element_count;
+    if (!(elements = vkd3d_malloc(element_count * sizeof(*elements))))
+        return false;
+    memcpy(elements, s->elements, element_count * sizeof(*elements));
+
+    qsort(elements, element_count, sizeof(elements[0]), signature_element_register_compare);
+
+    for (i = 0, new_count = 0; i < element_count; i = j, elements[new_count++] = *e)
+    {
+        e = &elements[i];
+        j = i + 1;
+
+        if (e->register_index == ~0u)
+            continue;
+
+        /* Do not merge if the register index will be relative-addressed. */
+        if (range_map_get_register_count(range_map, e->register_index, e->mask) > 1)
+            continue;
+
+        for (; j < element_count; ++j)
+        {
+            f = &elements[j];
+
+            /* Merge different components of the same register unless sysvals are different,
+             * or it will be relative-addressed. */
+            if (f->register_index != e->register_index || f->sysval_semantic != e->sysval_semantic
+                    || range_map_get_register_count(range_map, f->register_index, f->mask) > 1)
+                break;
+
+            TRACE("Merging %s, reg %u, mask %#x, sysval %#x with %s, mask %#x, sysval %#x.\n", e->semantic_name,
+                    e->register_index, e->mask, e->sysval_semantic, f->semantic_name, f->mask, f->sysval_semantic);
+            assert(!(e->mask & f->mask));
+
+            e->mask |= f->mask;
+            e->used_mask |= f->used_mask;
+            e->semantic_index = min(e->semantic_index, f->semantic_index);
+        }
+    }
+    element_count = new_count;
+    /* Signature 's' is a copy of the original signature struct, so we can replace
+     * the 'elements' pointer without freeing it. */
+    s->elements = elements;
+    s->element_count = element_count;
+
+    if (is_patch_constant)
+        shader_signature_map_patch_constant_index_ranges(s, range_map);
+
+    for (i = 0, new_count = 0; i < element_count; i += register_count, elements[new_count++] = *e)
+    {
+        e = &elements[i];
+        register_count = 1;
+
+        if (e->register_index >= MAX_REG_OUTPUT)
+            continue;
+
+        register_count = range_map_get_register_count(range_map, e->register_index, e->mask);
+        assert(register_count != UINT8_MAX);
+        register_count += !register_count;
+
+        if (register_count > 1)
+        {
+            TRACE("Merging %s, base reg %u, count %u.\n", e->semantic_name, e->register_index, register_count);
+            e->register_count = register_count;
+        }
+    }
+    element_count = new_count;
+
+    /* Restoring the original order is required for sensible trace output. */
+    qsort(elements, element_count, sizeof(elements[0]), signature_element_index_compare);
+
+    s->element_count = element_count;
+
+    return true;
+}
+
+static bool sysval_semantic_is_tess_factor(enum vkd3d_shader_sysval_semantic sysval_semantic)
+{
+    return sysval_semantic >= VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE
+        && sysval_semantic <= VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN;
+}
+
+static unsigned int shader_register_normalise_arrayed_addressing(struct vkd3d_shader_register *reg,
+        unsigned int id_idx, unsigned int register_index)
+{
+    assert(id_idx < ARRAY_SIZE(reg->idx) - 1);
+
+    /* For a relative-addressed register index, move the id up a slot to separate it from the address,
+     * because rel_addr can be replaced with a constant offset in some cases. */
+    if (reg->idx[id_idx].rel_addr)
+    {
+        reg->idx[id_idx + 1].rel_addr = NULL;
+        reg->idx[id_idx + 1].offset = reg->idx[id_idx].offset;
+        reg->idx[id_idx].offset -= register_index;
+        ++id_idx;
+    }
+    /* Otherwise we have no address for the arrayed register, so insert one. This happens e.g. where
+     * tessellation level registers are merged into an array because they're an array in SPIR-V. */
+    else
+    {
+        ++id_idx;
+        memmove(&reg->idx[1], &reg->idx[0], id_idx * sizeof(reg->idx[0]));
+        reg->idx[0].rel_addr = NULL;
+        reg->idx[0].offset = reg->idx[id_idx].offset - register_index;
+    }
+
+    return id_idx;
+}
+
+static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_param, bool is_io_dcl,
+         struct io_normaliser *normaliser)
+ {
+    unsigned int id_idx, reg_idx, write_mask, element_idx;
+    struct vkd3d_shader_register *reg = &dst_param->reg;
+    struct vkd3d_shader_dst_param **dcl_params;
+    const struct shader_signature *signature;
+    const struct signature_element *e;
+
+    if ((reg->type == VKD3DSPR_OUTPUT && io_normaliser_is_in_fork_or_join_phase(normaliser))
+            || reg->type == VKD3DSPR_PATCHCONST)
+    {
+        signature = normaliser->patch_constant_signature;
+        /* Convert patch constant outputs to the patch constant register type to avoid the need
+         * to convert compiler symbols when accessed as inputs in a later stage. */
+        reg->type = VKD3DSPR_PATCHCONST;
+        dcl_params = normaliser->pc_dcl_params;
+    }
+    else if (reg->type == VKD3DSPR_OUTPUT || dst_param->reg.type == VKD3DSPR_COLOROUT)
+    {
+        signature = normaliser->output_signature;
+        dcl_params = normaliser->output_dcl_params;
+    }
+    else if (dst_param->reg.type == VKD3DSPR_INCONTROLPOINT || dst_param->reg.type == VKD3DSPR_INPUT)
+    {
+        signature = normaliser->input_signature;
+        dcl_params = normaliser->input_dcl_params;
+    }
+    else
+    {
+        return true;
+    }
+
+    id_idx = reg->idx_count - 1;
+    reg_idx = reg->idx[id_idx].offset;
+    write_mask = dst_param->write_mask;
+    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
+    e = &signature->elements[element_idx];
+
+    dst_param->write_mask >>= vkd3d_write_mask_get_component_idx(e->mask);
+    if (is_io_dcl)
+    {
+        /* Validated in the TPF reader. */
+        assert(element_idx < ARRAY_SIZE(normaliser->input_dcl_params));
+
+        if (dcl_params[element_idx])
+        {
+            /* Merge split declarations into a single one. */
+            dcl_params[element_idx]->write_mask |= dst_param->write_mask;
+            /* Turn this into a nop. */
+            return false;
+        }
+        else
+        {
+            dcl_params[element_idx] = dst_param;
+        }
+    }
+
+    if (io_normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
+    {
+        if (is_io_dcl)
+        {
+            /* Emit an array size for the control points for consistency with inputs. */
+            reg->idx[0].offset = normaliser->output_control_point_count;
+        }
+        else
+        {
+            /* The control point id param. */
+            assert(reg->idx[0].rel_addr);
+        }
+        id_idx = 1;
+    }
+
+    if ((e->register_count > 1 || sysval_semantic_is_tess_factor(e->sysval_semantic)))
+    {
+        if (is_io_dcl)
+        {
+            /* For control point I/O, idx 0 contains the control point count.
+             * Ensure it is moved up to the next slot. */
+            reg->idx[id_idx].offset = reg->idx[0].offset;
+            reg->idx[0].offset = e->register_count;
+            ++id_idx;
+        }
+        else
+        {
+            id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
+        }
+    }
+
+    /* Replace the register index with the signature element index */
+    reg->idx[id_idx].offset = element_idx;
+    reg->idx_count = id_idx + 1;
+
+    return true;
+}
+
+static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_param,
+        struct io_normaliser *normaliser)
+{
+    unsigned int i, id_idx, reg_idx, write_mask, element_idx, component_idx;
+    struct vkd3d_shader_register *reg = &src_param->reg;
+    const struct shader_signature *signature;
+    const struct signature_element *e;
+
+    /* Input/output registers from one phase can be used as inputs in
+     * subsequent phases. Specifically:
+     *
+     *   - Control phase inputs are available as "vicp" in fork and join
+     *     phases.
+     *   - Control phase outputs are available as "vocp" in fork and join
+     *     phases.
+     *   - Fork phase patch constants are available as "vpc" in join
+     *     phases.
+     *
+     * We handle "vicp" here by converting INCONTROLPOINT src registers to
+     * type INPUT so they match the control phase declarations. We handle
+     * "vocp" by converting OUTCONTROLPOINT registers to type OUTPUT.
+     * Merging fork and join phases handles "vpc". */
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_PATCHCONST:
+            signature = normaliser->patch_constant_signature;
+            break;
+        case VKD3DSPR_INCONTROLPOINT:
+            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
+                reg->type = VKD3DSPR_INPUT;
+            /* fall through */
+        case VKD3DSPR_INPUT:
+            signature = normaliser->input_signature;
+            break;
+        case VKD3DSPR_OUTCONTROLPOINT:
+            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
+                reg->type = VKD3DSPR_OUTPUT;
+            /* fall through */
+        case VKD3DSPR_OUTPUT:
+            signature = normaliser->output_signature;
+            break;
+        default:
+            return;
+    }
+
+    id_idx = reg->idx_count - 1;
+    reg_idx = reg->idx[id_idx].offset;
+    write_mask = VKD3DSP_WRITEMASK_0 << vkd3d_swizzle_get_component(src_param->swizzle, 0);
+    element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
+
+    e = &signature->elements[element_idx];
+    if ((e->register_count > 1 || sysval_semantic_is_tess_factor(e->sysval_semantic)))
+        id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
+    reg->idx[id_idx].offset = element_idx;
+    reg->idx_count = id_idx + 1;
+
+    if ((component_idx = vkd3d_write_mask_get_component_idx(e->mask)))
+    {
+        for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
+            if (vkd3d_swizzle_get_component(src_param->swizzle, i))
+                src_param->swizzle -= component_idx << VKD3D_SHADER_SWIZZLE_SHIFT(i);
+    }
+}
+
+static void shader_instruction_normalise_io_params(struct vkd3d_shader_instruction *ins,
+        struct io_normaliser *normaliser)
+{
+    struct vkd3d_shader_register *reg;
+    bool keep = true;
+    unsigned int i;
+
+    switch (ins->handler_idx)
+    {
+        case VKD3DSIH_DCL_INPUT:
+            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
+            {
+                reg = &ins->declaration.dst.reg;
+                /* We don't need to keep OUTCONTROLPOINT or PATCHCONST input declarations since their
+                * equivalents were declared earlier, but INCONTROLPOINT may be the first occurrence. */
+                if (reg->type == VKD3DSPR_OUTCONTROLPOINT || reg->type == VKD3DSPR_PATCHCONST)
+                    vkd3d_shader_instruction_make_nop(ins);
+                else if (reg->type == VKD3DSPR_INCONTROLPOINT)
+                    reg->type = VKD3DSPR_INPUT;
+            }
+            /* fall through */
+        case VKD3DSIH_DCL_INPUT_PS:
+        case VKD3DSIH_DCL_OUTPUT:
+            keep = shader_dst_param_io_normalise(&ins->declaration.dst, true, normaliser);
+            break;
+        case VKD3DSIH_DCL_INPUT_SGV:
+        case VKD3DSIH_DCL_INPUT_SIV:
+        case VKD3DSIH_DCL_INPUT_PS_SGV:
+        case VKD3DSIH_DCL_INPUT_PS_SIV:
+        case VKD3DSIH_DCL_OUTPUT_SIV:
+            keep = shader_dst_param_io_normalise(&ins->declaration.register_semantic.reg, true,
+                    normaliser);
+            break;
+        case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+        case VKD3DSIH_HS_FORK_PHASE:
+        case VKD3DSIH_HS_JOIN_PHASE:
+            normaliser->phase = ins->handler_idx;
+            memset(normaliser->input_dcl_params, 0, sizeof(normaliser->input_dcl_params));
+            memset(normaliser->output_dcl_params, 0, sizeof(normaliser->output_dcl_params));
+            memset(normaliser->pc_dcl_params, 0, sizeof(normaliser->pc_dcl_params));
+            break;
+        default:
+            if (shader_instruction_is_dcl(ins))
+                break;
+            for (i = 0; i < ins->dst_count; ++i)
+                shader_dst_param_io_normalise((struct vkd3d_shader_dst_param *)&ins->dst[i], false, normaliser);
+            for (i = 0; i < ins->src_count; ++i)
+                shader_src_param_io_normalise((struct vkd3d_shader_src_param *)&ins->src[i], normaliser);
+            break;
+    }
+
+    if (!keep)
+        shader_instruction_init(ins, VKD3DSIH_NOP);
+}
+
+enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
+        enum vkd3d_shader_type shader_type, struct shader_signature *input_signature,
+        struct shader_signature *output_signature, struct shader_signature *patch_constant_signature)
+{
+    struct io_normaliser normaliser = {*instructions};
+    struct vkd3d_shader_instruction *ins;
+    bool has_control_point_phase;
+    unsigned int i, j;
+
+    normaliser.phase = VKD3DSIH_INVALID;
+    normaliser.shader_type = shader_type;
+    normaliser.input_signature = input_signature;
+    normaliser.output_signature = output_signature;
+    normaliser.patch_constant_signature = patch_constant_signature;
+
+    for (i = 0, has_control_point_phase = false; i < instructions->count; ++i)
+    {
+        ins = &instructions->elements[i];
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
+                normaliser.output_control_point_count = ins->declaration.count;
+                break;
+            case VKD3DSIH_DCL_INDEX_RANGE:
+                io_normaliser_add_index_range(&normaliser, ins);
+                vkd3d_shader_instruction_make_nop(ins);
+                break;
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+                has_control_point_phase = true;
+                /* fall through */
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                normaliser.phase = ins->handler_idx;
+                break;
+            default:
+                break;
+        }
+    }
+
+    if (normaliser.shader_type == VKD3D_SHADER_TYPE_HULL && !has_control_point_phase)
+    {
+        /* Inputs and outputs must match for the default phase, so merge ranges must match too. */
+        for (i = 0; i < MAX_REG_OUTPUT; ++i)
+        {
+            for (j = 0; j < VKD3D_VEC4_SIZE; ++j)
+            {
+                if (!normaliser.input_range_map[i][j] && normaliser.output_range_map[i][j])
+                    normaliser.input_range_map[i][j] = normaliser.output_range_map[i][j];
+                else if (normaliser.input_range_map[i][j] && !normaliser.output_range_map[i][j])
+                    normaliser.output_range_map[i][j] = normaliser.input_range_map[i][j];
+                else assert(normaliser.input_range_map[i][j] == normaliser.output_range_map[i][j]);
+            }
+        }
+    }
+
+    if (!shader_signature_merge(input_signature, normaliser.input_range_map, false)
+            || !shader_signature_merge(output_signature, normaliser.output_range_map, false)
+            || !shader_signature_merge(patch_constant_signature, normaliser.pc_range_map, true))
+    {
+        *instructions = normaliser.instructions;
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    normaliser.phase = VKD3DSIH_INVALID;
+    for (i = 0; i < normaliser.instructions.count; ++i)
+        shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
+
+    *instructions = normaliser.instructions;
+    return VKD3D_OK;
+}
