@@ -661,8 +661,9 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
     else if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE || semantic->resource.reg.reg.type == VKD3DSPR_UAV)
     {
         if (semantic->resource.reg.reg.type == VKD3DSPR_RESOURCE)
-            shader_addline(buffer, "_resource_");
+            shader_addline(buffer, "_resource");
 
+        shader_addline(buffer, "_");
         shader_dump_resource_type(compiler, semantic->resource_type);
         if (semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS
                 || semantic->resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY)
