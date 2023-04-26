@@ -63,6 +63,7 @@ vkd3d_shader_tests = \
 	tests/cbuffer.shader_test \
 	tests/compute.shader_test \
 	tests/conditional.shader_test \
+	tests/ddxddy.shader_test \
 	tests/distance.shader_test \
 	tests/entry-point-semantics.shader_test \
 	tests/exp.shader_test \

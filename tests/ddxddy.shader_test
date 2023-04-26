@@ -1,0 +1,26 @@
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    return float4(ddx(pos.x), ddy(pos.y), 0, 0);
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 0.0, 0.0)
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    pos /= 10.0;
+    float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
+    return float4(nonlinear, ddx(nonlinear), ddy(nonlinear), 0.0);
+}
+
+[test]
+draw quad
+probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 8
+probe (11, 10) rgba (-0.689999819, -0.164999843, 0.104999900, 0.0) 8
+probe (10, 11) rgba (-0.420000076, -0.164999843, 0.104999900, 0.0) 8
+probe (11, 11) rgba (-0.574999928, -0.164999843, 0.104999900, 0.0) 8
+probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 8
+probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 40
