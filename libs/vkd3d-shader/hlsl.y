@@ -3743,7 +3743,9 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
     }
     if (multisampled)
     {
-        hlsl_fixme(ctx, loc, "Load() sampling index parameter.");
+        if (!(load_params.sample_index = add_implicit_conversion(ctx, instrs, params->args[1],
+                hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), loc)))
+            return false;
     }
 
     assert(offset_dim);
@@ -3758,9 +3760,9 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct list *instrs, stru
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
     }
 
-    /* +1 for the mipmap level */
+    /* +1 for the mipmap level for non-multisampled textures */
     if (!(load_params.coords = add_implicit_conversion(ctx, instrs, params->args[0],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + 1), loc)))
+            hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + !multisampled), loc)))
         return false;
 
     load_params.format = object_type->e.resource_format;

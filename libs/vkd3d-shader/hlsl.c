@@ -1351,6 +1351,7 @@ struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     }
 
     hlsl_src_from_node(&load->coords, params->coords);
+    hlsl_src_from_node(&load->sample_index, params->sample_index);
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
     load->sampling_dim = params->sampling_dim;
@@ -1643,6 +1644,7 @@ static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
     }
     clone_src(map, &dst->coords, &src->coords);
     clone_src(map, &dst->lod, &src->lod);
+    clone_src(map, &dst->sample_index, &src->sample_index);
     clone_src(map, &dst->texel_offset, &src->texel_offset);
     dst->sampling_dim = src->sampling_dim;
     return &dst->node;
@@ -2439,6 +2441,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     dump_deref(buffer, &load->sampler);
     vkd3d_string_buffer_printf(buffer, ", coords = ");
     dump_src(buffer, &load->coords);
+    if (load->sample_index.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", sample index = ");
+        dump_src(buffer, &load->sample_index);
+    }
     if (load->texel_offset.node)
     {
         vkd3d_string_buffer_printf(buffer, ", offset = ");
@@ -2685,6 +2692,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
     hlsl_src_remove(&load->coords);
     hlsl_src_remove(&load->lod);
     hlsl_src_remove(&load->texel_offset);
+    hlsl_src_remove(&load->sample_index);
     vkd3d_free(load);
 }
 

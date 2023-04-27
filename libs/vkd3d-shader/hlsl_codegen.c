@@ -2674,6 +2674,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
                 load->texel_offset.node->last_read = instr->index;
             if (load->lod.node)
                 load->lod.node->last_read = instr->index;
+            if (load->sample_index.node)
+                load->sample_index.node->last_read = instr->index;
             break;
         }
         case HLSL_IR_RESOURCE_STORE:

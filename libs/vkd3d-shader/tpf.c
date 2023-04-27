@@ -2809,6 +2809,8 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
                     return D3D_SVT_TEXTURE1D;
                 case HLSL_SAMPLER_DIM_2D:
                     return D3D_SVT_TEXTURE2D;
+                case HLSL_SAMPLER_DIM_2DMS:
+                    return D3D_SVT_TEXTURE2DMS;
                 case HLSL_SAMPLER_DIM_3D:
                     return D3D_SVT_TEXTURE3D;
                 case HLSL_SAMPLER_DIM_CUBE:
@@ -3984,14 +3986,20 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
 static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
-        const struct hlsl_ir_node *texel_offset, enum hlsl_sampler_dim dim)
+        const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
+        enum hlsl_sampler_dim dim)
 {
+    bool multisampled = resource_type->base_type == HLSL_TYPE_TEXTURE
+            && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
     bool uav = (hlsl_type_get_regset(resource_type) == HLSL_REGSET_UAVS);
     struct sm4_instruction instr;
     unsigned int dim_count;
 
     memset(&instr, 0, sizeof(instr));
-    instr.opcode = uav ? VKD3D_SM5_OP_LD_UAV_TYPED : VKD3D_SM4_OP_LD;
+    if (uav)
+        instr.opcode = VKD3D_SM5_OP_LD_UAV_TYPED;
+    else
+        instr.opcode = multisampled ? VKD3D_SM4_OP_LD2DMS : VKD3D_SM4_OP_LD;
 
     if (texel_offset)
     {
@@ -4022,6 +4030,33 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
 
     instr.src_count = 2;
+
+    if (multisampled)
+    {
+        if (sample_index->type == HLSL_IR_CONSTANT)
+        {
+            struct sm4_register *reg = &instr.srcs[2].reg;
+            struct hlsl_ir_constant *index;
+
+            index = hlsl_ir_constant(sample_index);
+
+            memset(&instr.srcs[2], 0, sizeof(instr.srcs[2]));
+            instr.srcs[2].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
+            reg->type = VKD3D_SM4_RT_IMMCONST;
+            reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
+            reg->immconst_uint[0] = index->value.u[0].u;
+        }
+        else if (ctx->profile->major_version == 4 && ctx->profile->minor_version == 0)
+        {
+            hlsl_error(ctx, &sample_index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Expected literal sample index.");
+        }
+        else
+        {
+            sm4_src_from_node(&instr.srcs[2], sample_index, 0);
+        }
+
+        ++instr.src_count;
+    }
 
     write_sm4_instruction(buffer, &instr);
 }
@@ -4833,6 +4868,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 {
     const struct hlsl_type *resource_type = load->resource.var->data_type;
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
+    const struct hlsl_ir_node *sample_index = load->sample_index.node;
     const struct hlsl_ir_node *coords = load->coords.node;
 
     if (!hlsl_type_is_resource(resource_type))
@@ -4868,7 +4904,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     {
         case HLSL_RESOURCE_LOAD:
             write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource,
-                    coords, texel_offset, load->sampling_dim);
+                    coords, sample_index, texel_offset, load->sampling_dim);
             break;
 
         case HLSL_RESOURCE_SAMPLE:
