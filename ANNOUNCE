@@ -1,17 +1,12 @@
-The Wine team is proud to announce that release 1.7 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.7.1 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
-This release contains improvements that are listed in the release notes below.
-The main highlights are:
-
-  - Support for many more HLSL features and intrinsics.
-  - Much improved support for the Direct3D shader model 1/2/3 HLSL profiles.
-  - Public vkd3d-shader API for parsing and serialising DXBC blobs.
-  - Miscellaneous bug fixes.
+This is a bugfix release, only containing targeted fixes for a couple
+of defects that had slipped in in vkd3d 1.7.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.7.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.7.1.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -22,49 +17,20 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.7
-=======================
+What's new in vkd3d 1.7.1
+=========================
 
 
-*** libvkd3d-shader
+*** libvkd3d
 
-- New features for the HLSL source type:
-  - Support for calling user-defined functions.
-  - Support for array parameters to user-defined functions.
-  - Much improved support for the Direct3D shader model 1/2/3 profiles.
-  - Support for the SV_DispatchThreadID, SV_GroupID, and SV_GroupThreadID
-    compute shader system-value semantics.
-  - Support for the optional "offset" parameter of the texture object Load()
-    method.
-  - Support for the all() intrinsic function.
-  - Support for the distance() intrinsic function.
-  - Support for the exp() and exp2() intrinsic functions.
-  - Support for the frac() intrinsic function.
-  - Support for the lit() intrinsic function.
-  - Support for the reflect() intrinsic function.
-  - Support for the sin() and cos() intrinsic functions.
-  - Support for the smoothstep() intrinsic function.
-  - Support for the sqrt() and rsqrt() intrinsic functions.
-  - Support for the step() intrinsic function.
-  - Support for the transpose() intrinsic function.
-  - Support for the case-insensitive variants of the "float" and "dword" data
-    types.
-  - Partial support for minimum precision data types like "min16float". These
-    are currently interpreted as their regular counterparts.
-  - Improved constant propagation support, in particular to constant
-    propagation through swizzles.
+- Release 1.7 has a bug that causes an internal mutex in its command
+  queue implementation to be unlocked too early under certain usage
+  patterns. This is known to further cause internal inconsistencies
+  that manifest as program deadlocks for some programs. In release
+  1.7.1 the mutex is correctly kept locked until required.
 
-- HLSL static variables are now properly zero-initialised.
+*** libvkd3d-utils
 
-- The Direct3D shader model 4 and 5 disassembler outputs sample counts for
-  multi-sampled resource declarations.
-
-- New interfaces:
-  - vkd3d_shader_parse_dxbc() provides support for parsing DXBC blobs.
-  - vkd3d_shader_serialize_dxbc() provides support for serialising DXBC blobs.
-  - vkd3d_shader_free_dxbc() is used to free vkd3d_shader_dxbc_desc
-    structures, as returned by vkd3d_shader_parse_dxbc().
-  - The VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE compile option
-    can be used to specify whether SPIR-V shaders targeting Vulkan
-    environments should write point sizes for geometry and tessellation
-    shaders. If left unspecified, point sizes will be written.
+- Symbol D3D12CreateDevice is mistakenly not exported in release 1.7,
+  breaking library clients that need it. The symbol is exported again
+  in release 1.7.1.
