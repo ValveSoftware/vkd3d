@@ -3159,6 +3159,27 @@ static void d3d12_command_list_update_descriptor_tables(struct d3d12_command_lis
     }
 }
 
+static bool contains_heap(struct d3d12_descriptor_heap **heap_array, unsigned int count,
+        const struct d3d12_descriptor_heap *query)
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+        if (heap_array[i] == query)
+            return true;
+    return false;
+}
+
+static void command_list_flush_vk_heap_updates(struct d3d12_command_list *list)
+{
+    struct d3d12_device *device = list->device;
+    unsigned int i;
+
+    for (i = 0; i < list->descriptor_heap_count; ++i)
+        d3d12_desc_flush_vk_heap_updates(list->descriptor_heaps[i], device);
+    list->descriptor_heap_count = 0;
+}
+
 static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *list,
         enum vkd3d_pipeline_bind_point bind_point, struct d3d12_descriptor_heap *heap)
 {
@@ -3181,6 +3202,17 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         if (heap->serial_id == bindings->sampler_heap_id)
             return;
         bindings->sampler_heap_id = heap->serial_id;
+    }
+
+    if (!contains_heap(list->descriptor_heaps, list->descriptor_heap_count, heap))
+    {
+        if (list->descriptor_heap_count == ARRAY_SIZE(list->descriptor_heaps))
+        {
+            /* Descriptors can be written after binding. */
+            FIXME("Flushing descriptor updates while list %p is not closed.\n", list);
+            command_list_flush_vk_heap_updates(list);
+        }
+        list->descriptor_heaps[list->descriptor_heap_count++] = heap;
     }
 
     for (set = 0; set < ARRAY_SIZE(heap->vk_descriptor_sets); ++set)
@@ -5927,6 +5959,7 @@ static HRESULT d3d12_command_list_init(struct d3d12_command_list *list, struct d
 
     list->update_descriptors = device->use_vk_heaps ? d3d12_command_list_update_heap_descriptors
             : d3d12_command_list_update_descriptors;
+    list->descriptor_heap_count = 0;
 
     if (SUCCEEDED(hr = d3d12_command_allocator_allocate_command_buffer(allocator, list)))
     {
@@ -6187,44 +6220,6 @@ static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
     }
 }
 
-static bool contains_heap(const struct d3d12_descriptor_heap **heap_array, unsigned int count,
-        const struct d3d12_descriptor_heap *query)
-{
-    unsigned int i;
-
-    for (i = 0; i < count; ++i)
-        if (heap_array[i] == query)
-            return true;
-    return false;
-}
-
-static void pipeline_bindings_flush_vk_heap_updates(struct vkd3d_pipeline_bindings *bindings,
-        struct d3d12_device *device)
-{
-    /* Only two heaps are strictly allowed, but more could be supported with a hack. */
-    const struct d3d12_descriptor_heap *heap_array[3];
-    struct d3d12_descriptor_heap *descriptor_heap;
-    unsigned int i, count;
-    uint64_t mask;
-
-    mask = bindings->descriptor_table_active_mask & bindings->root_signature->descriptor_table_mask;
-
-    for (i = 0, count = 0; i < ARRAY_SIZE(bindings->descriptor_tables); ++i)
-    {
-        if (!(mask & (1ull << i)) || !bindings->descriptor_tables[i])
-            continue;
-
-        descriptor_heap = d3d12_desc_get_descriptor_heap(bindings->descriptor_tables[i]);
-        /* Another thread could be writing unused descriptors, so try to check each heap only once. Flushing
-         * any updates added after the first flush will only delay execution of the command list. */
-        if (contains_heap(heap_array, count, descriptor_heap))
-            continue;
-        if (count < ARRAY_SIZE(heap_array))
-            heap_array[count++] = descriptor_heap;
-        d3d12_desc_flush_vk_heap_updates(descriptor_heap, device);
-    }
-}
-
 static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12CommandQueue *iface,
         UINT command_list_count, ID3D12CommandList * const *command_lists)
 {
@@ -6258,9 +6253,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
             return;
         }
 
-        if (cmd_list->state)
-            pipeline_bindings_flush_vk_heap_updates(&cmd_list->pipeline_bindings[cmd_list->state->vk_bind_point],
-                    cmd_list->device);
+        command_list_flush_vk_heap_updates(cmd_list);
 
         buffers[i] = cmd_list->vk_command_buffer;
     }

@@ -1407,6 +1407,8 @@ struct d3d12_command_list
     VkDeviceSize so_counter_buffer_offsets[D3D12_SO_BUFFER_SLOT_COUNT];
 
     void (*update_descriptors)(struct d3d12_command_list *list, enum vkd3d_pipeline_bind_point bind_point);
+    struct d3d12_descriptor_heap *descriptor_heaps[64];
+    unsigned int descriptor_heap_count;
 
     struct vkd3d_private_store private_store;
 };
