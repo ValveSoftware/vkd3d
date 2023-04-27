@@ -988,13 +988,14 @@ struct d3d12_descriptor_heap
 
     VkDescriptorPool vk_descriptor_pool;
     struct d3d12_descriptor_heap_vk_set vk_descriptor_sets[VKD3D_SET_INDEX_COUNT];
+    struct vkd3d_mutex vk_sets_mutex;
 
     unsigned int volatile dirty_list_head;
 
     uint8_t DECLSPEC_ALIGN(sizeof(void *)) descriptors[];
 };
 
-void d3d12_desc_flush_vk_heap_updates(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device);
+void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device);
 
 static inline struct d3d12_descriptor_heap *d3d12_desc_get_descriptor_heap(const struct d3d12_desc *descriptor)
 {

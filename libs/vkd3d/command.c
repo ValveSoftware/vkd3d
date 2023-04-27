@@ -3176,7 +3176,11 @@ static void command_list_flush_vk_heap_updates(struct d3d12_command_list *list)
     unsigned int i;
 
     for (i = 0; i < list->descriptor_heap_count; ++i)
-        d3d12_desc_flush_vk_heap_updates(list->descriptor_heaps[i], device);
+    {
+        vkd3d_mutex_lock(&list->descriptor_heaps[i]->vk_sets_mutex);
+        d3d12_desc_flush_vk_heap_updates_locked(list->descriptor_heaps[i], device);
+        vkd3d_mutex_unlock(&list->descriptor_heaps[i]->vk_sets_mutex);
+    }
     list->descriptor_heap_count = 0;
 }
 
@@ -3215,6 +3219,8 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         list->descriptor_heaps[list->descriptor_heap_count++] = heap;
     }
 
+    vkd3d_mutex_lock(&heap->vk_sets_mutex);
+
     for (set = 0; set < ARRAY_SIZE(heap->vk_descriptor_sets); ++set)
     {
         VkDescriptorSet vk_descriptor_set = heap->vk_descriptor_sets[set].vk_set;
@@ -3225,6 +3231,8 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         VK_CALL(vkCmdBindDescriptorSets(list->vk_command_buffer, bindings->vk_bind_point, rs->vk_pipeline_layout,
                 rs->vk_set_count + set, 1, &vk_descriptor_set, 0, NULL));
     }
+
+    vkd3d_mutex_unlock(&heap->vk_sets_mutex);
 }
 
 static void d3d12_command_list_update_heap_descriptors(struct d3d12_command_list *list,

@@ -2323,7 +2323,7 @@ static void d3d12_desc_write_vk_heap(struct d3d12_descriptor_heap *descriptor_he
     writes->count = i;
 }
 
-void d3d12_desc_flush_vk_heap_updates(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device)
+void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_device *device)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     struct d3d12_desc *descriptors, *src;
@@ -3724,6 +3724,7 @@ static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_Release(ID3D12DescriptorHea
         }
 
         VK_CALL(vkDestroyDescriptorPool(device->vk_device, heap->vk_descriptor_pool, NULL));
+        vkd3d_mutex_destroy(&heap->vk_sets_mutex);
 
         vkd3d_free(heap);
 
@@ -3946,6 +3947,7 @@ static HRESULT d3d12_descriptor_heap_init(struct d3d12_descriptor_heap *descript
         return hr;
 
     d3d12_descriptor_heap_vk_descriptor_sets_init(descriptor_heap, device, desc);
+    vkd3d_mutex_init(&descriptor_heap->vk_sets_mutex);
 
     d3d12_device_add_ref(descriptor_heap->device = device);
 
