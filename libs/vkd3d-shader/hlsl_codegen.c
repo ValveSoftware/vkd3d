@@ -858,6 +858,42 @@ static bool lower_calls(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *
     return true;
 }
 
+static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct hlsl_ir_node *index,
+        const struct vkd3d_shader_location *loc)
+{
+    unsigned int dim_count = index->data_type->dimx;
+    struct hlsl_ir_load *coords_load;
+    struct hlsl_deref coords_deref;
+    struct hlsl_ir_constant *zero;
+    struct hlsl_ir_store *store;
+    struct hlsl_ir_var *coords;
+
+    assert(dim_count < 4);
+
+    if (!(coords = hlsl_new_synthetic_var(ctx, "coords",
+            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count + 1), loc)))
+        return NULL;
+
+    hlsl_init_simple_deref_from_var(&coords_deref, coords);
+    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
+        return NULL;
+    list_add_after(&index->entry, &store->node.entry);
+
+    if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
+        return NULL;
+    list_add_after(&store->node.entry, &zero->node.entry);
+
+    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, &zero->node, 1u << dim_count, loc)))
+        return NULL;
+    list_add_after(&zero->node.entry, &store->node.entry);
+
+    if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
+        return NULL;
+    list_add_after(&store->node.entry, &coords_load->node.entry);
+
+    return &coords_load->node;
+}
+
 /* hlsl_ir_index nodes are a parse-time construct used to represent array indexing and struct
  * record access before knowing if they will be used in the lhs of an assignment --in which case
  * they are lowered into a deref-- or as the load of an element within a larger value.
@@ -880,12 +916,21 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
     if (hlsl_index_is_resource_access(index))
     {
+        unsigned int dim_count = hlsl_sampler_dim_count(val->data_type->sampler_dim);
+        struct hlsl_ir_node *coords = index->idx.node;
         struct hlsl_resource_load_params params = {0};
         struct hlsl_ir_node *load;
 
+        assert(coords->data_type->class == HLSL_CLASS_VECTOR);
+        assert(coords->data_type->base_type == HLSL_TYPE_UINT);
+        assert(coords->data_type->dimx == dim_count);
+
+        if (!(coords = add_zero_mipmap_level(ctx, coords, &instr->loc)))
+            return false;
+
         params.type = HLSL_RESOURCE_LOAD;
         params.resource = val;
-        params.coords = index->idx.node;
+        params.coords = coords;
         params.format = val->data_type->e.resource_format;
 
         if (!(load = hlsl_new_resource_load(ctx, &params, &instr->loc)))

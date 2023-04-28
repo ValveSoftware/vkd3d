@@ -712,39 +712,6 @@ static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, str
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc);
 
-static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct list *instrs,
-        struct hlsl_ir_node *index, unsigned int dim_count, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_load *coords_load;
-    struct hlsl_deref coords_deref;
-    struct hlsl_ir_constant *zero;
-    struct hlsl_ir_store *store;
-    struct hlsl_ir_var *coords;
-
-    if (!(coords = hlsl_new_synthetic_var(ctx, "coords",
-            hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count + 1), loc)))
-        return NULL;
-
-    hlsl_init_simple_deref_from_var(&coords_deref, coords);
-    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, index, (1u << dim_count) - 1, loc)))
-        return NULL;
-    list_add_tail(instrs, &store->node.entry);
-
-    if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
-        return NULL;
-    list_add_tail(instrs, &zero->node.entry);
-
-    if (!(store = hlsl_new_store_index(ctx, &coords_deref, NULL, &zero->node, 1u << dim_count, loc)))
-        return NULL;
-    list_add_tail(instrs, &store->node.entry);
-
-    if (!(coords_load = hlsl_new_var_load(ctx, coords, loc)))
-        return NULL;
-    list_add_tail(instrs, &coords_load->node.entry);
-
-    return &coords_load->node;
-}
-
 static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *array,
         struct hlsl_ir_node *index, const struct vkd3d_shader_location *loc)
 {
@@ -770,9 +737,6 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct list *instrs, struct h
 
         if (!(index = add_implicit_conversion(ctx, instrs, index,
                 hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, dim_count), &index->loc)))
-            return false;
-
-        if (!(index = add_zero_mipmap_level(ctx, instrs, index, dim_count, loc)))
             return false;
 
         if (!(return_index = hlsl_new_index(ctx, array, index, loc)))
@@ -1750,10 +1714,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
 
     if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
     {
-        struct hlsl_ir_node *load_coords = hlsl_ir_index(lhs)->idx.node;
+        struct hlsl_ir_node *coords = hlsl_ir_index(lhs)->idx.node;
         struct hlsl_deref resource_deref;
         struct hlsl_type *resource_type;
-        struct hlsl_ir_swizzle *coords;
         struct hlsl_ir_node *store;
         unsigned int dim_count;
 
@@ -1774,18 +1737,11 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct list *in
             hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK,
                     "Resource store expressions must write to all components.");
 
-        /* Remove the (implicit) mipmap level from the load expression. */
-        assert(load_coords->data_type->class == HLSL_CLASS_VECTOR);
-        assert(load_coords->data_type->base_type == HLSL_TYPE_UINT);
-        assert(load_coords->data_type->dimx == dim_count + 1);
-        if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), dim_count, load_coords, &lhs->loc)))
-        {
-            hlsl_cleanup_deref(&resource_deref);
-            return NULL;
-        }
-        list_add_tail(instrs, &coords->node.entry);
+        assert(coords->data_type->class == HLSL_CLASS_VECTOR);
+        assert(coords->data_type->base_type == HLSL_TYPE_UINT);
+        assert(coords->data_type->dimx == dim_count);
 
-        if (!(store = hlsl_new_resource_store(ctx, &resource_deref, &coords->node, rhs, &lhs->loc)))
+        if (!(store = hlsl_new_resource_store(ctx, &resource_deref, coords, rhs, &lhs->loc)))
         {
             hlsl_cleanup_deref(&resource_deref);
             return NULL;
