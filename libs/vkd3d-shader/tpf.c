@@ -2202,7 +2202,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
 
     *parser = &sm4->p;
 
-    return VKD3D_OK;
+    return sm4->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }
 
 static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_block *block);
