@@ -989,7 +989,7 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
 
     *parser = &sm1->p;
 
-    return VKD3D_OK;
+    return sm1->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }
 
 bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
