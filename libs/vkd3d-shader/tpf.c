@@ -3528,8 +3528,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
             {
                 const unsigned int var_size = (profile->major_version >= 5 ? 10 : 6);
                 size_t var_offset = vars_start + j * var_size * sizeof(uint32_t);
-                size_t string_offset = put_string(&buffer, var->name);
 
+                string_offset = put_string(&buffer, var->name);
                 set_u32(&buffer, var_offset, string_offset);
                 write_sm4_type(ctx, &buffer, var->data_type);
                 set_u32(&buffer, var_offset + 4 * sizeof(uint32_t), var->data_type->bytecode_offset);
