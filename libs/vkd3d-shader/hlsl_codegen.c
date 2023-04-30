@@ -1304,12 +1304,10 @@ static struct copy_propagation_value *copy_propagation_get_value(const struct co
         {
             struct copy_propagation_var_def *var_def = RB_ENTRY_VALUE(entry, struct copy_propagation_var_def, entry);
             unsigned int component_count = hlsl_type_component_count(var->data_type);
-            enum copy_propagation_value_state state;
 
             assert(component < component_count);
-            state = var_def->values[component].state;
 
-            switch (state)
+            switch (var_def->values[component].state)
             {
                 case VALUE_STATE_STATICALLY_WRITTEN:
                     return &var_def->values[component];
