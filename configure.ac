@@ -62,6 +62,7 @@ AS_IF([test "x${GCC}" = "xyes"],
       VKD3D_CHECK_CFLAGS([-Wimplicit-fallthrough])
       VKD3D_CHECK_CFLAGS([-Winit-self])
       VKD3D_CHECK_CFLAGS([-Wmissing-prototypes])
+      VKD3D_CHECK_CFLAGS([-Wshadow])
       VKD3D_CHECK_CFLAGS([-Wunused-but-set-parameter])
       VKD3D_CHECK_CFLAGS([-Wvla])
       VKD3D_CHECK_CFLAGS([-Wpointer-arith])
