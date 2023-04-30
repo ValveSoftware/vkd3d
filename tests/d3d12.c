@@ -19893,7 +19893,7 @@ static void test_get_copyable_footprints(void)
     uint64_t row_sizes[10], total_size;
     D3D12_RESOURCE_DESC resource_desc;
     unsigned int sub_resource_count;
-    unsigned int i, j, k, l;
+    unsigned int i, j, k;
     ID3D12Device *device;
     UINT row_counts[10];
     ULONG refcount;
@@ -20090,7 +20090,7 @@ static void test_get_copyable_footprints(void)
                 check_copyable_footprints(&resource_desc, 0, sub_resource_count, base_offsets[k],
                         NULL, NULL, NULL, &total_size);
 
-                for (l = 0; l < sub_resource_count; ++l)
+                for (unsigned int l = 0; l < sub_resource_count; ++l)
                 {
                     vkd3d_test_push_context("sub-resource %u", l);
 
