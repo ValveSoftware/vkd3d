@@ -618,7 +618,6 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         D3D_PRIMITIVE_TOPOLOGY topology;
         struct resource_params params;
         unsigned int vertex_count;
-        char *rest;
 
         if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
         {
