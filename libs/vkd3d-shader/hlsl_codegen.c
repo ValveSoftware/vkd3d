@@ -1090,7 +1090,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         unsigned int dim_count = hlsl_sampler_dim_count(val->data_type->sampler_dim);
         struct hlsl_ir_node *coords = index->idx.node;
         struct hlsl_resource_load_params params = {0};
-        struct hlsl_ir_node *load;
+        struct hlsl_ir_node *resource_load;
 
         assert(coords->data_type->class == HLSL_CLASS_VECTOR);
         assert(coords->data_type->base_type == HLSL_TYPE_UINT);
@@ -1104,9 +1104,9 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         params.coords = coords;
         params.format = val->data_type->e.resource_format;
 
-        if (!(load = hlsl_new_resource_load(ctx, &params, &instr->loc)))
+        if (!(resource_load = hlsl_new_resource_load(ctx, &params, &instr->loc)))
             return false;
-        hlsl_block_add_instr(block, load);
+        hlsl_block_add_instr(block, resource_load);
         return true;
     }
 
