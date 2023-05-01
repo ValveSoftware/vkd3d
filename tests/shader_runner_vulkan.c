@@ -114,7 +114,7 @@ static void transition_image_layout(struct vulkan_shader_runner *runner,
     barrier.image = image;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
@@ -178,7 +178,7 @@ static VkBuffer create_buffer(const struct vulkan_shader_runner *runner, VkDevic
 }
 
 static VkImage create_2d_image(const struct vulkan_shader_runner *runner, uint32_t width, uint32_t height,
-        VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
+        uint32_t level_count, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
 {
     VkImageCreateInfo image_info = {.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
     VkMemoryRequirements memory_reqs;
@@ -189,7 +189,7 @@ static VkImage create_2d_image(const struct vulkan_shader_runner *runner, uint32
     image_info.extent.width = width;
     image_info.extent.height = height;
     image_info.extent.depth = 1;
-    image_info.mipLevels = 1;
+    image_info.mipLevels = level_count;
     image_info.arrayLayers = 1;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -220,7 +220,7 @@ static VkImageView create_2d_image_view(const struct vulkan_shader_runner *runne
     view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     view_info.subresourceRange.baseMipLevel = 0;
-    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
     view_info.subresourceRange.baseArrayLayer = 0;
     view_info.subresourceRange.layerCount = 1;
 
@@ -234,7 +234,6 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
     struct vulkan_resource *resource;
     VkDevice device = runner->device;
-    VkBufferImageCopy region = {0};
     VkDeviceMemory staging_memory;
     VkBuffer staging_buffer;
     VkFormat format;
@@ -248,7 +247,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
         case RESOURCE_TYPE_RENDER_TARGET:
             format = vkd3d_get_vk_format(params->format);
 
-            resource->image = create_2d_image(runner, params->width, params->height,
+            resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
             resource->view = create_2d_image_view(runner, resource->image, format);
 
@@ -263,6 +262,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
         {
             VkImageUsageFlagBits usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
             VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            unsigned int buffer_offset = 0;
 
             format = vkd3d_get_vk_format(params->format);
 
@@ -272,7 +272,8 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
                 usage |= VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
             }
 
-            resource->image = create_2d_image(runner, params->width, params->height, usage, format, &resource->memory);
+            resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
+                    usage, format, &resource->memory);
             resource->view = create_2d_image_view(runner, resource->image, format);
 
             staging_buffer = create_buffer(runner, params->data_size,
@@ -286,13 +287,24 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             transition_image_layout(runner, resource->image,
                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            region.imageSubresource.layerCount = 1;
-            region.imageExtent.width = params->width;
-            region.imageExtent.height = params->height;
-            region.imageExtent.depth = 1;
-            VK_CALL(vkCmdCopyBufferToImage(runner->cmd_buffer, staging_buffer, resource->image,
-                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+            for (unsigned int level = 0; level < params->level_count; ++level)
+            {
+                unsigned int level_width = get_level_dimension(params->width, level);
+                unsigned int level_height = get_level_dimension(params->height, level);
+                VkBufferImageCopy region = {0};
+
+                region.bufferOffset = buffer_offset;
+                region.imageSubresource.mipLevel = level;
+                region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                region.imageSubresource.layerCount = 1;
+                region.imageExtent.width = level_width;
+                region.imageExtent.height = level_height;
+                region.imageExtent.depth = 1;
+                VK_CALL(vkCmdCopyBufferToImage(runner->cmd_buffer, staging_buffer, resource->image,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region));
+
+                buffer_offset += level_width * level_height * params->texel_size;
+            }
 
             transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout);
 
@@ -739,6 +751,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
         sampler_desc.addressModeU = vk_address_mode_from_d3d12(sampler->u_address);
         sampler_desc.addressModeV = vk_address_mode_from_d3d12(sampler->v_address);
         sampler_desc.addressModeW = vk_address_mode_from_d3d12(sampler->w_address);
+        sampler_desc.maxLod = FLT_MAX;
 
         VK_CALL(vkCreateSampler(runner->device, &sampler_desc, NULL, &vulkan_sampler->vk_sampler));
         vulkan_sampler->binding = binding_index++;

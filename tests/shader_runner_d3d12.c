@@ -90,11 +90,26 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
-    D3D12_SUBRESOURCE_DATA resource_data;
+    D3D12_SUBRESOURCE_DATA resource_data[2];
     struct d3d12_resource *resource;
+    unsigned int buffer_offset = 0;
+
+    if (params->level_count > ARRAY_SIZE(resource_data))
+        fatal_error("Level count %u is too high.\n", params->level_count);
 
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
+
+    for (unsigned int level = 0; level < params->level_count; ++level)
+    {
+        unsigned int level_width = get_level_dimension(params->width, level);
+        unsigned int level_height = get_level_dimension(params->height, level);
+
+        resource_data[level].pData = &params->data[buffer_offset];
+        resource_data[level].RowPitch = level_width * params->texel_size;
+        resource_data[level].SlicePitch = level_height * resource_data[level].RowPitch;
+        buffer_offset += resource_data[level].SlicePitch;
+    }
 
     switch (params->type)
     {
@@ -106,7 +121,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             if (params->slot >= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT)
                 fatal_error("RTV slot %u is too high.\n", params->slot);
 
-            resource->resource = create_default_texture(device, params->width, params->height,
+            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
                     params->format, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, D3D12_RESOURCE_STATE_RENDER_TARGET);
             ID3D12Device_CreateRenderTargetView(device, resource->resource,
                     NULL, get_cpu_rtv_handle(test_context, runner->rtv_heap, resource->r.slot));
@@ -117,11 +132,10 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            resource->resource = create_default_texture(device, params->width, params->height,
+            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
                     params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-            resource_data.pData = params->data;
-            resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
-            upload_texture_data(resource->resource, &resource_data, 1, test_context->queue, test_context->list);
+            upload_texture_data(resource->resource, resource_data,
+                    params->level_count, test_context->queue, test_context->list);
             reset_command_list(test_context->list, test_context->allocator);
             transition_resource_state(test_context->list, resource->resource, D3D12_RESOURCE_STATE_COPY_DEST,
                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -134,11 +148,10 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            resource->resource = create_default_texture(device, params->width, params->height,
+            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
                     params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-            resource_data.pData = params->data;
-            resource_data.SlicePitch = resource_data.RowPitch = params->width * params->texel_size;
-            upload_texture_data(resource->resource, &resource_data, 1, test_context->queue, test_context->list);
+            upload_texture_data(resource->resource, resource_data,
+                    params->level_count, test_context->queue, test_context->list);
             reset_command_list(test_context->list, test_context->allocator);
             transition_resource_state(test_context->list, resource->resource,
                     D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -236,6 +249,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         sampler_desc->AddressU = sampler->u_address;
         sampler_desc->AddressV = sampler->v_address;
         sampler_desc->AddressW = sampler->w_address;
+        sampler_desc->MaxLOD = FLT_MAX;
         sampler_desc->ShaderRegister = sampler->slot;
         sampler_desc->RegisterSpace = 0;
         sampler_desc->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;

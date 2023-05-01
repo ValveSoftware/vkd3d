@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <float.h>
 #include <stdint.h>
 #include "vkd3d_windows.h"
 #include "vkd3d_d3dcommon.h"
@@ -68,6 +69,7 @@ struct resource_params
     enum texture_data_type data_type;
     unsigned int texel_size;
     unsigned int width, height;
+    unsigned int level_count;
     uint8_t *data;
     size_t data_size, data_capacity;
 };
@@ -133,6 +135,11 @@ struct shader_runner_ops
     struct resource_readback *(*get_resource_readback)(struct shader_runner *runner, struct resource *resource);
     void (*release_readback)(struct shader_runner *runner, struct resource_readback *rb);
 };
+
+static inline unsigned int get_level_dimension(unsigned int dimension, unsigned int level)
+{
+    return max(1, dimension >> level);
+}
 
 void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2);
 

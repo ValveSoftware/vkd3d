@@ -251,6 +251,14 @@ static void parse_resource_directive(struct resource_params *resource, const cha
         if (ret < 2)
             fatal_error("Malformed texture size '%s'.\n", line);
     }
+    else if (match_string(line, "levels", &line))
+    {
+        char *rest;
+
+        resource->level_count = strtoul(line, &rest, 10);
+        if (rest == line)
+            fatal_error("Malformed texture directive '%s'.\n", line);
+    }
     else
     {
         union
@@ -474,6 +482,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.texel_size = 16;
             params.width = RENDER_TARGET_WIDTH;
             params.height = RENDER_TARGET_HEIGHT;
+            params.level_count = 1;
 
             set_resource(runner, runner->ops->create_resource(runner, &params));
         }
@@ -518,6 +527,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             params.texel_size = 16;
             params.width = RENDER_TARGET_WIDTH;
             params.height = RENDER_TARGET_HEIGHT;
+            params.level_count = 1;
 
             set_resource(runner, runner->ops->create_resource(runner, &params));
         }
@@ -995,6 +1005,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
+                current_resource.level_count = 1;
             }
             else if (sscanf(line, "[texture %u]\n", &index))
             {
@@ -1007,6 +1018,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
+                current_resource.level_count = 1;
             }
             else if (sscanf(line, "[uav %u]\n", &index))
             {
@@ -1019,6 +1031,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
+                current_resource.level_count = 1;
             }
             else if (sscanf(line, "[vertex buffer %u]\n", &index))
             {

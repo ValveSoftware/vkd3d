@@ -338,7 +338,6 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
     ID3D11Device *device = runner->device;
-    D3D11_SUBRESOURCE_DATA resource_data;
     struct d3d11_resource *resource;
     HRESULT hr;
 
@@ -351,11 +350,15 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
         {
+            D3D11_SUBRESOURCE_DATA resource_data[2];
             D3D11_TEXTURE2D_DESC desc = {0};
+
+            if (params->level_count > ARRAY_SIZE(resource_data))
+                fatal_error("Level count %u is too high.\n", params->level_count);
 
             desc.Width = params->width;
             desc.Height = params->height;
-            desc.MipLevels = 1;
+            desc.MipLevels = params->level_count;
             desc.ArraySize = 1;
             desc.Format = params->format;
             desc.SampleDesc.Count = 1;
@@ -369,10 +372,19 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
 
             if (params->data)
             {
-                resource_data.pSysMem = params->data;
-                resource_data.SysMemPitch = params->width * params->texel_size;
-                resource_data.SysMemSlicePitch = params->height * resource_data.SysMemPitch;
-                hr = ID3D11Device_CreateTexture2D(device, &desc, &resource_data, &resource->texture);
+                unsigned int buffer_offset = 0;
+
+                for (unsigned int level = 0; level < params->level_count; ++level)
+                {
+                    unsigned int level_width = get_level_dimension(params->width, level);
+                    unsigned int level_height = get_level_dimension(params->height, level);
+
+                    resource_data[level].pSysMem = &params->data[buffer_offset];
+                    resource_data[level].SysMemPitch = level_width * params->texel_size;
+                    resource_data[level].SysMemSlicePitch = level_height * resource_data[level].SysMemPitch;
+                    buffer_offset += resource_data[level].SysMemSlicePitch;
+                }
+                hr = ID3D11Device_CreateTexture2D(device, &desc, resource_data, &resource->texture);
             }
             else
             {

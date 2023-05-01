@@ -190,7 +190,6 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
     struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
     IDirect3DDevice9 *device = runner->device;
     struct d3d9_resource *resource;
-    unsigned int src_pitch, y;
     D3DLOCKED_RECT map_desc;
     D3DFORMAT format;
     HRESULT hr;
@@ -223,18 +222,32 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
             break;
 
         case RESOURCE_TYPE_TEXTURE:
+        {
+            unsigned int src_buffer_offset = 0;
+
             hr = IDirect3DDevice9_CreateTexture(device, params->width, params->height,
-                    1, D3DUSAGE_DYNAMIC, format, D3DPOOL_DEFAULT, &resource->texture, NULL);
+                    params->level_count, 0, format, D3DPOOL_MANAGED, &resource->texture, NULL);
             ok(hr == D3D_OK, "Failed to create texture, hr %#lx.\n", hr);
 
-            hr = IDirect3DTexture9_LockRect(resource->texture, 0, &map_desc, NULL, D3DLOCK_DISCARD);
-            ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
-            src_pitch = params->width * params->texel_size;
-            for (y = 0; y < params->height; ++y)
-                memcpy((char *)map_desc.pBits + y * map_desc.Pitch, params->data + y * src_pitch, src_pitch);
-            hr = IDirect3DTexture9_UnlockRect(resource->texture, 0);
-            ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+            for (unsigned int level = 0; level < params->level_count; ++level)
+            {
+                unsigned int level_width = get_level_dimension(params->width, level);
+                unsigned int level_height = get_level_dimension(params->height, level);
+                unsigned int src_row_pitch = level_width * params->texel_size;
+                unsigned int src_slice_pitch = level_height * src_row_pitch;
+
+                hr = IDirect3DTexture9_LockRect(resource->texture, level, &map_desc, NULL, 0);
+                ok(hr == D3D_OK, "Failed to map texture, hr %#lx.\n", hr);
+                for (unsigned int y = 0; y < level_height; ++y)
+                    memcpy(&((char *)map_desc.pBits)[y * map_desc.Pitch],
+                            &params->data[src_buffer_offset + y * src_row_pitch], src_row_pitch);
+                hr = IDirect3DTexture9_UnlockRect(resource->texture, level);
+                ok(hr == D3D_OK, "Failed to unmap texture, hr %#lx.\n", hr);
+
+                src_buffer_offset += src_slice_pitch;
+            }
             break;
+        }
 
         case RESOURCE_TYPE_UAV:
             fatal_error("UAVs are not supported.\n");
