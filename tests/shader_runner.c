@@ -116,6 +116,7 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
         static const char *const model_strings[] =
         {
             [SHADER_MODEL_2_0] = "2.0",
+            [SHADER_MODEL_3_0] = "3.0",
             [SHADER_MODEL_4_0] = "4.0",
             [SHADER_MODEL_4_1] = "4.1",
             [SHADER_MODEL_5_0] = "5.0",
@@ -747,6 +748,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     static const char *const shader_models[] =
     {
         [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_3_0] = "4_0",
         [SHADER_MODEL_4_0] = "4_0",
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",

@@ -157,6 +157,7 @@ vkd3d_shader_tests = \
 	tests/register-reservations.shader_test \
 	tests/return.shader_test \
 	tests/round.shader_test \
+	tests/sample-level.shader_test \
 	tests/sampler.shader_test \
 	tests/sampler-offset.shader_test \
 	tests/saturate.shader_test \

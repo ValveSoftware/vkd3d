@@ -364,6 +364,7 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     static const char *const shader_models[] =
     {
         [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_3_0] = "4_0",
         [SHADER_MODEL_4_0] = "4_0",
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",

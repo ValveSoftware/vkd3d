@@ -80,6 +80,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
     static const char *const shader_models[] =
     {
         [SHADER_MODEL_2_0] = "4_0",
+        [SHADER_MODEL_3_0] = "4_0",
         [SHADER_MODEL_4_0] = "4_0",
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",

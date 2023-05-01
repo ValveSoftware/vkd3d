@@ -1,0 +1,36 @@
+[require]
+shader model >= 3.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[texture 0]
+size (2, 2)
+levels 2
+
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+
+0.0 0.0 1.0 0.0
+
+[pixel shader todo]
+sampler s;
+Texture2D t;
+uniform float level;
+
+float4 main() : sv_target
+{
+    return t.SampleLevel(s, float2(0.5, 0.5), level);
+}
+
+[test]
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (1.0, 0.0, 1.0, 0.0)
+uniform 0 float4 0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (0.5, 0.0, 1.0, 0.0)
+uniform 0 float4 1.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (0.0, 0.0, 1.0, 0.0)
