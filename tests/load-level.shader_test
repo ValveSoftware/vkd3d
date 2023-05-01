@@ -1,0 +1,51 @@
+[require]
+shader model >= 4.0
+
+[texture 0]
+size (2, 2)
+levels 2
+
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+
+0.0 0.0 1.0 0.0
+
+[pixel shader]
+sampler s;
+Texture2D t;
+uniform uint level;
+
+float4 main() : sv_target
+{
+    return t.Load(uint3(0, 0, level));
+}
+
+[test]
+uniform 0 uint 0
+draw quad
+probe all rgba (1.0, 0.0, 1.0, 0.0)
+uniform 0 uint 1
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 0.0)
+
+[pixel shader fail]
+sampler s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t[uint3(0, 0, 0)];
+}
+
+[pixel shader]
+sampler s;
+Texture2D t;
+
+float4 main() : sv_target
+{
+    return t[uint2(0, 0)];
+}
+
+[test]
+draw quad
+probe all rgba (1.0, 0.0, 1.0, 0.0)
