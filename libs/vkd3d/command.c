@@ -3186,6 +3186,20 @@ static void command_list_flush_vk_heap_updates(struct d3d12_command_list *list)
     }
 }
 
+static void command_list_add_descriptor_heap(struct d3d12_command_list *list, struct d3d12_descriptor_heap *heap)
+{
+    if (!contains_heap(list->descriptor_heaps, list->descriptor_heap_count, heap))
+    {
+        if (list->descriptor_heap_count == ARRAY_SIZE(list->descriptor_heaps))
+        {
+            /* Descriptors can be written after binding. */
+            FIXME("Flushing descriptor updates while list %p is not closed.\n", list);
+            command_list_flush_vk_heap_updates(list);
+        }
+        list->descriptor_heaps[list->descriptor_heap_count++] = heap;
+    }
+}
+
 static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *list,
         enum vkd3d_pipeline_bind_point bind_point, struct d3d12_descriptor_heap *heap)
 {
@@ -3208,18 +3222,6 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
         if (heap->serial_id == bindings->sampler_heap_id)
             return;
         bindings->sampler_heap_id = heap->serial_id;
-    }
-
-    if (!contains_heap(list->descriptor_heaps, list->descriptor_heap_count, heap))
-    {
-        if (list->descriptor_heap_count == ARRAY_SIZE(list->descriptor_heaps))
-        {
-            /* Descriptors can be written after binding. */
-            FIXME("Flushing descriptor updates while list %p is not closed.\n", list);
-            command_list_flush_vk_heap_updates(list);
-            list->descriptor_heap_count = 0;
-        }
-        list->descriptor_heaps[list->descriptor_heap_count++] = heap;
     }
 
     vkd3d_mutex_lock(&heap->vk_sets_mutex);
@@ -4444,6 +4446,7 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
         WARN("Descriptor heap %p is not shader visible.\n", descriptor_heap);
         return;
     }
+    command_list_add_descriptor_heap(list, descriptor_heap);
 
     bindings->descriptor_tables[index] = desc;
     bindings->descriptor_table_dirty_mask |= (uint64_t)1 << index;
