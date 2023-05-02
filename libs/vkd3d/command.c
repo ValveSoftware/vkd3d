@@ -2463,6 +2463,8 @@ static void d3d12_command_list_reset_state(struct d3d12_command_list *list,
     memset(list->so_counter_buffers, 0, sizeof(list->so_counter_buffers));
     memset(list->so_counter_buffer_offsets, 0, sizeof(list->so_counter_buffer_offsets));
 
+    list->descriptor_heap_count = 0;
+
     ID3D12GraphicsCommandList2_SetPipelineState(iface, initial_pipeline_state);
 }
 
@@ -3181,7 +3183,6 @@ static void command_list_flush_vk_heap_updates(struct d3d12_command_list *list)
         d3d12_desc_flush_vk_heap_updates_locked(list->descriptor_heaps[i], device);
         vkd3d_mutex_unlock(&list->descriptor_heaps[i]->vk_sets_mutex);
     }
-    list->descriptor_heap_count = 0;
 }
 
 static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *list,
@@ -3215,6 +3216,7 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
             /* Descriptors can be written after binding. */
             FIXME("Flushing descriptor updates while list %p is not closed.\n", list);
             command_list_flush_vk_heap_updates(list);
+            list->descriptor_heap_count = 0;
         }
         list->descriptor_heaps[list->descriptor_heap_count++] = heap;
     }
