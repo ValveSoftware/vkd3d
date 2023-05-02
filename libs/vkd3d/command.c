@@ -1316,32 +1316,26 @@ static HRESULT d3d12_command_allocator_allocate_command_buffer(struct d3d12_comm
         return hr;
     }
 
-    allocator->current_command_list = list;
-
-    return S_OK;
-}
-
-static void d3d12_command_allocator_free_command_buffer(struct d3d12_command_allocator *allocator,
-        struct d3d12_command_list *list)
-{
-    struct d3d12_device *device = allocator->device;
-    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
-
-    TRACE("allocator %p, list %p.\n", allocator, list);
-
-    if (allocator->current_command_list == list)
-        allocator->current_command_list = NULL;
-
     if (!vkd3d_array_reserve((void **)&allocator->command_buffers, &allocator->command_buffers_size,
             allocator->command_buffer_count + 1, sizeof(*allocator->command_buffers)))
     {
         WARN("Failed to add command buffer.\n");
         VK_CALL(vkFreeCommandBuffers(device->vk_device, allocator->vk_command_pool,
                 1, &list->vk_command_buffer));
-        return;
+        return E_OUTOFMEMORY;
     }
-
     allocator->command_buffers[allocator->command_buffer_count++] = list->vk_command_buffer;
+
+    allocator->current_command_list = list;
+
+    return S_OK;
+}
+
+static void d3d12_command_allocator_remove_command_list(struct d3d12_command_allocator *allocator,
+        const struct d3d12_command_list *list)
+{
+    if (allocator->current_command_list == list)
+        allocator->current_command_list = NULL;
 }
 
 static bool d3d12_command_allocator_add_render_pass(struct d3d12_command_allocator *allocator, VkRenderPass pass)
@@ -2314,7 +2308,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_list_Release(ID3D12GraphicsCommandL
 
         /* When command pool is destroyed, all command buffers are implicitly freed. */
         if (list->allocator)
-            d3d12_command_allocator_free_command_buffer(list->allocator, list);
+            d3d12_command_allocator_remove_command_list(list->allocator, list);
 
         vkd3d_pipeline_bindings_cleanup(&list->pipeline_bindings[VKD3D_PIPELINE_BIND_POINT_COMPUTE]);
         vkd3d_pipeline_bindings_cleanup(&list->pipeline_bindings[VKD3D_PIPELINE_BIND_POINT_GRAPHICS]);
@@ -2412,7 +2406,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_list_Close(ID3D12GraphicsCommandL
 
     if (list->allocator)
     {
-        d3d12_command_allocator_free_command_buffer(list->allocator, list);
+        d3d12_command_allocator_remove_command_list(list->allocator, list);
         list->allocator = NULL;
     }
 
