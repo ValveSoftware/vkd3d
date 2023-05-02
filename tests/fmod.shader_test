@@ -1,0 +1,13 @@
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    return float4(fmod(u.x, u.y), 0, 0, 0);
+}
+
+[test]
+uniform 0 float4 -0.5 6.5 0.0 0.0
+draw quad
+probe all rgba (-0.5, 0.0, 0.0, 0.0) 4
+uniform 0 float4 1.1 0.3 0.0 0.0
+draw quad
+probe all rgba (0.2, 0.0, 0.0, 0.0) 4

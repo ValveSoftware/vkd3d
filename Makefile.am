@@ -71,6 +71,7 @@ vkd3d_shader_tests = \
 	tests/exp.shader_test \
 	tests/expr-indexing.shader_test \
 	tests/floor.shader_test \
+	tests/fmod.shader_test \
 	tests/frac.shader_test \
 	tests/function-return.shader_test \
 	tests/hlsl-array-dimension.shader_test \

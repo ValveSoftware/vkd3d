@@ -2697,6 +2697,49 @@ static bool intrinsic_floor(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FLOOR, arg, loc);
 }
 
+static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *x, *y, *div, *abs, *frac, *neg_frac, *ge;
+    struct hlsl_ir_constant *zero;
+    struct hlsl_ir_load *select;
+    unsigned int count, i;
+
+    if (!(x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    if (!(y = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
+        return false;
+
+    if (!(div = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, x, y, loc)))
+        return false;
+
+    if (!(zero = hlsl_new_constant(ctx, div->data_type, loc)))
+        return false;
+    list_add_tail(params->instrs, &zero->node.entry);
+
+    count = hlsl_type_element_count(div->data_type);
+    for (i = 0; i < count; ++i)
+        zero->value.u[i].f = 0.0f;
+
+    if (!(abs = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, div, loc)))
+        return false;
+
+    if (!(frac = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_FRACT, abs, loc)))
+        return false;
+
+    if (!(neg_frac = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, frac, loc)))
+        return false;
+
+    if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, &zero->node, loc)))
+        return false;
+
+    if (!(select = hlsl_add_conditional(ctx, params->instrs, ge, frac, neg_frac)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, &select->node, y, loc);
+}
+
 static bool intrinsic_frac(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3456,6 +3499,7 @@ intrinsic_functions[] =
     {"exp",                                 1, true,  intrinsic_exp},
     {"exp2",                                1, true,  intrinsic_exp2},
     {"floor",                               1, true,  intrinsic_floor},
+    {"fmod",                                2, true,  intrinsic_fmod},
     {"frac",                                1, true,  intrinsic_frac},
     {"ldexp",                               2, true,  intrinsic_ldexp},
     {"length",                              1, true,  intrinsic_length},
