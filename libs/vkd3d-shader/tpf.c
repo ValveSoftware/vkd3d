@@ -565,6 +565,9 @@ struct vkd3d_shader_sm4_parser
     unsigned int output_map[MAX_REG_OUTPUT];
 
     enum vkd3d_shader_opcode phase;
+    unsigned int input_register_masks[MAX_REG_OUTPUT];
+    unsigned int output_register_masks[MAX_REG_OUTPUT];
+    unsigned int patch_constant_register_masks[MAX_REG_OUTPUT];
 
     struct vkd3d_shader_parser p;
 };
@@ -1427,7 +1430,7 @@ static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d
 
                 if (reg_idx >= ARRAY_SIZE(sm4->output_map))
                 {
-                    ERR("Invalid output index %u.\n", reg_idx);
+                    /* Validated later */
                     break;
                 }
 
@@ -1772,16 +1775,61 @@ static bool register_is_control_point_input(const struct vkd3d_shader_register *
             || priv->p.shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY));
 }
 
+static unsigned int mask_from_swizzle(unsigned int swizzle)
+{
+    return (1u << vkd3d_swizzle_get_component(swizzle, 0))
+            | (1u << vkd3d_swizzle_get_component(swizzle, 1))
+            | (1u << vkd3d_swizzle_get_component(swizzle, 2))
+            | (1u << vkd3d_swizzle_get_component(swizzle, 3));
+}
+
 static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_parser *priv,
-        const struct vkd3d_shader_register *reg)
+        const struct vkd3d_shader_register *reg, unsigned int mask)
 {
     unsigned int idx_count = 1 + register_is_control_point_input(reg, priv);
+    const unsigned int *masks;
+    unsigned int register_idx;
 
     if (reg->idx_count != idx_count)
     {
         vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_INDEX_COUNT,
                 "Invalid index count %u for register type %#x; expected count %u.",
                 reg->idx_count, reg->type, idx_count);
+        return false;
+    }
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_INCONTROLPOINT:
+            masks = priv->input_register_masks;
+            break;
+        case VKD3DSPR_OUTPUT:
+            masks = (priv->phase == VKD3DSIH_HS_FORK_PHASE || priv->phase == VKD3DSIH_HS_JOIN_PHASE)
+                    ? priv->patch_constant_register_masks
+                    : priv->output_register_masks;
+            break;
+        case VKD3DSPR_COLOROUT:
+        case VKD3DSPR_OUTCONTROLPOINT:
+            masks = priv->output_register_masks;
+            break;
+        case VKD3DSPR_PATCHCONST:
+            masks = priv->patch_constant_register_masks;
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    register_idx = reg->idx[reg->idx_count - 1].offset;
+    /* The signature element registers have already been checked against MAX_REG_OUTPUT. */
+    if (register_idx >= MAX_REG_OUTPUT || (masks[register_idx] & mask) != mask)
+    {
+        WARN("Failed to find signature element for register type %#x, index %u and mask %#x.\n",
+                reg->type, register_idx, mask);
+        vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_IO_REGISTER,
+                "Could not find signature element matching register type %#x, index %u and mask %#x.",
+                reg->type, register_idx, mask);
         return false;
     }
 
@@ -1839,7 +1887,8 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
         }
     }
 
-    if (register_is_input_output(&src_param->reg) && !shader_sm4_validate_input_output_register(priv, &src_param->reg))
+    if (register_is_input_output(&src_param->reg) && !shader_sm4_validate_input_output_register(priv,
+            &src_param->reg, mask_from_swizzle(src_param->swizzle)))
         return false;
 
     return true;
@@ -1879,7 +1928,8 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
     dst_param->modifiers = 0;
     dst_param->shift = 0;
 
-    if (register_is_input_output(&dst_param->reg) && !shader_sm4_validate_input_output_register(priv, &dst_param->reg))
+    if (register_is_input_output(&dst_param->reg) && !shader_sm4_validate_input_output_register(priv,
+            &dst_param->reg, dst_param->write_mask))
         return false;
 
     return true;
@@ -2201,7 +2251,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 }
 
 static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser *sm4,
-        const struct shader_signature *signature, const char *name)
+        const struct shader_signature *signature, unsigned int *masks, const char *name)
 {
     unsigned int i, register_idx, register_count, mask;
 
@@ -2225,6 +2275,9 @@ static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser 
             vkd3d_shader_parser_warning(&sm4->p, VKD3D_SHADER_WARNING_TPF_MASK_NOT_CONTIGUOUS,
                     "%s signature element %u mask %#x is not contiguous.", name, i, mask);
         }
+
+        if (register_idx != ~0u)
+            masks[register_idx] |= mask;
     }
 
     return true;
@@ -2263,9 +2316,12 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature, "Input")
-            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->output_signature, "Output")
-            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->patch_constant_signature, "Patch constant"))
+    if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature,
+            sm4->input_register_masks, "Input")
+            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->output_signature,
+            sm4->output_register_masks, "Output")
+            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->patch_constant_signature,
+            sm4->patch_constant_register_masks, "Patch constant"))
     {
         shader_sm4_destroy(&sm4->p);
         return VKD3D_ERROR_INVALID_SHADER;
