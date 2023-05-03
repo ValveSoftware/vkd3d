@@ -465,6 +465,7 @@ static void shader_sm1_parse_src_param(uint32_t param, const struct vkd3d_shader
     src->reg.idx[1].rel_addr = NULL;
     src->reg.idx[2].offset = ~0u;
     src->reg.idx[2].rel_addr = NULL;
+    src->reg.idx_count = 1;
     src->swizzle = swizzle_from_sm1((param & VKD3D_SM1_SWIZZLE_MASK) >> VKD3D_SM1_SWIZZLE_SHIFT);
     src->modifiers = (param & VKD3D_SM1_SRC_MODIFIER_MASK) >> VKD3D_SM1_SRC_MODIFIER_SHIFT;
 }
@@ -483,6 +484,7 @@ static void shader_sm1_parse_dst_param(uint32_t param, const struct vkd3d_shader
     dst->reg.idx[1].rel_addr = NULL;
     dst->reg.idx[2].offset = ~0u;
     dst->reg.idx[2].rel_addr = NULL;
+    dst->reg.idx_count = 1;
     dst->write_mask = (param & VKD3D_SM1_WRITEMASK_MASK) >> VKD3D_SM1_WRITEMASK_SHIFT;
     dst->modifiers = (param & VKD3D_SM1_DST_MODIFIER_MASK) >> VKD3D_SM1_DST_MODIFIER_SHIFT;
     dst->shift = (param & VKD3D_SM1_DSTSHIFT_MASK) >> VKD3D_SM1_DSTSHIFT_SHIFT;
@@ -664,6 +666,7 @@ static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const 
     src_param->reg.idx[1].rel_addr = NULL;
     src_param->reg.idx[2].offset = ~0u;
     src_param->reg.idx[2].rel_addr = NULL;
+    src_param->reg.idx_count = 0;
     src_param->reg.immconst_type = type;
     memcpy(src_param->reg.u.immconst_uint, *ptr, count * sizeof(uint32_t));
     src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;

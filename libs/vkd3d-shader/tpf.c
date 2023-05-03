@@ -564,6 +564,8 @@ struct vkd3d_shader_sm4_parser
 
     unsigned int output_map[MAX_REG_OUTPUT];
 
+    enum vkd3d_shader_opcode phase;
+
     struct vkd3d_shader_parser p;
 };
 
@@ -1669,6 +1671,8 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         return false;
     }
 
+    param->idx_count = order;
+
     if (register_type == VKD3D_SM4_RT_IMMCONST || register_type == VKD3D_SM4_RT_IMMCONST64)
     {
         enum vkd3d_sm4_dimension dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT;
@@ -1710,6 +1714,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
          * other values up one slot. Normalize to SM5.1. */
         param->idx[2] = param->idx[1];
         param->idx[1] = param->idx[0];
+        ++param->idx_count;
     }
 
     map_register(priv, param);
@@ -1740,6 +1745,47 @@ static bool shader_sm4_is_scalar_register(const struct vkd3d_shader_register *re
 static uint32_t swizzle_from_sm4(uint32_t s)
 {
     return vkd3d_shader_create_swizzle(s & 0x3, (s >> 2) & 0x3, (s >> 4) & 0x3, (s >> 6) & 0x3);
+}
+
+static bool register_is_input_output(const struct vkd3d_shader_register *reg)
+{
+    switch (reg->type)
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_COLOROUT:
+        case VKD3DSPR_INCONTROLPOINT:
+        case VKD3DSPR_OUTCONTROLPOINT:
+        case VKD3DSPR_PATCHCONST:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static bool register_is_control_point_input(const struct vkd3d_shader_register *reg,
+        const struct vkd3d_shader_sm4_parser *priv)
+{
+    return reg->type == VKD3DSPR_INCONTROLPOINT || reg->type == VKD3DSPR_OUTCONTROLPOINT
+            || (reg->type == VKD3DSPR_INPUT && (priv->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
+            || priv->p.shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY));
+}
+
+static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_parser *priv,
+        const struct vkd3d_shader_register *reg)
+{
+    unsigned int idx_count = 1 + register_is_control_point_input(reg, priv);
+
+    if (reg->idx_count != idx_count)
+    {
+        vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_INDEX_COUNT,
+                "Invalid index count %u for register type %#x; expected count %u.",
+                reg->idx_count, reg->type, idx_count);
+        return false;
+    }
+
+    return true;
 }
 
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
@@ -1793,6 +1839,9 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
         }
     }
 
+    if (register_is_input_output(&src_param->reg) && !shader_sm4_validate_input_output_register(priv, &src_param->reg))
+        return false;
+
     return true;
 }
 
@@ -1829,6 +1878,9 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
         dst_param->write_mask = VKD3DSP_WRITEMASK_0;
     dst_param->modifiers = 0;
     dst_param->shift = 0;
+
+    if (register_is_input_output(&dst_param->reg) && !shader_sm4_validate_input_output_register(priv, &dst_param->reg))
+        return false;
 
     return true;
 }
@@ -1967,6 +2019,9 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     }
 
     ins->handler_idx = opcode_info->handler_idx;
+    if (ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE || ins->handler_idx == VKD3DSIH_HS_FORK_PHASE
+            || ins->handler_idx == VKD3DSIH_HS_JOIN_PHASE)
+        sm4->phase = ins->handler_idx;
     ins->flags = 0;
     ins->coissue = false;
     ins->raw = false;

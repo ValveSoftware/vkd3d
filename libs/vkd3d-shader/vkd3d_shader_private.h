@@ -74,6 +74,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_TPF_MISMATCHED_CF                = 1000,
     VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE       = 1001,
     VKD3D_SHADER_ERROR_TPF_OUT_OF_MEMORY                = 1002,
+    VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_INDEX_COUNT = 1003,
 
     VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND = 2000,
     VKD3D_SHADER_ERROR_SPV_INVALID_REGISTER_TYPE        = 2001,
@@ -677,6 +678,7 @@ struct vkd3d_shader_register
     bool non_uniform;
     enum vkd3d_data_type data_type;
     struct vkd3d_shader_register_index idx[3];
+    unsigned int idx_count;
     enum vkd3d_immconst_type immconst_type;
     union
     {

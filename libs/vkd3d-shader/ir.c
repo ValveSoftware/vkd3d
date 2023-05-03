@@ -43,7 +43,7 @@ static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_regis
 {
     unsigned int i;
 
-    for (i = 0; i < ARRAY_SIZE(reg->idx) && reg->idx[i].offset != ~0u; ++i)
+    for (i = 0; i < reg->idx_count; ++i)
     {
         if (reg->idx[i].rel_addr && shader_register_is_phase_instance_id(&reg->idx[i].rel_addr->reg))
         {
@@ -73,6 +73,7 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
             reg->idx[1].rel_addr = NULL;
             reg->idx[2].offset = ~0u;
             reg->idx[2].rel_addr = NULL;
+            reg->idx_count = 0;
             reg->immconst_type = VKD3D_IMMCONST_SCALAR;
             reg->u.immconst_uint[0] = instance_id;
             continue;
@@ -222,8 +223,8 @@ static enum vkd3d_result shader_normaliser_flatten_phases(struct vkd3d_shader_no
     return VKD3D_OK;
 }
 
-static void shader_register_init(struct vkd3d_shader_register *reg,
-        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type)
+static void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
 {
     reg->type = reg_type;
     reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
@@ -235,6 +236,7 @@ static void shader_register_init(struct vkd3d_shader_register *reg,
     reg->idx[1].rel_addr = NULL;
     reg->idx[2].offset = ~0u;
     reg->idx[2].rel_addr = NULL;
+    reg->idx_count = idx_count;
     reg->immconst_type = VKD3D_IMMCONST_SCALAR;
 }
 
@@ -286,46 +288,37 @@ static struct vkd3d_shader_src_param *shader_normaliser_create_outpointid_param(
     if (!(rel_addr = shader_src_param_allocator_get(&normaliser->instructions.src_params, 1)))
         return NULL;
 
-    shader_register_init(&rel_addr->reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT);
+    shader_register_init(&rel_addr->reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT, 0);
     rel_addr->swizzle = 0;
     rel_addr->modifiers = 0;
 
     return rel_addr;
 }
 
-static bool shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param *dst_param,
+static void shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param *dst_param,
         struct vkd3d_shader_normaliser *normaliser)
 {
     struct vkd3d_shader_register *reg = &dst_param->reg;
 
     if (normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
     {
-        if (reg->idx[2].offset != ~0u)
-        {
-            FIXME("Cannot insert phase id.\n");
-            return false;
-        }
-        if (reg->idx[1].offset != ~0u)
-        {
-            WARN("Unexpected address at index 1.\n");
-            reg->idx[2] = reg->idx[1];
-        }
+        /* The TPF reader validates idx_count. */
+        assert(reg->idx_count == 1);
         reg->idx[1] = reg->idx[0];
         /* The control point id param is implicit here. Avoid later complications by inserting it. */
         reg->idx[0].offset = 0;
         reg->idx[0].rel_addr = normaliser->outpointid_param;
+        ++reg->idx_count;
     }
-
-    return true;
 }
 
-static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param,
-        const struct signature_element *e, enum vkd3d_shader_register_type reg_type)
+static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param, const struct signature_element *e,
+        enum vkd3d_shader_register_type reg_type, unsigned int idx_count)
 {
     param->write_mask = e->mask;
     param->modifiers = 0;
     param->shift = 0;
-    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type));
+    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
 }
 
 static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_normaliser *normaliser,
@@ -369,7 +362,7 @@ static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_nor
             param = &ins->declaration.dst;
         }
 
-        shader_dst_param_io_init(param, e, VKD3DSPR_INPUT);
+        shader_dst_param_io_init(param, e, VKD3DSPR_INPUT, 2);
         param->reg.idx[0].offset = input_control_point_count;
         param->reg.idx[1].offset = i;
 
@@ -409,11 +402,7 @@ enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struc
                 if (shader_instruction_is_dcl(ins))
                     break;
                 for (j = 0; j < ins->dst_count; ++j)
-                {
-                    if (!shader_dst_param_normalise_outpointid((struct vkd3d_shader_dst_param *)&ins->dst[j],
-                            normaliser))
-                        return VKD3D_ERROR_INVALID_ARGUMENT;
-                }
+                    shader_dst_param_normalise_outpointid((struct vkd3d_shader_dst_param *)&ins->dst[j], normaliser);
                 break;
         }
     }
