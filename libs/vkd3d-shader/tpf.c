@@ -2203,7 +2203,7 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser *sm4,
         const struct shader_signature *signature, const char *name)
 {
-    unsigned int i, register_idx, register_count;
+    unsigned int i, register_idx, register_count, mask;
 
     for (i = 0; i < signature->element_count; ++i)
     {
@@ -2217,6 +2217,13 @@ static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser 
                     "%s signature element %u register index %u, count %u exceeds maximum index of %u.", name,
                     i, register_idx, register_count, MAX_REG_OUTPUT - 1);
             return false;
+        }
+
+        if (!vkd3d_bitmask_is_contiguous(mask = signature->elements[i].mask))
+        {
+            WARN("%s signature element %u mask %#x is not contiguous.\n", name, i, mask);
+            vkd3d_shader_parser_warning(&sm4->p, VKD3D_SHADER_WARNING_TPF_MASK_NOT_CONTIGUOUS,
+                    "%s signature element %u mask %#x is not contiguous.", name, i, mask);
         }
     }
 
