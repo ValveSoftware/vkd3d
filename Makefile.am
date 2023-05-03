@@ -158,6 +158,7 @@ vkd3d_shader_tests = \
 	tests/return.shader_test \
 	tests/round.shader_test \
 	tests/sample-bias.shader_test \
+	tests/sample-grad.shader_test \
 	tests/sample-level.shader_test \
 	tests/sampler.shader_test \
 	tests/sampler-offset.shader_test \
