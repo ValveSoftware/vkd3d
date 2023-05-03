@@ -1937,7 +1937,7 @@ static int compare_function_decl_rb(const void *key, const struct rb_entry *entr
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type)
 {
-    struct vkd3d_string_buffer *string;
+    struct vkd3d_string_buffer *string, *inner_string;
 
     static const char *const base_types[] =
     {
@@ -1977,7 +1977,6 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
 
         case HLSL_CLASS_ARRAY:
         {
-            struct vkd3d_string_buffer *inner_string;
             const struct hlsl_type *t;
 
             for (t = type; t->class == HLSL_CLASS_ARRAY; t = t->e.array.type)
@@ -2029,13 +2028,24 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
 
                     assert(type->sampler_dim < ARRAY_SIZE(dimensions));
                     assert(type->e.resource_format->base_type < ARRAY_SIZE(base_types));
-                    vkd3d_string_buffer_printf(string, "Texture%s<%s%u>", dimensions[type->sampler_dim],
-                            base_types[type->e.resource_format->base_type], type->e.resource_format->dimx);
+                    vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
+                    if ((inner_string = hlsl_type_to_string(ctx, type->e.resource_format)))
+                    {
+                        vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
+                        hlsl_release_string_buffer(ctx, inner_string);
+                    }
                     return string;
 
                 case HLSL_TYPE_UAV:
-                    vkd3d_string_buffer_printf(string, "RWTexture%s<%s%u>", dimensions[type->sampler_dim],
-                            base_types[type->e.resource_format->base_type], type->e.resource_format->dimx);
+                    if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
+                        vkd3d_string_buffer_printf(string, "RWBuffer");
+                    else
+                        vkd3d_string_buffer_printf(string, "RWTexture%s", dimensions[type->sampler_dim]);
+                    if ((inner_string = hlsl_type_to_string(ctx, type->e.resource_format)))
+                    {
+                        vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
+                        hlsl_release_string_buffer(ctx, inner_string);
+                    }
                     return string;
 
                 default:

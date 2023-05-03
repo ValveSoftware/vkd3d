@@ -4146,6 +4146,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %token KW_RETURN
 %token KW_REGISTER
 %token KW_ROW_MAJOR
+%token KW_RWBUFFER
 %token KW_RWTEXTURE1D
 %token KW_RWTEXTURE2D
 %token KW_RWTEXTURE3D
@@ -4955,7 +4956,11 @@ texture_ms_type:
         }
 
 uav_type:
-      KW_RWTEXTURE1D
+      KW_RWBUFFER
+        {
+            $$ = HLSL_SAMPLER_DIM_BUFFER;
+        }
+    | KW_RWTEXTURE1D
         {
             $$ = HLSL_SAMPLER_DIM_1D;
         }

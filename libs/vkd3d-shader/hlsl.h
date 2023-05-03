@@ -104,18 +104,20 @@ enum hlsl_base_type
 
 enum hlsl_sampler_dim
 {
-   HLSL_SAMPLER_DIM_GENERIC,
-   HLSL_SAMPLER_DIM_1D,
-   HLSL_SAMPLER_DIM_2D,
-   HLSL_SAMPLER_DIM_3D,
-   HLSL_SAMPLER_DIM_CUBE,
-   HLSL_SAMPLER_DIM_LAST_SAMPLER = HLSL_SAMPLER_DIM_CUBE,
-   HLSL_SAMPLER_DIM_1DARRAY,
-   HLSL_SAMPLER_DIM_2DARRAY,
-   HLSL_SAMPLER_DIM_2DMS,
-   HLSL_SAMPLER_DIM_2DMSARRAY,
-   HLSL_SAMPLER_DIM_CUBEARRAY,
-   HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_CUBEARRAY,
+    HLSL_SAMPLER_DIM_GENERIC,
+    HLSL_SAMPLER_DIM_1D,
+    HLSL_SAMPLER_DIM_2D,
+    HLSL_SAMPLER_DIM_3D,
+    HLSL_SAMPLER_DIM_CUBE,
+    HLSL_SAMPLER_DIM_LAST_SAMPLER = HLSL_SAMPLER_DIM_CUBE,
+    HLSL_SAMPLER_DIM_1DARRAY,
+    HLSL_SAMPLER_DIM_2DARRAY,
+    HLSL_SAMPLER_DIM_2DMS,
+    HLSL_SAMPLER_DIM_2DMSARRAY,
+    HLSL_SAMPLER_DIM_CUBEARRAY,
+    HLSL_SAMPLER_DIM_LAST_TEXTURE = HLSL_SAMPLER_DIM_CUBEARRAY,
+    HLSL_SAMPLER_DIM_BUFFER,
+    HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_BUFFER,
 };
 
 enum hlsl_regset
@@ -143,9 +145,10 @@ struct hlsl_type
     enum hlsl_base_type base_type;
 
     /* If base_type is HLSL_TYPE_SAMPLER, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_SAMPLER.
-     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim can have any value of the enum.
-     * If base_type is HLSL_TYPE_UAV, them sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
-     *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, or HLSL_SAMPLER_DIM_2DARRAY.
+     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_TEXTURE.
+     * If base_type is HLSL_TYPE_UAV, then sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
+     *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, HLSL_SAMPLER_DIM_2DARRAY,
+     *   or HLSL_SAMPLER_DIM_BUFFER.
      * Otherwise, sampler_dim is not used */
     enum hlsl_sampler_dim sampler_dim;
     /* Name, in case the type is a named struct or a typedef. */
@@ -1023,6 +1026,7 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
     switch (dim)
     {
         case HLSL_SAMPLER_DIM_1D:
+        case HLSL_SAMPLER_DIM_BUFFER:
             return 1;
         case HLSL_SAMPLER_DIM_1DARRAY:
         case HLSL_SAMPLER_DIM_2D:

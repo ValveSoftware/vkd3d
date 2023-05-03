@@ -2959,6 +2959,8 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
             return D3D_SRV_DIMENSION_TEXTURE2DMSARRAY;
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return D3D_SRV_DIMENSION_TEXTURECUBEARRAY;
+        case HLSL_SAMPLER_DIM_BUFFER:
+            return D3D_SRV_DIMENSION_BUFFER;
         default:
             vkd3d_unreachable();
     }
@@ -3258,6 +3260,8 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
             return VKD3D_SM4_RESOURCE_TEXTURE_2DMSARRAY;
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY;
+        case HLSL_SAMPLER_DIM_BUFFER:
+            return VKD3D_SM4_RESOURCE_BUFFER;
         default:
             vkd3d_unreachable();
     }
