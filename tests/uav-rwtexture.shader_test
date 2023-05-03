@@ -161,3 +161,171 @@ float4 main() : sv_target1
 draw quad
 probe uav 2 (0, 0) rgba (1.1, 1.2, 1.3, 1.4)
 probe uav 3 (0, 0) rgba (2.1, 2.2, 2.3, 2.4)
+
+% RWTexture1D types
+[pixel shader]
+struct s
+{
+    float3 a;
+};
+
+RWTexture1D<float4> u : register(u2);
+RWTexture1D<float> u1;
+RWTexture1D<float2x2> u2;
+RWTexture1D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture2D types
+[pixel shader]
+struct s
+{
+    float3 a;
+};
+
+RWTexture2D<float4> u : register(u2);
+RWTexture2D<float> u1;
+RWTexture2D<float2x2> u2;
+RWTexture2D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture3D types
+[pixel shader]
+struct s
+{
+    float3 a;
+};
+
+RWTexture3D<float4> u : register(u2);
+RWTexture3D<float> u1;
+RWTexture3D<float2x2> u2;
+RWTexture3D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% Type is too wide
+[pixel shader fail]
+struct s
+{
+    float3 a;
+    float2 b;
+};
+RWTexture1D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    float3 a;
+    float2 b;
+};
+RWTexture2D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    float3 a;
+    float2 b;
+};
+RWTexture3D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+% Array type
+[pixel shader fail]
+typedef float arr[2];
+RWTexture1D<arr> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+% Object types
+[pixel shader fail]
+RWTexture1D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+RWTexture2D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+RWTexture3D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RWTexture1D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RWTexture2D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RWTexture3D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}

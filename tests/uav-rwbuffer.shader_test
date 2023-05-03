@@ -1,0 +1,80 @@
+[require]
+shader model >= 5.0
+
+[pixel shader]
+struct s
+{
+    float3 a;
+};
+
+RWBuffer<float4> u : register(u2);
+RWBuffer<float> u1;
+RWBuffer<float2x2> u2;
+RWBuffer<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% Type size is too wide
+[pixel shader fail]
+struct s
+{
+    float3 a;
+    float2 b;
+};
+RWBuffer<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+RWBuffer<double3> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader]
+RWBuffer<double2> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+% Array type
+[pixel shader fail]
+typedef float arr[2];
+RWBuffer<arr> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+% Object types
+[pixel shader fail]
+RWBuffer<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+RWBuffer<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}

@@ -5097,16 +5097,42 @@ type_no_void:
         }
     | uav_type '<' type '>'
         {
-            if ($3->class > HLSL_CLASS_VECTOR)
-            {
-                struct vkd3d_string_buffer *string;
+            struct vkd3d_string_buffer *string = hlsl_type_to_string(ctx, $3);
 
-                string = hlsl_type_to_string(ctx, $3);
+            if (!type_contains_only_numerics($3))
+            {
                 if (string)
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "UAV data type %s is not scalar or vector.", string->buffer);
-                hlsl_release_string_buffer(ctx, string);
+                            "UAV type %s is not numeric.", string->buffer);
             }
+
+            switch ($1)
+            {
+                case HLSL_SAMPLER_DIM_BUFFER:
+                case HLSL_SAMPLER_DIM_1D:
+                case HLSL_SAMPLER_DIM_2D:
+                case HLSL_SAMPLER_DIM_3D:
+                    if ($3->class == HLSL_CLASS_ARRAY)
+                    {
+                        if (string)
+                            hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                    "This type of UAV does not support array type.");
+                    }
+                    else if (hlsl_type_component_count($3) > 4)
+                    {
+                        if (string)
+                            hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                                    "UAV data type %s size exceeds maximum size.", string->buffer);
+                    }
+                    break;
+                case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+                    break;
+                default:
+                    vkd3d_unreachable();
+            }
+
+            hlsl_release_string_buffer(ctx, string);
+
             $$ = hlsl_new_uav_type(ctx, $1, $3);
         }
     | TYPE_IDENTIFIER
