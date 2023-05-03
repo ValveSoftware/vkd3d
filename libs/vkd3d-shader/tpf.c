@@ -2200,6 +2200,29 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     return true;
 }
 
+static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser *sm4,
+        const struct shader_signature *signature, const char *name)
+{
+    unsigned int i, register_idx, register_count;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        register_idx = signature->elements[i].register_index;
+        register_count = signature->elements[i].register_count;
+        if (register_idx != ~0u && (register_idx >= MAX_REG_OUTPUT || MAX_REG_OUTPUT - register_idx < register_count))
+        {
+            WARN("%s signature element %u unhandled register index %u, count %u.\n",
+                    name, i, register_idx, register_count);
+            vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_TOO_MANY_REGISTERS,
+                    "%s signature element %u register index %u, count %u exceeds maximum index of %u.", name,
+                    i, register_idx, register_count, MAX_REG_OUTPUT - 1);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
@@ -2231,6 +2254,14 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         free_shader_desc(shader_desc);
         vkd3d_free(sm4);
         return VKD3D_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature, "Input")
+            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->output_signature, "Output")
+            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->patch_constant_signature, "Patch constant"))
+    {
+        shader_sm4_destroy(&sm4->p);
+        return VKD3D_ERROR_INVALID_SHADER;
     }
 
     instructions = &sm4->p.instructions;
