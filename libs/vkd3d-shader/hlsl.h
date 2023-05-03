@@ -939,6 +939,15 @@ static inline void *hlsl_alloc(struct hlsl_ctx *ctx, size_t size)
     return ptr;
 }
 
+static inline void *hlsl_calloc(struct hlsl_ctx *ctx, size_t count, size_t size)
+{
+    void *ptr = vkd3d_calloc(count, size);
+
+    if (!ptr)
+        ctx->result = VKD3D_ERROR_OUT_OF_MEMORY;
+    return ptr;
+}
+
 static inline void *hlsl_realloc(struct hlsl_ctx *ctx, void *ptr, size_t size)
 {
     void *ret = vkd3d_realloc(ptr, size);

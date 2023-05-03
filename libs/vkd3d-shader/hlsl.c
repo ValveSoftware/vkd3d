@@ -443,7 +443,7 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
         return true;
     }
 
-    if (!(deref->path = hlsl_alloc(ctx, sizeof(*deref->path) * deref->path_len)))
+    if (!(deref->path = hlsl_calloc(ctx, deref->path_len, sizeof(*deref->path))))
     {
         deref->var = NULL;
         deref->path_len = 0;
@@ -882,7 +882,7 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
 
             type->e.record.field_count = field_count;
 
-            if (!(type->e.record.fields = hlsl_alloc(ctx, field_count * sizeof(*type->e.record.fields))))
+            if (!(type->e.record.fields = hlsl_calloc(ctx, field_count, sizeof(*type->e.record.fields))))
             {
                 vkd3d_free((void *)type->name);
                 vkd3d_free(type);
@@ -974,7 +974,7 @@ struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct 
         if (obj_count == 0)
             continue;
 
-        if (!(var->objects_usage[k] = hlsl_alloc(ctx, sizeof(*var->objects_usage[0]) * obj_count)))
+        if (!(var->objects_usage[k] = hlsl_calloc(ctx, obj_count, sizeof(*var->objects_usage[0]))))
         {
             for (i = 0; i < k; ++i)
                 vkd3d_free(var->objects_usage[i]);
