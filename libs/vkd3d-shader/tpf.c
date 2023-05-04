@@ -742,7 +742,7 @@ static void shader_sm4_set_descriptor_register_range(struct vkd3d_shader_sm4_par
     {
         FIXME("Invalid register range [%u:%u].\n", range->first, range->last);
         vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_RANGE,
-                "Last register %u must not be less than first register %u in range.\n", range->last, range->first);
+                "Last register %u must not be less than first register %u in range.", range->last, range->first);
     }
 }
 
