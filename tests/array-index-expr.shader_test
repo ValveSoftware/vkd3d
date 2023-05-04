@@ -72,3 +72,28 @@ todo probe all rgba (23.0, 1.0, 22.0, 0.0)
 uniform 0 float 3
 todo draw quad
 todo probe all rgba (24.0, 0.0, 21.0, 1.0)
+
+
+[pixel shader todo]
+uniform float2 i;
+
+float4 main() : sv_target
+{
+    float4 f[3] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+
+    return f[i.x + i.y];
+}
+
+[test]
+uniform 0 float4 0 0 0 0
+todo draw quad
+todo probe all rgba (1.0, 2.0, 3.0, 4.0)
+uniform 0 float4 1 0 0 0
+todo draw quad
+todo probe all rgba (5.0, 6.0, 7.0, 8.0)
+uniform 0 float4 0 1 0 0
+todo draw quad
+todo probe all rgba (5.0, 6.0, 7.0, 8.0)
+uniform 0 float4 1 1 0 0
+todo draw quad
+todo probe all rgba (9.0, 10.0, 11.0, 12.0)
