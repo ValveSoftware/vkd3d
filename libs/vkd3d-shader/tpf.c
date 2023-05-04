@@ -558,6 +558,19 @@ enum vkd3d_sm4_shader_data_type
     VKD3D_SM4_SHADER_DATA_MESSAGE                   = 0x4,
 };
 
+struct sm4_index_range
+{
+    unsigned int index;
+    unsigned int count;
+    unsigned int mask;
+};
+
+struct sm4_index_range_array
+{
+    unsigned int count;
+    struct sm4_index_range ranges[MAX_REG_OUTPUT * 2];
+};
+
 struct vkd3d_shader_sm4_parser
 {
     const uint32_t *start, *end, *ptr;
@@ -568,6 +581,10 @@ struct vkd3d_shader_sm4_parser
     unsigned int input_register_masks[MAX_REG_OUTPUT];
     unsigned int output_register_masks[MAX_REG_OUTPUT];
     unsigned int patch_constant_register_masks[MAX_REG_OUTPUT];
+
+    struct sm4_index_range_array input_index_ranges;
+    struct sm4_index_range_array output_index_ranges;
+    struct sm4_index_range_array patch_constant_index_ranges;
 
     struct vkd3d_shader_parser p;
 };
@@ -823,12 +840,109 @@ static void shader_sm4_read_dcl_sampler(struct vkd3d_shader_instruction *ins, ui
     shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.sampler.range.space);
 }
 
+static bool sm4_parser_is_in_fork_or_join_phase(const struct vkd3d_shader_sm4_parser *sm4)
+{
+    return sm4->phase == VKD3DSIH_HS_FORK_PHASE || sm4->phase == VKD3DSIH_HS_JOIN_PHASE;
+}
+
 static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
+    struct vkd3d_shader_index_range *index_range = &ins->declaration.index_range;
+    unsigned int i, register_idx, register_count, write_mask;
+    enum vkd3d_shader_register_type type;
+    struct sm4_index_range_array *ranges;
+    unsigned int *io_masks;
+
     shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE,
-            &ins->declaration.index_range.dst);
-    ins->declaration.index_range.register_count = *tokens;
+            &index_range->dst);
+    index_range->register_count = *tokens;
+
+    register_idx = index_range->dst.reg.idx[index_range->dst.reg.idx_count - 1].offset;
+    register_count = index_range->register_count;
+    write_mask = index_range->dst.write_mask;
+
+    if (vkd3d_write_mask_component_count(write_mask) != 1)
+    {
+        WARN("Unhandled write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_INDEX_RANGE_MASK,
+                "Index range mask %#x is not scalar.", write_mask);
+    }
+
+    switch ((type = index_range->dst.reg.type))
+    {
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_INCONTROLPOINT:
+            io_masks = priv->input_register_masks;
+            ranges = &priv->input_index_ranges;
+            break;
+        case VKD3DSPR_OUTPUT:
+            if (sm4_parser_is_in_fork_or_join_phase(priv))
+            {
+                io_masks = priv->patch_constant_register_masks;
+                ranges = &priv->patch_constant_index_ranges;
+            }
+            else
+            {
+                io_masks = priv->output_register_masks;
+                ranges = &priv->output_index_ranges;
+            }
+            break;
+        case VKD3DSPR_COLOROUT:
+        case VKD3DSPR_OUTCONTROLPOINT:
+            io_masks = priv->output_register_masks;
+            ranges = &priv->output_index_ranges;
+            break;
+        case VKD3DSPR_PATCHCONST:
+            io_masks = priv->patch_constant_register_masks;
+            ranges = &priv->patch_constant_index_ranges;
+            break;
+
+        default:
+            WARN("Unhandled register type %#x.\n", type);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_INDEX_RANGE_DCL,
+                    "Invalid register type %#x for index range base %u, count %u, mask %#x.",
+                    type, register_idx, register_count, write_mask);
+            return;
+    }
+
+    for (i = 0; i < ranges->count; ++i)
+    {
+        struct sm4_index_range r = ranges->ranges[i];
+
+        if (!(r.mask & write_mask))
+            continue;
+        /* Ranges with the same base but different lengths are not an issue. */
+        if (register_idx == r.index)
+            continue;
+
+        if ((r.index <= register_idx && register_idx - r.index < r.count)
+                || (register_idx < r.index && r.index - register_idx < register_count))
+        {
+            WARN("Detected index range collision for base %u, count %u, mask %#x.\n",
+                    register_idx, register_count, write_mask);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_INDEX_RANGE_DCL,
+                    "Register index range base %u, count %u, mask %#x collides with a previous declaration.",
+                    register_idx, register_count, write_mask);
+            return;
+        }
+    }
+    ranges->ranges[ranges->count].index = register_idx;
+    ranges->ranges[ranges->count].count = register_count;
+    ranges->ranges[ranges->count++].mask = write_mask;
+
+    for (i = 0; i < register_count; ++i)
+    {
+        if ((io_masks[register_idx + i] & write_mask) != write_mask)
+        {
+            WARN("No matching declaration for index range base %u, count %u, mask %#x.\n",
+                    register_idx, register_count, write_mask);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_INDEX_RANGE_DCL,
+                    "Input/output registers matching index range base %u, count %u, mask %#x were not declared.",
+                    register_idx, register_count, write_mask);
+            return;
+        }
+    }
 }
 
 static void shader_sm4_read_dcl_output_topology(struct vkd3d_shader_instruction *ins, uint32_t opcode,
@@ -1805,8 +1919,7 @@ static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_pa
             masks = priv->input_register_masks;
             break;
         case VKD3DSPR_OUTPUT:
-            masks = (priv->phase == VKD3DSIH_HS_FORK_PHASE || priv->phase == VKD3DSIH_HS_JOIN_PHASE)
-                    ? priv->patch_constant_register_masks
+            masks = sm4_parser_is_in_fork_or_join_phase(priv) ? priv->patch_constant_register_masks
                     : priv->output_register_masks;
             break;
         case VKD3DSPR_COLOROUT:

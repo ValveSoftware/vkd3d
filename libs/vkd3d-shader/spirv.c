@@ -6195,8 +6195,6 @@ static bool spirv_compiler_check_index_range(struct spirv_compiler *compiler,
     struct vkd3d_shader_register_info reg_info;
     struct vkd3d_shader_register current_reg;
     struct vkd3d_symbol reg_symbol;
-    unsigned int i;
-    uint32_t id;
 
     current_reg = *reg;
     vkd3d_symbol_make_register(&reg_symbol, &current_reg);
@@ -6211,27 +6209,6 @@ static bool spirv_compiler_check_index_range(struct spirv_compiler *compiler,
     {
         FIXME("Unhandled register %#x.\n", reg->type);
         return false;
-    }
-    id = reg_info.id;
-
-    for (i = reg->idx[0].offset; i < reg->idx[0].offset + range->register_count; ++i)
-    {
-        current_reg.idx[0].offset = i;
-        vkd3d_symbol_make_register(&reg_symbol, &current_reg);
-
-        if (range->dst.write_mask != reg_info.write_mask
-                || vkd3d_write_mask_component_count(reg_info.write_mask) != 1)
-        {
-            FIXME("Unhandled index range write mask %#x (%#x).\n",
-                    range->dst.write_mask, reg_info.write_mask);
-            return false;
-        }
-
-        if (reg_info.id != id)
-        {
-            FIXME("Unhandled index range %#x, %u.\n", reg->type, i);
-            return false;
-        }
     }
 
     return true;
