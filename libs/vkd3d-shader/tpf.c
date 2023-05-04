@@ -578,6 +578,7 @@ struct vkd3d_shader_sm4_parser
     unsigned int output_map[MAX_REG_OUTPUT];
 
     enum vkd3d_shader_opcode phase;
+    bool has_control_point_phase;
     unsigned int input_register_masks[MAX_REG_OUTPUT];
     unsigned int output_register_masks[MAX_REG_OUTPUT];
     unsigned int patch_constant_register_masks[MAX_REG_OUTPUT];
@@ -2185,6 +2186,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     if (ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE || ins->handler_idx == VKD3DSIH_HS_FORK_PHASE
             || ins->handler_idx == VKD3DSIH_HS_JOIN_PHASE)
         sm4->phase = ins->handler_idx;
+    sm4->has_control_point_phase |= ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE;
     ins->flags = 0;
     ins->coissue = false;
     ins->raw = false;
@@ -2396,6 +2398,34 @@ static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser 
     return true;
 }
 
+static int index_range_compare(const void *a, const void *b)
+{
+    return memcmp(a, b, sizeof(struct sm4_index_range));
+}
+
+static void shader_sm4_validate_default_phase_index_ranges(struct vkd3d_shader_sm4_parser *sm4)
+{
+    if (!sm4->input_index_ranges.count || !sm4->output_index_ranges.count)
+        return;
+
+    if (sm4->input_index_ranges.count == sm4->output_index_ranges.count)
+    {
+        qsort(sm4->input_index_ranges.ranges, sm4->input_index_ranges.count, sizeof(sm4->input_index_ranges.ranges[0]),
+                index_range_compare);
+        qsort(sm4->output_index_ranges.ranges, sm4->output_index_ranges.count, sizeof(sm4->output_index_ranges.ranges[0]),
+                index_range_compare);
+        if (!memcmp(sm4->input_index_ranges.ranges, sm4->output_index_ranges.ranges,
+                sm4->input_index_ranges.count * sizeof(sm4->input_index_ranges.ranges[0])))
+            return;
+    }
+
+    /* This is very unlikely to occur and would complicate the default control point phase implementation. */
+    WARN("Default phase index ranges are not identical.\n");
+    vkd3d_shader_parser_error(&sm4->p, VKD3D_SHADER_ERROR_TPF_INVALID_INDEX_RANGE_DCL,
+            "Default control point phase input and output index range declarations are not identical.");
+    return;
+}
+
 int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
@@ -2461,6 +2491,8 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         }
         ++instructions->count;
     }
+    if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL && !sm4->has_control_point_phase && !sm4->p.failed)
+        shader_sm4_validate_default_phase_index_ranges(sm4);
 
     *parser = &sm4->p;
 
