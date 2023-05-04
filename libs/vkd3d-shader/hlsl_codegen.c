@@ -123,15 +123,14 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 }
 
 /* TODO: remove when no longer needed, only used for transform_deref_paths_into_offsets() */
-static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
     const struct hlsl_type *type;
     struct hlsl_ir_node *offset;
     struct hlsl_block block;
 
-    if (!deref->var)
-        return;
+    assert(deref->var);
 
     /* register offsets shouldn't be used before this point is reached. */
     assert(!deref->offset.node);
@@ -143,45 +142,19 @@ static void replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     if (type->class == HLSL_CLASS_STRUCT || type->class == HLSL_CLASS_ARRAY)
     {
         hlsl_cleanup_deref(deref);
-        return;
+        return true;
     }
 
     deref->offset_regset = hlsl_type_get_regset(type);
 
     if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
-        return;
+        return false;
     list_move_before(&instr->entry, &block.instrs);
 
     hlsl_cleanup_deref(deref);
     hlsl_src_from_node(&deref->offset, offset);
-}
 
-/* TODO: remove when no longer needed. */
-static bool transform_deref_paths_into_offsets(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
-{
-    switch(instr->type)
-    {
-        case HLSL_IR_LOAD:
-            replace_deref_path_with_offset(ctx, &hlsl_ir_load(instr)->src, instr);
-            return true;
-
-        case HLSL_IR_STORE:
-            replace_deref_path_with_offset(ctx, &hlsl_ir_store(instr)->lhs, instr);
-            return true;
-
-        case HLSL_IR_RESOURCE_LOAD:
-            replace_deref_path_with_offset(ctx, &hlsl_ir_resource_load(instr)->resource, instr);
-            replace_deref_path_with_offset(ctx, &hlsl_ir_resource_load(instr)->sampler, instr);
-            return true;
-
-        case HLSL_IR_RESOURCE_STORE:
-            replace_deref_path_with_offset(ctx, &hlsl_ir_resource_store(instr)->resource, instr);
-            return true;
-
-        default:
-            return false;
-    }
-    return false;
+    return true;
 }
 
 /* Split uniforms into two variables representing the constant and temp
@@ -598,6 +571,44 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
     }
 
     return progress;
+}
+
+static bool transform_instr_derefs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    bool res;
+    bool (*func)(struct hlsl_ctx *ctx, struct hlsl_deref *, struct hlsl_ir_node *) = context;
+
+    switch(instr->type)
+    {
+        case HLSL_IR_LOAD:
+            res = func(ctx, &hlsl_ir_load(instr)->src, instr);
+            return res;
+
+        case HLSL_IR_STORE:
+            res = func(ctx, &hlsl_ir_store(instr)->lhs, instr);
+            return res;
+
+        case HLSL_IR_RESOURCE_LOAD:
+            res = func(ctx, &hlsl_ir_resource_load(instr)->resource, instr);
+            if (hlsl_ir_resource_load(instr)->sampler.var)
+                res |= func(ctx, &hlsl_ir_resource_load(instr)->sampler, instr);
+            return res;
+
+        case HLSL_IR_RESOURCE_STORE:
+            res = func(ctx, &hlsl_ir_resource_store(instr)->resource, instr);
+            return res;
+
+        default:
+            return false;
+    }
+    return false;
+}
+
+static bool transform_derefs(struct hlsl_ctx *ctx,
+        bool (*func)(struct hlsl_ctx *ctx, struct hlsl_deref *, struct hlsl_ir_node *),
+        struct hlsl_block *block)
+{
+    return hlsl_transform_ir(ctx, transform_instr_derefs, block, func);
 }
 
 struct recursive_call_ctx
@@ -3956,7 +3967,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
-    hlsl_transform_ir(ctx, transform_deref_paths_into_offsets, body, NULL);
+    transform_derefs(ctx, replace_deref_path_with_offset, body);
     while (hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL));
 
     do
