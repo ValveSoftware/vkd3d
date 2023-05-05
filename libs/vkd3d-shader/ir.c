@@ -85,14 +85,21 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
         shader_register_eliminate_phase_addressing((struct vkd3d_shader_register *)&ins->dst[i].reg, instance_id);
 }
 
-static bool normaliser_is_in_control_point_phase(const struct vkd3d_shader_normaliser *normaliser)
+struct hull_flattener
 {
-    return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
-}
+    struct vkd3d_shader_instruction_array instructions;
 
-static bool normaliser_is_in_fork_or_join_phase(const struct vkd3d_shader_normaliser *normaliser)
+    unsigned int max_temp_count;
+    unsigned int temp_dcl_idx;
+
+    unsigned int instance_count;
+    unsigned int phase_body_idx;
+    enum vkd3d_shader_opcode phase;
+};
+
+static bool flattener_is_in_fork_or_join_phase(const struct hull_flattener *flattener)
 {
-    return normaliser->phase == VKD3DSIH_HS_FORK_PHASE || normaliser->phase == VKD3DSIH_HS_JOIN_PHASE;
+    return flattener->phase == VKD3DSIH_HS_FORK_PHASE || flattener->phase == VKD3DSIH_HS_JOIN_PHASE;
 }
 
 struct shader_phase_location
@@ -109,7 +116,7 @@ struct shader_phase_location_array
     unsigned int count;
 };
 
-static void shader_normaliser_eliminate_phase_related_dcls(struct vkd3d_shader_normaliser *normaliser,
+static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normaliser,
         unsigned int index, struct shader_phase_location_array *locations)
 {
     struct vkd3d_shader_instruction *ins = &normaliser->instructions.elements[index];
@@ -118,7 +125,7 @@ static void shader_normaliser_eliminate_phase_related_dcls(struct vkd3d_shader_n
 
     if (ins->handler_idx == VKD3DSIH_HS_FORK_PHASE || ins->handler_idx == VKD3DSIH_HS_JOIN_PHASE)
     {
-        b = normaliser_is_in_fork_or_join_phase(normaliser);
+        b = flattener_is_in_fork_or_join_phase(normaliser);
         /* Reset the phase info. */
         normaliser->phase_body_idx = ~0u;
         normaliser->phase = ins->handler_idx;
@@ -173,7 +180,7 @@ static void shader_normaliser_eliminate_phase_related_dcls(struct vkd3d_shader_n
     }
 }
 
-static enum vkd3d_result shader_normaliser_flatten_phases(struct vkd3d_shader_normaliser *normaliser,
+static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normaliser,
         struct shader_phase_location_array *locations)
 {
     struct shader_phase_location *loc;
@@ -246,46 +253,55 @@ static void shader_instruction_init(struct vkd3d_shader_instruction *ins, enum v
     ins->handler_idx = handler_idx;
 }
 
-void shader_normaliser_init(struct vkd3d_shader_normaliser *normaliser,
-        struct vkd3d_shader_instruction_array *instructions)
+enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *src_instructions)
 {
-    memset(normaliser, 0, sizeof(*normaliser));
-    normaliser->phase = VKD3DSIH_INVALID;
-    normaliser->instructions = *instructions;
-    memset(instructions, 0, sizeof(*instructions));
-}
-
-enum vkd3d_result shader_normaliser_flatten_hull_shader_phases(struct vkd3d_shader_normaliser *normaliser)
-{
-    struct vkd3d_shader_instruction_array *instructions = &normaliser->instructions;
+    struct hull_flattener flattener = {*src_instructions};
+    struct vkd3d_shader_instruction_array *instructions;
     struct shader_phase_location_array locations;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
-    for (i = 0, locations.count = 0; i < instructions->count; ++i)
-        shader_normaliser_eliminate_phase_related_dcls(normaliser, i, &locations);
+    instructions = &flattener.instructions;
 
-    if ((result = shader_normaliser_flatten_phases(normaliser, &locations)) < 0)
+    flattener.phase = VKD3DSIH_INVALID;
+    for (i = 0, locations.count = 0; i < instructions->count; ++i)
+        flattener_eliminate_phase_related_dcls(&flattener, i, &locations);
+
+    if ((result = flattener_flatten_phases(&flattener, &locations)) < 0)
         return result;
 
-    if (normaliser->phase != VKD3DSIH_INVALID)
+    if (flattener.phase != VKD3DSIH_INVALID)
     {
-        if (normaliser->temp_dcl_idx)
-            instructions->elements[normaliser->temp_dcl_idx].declaration.count = normaliser->max_temp_count;
+        if (flattener.temp_dcl_idx)
+            instructions->elements[flattener.temp_dcl_idx].declaration.count = flattener.max_temp_count;
 
-        if (!shader_instruction_array_reserve(&normaliser->instructions, normaliser->instructions.count + 1))
+        if (!shader_instruction_array_reserve(&flattener.instructions, flattener.instructions.count + 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
         shader_instruction_init(&instructions->elements[instructions->count++], VKD3DSIH_RET);
     }
 
+    *src_instructions = flattener.instructions;
     return result;
 }
 
-static struct vkd3d_shader_src_param *shader_normaliser_create_outpointid_param(struct vkd3d_shader_normaliser *normaliser)
+struct control_point_normaliser
+{
+    struct vkd3d_shader_instruction_array instructions;
+    enum vkd3d_shader_opcode phase;
+    struct vkd3d_shader_src_param *outpointid_param;
+};
+
+static bool control_point_normaliser_is_in_control_point_phase(const struct control_point_normaliser *normaliser)
+{
+    return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
+}
+
+static struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
+        struct vkd3d_shader_instruction_array *instructions)
 {
     struct vkd3d_shader_src_param *rel_addr;
 
-    if (!(rel_addr = shader_src_param_allocator_get(&normaliser->instructions.src_params, 1)))
+    if (!(rel_addr = shader_src_param_allocator_get(&instructions->src_params, 1)))
         return NULL;
 
     shader_register_init(&rel_addr->reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT, 0);
@@ -296,11 +312,11 @@ static struct vkd3d_shader_src_param *shader_normaliser_create_outpointid_param(
 }
 
 static void shader_dst_param_normalise_outpointid(struct vkd3d_shader_dst_param *dst_param,
-        struct vkd3d_shader_normaliser *normaliser)
+        struct control_point_normaliser *normaliser)
 {
     struct vkd3d_shader_register *reg = &dst_param->reg;
 
-    if (normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
+    if (control_point_normaliser_is_in_control_point_phase(normaliser) && reg->type == VKD3DSPR_OUTPUT)
     {
         /* The TPF reader validates idx_count. */
         assert(reg->idx_count == 1);
@@ -321,7 +337,7 @@ static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param, const
     shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
 }
 
-static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_normaliser *normaliser,
+static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_point_normaliser *normaliser,
         const struct shader_signature *s, unsigned int input_control_point_count, unsigned int dst)
 {
     struct vkd3d_shader_instruction *ins;
@@ -372,22 +388,26 @@ static enum vkd3d_result shader_normaliser_emit_hs_input(struct vkd3d_shader_nor
     return VKD3D_OK;
 }
 
-enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
-        const struct shader_signature *input_signature)
+enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
+        struct vkd3d_shader_instruction_array *src_instructions, const struct shader_signature *input_signature)
 {
-    struct vkd3d_shader_instruction_array *instructions = &normaliser->instructions;
+    struct vkd3d_shader_instruction_array *instructions;
+    struct control_point_normaliser normaliser;
     unsigned int input_control_point_count;
     struct vkd3d_shader_instruction *ins;
+    enum vkd3d_result ret;
     unsigned int i, j;
 
-    if (!(normaliser->outpointid_param = shader_normaliser_create_outpointid_param(normaliser)))
+    if (!(normaliser.outpointid_param = instruction_array_create_outpointid_param(src_instructions)))
     {
         ERR("Failed to allocate src param.\n");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
+    normaliser.instructions = *src_instructions;
+    instructions = &normaliser.instructions;
+    normaliser.phase = VKD3DSIH_INVALID;
 
-    normaliser->phase = VKD3DSIH_INVALID;
-    for (i = 0; i < normaliser->instructions.count; ++i)
+    for (i = 0; i < normaliser.instructions.count; ++i)
     {
         ins = &instructions->elements[i];
 
@@ -396,18 +416,18 @@ enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struc
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
-                normaliser->phase = ins->handler_idx;
+                normaliser.phase = ins->handler_idx;
                 break;
             default:
                 if (shader_instruction_is_dcl(ins))
                     break;
                 for (j = 0; j < ins->dst_count; ++j)
-                    shader_dst_param_normalise_outpointid((struct vkd3d_shader_dst_param *)&ins->dst[j], normaliser);
+                    shader_dst_param_normalise_outpointid((struct vkd3d_shader_dst_param *)&ins->dst[j], &normaliser);
                 break;
         }
     }
 
-    normaliser->phase = VKD3DSIH_INVALID;
+    normaliser.phase = VKD3DSIH_INVALID;
     input_control_point_count = 1;
 
     for (i = 0; i < instructions->count; ++i)
@@ -420,19 +440,19 @@ enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struc
                 input_control_point_count = ins->declaration.count;
                 break;
             case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+                *src_instructions = normaliser.instructions;
                 return VKD3D_OK;
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
-                return shader_normaliser_emit_hs_input(normaliser, input_signature, input_control_point_count, i);
+                ret = control_point_normaliser_emit_hs_input(&normaliser, input_signature,
+                        input_control_point_count, i);
+                *src_instructions = normaliser.instructions;
+                return ret;
             default:
                 break;
         }
     }
 
+    *src_instructions = normaliser.instructions;
     return VKD3D_OK;
-}
-
-void shader_normaliser_destroy(struct vkd3d_shader_normaliser *normaliser)
-{
-    shader_instruction_array_destroy(&normaliser->instructions);
 }

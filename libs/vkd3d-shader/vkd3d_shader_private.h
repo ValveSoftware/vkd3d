@@ -1363,25 +1363,8 @@ void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void 
 void dxbc_writer_init(struct dxbc_writer *dxbc);
 int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
 
-struct vkd3d_shader_normaliser
-{
-    struct vkd3d_shader_instruction_array instructions;
-
-    unsigned int max_temp_count;
-    unsigned int temp_dcl_idx;
-
-    unsigned int instance_count;
-    unsigned int phase_body_idx;
-    enum vkd3d_shader_opcode phase;
-
-    struct vkd3d_shader_src_param *outpointid_param;
-};
-
-void shader_normaliser_init(struct vkd3d_shader_normaliser *normaliser,
-        struct vkd3d_shader_instruction_array *instructions);
-enum vkd3d_result shader_normaliser_flatten_hull_shader_phases(struct vkd3d_shader_normaliser *normaliser);
-enum vkd3d_result shader_normaliser_normalise_hull_shader_control_point_io(struct vkd3d_shader_normaliser *normaliser,
-        const struct shader_signature *input_signature);
-void shader_normaliser_destroy(struct vkd3d_shader_normaliser *normaliser);
+enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *instructions);
+enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
+        struct vkd3d_shader_instruction_array *instructions, const struct shader_signature *input_signature);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */

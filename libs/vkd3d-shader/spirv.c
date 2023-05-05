@@ -9689,7 +9689,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    struct vkd3d_shader_normaliser normaliser;
+    struct vkd3d_shader_instruction_array normalised_instructions;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
@@ -9698,11 +9698,12 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL)
     {
-        shader_normaliser_init(&normaliser, instructions);
-        if ((result = shader_normaliser_flatten_hull_shader_phases(&normaliser)) >= 0)
-            result = shader_normaliser_normalise_hull_shader_control_point_io(&normaliser,
+        normalised_instructions = parser->instructions;
+        memset(&parser->instructions, 0, sizeof(parser->instructions));
+        instructions = &normalised_instructions;
+        if ((result = instruction_array_flatten_hull_shader_phases(instructions)) >= 0)
+            result = instruction_array_normalise_hull_shader_control_point_io(instructions,
                     &parser->shader_desc.input_signature);
-        instructions = &normaliser.instructions;
 
         if (result >= 0 && TRACE_ON())
             vkd3d_shader_trace(instructions, &parser->shader_version);
@@ -9714,8 +9715,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         result = spirv_compiler_handle_instruction(compiler, &instructions->elements[i]);
     }
 
-    if (instructions == &normaliser.instructions)
-        shader_normaliser_destroy(&normaliser);
+    if (instructions == &normalised_instructions)
+        shader_instruction_array_destroy(&normalised_instructions);
 
     if (result < 0)
         return result;
