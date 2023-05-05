@@ -2674,6 +2674,10 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
                 load->texel_offset.node->last_read = instr->index;
             if (load->lod.node)
                 load->lod.node->last_read = instr->index;
+            if (load->ddx.node)
+                load->ddx.node->last_read = instr->index;
+            if (load->ddy.node)
+                load->ddy.node->last_read = instr->index;
             if (load->sample_index.node)
                 load->sample_index.node->last_read = instr->index;
             break;

@@ -1354,6 +1354,8 @@ struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     hlsl_src_from_node(&load->sample_index, params->sample_index);
     hlsl_src_from_node(&load->texel_offset, params->texel_offset);
     hlsl_src_from_node(&load->lod, params->lod);
+    hlsl_src_from_node(&load->ddx, params->ddx);
+    hlsl_src_from_node(&load->ddy, params->ddy);
     load->sampling_dim = params->sampling_dim;
     if (load->sampling_dim == HLSL_SAMPLER_DIM_GENERIC)
         load->sampling_dim = hlsl_deref_get_type(ctx, &load->resource)->sampler_dim;
@@ -1644,6 +1646,8 @@ static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
     }
     clone_src(map, &dst->coords, &src->coords);
     clone_src(map, &dst->lod, &src->lod);
+    clone_src(map, &dst->ddx, &src->ddx);
+    clone_src(map, &dst->ddy, &src->ddy);
     clone_src(map, &dst->sample_index, &src->sample_index);
     clone_src(map, &dst->texel_offset, &src->texel_offset);
     dst->sampling_dim = src->sampling_dim;
@@ -2440,6 +2444,7 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
         [HLSL_RESOURCE_SAMPLE] = "sample",
         [HLSL_RESOURCE_SAMPLE_LOD] = "sample_lod",
         [HLSL_RESOURCE_SAMPLE_LOD_BIAS] = "sample_biased",
+        [HLSL_RESOURCE_SAMPLE_GRAD] = "sample_grad",
         [HLSL_RESOURCE_GATHER_RED] = "gather_red",
         [HLSL_RESOURCE_GATHER_GREEN] = "gather_green",
         [HLSL_RESOURCE_GATHER_BLUE] = "gather_blue",
@@ -2467,6 +2472,16 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         vkd3d_string_buffer_printf(buffer, ", lod = ");
         dump_src(buffer, &load->lod);
+    }
+    if (load->ddx.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", ddx = ");
+        dump_src(buffer, &load->ddx);
+    }
+    if (load->ddy.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", ddy = ");
+        dump_src(buffer, &load->ddy);
     }
     vkd3d_string_buffer_printf(buffer, ")");
 }
@@ -2703,6 +2718,8 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
     hlsl_cleanup_deref(&load->resource);
     hlsl_src_remove(&load->coords);
     hlsl_src_remove(&load->lod);
+    hlsl_src_remove(&load->ddx);
+    hlsl_src_remove(&load->ddy);
     hlsl_src_remove(&load->texel_offset);
     hlsl_src_remove(&load->sample_index);
     vkd3d_free(load);

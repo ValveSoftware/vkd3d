@@ -3335,7 +3335,7 @@ struct sm4_instruction
         struct sm4_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
         unsigned int swizzle;
-    } srcs[4];
+    } srcs[5];
     unsigned int src_count;
 
     unsigned int byte_stride;
@@ -4112,6 +4112,10 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
             instr.opcode = VKD3D_SM4_OP_SAMPLE_B;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_GRAD:
+            instr.opcode = VKD3D_SM4_OP_SAMPLE_GRAD;
+            break;
+
         default:
             vkd3d_unreachable();
     }
@@ -4138,6 +4142,12 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     {
         sm4_src_from_node(&instr.srcs[3], load->lod.node, VKD3DSP_WRITEMASK_ALL);
         ++instr.src_count;
+    }
+    else if (load->load_type == HLSL_RESOURCE_SAMPLE_GRAD)
+    {
+        sm4_src_from_node(&instr.srcs[3], load->ddx.node, VKD3DSP_WRITEMASK_ALL);
+        sm4_src_from_node(&instr.srcs[4], load->ddy.node, VKD3DSP_WRITEMASK_ALL);
+        instr.src_count += 2;
     }
 
     write_sm4_instruction(buffer, &instr);
@@ -4938,6 +4948,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
         case HLSL_RESOURCE_SAMPLE:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
+        case HLSL_RESOURCE_SAMPLE_GRAD:
             if (!load->sampler.var)
             {
                 hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
