@@ -4108,6 +4108,10 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
             instr.opcode = VKD3D_SM4_OP_SAMPLE;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_LOD:
+            instr.opcode = VKD3D_SM4_OP_SAMPLE_LOD;
+            break;
+
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
             instr.opcode = VKD3D_SM4_OP_SAMPLE_B;
             break;
@@ -4138,7 +4142,8 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     sm4_src_from_deref(ctx, &instr.srcs[2], sampler, sampler->var->data_type, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 3;
 
-    if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD_BIAS)
+    if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD
+           || load->load_type == HLSL_RESOURCE_SAMPLE_LOD_BIAS)
     {
         sm4_src_from_node(&instr.srcs[3], load->lod.node, VKD3DSP_WRITEMASK_ALL);
         ++instr.src_count;
@@ -4947,6 +4952,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE:
+        case HLSL_RESOURCE_SAMPLE_LOD:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
         case HLSL_RESOURCE_SAMPLE_GRAD:
             if (!load->sampler.var)
@@ -4975,10 +4981,6 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_GATHER_ALPHA:
             write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
                     &load->sampler, coords, HLSL_SWIZZLE(W, W, W, W), texel_offset);
-            break;
-
-        case HLSL_RESOURCE_SAMPLE_LOD:
-            hlsl_fixme(ctx, &load->node.loc, "SM4 sample-LOD expression.");
             break;
     }
 }
