@@ -1,19 +1,16 @@
-[vertex shader]
-void main(out float tex : texcoord, inout float4 pos : sv_position)
-{
-    tex = pos.x;
-}
-
 [pixel shader]
-float4 main(float tex : texcoord) : SV_TARGET
+float4 main(uniform float4 u) : sv_target
 {
-    if (tex > 0.0)
+    if (u.x > 0.0)
         return float4(0.1, 0.2, 0.3, 0.4);
     else
         return float4(0.9, 0.8, 0.7, 0.6);
 }
 
 [test]
+uniform 0 float4 0.0 0.0 0.0 0.0
 draw quad
-probe (  0, 0, 319, 480) rgba (0.9, 0.8, 0.7, 0.6)
-probe (321, 0, 640, 480) rgba (0.1, 0.2, 0.3, 0.4)
+probe all rgba (0.9, 0.8, 0.7, 0.6)
+uniform 0 float4 0.1 0.0 0.0 0.0
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)
