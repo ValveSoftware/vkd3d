@@ -1360,20 +1360,27 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
     return add_expr(ctx, instrs, op, args, bool_type, loc);
 }
 
-static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
-        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
-        const struct vkd3d_shader_location *loc)
+static struct hlsl_type *get_common_numeric_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *arg1,
+        const struct hlsl_ir_node *arg2, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_type *common_type;
     enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     enum hlsl_type_class type;
     unsigned int dimx, dimy;
-    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
 
     if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
         return NULL;
 
-    common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
+    return hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
+}
+
+static struct hlsl_ir_node *add_binary_arithmetic_expr(struct hlsl_ctx *ctx, struct list *instrs,
+        enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *common_type;
+
+    common_type = get_common_numeric_type(ctx, arg1, arg2, loc);
 
     if (!(args[0] = add_implicit_conversion(ctx, instrs, arg1, common_type, loc)))
         return NULL;
@@ -6008,11 +6015,21 @@ conditional_expr:
     | logicor_expr '?' expr ':' assignment_expr
         {
             struct hlsl_ir_node *cond = node_from_list($1), *first = node_from_list($3), *second = node_from_list($5);
+            struct hlsl_type *common_type;
 
             list_move_tail($1, $3);
             list_move_tail($1, $5);
             vkd3d_free($3);
             vkd3d_free($5);
+
+            if (!(common_type = get_common_numeric_type(ctx, first, second, &@3)))
+                YYABORT;
+
+            if (!(first = add_implicit_conversion(ctx, $1, first, common_type, &@3)))
+                YYABORT;
+
+            if (!(second = add_implicit_conversion(ctx, $1, second, common_type, &@5)))
+                YYABORT;
 
             if (!hlsl_add_conditional(ctx, $1, cond, first, second))
                 YYABORT;
