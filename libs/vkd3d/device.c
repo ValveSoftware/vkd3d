@@ -19,6 +19,8 @@
 #include "vkd3d_private.h"
 #include "vkd3d_version.h"
 
+#define VKD3D_MAX_UAV_CLEAR_DESCRIPTORS_PER_TYPE 256u
+
 struct vkd3d_struct
 {
     enum vkd3d_structure_type type;
@@ -2393,9 +2395,23 @@ static void vkd3d_time_domains_init(struct d3d12_device *device)
         WARN("Found no acceptable host time domain. Calibrated timestamps will not be available.\n");
 }
 
-static void vkd3d_init_descriptor_pool_sizes(VkDescriptorPoolSize *pool_sizes,
-        const struct vkd3d_device_descriptor_limits *limits)
+static void device_init_descriptor_pool_sizes(struct d3d12_device *device)
 {
+    const struct vkd3d_device_descriptor_limits *limits = &device->vk_info.descriptor_limits;
+    VkDescriptorPoolSize *pool_sizes = device->vk_pool_sizes;
+
+    if (device->use_vk_heaps)
+    {
+        pool_sizes[0].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        pool_sizes[0].descriptorCount = min(limits->storage_image_max_descriptors,
+                VKD3D_MAX_UAV_CLEAR_DESCRIPTORS_PER_TYPE);
+        pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        pool_sizes[1].descriptorCount = pool_sizes[0].descriptorCount;
+        device->vk_pool_count = 2;
+        return;
+    }
+
+    assert(ARRAY_SIZE(device->vk_pool_sizes) >= 6);
     pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     pool_sizes[0].descriptorCount = min(limits->uniform_buffer_max_descriptors,
             VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
@@ -2412,6 +2428,7 @@ static void vkd3d_init_descriptor_pool_sizes(VkDescriptorPoolSize *pool_sizes,
     pool_sizes[5].type = VK_DESCRIPTOR_TYPE_SAMPLER;
     pool_sizes[5].descriptorCount = min(limits->sampler_max_descriptors,
             VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE);
+    device->vk_pool_count = 6;
 };
 
 static void vkd3d_desc_object_cache_init(struct vkd3d_desc_object_cache *cache, size_t size)
@@ -4000,7 +4017,7 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     vkd3d_desc_object_cache_init(&device->view_desc_cache, sizeof(struct vkd3d_view));
     vkd3d_desc_object_cache_init(&device->cbuffer_desc_cache, sizeof(struct vkd3d_cbuffer_desc));
 
-    vkd3d_init_descriptor_pool_sizes(device->vk_pool_sizes, &device->vk_info.descriptor_limits);
+    device_init_descriptor_pool_sizes(device);
 
     if ((device->parent = create_info->parent))
         IUnknown_AddRef(device->parent);

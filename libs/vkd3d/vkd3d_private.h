@@ -1666,6 +1666,7 @@ struct d3d12_device
     struct vkd3d_uav_clear_state uav_clear_state;
 
     VkDescriptorPoolSize vk_pool_sizes[VKD3D_DESCRIPTOR_POOL_COUNT];
+    unsigned int vk_pool_count;
     struct vkd3d_vk_descriptor_heap_layout vk_descriptor_heap_layouts[VKD3D_SET_INDEX_COUNT];
     bool use_vk_heaps;
 };

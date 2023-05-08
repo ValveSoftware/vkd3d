@@ -1437,7 +1437,7 @@ static VkDescriptorPool d3d12_command_allocator_allocate_descriptor_pool(
         pool_desc.pNext = NULL;
         pool_desc.flags = 0;
         pool_desc.maxSets = 512;
-        pool_desc.poolSizeCount = ARRAY_SIZE(device->vk_pool_sizes);
+        pool_desc.poolSizeCount = device->vk_pool_count;
         pool_desc.pPoolSizes = device->vk_pool_sizes;
         if ((vr = VK_CALL(vkCreateDescriptorPool(vk_device, &pool_desc, NULL, &vk_pool))) < 0)
         {
