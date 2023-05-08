@@ -40,6 +40,7 @@ static void update_location(struct preproc_ctx *ctx);
 %option bison-locations
 %option extra-type="struct preproc_ctx *"
 %option never-interactive
+%option nodefault
 %option noinput
 %option nounput
 %option noyy_top_state
