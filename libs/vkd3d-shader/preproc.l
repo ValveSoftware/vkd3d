@@ -175,9 +175,9 @@ INT_SUFFIX      [uUlL]{0,2}
         return T_NEWLINE;
     }
 
-<INITIAL>{WS}+                      {}
+<INITIAL,INCLUDE,LINE>{WS}+         {}
 <INITIAL>[-()\[\]{},+!*/<>&|^?:]    {return yytext[0];}
-<INITIAL>.                          {return T_TEXT;}
+<INITIAL,INCLUDE,LINE>.             {return T_TEXT;}
 
 %%
 
