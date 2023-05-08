@@ -74,6 +74,7 @@ INT_SUFFIX      [uUlL]{0,2}
 <C_COMMENT>"*/"                     {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT><<EOF>>      {yy_pop_state(yyscanner);}
 <C_COMMENT,CXX_COMMENT>.            {}
+<C_COMMENT>\n                       {}
 
 <ERROR>(\\{NEWLINE}|[^\n])*         {return T_STRING;}
 
