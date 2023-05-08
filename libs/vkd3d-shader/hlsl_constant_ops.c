@@ -22,6 +22,46 @@
 
 #include "hlsl.h"
 
+static bool fold_abs(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
+{
+    enum hlsl_base_type type = dst->node.data_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->value.u[k].f = fabsf(src->value.u[k].f);
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->value.u[k].d = fabs(src->value.u[k].d);
+                break;
+
+            case HLSL_TYPE_INT:
+                /* C's abs(INT_MIN) is undefined, but HLSL evaluates this to INT_MIN */
+                if (src->value.u[k].i == INT_MIN)
+                    dst->value.u[k].i = INT_MIN;
+                else
+                    dst->value.u[k].i = abs(src->value.u[k].i);
+                break;
+
+            case HLSL_TYPE_UINT:
+                dst->value.u[k].u = src->value.u[k].u;
+                break;
+
+            default:
+                FIXME("Fold abs() for type %s.\n", debug_hlsl_type(ctx, dst->node.data_type));
+                return false;
+        }
+    }
+    return true;
+}
+
 static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_ir_constant *dst, struct hlsl_ir_constant *src)
 {
     unsigned int k;
@@ -533,6 +573,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
     switch (expr->op)
     {
+        case HLSL_OP1_ABS:
+            success = fold_abs(ctx, res, arg1);
+            break;
+
         case HLSL_OP1_CAST:
             success = fold_cast(ctx, res, arg1);
             break;
