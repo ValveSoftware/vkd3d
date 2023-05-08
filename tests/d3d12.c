@@ -24332,6 +24332,7 @@ static void test_execute_indirect(void)
     ID3D12CommandQueue *queue;
     ID3D12Resource *vb, *ib;
     unsigned int i;
+    ULONG refcount;
     D3D12_BOX box;
     HRESULT hr;
 
@@ -24511,13 +24512,15 @@ static void test_execute_indirect(void)
     ID3D12GraphicsCommandList_ExecuteIndirect(command_list, command_signature, 4, argument_buffer, 0,
             count_buffer, 0);
 
+    refcount = ID3D12CommandSignature_Release(command_signature);
+    ok(!refcount, "ID3D12CommandSignature has %u references left.\n", (unsigned int)refcount);
+
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
 
     reset_command_list(command_list, context.allocator);
 
-    ID3D12CommandSignature_Release(command_signature);
     command_signature = create_command_signature(context.device, D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH);
 
     uav = create_default_buffer(context.device, 2 * 3 * 4 * sizeof(UINT),
@@ -24544,6 +24547,9 @@ static void test_execute_indirect(void)
     ID3D12GraphicsCommandList_ExecuteIndirect(command_list, command_signature, 1, argument_buffer,
             offsetof(struct argument_data, dispatch), NULL, 0);
 
+    refcount = ID3D12CommandSignature_Release(command_signature);
+    ok(!refcount, "ID3D12CommandSignature has %u references left.\n", (unsigned int)refcount);
+
     transition_sub_resource_state(command_list, uav, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(uav, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
@@ -24558,7 +24564,6 @@ static void test_execute_indirect(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    ID3D12CommandSignature_Release(command_signature);
     command_signature = create_command_signature(context.device, D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED);
 
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
@@ -24604,6 +24609,9 @@ static void test_execute_indirect(void)
             ARRAY_SIZE(argument_data.indexed_draws), argument_buffer,
             offsetof(struct argument_data, indexed_draws), count_buffer, sizeof(uint32_t));
 
+    refcount = ID3D12CommandSignature_Release(command_signature);
+    ok(!refcount, "ID3D12CommandSignature has %u references left.\n", (unsigned int)refcount);
+
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffff00, 0);
@@ -24613,7 +24621,6 @@ static void test_execute_indirect(void)
     ID3D12Resource_Release(ib);
     ID3D12Resource_Release(uav);
     ID3D12Resource_Release(vb);
-    ID3D12CommandSignature_Release(command_signature);
     ID3D12Resource_Release(argument_buffer);
     ID3D12Resource_Release(count_buffer);
     destroy_test_context(&context);
