@@ -1,6 +1,6 @@
 % Use a uniform to prevent the compiler from optimizing.
 
-[pixel shader todo]
+[pixel shader]
 uniform float i;
 float4 main() : SV_TARGET
 {
@@ -12,5 +12,5 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float 2
-todo draw quad
+draw quad
 probe all rgba (0.5, 0.3, 0.8, 0.2)

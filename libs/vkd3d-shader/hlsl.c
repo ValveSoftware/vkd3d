@@ -1287,6 +1287,19 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
     return load;
 }
 
+struct hlsl_ir_load *hlsl_new_load_parent(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
+        const struct vkd3d_shader_location *loc)
+{
+    /* This deref can only exists temporarily because it is not the real owner of its members. */
+    struct hlsl_deref tmp_deref;
+
+    assert(deref->path_len >= 1);
+
+    tmp_deref = *deref;
+    tmp_deref.path_len = deref->path_len - 1;
+    return hlsl_new_load_index(ctx, &tmp_deref, NULL, loc);
+}
+
 struct hlsl_ir_load *hlsl_new_var_load(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
         const struct vkd3d_shader_location *loc)
 {

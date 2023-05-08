@@ -1992,6 +1992,81 @@ static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
     return true;
 }
 
+static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *idx;
+    struct hlsl_deref *deref;
+    struct hlsl_type *type;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_LOAD)
+        return false;
+
+    deref = &hlsl_ir_load(instr)->src;
+    assert(deref->var);
+
+    if (deref->path_len == 0)
+        return false;
+
+    type = deref->var->data_type;
+    for (i = 0; i < deref->path_len - 1; ++i)
+        type = hlsl_get_element_type_from_path_index(ctx, type, deref->path[i].node);
+
+    idx = deref->path[deref->path_len - 1].node;
+
+    if (type->class == HLSL_CLASS_VECTOR && idx->type != HLSL_IR_CONSTANT)
+    {
+        struct hlsl_ir_node *eq, *swizzle, *dot, *operands[HLSL_MAX_OPERANDS] = {0};
+        struct hlsl_ir_load *vector_load;
+        struct hlsl_ir_constant *c;
+        enum hlsl_ir_expr_op op;
+
+        if (!(vector_load = hlsl_new_load_parent(ctx, deref, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &vector_load->node.entry);
+
+        if (!(swizzle = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, X, X, X), type->dimx, idx, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &swizzle->entry);
+
+        if (!(c = hlsl_new_constant(ctx, hlsl_get_vector_type(ctx, HLSL_TYPE_UINT, type->dimx), &instr->loc)))
+            return false;
+        c->value.u[0].u = 0;
+        c->value.u[1].u = 1;
+        c->value.u[2].u = 2;
+        c->value.u[3].u = 3;
+        list_add_before(&instr->entry, &c->node.entry);
+
+        operands[0] = swizzle;
+        operands[1] = &c->node;
+        if (!(eq = hlsl_new_expr(ctx, HLSL_OP2_EQUAL, operands,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_BOOL, type->dimx), &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &eq->entry);
+
+        if (!(eq = hlsl_new_cast(ctx, eq, type, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &eq->entry);
+
+        op = HLSL_OP2_DOT;
+        if (type->dimx == 1)
+            op = type->base_type == HLSL_TYPE_BOOL ? HLSL_OP2_LOGIC_AND : HLSL_OP2_MUL;
+
+        /* Note: We may be creating a DOT for bool vectors here, which we need to lower to
+         * LOGIC_OR + LOGIC_AND. */
+        operands[0] = &vector_load->node;
+        operands[1] = eq;
+        if (!(dot = hlsl_new_expr(ctx, op, operands, instr->data_type, &instr->loc)))
+            return false;
+        list_add_before(&instr->entry, &dot->entry);
+        hlsl_replace_node(instr, dot);
+
+        return true;
+    }
+
+    return false;
+}
+
 /* Lower DIV to RCP + MUL. */
 static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -2395,6 +2470,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
     struct hlsl_type *type = instr->data_type;
     struct hlsl_ir_expr *expr;
     unsigned int i, dimx;
+    bool is_bool;
 
     if (instr->type != HLSL_IR_EXPR)
         return false;
@@ -2403,14 +2479,16 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
     if (expr->op != HLSL_OP2_DOT)
         return false;
 
-    if (type->base_type == HLSL_TYPE_INT || type->base_type == HLSL_TYPE_UINT)
+    if (type->base_type == HLSL_TYPE_INT || type->base_type == HLSL_TYPE_UINT
+            || type->base_type == HLSL_TYPE_BOOL)
     {
         arg1 = expr->operands[0].node;
         arg2 = expr->operands[1].node;
         assert(arg1->data_type->dimx == arg2->data_type->dimx);
         dimx = arg1->data_type->dimx;
+        is_bool = type->base_type == HLSL_TYPE_BOOL;
 
-        if (!(mult = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, arg1, arg2)))
+        if (!(mult = hlsl_new_binary_expr(ctx, is_bool ? HLSL_OP2_LOGIC_AND : HLSL_OP2_MUL, arg1, arg2)))
             return false;
         list_add_before(&instr->entry, &mult->entry);
 
@@ -2426,7 +2504,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
         res = comps[0];
         for (i = 1; i < dimx; ++i)
         {
-            if (!(res = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, res, comps[i])))
+            if (!(res = hlsl_new_binary_expr(ctx, is_bool ? HLSL_OP2_LOGIC_OR : HLSL_OP2_ADD, res, comps[i])))
                 return false;
             list_add_before(&instr->entry, &res->entry);
         }
@@ -3999,6 +4077,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }
     while (progress);
+
+    hlsl_transform_ir(ctx, lower_nonconstant_vector_derefs, body, NULL);
+    hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
+    hlsl_transform_ir(ctx, lower_int_dot, body, NULL);
 
     if (profile->major_version < 4)
     {
