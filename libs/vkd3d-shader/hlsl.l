@@ -37,6 +37,7 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *loc);
 %option bison-locations
 %option extra-type="struct hlsl_ctx *"
 %option never-interactive
+%option nodefault
 %option noinput
 %option nounput
 %option noyywrap
