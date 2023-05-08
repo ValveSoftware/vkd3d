@@ -266,6 +266,10 @@ row_major               {return KW_ROW_MAJOR;           }
                             return STRING;
                         }
 <pp_line>{WS}+          {}
+<pp_line>{ANY}          {
+                            FIXME("Malformed preprocessor line directive?\n");
+                            BEGIN(INITIAL);
+                        }
 <pp_line>{NEWLINE}      {
                             FIXME("Malformed preprocessor line directive?\n");
                             BEGIN(INITIAL);
