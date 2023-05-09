@@ -34,8 +34,9 @@ struct vulkan_resource
     struct resource r;
 
     VkBuffer buffer;
+    VkBufferView buffer_view;
     VkImage image;
-    VkImageView view;
+    VkImageView image_view;
     VkDeviceMemory memory;
 
     uint32_t binding;
@@ -177,6 +178,21 @@ static VkBuffer create_buffer(const struct vulkan_shader_runner *runner, VkDevic
     return buffer;
 }
 
+static VkBufferView create_buffer_view(const struct vulkan_shader_runner *runner, VkBuffer buffer,
+        VkFormat format)
+{
+    VkBufferViewCreateInfo view_info = {.sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO};
+    VkBufferView view;
+
+    view_info.buffer = buffer;
+    view_info.format = format;
+    view_info.range = VK_WHOLE_SIZE;
+
+    VK_CALL(vkCreateBufferView(runner->device, &view_info, NULL, &view));
+
+    return view;
+}
+
 static VkImage create_2d_image(const struct vulkan_shader_runner *runner, uint32_t width, uint32_t height,
         uint32_t level_count, VkImageUsageFlags usage, VkFormat format, VkDeviceMemory *memory)
 {
@@ -249,7 +265,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
             resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, format, &resource->memory);
-            resource->view = create_2d_image_view(runner, resource->image, format);
+            resource->image_view = create_2d_image_view(runner, resource->image, format);
 
             begin_command_buffer(runner);
             transition_image_layout(runner, resource->image,
@@ -274,7 +290,7 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
 
             resource->image = create_2d_image(runner, params->width, params->height, params->level_count,
                     usage, format, &resource->memory);
-            resource->view = create_2d_image_view(runner, resource->image, format);
+            resource->image_view = create_2d_image_view(runner, resource->image, format);
 
             staging_buffer = create_buffer(runner, params->data_size,
                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &staging_memory);
@@ -315,6 +331,18 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             break;
         }
 
+        case RESOURCE_TYPE_BUFFER_UAV:
+            format = vkd3d_get_vk_format(params->format);
+
+            resource->buffer = create_buffer(runner, params->data_size, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
+            resource->buffer_view = create_buffer_view(runner, resource->buffer, format);
+
+            VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
+            memcpy(data, params->data, params->data_size);
+            VK_CALL(vkUnmapMemory(device, resource->memory));
+            break;
+
         case RESOURCE_TYPE_VERTEX_BUFFER:
             resource->buffer = create_buffer(runner, params->data_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
@@ -338,10 +366,12 @@ static void vulkan_runner_destroy_resource(struct shader_runner *r, struct resou
         VK_CALL(vkFreeMemory(device, resource->memory, NULL));
     if (resource->image)
         VK_CALL(vkDestroyImage(device, resource->image, NULL));
-    if (resource->view)
-        VK_CALL(vkDestroyImageView(device, resource->view, NULL));
+    if (resource->image_view)
+        VK_CALL(vkDestroyImageView(device, resource->image_view, NULL));
     if (resource->buffer)
         VK_CALL(vkDestroyBuffer(device, resource->buffer, NULL));
+    if (resource->buffer_view)
+        VK_CALL(vkDestroyBufferView(device, resource->buffer_view, NULL));
 
     free(resource);
 }
@@ -415,15 +445,19 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
 
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 binding = &bindings[interface_info.binding_count++];
-                if (resource->r.type == RESOURCE_TYPE_UAV)
+                if (resource->r.type == RESOURCE_TYPE_UAV || resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
                     binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
                 else
                     binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
                 binding->register_space = 0;
                 binding->register_index = resource->r.slot;
                 binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-                binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
+                if (resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
+                else
+                    binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
                 binding->binding.set = 0;
                 binding->binding.binding = resource->binding;
                 binding->binding.count = 1;
@@ -596,6 +630,7 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -724,6 +759,7 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
 
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 binding = &bindings[set_desc.bindingCount++];
 
                 resource->binding = binding_index++;
@@ -731,6 +767,8 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
                 binding->binding = resource->binding;
                 if (resource->r.type == RESOURCE_TYPE_UAV)
                     binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+                else if (resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+                    binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
                 else
                     binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 binding->descriptorCount = 1;
@@ -796,7 +834,7 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
-                image_info.imageView = resource->view;
+                image_info.imageView = resource->image_view;
                 image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
                 write.dstSet = descriptor_set;
@@ -811,6 +849,17 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
                     image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
                 }
+
+                VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
+                break;
+
+            case RESOURCE_TYPE_BUFFER_UAV:
+                write.dstSet = descriptor_set;
+                write.dstBinding = resource->binding;
+                write.dstArrayElement = 0;
+                write.descriptorCount = 1;
+                write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+                write.pTexelBufferView = &resource->buffer_view;
 
                 VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
                 break;
@@ -867,7 +916,7 @@ static void create_render_pass_and_framebuffer(struct vulkan_shader_runner *runn
         color_ref->attachment = rt_count;
         color_ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-        rtvs[rt_count] = resource->view;
+        rtvs[rt_count] = resource->image_view;
 
         ++rt_count;
     }
@@ -1011,11 +1060,6 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     VkBufferImageCopy region = {0};
     VkImageLayout layout;
 
-    if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
-        layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    else
-        layout = VK_IMAGE_LAYOUT_GENERAL;
-
     rb->rb.width = resource->r.width;
     rb->rb.height = resource->r.height;
     rb->rb.depth = 1;
@@ -1025,24 +1069,42 @@ static struct resource_readback *vulkan_runner_get_resource_readback(struct shad
     rb->buffer = create_buffer(runner, rb->rb.row_pitch * rb->rb.height,
             VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &rb->memory);
 
-    begin_command_buffer(runner);
+    if (resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+    {
+        void *data;
 
-    transition_image_layout(runner, resource->image, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+        VK_CALL(vkMapMemory(device, resource->memory, 0, VK_WHOLE_SIZE, 0, &data));
+        VK_CALL(vkMapMemory(device, rb->memory, 0, VK_WHOLE_SIZE, 0, &rb->rb.data));
+        memcpy(rb->rb.data, data, rb->rb.row_pitch * rb->rb.height);
+        VK_CALL(vkUnmapMemory(device, resource->memory));
+    }
+    else
+    {
+        if (resource->r.type == RESOURCE_TYPE_RENDER_TARGET)
+            layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        else
+            layout = VK_IMAGE_LAYOUT_GENERAL;
 
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.layerCount = 1;
-    region.imageExtent.width = resource->r.width;
-    region.imageExtent.height = resource->r.height;
-    region.imageExtent.depth = 1;
+        begin_command_buffer(runner);
 
-    VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
-            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
+        transition_image_layout(runner, resource->image, layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-    transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent.width = resource->r.width;
+        region.imageExtent.height = resource->r.height;
+        region.imageExtent.depth = 1;
 
-    end_command_buffer(runner);
+        VK_CALL(vkCmdCopyImageToBuffer(runner->cmd_buffer, resource->image,
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, rb->buffer, 1, &region));
 
-    VK_CALL(vkMapMemory(device, rb->memory, 0, VK_WHOLE_SIZE, 0, &rb->rb.data));
+        transition_image_layout(runner, resource->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout);
+
+        end_command_buffer(runner);
+
+        VK_CALL(vkMapMemory(device, rb->memory, 0, VK_WHOLE_SIZE, 0, &rb->rb.data));
+    }
+
     return &rb->rb;
 }
 
@@ -1141,7 +1203,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkPhysicalDeviceFeatures ret_features, features;
-    VkDescriptorPoolSize descriptor_pool_sizes[3];
+    VkDescriptorPoolSize descriptor_pool_sizes[4];
     static const float queue_priority = 1.0f;
     VkFormatProperties format_props;
     uint32_t count, graphics_index;
@@ -1253,6 +1315,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     descriptor_pool_sizes[1].descriptorCount = MAX_SAMPLERS;
     descriptor_pool_sizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     descriptor_pool_sizes[2].descriptorCount = MAX_RESOURCES;
+    descriptor_pool_sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+    descriptor_pool_sizes[3].descriptorCount = MAX_RESOURCES;
 
     descriptor_pool_desc.maxSets = 1;
     descriptor_pool_desc.poolSizeCount = ARRAY_SIZE(descriptor_pool_sizes);

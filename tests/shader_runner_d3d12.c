@@ -145,6 +145,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             break;
 
         case RESOURCE_TYPE_UAV:
+        case RESOURCE_TYPE_BUFFER_UAV:
             if (!runner->heap)
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
@@ -213,6 +214,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 range = &resource->descriptor_range;
 
                 resource->root_index = root_signature_desc.NumParameters++;
@@ -314,6 +316,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
                 break;
 
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
                         get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
                 break;
@@ -447,6 +450,7 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
                         get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
                 break;

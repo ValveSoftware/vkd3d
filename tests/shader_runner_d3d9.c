@@ -258,6 +258,7 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
         }
 
         case RESOURCE_TYPE_UAV:
+        case RESOURCE_TYPE_BUFFER_UAV:
             fatal_error("UAVs are not supported.\n");
             break;
 
@@ -383,6 +384,7 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 vkd3d_unreachable();
 
             case RESOURCE_TYPE_VERTEX_BUFFER:

@@ -350,6 +350,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
+        case RESOURCE_TYPE_BUFFER_UAV:
         {
             D3D11_SUBRESOURCE_DATA resource_data[2];
             D3D11_TEXTURE2D_DESC desc = {0};
@@ -364,7 +365,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             desc.Format = params->format;
             desc.SampleDesc.Count = 1;
             desc.Usage = D3D11_USAGE_DEFAULT;
-            if (params->type == RESOURCE_TYPE_UAV)
+            if (params->type == RESOURCE_TYPE_UAV || params->type == RESOURCE_TYPE_BUFFER_UAV)
                 desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
             else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
                 desc.BindFlags = D3D11_BIND_RENDER_TARGET;
@@ -394,7 +395,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
             resource->resource = (ID3D11Resource *)resource->texture;
-            if (params->type == RESOURCE_TYPE_UAV)
+            if (params->type == RESOURCE_TYPE_UAV || params->type == RESOURCE_TYPE_BUFFER_UAV)
                 hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
             else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
                 hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
@@ -485,6 +486,7 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
                 break;
 
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 ID3D11DeviceContext_CSSetUnorderedAccessViews(context, resource->r.slot, 1, &resource->uav, NULL);
                 break;
 
@@ -571,6 +573,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
+            case RESOURCE_TYPE_BUFFER_UAV:
                 uavs[resource->r.slot] = resource->uav;
                 min_uav_slot = min(min_uav_slot, resource->r.slot);
                 break;
