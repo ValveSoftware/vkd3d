@@ -175,15 +175,15 @@ probe all rgba (0.2, 0.2, 0.2, 0.2) 1
 
 uniform 0 float 0.3
 draw quad
-todo probe all rgba (0.4, 0.4, 0.4, 0.4) 1
+probe all rgba (0.4, 0.4, 0.4, 0.4) 1
 
 uniform 0 float 0.7
 draw quad
-todo probe all rgba (0.8, 0.8, 0.8, 0.8) 1
+probe all rgba (0.8, 0.8, 0.8, 0.8) 1
 
 uniform 0 float 0.9
 draw quad
-todo probe all rgba (0.9, 0.9, 0.9, 0.9) 1
+probe all rgba (0.9, 0.9, 0.9, 0.9) 1
 
 [pixel shader]
 
