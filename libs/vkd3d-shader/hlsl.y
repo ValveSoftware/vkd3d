@@ -4042,6 +4042,12 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct list *instr
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
+    {
+        return raise_invalid_method_object_type(ctx, object_type, name, loc);
+    }
+
     load_params.type = HLSL_RESOURCE_SAMPLE_GRAD;
 
     if (params->args_count < 4 || params->args_count > 5 + !!offset_dim)
@@ -4097,10 +4103,40 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct list *instr
     return true;
 }
 
+static const struct method_function
+{
+    const char *name;
+    bool (*handler)(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
+            const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc);
+}
+object_methods[] =
+{
+    { "Gather",             add_gather_method_call },
+    { "GatherAlpha",        add_gather_method_call },
+    { "GatherBlue",         add_gather_method_call },
+    { "GatherGreen",        add_gather_method_call },
+    { "GatherRed",          add_gather_method_call },
+
+    { "Load",               add_load_method_call },
+
+    { "Sample",             add_sample_method_call },
+    { "SampleBias",         add_sample_lod_method_call },
+    { "SampleGrad",         add_sample_grad_method_call },
+    { "SampleLevel",        add_sample_lod_method_call },
+};
+
+static int object_method_function_name_compare(const void *a, const void *b)
+{
+    const struct method_function *func = b;
+
+    return strcmp(a, func->name);
+}
+
 static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
+    const struct method_function *method;
 
     if (object_type->class != HLSL_CLASS_OBJECT || object_type->base_type != HLSL_TYPE_TEXTURE
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
@@ -4114,32 +4150,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct list *instrs, struct hl
         return false;
     }
 
-    if (!strcmp(name, "Load"))
+    if ((method = bsearch(name, object_methods, ARRAY_SIZE(object_methods),
+            sizeof(*method), object_method_function_name_compare)))
     {
-        return add_load_method_call(ctx, instrs, object, name, params, loc);
-    }
-    else if (!strcmp(name, "Sample"))
-    {
-        return add_sample_method_call(ctx, instrs, object, name, params, loc);
-    }
-    else if ((!strcmp(name, "Gather") || !strcmp(name, "GatherRed") || !strcmp(name, "GatherBlue")
-            || !strcmp(name, "GatherGreen") || !strcmp(name, "GatherAlpha")))
-    {
-        return add_gather_method_call(ctx, instrs, object, name, params, loc);
-    }
-    else if (!strcmp(name, "SampleLevel"))
-    {
-        return add_sample_lod_method_call(ctx, instrs, object, name, params, loc);
-    }
-    else if (!strcmp(name, "SampleBias"))
-    {
-        return add_sample_lod_method_call(ctx, instrs, object, name, params, loc);
-    }
-    else if (!strcmp(name, "SampleGrad")
-            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMS
-            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DMSARRAY)
-    {
-        return add_sample_grad_method_call(ctx, instrs, object, name, params, loc);
+        return method->handler(ctx, instrs, object, name, params, loc);
     }
     else
     {
