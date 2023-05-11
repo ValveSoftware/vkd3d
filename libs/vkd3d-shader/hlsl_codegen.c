@@ -174,6 +174,24 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     return true;
 }
 
+static bool clean_constant_deref_offset_srcs(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+        struct hlsl_ir_node *instr)
+{
+    if (deref->offset.node && deref->offset.node->type == HLSL_IR_CONSTANT)
+    {
+        enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
+
+        if (regset == HLSL_REGSET_NUMERIC)
+            deref->const_offset += 4 * hlsl_ir_constant(deref->offset.node)->value.u[0].u;
+        else
+            deref->const_offset += hlsl_ir_constant(deref->offset.node)->value.u[0].u;
+        hlsl_src_remove(&deref->offset);
+        return true;
+    }
+    return false;
+}
+
+
 /* Split uniforms into two variables representing the constant and temp
  * registers, and copy the former to the latter, so that writes to uniforms
  * work. */
@@ -4465,14 +4483,8 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
         /* We should always have generated a cast to UINT. */
         assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
                 && offset_node->data_type->base_type == HLSL_TYPE_UINT);
-
-        if (offset_node->type != HLSL_IR_CONSTANT)
-            return false;
-
-        if (regset == HLSL_REGSET_NUMERIC)
-            *offset += 4 * hlsl_ir_constant(offset_node)->value.u[0].u;
-        else
-            *offset += hlsl_ir_constant(offset_node)->value.u[0].u;
+        assert(offset_node->type != HLSL_IR_CONSTANT);
+        return false;
     }
 
     size = deref->var->data_type->reg_size[regset];
@@ -4789,6 +4801,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     /* TODO: move forward, remove when no longer needed */
     transform_derefs(ctx, replace_deref_path_with_offset, body);
     while (hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL));
+    transform_derefs(ctx, clean_constant_deref_offset_srcs, body);
 
     do
         compute_liveness(ctx, entry_func);
