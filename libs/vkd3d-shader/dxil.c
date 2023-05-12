@@ -62,6 +62,86 @@ enum bitcode_abbrev_type
     ABBREV_BLOB  = 5,
 };
 
+enum bitcode_address_space
+{
+    ADDRESS_SPACE_DEFAULT,
+    ADDRESS_SPACE_DEVICEMEM,
+    ADDRESS_SPACE_CBUFFER,
+    ADDRESS_SPACE_GROUPSHARED,
+};
+
+enum bitcode_type_code
+{
+    TYPE_CODE_NUMENTRY     =  1,
+    TYPE_CODE_VOID         =  2,
+    TYPE_CODE_FLOAT        =  3,
+    TYPE_CODE_DOUBLE       =  4,
+    TYPE_CODE_LABEL        =  5,
+    TYPE_CODE_INTEGER      =  7,
+    TYPE_CODE_POINTER      =  8,
+    TYPE_CODE_HALF         = 10,
+    TYPE_CODE_ARRAY        = 11,
+    TYPE_CODE_VECTOR       = 12,
+    TYPE_CODE_METADATA     = 16,
+    TYPE_CODE_STRUCT_ANON  = 18,
+    TYPE_CODE_STRUCT_NAME  = 19,
+    TYPE_CODE_STRUCT_NAMED = 20,
+    TYPE_CODE_FUNCTION     = 21,
+};
+
+struct sm6_pointer_info
+{
+    const struct sm6_type *type;
+    enum bitcode_address_space addr_space;
+};
+
+struct sm6_struct_info
+{
+    const char *name;
+    unsigned int elem_count;
+    const struct sm6_type *elem_types[];
+};
+
+struct sm6_function_info
+{
+    const struct sm6_type *ret_type;
+    unsigned int param_count;
+    const struct sm6_type *param_types[];
+};
+
+struct sm6_array_info
+{
+    unsigned int count;
+    const struct sm6_type *elem_type;
+};
+
+enum sm6_type_class
+{
+    TYPE_CLASS_VOID,
+    TYPE_CLASS_INTEGER,
+    TYPE_CLASS_FLOAT,
+    TYPE_CLASS_POINTER,
+    TYPE_CLASS_STRUCT,
+    TYPE_CLASS_FUNCTION,
+    TYPE_CLASS_VECTOR,
+    TYPE_CLASS_ARRAY,
+    TYPE_CLASS_LABEL,
+    TYPE_CLASS_METADATA,
+};
+
+struct sm6_type
+{
+    enum sm6_type_class class;
+    union
+    {
+        unsigned int width;
+        struct sm6_pointer_info pointer;
+        struct sm6_struct_info *struc;
+        struct sm6_function_info *function;
+        struct sm6_array_info array;
+    } u;
+};
+
 struct dxil_record
 {
     unsigned int code;
@@ -105,6 +185,9 @@ struct sm6_parser
     struct dxil_global_abbrev **abbrevs;
     size_t abbrev_capacity;
     size_t abbrev_count;
+
+    struct sm6_type *types;
+    size_t type_count;
 
     struct vkd3d_shader_parser p;
 };
@@ -714,6 +797,346 @@ static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, siz
     vkd3d_free(abbrevs);
 }
 
+static const struct dxil_block *sm6_parser_get_level_one_block(const struct sm6_parser *sm6,
+        enum bitcode_block_id id, bool *is_unique)
+{
+    const struct dxil_block *block, *found = NULL;
+    size_t i;
+
+    for (i = 0, *is_unique = true; i < sm6->root_block.child_block_count; ++i)
+    {
+        block = sm6->root_block.child_blocks[i];
+        if (block->id != id)
+            continue;
+
+        if (!found)
+            found = block;
+        else
+            *is_unique = false;
+    }
+
+    return found;
+}
+
+static char *dxil_record_to_string(const struct dxil_record *record)
+{
+    unsigned int i;
+    char *str;
+
+    if (!(str = vkd3d_calloc(record->operand_count + 1, 1)))
+        return NULL;
+
+    for (i = 0; i < record->operand_count; ++i)
+        str[i] = record->operands[i];
+
+    return str;
+}
+
+static bool dxil_record_validate_operand_min_count(const struct dxil_record *record, unsigned int min_count,
+        struct sm6_parser *sm6)
+{
+    if (record->operand_count >= min_count)
+        return true;
+
+    WARN("Invalid operand count %u for code %u.\n", record->operand_count, record->code);
+    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+            "Invalid operand count %u for record code %u.", record->operand_count, record->code);
+    return false;
+}
+
+static void dxil_record_validate_operand_max_count(const struct dxil_record *record, unsigned int max_count,
+        struct sm6_parser *sm6)
+{
+    if (record->operand_count <= max_count)
+        return;
+
+    WARN("Ignoring %u extra operands for code %u.\n", record->operand_count - max_count, record->code);
+    vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+            "Ignoring %u extra operands for record code %u.", record->operand_count - max_count, record->code);
+}
+
+static bool dxil_record_validate_operand_count(const struct dxil_record *record, unsigned int min_count,
+        unsigned int max_count, struct sm6_parser *sm6)
+{
+    dxil_record_validate_operand_max_count(record, max_count, sm6);
+    return dxil_record_validate_operand_min_count(record, min_count, sm6);
+}
+
+static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
+{
+    const struct dxil_record *record;
+    size_t i, type_count, type_index;
+    const struct dxil_block *block;
+    char *struct_name = NULL;
+    unsigned int j, count;
+    struct sm6_type *type;
+    uint64_t type_id;
+    bool is_unique;
+
+    sm6->p.location.line = 0;
+    sm6->p.location.column = 0;
+
+    if (!(block = sm6_parser_get_level_one_block(sm6, TYPE_BLOCK, &is_unique)))
+    {
+        WARN("No type definitions found.\n");
+        return VKD3D_OK;
+    }
+    if (!is_unique)
+        WARN("Ignoring invalid extra type table(s).\n");
+
+    sm6->p.location.line = block->id;
+
+    type_count = 0;
+    for (i = 0; i < block->record_count; ++i)
+        type_count += block->records[i]->code != TYPE_CODE_NUMENTRY && block->records[i]->code != TYPE_CODE_STRUCT_NAME;
+
+    /* The type array must not be relocated. */
+    if (!(sm6->types = vkd3d_calloc(type_count, sizeof(*sm6->types))))
+    {
+        ERR("Failed to allocate type array.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+        record = block->records[i];
+
+        type = &sm6->types[sm6->type_count];
+        type_index = sm6->type_count;
+
+        switch (record->code)
+        {
+            case TYPE_CODE_ARRAY:
+            case TYPE_CODE_VECTOR:
+                if (!dxil_record_validate_operand_count(record, 2, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                type->class = record->code == TYPE_CODE_ARRAY ? TYPE_CLASS_ARRAY : TYPE_CLASS_VECTOR;
+
+                if (!(type->u.array.count = record->operands[0]))
+                {
+                    TRACE("Setting unbounded for type %zu.\n", type_index);
+                    type->u.array.count = UINT_MAX;
+                }
+
+                if ((type_id = record->operands[1]) >= type_count)
+                {
+                    WARN("Invalid contained type id %"PRIu64" for type %zu.\n", type_id, type_index);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                type->u.array.elem_type = &sm6->types[type_id];
+                break;
+
+            case TYPE_CODE_DOUBLE:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                type->class = TYPE_CLASS_FLOAT;
+                type->u.width = 64;
+                break;
+
+            case TYPE_CODE_FLOAT:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                type->class = TYPE_CLASS_FLOAT;
+                type->u.width = 32;
+                break;
+
+            case TYPE_CODE_FUNCTION:
+                if (!dxil_record_validate_operand_min_count(record, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+                if (record->operands[0])
+                    FIXME("Unhandled vararg function type %zu.\n", type_index);
+
+                type->class = TYPE_CLASS_FUNCTION;
+
+                if ((type_id = record->operands[1]) >= type_count)
+                {
+                    WARN("Invalid return type id %"PRIu64" for type %zu.\n", type_id, type_index);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                count = record->operand_count - 2;
+                if (vkd3d_object_range_overflow(sizeof(type->u.function), count, sizeof(type->u.function->param_types[0]))
+                        || !(type->u.function = vkd3d_malloc(offsetof(struct sm6_function_info, param_types[count]))))
+                {
+                    ERR("Failed to allocate function parameter types.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+
+                type->u.function->ret_type = &sm6->types[type_id];
+                type->u.function->param_count = count;
+                for (j = 0; j < count; ++j)
+                {
+                    if ((type_id = record->operands[j + 2]) >= type_count)
+                    {
+                        WARN("Invalid parameter type id %"PRIu64" for type %zu.\n", type_id, type_index);
+                        vkd3d_free(type->u.function);
+                        return VKD3D_ERROR_INVALID_SHADER;
+                    }
+                    type->u.function->param_types[j] = &sm6->types[type_id];
+                }
+                break;
+
+            case TYPE_CODE_HALF:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                type->class = TYPE_CLASS_FLOAT;
+                type->u.width = 16;
+                break;
+
+            case TYPE_CODE_INTEGER:
+            {
+                uint64_t width;
+
+                if (!dxil_record_validate_operand_count(record, 1, 1, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                type->class = TYPE_CLASS_INTEGER;
+
+                switch ((width = record->operands[0]))
+                {
+                    case 1:
+                    case 8:
+                    case 16:
+                    case 32:
+                    case 64:
+                        break;
+                    default:
+                        WARN("Invalid integer width %"PRIu64" for type %zu.\n", width, type_index);
+                        return VKD3D_ERROR_INVALID_SHADER;
+                }
+                type->u.width = width;
+                break;
+            }
+
+            case TYPE_CODE_LABEL:
+                type->class = TYPE_CLASS_LABEL;
+                break;
+
+            case TYPE_CODE_METADATA:
+                type->class = TYPE_CLASS_METADATA;
+                break;
+
+            case TYPE_CODE_NUMENTRY:
+                continue;
+
+            case TYPE_CODE_POINTER:
+                if (!dxil_record_validate_operand_count(record, 1, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                type->class = TYPE_CLASS_POINTER;
+
+                if ((type_id = record->operands[0]) >= type_count)
+                {
+                    WARN("Invalid pointee type id %"PRIu64" for type %zu.\n", type_id, type_index);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                type->u.pointer.type = &sm6->types[type_id];
+                type->u.pointer.addr_space = (record->operand_count > 1) ? record->operands[1] : ADDRESS_SPACE_DEFAULT;
+                break;
+
+            case TYPE_CODE_STRUCT_ANON:
+            case TYPE_CODE_STRUCT_NAMED:
+                if (!dxil_record_validate_operand_min_count(record, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+                if (record->code == TYPE_CODE_STRUCT_NAMED && !struct_name)
+                {
+                    WARN("Missing struct name before struct type %zu.\n", type_index);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                type->class = TYPE_CLASS_STRUCT;
+
+                count = record->operand_count - 1;
+                if (vkd3d_object_range_overflow(sizeof(type->u.struc), count, sizeof(type->u.struc->elem_types[0]))
+                        || !(type->u.struc = vkd3d_malloc(offsetof(struct sm6_struct_info, elem_types[count]))))
+                {
+                    ERR("Failed to allocate struct element types.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+
+                if (record->operands[0])
+                    FIXME("Ignoring struct packed attribute.\n");
+
+                type->u.struc->elem_count = count;
+                for (j = 0; j < count; ++j)
+                {
+                    if ((type_id = record->operands[j + 1]) >= type_count)
+                    {
+                        WARN("Invalid contained type id %"PRIu64" for type %zu.\n", type_id, type_index);
+                        vkd3d_free(type->u.struc);
+                        return VKD3D_ERROR_INVALID_SHADER;
+                    }
+                    type->u.struc->elem_types[j] = &sm6->types[type_id];
+                }
+
+                if (record->code == TYPE_CODE_STRUCT_ANON)
+                {
+                    type->u.struc->name = NULL;
+                    break;
+                }
+
+                type->u.struc->name = struct_name;
+                struct_name = NULL;
+                break;
+
+            case TYPE_CODE_STRUCT_NAME:
+                if (!(struct_name = dxil_record_to_string(record)))
+                {
+                    ERR("Failed to allocate struct name.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                if (!struct_name[0])
+                    WARN("Struct name is empty for type %zu.\n", type_index);
+                continue;
+
+            case TYPE_CODE_VOID:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                type->class = TYPE_CLASS_VOID;
+                break;
+
+            default:
+                FIXME("Unhandled type %u at index %zu.\n", record->code, type_index);
+                return VKD3D_ERROR_INVALID_SHADER;
+        }
+        ++sm6->type_count;
+    }
+
+    assert(sm6->type_count == type_count);
+
+    if (struct_name)
+    {
+        WARN("Unused struct name %s.\n", struct_name);
+        vkd3d_free(struct_name);
+    }
+
+    return VKD3D_OK;
+}
+
+static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
+{
+    size_t i;
+
+    if (!types)
+        return;
+
+    for (i = 0; i < count; ++i)
+    {
+        switch (types[i].class)
+        {
+            case TYPE_CLASS_STRUCT:
+                vkd3d_free((void *)types[i].u.struc->name);
+                vkd3d_free(types[i].u.struc);
+                break;
+            case TYPE_CLASS_FUNCTION:
+                vkd3d_free(types[i].u.function);
+                break;
+            default:
+                break;
+        }
+    }
+
+    vkd3d_free(types);
+}
+
 static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     struct sm6_parser *sm6 = sm6_parser(parser);
@@ -721,6 +1144,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     dxil_block_destroy(&sm6->root_block);
     dxil_global_abbrevs_cleanup(sm6->abbrevs, sm6->abbrev_count);
     shader_instruction_array_destroy(&parser->instructions);
+    sm6_type_table_cleanup(sm6->types, sm6->type_count);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
 }
@@ -859,6 +1283,19 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         WARN("Invalid module length %zu; expected %zu.\n", length, expected_length);
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_MODULE_LENGTH,
                 "Module ends with length %zu but indicated length is %zu.", length, expected_length);
+    }
+
+    if ((ret = sm6_parser_type_table_init(sm6)) < 0)
+    {
+        if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                    "Out of memory parsing DXIL type table.");
+        else if (ret == VKD3D_ERROR_INVALID_SHADER)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_TYPE_TABLE,
+                    "DXIL type table is invalid.");
+        else
+            vkd3d_unreachable();
+        return ret;
     }
 
     dxil_block_destroy(&sm6->root_block);

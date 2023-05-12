@@ -173,6 +173,11 @@ static inline bool vkd3d_bound_range(size_t start, size_t count, size_t limit)
 #endif
 }
 
+static inline bool vkd3d_object_range_overflow(size_t start, size_t count, size_t size)
+{
+    return (~(size_t)0 - start) / size < count;
+}
+
 static inline uint16_t vkd3d_make_u16(uint8_t low, uint8_t high)
 {
     return low | ((uint16_t)high << 8);
