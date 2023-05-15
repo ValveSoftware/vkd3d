@@ -1,0 +1,43 @@
+[pixel shader]
+float a;
+
+float4 main() : sv_target
+{
+    float res = 0;
+
+    for (int i = 0; i < 10; ++i)
+    {
+        res += a;
+        // The temp copy of 'a' must reserve its registers for the rest of the loop.
+        // It shall not be overwritten.
+    }
+    return res;
+}
+
+[test]
+uniform 0 float 5.0
+draw quad
+todo probe all rgba (50.0, 50.0, 50.0, 50.0)
+
+
+[pixel shader]
+float a;
+
+float4 main() : sv_target
+{
+    float res = 0;
+
+    for (int i = 0; i < 10; ++i)
+    {
+        res += a;
+        // The temp copy of 'a' must reserve its registers for the rest of the loop.
+        // It shall not be overwritten.
+        i++;
+    }
+    return res;
+}
+
+[test]
+uniform 0 float 4.0
+draw quad
+todo probe all rgba (20.0, 20.0, 20.0, 20.0)
