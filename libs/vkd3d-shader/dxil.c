@@ -155,6 +155,28 @@ struct sm6_type
     } u;
 };
 
+enum sm6_value_type
+{
+    VALUE_TYPE_FUNCTION,
+};
+
+struct sm6_function_data
+{
+    const char *name;
+    bool is_prototype;
+    unsigned int attribs_id;
+};
+
+struct sm6_value
+{
+    const struct sm6_type *type;
+    enum sm6_value_type value_type;
+    union
+    {
+        struct sm6_function_data function;
+    } u;
+};
+
 struct dxil_record
 {
     unsigned int code;
@@ -210,6 +232,10 @@ struct sm6_parser
 
     struct sm6_symbol *global_symbols;
     size_t global_symbol_count;
+
+    struct sm6_value *values;
+    size_t value_count;
+    size_t value_capacity;
 
     struct vkd3d_shader_parser p;
 };
@@ -810,6 +836,15 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
     return ret;
 }
 
+static size_t dxil_block_compute_module_decl_count(const struct dxil_block *block)
+{
+    size_t i, count;
+
+    for (i = 0, count = 0; i < block->record_count; ++i)
+        count += block->records[i]->code == MODULE_CODE_FUNCTION;
+    return count;
+}
+
 static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, size_t count)
 {
     size_t i;
@@ -1134,6 +1169,88 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static inline bool sm6_type_is_void(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_VOID;
+}
+
+static inline bool sm6_type_is_numeric(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_INTEGER || type->class == TYPE_CLASS_FLOAT;
+}
+
+static inline bool sm6_type_is_pointer(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_POINTER;
+}
+
+static bool sm6_type_is_numeric_aggregate(const struct sm6_type *type)
+{
+    unsigned int i;
+
+    switch (type->class)
+    {
+        case TYPE_CLASS_ARRAY:
+        case TYPE_CLASS_VECTOR:
+            return sm6_type_is_numeric(type->u.array.elem_type);
+
+        case TYPE_CLASS_STRUCT:
+            /* Do not handle nested structs. Support can be added if they show up. */
+            for (i = 0; i < type->u.struc->elem_count; ++i)
+                if (!sm6_type_is_numeric(type->u.struc->elem_types[i]))
+                    return false;
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+static inline bool sm6_type_is_struct(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_STRUCT;
+}
+
+static inline bool sm6_type_is_function(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_FUNCTION;
+}
+
+static inline bool sm6_type_is_handle(const struct sm6_type *type)
+{
+    return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Handle");
+}
+
+static const struct sm6_type *sm6_type_get_pointer_to_type(const struct sm6_type *type,
+        enum bitcode_address_space addr_space, struct sm6_parser *sm6)
+{
+    size_t i, start = type - sm6->types;
+    const struct sm6_type *pointer_type;
+
+    /* DXC seems usually to place the pointer type immediately after its pointee. */
+    for (i = (start + 1) % sm6->type_count; i != start; i = (i + 1) % sm6->type_count)
+    {
+        pointer_type = &sm6->types[i];
+        if (sm6_type_is_pointer(pointer_type) && pointer_type->u.pointer.type == type
+                && pointer_type->u.pointer.addr_space == addr_space)
+            return pointer_type;
+    }
+
+    return NULL;
+}
+
+static const struct sm6_type *sm6_parser_get_type(struct sm6_parser *sm6, uint64_t type_id)
+{
+    if (type_id >= sm6->type_count)
+    {
+        WARN("Invalid type index %"PRIu64" at %zu.\n", type_id, sm6->value_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_TYPE_ID,
+                "DXIL type id %"PRIu64" is invalid.", type_id);
+        return NULL;
+    }
+    return &sm6->types[type_id];
+}
+
 static int global_symbol_compare(const void *a, const void *b)
 {
     return vkd3d_u32_compare(((const struct sm6_symbol *)a)->id, ((const struct sm6_symbol *)b)->id);
@@ -1208,6 +1325,104 @@ static enum vkd3d_result sm6_parser_symtab_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static const char *sm6_parser_get_global_symbol_name(const struct sm6_parser *sm6, size_t id)
+{
+    size_t i, start;
+
+    /* id == array index is normally true */
+    i = start = id % sm6->global_symbol_count;
+    do
+    {
+        if (sm6->global_symbols[i].id == id)
+            return sm6->global_symbols[i].name;
+        i = (i + 1) % sm6->global_symbol_count;
+    } while (i != start);
+
+    return NULL;
+}
+
+static inline bool sm6_value_is_dx_intrinsic_dcl(const struct sm6_value *fn)
+{
+    assert(fn->value_type == VALUE_TYPE_FUNCTION);
+    return fn->u.function.is_prototype && !strncmp(fn->u.function.name, "dx.op.", 6);
+}
+
+static inline struct sm6_value *sm6_parser_get_current_value(const struct sm6_parser *sm6)
+{
+    assert(sm6->value_count < sm6->value_capacity);
+    return &sm6->values[sm6->value_count];
+}
+
+static void sm6_parser_compute_max_value_count(struct sm6_parser *sm6,
+        const struct dxil_block *block)
+{
+    sm6->value_capacity = dxil_block_compute_module_decl_count(block);
+}
+
+static bool sm6_parser_declare_function(struct sm6_parser *sm6, const struct dxil_record *record)
+{
+    const unsigned int max_count = 15;
+    const struct sm6_type *ret_type;
+    struct sm6_value *fn;
+    unsigned int i, j;
+
+    if (!dxil_record_validate_operand_count(record, 8, max_count, sm6))
+        return false;
+
+    fn = sm6_parser_get_current_value(sm6);
+    fn->value_type = VALUE_TYPE_FUNCTION;
+    if (!(fn->u.function.name = sm6_parser_get_global_symbol_name(sm6, sm6->value_count)))
+    {
+        WARN("Missing symbol name for function %zu.\n", sm6->value_count);
+        fn->u.function.name = "";
+    }
+
+    if (!(fn->type = sm6_parser_get_type(sm6, record->operands[0])))
+        return false;
+    if (!sm6_type_is_function(fn->type))
+    {
+        WARN("Type is not a function.\n");
+        return false;
+    }
+    ret_type = fn->type->u.function->ret_type;
+
+    if (!(fn->type = sm6_type_get_pointer_to_type(fn->type, ADDRESS_SPACE_DEFAULT, sm6)))
+    {
+        WARN("Failed to get pointer type for type %u.\n", fn->type->class);
+        return false;
+    }
+
+    if (record->operands[1])
+        WARN("Ignoring calling convention %#"PRIx64".\n", record->operands[1]);
+
+    fn->u.function.is_prototype = !!record->operands[2];
+
+    if (record->operands[3])
+        WARN("Ignoring linkage %#"PRIx64".\n", record->operands[3]);
+
+    if (record->operands[4] > UINT_MAX)
+        WARN("Invalid attributes id %#"PRIx64".\n", record->operands[4]);
+    /* 1-based index. */
+    if ((fn->u.function.attribs_id = record->operands[4]))
+        TRACE("Ignoring function attributes.\n");
+
+    /* These always seem to be zero. */
+    for (i = 5, j = 0; i < min(record->operand_count, max_count); ++i)
+        j += !!record->operands[i];
+    if (j)
+        WARN("Ignoring %u operands.\n", j);
+
+    if (sm6_value_is_dx_intrinsic_dcl(fn) && !sm6_type_is_void(ret_type) && !sm6_type_is_numeric(ret_type)
+            && !sm6_type_is_numeric_aggregate(ret_type) && !sm6_type_is_handle(ret_type))
+    {
+        WARN("Unexpected return type for dx intrinsic function '%s'.\n", fn->u.function.name);
+    }
+
+    ++sm6->value_count;
+
+    return true;
+}
+
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
 {
     const struct dxil_block *block = &sm6->root_block;
@@ -1225,7 +1440,12 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
         switch (record->code)
         {
             case MODULE_CODE_FUNCTION:
-                FIXME("Functions are not implemented yet.\n");
+                if (!sm6_parser_declare_function(sm6, record))
+                {
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_FUNCTION_DCL,
+                            "A DXIL function declaration is invalid.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
                 break;
 
             case MODULE_CODE_GLOBALVAR:
@@ -1295,6 +1515,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     shader_instruction_array_destroy(&parser->instructions);
     sm6_type_table_cleanup(sm6->types, sm6->type_count);
     sm6_symtab_cleanup(sm6->global_symbols, sm6->global_symbol_count);
+    vkd3d_free(sm6->values);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
 }
@@ -1459,6 +1680,15 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         else
             vkd3d_unreachable();
         return ret;
+    }
+
+    sm6_parser_compute_max_value_count(sm6, &sm6->root_block);
+    if (!(sm6->values = vkd3d_calloc(sm6->value_capacity, sizeof(*sm6->values))))
+    {
+        ERR("Failed to allocate value array.\n");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating DXIL value array.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
     if ((ret = sm6_parser_globals_init(sm6)) < 0)
