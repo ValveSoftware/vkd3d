@@ -77,6 +77,19 @@ enum bitcode_module_code
     MODULE_CODE_FUNCTION    =  8,
 };
 
+enum bitcode_constant_code
+{
+    CST_CODE_SETTYPE         =  1,
+    CST_CODE_NULL            =  2,
+    CST_CODE_UNDEF           =  3,
+    CST_CODE_INTEGER         =  4,
+    CST_CODE_FLOAT           =  6,
+    CST_CODE_STRING          =  8,
+    CST_CODE_CE_GEP          = 12,
+    CST_CODE_CE_INBOUNDS_GEP = 20,
+    CST_CODE_DATA            = 22,
+};
+
 enum bitcode_type_code
 {
     TYPE_CODE_NUMENTRY     =  1,
@@ -158,6 +171,7 @@ struct sm6_type
 enum sm6_value_type
 {
     VALUE_TYPE_FUNCTION,
+    VALUE_TYPE_REG,
 };
 
 struct sm6_function_data
@@ -174,6 +188,7 @@ struct sm6_value
     union
     {
         struct sm6_function_data function;
+        struct vkd3d_shader_register reg;
     } u;
 };
 
@@ -258,6 +273,12 @@ struct dxil_global_abbrev
     unsigned int block_id;
     struct dxil_abbrev abbrev;
 };
+
+static size_t size_add_with_overflow_check(size_t a, size_t b)
+{
+    size_t i = a + b;
+    return (i < a) ? SIZE_MAX : i;
+}
 
 static struct sm6_parser *sm6_parser(struct vkd3d_shader_parser *parser)
 {
@@ -845,6 +866,15 @@ static size_t dxil_block_compute_module_decl_count(const struct dxil_block *bloc
     return count;
 }
 
+static size_t dxil_block_compute_constants_count(const struct dxil_block *block)
+{
+    size_t i, count;
+
+    for (i = 0, count = 0; i < block->record_count; ++i)
+        count += block->records[i]->code != CST_CODE_SETTYPE;
+    return count;
+}
+
 static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, size_t count)
 {
     size_t i;
@@ -1174,6 +1204,16 @@ static inline bool sm6_type_is_void(const struct sm6_type *type)
     return type->class == TYPE_CLASS_VOID;
 }
 
+static inline bool sm6_type_is_integer(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_INTEGER;
+}
+
+static inline bool sm6_type_is_floating_point(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_FLOAT;
+}
+
 static inline bool sm6_type_is_numeric(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_INTEGER || type->class == TYPE_CLASS_FLOAT;
@@ -1219,6 +1259,11 @@ static inline bool sm6_type_is_function(const struct sm6_type *type)
 static inline bool sm6_type_is_handle(const struct sm6_type *type)
 {
     return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Handle");
+}
+
+static inline const struct sm6_type *sm6_type_get_element_type(const struct sm6_type *type)
+{
+    return (type->class == TYPE_CLASS_ARRAY || type->class == TYPE_CLASS_VECTOR) ? type->u.array.elem_type : type;
 }
 
 static const struct sm6_type *sm6_type_get_pointer_to_type(const struct sm6_type *type,
@@ -1353,10 +1398,70 @@ static inline struct sm6_value *sm6_parser_get_current_value(const struct sm6_pa
     return &sm6->values[sm6->value_count];
 }
 
-static void sm6_parser_compute_max_value_count(struct sm6_parser *sm6,
-        const struct dxil_block *block)
+static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type *type)
 {
-    sm6->value_capacity = dxil_block_compute_module_decl_count(block);
+    if (type->class == TYPE_CLASS_INTEGER)
+    {
+        switch (type->u.width)
+        {
+            case 8:
+                return VKD3D_DATA_UINT8;
+            case 32:
+                return VKD3D_DATA_UINT;
+            default:
+                FIXME("Unhandled width %u.\n", type->u.width);
+                return VKD3D_DATA_UINT;
+        }
+    }
+    else if (type->class == TYPE_CLASS_FLOAT)
+    {
+        switch (type->u.width)
+        {
+            case 32:
+                return VKD3D_DATA_FLOAT;
+            case 64:
+                return VKD3D_DATA_DOUBLE;
+            default:
+                FIXME("Unhandled width %u.\n", type->u.width);
+                return VKD3D_DATA_FLOAT;
+        }
+    }
+
+    FIXME("Unhandled type %u.\n", type->class);
+    return VKD3D_DATA_UINT;
+}
+
+/* Recurse through the block tree while maintaining a current value count. The current
+ * count is the sum of the global count plus all declarations within the current function.
+ * Store into value_capacity the highest count seen. */
+static size_t sm6_parser_compute_max_value_count(struct sm6_parser *sm6,
+        const struct dxil_block *block, size_t value_count)
+{
+    size_t i, old_value_count = value_count;
+
+    if (block->id == MODULE_BLOCK)
+        value_count = size_add_with_overflow_check(value_count, dxil_block_compute_module_decl_count(block));
+
+    for (i = 0; i < block->child_block_count; ++i)
+        value_count = sm6_parser_compute_max_value_count(sm6, block->child_blocks[i], value_count);
+
+    switch (block->id)
+    {
+        case CONSTANTS_BLOCK:
+            /* Function local constants are contained in a child block of the function block. */
+            value_count = size_add_with_overflow_check(value_count, dxil_block_compute_constants_count(block));
+            break;
+        case FUNCTION_BLOCK:
+            sm6->value_capacity = max(sm6->value_capacity, value_count);
+            /* The value count returns to its previous value after handling a function. */
+            if (value_count < SIZE_MAX)
+                value_count = old_value_count;
+            break;
+        default:
+            break;
+    }
+
+    return value_count;
 }
 
 static bool sm6_parser_declare_function(struct sm6_parser *sm6, const struct dxil_record *record)
@@ -1423,6 +1528,156 @@ static bool sm6_parser_declare_function(struct sm6_parser *sm6, const struct dxi
     return true;
 }
 
+static inline uint64_t decode_rotated_signed_value(uint64_t value)
+{
+    if (value != 1)
+    {
+        bool neg = value & 1;
+        value >>= 1;
+        return neg ? -value : value;
+    }
+    return value << 63;
+}
+
+static inline float bitcast_uint64_to_float(uint64_t value)
+{
+    union
+    {
+        uint32_t uint32_value;
+        float float_value;
+    } u;
+
+    u.uint32_value = value;
+    return u.float_value;
+}
+
+static inline double bitcast_uint64_to_double(uint64_t value)
+{
+    union
+    {
+        uint64_t uint64_value;
+        double double_value;
+    } u;
+
+    u.uint64_value = value;
+    return u.double_value;
+}
+
+static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const struct dxil_block *block)
+{
+    enum vkd3d_shader_register_type reg_type = VKD3DSPR_INVALID;
+    const struct sm6_type *type, *elem_type;
+    enum vkd3d_data_type reg_data_type;
+    const struct dxil_record *record;
+    struct sm6_value *dst;
+    size_t i, value_idx;
+    uint64_t value;
+
+    for (i = 0, type = NULL; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+        record = block->records[i];
+        value_idx = sm6->value_count;
+
+        if (record->code == CST_CODE_SETTYPE)
+        {
+            if (!dxil_record_validate_operand_count(record, 1, 1, sm6))
+                return VKD3D_ERROR_INVALID_SHADER;
+
+            if (!(type = sm6_parser_get_type(sm6, record->operands[0])))
+                return VKD3D_ERROR_INVALID_SHADER;
+
+            elem_type = sm6_type_get_element_type(type);
+            if (sm6_type_is_numeric(elem_type))
+            {
+                reg_data_type = vkd3d_data_type_from_sm6_type(elem_type);
+                reg_type = elem_type->u.width > 32 ? VKD3DSPR_IMMCONST64 : VKD3DSPR_IMMCONST;
+            }
+            else
+            {
+                reg_data_type = VKD3D_DATA_UNUSED;
+                reg_type = VKD3DSPR_INVALID;
+            }
+
+            if (i == block->record_count - 1)
+                WARN("Unused SETTYPE record.\n");
+
+            continue;
+        }
+
+        if (!type)
+        {
+            WARN("Constant record %zu has no type.\n", value_idx);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        dst = sm6_parser_get_current_value(sm6);
+        dst->type = type;
+        dst->value_type = VALUE_TYPE_REG;
+        dst->u.reg.type = reg_type;
+        dst->u.reg.immconst_type = VKD3D_IMMCONST_SCALAR;
+        dst->u.reg.data_type = reg_data_type;
+
+        switch (record->code)
+        {
+            case CST_CODE_NULL:
+                /* Register constant data is already zero-filled. */
+                break;
+
+            case CST_CODE_INTEGER:
+                if (!dxil_record_validate_operand_count(record, 1, 1, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if (!sm6_type_is_integer(type))
+                {
+                    WARN("Invalid integer of non-integer type %u at constant idx %zu.\n", type->class, value_idx);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                value = decode_rotated_signed_value(record->operands[0]);
+                if (type->u.width <= 32)
+                    dst->u.reg.u.immconst_uint[0] = value & ((1ull << type->u.width) - 1);
+                else
+                    dst->u.reg.u.immconst_uint64[0] = value;
+
+                break;
+
+            case CST_CODE_FLOAT:
+                if (!dxil_record_validate_operand_count(record, 1, 1, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if (!sm6_type_is_floating_point(type))
+                {
+                    WARN("Invalid float of non-fp type %u at constant idx %zu.\n", type->class, value_idx);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                if (type->u.width == 16)
+                    FIXME("Half float type is not supported yet.\n");
+                else if (type->u.width == 32)
+                    dst->u.reg.u.immconst_float[0] = bitcast_uint64_to_float(record->operands[0]);
+                else if (type->u.width == 64)
+                    dst->u.reg.u.immconst_double[0] = bitcast_uint64_to_double(record->operands[0]);
+                else
+                    vkd3d_unreachable();
+
+                break;
+
+            case CST_CODE_DATA:
+                WARN("Unhandled constant array.\n");
+                break;
+
+            default:
+                FIXME("Unhandled constant code %u.\n", record->code);
+                break;
+        }
+
+        ++sm6->value_count;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
 {
     const struct dxil_block *block = &sm6->root_block;
@@ -1466,6 +1721,44 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
             default:
                 break;
         }
+    }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const struct dxil_block *block,
+        unsigned int level)
+{
+    enum vkd3d_result ret;
+    size_t i;
+
+    for (i = 0; i < block->child_block_count; ++i)
+    {
+        if ((ret = sm6_parser_module_init(sm6, block->child_blocks[i], level + 1)) < 0)
+            return ret;
+    }
+
+    sm6->p.location.line = block->id;
+    sm6->p.location.column = 0;
+
+    switch (block->id)
+    {
+        case CONSTANTS_BLOCK:
+            return sm6_parser_constants_init(sm6, block);
+
+        case BLOCKINFO_BLOCK:
+        case MODULE_BLOCK:
+        case PARAMATTR_BLOCK:
+        case PARAMATTR_GROUP_BLOCK:
+        case VALUE_SYMTAB_BLOCK:
+        case METADATA_BLOCK:
+        case METADATA_ATTACHMENT_BLOCK:
+        case TYPE_BLOCK:
+            break;
+
+        default:
+            FIXME("Unhandled block id %u.\n", block->id);
+            break;
     }
 
     return VKD3D_OK;
@@ -1682,7 +1975,13 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
-    sm6_parser_compute_max_value_count(sm6, &sm6->root_block);
+    if (sm6_parser_compute_max_value_count(sm6, &sm6->root_block, 0) == SIZE_MAX)
+    {
+        WARN("Value array count overflowed.\n");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                "Overflow occurred in the DXIL module value count.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
     if (!(sm6->values = vkd3d_calloc(sm6->value_capacity, sizeof(*sm6->values))))
     {
         ERR("Failed to allocate value array.\n");
@@ -1694,6 +1993,19 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((ret = sm6_parser_globals_init(sm6)) < 0)
     {
         WARN("Failed to load global declarations.\n");
+        return ret;
+    }
+
+    if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
+    {
+        if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                    "Out of memory parsing DXIL module.");
+        else if (ret == VKD3D_ERROR_INVALID_SHADER)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                    "DXIL module is invalid.");
+        else
+            vkd3d_unreachable();
         return ret;
     }
 
