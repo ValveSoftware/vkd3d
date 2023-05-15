@@ -90,6 +90,29 @@ enum bitcode_constant_code
     CST_CODE_DATA            = 22,
 };
 
+enum bitcode_function_code
+{
+    FUNC_CODE_DECLAREBLOCKS    =  1,
+    FUNC_CODE_INST_BINOP       =  2,
+    FUNC_CODE_INST_CAST        =  3,
+    FUNC_CODE_INST_RET         = 10,
+    FUNC_CODE_INST_BR          = 11,
+    FUNC_CODE_INST_SWITCH      = 12,
+    FUNC_CODE_INST_PHI         = 16,
+    FUNC_CODE_INST_ALLOCA      = 19,
+    FUNC_CODE_INST_LOAD        = 20,
+    FUNC_CODE_INST_EXTRACTVAL  = 26,
+    FUNC_CODE_INST_CMP2        = 28,
+    FUNC_CODE_INST_VSELECT     = 29,
+    FUNC_CODE_INST_CALL        = 34,
+    FUNC_CODE_INST_ATOMICRMW   = 38,
+    FUNC_CODE_INST_LOADATOMIC  = 41,
+    FUNC_CODE_INST_GEP         = 43,
+    FUNC_CODE_INST_STORE       = 44,
+    FUNC_CODE_INST_STOREATOMIC = 45,
+    FUNC_CODE_INST_CMPXCHG     = 46,
+};
+
 enum bitcode_type_code
 {
     TYPE_CODE_NUMENTRY     =  1,
@@ -205,6 +228,21 @@ struct sm6_symbol
     const char *name;
 };
 
+struct sm6_block
+{
+    struct vkd3d_shader_instruction *instructions;
+    size_t instruction_capacity;
+    size_t instruction_count;
+};
+
+struct sm6_function
+{
+    const struct sm6_value *declaration;
+
+    struct sm6_block *blocks[1];
+    size_t block_count;
+};
+
 struct dxil_block
 {
     const struct dxil_block *parent;
@@ -247,6 +285,9 @@ struct sm6_parser
 
     struct sm6_symbol *global_symbols;
     size_t global_symbol_count;
+
+    struct sm6_function *functions;
+    size_t function_count;
 
     struct sm6_value *values;
     size_t value_count;
@@ -857,6 +898,16 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
     return ret;
 }
 
+static size_t dxil_block_compute_function_count(const struct dxil_block *root)
+{
+    size_t i, count;
+
+    for (i = 0, count = 0; i < root->child_block_count; ++i)
+        count += root->child_blocks[i]->id == FUNCTION_BLOCK;
+
+    return count;
+}
+
 static size_t dxil_block_compute_module_decl_count(const struct dxil_block *block)
 {
     size_t i, count;
@@ -1256,6 +1307,11 @@ static inline bool sm6_type_is_function(const struct sm6_type *type)
     return type->class == TYPE_CLASS_FUNCTION;
 }
 
+static inline bool sm6_type_is_function_pointer(const struct sm6_type *type)
+{
+    return sm6_type_is_pointer(type) && sm6_type_is_function(type->u.pointer.type);
+}
+
 static inline bool sm6_type_is_handle(const struct sm6_type *type)
 {
     return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Handle");
@@ -1452,6 +1508,9 @@ static size_t sm6_parser_compute_max_value_count(struct sm6_parser *sm6,
             value_count = size_add_with_overflow_check(value_count, dxil_block_compute_constants_count(block));
             break;
         case FUNCTION_BLOCK:
+            /* A function must start with a block count, which emits no value. This formula is likely to
+             * overestimate the value count somewhat, but this should be no problem. */
+            value_count = size_add_with_overflow_check(value_count, max(block->record_count, 1u) - 1);
             sm6->value_capacity = max(sm6->value_capacity, value_count);
             /* The value count returns to its previous value after handling a function. */
             if (value_count < SIZE_MAX)
@@ -1726,11 +1785,158 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static const struct sm6_value *sm6_parser_next_function_definition(struct sm6_parser *sm6)
+{
+    size_t i, count = sm6->function_count;
+
+    for (i = 0; i < sm6->value_count; ++i)
+    {
+        if (sm6_type_is_function_pointer(sm6->values[i].type) && !sm6->values[i].u.function.is_prototype && !count--)
+            break;
+    }
+    if (i == sm6->value_count)
+        return NULL;
+
+    ++sm6->function_count;
+    return &sm6->values[i];
+}
+
+static struct sm6_block *sm6_block_create()
+{
+    struct sm6_block *block = vkd3d_calloc(1, sizeof(*block));
+    return block;
+}
+
+static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
+{
+    if (!dxil_record_validate_operand_count(record, 0, 1, sm6))
+        return;
+
+    if (record->operand_count)
+        FIXME("Non-void return is not implemented.\n");
+
+    ins->handler_idx = VKD3DSIH_NOP;
+}
+
+static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
+        struct sm6_function *function)
+{
+    struct vkd3d_shader_instruction *ins;
+    const struct dxil_record *record;
+    struct sm6_block *code_block;
+    struct sm6_value *dst;
+    size_t i, block_idx;
+    bool ret_found;
+    enum
+    {
+        RESULT_VALUE,
+        RESULT_TERMINATE,
+    } result_type;
+
+    if (sm6->function_count)
+    {
+        FIXME("Multiple functions are not supported yet.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (!(function->declaration = sm6_parser_next_function_definition(sm6)))
+    {
+        WARN("Failed to find definition to match function body.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (block->record_count < 2)
+    {
+        /* It should contain at least a block count and a RET instruction. */
+        WARN("Invalid function block record count %zu.\n", block->record_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (block->records[0]->code != FUNC_CODE_DECLAREBLOCKS || !block->records[0]->operand_count
+            || block->records[0]->operands[0] > UINT_MAX)
+    {
+        WARN("Block count declaration not found or invalid.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!(function->block_count = block->records[0]->operands[0]))
+    {
+        WARN("Function contains no blocks.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (function->block_count > 1)
+    {
+        FIXME("Branched shaders are not supported yet.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!(function->blocks[0] = sm6_block_create()))
+    {
+        ERR("Failed to allocate code block.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    code_block = function->blocks[0];
+
+    for (i = 1, block_idx = 0, ret_found = false; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+
+        /* block->record_count - 1 is the instruction count, but some instructions
+         * can emit >1 IR instruction, so extra may be used. */
+        if (!vkd3d_array_reserve((void **)&code_block->instructions, &code_block->instruction_capacity,
+                max(code_block->instruction_count + 1, block->record_count), sizeof(*code_block->instructions)))
+        {
+            ERR("Failed to allocate instructions.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        ins = &code_block->instructions[code_block->instruction_count];
+        ins->handler_idx = VKD3DSIH_INVALID;
+
+        dst = sm6_parser_get_current_value(sm6);
+        dst->type = NULL;
+        dst->value_type = VALUE_TYPE_REG;
+        result_type = RESULT_VALUE;
+
+        record = block->records[i];
+        switch (record->code)
+        {
+            case FUNC_CODE_INST_RET:
+                sm6_parser_emit_ret(sm6, record, code_block, ins);
+                result_type = RESULT_TERMINATE;
+                ret_found = true;
+                break;
+            default:
+                FIXME("Unhandled dxil instruction %u.\n", record->code);
+                return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if (result_type == RESULT_TERMINATE)
+        {
+            ++block_idx;
+            code_block = (block_idx < function->block_count) ? function->blocks[block_idx] : NULL;
+        }
+        if (code_block)
+            code_block->instruction_count += ins->handler_idx != VKD3DSIH_NOP;
+        else
+            assert(ins->handler_idx == VKD3DSIH_NOP);
+        sm6->value_count += !!dst->type;
+    }
+
+    if (!ret_found)
+    {
+        WARN("Function contains no RET instruction.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const struct dxil_block *block,
         unsigned int level)
 {
+    size_t i, old_value_count = sm6->value_count;
+    struct sm6_function *function;
     enum vkd3d_result ret;
-    size_t i;
 
     for (i = 0; i < block->child_block_count; ++i)
     {
@@ -1745,6 +1951,17 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     {
         case CONSTANTS_BLOCK:
             return sm6_parser_constants_init(sm6, block);
+
+        case FUNCTION_BLOCK:
+            function = &sm6->functions[sm6->function_count];
+            if ((ret = sm6_parser_function_init(sm6, block, function)) < 0)
+                return ret;
+            /* The value index returns to its previous value after handling a function. It's usually nonzero
+             * at the start because of global constants/variables/function declarations. Function constants
+             * occur in a child block, so value_count is already saved before they are emitted. */
+            memset(&sm6->values[old_value_count], 0, (sm6->value_count - old_value_count) * sizeof(*sm6->values));
+            sm6->value_count = old_value_count;
+            break;
 
         case BLOCKINFO_BLOCK:
         case MODULE_BLOCK:
@@ -1799,6 +2016,24 @@ static void sm6_symtab_cleanup(struct sm6_symbol *symbols, size_t count)
     vkd3d_free(symbols);
 }
 
+static void sm6_block_destroy(struct sm6_block *block)
+{
+    vkd3d_free(block->instructions);
+    vkd3d_free(block);
+}
+
+static void sm6_functions_cleanup(struct sm6_function *functions, size_t count)
+{
+    size_t i, j;
+
+    for (i = 0; i < count; ++i)
+    {
+        for (j = 0; j < functions[i].block_count; ++j)
+            sm6_block_destroy(functions[i].blocks[j]);
+    }
+    vkd3d_free(functions);
+}
+
 static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     struct sm6_parser *sm6 = sm6_parser(parser);
@@ -1808,6 +2043,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     shader_instruction_array_destroy(&parser->instructions);
     sm6_type_table_cleanup(sm6->types, sm6->type_count);
     sm6_symtab_cleanup(sm6->global_symbols, sm6->global_symbol_count);
+    sm6_functions_cleanup(sm6->functions, sm6->function_count);
     vkd3d_free(sm6->values);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
@@ -1824,11 +2060,11 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t version_token, dxil_version, token_count, magic;
     unsigned int chunk_offset, chunk_size;
+    size_t count, length, function_count;
     enum bitcode_block_abbreviation abbr;
     struct vkd3d_shader_version version;
     struct dxil_block *block;
     enum vkd3d_result ret;
-    size_t count, length;
 
     count = byte_code_size / sizeof(*byte_code);
     if (count < 6)
@@ -1973,6 +2209,15 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         else
             vkd3d_unreachable();
         return ret;
+    }
+
+    function_count = dxil_block_compute_function_count(&sm6->root_block);
+    if (!(sm6->functions = vkd3d_calloc(function_count, sizeof(*sm6->functions))))
+    {
+        ERR("Failed to allocate function array.\n");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating DXIL function array.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
     if (sm6_parser_compute_max_value_count(sm6, &sm6->root_block, 0) == SIZE_MAX)
