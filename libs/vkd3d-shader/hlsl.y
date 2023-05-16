@@ -5148,6 +5148,10 @@ type_no_void:
         {
             $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_GENERIC];
         }
+    | KW_SAMPLERCOMPARISONSTATE
+        {
+            $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_COMPARISON];
+        }
     | KW_SAMPLER1D
         {
             $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_1D];

@@ -105,6 +105,7 @@ enum hlsl_base_type
 enum hlsl_sampler_dim
 {
     HLSL_SAMPLER_DIM_GENERIC,
+    HLSL_SAMPLER_DIM_COMPARISON,
     HLSL_SAMPLER_DIM_1D,
     HLSL_SAMPLER_DIM_2D,
     HLSL_SAMPLER_DIM_3D,

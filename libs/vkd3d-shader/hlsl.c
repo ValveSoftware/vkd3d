@@ -3061,11 +3061,12 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const char *const sampler_names[] =
     {
-        [HLSL_SAMPLER_DIM_GENERIC] = "sampler",
-        [HLSL_SAMPLER_DIM_1D]      = "sampler1D",
-        [HLSL_SAMPLER_DIM_2D]      = "sampler2D",
-        [HLSL_SAMPLER_DIM_3D]      = "sampler3D",
-        [HLSL_SAMPLER_DIM_CUBE]    = "samplerCUBE",
+        [HLSL_SAMPLER_DIM_GENERIC]    = "sampler",
+        [HLSL_SAMPLER_DIM_COMPARISON] = "SamplerComparisonState",
+        [HLSL_SAMPLER_DIM_1D]         = "sampler1D",
+        [HLSL_SAMPLER_DIM_2D]         = "sampler2D",
+        [HLSL_SAMPLER_DIM_3D]         = "sampler3D",
+        [HLSL_SAMPLER_DIM_CUBE]       = "samplerCUBE",
     };
 
     static const struct
