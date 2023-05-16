@@ -117,7 +117,8 @@ enum hlsl_sampler_dim
     HLSL_SAMPLER_DIM_CUBEARRAY,
     HLSL_SAMPLER_DIM_LAST_TEXTURE = HLSL_SAMPLER_DIM_CUBEARRAY,
     HLSL_SAMPLER_DIM_BUFFER,
-    HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_BUFFER,
+    HLSL_SAMPLER_DIM_STRUCTURED_BUFFER,
+    HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_STRUCTURED_BUFFER,
 };
 
 enum hlsl_regset
@@ -148,7 +149,7 @@ struct hlsl_type
      * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_TEXTURE.
      * If base_type is HLSL_TYPE_UAV, then sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
      *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, HLSL_SAMPLER_DIM_2DARRAY,
-     *   or HLSL_SAMPLER_DIM_BUFFER.
+     *   HLSL_SAMPLER_DIM_BUFFER, or HLSL_SAMPLER_DIM_STRUCTURED_BUFFER.
      * Otherwise, sampler_dim is not used */
     enum hlsl_sampler_dim sampler_dim;
     /* Name, in case the type is a named struct or a typedef. */
@@ -1027,6 +1028,7 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
     {
         case HLSL_SAMPLER_DIM_1D:
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             return 1;
         case HLSL_SAMPLER_DIM_1DARRAY:
         case HLSL_SAMPLER_DIM_2D:

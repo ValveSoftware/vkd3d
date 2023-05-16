@@ -2960,6 +2960,7 @@ static D3D_SRV_DIMENSION sm4_rdef_resource_dimension(const struct hlsl_type *typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return D3D_SRV_DIMENSION_TEXTURECUBEARRAY;
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             return D3D_SRV_DIMENSION_BUFFER;
         default:
             vkd3d_unreachable();
@@ -3261,6 +3262,7 @@ static enum vkd3d_sm4_resource_type sm4_resource_dimension(const struct hlsl_typ
         case HLSL_SAMPLER_DIM_CUBEARRAY:
             return VKD3D_SM4_RESOURCE_TEXTURE_CUBEARRAY;
         case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
             return VKD3D_SM4_RESOURCE_BUFFER;
         default:
             vkd3d_unreachable();
@@ -3335,6 +3337,8 @@ struct sm4_instruction
         unsigned int swizzle;
     } srcs[4];
     unsigned int src_count;
+
+    unsigned int byte_stride;
 
     uint32_t idx[3];
     unsigned int idx_count;
@@ -3570,6 +3574,8 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
     for (i = 0; i < instr->src_count; ++i)
         size += sm4_register_order(&instr->srcs[i].reg);
     size += instr->idx_count;
+    if (instr->byte_stride)
+        ++size;
 
     token |= (size << VKD3D_SM4_INSTRUCTION_LENGTH_SHIFT);
 
@@ -3623,6 +3629,9 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
             }
         }
     }
+
+    if (instr->byte_stride)
+        put_u32(buffer, instr->byte_stride);
 
     for (j = 0; j < instr->idx_count; ++j)
         put_u32(buffer, instr->idx[j]);
@@ -3709,9 +3718,6 @@ static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
         instr = (struct sm4_instruction)
         {
-            .opcode = (uav ? VKD3D_SM5_OP_DCL_UAV_TYPED : VKD3D_SM4_OP_DCL_RESOURCE)
-                    | (sm4_resource_dimension(component_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT),
-
             .dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE,
             .dsts[0].reg.idx = {var->regs[regset].id + i},
             .dsts[0].reg.idx_count = 1,
@@ -3720,6 +3726,25 @@ static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             .idx[0] = sm4_resource_format(component_type) * 0x1111,
             .idx_count = 1,
         };
+
+        if (uav)
+        {
+            switch (var->data_type->sampler_dim)
+            {
+            case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+                instr.opcode = VKD3D_SM5_OP_DCL_UAV_STRUCTURED;
+                instr.byte_stride = var->data_type->e.resource_format->reg_size[HLSL_REGSET_NUMERIC] * 4;
+                break;
+            default:
+                instr.opcode = VKD3D_SM5_OP_DCL_UAV_TYPED;
+                break;
+            }
+        }
+        else
+        {
+            instr.opcode = VKD3D_SM4_OP_DCL_RESOURCE;
+        }
+        instr.opcode |= (sm4_resource_dimension(component_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT);
 
         if (component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
                 || component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
@@ -4961,6 +4986,12 @@ static void write_sm4_resource_store(struct hlsl_ctx *ctx,
     if (!store->resource.var->is_uniform)
     {
         hlsl_fixme(ctx, &store->node.loc, "Store to non-uniform resource variable.");
+        return;
+    }
+
+    if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    {
+        hlsl_fixme(ctx, &store->node.loc, "Structured buffers store is not implemented.\n");
         return;
     }
 

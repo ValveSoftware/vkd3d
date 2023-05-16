@@ -105,6 +105,7 @@ RenderTargetView        {return KW_RENDERTARGETVIEW;    }
 return                  {return KW_RETURN;              }
 register                {return KW_REGISTER;            }
 RWBuffer                {return KW_RWBUFFER;            }
+RWStructuredBuffer      {return KW_RWSTRUCTUREDBUFFER;  }
 RWTexture1D             {return KW_RWTEXTURE1D;         }
 RWTexture2D             {return KW_RWTEXTURE2D;         }
 RWTexture3D             {return KW_RWTEXTURE3D;         }

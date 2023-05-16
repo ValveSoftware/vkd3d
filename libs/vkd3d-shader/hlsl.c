@@ -2039,6 +2039,8 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                 case HLSL_TYPE_UAV:
                     if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
                         vkd3d_string_buffer_printf(string, "RWBuffer");
+                    else if (type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+                        vkd3d_string_buffer_printf(string, "RWStructuredBuffer");
                     else
                         vkd3d_string_buffer_printf(string, "RWTexture%s", dimensions[type->sampler_dim]);
                     if ((inner_string = hlsl_type_to_string(ctx, type->e.resource_format)))
