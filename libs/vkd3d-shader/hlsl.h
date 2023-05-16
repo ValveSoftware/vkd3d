@@ -615,6 +615,7 @@ enum hlsl_resource_load_type
 {
     HLSL_RESOURCE_LOAD,
     HLSL_RESOURCE_SAMPLE,
+    HLSL_RESOURCE_SAMPLE_CMP,
     HLSL_RESOURCE_SAMPLE_LOD,
     HLSL_RESOURCE_SAMPLE_LOD_BIAS,
     HLSL_RESOURCE_SAMPLE_GRAD,
@@ -629,7 +630,7 @@ struct hlsl_ir_resource_load
     struct hlsl_ir_node node;
     enum hlsl_resource_load_type load_type;
     struct hlsl_deref resource, sampler;
-    struct hlsl_src coords, lod, ddx, ddy, sample_index, texel_offset;
+    struct hlsl_src coords, lod, ddx, ddy, cmp, sample_index, texel_offset;
     enum hlsl_sampler_dim sampling_dim;
 };
 
@@ -831,7 +832,7 @@ struct hlsl_resource_load_params
     struct hlsl_type *format;
     enum hlsl_resource_load_type type;
     struct hlsl_ir_node *resource, *sampler;
-    struct hlsl_ir_node *coords, *lod, *ddx, *ddy, *sample_index, *texel_offset;
+    struct hlsl_ir_node *coords, *lod, *ddx, *ddy, *cmp, *sample_index, *texel_offset;
     enum hlsl_sampler_dim sampling_dim;
 };
 

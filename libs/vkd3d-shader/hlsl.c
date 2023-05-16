@@ -1356,6 +1356,7 @@ struct hlsl_ir_node *hlsl_new_resource_load(struct hlsl_ctx *ctx,
     hlsl_src_from_node(&load->lod, params->lod);
     hlsl_src_from_node(&load->ddx, params->ddx);
     hlsl_src_from_node(&load->ddy, params->ddy);
+    hlsl_src_from_node(&load->cmp, params->cmp);
     load->sampling_dim = params->sampling_dim;
     if (load->sampling_dim == HLSL_SAMPLER_DIM_GENERIC)
         load->sampling_dim = hlsl_deref_get_type(ctx, &load->resource)->sampler_dim;
@@ -1649,6 +1650,7 @@ static struct hlsl_ir_node *clone_resource_load(struct hlsl_ctx *ctx,
     clone_src(map, &dst->ddx, &src->ddx);
     clone_src(map, &dst->ddy, &src->ddy);
     clone_src(map, &dst->sample_index, &src->sample_index);
+    clone_src(map, &dst->cmp, &src->cmp);
     clone_src(map, &dst->texel_offset, &src->texel_offset);
     dst->sampling_dim = src->sampling_dim;
     return &dst->node;
@@ -2442,6 +2444,7 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         [HLSL_RESOURCE_LOAD] = "load_resource",
         [HLSL_RESOURCE_SAMPLE] = "sample",
+        [HLSL_RESOURCE_SAMPLE_CMP] = "sample_cmp",
         [HLSL_RESOURCE_SAMPLE_LOD] = "sample_lod",
         [HLSL_RESOURCE_SAMPLE_LOD_BIAS] = "sample_biased",
         [HLSL_RESOURCE_SAMPLE_GRAD] = "sample_grad",
@@ -2482,6 +2485,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     {
         vkd3d_string_buffer_printf(buffer, ", ddy = ");
         dump_src(buffer, &load->ddy);
+    }
+    if (load->cmp.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", cmp = ");
+        dump_src(buffer, &load->cmp);
     }
     vkd3d_string_buffer_printf(buffer, ")");
 }
@@ -2720,6 +2728,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
     hlsl_src_remove(&load->lod);
     hlsl_src_remove(&load->ddx);
     hlsl_src_remove(&load->ddy);
+    hlsl_src_remove(&load->cmp);
     hlsl_src_remove(&load->texel_offset);
     hlsl_src_remove(&load->sample_index);
     vkd3d_free(load);
