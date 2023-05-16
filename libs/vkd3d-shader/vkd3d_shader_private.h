@@ -180,6 +180,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_WARNING_DXIL_INVALID_BLOCK_LENGTH      = 8302,
     VKD3D_SHADER_WARNING_DXIL_INVALID_MODULE_LENGTH     = 8303,
     VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS         = 8304,
+    VKD3D_SHADER_WARNING_DXIL_UNHANDLED_INTRINSIC       = 8305,
 
     VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED             = 9000,
 };
@@ -557,6 +558,11 @@ enum vkd3d_data_type
     VKD3D_DATA_UINT8,
 };
 
+static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
+{
+    return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT;
+}
+
 enum vkd3d_immconst_type
 {
     VKD3D_IMMCONST_SCALAR,
@@ -734,6 +740,9 @@ struct vkd3d_shader_register
         unsigned fp_body_idx;
     } u;
 };
+
+void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count);
 
 struct vkd3d_shader_dst_param
 {
