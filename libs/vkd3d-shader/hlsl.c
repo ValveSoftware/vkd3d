@@ -1039,20 +1039,31 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *tem
     struct vkd3d_string_buffer *string;
     struct hlsl_ir_var *var;
     static LONG counter;
-    const char *name;
 
     if (!(string = hlsl_get_string_buffer(ctx)))
         return NULL;
     vkd3d_string_buffer_printf(string, "<%s-%u>", template, InterlockedIncrement(&counter));
-    if (!(name = hlsl_strdup(ctx, string->buffer)))
-    {
-        hlsl_release_string_buffer(ctx, string);
-        return NULL;
-    }
-    var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL);
+    var = hlsl_new_synthetic_var_named(ctx, string->buffer, type, loc, true);
     hlsl_release_string_buffer(ctx, string);
+    return var;
+}
+
+struct hlsl_ir_var *hlsl_new_synthetic_var_named(struct hlsl_ctx *ctx, const char *name,
+    struct hlsl_type *type, const struct vkd3d_shader_location *loc, bool dummy_scope)
+{
+    struct hlsl_ir_var *var;
+    const char *name_copy;
+
+    if (!(name_copy = hlsl_strdup(ctx, name)))
+        return NULL;
+    var = hlsl_new_var(ctx, name_copy, type, loc, NULL, 0, NULL);
     if (var)
-        list_add_tail(&ctx->dummy_scope->vars, &var->scope_entry);
+    {
+        if (dummy_scope)
+            list_add_tail(&ctx->dummy_scope->vars, &var->scope_entry);
+        else
+            list_add_tail(&ctx->globals->vars, &var->scope_entry);
+    }
     return var;
 }
 
