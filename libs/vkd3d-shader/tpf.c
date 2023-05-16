@@ -3680,23 +3680,24 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
 static void write_sm4_dcl_samplers(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
 {
     unsigned int i, count = var->data_type->reg_size[HLSL_REGSET_SAMPLERS];
-    struct sm4_instruction instr;
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
+
+        .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
+        .dsts[0].reg.idx_count = 1,
+        .dst_count = 1,
+    };
+
+    if (var->data_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
+        instr.opcode |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
 
     for (i = 0; i < count; ++i)
     {
         if (!var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
             continue;
 
-        instr = (struct sm4_instruction)
-        {
-            .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
-
-            .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
-            .dsts[0].reg.idx = {var->regs[HLSL_REGSET_SAMPLERS].id + i},
-            .dsts[0].reg.idx_count = 1,
-            .dst_count = 1,
-        };
-
+        instr.dsts[0].reg.idx[0] = var->regs[HLSL_REGSET_SAMPLERS].id + i;
         write_sm4_instruction(buffer, &instr);
     }
 }
@@ -4108,6 +4109,10 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
             instr.opcode = VKD3D_SM4_OP_SAMPLE;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_CMP:
+            instr.opcode = VKD3D_SM4_OP_SAMPLE_C;
+            break;
+
         case HLSL_RESOURCE_SAMPLE_LOD:
             instr.opcode = VKD3D_SM4_OP_SAMPLE_LOD;
             break;
@@ -4153,6 +4158,11 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         sm4_src_from_node(&instr.srcs[3], load->ddx.node, VKD3DSP_WRITEMASK_ALL);
         sm4_src_from_node(&instr.srcs[4], load->ddy.node, VKD3DSP_WRITEMASK_ALL);
         instr.src_count += 2;
+    }
+    else if (load->load_type == HLSL_RESOURCE_SAMPLE_CMP)
+    {
+        sm4_src_from_node(&instr.srcs[3], load->cmp.node, VKD3DSP_WRITEMASK_ALL);
+        ++instr.src_count;
     }
 
     write_sm4_instruction(buffer, &instr);
@@ -4952,6 +4962,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE:
+        case HLSL_RESOURCE_SAMPLE_CMP:
         case HLSL_RESOURCE_SAMPLE_LOD:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
         case HLSL_RESOURCE_SAMPLE_GRAD:
@@ -4981,10 +4992,6 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_GATHER_ALPHA:
             write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
                     &load->sampler, coords, HLSL_SWIZZLE(W, W, W, W), texel_offset);
-            break;
-
-        case HLSL_RESOURCE_SAMPLE_CMP:
-            hlsl_fixme(ctx, &load->node.loc, "SM4 sample-comparison expression.");
             break;
     }
 }
