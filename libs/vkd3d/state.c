@@ -20,6 +20,7 @@
 
 #include "vkd3d_private.h"
 #include "vkd3d_shaders.h"
+#include "vkd3d_shader_utils.h"
 
 /* ID3D12RootSignature */
 static inline struct d3d12_root_signature *impl_from_ID3D12RootSignature(ID3D12RootSignature *iface)
@@ -1978,14 +1979,14 @@ static HRESULT create_shader_stage(struct d3d12_device *device,
     compile_info.next = shader_interface;
     compile_info.source.code = code->pShaderBytecode;
     compile_info.source.size = code->BytecodeLength;
-    compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     compile_info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
     compile_info.options = options;
     compile_info.option_count = ARRAY_SIZE(options);
     compile_info.log_level = VKD3D_SHADER_LOG_NONE;
     compile_info.source_name = NULL;
 
-    if ((ret = vkd3d_shader_compile(&compile_info, &spirv, NULL)) < 0)
+    if ((ret = vkd3d_shader_parse_dxbc_source_type(&compile_info.source, &compile_info.source_type, NULL)) < 0
+            || (ret = vkd3d_shader_compile(&compile_info, &spirv, NULL)) < 0)
     {
         WARN("Failed to compile shader, vkd3d result %d.\n", ret);
         return hresult_from_vkd3d_result(ret);
@@ -2008,6 +2009,7 @@ static int vkd3d_scan_dxbc(const struct d3d12_device *device, const D3D12_SHADER
         struct vkd3d_shader_scan_descriptor_info *descriptor_info)
 {
     struct vkd3d_shader_compile_info compile_info;
+    enum vkd3d_result ret;
 
     const struct vkd3d_shader_compile_option options[] =
     {
@@ -2019,12 +2021,14 @@ static int vkd3d_scan_dxbc(const struct d3d12_device *device, const D3D12_SHADER
     compile_info.next = descriptor_info;
     compile_info.source.code = code->pShaderBytecode;
     compile_info.source.size = code->BytecodeLength;
-    compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     compile_info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
     compile_info.options = options;
     compile_info.option_count = ARRAY_SIZE(options);
     compile_info.log_level = VKD3D_SHADER_LOG_NONE;
     compile_info.source_name = NULL;
+
+    if ((ret = vkd3d_shader_parse_dxbc_source_type(&compile_info.source, &compile_info.source_type, NULL)) < 0)
+        return ret;
 
     return vkd3d_shader_scan(&compile_info, NULL);
 }
