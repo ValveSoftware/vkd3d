@@ -44,6 +44,7 @@ struct d3d11_resource
     struct resource r;
 
     ID3D11Resource *resource;
+    ID3D11Buffer *buffer;
     ID3D11Texture2D *texture;
     ID3D11RenderTargetView *rtv;
     ID3D11ShaderResourceView *srv;
@@ -350,7 +351,6 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
         case RESOURCE_TYPE_UAV:
-        case RESOURCE_TYPE_BUFFER_UAV:
         {
             D3D11_SUBRESOURCE_DATA resource_data[2];
             D3D11_TEXTURE2D_DESC desc = {0};
@@ -365,7 +365,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             desc.Format = params->format;
             desc.SampleDesc.Count = 1;
             desc.Usage = D3D11_USAGE_DEFAULT;
-            if (params->type == RESOURCE_TYPE_UAV || params->type == RESOURCE_TYPE_BUFFER_UAV)
+            if (params->type == RESOURCE_TYPE_UAV)
                 desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
             else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
                 desc.BindFlags = D3D11_BIND_RENDER_TARGET;
@@ -395,7 +395,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
 
             resource->resource = (ID3D11Resource *)resource->texture;
-            if (params->type == RESOURCE_TYPE_UAV || params->type == RESOURCE_TYPE_BUFFER_UAV)
+            if (params->type == RESOURCE_TYPE_UAV)
                 hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, NULL, &resource->uav);
             else if (params->type == RESOURCE_TYPE_RENDER_TARGET)
                 hr = ID3D11Device_CreateRenderTargetView(device, resource->resource, NULL, &resource->rtv);
@@ -405,9 +405,26 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             break;
         }
 
+        case RESOURCE_TYPE_BUFFER_UAV:
+        {
+            D3D11_UNORDERED_ACCESS_VIEW_DESC uav_desc;
+
+            resource->buffer = create_buffer(device, D3D11_BIND_UNORDERED_ACCESS, params->data_size, params->data);
+            resource->resource = (ID3D11Resource *)resource->buffer;
+
+            uav_desc.Format = params->format;
+            uav_desc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+            uav_desc.Buffer.FirstElement = 0;
+            uav_desc.Buffer.NumElements = params->data_size / params->texel_size;
+            uav_desc.Buffer.Flags = 0;
+            hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, &uav_desc, &resource->uav);
+            ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
+            break;
+        }
+
         case RESOURCE_TYPE_VERTEX_BUFFER:
-            resource->resource = (ID3D11Resource *)create_buffer(device,
-                    D3D11_BIND_VERTEX_BUFFER, params->data_size, params->data);
+            resource->buffer = create_buffer(device, D3D11_BIND_VERTEX_BUFFER, params->data_size, params->data);
+            resource->resource = (ID3D11Resource *)resource->buffer;
             break;
     }
 
@@ -652,15 +669,36 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
     struct d3d11_resource *resource = d3d11_resource(res);
     D3D11_TEXTURE2D_DESC texture_desc;
     D3D11_MAPPED_SUBRESOURCE map_desc;
+    D3D11_BUFFER_DESC buffer_desc;
     HRESULT hr;
 
-    ID3D11Texture2D_GetDesc(resource->texture, &texture_desc);
-    texture_desc.Usage = D3D11_USAGE_STAGING;
-    texture_desc.BindFlags = 0;
-    texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    texture_desc.MiscFlags = 0;
-    hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
-    ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+    switch (resource->r.type)
+    {
+        case RESOURCE_TYPE_BUFFER_UAV:
+            ID3D11Buffer_GetDesc(resource->buffer, &buffer_desc);
+            buffer_desc.Usage = D3D11_USAGE_STAGING;
+            buffer_desc.BindFlags = 0;
+            buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            buffer_desc.MiscFlags = 0;
+            hr = ID3D11Device_CreateBuffer(runner->device, &buffer_desc, NULL, (ID3D11Buffer **)&rb->resource);
+            ok(hr == S_OK, "Failed to create buffer, hr %#lx.\n", hr);
+            break;
+
+        case RESOURCE_TYPE_RENDER_TARGET:
+        case RESOURCE_TYPE_UAV:
+            ID3D11Texture2D_GetDesc(resource->texture, &texture_desc);
+            texture_desc.Usage = D3D11_USAGE_STAGING;
+            texture_desc.BindFlags = 0;
+            texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            texture_desc.MiscFlags = 0;
+            hr = ID3D11Device_CreateTexture2D(runner->device, &texture_desc, NULL, (ID3D11Texture2D **)&rb->resource);
+            ok(hr == S_OK, "Failed to create texture, hr %#lx.\n", hr);
+            break;
+
+        case RESOURCE_TYPE_VERTEX_BUFFER:
+        case RESOURCE_TYPE_TEXTURE:
+            assert(0);
+    }
 
     ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, resource->resource);
     hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
@@ -668,8 +706,8 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
 
     rb->rb.data = map_desc.pData;
     rb->rb.row_pitch = map_desc.RowPitch;
-    rb->rb.width = texture_desc.Width;
-    rb->rb.height = texture_desc.Height;
+    rb->rb.width = resource->r.width;
+    rb->rb.height = resource->r.height;
     rb->rb.depth = 1;
     return &rb->rb;
 }
