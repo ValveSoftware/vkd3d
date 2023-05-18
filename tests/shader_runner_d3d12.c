@@ -145,7 +145,6 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
             break;
 
         case RESOURCE_TYPE_UAV:
-        case RESOURCE_TYPE_BUFFER_UAV:
             if (!runner->heap)
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
@@ -161,6 +160,30 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                     NULL, NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             break;
 
+        case RESOURCE_TYPE_BUFFER_UAV:
+        {
+            D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = { 0 };
+
+            if (!runner->heap)
+                runner->heap = create_gpu_descriptor_heap(device,
+                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
+
+            resource->resource = create_default_buffer(device, params->data_size,
+                    D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+            upload_buffer_data(resource->resource, 0, params->data_size, resource_data,
+                    test_context->queue, test_context->list);
+            reset_command_list(test_context->list, test_context->allocator);
+            transition_resource_state(test_context->list, resource->resource,
+                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+            uav_desc.Format = params->format;
+            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+            uav_desc.Buffer.NumElements = params->width * params->height;
+
+            ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
+                    NULL, &uav_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+            break;
+        }
         case RESOURCE_TYPE_VERTEX_BUFFER:
             resource->resource = create_upload_buffer(device, params->data_size, params->data);
             break;
@@ -224,7 +247,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
                 root_param->DescriptorTable.pDescriptorRanges = range;
                 root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                if (resource->r.type == RESOURCE_TYPE_UAV)
+                if (resource->r.type == RESOURCE_TYPE_UAV || resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                 else
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -432,6 +455,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
     if (runner->r.uniform_count)
         ID3D12GraphicsCommandList_SetGraphicsRoot32BitConstants(command_list, uniform_index,
                 runner->r.uniform_count, runner->r.uniforms, 0);
+    if (runner->heap)
+        ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &runner->heap);
     for (i = 0; i < runner->r.resource_count; ++i)
     {
         struct d3d12_resource *resource = d3d12_resource(runner->r.resources[i]);

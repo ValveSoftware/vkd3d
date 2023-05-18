@@ -420,7 +420,6 @@ struct d3d12_resource_readback
 static void get_resource_readback_with_command_list(ID3D12Resource *resource, unsigned int sub_resource,
         struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
-    D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Resource *src_resource;
@@ -434,8 +433,6 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
     assert_that(hr == S_OK, "Failed to get device, hr %#x.\n", hr);
 
     resource_desc = ID3D12Resource_GetDesc(resource);
-    assert_that(resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER,
-            "Resource %p is not texture.\n", resource);
 
     miplevel = sub_resource % resource_desc.MipLevels;
     rb->rb.width = max(1, resource_desc.Width >> miplevel);
@@ -444,10 +441,13 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
     rb->rb.height = align(rb->rb.height, format_block_height(resource_desc.Format));
     rb->rb.depth = resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D
             ? max(1, resource_desc.DepthOrArraySize >> miplevel) : 1;
-    rb->rb.row_pitch = align(rb->rb.width * format_size(resource_desc.Format), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    rb->rb.row_pitch = rb->rb.width * format_size(resource_desc.Format);
+    if (resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
+        rb->rb.row_pitch = align(rb->rb.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     rb->rb.data = NULL;
 
-    if (resource_desc.SampleDesc.Count > 1)
+    src_resource = resource;
+    if (resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER && resource_desc.SampleDesc.Count > 1)
     {
         memset(&heap_properties, 0, sizeof(heap_properties));
         heap_properties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -468,28 +468,33 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
 
         sub_resource = 0;
     }
-    else
-    {
-        src_resource = resource;
-    }
 
     buffer_size = rb->rb.row_pitch * rb->rb.height * rb->rb.depth;
     rb->resource = create_readback_buffer(device, buffer_size);
 
-    dst_location.pResource = rb->resource;
-    dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    dst_location.PlacedFootprint.Offset = 0;
-    dst_location.PlacedFootprint.Footprint.Format = resource_desc.Format;
-    dst_location.PlacedFootprint.Footprint.Width = rb->rb.width;
-    dst_location.PlacedFootprint.Footprint.Height = rb->rb.height;
-    dst_location.PlacedFootprint.Footprint.Depth = rb->rb.depth;
-    dst_location.PlacedFootprint.Footprint.RowPitch = rb->rb.row_pitch;
+    if (resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+    {
+        ID3D12GraphicsCommandList_CopyResource(command_list, rb->resource, resource);
+    }
+    else
+    {
+        D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
 
-    src_location.pResource = src_resource;
-    src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    src_location.SubresourceIndex = sub_resource;
+        dst_location.pResource = rb->resource;
+        dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        dst_location.PlacedFootprint.Offset = 0;
+        dst_location.PlacedFootprint.Footprint.Format = resource_desc.Format;
+        dst_location.PlacedFootprint.Footprint.Width = rb->rb.width;
+        dst_location.PlacedFootprint.Footprint.Height = rb->rb.height;
+        dst_location.PlacedFootprint.Footprint.Depth = rb->rb.depth;
+        dst_location.PlacedFootprint.Footprint.RowPitch = rb->rb.row_pitch;
 
-    ID3D12GraphicsCommandList_CopyTextureRegion(command_list, &dst_location, 0, 0, 0, &src_location, NULL);
+        src_location.pResource = src_resource;
+        src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        src_location.SubresourceIndex = sub_resource;
+
+        ID3D12GraphicsCommandList_CopyTextureRegion(command_list, &dst_location, 0, 0, 0, &src_location, NULL);
+    }
     hr = ID3D12GraphicsCommandList_Close(command_list);
     assert_that(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
 
@@ -696,18 +701,25 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
     }
     ID3D12Resource_Unmap(upload_buffer, 0, NULL);
 
-    for (i = 0; i < sub_resource_count; ++i)
+    if (resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
     {
-        dst_location.pResource = texture;
-        dst_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        dst_location.SubresourceIndex = i;
+        ID3D12GraphicsCommandList_CopyResource(command_list, texture, upload_buffer);
+    }
+    else
+    {
+        for (i = 0; i < sub_resource_count; ++i)
+        {
+            dst_location.pResource = texture;
+            dst_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            dst_location.SubresourceIndex = i;
 
-        src_location.pResource = upload_buffer;
-        src_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        src_location.PlacedFootprint = layouts[i];
+            src_location.pResource = upload_buffer;
+            src_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            src_location.PlacedFootprint = layouts[i];
 
-        ID3D12GraphicsCommandList_CopyTextureRegion(command_list,
-                &dst_location, 0, 0, 0, &src_location, NULL);
+            ID3D12GraphicsCommandList_CopyTextureRegion(command_list,
+                    &dst_location, 0, 0, 0, &src_location, NULL);
+        }
     }
 
     hr = ID3D12GraphicsCommandList_Close(command_list);
@@ -722,6 +734,31 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
     free(layouts);
     free(row_counts);
     free(row_sizes);
+}
+
+#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
+static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer, size_t offset,
+        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+{
+    ID3D12Resource *upload_buffer;
+    ID3D12Device *device;
+    HRESULT hr;
+
+    hr = ID3D12Resource_GetDevice(buffer, &IID_ID3D12Device, (void **)&device);
+    ok_(line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
+
+    upload_buffer = create_upload_buffer_(line, device, size, data);
+
+    ID3D12GraphicsCommandList_CopyBufferRegion(command_list, buffer, offset,
+            upload_buffer, 0, size);
+
+    hr = ID3D12GraphicsCommandList_Close(command_list);
+    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
+    exec_command_list(queue, command_list);
+    wait_queue_idle(device, queue);
+
+    ID3D12Resource_Release(upload_buffer);
+    ID3D12Device_Release(device);
 }
 
 static HRESULT create_root_signature(ID3D12Device *device, const D3D12_ROOT_SIGNATURE_DESC *desc,

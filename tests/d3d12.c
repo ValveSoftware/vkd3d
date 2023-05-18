@@ -137,31 +137,6 @@ static void uav_barrier(ID3D12GraphicsCommandList *list, ID3D12Resource *resourc
     ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
 }
 
-#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
-static void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer, size_t offset,
-        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
-{
-    ID3D12Resource *upload_buffer;
-    ID3D12Device *device;
-    HRESULT hr;
-
-    hr = ID3D12Resource_GetDevice(buffer, &IID_ID3D12Device, (void **)&device);
-    ok_(line)(SUCCEEDED(hr), "Failed to get device, hr %#x.\n", hr);
-
-    upload_buffer = create_upload_buffer_(line, device, size, data);
-
-    ID3D12GraphicsCommandList_CopyBufferRegion(command_list, buffer, offset,
-            upload_buffer, 0, size);
-
-    hr = ID3D12GraphicsCommandList_Close(command_list);
-    ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
-    exec_command_list(queue, command_list);
-    wait_queue_idle(device, queue);
-
-    ID3D12Resource_Release(upload_buffer);
-    ID3D12Device_Release(device);
-}
-
 static const DXGI_FORMAT depth_stencil_formats[] =
 {
     DXGI_FORMAT_R32G8X24_TYPELESS,
