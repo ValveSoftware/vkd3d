@@ -92,6 +92,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_SPV_INVALID_DESCRIPTOR_BINDING   = 2002,
     VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_IDX_UNSUPPORTED   = 2003,
     VKD3D_SHADER_ERROR_SPV_STENCIL_EXPORT_UNSUPPORTED   = 2004,
+    VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY                = 2005,
 
     VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE            = 2300,
 
@@ -529,6 +530,7 @@ enum vkd3d_shader_register_type
     VKD3DSPR_RASTERIZER,
     VKD3DSPR_OUTSTENCILREF,
     VKD3DSPR_UNDEF,
+    VKD3DSPR_SSA,
 
     VKD3DSPR_COUNT,
 
@@ -880,6 +882,7 @@ struct vkd3d_shader_desc
     struct shader_signature patch_constant_signature;
 
     uint32_t temp_count;
+    unsigned int ssa_count;
 
     struct
     {

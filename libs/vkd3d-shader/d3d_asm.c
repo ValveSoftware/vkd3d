@@ -1070,6 +1070,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
             shader_addline(buffer, "undef");
             break;
 
+        case VKD3DSPR_SSA:
+            shader_addline(buffer, "sr");
+            break;
+
         default:
             shader_addline(buffer, "<unhandled_rtype(%#x)>", reg->type);
             break;
@@ -1185,7 +1189,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
             {
                 shader_print_subscript_range(compiler, reg->idx[1].offset, reg->idx[2].offset);
             }
-            else
+            else if (reg->type != VKD3DSPR_SSA)
             {
                 /* For descriptors in sm < 5.1 we move the reg->idx values up one slot
                  * to normalise with 5.1.

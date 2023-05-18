@@ -2332,6 +2332,9 @@ struct spirv_compiler
     bool write_tess_geom_point_size;
 
     struct vkd3d_string_buffer_cache string_buffers;
+
+    uint32_t *ssa_register_ids;
+    unsigned int ssa_register_count;
 };
 
 static bool is_in_default_phase(const struct spirv_compiler *compiler)
@@ -2378,6 +2381,8 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     shader_signature_cleanup(&compiler->input_signature);
     shader_signature_cleanup(&compiler->output_signature);
     shader_signature_cleanup(&compiler->patch_constant_signature);
+
+    vkd3d_free(compiler->ssa_register_ids);
 
     vkd3d_free(compiler);
 }
@@ -3697,6 +3702,22 @@ static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
     return val_id;
 }
 
+static uint32_t spirv_compiler_get_ssa_register_id(const struct spirv_compiler *compiler,
+        const struct vkd3d_shader_register *reg)
+{
+    assert(reg->idx[0].offset < compiler->ssa_register_count);
+    assert(reg->idx_count == 1);
+    return compiler->ssa_register_ids[reg->idx[0].offset];
+}
+
+static void spirv_compiler_set_ssa_register_id(const struct spirv_compiler *compiler,
+        const struct vkd3d_shader_register *reg, uint32_t val_id)
+{
+    unsigned int i = reg->idx[0].offset;
+    assert(i < compiler->ssa_register_count);
+    compiler->ssa_register_ids[i] = val_id;
+}
+
 static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, DWORD swizzle, DWORD write_mask)
 {
@@ -3716,6 +3737,10 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
 
     component_count = vkd3d_write_mask_component_count(write_mask);
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
+
+    if (reg->type == VKD3DSPR_SSA)
+        return spirv_compiler_get_ssa_register_id(compiler, reg);
+
     if (!spirv_compiler_get_register_info(compiler, reg, &reg_info))
     {
         type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
@@ -3926,6 +3951,12 @@ static void spirv_compiler_emit_store_reg(struct spirv_compiler *compiler,
     uint32_t type_id;
 
     assert(!register_is_constant_or_undef(reg));
+
+    if (reg->type == VKD3DSPR_SSA)
+    {
+        spirv_compiler_set_ssa_register_id(compiler, reg, val_id);
+        return;
+    }
 
     if (!spirv_compiler_get_register_info(compiler, reg, &reg_info))
         return;
@@ -5390,6 +5421,18 @@ static void spirv_compiler_emit_temps(struct spirv_compiler *compiler, uint32_t 
     vkd3d_spirv_end_function_stream_insertion(builder);
 }
 
+static void spirv_compiler_allocate_ssa_register_ids(struct spirv_compiler *compiler, unsigned int count)
+{
+    assert(!compiler->ssa_register_ids);
+    if (!(compiler->ssa_register_ids = vkd3d_calloc(count, sizeof(*compiler->ssa_register_ids))))
+    {
+        ERR("Failed to allocate SSA register value id array, count %u.\n", count);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY,
+                "Failed to allocate SSA register value id array of count %u.", count);
+    }
+    compiler->ssa_register_count = count;
+}
+
 static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compiler,
           const struct vkd3d_shader_instruction *instruction)
 {
@@ -6707,7 +6750,8 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
     uint32_t components[VKD3D_VEC4_SIZE];
     unsigned int i, component_count;
 
-    if (register_is_constant_or_undef(&src->reg) || dst->modifiers || src->modifiers)
+    if (register_is_constant_or_undef(&src->reg) || src->reg.type == VKD3DSPR_SSA || dst->reg.type == VKD3DSPR_SSA
+            || dst->modifiers || src->modifiers)
         goto general_implementation;
 
     spirv_compiler_get_register_info(compiler, &dst->reg, &dst_reg_info);
@@ -9638,6 +9682,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (parser->shader_desc.temp_count)
         spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
+    if (parser->shader_desc.ssa_count)
+        spirv_compiler_allocate_ssa_register_ids(compiler, parser->shader_desc.ssa_count);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 
