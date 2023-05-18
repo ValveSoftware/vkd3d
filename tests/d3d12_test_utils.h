@@ -417,7 +417,7 @@ struct d3d12_resource_readback
     ID3D12Resource *resource;
 };
 
-static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsigned int sub_resource,
+static void get_resource_readback_with_command_list(ID3D12Resource *resource, unsigned int sub_resource,
         struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
 {
     D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
@@ -430,12 +430,12 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
     uint64_t buffer_size;
     HRESULT hr;
 
-    hr = ID3D12Resource_GetDevice(texture, &IID_ID3D12Device, (void **)&device);
+    hr = ID3D12Resource_GetDevice(resource, &IID_ID3D12Device, (void **)&device);
     assert_that(hr == S_OK, "Failed to get device, hr %#x.\n", hr);
 
-    resource_desc = ID3D12Resource_GetDesc(texture);
+    resource_desc = ID3D12Resource_GetDesc(resource);
     assert_that(resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER,
-            "Resource %p is not texture.\n", texture);
+            "Resource %p is not texture.\n", resource);
 
     miplevel = sub_resource % resource_desc.MipLevels;
     rb->rb.width = max(1, resource_desc.Width >> miplevel);
@@ -459,10 +459,10 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
         hr = ID3D12Device_CreateCommittedResource(device, &heap_properties, D3D12_HEAP_FLAG_NONE,
                 &resource_desc, D3D12_RESOURCE_STATE_RESOLVE_DEST, NULL,
                 &IID_ID3D12Resource, (void **)&src_resource);
-        assert_that(hr == S_OK, "Failed to create texture, hr %#x.\n", hr);
+        assert_that(hr == S_OK, "Failed to create resource, hr %#x.\n", hr);
 
         ID3D12GraphicsCommandList_ResolveSubresource(command_list,
-                src_resource, 0, texture, sub_resource, resource_desc.Format);
+                src_resource, 0, resource, sub_resource, resource_desc.Format);
         transition_resource_state(command_list, src_resource,
                 D3D12_RESOURCE_STATE_RESOLVE_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
@@ -470,7 +470,7 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
     }
     else
     {
-        src_resource = texture;
+        src_resource = resource;
     }
 
     buffer_size = rb->rb.row_pitch * rb->rb.height * rb->rb.depth;
@@ -497,7 +497,7 @@ static void get_texture_readback_with_command_list(ID3D12Resource *texture, unsi
     wait_queue_idle(device, queue);
     ID3D12Device_Release(device);
 
-    if (src_resource != texture)
+    if (src_resource != resource)
         ID3D12Resource_Release(src_resource);
 
     read_range.Begin = 0;
@@ -560,7 +560,7 @@ static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *t
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_uint_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
@@ -572,7 +572,7 @@ static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *t
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_vec4_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }

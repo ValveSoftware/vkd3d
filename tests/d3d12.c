@@ -271,13 +271,13 @@ static const struct uvec4 *get_readback_uvec4(struct resource_readback *rb, unsi
 }
 
 #define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_float_(unsigned int line, ID3D12Resource *texture,
+static void check_sub_resource_float_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         float expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_float_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
@@ -312,13 +312,13 @@ static void check_readback_data_uint8_(unsigned int line, struct resource_readba
 }
 
 #define check_sub_resource_uint8(a, b, c, d, e, f) check_sub_resource_uint8_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint8_(unsigned int line, ID3D12Resource *texture,
+static void check_sub_resource_uint8_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint8_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_uint8_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
@@ -353,13 +353,13 @@ static void check_readback_data_uint16_(unsigned int line, struct resource_readb
 }
 
 #define check_sub_resource_uint16(a, b, c, d, e, f) check_sub_resource_uint16_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint16_(unsigned int line, ID3D12Resource *texture,
+static void check_sub_resource_uint16_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint16_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_uint16_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
@@ -394,19 +394,19 @@ static void check_readback_data_uint64_(unsigned int line, struct resource_readb
 }
 
 #define check_sub_resource_uint64(a, b, c, d, e, f) check_sub_resource_uint64_(__LINE__, a, b, c, d, e, f)
-static void check_sub_resource_uint64_(unsigned int line, ID3D12Resource *texture,
+static void check_sub_resource_uint64_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         uint64_t expected, unsigned int max_diff)
 {
     struct d3d12_resource_readback rb;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_uint64_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
 }
 
 #define check_sub_resource_uvec4(a, b, c, d, e) check_sub_resource_uvec4_(__LINE__, a, b, c, d, e)
-static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *texture,
+static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
         const struct uvec4 *expected_value)
 {
@@ -415,7 +415,7 @@ static void check_sub_resource_uvec4_(unsigned int line, ID3D12Resource *texture
     unsigned int x = 0, y;
     bool all_match = true;
 
-    get_texture_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -4762,7 +4762,7 @@ static void test_clear_render_target_view(void)
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, green, 0, NULL);
     transition_resource_state(command_list, resource,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 32, 32, 2);
     check_readback_data_uint(&rb.rb, &box, 0xbf4c7f19, 1);
     set_box(&box, 0, 0, 2, 32, 32, 4);
@@ -4781,7 +4781,7 @@ static void test_clear_render_target_view(void)
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, rtv_handle, green, 0, NULL);
     transition_resource_state(command_list, resource,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 4, 32, 32, 30);
     check_readback_data_uint(&rb.rb, &box, 0xbf4c7f19, 1);
     set_box(&box, 0, 0, 30, 32, 32, 32);
@@ -5221,7 +5221,7 @@ static void test_clear_unordered_access_view_image(void)
 
             for (layer = 0; layer < tests[i].image_layers / image_depth; ++layer)
             {
-                get_texture_readback_with_command_list(texture,
+                get_resource_readback_with_command_list(texture,
                         tests[i].mip_level + (layer * tests[i].image_mips),
                         &rb, queue, command_list);
 
@@ -6092,7 +6092,7 @@ static void test_append_aligned_element(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     color = get_readback_uint(&rb.rb, 80, 16, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 240, 16, 0);
@@ -6370,7 +6370,7 @@ static void test_fragment_coords(void)
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         all_match = true;
         for (y = 0; y < rb.rb.height; ++y)
         {
@@ -6532,7 +6532,7 @@ static void test_fractional_viewports(void)
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (y = 0; y < rb.rb.height; ++y)
         {
             for (x = 0; x < rb.rb.width; ++x)
@@ -6611,7 +6611,7 @@ static void test_scissor(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     color = get_readback_uint(&rb.rb, 320, 60, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 80, 240, 0);
@@ -6848,7 +6848,7 @@ static void test_draw_depth_only(void)
     }
     transition_resource_state(command_list, ds.texture,
             D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(ds.texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(ds.texture, 0, &rb, queue, command_list);
     for (i = 0; i < 4; ++i)
     {
         for (j = 0; j < 4; ++j)
@@ -7498,7 +7498,7 @@ static void test_bundle_state_inheritance(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -7535,7 +7535,7 @@ static void test_bundle_state_inheritance(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -13505,7 +13505,7 @@ static void test_sample_instructions(void)
 
         x_step = desc.rt_width / tests[i].texture->width;
         y_step = desc.rt_height / tests[i].texture->height;
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (y = 0; y < tests[i].texture->height; ++y)
         {
             for (x = 0; x < tests[i].texture->width; ++x)
@@ -13957,7 +13957,7 @@ static void test_gather(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -13995,7 +13995,7 @@ static void test_gather(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14033,7 +14033,7 @@ static void test_gather(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14071,7 +14071,7 @@ static void test_gather(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14107,7 +14107,7 @@ static void test_gather(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14297,7 +14297,7 @@ static void test_gather_c(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14335,7 +14335,7 @@ static void test_gather_c(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14371,7 +14371,7 @@ static void test_gather_c(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (y = 0; y < rb.rb.height; ++y)
     {
         for (x = 0; x < rb.rb.width; ++x)
@@ -14804,7 +14804,7 @@ static void test_sample_c_lz(void)
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         /* Avoid testing values affected by seamless cube map filtering. */
         set_rect(&rect, 100, 100, 540, 380);
         check_readback_data_float(&rb.rb, &rect, tests[i].expected, 2);
@@ -14856,7 +14856,7 @@ static void test_sample_c_lz(void)
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         /* Avoid testing values affected by seamless cube map filtering. */
         set_rect(&rect, 100, 100, 540, 380);
         check_readback_data_float(&rb.rb, &rect, tests[i].expected, 2);
@@ -16704,7 +16704,7 @@ static void test_update_descriptor_tables(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 16, 32, 1);
     check_readback_data_uint(&rb.rb, &box, 0xff00407f, 1);
     set_box(&box, 16, 0, 0, 32, 32, 1);
@@ -16837,7 +16837,7 @@ static void test_update_descriptor_heap_after_closing_command_list(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     value = get_readback_uint(&rb.rb, 0, 0, 0);
     todo_if(binding_tier < D3D12_RESOURCE_BINDING_TIER_3)
     ok(value == 0xff00ff00, "Got unexpected value %#x.\n", value);
@@ -18329,7 +18329,7 @@ static void test_copy_descriptors_range_sizes(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     for (i = 0; i < desc.rt_width; ++i)
     {
         set_box(&box, i, 0, 0, i + 1, desc.rt_height, 1);
@@ -22170,7 +22170,7 @@ static void test_uav_load(void)
         transition_sub_resource_state(command_list, rt_texture, 0,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(rt_texture, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(rt_texture, 0, &rb, queue, command_list);
         for (y = 0; y < 4; ++y)
         {
             for (x = 0; x < 4; ++x)
@@ -22520,7 +22520,7 @@ static void test_cs_uav_store(void)
 
     transition_sub_resource_state(command_list, resource, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_rect(&rect, 0, 0, 16, 32);
     check_readback_data_float(&rb.rb, &rect, 0.5f, 2);
     set_rect(&rect, 0, 32, rb.rb.width, rb.rb.height);
@@ -22550,7 +22550,7 @@ static void test_cs_uav_store(void)
 
     transition_sub_resource_state(command_list, resource, 0,
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(resource, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(resource, 0, &rb, queue, command_list);
     set_rect(&rect, 0, 0, 60, 60);
     check_readback_data_float(&rb.rb, &rect, 0.6f, 2);
     set_rect(&rect, 0, 60, rb.rb.width, rb.rb.height);
@@ -23720,7 +23720,7 @@ static void test_buffer_srv(void)
         transition_sub_resource_state(command_list, context.render_target, 0,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (y = 0; y < 4; ++y)
         {
             for (x = 0; x < 4; ++x)
@@ -24598,7 +24598,7 @@ static void test_execute_indirect(void)
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 32, 8, 1);
     check_readback_data_uint(&rb.rb, &box, 0xffffff00, 0);
     set_box(&box, 24, 8, 0, 32, 32, 1);
@@ -25184,14 +25184,14 @@ static void test_instance_id(void)
 
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(expected_results); ++j)
             check_readback_data_uint(&rb.rb, &expected_results[j].box, tests[i].expected_colors[j], 1);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
         transition_resource_state(command_list, render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(render_target, 0, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(expected_results); ++j)
             check_readback_data_uint(&rb.rb, &expected_results[j].box, expected_results[j].instance_id, 0);
         release_resource_readback(&rb);
@@ -25618,7 +25618,7 @@ static void test_copy_texture(void)
 
         transition_resource_state(command_list, dst_texture,
                 D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
         for (y = 0; y < 4; ++y)
         {
             for (x = 0; x < 4; ++x)
@@ -25988,7 +25988,7 @@ static void test_copy_buffer_texture(void)
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     got = expected = 0;
-    get_texture_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
     for (z = 0; z < 64; ++z)
     {
         for (y = 0; y < 100; ++y)
@@ -26020,7 +26020,7 @@ static void test_copy_buffer_texture(void)
 
     reset_command_list(command_list, context.allocator);
     got = expected = 0;
-    get_texture_readback_with_command_list(dst_texture, 1, &rb, queue, command_list);
+    get_resource_readback_with_command_list(dst_texture, 1, &rb, queue, command_list);
     for (z = 0; z < 32; ++z)
     {
         for (y = 0; y < 50; ++y)
@@ -26163,7 +26163,7 @@ static void test_copy_block_compressed_texture(void)
     transition_resource_state(command_list, dst_buffer,
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, 0, &rb, queue, command_list);
     for (y = 0; y < 8 / format_block_height(DXGI_FORMAT_BC2_UNORM); ++y)
     {
         for (x = 0; x < 8 / format_block_width(DXGI_FORMAT_BC2_UNORM); ++x)
@@ -26195,7 +26195,7 @@ static void test_copy_block_compressed_texture(void)
             got.x, got.y, got.z, got.w, x, y, expected.x, expected.y, expected.z, expected.w);
 
     reset_command_list(command_list, context.allocator);
-    get_texture_readback_with_command_list(texture, 2, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, 2, &rb, queue, command_list);
     block_id = 1;
     expected.x = block_id << 8 | 0;
     expected.y = block_id << 8 | 1;
@@ -26208,7 +26208,7 @@ static void test_copy_block_compressed_texture(void)
             got.x, got.y, got.z, got.w, expected.x, expected.y, expected.z, expected.w);
 
     reset_command_list(command_list, context.allocator);
-    get_texture_readback_with_command_list(texture, 3, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, 3, &rb, queue, command_list);
     block_id = 2;
     expected.x = block_id << 8 | 0;
     expected.y = block_id << 8 | 1;
@@ -27175,7 +27175,7 @@ static void test_geometry_shader(void)
     transition_resource_state(command_list, texture,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     color = get_readback_uint(&rb.rb, 320, 190, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 255, 240, 0);
@@ -27189,7 +27189,7 @@ static void test_geometry_shader(void)
     release_resource_readback(&rb);
 
     reset_command_list(command_list, context.allocator);
-    get_texture_readback_with_command_list(texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture, 0, &rb, queue, command_list);
     color = get_readback_uint(&rb.rb, 320, 190, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 255, 240, 0);
@@ -30216,7 +30216,7 @@ static void check_clip_distance(struct test_context *context, ID3D12PipelineStat
     ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
     transition_resource_state(command_list, context->render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 320, 480, 1);
     check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     set_box(&box, 320, 0, 0, 320, 480, 1);
@@ -30249,7 +30249,7 @@ static void check_clip_distance(struct test_context *context, ID3D12PipelineStat
     ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
     transition_resource_state(command_list, context->render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context->render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 640, 240, 1);
     check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
     set_box(&box, 0, 240, 0, 640, 240, 1);
@@ -30890,7 +30890,7 @@ static void test_clip_distance(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, 320, 240, 1);
     check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 1);
     set_box(&box, 0, 240, 0, 320, 480, 1);
@@ -31149,7 +31149,7 @@ static void test_combined_clip_and_cull_distances(void)
             }
             else
             {
-                get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+                get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
                 color = get_readback_uint(&rb.rb, 160, 240, 0);
                 ok(color == expected_color[0], "Got unexpected color 0x%08x.\n", color);
                 color = get_readback_uint(&rb.rb, 480, 240, 0);
@@ -31435,7 +31435,7 @@ static void test_64kb_texture_alignment(void)
     reset_command_list(command_list, context.allocator);
     transition_resource_state(command_list, textures[1],
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
     set_box(&box, 0, 0, 0, resource_desc.Width, resource_desc.Height, 1);
     check_readback_data_uint(&rb.rb, &box, 0xcafef00d, 0);
     release_resource_readback(&rb);
@@ -31448,7 +31448,7 @@ static void test_64kb_texture_alignment(void)
 
     /* If the heap could not be used, the texture is not aliased. */
     reset_command_list(command_list, context.allocator);
-    get_texture_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(textures[1], 0, &rb, queue, command_list);
     check_readback_data_uint(&rb.rb, &box, 0xdeadbeef, 0);
     release_resource_readback(&rb);
 
@@ -32533,7 +32533,7 @@ static void test_shader_sample_position(void)
     transition_resource_state(command_list, readback_texture,
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(readback_texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(readback_texture, 0, &rb, queue, command_list);
     for (i = 0; i < resource_desc.SampleDesc.Count; ++i)
     {
         const struct vec4 *position = get_readback_vec4(&rb.rb, i, 0);
@@ -32885,7 +32885,7 @@ static void test_primitive_restart(void)
 
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+        get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         if (tests[i].full_quad)
         {
             todo_if(tests[i].is_todo)
@@ -33250,7 +33250,7 @@ static void test_read_write_subresource(void)
 
     transition_resource_state(command_list, dst_texture,
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(dst_texture, 0, &rb, queue, command_list);
     for (z = 0; z < 64; ++z)
     {
         for (y = 0; y < 100; ++y)
@@ -34062,7 +34062,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     bug_if(is_radv_device(context.device))
     todo check_readback_data_uint(&rb.rb, NULL, 0xffffffff, 0);
     release_resource_readback(&rb);
@@ -34115,7 +34115,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
     todo check_readback_data_uint(&rb.rb, NULL, 0xffffffff, 0);
     release_resource_readback(&rb);
     reset_command_list(command_list, context.allocator);
@@ -34232,7 +34232,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, texture_copy,
             D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
     todo check_readback_data_uint(&rb.rb, NULL, r8g8b8a8_data[1], 0);
     release_resource_readback(&rb);
 
@@ -34297,7 +34297,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, texture_copy,
             D3D12_RESOURCE_STATE_RESOLVE_DEST, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
-    get_texture_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
+    get_resource_readback_with_command_list(texture_copy, 0, &rb, queue, command_list);
     bug_if(is_radv_device(context.device))
     todo check_readback_data_uint(&rb.rb, NULL, r8g8b8a8_data[1], 0);
     release_resource_readback(&rb);

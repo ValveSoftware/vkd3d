@@ -502,7 +502,7 @@ static void test_thread_id(void)
 
     transition_resource_state(command_list, textures[0],
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(textures[0], 0, &rb, context.queue, command_list);
+    get_resource_readback_with_command_list(textures[0], 0, &rb, context.queue, command_list);
     for (x = 0; x < 16; ++x)
     {
         for (y = 0; y < 8; ++y)
@@ -525,7 +525,7 @@ static void test_thread_id(void)
 
     transition_resource_state(command_list, textures[1],
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(textures[1], 0, &rb, context.queue, command_list);
+    get_resource_readback_with_command_list(textures[1], 0, &rb, context.queue, command_list);
     for (x = 0; x < 16; ++x)
     {
         for (y = 0; y < 8; ++y)
@@ -548,7 +548,7 @@ static void test_thread_id(void)
 
     transition_resource_state(command_list, textures[2],
             D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_texture_readback_with_command_list(textures[2], 0, &rb, context.queue, command_list);
+    get_resource_readback_with_command_list(textures[2], 0, &rb, context.queue, command_list);
     for (x = 0; x < 16; ++x)
     {
         for (y = 0; y < 8; ++y)
