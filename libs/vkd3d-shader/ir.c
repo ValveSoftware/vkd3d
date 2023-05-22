@@ -247,7 +247,7 @@ static void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_s
     reg->immconst_type = VKD3D_IMMCONST_SCALAR;
 }
 
-static void shader_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx)
+void shader_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx)
 {
     memset(ins, 0, sizeof(*ins));
     ins->handler_idx = handler_idx;
