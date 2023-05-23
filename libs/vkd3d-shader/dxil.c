@@ -208,6 +208,7 @@ struct sm6_value
 {
     const struct sm6_type *type;
     enum sm6_value_type value_type;
+    bool is_undefined;
     union
     {
         struct sm6_function_data function;
@@ -1726,8 +1727,16 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 WARN("Unhandled constant array.\n");
                 break;
 
+            case CST_CODE_UNDEF:
+                dxil_record_validate_operand_max_count(record, 0, sm6);
+                dst->u.reg.type = VKD3DSPR_UNDEF;
+                /* Mark as explicitly undefined, not the result of a missing constant code or instruction. */
+                dst->is_undefined = true;
+                break;
+
             default:
                 FIXME("Unhandled constant code %u.\n", record->code);
+                dst->u.reg.type = VKD3DSPR_UNDEF;
                 break;
         }
 
