@@ -2389,6 +2389,55 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
     return true;
 }
 
+static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *arg1, *arg2, *mult, *comps[4] = {0}, *res;
+    struct hlsl_type *type = instr->data_type;
+    struct hlsl_ir_expr *expr;
+    unsigned int i, dimx;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+
+    if (expr->op != HLSL_OP2_DOT)
+        return false;
+
+    if (type->base_type == HLSL_TYPE_INT || type->base_type == HLSL_TYPE_UINT)
+    {
+        arg1 = expr->operands[0].node;
+        arg2 = expr->operands[1].node;
+        assert(arg1->data_type->dimx == arg2->data_type->dimx);
+        dimx = arg1->data_type->dimx;
+
+        if (!(mult = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, arg1, arg2)))
+            return false;
+        list_add_before(&instr->entry, &mult->entry);
+
+        for (i = 0; i < dimx; ++i)
+        {
+            unsigned int s = hlsl_swizzle_from_writemask(1 << i);
+
+            if (!(comps[i] = hlsl_new_swizzle(ctx, s, 1, mult, &instr->loc)))
+                return false;
+            list_add_before(&instr->entry, &comps[i]->entry);
+        }
+
+        res = comps[0];
+        for (i = 1; i < dimx; ++i)
+        {
+            if (!(res = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, res, comps[i])))
+                return false;
+            list_add_before(&instr->entry, &res->entry);
+        }
+
+        hlsl_replace_node(instr, res);
+        return true;
+    }
+
+    return false;
+}
+
 static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_node *arg1, *arg2, *mul1, *neg1, *ge, *neg2, *div, *mul2, *frc, *cond;
@@ -3936,6 +3985,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     hlsl_transform_ir(ctx, lower_narrowing_casts, body, NULL);
     hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
+    hlsl_transform_ir(ctx, lower_int_dot, body, NULL);
     hlsl_transform_ir(ctx, lower_int_division, body, NULL);
     hlsl_transform_ir(ctx, lower_int_modulus, body, NULL);
     hlsl_transform_ir(ctx, lower_int_abs, body, NULL);
