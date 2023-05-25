@@ -6577,6 +6577,7 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_DTOF,       SpvOpFConvert},
         {VKD3DSIH_DTOI,       SpvOpConvertFToS},
         {VKD3DSIH_DTOU,       SpvOpConvertFToU},
+        {VKD3DSIH_FREM,       SpvOpFRem},
         {VKD3DSIH_FTOD,       SpvOpFConvert},
         {VKD3DSIH_IADD,       SpvOpIAdd},
         {VKD3DSIH_INEG,       SpvOpSNegate},
@@ -9388,6 +9389,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DTOF:
         case VKD3DSIH_DTOI:
         case VKD3DSIH_DTOU:
+        case VKD3DSIH_FREM:
         case VKD3DSIH_FTOD:
         case VKD3DSIH_IADD:
         case VKD3DSIH_INEG:
