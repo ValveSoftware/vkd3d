@@ -6949,7 +6949,7 @@ static void spirv_compiler_emit_imul(struct spirv_compiler *compiler,
     uint32_t type_id, val_id, src0_id, src1_id;
 
     if (dst[0].reg.type != VKD3DSPR_NULL)
-        FIXME("Extended multiplies not implemented.\n"); /* SpvOpSMulExtended */
+        FIXME("Extended multiplies not implemented.\n"); /* SpvOpSMulExtended/SpvOpUMulExtended */
 
     if (dst[1].reg.type == VKD3DSPR_NULL)
         return;
@@ -9440,6 +9440,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_sincos(compiler, instruction);
             break;
         case VKD3DSIH_IMUL:
+        case VKD3DSIH_UMUL:
             spirv_compiler_emit_imul(compiler, instruction);
             break;
         case VKD3DSIH_IMAD:
