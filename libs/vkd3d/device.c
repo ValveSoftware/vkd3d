@@ -3893,12 +3893,18 @@ static void STDMETHODCALLTYPE d3d12_device_GetResourceTiling(ID3D12Device *iface
         UINT *sub_resource_tiling_count, UINT first_sub_resource_tiling,
         D3D12_SUBRESOURCE_TILING *sub_resource_tilings)
 {
-    FIXME("iface %p, resource %p, total_tile_count %p, packed_mip_info %p, "
+    const struct d3d12_resource *resource_impl = impl_from_ID3D12Resource(resource);
+    struct d3d12_device *device = impl_from_ID3D12Device(iface);
+
+    TRACE("iface %p, resource %p, total_tile_count %p, packed_mip_info %p, "
             "standard_title_shape %p, sub_resource_tiling_count %p, "
-            "first_sub_resource_tiling %u, sub_resource_tilings %p stub!\n",
+            "first_sub_resource_tiling %u, sub_resource_tilings %p.\n",
             iface, resource, total_tile_count, packed_mip_info, standard_tile_shape,
             sub_resource_tiling_count, first_sub_resource_tiling,
             sub_resource_tilings);
+
+    d3d12_resource_get_tiling(device, resource_impl, total_tile_count, packed_mip_info, standard_tile_shape,
+            sub_resource_tiling_count, first_sub_resource_tiling, sub_resource_tilings);
 }
 
 static LUID * STDMETHODCALLTYPE d3d12_device_GetAdapterLuid(ID3D12Device *iface, LUID *luid)

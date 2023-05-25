@@ -687,9 +687,27 @@ struct d3d12_heap *unsafe_impl_from_ID3D12Heap(ID3D12Heap *iface);
 #define VKD3D_RESOURCE_DEDICATED_HEAP 0x00000008
 #define VKD3D_RESOURCE_LINEAR_TILING  0x00000010
 
+struct vkd3d_tiled_region_extent
+{
+    unsigned int width;
+    unsigned int height;
+    unsigned int depth;
+};
+
+struct vkd3d_subresource_tile_info
+{
+    unsigned int offset;
+    unsigned int count;
+    struct vkd3d_tiled_region_extent extent;
+};
+
 struct d3d12_resource_tile_info
 {
+    VkExtent3D tile_extent;
+    unsigned int total_count;
+    unsigned int standard_mip_count;
     unsigned int subresource_count;
+    struct vkd3d_subresource_tile_info *subresources;
 };
 
 /* ID3D12Resource */
@@ -742,6 +760,10 @@ static inline bool d3d12_resource_is_texture(const struct d3d12_resource *resour
 
 bool d3d12_resource_is_cpu_accessible(const struct d3d12_resource *resource);
 HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC *desc, struct d3d12_device *device);
+void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_resource *resource,
+        UINT *total_tile_count, D3D12_PACKED_MIP_INFO *packed_mip_info, D3D12_TILE_SHAPE *standard_tile_shape,
+        UINT *sub_resource_tiling_count, UINT first_sub_resource_tiling,
+        D3D12_SUBRESOURCE_TILING *sub_resource_tilings);
 
 HRESULT d3d12_committed_resource_create(struct d3d12_device *device,
         const D3D12_HEAP_PROPERTIES *heap_properties, D3D12_HEAP_FLAGS heap_flags,

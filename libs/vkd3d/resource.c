@@ -971,6 +971,11 @@ HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
     return hr;
 }
 
+static void d3d12_resource_tile_info_cleanup(struct d3d12_resource *resource)
+{
+    vkd3d_free(resource->tiles.subresources);
+}
+
 static void d3d12_resource_destroy(struct d3d12_resource *resource, struct d3d12_device *device)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
@@ -985,6 +990,8 @@ static void d3d12_resource_destroy(struct d3d12_resource *resource, struct d3d12
         VK_CALL(vkDestroyBuffer(device->vk_device, resource->u.vk_buffer, NULL));
     else
         VK_CALL(vkDestroyImage(device->vk_device, resource->u.vk_image, NULL));
+
+    d3d12_resource_tile_info_cleanup(resource);
 
     if (resource->heap)
         d3d12_heap_resource_destroyed(resource->heap);
@@ -1057,9 +1064,101 @@ static void d3d12_resource_get_level_box(const struct d3d12_resource *resource,
     box->back = d3d12_resource_desc_get_depth(&resource->desc, level);
 }
 
-static void d3d12_resource_init_tiles(struct d3d12_resource *resource)
+void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_resource *resource,
+        UINT *total_tile_count, D3D12_PACKED_MIP_INFO *packed_mip_info, D3D12_TILE_SHAPE *standard_tile_shape,
+        UINT *subresource_tiling_count, UINT first_subresource_tiling,
+        D3D12_SUBRESOURCE_TILING *subresource_tilings)
 {
-    resource->tiles.subresource_count = d3d12_resource_desc_get_sub_resource_count(&resource->desc);
+    unsigned int i, subresource, subresource_count, count;
+    const struct vkd3d_subresource_tile_info *tile_info;
+    const VkExtent3D *tile_extent;
+
+    if (d3d12_resource_is_texture(resource))
+    {
+        FIXME("Not implemented for textures.\n");
+        return;
+    }
+
+    tile_extent = &resource->tiles.tile_extent;
+
+    if (packed_mip_info)
+    {
+        packed_mip_info->NumStandardMips = resource->tiles.standard_mip_count;
+        packed_mip_info->NumPackedMips = 0;
+        packed_mip_info->NumTilesForPackedMips = 0;
+        packed_mip_info->StartTileIndexInOverallResource = 0;
+    }
+
+    if (standard_tile_shape)
+    {
+        /* D3D12 docs say tile shape is cleared to zero if there is no standard mip, but drivers don't to do this. */
+        standard_tile_shape->WidthInTexels = tile_extent->width;
+        standard_tile_shape->HeightInTexels = tile_extent->height;
+        standard_tile_shape->DepthInTexels = tile_extent->depth;
+    }
+
+    if (total_tile_count)
+        *total_tile_count = resource->tiles.total_count;
+
+    if (!subresource_tiling_count)
+        return;
+
+    subresource_count = resource->tiles.subresource_count;
+
+    count = subresource_count - min(first_subresource_tiling, subresource_count);
+    count = min(count, *subresource_tiling_count);
+
+    for (i = 0; i < count; ++i)
+    {
+        subresource = i + first_subresource_tiling;
+        tile_info = &resource->tiles.subresources[subresource];
+        subresource_tilings[i].StartTileIndexInOverallResource = tile_info->offset;
+        subresource_tilings[i].WidthInTiles = tile_info->extent.width;
+        subresource_tilings[i].HeightInTiles = tile_info->extent.height;
+        subresource_tilings[i].DepthInTiles = tile_info->extent.depth;
+    }
+    *subresource_tiling_count = i;
+}
+
+static bool d3d12_resource_init_tiles(struct d3d12_resource *resource, struct d3d12_device *device)
+{
+    const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+    struct vkd3d_subresource_tile_info *tile_info;
+    VkMemoryRequirements requirements;
+    unsigned int subresource_count;
+
+    subresource_count = d3d12_resource_desc_get_sub_resource_count(&resource->desc);
+
+    if (d3d12_resource_is_buffer(resource))
+    {
+        assert(subresource_count == 1);
+        if (!(resource->tiles.subresources = vkd3d_calloc(subresource_count, sizeof(*resource->tiles.subresources))))
+        {
+            ERR("Failed to allocate subresource info array.\n");
+            return false;
+        }
+
+        VK_CALL(vkGetBufferMemoryRequirements(device->vk_device, resource->u.vk_buffer, &requirements));
+        if (requirements.alignment > D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES)
+            FIXME("Vulkan device tile size is greater than the standard D3D12 tile size.\n");
+
+        tile_info = &resource->tiles.subresources[0];
+        tile_info->offset = 0;
+        tile_info->extent.width = align(resource->desc.Width, D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES)
+                / D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES;
+        tile_info->extent.height = 1;
+        tile_info->extent.depth = 1;
+        tile_info->count = tile_info->extent.width;
+
+        resource->tiles.tile_extent.width = D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES;
+        resource->tiles.tile_extent.height = 1;
+        resource->tiles.tile_extent.depth = 1;
+        resource->tiles.total_count = tile_info->extent.width;
+        resource->tiles.subresource_count = 1;
+        resource->tiles.standard_mip_count = 1;
+    }
+
+    return true;
 }
 
 /* ID3D12Resource */
@@ -2013,7 +2112,11 @@ HRESULT d3d12_reserved_resource_create(struct d3d12_device *device,
             desc, initial_state, optimized_clear_value, &object)))
         return hr;
 
-    d3d12_resource_init_tiles(object);
+    if (!d3d12_resource_init_tiles(object, device))
+    {
+        d3d12_resource_Release(&object->ID3D12Resource_iface);
+        return E_OUTOFMEMORY;
+    }
 
     TRACE("Created reserved resource %p.\n", object);
 
