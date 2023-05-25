@@ -706,6 +706,7 @@ struct d3d12_resource_tile_info
     VkExtent3D tile_extent;
     unsigned int total_count;
     unsigned int standard_mip_count;
+    unsigned int packed_mip_tile_count;
     unsigned int subresource_count;
     struct vkd3d_subresource_tile_info *subresources;
 };

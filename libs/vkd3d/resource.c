@@ -1064,29 +1064,38 @@ static void d3d12_resource_get_level_box(const struct d3d12_resource *resource,
     box->back = d3d12_resource_desc_get_depth(&resource->desc, level);
 }
 
+static void compute_image_subresource_size_in_tiles(const VkExtent3D *tile_extent,
+        const struct D3D12_RESOURCE_DESC *desc, unsigned int miplevel_idx,
+        struct vkd3d_tiled_region_extent *size)
+{
+    unsigned int width, height, depth;
+
+    width = d3d12_resource_desc_get_width(desc, miplevel_idx);
+    height = d3d12_resource_desc_get_height(desc, miplevel_idx);
+    depth = d3d12_resource_desc_get_depth(desc, miplevel_idx);
+    size->width = (width + tile_extent->width - 1) / tile_extent->width;
+    size->height = (height + tile_extent->height - 1) / tile_extent->height;
+    size->depth = (depth + tile_extent->depth - 1) / tile_extent->depth;
+}
+
 void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_resource *resource,
         UINT *total_tile_count, D3D12_PACKED_MIP_INFO *packed_mip_info, D3D12_TILE_SHAPE *standard_tile_shape,
         UINT *subresource_tiling_count, UINT first_subresource_tiling,
         D3D12_SUBRESOURCE_TILING *subresource_tilings)
 {
-    unsigned int i, subresource, subresource_count, count;
+    unsigned int i, subresource, subresource_count, miplevel_idx, count;
     const struct vkd3d_subresource_tile_info *tile_info;
     const VkExtent3D *tile_extent;
-
-    if (d3d12_resource_is_texture(resource))
-    {
-        FIXME("Not implemented for textures.\n");
-        return;
-    }
 
     tile_extent = &resource->tiles.tile_extent;
 
     if (packed_mip_info)
     {
         packed_mip_info->NumStandardMips = resource->tiles.standard_mip_count;
-        packed_mip_info->NumPackedMips = 0;
-        packed_mip_info->NumTilesForPackedMips = 0;
-        packed_mip_info->StartTileIndexInOverallResource = 0;
+        packed_mip_info->NumPackedMips = resource->desc.MipLevels - packed_mip_info->NumStandardMips;
+        packed_mip_info->NumTilesForPackedMips = !!resource->tiles.packed_mip_tile_count; /* non-zero dummy value */
+        packed_mip_info->StartTileIndexInOverallResource = packed_mip_info->NumPackedMips
+                ? resource->tiles.subresources[resource->tiles.standard_mip_count].offset : 0;
     }
 
     if (standard_tile_shape)
@@ -1111,6 +1120,14 @@ void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_r
     for (i = 0; i < count; ++i)
     {
         subresource = i + first_subresource_tiling;
+        miplevel_idx = subresource % resource->desc.MipLevels;
+        if (miplevel_idx >= resource->tiles.standard_mip_count)
+        {
+            memset(&subresource_tilings[i], 0, sizeof(subresource_tilings[i]));
+            subresource_tilings[i].StartTileIndexInOverallResource = D3D12_PACKED_TILE;
+            continue;
+        }
+
         tile_info = &resource->tiles.subresources[subresource];
         subresource_tilings[i].StartTileIndexInOverallResource = tile_info->offset;
         subresource_tilings[i].WidthInTiles = tile_info->extent.width;
@@ -1122,21 +1139,26 @@ void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_r
 
 static bool d3d12_resource_init_tiles(struct d3d12_resource *resource, struct d3d12_device *device)
 {
+    unsigned int i, start_idx, subresource_count, tile_count, miplevel_idx;
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
+    VkSparseImageMemoryRequirements *sparse_requirements_array;
+    VkSparseImageMemoryRequirements sparse_requirements = {0};
     struct vkd3d_subresource_tile_info *tile_info;
     VkMemoryRequirements requirements;
-    unsigned int subresource_count;
+    const VkExtent3D *tile_extent;
+    uint32_t requirement_count;
 
     subresource_count = d3d12_resource_desc_get_sub_resource_count(&resource->desc);
+
+    if (!(resource->tiles.subresources = vkd3d_calloc(subresource_count, sizeof(*resource->tiles.subresources))))
+    {
+        ERR("Failed to allocate subresource info array.\n");
+        return false;
+    }
 
     if (d3d12_resource_is_buffer(resource))
     {
         assert(subresource_count == 1);
-        if (!(resource->tiles.subresources = vkd3d_calloc(subresource_count, sizeof(*resource->tiles.subresources))))
-        {
-            ERR("Failed to allocate subresource info array.\n");
-            return false;
-        }
 
         VK_CALL(vkGetBufferMemoryRequirements(device->vk_device, resource->u.vk_buffer, &requirements));
         if (requirements.alignment > D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES)
@@ -1156,6 +1178,76 @@ static bool d3d12_resource_init_tiles(struct d3d12_resource *resource, struct d3
         resource->tiles.total_count = tile_info->extent.width;
         resource->tiles.subresource_count = 1;
         resource->tiles.standard_mip_count = 1;
+        resource->tiles.packed_mip_tile_count = 0;
+    }
+    else
+    {
+        VK_CALL(vkGetImageMemoryRequirements(device->vk_device, resource->u.vk_image, &requirements));
+        if (requirements.alignment > D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES)
+            FIXME("Vulkan device tile size is greater than the standard D3D12 tile size.\n");
+
+        requirement_count = 0;
+        VK_CALL(vkGetImageSparseMemoryRequirements(device->vk_device, resource->u.vk_image, &requirement_count, NULL));
+        if (!(sparse_requirements_array = vkd3d_calloc(requirement_count, sizeof(*sparse_requirements_array))))
+        {
+            ERR("Failed to allocate sparse requirements array.\n");
+            return false;
+        }
+        VK_CALL(vkGetImageSparseMemoryRequirements(device->vk_device, resource->u.vk_image,
+                &requirement_count, sparse_requirements_array));
+
+        for (i = 0; i < requirement_count; ++i)
+        {
+            if (sparse_requirements_array[i].formatProperties.aspectMask & resource->format->vk_aspect_mask)
+            {
+                if (sparse_requirements.formatProperties.aspectMask)
+                {
+                    WARN("Ignoring properties for aspect mask %#x.\n",
+                            sparse_requirements_array[i].formatProperties.aspectMask);
+                }
+                else
+                {
+                    sparse_requirements = sparse_requirements_array[i];
+                }
+            }
+        }
+        vkd3d_free(sparse_requirements_array);
+        if (!sparse_requirements.formatProperties.aspectMask)
+        {
+            WARN("Failed to get sparse requirements.\n");
+            return false;
+        }
+
+        resource->tiles.tile_extent = sparse_requirements.formatProperties.imageGranularity;
+        resource->tiles.subresource_count = subresource_count;
+        resource->tiles.standard_mip_count = sparse_requirements.imageMipTailSize
+                ? sparse_requirements.imageMipTailFirstLod : resource->desc.MipLevels;
+        resource->tiles.packed_mip_tile_count = (resource->tiles.standard_mip_count < resource->desc.MipLevels)
+                ? sparse_requirements.imageMipTailSize / requirements.alignment : 0;
+
+        for (i = 0, start_idx = 0; i < subresource_count; ++i)
+        {
+            miplevel_idx = i % resource->desc.MipLevels;
+
+            tile_extent = &sparse_requirements.formatProperties.imageGranularity;
+            tile_info = &resource->tiles.subresources[i];
+            compute_image_subresource_size_in_tiles(tile_extent, &resource->desc, miplevel_idx, &tile_info->extent);
+            tile_info->offset = start_idx;
+            tile_info->count = 0;
+
+            if (miplevel_idx < resource->tiles.standard_mip_count)
+            {
+                tile_count = tile_info->extent.width * tile_info->extent.height * tile_info->extent.depth;
+                start_idx += tile_count;
+                tile_info->count = tile_count;
+            }
+            else if (miplevel_idx == resource->tiles.standard_mip_count)
+            {
+                tile_info->count = 1; /* Non-zero dummy value */
+                start_idx += 1;
+            }
+        }
+        resource->tiles.total_count = start_idx;
     }
 
     return true;
