@@ -1431,13 +1431,6 @@ static uint32_t vkd3d_spirv_build_op_udiv(struct vkd3d_spirv_builder *builder,
             SpvOpUDiv, result_type, operand0, operand1);
 }
 
-static uint32_t vkd3d_spirv_build_op_umod(struct vkd3d_spirv_builder *builder,
-        uint32_t result_type, uint32_t operand0, uint32_t operand1)
-{
-    return vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
-            SpvOpUMod, result_type, operand0, operand1);
-}
-
 static uint32_t vkd3d_spirv_build_op_isub(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t operand0, uint32_t operand1)
 {
@@ -6992,7 +6985,7 @@ static void spirv_compiler_emit_imad(struct spirv_compiler *compiler,
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
+static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     uint32_t type_id, val_id, src0_id, src1_id, condition_id, uint_max_id;
@@ -7000,6 +6993,10 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
     unsigned int component_count = 0;
+    SpvOp div_op, mod_op;
+
+    div_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSDiv : SpvOpUDiv;
+    mod_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSRem : SpvOpUMod;
 
     if (dst[0].reg.type != VKD3DSPR_NULL)
     {
@@ -7014,7 +7011,7 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
         uint_max_id = spirv_compiler_get_constant_uint_vector(compiler,
                 0xffffffff, component_count);
 
-        val_id = vkd3d_spirv_build_op_udiv(builder, type_id, src0_id, src1_id);
+        val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, div_op, type_id, src0_id, src1_id);
         /* The SPIR-V spec says: "The resulting value is undefined if Operand 2 is 0." */
         val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, val_id, uint_max_id);
 
@@ -7037,7 +7034,7 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
                     0xffffffff, component_count);
         }
 
-        val_id = vkd3d_spirv_build_op_umod(builder, type_id, src0_id, src1_id);
+        val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, mod_op, type_id, src0_id, src1_id);
         /* The SPIR-V spec says: "The resulting value is undefined if Operand 2 is 0." */
         val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, val_id, uint_max_id);
 
@@ -9448,8 +9445,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_IMAD:
             spirv_compiler_emit_imad(compiler, instruction);
             break;
+        case VKD3DSIH_IDIV:
         case VKD3DSIH_UDIV:
-            spirv_compiler_emit_udiv(compiler, instruction);
+            spirv_compiler_emit_int_div(compiler, instruction);
             break;
         case VKD3DSIH_FTOI:
             spirv_compiler_emit_ftoi(compiler, instruction);

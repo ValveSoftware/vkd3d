@@ -171,6 +171,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_HS_JOIN_PHASE                   ] = "hs_join_phase",
     [VKD3DSIH_IADD                            ] = "iadd",
     [VKD3DSIH_IBFE                            ] = "ibfe",
+    [VKD3DSIH_IDIV                            ] = "idiv",
     [VKD3DSIH_IEQ                             ] = "ieq",
     [VKD3DSIH_IF                              ] = "if",
     [VKD3DSIH_IFC                             ] = "ifc",
