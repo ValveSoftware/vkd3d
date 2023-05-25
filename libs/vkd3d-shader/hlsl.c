@@ -3127,8 +3127,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
     {
-        unsigned int n_variants = 0;
         const char *const *variants;
+        unsigned int n_variants;
 
         switch (bt)
         {
@@ -3148,6 +3148,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
                 break;
 
             default:
+                n_variants = 0;
+                variants = NULL;
                 break;
         }
 
