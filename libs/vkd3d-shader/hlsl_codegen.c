@@ -3097,7 +3097,7 @@ static const char *debug_register(char class, struct hlsl_reg reg, const struct 
     return vkd3d_dbg_sprintf("%c%u%s", class, reg.id, debug_hlsl_writemask(reg.writemask));
 }
 
-static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool track_object_components_sampler_dim(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_resource_load *load;
     struct hlsl_ir_var *var;
@@ -3109,15 +3109,16 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
 
     load = hlsl_ir_resource_load(instr);
     var = load->resource.var;
+
     regset = hlsl_type_get_regset(hlsl_deref_get_type(ctx, &load->resource));
+    if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
+        return false;
 
     if (regset == HLSL_REGSET_SAMPLERS)
     {
         enum hlsl_sampler_dim dim;
 
         assert(!load->sampler.var);
-        if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
-            return false;
 
         dim = var->objects_usage[regset][index].sampler_dim;
         if (dim != load->sampling_dim)
@@ -3135,25 +3136,37 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
                 return false;
             }
         }
-        var->objects_usage[regset][index].used = true;
-        var->objects_usage[regset][index].sampler_dim = load->sampling_dim;
     }
-    else
+    var->objects_usage[regset][index].sampler_dim = load->sampling_dim;
+
+    return false;
+}
+
+static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_resource_load *load;
+    struct hlsl_ir_var *var;
+    enum hlsl_regset regset;
+    unsigned int index;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+
+    load = hlsl_ir_resource_load(instr);
+    var = load->resource.var;
+
+    regset = hlsl_type_get_regset(hlsl_deref_get_type(ctx, &load->resource));
+    if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
+        return false;
+
+    var->objects_usage[regset][index].used = true;
+    if (load->sampler.var)
     {
-        if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
+        var = load->sampler.var;
+        if (!hlsl_regset_index_from_deref(ctx, &load->sampler, HLSL_REGSET_SAMPLERS, &index))
             return false;
 
-        var->objects_usage[regset][index].used = true;
-        var->objects_usage[regset][index].sampler_dim = load->sampling_dim;
-
-        if (load->sampler.var)
-        {
-            var = load->sampler.var;
-            if (!hlsl_regset_index_from_deref(ctx, &load->sampler, HLSL_REGSET_SAMPLERS, &index))
-                return false;
-
-            var->objects_usage[HLSL_REGSET_SAMPLERS][index].used = true;
-        }
+        var->objects_usage[HLSL_REGSET_SAMPLERS][index].used = true;
     }
 
     return false;
@@ -4194,6 +4207,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     }
 
     hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
+    hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
