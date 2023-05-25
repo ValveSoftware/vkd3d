@@ -2244,6 +2244,7 @@ struct spirv_compiler
     struct vkd3d_push_constant_buffer_binding *push_constants;
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
 
+    bool main_block_open;
     bool after_declarations_section;
     struct shader_signature input_signature;
     struct shader_signature output_signature;
@@ -5211,6 +5212,7 @@ static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *comp
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
     {
         vkd3d_spirv_builder_begin_main_function(builder);
+        compiler->main_block_open = true;
     }
 }
 
@@ -7509,6 +7511,8 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
 
             if (cf_info)
                 cf_info->inside_block = false;
+            else
+                compiler->main_block_open = false;
             break;
 
         case VKD3DSIH_RETP:
@@ -9468,6 +9472,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (result < 0)
         return result;
+
+    if (compiler->main_block_open)
+        vkd3d_spirv_build_op_return(builder);
 
     if (!is_in_default_phase(compiler))
         spirv_compiler_leave_shader_phase(compiler);
