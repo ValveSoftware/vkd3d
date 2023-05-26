@@ -3862,7 +3862,7 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct list *instrs
     const struct hlsl_type *object_type = object->data_type;
     const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
     const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
-    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE_CMP};
+    struct hlsl_resource_load_params load_params = { 0 };
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
@@ -3871,6 +3871,11 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct list *instrs
     {
         return raise_invalid_method_object_type(ctx, object_type, name, loc);
     }
+
+    if (!strcmp(name, "SampleCmpLevelZero"))
+        load_params.type = HLSL_RESOURCE_SAMPLE_CMP_LZ;
+    else
+        load_params.type = HLSL_RESOURCE_SAMPLE_CMP;
 
     if (params->args_count < 3 || params->args_count > 5 + !!offset_dim)
     {
@@ -4191,6 +4196,7 @@ object_methods[] =
     { "Sample",             add_sample_method_call },
     { "SampleBias",         add_sample_lod_method_call },
     { "SampleCmp",          add_sample_cmp_method_call },
+    { "SampleCmpLevelZero", add_sample_cmp_method_call },
     { "SampleGrad",         add_sample_grad_method_call },
     { "SampleLevel",        add_sample_lod_method_call },
 };

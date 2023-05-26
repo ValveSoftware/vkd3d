@@ -4113,6 +4113,10 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
             instr.opcode = VKD3D_SM4_OP_SAMPLE_C;
             break;
 
+        case HLSL_RESOURCE_SAMPLE_CMP_LZ:
+            instr.opcode = VKD3D_SM4_OP_SAMPLE_C_LZ;
+            break;
+
         case HLSL_RESOURCE_SAMPLE_LOD:
             instr.opcode = VKD3D_SM4_OP_SAMPLE_LOD;
             break;
@@ -4159,7 +4163,8 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         sm4_src_from_node(&instr.srcs[4], load->ddy.node, VKD3DSP_WRITEMASK_ALL);
         instr.src_count += 2;
     }
-    else if (load->load_type == HLSL_RESOURCE_SAMPLE_CMP)
+    else if (load->load_type == HLSL_RESOURCE_SAMPLE_CMP
+            || load->load_type == HLSL_RESOURCE_SAMPLE_CMP_LZ)
     {
         sm4_src_from_node(&instr.srcs[3], load->cmp.node, VKD3DSP_WRITEMASK_ALL);
         ++instr.src_count;
@@ -4963,6 +4968,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
         case HLSL_RESOURCE_SAMPLE:
         case HLSL_RESOURCE_SAMPLE_CMP:
+        case HLSL_RESOURCE_SAMPLE_CMP_LZ:
         case HLSL_RESOURCE_SAMPLE_LOD:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
         case HLSL_RESOURCE_SAMPLE_GRAD:

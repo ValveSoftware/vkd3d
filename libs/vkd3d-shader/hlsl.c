@@ -2445,6 +2445,7 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
         [HLSL_RESOURCE_LOAD] = "load_resource",
         [HLSL_RESOURCE_SAMPLE] = "sample",
         [HLSL_RESOURCE_SAMPLE_CMP] = "sample_cmp",
+        [HLSL_RESOURCE_SAMPLE_CMP_LZ] = "sample_cmp_lz",
         [HLSL_RESOURCE_SAMPLE_LOD] = "sample_lod",
         [HLSL_RESOURCE_SAMPLE_LOD_BIAS] = "sample_biased",
         [HLSL_RESOURCE_SAMPLE_GRAD] = "sample_grad",
