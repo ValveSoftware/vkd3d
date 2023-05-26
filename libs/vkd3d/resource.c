@@ -2334,8 +2334,6 @@ void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descr
     if ((i = vkd3d_atomic_exchange(&descriptor_heap->dirty_list_head, UINT_MAX)) == UINT_MAX)
         return;
 
-    descriptors = (struct d3d12_desc *)descriptor_heap->descriptors;
-
     writes.null_vk_cbv_info.buffer = VK_NULL_HANDLE;
     writes.null_vk_cbv_info.offset = 0;
     writes.null_vk_cbv_info.range = VK_WHOLE_SIZE;
