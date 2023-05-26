@@ -2064,7 +2064,7 @@ static void vkd3d_symbol_make_register(struct vkd3d_symbol *symbol,
         assert(!reg->idx_count || symbol->key.reg.idx != ~0u);
     }
     else if (reg->type != VKD3DSPR_IMMCONSTBUFFER)
-        symbol->key.reg.idx = reg->idx[0].offset;
+        symbol->key.reg.idx = reg->idx_count ? reg->idx[0].offset : ~0u;
 }
 
 static void vkd3d_symbol_set_register_info(struct vkd3d_symbol *symbol,
