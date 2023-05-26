@@ -4008,7 +4008,7 @@ static void write_sm4_constant(struct hlsl_ctx *ctx,
     instr.dst_count = 1;
 
     sm4_src_from_constant_value(&instr.srcs[0], &constant->value, dimx, instr.dsts[0].writemask);
-    instr.src_count = 1,
+    instr.src_count = 1;
 
     write_sm4_instruction(buffer, &instr);
 }
