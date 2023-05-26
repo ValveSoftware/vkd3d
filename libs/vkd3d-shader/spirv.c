@@ -4469,8 +4469,8 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     unsigned int element_idx;
     uint32_t i, index;
 
-    assert(!reg->idx[0].rel_addr);
-    assert(!reg->idx[1].rel_addr);
+    assert(!reg->idx_count || !reg->idx[0].rel_addr);
+    assert(reg->idx_count < 2 || !reg->idx[1].rel_addr);
 
     shader_signature = reg->type == VKD3DSPR_PATCHCONST
             ? &compiler->patch_constant_signature : &compiler->input_signature;
