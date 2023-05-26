@@ -3004,6 +3004,10 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
 
     LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
     {
+        /* In SM4 all constants are inlined. */
+        if (ctx->profile->major_version >= 4 && instr->type == HLSL_IR_CONSTANT)
+            continue;
+
         if (!instr->reg.allocated && instr->last_read)
         {
             instr->reg = allocate_numeric_registers_for_type(ctx, allocator, instr->index, instr->last_read,

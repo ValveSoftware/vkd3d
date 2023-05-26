@@ -4003,24 +4003,6 @@ static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buff
     write_sm4_instruction(buffer, &instr);
 }
 
-static void write_sm4_constant(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_constant *constant)
-{
-    const unsigned int dimx = constant->node.data_type->dimx;
-    struct sm4_instruction instr;
-
-    memset(&instr, 0, sizeof(instr));
-    instr.opcode = VKD3D_SM4_OP_MOV;
-
-    sm4_dst_from_node(&instr.dsts[0], &constant->node);
-    instr.dst_count = 1;
-
-    sm4_src_from_constant_value(&instr.srcs[0], &constant->value, dimx, instr.dsts[0].writemask);
-    instr.src_count = 1;
-
-    write_sm4_instruction(buffer, &instr);
-}
-
 static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
@@ -5097,16 +5079,19 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
             }
 
             assert(instr->data_type->class == HLSL_CLASS_SCALAR || instr->data_type->class == HLSL_CLASS_VECTOR);
+
+            if (!instr->reg.allocated)
+            {
+                assert(instr->type == HLSL_IR_CONSTANT);
+                continue;
+            }
         }
 
         switch (instr->type)
         {
             case HLSL_IR_CALL:
-                vkd3d_unreachable();
-
             case HLSL_IR_CONSTANT:
-                write_sm4_constant(ctx, buffer, hlsl_ir_constant(instr));
-                break;
+                vkd3d_unreachable();
 
             case HLSL_IR_EXPR:
                 write_sm4_expr(ctx, buffer, hlsl_ir_expr(instr));
