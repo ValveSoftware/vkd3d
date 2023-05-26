@@ -1712,7 +1712,7 @@ static bool shader_register_clone_relative_addresses(struct vkd3d_shader_registe
 {
     unsigned int i;
 
-    for (i = 0; i < ARRAY_SIZE(reg->idx) && reg->idx[i].offset != ~0u; ++i)
+    for (i = 0; i < reg->idx_count; ++i)
     {
         if (!reg->idx[i].rel_addr)
             continue;
