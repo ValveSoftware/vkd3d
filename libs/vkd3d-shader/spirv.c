@@ -3368,9 +3368,9 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
     else if (register_info->is_aggregate)
     {
         /* Indices for these are swapped compared to the generated SPIR-V. */
-        if (reg->idx[2].offset != ~0u)
+        if (reg->idx_count > 2)
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[1]);
-        if (reg->idx[1].offset != ~0u)
+        if (reg->idx_count > 1)
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[0]);
         if (!index_count)
             /* A register sysval which is an array in SPIR-V, e.g. SAMPLEMASK. */
