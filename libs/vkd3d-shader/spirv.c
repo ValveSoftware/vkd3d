@@ -2881,7 +2881,7 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
 {
     unsigned int idx;
 
-    idx = reg->idx[1].offset != ~0u ? reg->idx[1].offset : reg->idx[0].offset;
+    idx = reg->idx_count ? reg->idx[reg->idx_count - 1].offset : 0;
     switch (reg->type)
     {
         case VKD3DSPR_RESOURCE:
