@@ -3512,16 +3512,6 @@ static void sm4_dst_from_node(struct sm4_dst_register *dst, const struct hlsl_ir
     sm4_register_from_node(&dst->reg, &dst->writemask, &swizzle_type, instr);
 }
 
-static void sm4_src_from_node(struct sm4_src_register *src,
-        const struct hlsl_ir_node *instr, unsigned int map_writemask)
-{
-    unsigned int writemask;
-
-    sm4_register_from_node(&src->reg, &writemask, &src->swizzle_type, instr);
-    if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
-        src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
-}
-
 static void sm4_src_from_constant_value(struct sm4_src_register *src,
         const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
 {
@@ -3543,6 +3533,16 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
                 src->reg.immconst_uint[i] = value->u[j++].u;
         }
     }
+}
+
+static void sm4_src_from_node(struct sm4_src_register *src,
+        const struct hlsl_ir_node *instr, unsigned int map_writemask)
+{
+    unsigned int writemask;
+
+    sm4_register_from_node(&src->reg, &writemask, &src->swizzle_type, instr);
+    if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
+        src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
 static uint32_t sm4_encode_register(const struct sm4_register *reg)
