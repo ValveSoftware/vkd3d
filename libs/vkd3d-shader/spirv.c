@@ -2060,11 +2060,8 @@ static void vkd3d_symbol_make_register(struct vkd3d_symbol *symbol,
     if (vkd3d_shader_register_is_input(reg) || vkd3d_shader_register_is_output(reg)
             || vkd3d_shader_register_is_patch_constant(reg))
     {
-        unsigned int i;
-        for (i = 2; i > 0; --i)
-            if (reg->idx[i].offset != ~0u)
-                break;
-        symbol->key.reg.idx = reg->idx[i].offset;
+        symbol->key.reg.idx = reg->idx_count ? reg->idx[reg->idx_count - 1].offset : ~0u;
+        assert(!reg->idx_count || symbol->key.reg.idx != ~0u);
     }
     else if (reg->type != VKD3DSPR_IMMCONSTBUFFER)
         symbol->key.reg.idx = reg->idx[0].offset;
