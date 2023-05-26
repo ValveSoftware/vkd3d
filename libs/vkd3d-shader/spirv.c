@@ -4272,6 +4272,7 @@ static uint32_t spirv_compiler_get_invocation_id(struct spirv_compiler *compiler
     r.type = VKD3DSPR_OUTPOINTID;
     r.idx[0].offset = ~0u;
     r.idx[1].offset = ~0u;
+    r.idx_count = 0;
     return spirv_compiler_get_register_id(compiler, &r);
 }
 
