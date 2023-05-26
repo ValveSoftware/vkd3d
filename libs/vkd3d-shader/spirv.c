@@ -4626,9 +4626,8 @@ static void spirv_compiler_emit_input_register(struct spirv_compiler *compiler,
     uint32_t write_mask;
     uint32_t input_id;
 
-    assert(!reg->idx[0].rel_addr);
-    assert(!reg->idx[1].rel_addr);
-    assert(reg->idx[1].offset == ~0u);
+    assert(!reg->idx_count || !reg->idx[0].rel_addr);
+    assert(reg->idx_count < 2);
 
     if (!(builtin = get_spirv_builtin_for_register(reg->type)))
     {
@@ -4783,9 +4782,8 @@ static void spirv_compiler_emit_output_register(struct spirv_compiler *compiler,
     uint32_t write_mask;
     uint32_t output_id;
 
-    assert(!reg->idx[0].rel_addr);
-    assert(!reg->idx[1].rel_addr);
-    assert(reg->idx[1].offset == ~0u);
+    assert(!reg->idx_count || !reg->idx[0].rel_addr);
+    assert(reg->idx_count < 2);
 
     if (!(builtin = get_spirv_builtin_for_register(reg->type)))
     {
