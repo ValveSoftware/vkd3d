@@ -779,6 +779,7 @@ static HRESULT vkd3d_create_image(struct d3d12_device *device,
     VkImageFormatListCreateInfoKHR format_list;
     const struct vkd3d_format *format;
     VkImageCreateInfo image_info;
+    uint32_t count;
     VkResult vr;
 
     if (resource)
@@ -913,6 +914,20 @@ static HRESULT vkd3d_create_image(struct d3d12_device *device,
 
     if (resource && image_info.tiling == VK_IMAGE_TILING_LINEAR)
         resource->flags |= VKD3D_RESOURCE_LINEAR_TILING;
+
+    if (sparse_resource)
+    {
+        count = 0;
+        VK_CALL(vkGetPhysicalDeviceSparseImageFormatProperties(device->vk_physical_device, image_info.format,
+                image_info.imageType, image_info.samples, image_info.usage, image_info.tiling, &count, NULL));
+
+        if (!count)
+        {
+            FIXME("Sparse images are not supported with format %u, type %u, samples %u, usage %#x.\n",
+                    image_info.format, image_info.imageType, image_info.samples, image_info.usage);
+            return E_INVALIDARG;
+        }
+    }
 
     if ((vr = VK_CALL(vkCreateImage(device->vk_device, &image_info, NULL, vk_image))) < 0)
         WARN("Failed to create Vulkan image, vr %d.\n", vr);
