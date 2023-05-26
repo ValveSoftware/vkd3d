@@ -3378,11 +3378,11 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
     }
     else
     {
-        if (reg->idx[1].rel_addr || (reg->idx[1].offset == ~0u && reg->idx[0].rel_addr))
+        if (reg->idx_count && reg->idx[reg->idx_count - 1].rel_addr)
             FIXME("Relative addressing not implemented.\n");
 
         /* Handle arrayed registers, e.g. v[3][0]. */
-        if (reg->idx[1].offset != ~0u && !register_is_descriptor(reg))
+        if (reg->idx_count > 1 && !register_is_descriptor(reg))
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[0]);
     }
 
