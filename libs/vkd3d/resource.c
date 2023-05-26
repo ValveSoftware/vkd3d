@@ -1686,6 +1686,12 @@ HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC *desc, struct d3d
                     WARN("The device does not support tiled 3D images.\n");
                     return E_INVALIDARG;
                 }
+                if (format->plane_count > 1)
+                {
+                    WARN("Invalid format %#x. D3D12 does not support multiplanar formats for tiled resources.\n",
+                            format->dxgi_format);
+                    return E_INVALIDARG;
+                }
             }
 
             if (!d3d12_resource_validate_texture_format(desc, format)
