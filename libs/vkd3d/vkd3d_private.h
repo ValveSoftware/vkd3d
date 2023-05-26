@@ -151,6 +151,7 @@ struct vkd3d_vulkan_info
 
     VkPhysicalDeviceSparseProperties sparse_properties;
     bool sparse_binding;
+    bool sparse_residency_3d;
 
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
 

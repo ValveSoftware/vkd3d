@@ -1679,6 +1679,15 @@ HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC *desc, struct d3d
                 return E_INVALIDARG;
             }
 
+            if (desc->Layout == D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE)
+            {
+                if (desc->Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D && !device->vk_info.sparse_residency_3d)
+                {
+                    WARN("The device does not support tiled 3D images.\n");
+                    return E_INVALIDARG;
+                }
+            }
+
             if (!d3d12_resource_validate_texture_format(desc, format)
                     || !d3d12_resource_validate_texture_alignment(desc, format))
                 return E_INVALIDARG;
