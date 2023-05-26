@@ -5172,6 +5172,7 @@ static void spirv_compiler_emit_hull_shader_builtins(struct spirv_compiler *comp
     dst.reg.type = VKD3DSPR_OUTPOINTID;
     dst.reg.idx[0].offset = ~0u;
     dst.reg.idx[1].offset = ~0u;
+    dst.reg.idx_count = 0;
     dst.write_mask = VKD3DSP_WRITEMASK_0;
     spirv_compiler_emit_input_register(compiler, &dst);
 }
