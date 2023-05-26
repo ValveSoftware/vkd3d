@@ -4436,10 +4436,8 @@ static unsigned int shader_register_get_io_indices(const struct vkd3d_shader_reg
     array_sizes[0] = 0;
     array_sizes[1] = 0;
     element_idx = reg->idx[0].offset;
-    for (i = 1; i < 3; ++i)
+    for (i = 1; i < reg->idx_count; ++i)
     {
-        if (reg->idx[i].offset == ~0u)
-            break;
         array_sizes[1] = array_sizes[0];
         array_sizes[0] = element_idx;
         element_idx = reg->idx[i].offset;
