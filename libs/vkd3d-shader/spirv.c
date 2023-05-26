@@ -6309,6 +6309,7 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
     invocation.reg.idx[0].offset = ~0u;
     invocation.reg.idx[1].offset = ~0u;
     invocation.reg.idx[2].offset = ~0u;
+    invocation.reg.idx_count = 0;
     invocation.swizzle = VKD3D_SHADER_NO_SWIZZLE;
 
     memset(&input_reg, 0, sizeof(input_reg));
@@ -6316,6 +6317,7 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
     input_reg.data_type = VKD3D_DATA_FLOAT;
     input_reg.idx[0].rel_addr = &invocation;
     input_reg.idx[2].offset = ~0u;
+    input_reg.idx_count = 2;
     input_id = spirv_compiler_get_register_id(compiler, &input_reg);
 
     assert(input_signature->element_count == output_signature->element_count);
