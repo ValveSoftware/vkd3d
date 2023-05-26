@@ -3540,6 +3540,14 @@ static void sm4_src_from_node(struct sm4_src_register *src,
 {
     unsigned int writemask;
 
+    if (instr->type == HLSL_IR_CONSTANT)
+    {
+        struct hlsl_ir_constant *constant = hlsl_ir_constant(instr);
+
+        sm4_src_from_constant_value(src, &constant->value, instr->data_type->dimx, map_writemask);
+        return;
+    }
+
     sm4_register_from_node(&src->reg, &writemask, &src->swizzle_type, instr);
     if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
