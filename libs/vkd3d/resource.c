@@ -943,6 +943,7 @@ HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
     D3D12_RESOURCE_DESC validated_desc;
     VkMemoryRequirements requirements;
     VkImage vk_image;
+    bool tiled;
     HRESULT hr;
 
     assert(desc->Dimension != D3D12_RESOURCE_DIMENSION_BUFFER);
@@ -955,8 +956,10 @@ HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
         desc = &validated_desc;
     }
 
+    tiled = desc->Layout == D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE;
+
     /* XXX: We have to create an image to get its memory requirements. */
-    if (SUCCEEDED(hr = vkd3d_create_image(device, &heap_properties, 0, desc, NULL, &vk_image)))
+    if (SUCCEEDED(hr = vkd3d_create_image(device, tiled ? NULL : &heap_properties, 0, desc, NULL, &vk_image)))
     {
         VK_CALL(vkGetImageMemoryRequirements(device->vk_device, vk_image, &requirements));
         VK_CALL(vkDestroyImage(device->vk_device, vk_image, NULL));
