@@ -5299,6 +5299,7 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     reg.type = VKD3DSPR_IDXTEMP;
     reg.idx[0].offset = temp->register_idx;
     reg.idx[1].offset = ~0u;
+    reg.idx_count = 1;
 
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
