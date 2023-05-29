@@ -607,9 +607,11 @@ struct hlsl_deref
      *   components, within the pertaining regset), from the start of the variable, of the part
      *   referenced.
      * The path is lowered to this single offset -- whose value may vary between SM1 and SM4 --
-     *   before writing the bytecode. */
+     *   before writing the bytecode.
+     * Since the type information cannot longer be retrieved from the offset alone, the type is
+     *   stored in the data_type field. */
     struct hlsl_src offset;
-    enum hlsl_regset offset_regset;
+    struct hlsl_type *data_type;
 };
 
 struct hlsl_ir_load

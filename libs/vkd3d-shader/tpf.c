@@ -3349,8 +3349,9 @@ struct sm4_instruction
 
 static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *reg,
         unsigned int *writemask, enum vkd3d_sm4_swizzle_type *swizzle_type,
-        const struct hlsl_deref *deref, const struct hlsl_type *data_type)
+        const struct hlsl_deref *deref)
 {
+    const struct hlsl_type *data_type = hlsl_deref_get_type(ctx, deref);
     const struct hlsl_ir_var *var = deref->var;
 
     if (var->is_uniform)
@@ -3365,7 +3366,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0] = var->regs[HLSL_REGSET_TEXTURES].id;
             reg->idx[0] += hlsl_offset_from_deref_safe(ctx, deref);
-            assert(deref->offset_regset == HLSL_REGSET_TEXTURES);
+            assert(regset == HLSL_REGSET_TEXTURES);
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -3377,7 +3378,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0] = var->regs[HLSL_REGSET_UAVS].id;
             reg->idx[0] += hlsl_offset_from_deref_safe(ctx, deref);
-            assert(deref->offset_regset == HLSL_REGSET_UAVS);
+            assert(regset == HLSL_REGSET_UAVS);
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -3389,7 +3390,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->idx[0] = var->regs[HLSL_REGSET_SAMPLERS].id;
             reg->idx[0] += hlsl_offset_from_deref_safe(ctx, deref);
-            assert(deref->offset_regset == HLSL_REGSET_SAMPLERS);
+            assert(regset == HLSL_REGSET_SAMPLERS);
             reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
@@ -3487,11 +3488,11 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 }
 
 static void sm4_src_from_deref(struct hlsl_ctx *ctx, struct sm4_src_register *src,
-        const struct hlsl_deref *deref, const struct hlsl_type *data_type, unsigned int map_writemask)
+        const struct hlsl_deref *deref, unsigned int map_writemask)
 {
     unsigned int writemask;
 
-    sm4_register_from_deref(ctx, &src->reg, &writemask, &src->swizzle_type, deref, data_type);
+    sm4_register_from_deref(ctx, &src->reg, &writemask, &src->swizzle_type, deref);
     if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
@@ -4011,11 +4012,11 @@ static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buff
 }
 
 static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
-        const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
-        const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
-        enum hlsl_sampler_dim dim)
+        const struct hlsl_ir_node *dst, const struct hlsl_deref *resource,
+        const struct hlsl_ir_node *coords, const struct hlsl_ir_node *sample_index,
+        const struct hlsl_ir_node *texel_offset, enum hlsl_sampler_dim dim)
 {
+    const struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, resource);
     bool multisampled = resource_type->base_type == HLSL_TYPE_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
     bool uav = (hlsl_type_get_regset(resource_type) == HLSL_REGSET_UAVS);
@@ -4055,7 +4056,7 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
     sm4_src_from_node(&instr.srcs[0], coords, coords_writemask);
 
-    sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
+    sm4_src_from_deref(ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
 
     instr.src_count = 2;
 
@@ -4092,7 +4093,6 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         const struct hlsl_ir_resource_load *load)
 {
-    const struct hlsl_type *resource_type = load->resource.var->data_type;
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
     const struct hlsl_deref *resource = &load->resource;
@@ -4145,8 +4145,8 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(ctx, &instr.srcs[1], resource, resource_type, instr.dsts[0].writemask);
-    sm4_src_from_deref(ctx, &instr.srcs[2], sampler, sampler->var->data_type, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(ctx, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 3;
 
     if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD
@@ -4316,7 +4316,7 @@ static void write_sm4_store_uav_typed(struct hlsl_ctx *ctx, struct vkd3d_bytecod
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
 
-    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, dst, dst->var->data_type);
+    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, dst);
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
@@ -4856,7 +4856,7 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
 
         instr.opcode = VKD3D_SM4_OP_MOVC;
 
-        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, type, instr.dsts[0].writemask);
+        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
 
         memset(&value, 0xff, sizeof(value));
         sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].writemask);
@@ -4868,7 +4868,7 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     {
         instr.opcode = VKD3D_SM4_OP_MOV;
 
-        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, type, instr.dsts[0].writemask);
+        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
         instr.src_count = 1;
     }
 
@@ -4892,8 +4892,7 @@ static void write_sm4_loop(struct hlsl_ctx *ctx,
 }
 
 static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_type *resource_type, const struct hlsl_ir_node *dst,
-        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
+        const struct hlsl_ir_node *dst, const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
         const struct hlsl_ir_node *coords, unsigned int swizzle, const struct hlsl_ir_node *texel_offset)
 {
     struct sm4_src_register *src;
@@ -4923,10 +4922,10 @@ static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         }
     }
 
-    sm4_src_from_deref(ctx, &instr.srcs[instr.src_count++], resource, resource_type, instr.dsts[0].writemask);
+    sm4_src_from_deref(ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].writemask);
 
     src = &instr.srcs[instr.src_count++];
-    sm4_src_from_deref(ctx, src, sampler, sampler->var->data_type, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
     src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
     src->swizzle_type = VKD3D_SM4_SWIZZLE_SCALAR;
     src->swizzle = swizzle;
@@ -4974,7 +4973,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
     switch (load->load_type)
     {
         case HLSL_RESOURCE_LOAD:
-            write_sm4_ld(ctx, buffer, resource_type, &load->node, &load->resource,
+            write_sm4_ld(ctx, buffer, &load->node, &load->resource,
                     coords, sample_index, texel_offset, load->sampling_dim);
             break;
 
@@ -4993,23 +4992,23 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_GATHER_RED:
-            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
-                    &load->sampler, coords, HLSL_SWIZZLE(X, X, X, X), texel_offset);
+            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+                    HLSL_SWIZZLE(X, X, X, X), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_GREEN:
-            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
-                    &load->sampler, coords, HLSL_SWIZZLE(Y, Y, Y, Y), texel_offset);
+            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+                    HLSL_SWIZZLE(Y, Y, Y, Y), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_BLUE:
-            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
-                    &load->sampler, coords, HLSL_SWIZZLE(Z, Z, Z, Z), texel_offset);
+            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+                    HLSL_SWIZZLE(Z, Z, Z, Z), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_ALPHA:
-            write_sm4_gather(ctx, buffer, resource_type, &load->node, &load->resource,
-                    &load->sampler, coords, HLSL_SWIZZLE(W, W, W, W), texel_offset);
+            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+                    HLSL_SWIZZLE(W, W, W, W), texel_offset);
             break;
     }
 }
@@ -5050,7 +5049,7 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
 
-    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs, rhs->data_type);
+    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs);
     instr.dsts[0].writemask = hlsl_combine_writemasks(writemask, store->writemask);
     instr.dst_count = 1;
 

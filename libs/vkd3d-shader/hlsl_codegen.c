@@ -97,6 +97,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, const struct vkd3d_shader_location *loc)
 {
+    enum hlsl_regset regset = hlsl_type_get_regset(deref->data_type);
     struct hlsl_ir_node *offset = NULL;
     struct hlsl_type *type;
     unsigned int i;
@@ -111,7 +112,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
         struct hlsl_block idx_block;
 
         if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node,
-                deref->offset_regset, loc)))
+                regset, loc)))
             return NULL;
 
         hlsl_block_add_block(block, &idx_block);
@@ -126,7 +127,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
-    const struct hlsl_type *type;
+    struct hlsl_type *type;
     struct hlsl_ir_node *offset;
     struct hlsl_block block;
 
@@ -145,7 +146,7 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
         return true;
     }
 
-    deref->offset_regset = hlsl_type_get_regset(type);
+    deref->data_type = type;
 
     if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
         return false;
@@ -3931,6 +3932,7 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
     struct hlsl_ir_node *offset_node = deref->offset.node;
+    enum hlsl_regset regset;
     unsigned int size;
 
     if (!offset_node)
@@ -3947,8 +3949,9 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
         return false;
 
     *offset = hlsl_ir_constant(offset_node)->value.u[0].u;
+    regset = hlsl_type_get_regset(deref->data_type);
 
-    size = deref->var->data_type->reg_size[deref->offset_regset];
+    size = deref->var->data_type->reg_size[regset];
     if (*offset >= size)
     {
         hlsl_error(ctx, &deref->offset.node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
@@ -3978,7 +3981,8 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     struct hlsl_reg ret = var->regs[HLSL_REGSET_NUMERIC];
     unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
-    assert(deref->offset_regset == HLSL_REGSET_NUMERIC);
+    assert(deref->data_type);
+    assert(deref->data_type->class <= HLSL_CLASS_LAST_NUMERIC);
 
     ret.id += offset / 4;
 

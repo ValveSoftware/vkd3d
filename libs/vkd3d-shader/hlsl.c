@@ -524,7 +524,9 @@ struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_de
     unsigned int i;
 
     assert(deref);
-    assert(!deref->offset.node);
+
+    if (deref->offset.node)
+        return deref->data_type;
 
     type = deref->var->data_type;
     for (i = 0; i < deref->path_len; ++i)
