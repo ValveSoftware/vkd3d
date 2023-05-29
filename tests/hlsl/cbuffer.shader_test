@@ -694,7 +694,7 @@ shader model >= 5.0
 size (1, 1)
 0.0 0.0 0.0 0.5
 
-[pixel shader todo]
+[pixel shader]
 struct apple
 {
     float2 a;
@@ -718,5 +718,5 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo draw quad
-todo probe all rgba (124.0, 135.0, 146.0, 150.5)
+draw quad
+probe all rgba (124.0, 135.0, 146.0, 150.5)

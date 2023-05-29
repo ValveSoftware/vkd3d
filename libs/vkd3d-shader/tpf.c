@@ -3007,6 +3007,7 @@ static void sm4_free_extern_resources(struct extern_resource *extern_resources, 
 
 static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
+    bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;
     struct extern_resource *extern_resources = NULL;
     const struct hlsl_ir_var *var;
     enum hlsl_regset regset;
@@ -3017,39 +3018,99 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!hlsl_type_is_resource(var->data_type))
-            continue;
-        regset = hlsl_type_get_regset(var->data_type);
-        if (!var->regs[regset].allocated)
-            continue;
-
-        if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
-                sizeof(*extern_resources))))
+        if (separate_components)
         {
-            sm4_free_extern_resources(extern_resources, *count);
-            *count = 0;
-            return NULL;
-        }
+            unsigned int component_count = hlsl_type_component_count(var->data_type);
+            unsigned int k, regset_offset;
 
-        if (!(name = hlsl_strdup(ctx, var->name)))
+            for (k = 0; k < component_count; ++k)
+            {
+                struct hlsl_type *component_type = hlsl_type_get_component_type(ctx, var->data_type, k);
+                struct vkd3d_string_buffer *name_buffer;
+
+                if (!hlsl_type_is_resource(component_type))
+                    continue;
+
+                regset = hlsl_type_get_regset(component_type);
+                regset_offset = hlsl_type_get_component_offset(ctx, var->data_type, regset, k);
+
+                if (regset_offset > var->regs[regset].bind_count)
+                    continue;
+
+                if (var->objects_usage[regset][regset_offset].used)
+                {
+                    if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                            sizeof(*extern_resources))))
+                    {
+                        sm4_free_extern_resources(extern_resources, *count);
+                        *count = 0;
+                        return NULL;
+                    }
+
+                    if (!(name_buffer = hlsl_component_to_string(ctx, var, k)))
+                    {
+                        sm4_free_extern_resources(extern_resources, *count);
+                        *count = 0;
+                        return NULL;
+                    }
+                    if (!(name = hlsl_strdup(ctx, name_buffer->buffer)))
+                    {
+                        sm4_free_extern_resources(extern_resources, *count);
+                        *count = 0;
+                        hlsl_release_string_buffer(ctx, name_buffer);
+                        return NULL;
+                    }
+                    hlsl_release_string_buffer(ctx, name_buffer);
+
+                    extern_resources[*count].var = NULL;
+
+                    extern_resources[*count].name = name;
+                    extern_resources[*count].data_type = component_type;
+                    extern_resources[*count].is_user_packed = false;
+
+                    extern_resources[*count].regset = regset;
+                    extern_resources[*count].id = var->regs[regset].id + regset_offset;
+                    extern_resources[*count].bind_count = 1;
+
+                    ++*count;
+                }
+            }
+        }
+        else
         {
-            sm4_free_extern_resources(extern_resources, *count);
-            *count = 0;
-            return NULL;
+            if (!hlsl_type_is_resource(var->data_type))
+                continue;
+            regset = hlsl_type_get_regset(var->data_type);
+            if (!var->regs[regset].allocated)
+                continue;
+
+            if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                    sizeof(*extern_resources))))
+            {
+                sm4_free_extern_resources(extern_resources, *count);
+                *count = 0;
+                return NULL;
+            }
+
+            if (!(name = hlsl_strdup(ctx, var->name)))
+            {
+                sm4_free_extern_resources(extern_resources, *count);
+                *count = 0;
+                return NULL;
+            }
+
+            extern_resources[*count].var = var;
+
+            extern_resources[*count].name = name;
+            extern_resources[*count].data_type = var->data_type;
+            extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
+
+            extern_resources[*count].regset = regset;
+            extern_resources[*count].id = var->regs[regset].id;
+            extern_resources[*count].bind_count = var->regs[regset].bind_count;
+
+            ++*count;
         }
-
-        extern_resources[*count].var = var;
-
-        extern_resources[*count].name = name;
-        extern_resources[*count].data_type = var->data_type;
-        extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
-
-        extern_resources[*count].regset = regset;
-        extern_resources[*count].id = var->regs[regset].id;
-        extern_resources[*count].bind_count = var->regs[regset].bind_count;
-
-
-        ++*count;
     }
 
     qsort(extern_resources, *count, sizeof(*extern_resources), sm4_compare_extern_resources);
@@ -4980,32 +5041,14 @@ static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
 static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
 {
-    const struct hlsl_type *resource_type = load->resource.var->data_type;
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *sample_index = load->sample_index.node;
     const struct hlsl_ir_node *coords = load->coords.node;
 
-    if (!hlsl_type_is_resource(resource_type))
+    if (load->sampler.var && !load->sampler.var->is_uniform)
     {
-        hlsl_fixme(ctx, &load->node.loc, "Separate object fields as new variables.");
+        hlsl_fixme(ctx, &load->node.loc, "Sample using non-uniform sampler variable.");
         return;
-    }
-
-    if (load->sampler.var)
-    {
-        const struct hlsl_type *sampler_type = load->sampler.var->data_type;
-
-        if (!hlsl_type_is_resource(sampler_type))
-        {
-            hlsl_fixme(ctx, &load->node.loc, "Separate object fields as new variables.");
-            return;
-        }
-
-        if (!load->sampler.var->is_uniform)
-        {
-            hlsl_fixme(ctx, &load->node.loc, "Sample using non-uniform sampler variable.");
-            return;
-        }
     }
 
     if (!load->resource.var->is_uniform)
@@ -5060,13 +5103,7 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 static void write_sm4_resource_store(struct hlsl_ctx *ctx,
         struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_store *store)
 {
-    const struct hlsl_type *resource_type = store->resource.var->data_type;
-
-    if (!hlsl_type_is_resource(resource_type))
-    {
-        hlsl_fixme(ctx, &store->node.loc, "Separate object fields as new variables.");
-        return;
-    }
+    struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, &store->resource);
 
     if (!store->resource.var->is_uniform)
     {

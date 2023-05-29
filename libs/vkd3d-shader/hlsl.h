@@ -1068,6 +1068,8 @@ const char *debug_hlsl_writemask(unsigned int writemask);
 const char *debug_hlsl_swizzle(unsigned int swizzle, unsigned int count);
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type);
+struct vkd3d_string_buffer *hlsl_component_to_string(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var,
+        unsigned int index);
 struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsigned int modifiers);
 const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type);
 
@@ -1202,6 +1204,8 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type);
 unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, enum hlsl_regset regset);
 struct hlsl_type *hlsl_type_get_component_type(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int index);
+unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
+        enum hlsl_regset regset, unsigned int index);
 bool hlsl_type_is_row_major(const struct hlsl_type *type);
 unsigned int hlsl_type_minor_size(const struct hlsl_type *type);
 unsigned int hlsl_type_major_size(const struct hlsl_type *type);
