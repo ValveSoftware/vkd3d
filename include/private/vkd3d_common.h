@@ -20,6 +20,7 @@
 #define __VKD3D_COMMON_H
 
 #include "config.h"
+#define WIN32_LEAN_AND_MEAN
 #include "vkd3d_windows.h"
 #include "vkd3d_types.h"
 
@@ -28,6 +29,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _MSC_VER
 #include <intrin.h>
