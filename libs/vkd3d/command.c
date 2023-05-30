@@ -6298,10 +6298,34 @@ static void STDMETHODCALLTYPE d3d12_command_queue_CopyTileMappings(ID3D12Command
         const D3D12_TILE_REGION_SIZE *region_size,
         D3D12_TILE_MAPPING_FLAGS flags)
 {
-    FIXME("iface %p, dst_resource %p, dst_region_start_coordinate %p, "
-            "src_resource %p, src_region_start_coordinate %p, region_size %p, flags %#x stub!\n",
+    struct d3d12_resource *dst_resource_impl = impl_from_ID3D12Resource(dst_resource);
+    struct d3d12_resource *src_resource_impl = impl_from_ID3D12Resource(src_resource);
+    struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
+    struct vkd3d_cs_op_data *op;
+
+    TRACE("iface %p, dst_resource %p, dst_region_start_coordinate %p, "
+            "src_resource %p, src_region_start_coordinate %p, region_size %p, flags %#x.\n",
             iface, dst_resource, dst_region_start_coordinate, src_resource,
             src_region_start_coordinate, region_size, flags);
+
+    vkd3d_mutex_lock(&command_queue->op_mutex);
+
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
+    {
+        ERR("Failed to add op.\n");
+        return;
+    }
+    op->opcode = VKD3D_CS_OP_COPY_MAPPINGS;
+    op->u.copy_mappings.dst_resource = dst_resource_impl;
+    op->u.copy_mappings.src_resource = src_resource_impl;
+    op->u.copy_mappings.dst_region_start_coordinate = *dst_region_start_coordinate;
+    op->u.copy_mappings.src_region_start_coordinate = *src_region_start_coordinate;
+    op->u.copy_mappings.region_size = *region_size;
+    op->u.copy_mappings.flags = flags;
+
+    d3d12_command_queue_submit_locked(command_queue);
+
+    vkd3d_mutex_unlock(&command_queue->op_mutex);
 }
 
 static void d3d12_command_queue_execute(struct d3d12_command_queue *command_queue,
@@ -7052,6 +7076,10 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
                 case VKD3D_CS_OP_UPDATE_MAPPINGS:
                     FIXME("Tiled resource binding is not supported yet.\n");
                     update_mappings_cleanup(&op->u.update_mappings);
+                    break;
+
+                case VKD3D_CS_OP_COPY_MAPPINGS:
+                    FIXME("Tiled resource mapping copying is not supported yet.\n");
                     break;
 
                 default:

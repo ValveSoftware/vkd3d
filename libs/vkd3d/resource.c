@@ -1063,11 +1063,6 @@ static void d3d12_resource_init_tiles(struct d3d12_resource *resource)
 }
 
 /* ID3D12Resource */
-static inline struct d3d12_resource *impl_from_ID3D12Resource(ID3D12Resource *iface)
-{
-    return CONTAINING_RECORD(iface, struct d3d12_resource, ID3D12Resource_iface);
-}
-
 static HRESULT STDMETHODCALLTYPE d3d12_resource_QueryInterface(ID3D12Resource *iface,
         REFIID riid, void **object)
 {

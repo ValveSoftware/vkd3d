@@ -711,6 +711,11 @@ struct d3d12_resource
     struct vkd3d_private_store private_store;
 };
 
+static inline struct d3d12_resource *impl_from_ID3D12Resource(ID3D12Resource *iface)
+{
+    return CONTAINING_RECORD(iface, struct d3d12_resource, ID3D12Resource_iface);
+}
+
 static inline bool d3d12_resource_is_buffer(const struct d3d12_resource *resource)
 {
     return resource->desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER;
@@ -1465,6 +1470,7 @@ enum vkd3d_cs_op
     VKD3D_CS_OP_SIGNAL,
     VKD3D_CS_OP_EXECUTE,
     VKD3D_CS_OP_UPDATE_MAPPINGS,
+    VKD3D_CS_OP_COPY_MAPPINGS,
 };
 
 struct vkd3d_cs_wait
@@ -1499,6 +1505,16 @@ struct vkd3d_cs_update_mappings
     D3D12_TILE_MAPPING_FLAGS flags;
 };
 
+struct vkd3d_cs_copy_mappings
+{
+    struct d3d12_resource *dst_resource;
+    struct d3d12_resource *src_resource;
+    D3D12_TILED_RESOURCE_COORDINATE dst_region_start_coordinate;
+    D3D12_TILED_RESOURCE_COORDINATE src_region_start_coordinate;
+    D3D12_TILE_REGION_SIZE region_size;
+    D3D12_TILE_MAPPING_FLAGS flags;
+};
+
 struct vkd3d_cs_op_data
 {
     enum vkd3d_cs_op opcode;
@@ -1508,6 +1524,7 @@ struct vkd3d_cs_op_data
         struct vkd3d_cs_signal signal;
         struct vkd3d_cs_execute execute;
         struct vkd3d_cs_update_mappings update_mappings;
+        struct vkd3d_cs_copy_mappings copy_mappings;
     } u;
 };
 
