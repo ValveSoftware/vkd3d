@@ -35,7 +35,7 @@ size (1, 1)
 4.0 4.0 4.0 1.0
 
 
-[pixel shader todo]
+[pixel shader]
 sampler sam;
 
 float4 main() : sv_target
@@ -44,12 +44,12 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (0, 0, 0, 1)
+draw quad
+probe all rgba (0, 0, 0, 1)
 
 
 % Textures for new separated samplers are allocated before regular textures.
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 sampler sam;
 
@@ -59,11 +59,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (10, 10, 10, 11)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 sampler sam[2];
 
@@ -73,11 +73,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (21, 21, 21, 11)
 
 
-[pixel shader todo]
+[pixel shader]
 sampler sam0;
 sampler sam1;
 sampler sam2;
@@ -89,11 +89,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (12, 12, 12, 111)
+draw quad
+probe all rgba (12, 12, 12, 111)
 
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex[2][2];
 sampler sam;
 
@@ -104,13 +104,13 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (104, 104, 104, 111)
 
 
 % Sampler arrays with components that have different usage dimensions are only forbidden in SM4 upwards.
 % However, tex2D and tex1D are considered the same dimension for these purposes.
-[pixel shader fail todo]
+[pixel shader fail]
 sampler sam[2];
 
 float4 main() : sv_target

@@ -422,6 +422,7 @@ struct hlsl_ir_var
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
+    uint32_t is_separated_resource : 1;
 };
 
 /* Sized array of variables representing a function's parameters. */

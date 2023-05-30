@@ -673,6 +673,7 @@ struct hlsl_type *hlsl_new_array_type(struct hlsl_ctx *ctx, struct hlsl_type *ba
     type->e.array.type = basic_type;
     type->dimx = basic_type->dimx;
     type->dimy = basic_type->dimy;
+    type->sampler_dim = basic_type->sampler_dim;
     hlsl_type_calculate_reg_size(ctx, type);
 
     list_add_tail(&ctx->types, &type->entry);

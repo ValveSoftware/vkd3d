@@ -3005,6 +3005,13 @@ static void sm4_free_extern_resources(struct extern_resource *extern_resources, 
     vkd3d_free(extern_resources);
 }
 
+static const char *string_skip_tag(const char *string)
+{
+    if (!strncmp(string, "<resource>", strlen("<resource>")))
+        return string + strlen("<resource>");
+    return string;
+}
+
 static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, unsigned int *count)
 {
     bool separate_components = ctx->profile->major_version == 5 && ctx->profile->minor_version == 0;
@@ -3053,7 +3060,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                         *count = 0;
                         return NULL;
                     }
-                    if (!(name = hlsl_strdup(ctx, name_buffer->buffer)))
+                    if (!(name = hlsl_strdup(ctx, string_skip_tag(name_buffer->buffer))))
                     {
                         sm4_free_extern_resources(extern_resources, *count);
                         *count = 0;
@@ -3092,7 +3099,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 return NULL;
             }
 
-            if (!(name = hlsl_strdup(ctx, var->name)))
+            if (!(name = hlsl_strdup(ctx, string_skip_tag(var->name))))
             {
                 sm4_free_extern_resources(extern_resources, *count);
                 *count = 0;
@@ -5070,11 +5077,8 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_SAMPLE_LOD:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
         case HLSL_RESOURCE_SAMPLE_GRAD:
-            if (!load->sampler.var)
-            {
-                hlsl_fixme(ctx, &load->node.loc, "SM4 combined sample expression.");
-                return;
-            }
+            /* Combined sample expressions were lowered. */
+            assert(load->sampler.var);
             write_sm4_sample(ctx, buffer, load);
             break;
 

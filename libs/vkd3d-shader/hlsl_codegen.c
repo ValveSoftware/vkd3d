@@ -2067,6 +2067,97 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
     return false;
 }
 
+/* Lower combined samples and sampler variables to synthesized separated textures and samplers.
+ * That is, translate SM1-style samples in the source to SM4-style samples in the bytecode. */
+static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_resource_load *load;
+    struct vkd3d_string_buffer *name;
+    struct hlsl_ir_var *var;
+    unsigned int i;
+
+    if (instr->type != HLSL_IR_RESOURCE_LOAD)
+        return false;
+    load = hlsl_ir_resource_load(instr);
+
+    switch (load->load_type)
+    {
+        case HLSL_RESOURCE_LOAD:
+        case HLSL_RESOURCE_GATHER_RED:
+        case HLSL_RESOURCE_GATHER_GREEN:
+        case HLSL_RESOURCE_GATHER_BLUE:
+        case HLSL_RESOURCE_GATHER_ALPHA:
+        case HLSL_RESOURCE_SAMPLE_CMP:
+        case HLSL_RESOURCE_SAMPLE_CMP_LZ:
+        case HLSL_RESOURCE_SAMPLE_GRAD:
+            return false;
+
+        case HLSL_RESOURCE_SAMPLE:
+        case HLSL_RESOURCE_SAMPLE_LOD:
+        case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
+            break;
+    }
+    if (load->sampler.var)
+        return false;
+
+    if (!hlsl_type_is_resource(load->resource.var->data_type))
+    {
+        hlsl_fixme(ctx, &instr->loc, "Lower combined samplers within structs.");
+        return false;
+    }
+
+    assert(hlsl_type_get_regset(load->resource.var->data_type) == HLSL_REGSET_SAMPLERS);
+
+    if (!(name = hlsl_get_string_buffer(ctx)))
+        return false;
+    vkd3d_string_buffer_printf(name, "<resource>%s", load->resource.var->name);
+
+    TRACE("Lowering to separate resource %s.\n", debugstr_a(name->buffer));
+
+    if (!(var = hlsl_get_var(ctx->globals, name->buffer)))
+    {
+        struct hlsl_type *texture_array_type = hlsl_new_texture_type(ctx, load->sampling_dim,
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), 0);
+
+        /* Create (possibly multi-dimensional) texture array type with the same dims as the sampler array. */
+        struct hlsl_type *arr_type = load->resource.var->data_type;
+        for (i = 0; i < load->resource.path_len; ++i)
+        {
+            assert(arr_type->class == HLSL_CLASS_ARRAY);
+            texture_array_type = hlsl_new_array_type(ctx, texture_array_type, arr_type->e.array.elements_count);
+            arr_type = arr_type->e.array.type;
+        }
+
+        if (!(var = hlsl_new_synthetic_var_named(ctx, name->buffer, texture_array_type, &instr->loc, false)))
+        {
+            hlsl_release_string_buffer(ctx, name);
+            return false;
+        }
+        var->is_uniform = 1;
+        var->is_separated_resource = true;
+
+        list_add_tail(&ctx->extern_vars, &var->extern_entry);
+    }
+    hlsl_release_string_buffer(ctx, name);
+
+    if (load->sampling_dim != var->data_type->sampler_dim)
+    {
+        hlsl_error(ctx, &load->node.loc, VKD3D_SHADER_ERROR_HLSL_INCONSISTENT_SAMPLER,
+                "Cannot split combined samplers from \"%s\" if they have different usage dimensions.",
+                load->resource.var->name);
+        hlsl_note(ctx, &var->loc, VKD3D_SHADER_LOG_ERROR, "First use as combined sampler is here.");
+        return false;
+
+    }
+
+    hlsl_copy_deref(ctx, &load->sampler, &load->resource);
+    load->resource.var = var;
+    assert(hlsl_deref_get_type(ctx, &load->resource)->base_type == HLSL_TYPE_TEXTURE);
+    assert(hlsl_deref_get_type(ctx, &load->sampler)->base_type == HLSL_TYPE_SAMPLER);
+
+    return true;
+}
+
 /* Lower DIV to RCP + MUL. */
 static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -3582,7 +3673,7 @@ static void validate_buffer_offsets(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var1, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!var1->is_uniform || var1->data_type->class == HLSL_CLASS_OBJECT)
+        if (!var1->is_uniform || hlsl_type_is_resource(var1->data_type))
             continue;
 
         buffer = var1->buffer;
@@ -3593,7 +3684,7 @@ static void validate_buffer_offsets(struct hlsl_ctx *ctx)
         {
             unsigned int var1_reg_size, var2_reg_size;
 
-            if (!var2->is_uniform || var2->data_type->class == HLSL_CLASS_OBJECT)
+            if (!var2->is_uniform || hlsl_type_is_resource(var2->data_type))
                 continue;
 
             if (var1 == var2 || var1->buffer != var2->buffer)
@@ -3643,7 +3734,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_uniform && var->data_type->class != HLSL_CLASS_OBJECT)
+        if (var->is_uniform && !hlsl_type_is_resource(var->data_type))
         {
             if (var->is_param)
                 var->buffer = ctx->params_buffer;
@@ -4193,6 +4284,12 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
     hlsl_transform_ir(ctx, lower_int_dot, body, NULL);
 
+    hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
+    hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
+    if (profile->major_version >= 4)
+        hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
+    hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
+
     if (profile->major_version < 4)
     {
         hlsl_transform_ir(ctx, lower_division, body, NULL);
@@ -4205,10 +4302,6 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         hlsl_transform_ir(ctx, lower_abs, body, NULL);
     }
-
-    hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
-    hlsl_transform_ir(ctx, track_object_components_sampler_dim, body, NULL);
-    hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
 
     /* TODO: move forward, remove when no longer needed */
     transform_derefs(ctx, replace_deref_path_with_offset, body);
