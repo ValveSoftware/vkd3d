@@ -673,6 +673,11 @@ struct d3d12_heap *unsafe_impl_from_ID3D12Heap(ID3D12Heap *iface);
 #define VKD3D_RESOURCE_DEDICATED_HEAP 0x00000008
 #define VKD3D_RESOURCE_LINEAR_TILING  0x00000010
 
+struct d3d12_resource_tile_info
+{
+    unsigned int subresource_count;
+};
+
 /* ID3D12Resource */
 struct d3d12_resource
 {
@@ -700,6 +705,8 @@ struct d3d12_resource
     D3D12_RESOURCE_STATES present_state;
 
     struct d3d12_device *device;
+
+    struct d3d12_resource_tile_info tiles;
 
     struct vkd3d_private_store private_store;
 };
@@ -1457,6 +1464,7 @@ enum vkd3d_cs_op
     VKD3D_CS_OP_WAIT,
     VKD3D_CS_OP_SIGNAL,
     VKD3D_CS_OP_EXECUTE,
+    VKD3D_CS_OP_UPDATE_MAPPINGS,
 };
 
 struct vkd3d_cs_wait
@@ -1477,6 +1485,20 @@ struct vkd3d_cs_execute
     unsigned int buffer_count;
 };
 
+struct vkd3d_cs_update_mappings
+{
+    struct d3d12_resource *resource;
+    struct d3d12_heap *heap;
+    D3D12_TILED_RESOURCE_COORDINATE *region_start_coordinates;
+    D3D12_TILE_REGION_SIZE *region_sizes;
+    D3D12_TILE_RANGE_FLAGS *range_flags;
+    UINT *heap_range_offsets;
+    UINT *range_tile_counts;
+    UINT region_count;
+    UINT range_count;
+    D3D12_TILE_MAPPING_FLAGS flags;
+};
+
 struct vkd3d_cs_op_data
 {
     enum vkd3d_cs_op opcode;
@@ -1485,6 +1507,7 @@ struct vkd3d_cs_op_data
         struct vkd3d_cs_wait wait;
         struct vkd3d_cs_signal signal;
         struct vkd3d_cs_execute execute;
+        struct vkd3d_cs_update_mappings update_mappings;
     } u;
 };
 
@@ -1521,6 +1544,8 @@ struct d3d12_command_queue
      * by the thread that set is_flushing; when is_flushing is not
      * set, aux_op_queue.count must be zero. */
     struct d3d12_command_queue_op_array aux_op_queue;
+
+    bool supports_sparse_binding;
 
     struct vkd3d_private_store private_store;
 };

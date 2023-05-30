@@ -1057,6 +1057,11 @@ static void d3d12_resource_get_level_box(const struct d3d12_resource *resource,
     box->back = d3d12_resource_desc_get_depth(&resource->desc, level);
 }
 
+static void d3d12_resource_init_tiles(struct d3d12_resource *resource)
+{
+    resource->tiles.subresource_count = d3d12_resource_desc_get_sub_resource_count(&resource->desc);
+}
+
 /* ID3D12Resource */
 static inline struct d3d12_resource *impl_from_ID3D12Resource(ID3D12Resource *iface)
 {
@@ -1826,6 +1831,8 @@ static HRESULT d3d12_resource_init(struct d3d12_resource *resource, struct d3d12
     resource->heap = NULL;
     resource->heap_offset = 0;
 
+    memset(&resource->tiles, 0, sizeof(resource->tiles));
+
     if (FAILED(hr = vkd3d_private_store_init(&resource->private_store)))
     {
         d3d12_resource_destroy(resource, device);
@@ -2010,6 +2017,8 @@ HRESULT d3d12_reserved_resource_create(struct d3d12_device *device,
     if (FAILED(hr = d3d12_resource_create(device, NULL, 0,
             desc, initial_state, optimized_clear_value, &object)))
         return hr;
+
+    d3d12_resource_init_tiles(object);
 
     TRACE("Created reserved resource %p.\n", object);
 

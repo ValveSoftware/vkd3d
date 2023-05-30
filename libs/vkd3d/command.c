@@ -26,6 +26,7 @@ static HRESULT d3d12_fence_signal(struct d3d12_fence *fence, uint64_t value, VkF
 static void d3d12_fence_signal_timeline_semaphore(struct d3d12_fence *fence, uint64_t timeline_value);
 static HRESULT d3d12_command_queue_signal(struct d3d12_command_queue *command_queue,
         struct d3d12_fence *fence, uint64_t value);
+static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue);
 static HRESULT d3d12_command_queue_flush_ops(struct d3d12_command_queue *queue, bool *flushed_any);
 static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *queue, bool *flushed_any);
 
@@ -6162,17 +6163,131 @@ static struct vkd3d_cs_op_data *d3d12_command_queue_op_array_require_space(struc
     return &array->ops[array->count++];
 }
 
+static bool clone_array_parameter(void **dst, const void *src, size_t elem_size, unsigned int count)
+{
+    void *buffer;
+
+    *dst = NULL;
+    if (src)
+    {
+        if (!(buffer = vkd3d_calloc(count, elem_size)))
+            return false;
+        memcpy(buffer, src, count * elem_size);
+        *dst = buffer;
+    }
+    return true;
+}
+
+static void update_mappings_cleanup(struct vkd3d_cs_update_mappings *update_mappings)
+{
+    vkd3d_free(update_mappings->region_start_coordinates);
+    vkd3d_free(update_mappings->region_sizes);
+    vkd3d_free(update_mappings->range_flags);
+    vkd3d_free(update_mappings->heap_range_offsets);
+    vkd3d_free(update_mappings->range_tile_counts);
+}
+
 static void STDMETHODCALLTYPE d3d12_command_queue_UpdateTileMappings(ID3D12CommandQueue *iface,
         ID3D12Resource *resource, UINT region_count,
         const D3D12_TILED_RESOURCE_COORDINATE *region_start_coordinates, const D3D12_TILE_REGION_SIZE *region_sizes,
         ID3D12Heap *heap, UINT range_count, const D3D12_TILE_RANGE_FLAGS *range_flags,
         const UINT *heap_range_offsets, const UINT *range_tile_counts, D3D12_TILE_MAPPING_FLAGS flags)
 {
-    FIXME("iface %p, resource %p, region_count %u, region_start_coordinates %p, "
+    struct d3d12_resource *resource_impl = unsafe_impl_from_ID3D12Resource(resource);
+    struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
+    struct d3d12_heap *heap_impl = unsafe_impl_from_ID3D12Heap(heap);
+    struct vkd3d_cs_update_mappings update_mappings = {0};
+    struct vkd3d_cs_op_data *op;
+
+    TRACE("iface %p, resource %p, region_count %u, region_start_coordinates %p, "
             "region_sizes %p, heap %p, range_count %u, range_flags %p, heap_range_offsets %p, "
-            "range_tile_counts %p, flags %#x stub!\n",
+            "range_tile_counts %p, flags %#x.\n",
             iface, resource, region_count, region_start_coordinates, region_sizes, heap, range_count,
             range_flags, heap_range_offsets, range_tile_counts, flags);
+
+    if (!region_count || !range_count)
+        return;
+
+    if (!command_queue->supports_sparse_binding)
+    {
+        FIXME("Command queue %p does not support sparse binding.\n", command_queue);
+        return;
+    }
+
+    if (!resource_impl->tiles.subresource_count)
+    {
+        WARN("Resource %p is not a tiled resource.\n", resource_impl);
+        return;
+    }
+
+    if (region_count > 1 && !region_start_coordinates)
+    {
+        WARN("Region start coordinates must not be NULL when region count is > 1.\n");
+        return;
+    }
+
+    if (range_count > 1 && !range_tile_counts)
+    {
+        WARN("Range tile counts must not be NULL when range count is > 1.\n");
+        return;
+    }
+
+    update_mappings.resource = resource_impl;
+    update_mappings.heap = heap_impl;
+    if (!clone_array_parameter((void **)&update_mappings.region_start_coordinates,
+            region_start_coordinates, sizeof(*region_start_coordinates), region_count))
+    {
+        ERR("Failed to allocate region start coordinates.\n");
+        return;
+    }
+    if (!clone_array_parameter((void **)&update_mappings.region_sizes,
+            region_sizes, sizeof(*region_sizes), region_count))
+    {
+        ERR("Failed to allocate region sizes.\n");
+        goto free_clones;
+    }
+    if (!clone_array_parameter((void **)&update_mappings.range_flags,
+            range_flags, sizeof(*range_flags), range_count))
+    {
+        ERR("Failed to allocate range flags.\n");
+        goto free_clones;
+    }
+    if (!clone_array_parameter((void **)&update_mappings.heap_range_offsets,
+            heap_range_offsets, sizeof(*heap_range_offsets), range_count))
+    {
+        ERR("Failed to allocate heap range offsets.\n");
+        goto free_clones;
+    }
+    if (!clone_array_parameter((void **)&update_mappings.range_tile_counts,
+            range_tile_counts, sizeof(*range_tile_counts), range_count))
+    {
+        ERR("Failed to allocate range tile counts.\n");
+        goto free_clones;
+    }
+    update_mappings.region_count = region_count;
+    update_mappings.range_count = range_count;
+    update_mappings.flags = flags;
+
+    vkd3d_mutex_lock(&command_queue->op_mutex);
+
+    if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
+    {
+        ERR("Failed to add op.\n");
+        goto unlock_mutex;
+    }
+
+    op->opcode = VKD3D_CS_OP_UPDATE_MAPPINGS;
+    op->u.update_mappings = update_mappings;
+
+    d3d12_command_queue_submit_locked(command_queue);
+
+    vkd3d_mutex_unlock(&command_queue->op_mutex);
+    return;
+
+unlock_mutex:
+    vkd3d_mutex_unlock(&command_queue->op_mutex);
+free_clones:
+    update_mappings_cleanup(&update_mappings);
 }
 
 static void STDMETHODCALLTYPE d3d12_command_queue_CopyTileMappings(ID3D12CommandQueue *iface,
@@ -6934,6 +7049,11 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
                     d3d12_command_queue_execute(queue, op->u.execute.buffers, op->u.execute.buffer_count);
                     break;
 
+                case VKD3D_CS_OP_UPDATE_MAPPINGS:
+                    FIXME("Tiled resource binding is not supported yet.\n");
+                    update_mappings_cleanup(&op->u.update_mappings);
+                    break;
+
                 default:
                     vkd3d_unreachable();
             }
@@ -6999,6 +7119,8 @@ static HRESULT d3d12_command_queue_init(struct d3d12_command_queue *queue,
 
     if (FAILED(hr = vkd3d_fence_worker_start(&queue->fence_worker, queue->vkd3d_queue, device)))
         goto fail_destroy_op_mutex;
+
+    queue->supports_sparse_binding = !!(queue->vkd3d_queue->vk_queue_flags & VK_QUEUE_SPARSE_BINDING_BIT);
 
     d3d12_device_add_ref(queue->device = device);
 
