@@ -646,7 +646,7 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
                 break;
 
             case VKD3D_SHADER_RESOURCE_TEXTURE_3D:
-                shader_addline(buffer, "_3d");
+                shader_addline(buffer, "_volume");
                 break;
 
             case VKD3D_SHADER_RESOURCE_TEXTURE_CUBE:
