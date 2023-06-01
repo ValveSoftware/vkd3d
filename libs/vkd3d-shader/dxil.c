@@ -2156,6 +2156,7 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
 {
     const struct dxil_block *block = &sm6->root_block;
     const struct dxil_record *record;
+    enum vkd3d_result ret;
     uint64_t version;
     size_t i;
 
@@ -2196,6 +2197,13 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
             default:
                 break;
         }
+    }
+
+    for (i = 0; i < block->child_block_count; ++i)
+    {
+        if (block->child_blocks[i]->id == CONSTANTS_BLOCK
+                && (ret = sm6_parser_constants_init(sm6, block->child_blocks[i])) < 0)
+            return ret;
     }
 
     return VKD3D_OK;
@@ -2770,6 +2778,9 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     switch (block->id)
     {
         case CONSTANTS_BLOCK:
+            /* Level 1 (global) constants are already done in sm6_parser_globals_init(). */
+            if (level < 2)
+                break;
             function = &sm6->functions[sm6->function_count];
             sm6->cur_max_value = function->value_count;
             return sm6_parser_constants_init(sm6, block);
