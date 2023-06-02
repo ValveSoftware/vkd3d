@@ -5242,7 +5242,7 @@ type_no_void:
         }
     | KW_SAMPLERCUBE
         {
-            $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_3D];
+            $$ = ctx->builtin_types.sampler[HLSL_SAMPLER_DIM_CUBE];
         }
     | KW_TEXTURE
         {
