@@ -7359,18 +7359,22 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
 
     switch (instruction->handler_idx)
     {
-        case VKD3DSIH_DEQ:
-        case VKD3DSIH_EQ:  op = SpvOpFOrdEqual; break;
-        case VKD3DSIH_DGE:
-        case VKD3DSIH_GE:  op = SpvOpFOrdGreaterThanEqual; break;
+        case VKD3DSIH_DEQO:
+        case VKD3DSIH_EQO: op = SpvOpFOrdEqual; break;
+        case VKD3DSIH_EQU: op = SpvOpFUnordEqual; break;
+        case VKD3DSIH_DGEO:
+        case VKD3DSIH_GEO: op = SpvOpFOrdGreaterThanEqual; break;
+        case VKD3DSIH_GEU: op = SpvOpFUnordGreaterThanEqual; break;
         case VKD3DSIH_IEQ: op = SpvOpIEqual; break;
         case VKD3DSIH_IGE: op = SpvOpSGreaterThanEqual; break;
         case VKD3DSIH_ILT: op = SpvOpSLessThan; break;
         case VKD3DSIH_INE: op = SpvOpINotEqual; break;
         case VKD3DSIH_DLT:
-        case VKD3DSIH_LT:  op = SpvOpFOrdLessThan; break;
+        case VKD3DSIH_LTO: op = SpvOpFOrdLessThan; break;
+        case VKD3DSIH_LTU: op = SpvOpFUnordLessThan; break;
+        case VKD3DSIH_NEO: op = SpvOpFOrdNotEqual; break;
         case VKD3DSIH_DNE:
-        case VKD3DSIH_NE:  op = SpvOpFUnordNotEqual; break;
+        case VKD3DSIH_NEU: op = SpvOpFUnordNotEqual; break;
         case VKD3DSIH_UGE: op = SpvOpUGreaterThanEqual; break;
         case VKD3DSIH_ULT: op = SpvOpULessThan; break;
         default:
@@ -9559,18 +9563,22 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_FTOU:
             spirv_compiler_emit_ftou(compiler, instruction);
             break;
-        case VKD3DSIH_DEQ:
-        case VKD3DSIH_DGE:
+        case VKD3DSIH_DEQO:
+        case VKD3DSIH_DGEO:
         case VKD3DSIH_DLT:
         case VKD3DSIH_DNE:
-        case VKD3DSIH_EQ:
-        case VKD3DSIH_GE:
+        case VKD3DSIH_EQO:
+        case VKD3DSIH_EQU:
+        case VKD3DSIH_GEO:
+        case VKD3DSIH_GEU:
         case VKD3DSIH_IEQ:
         case VKD3DSIH_IGE:
         case VKD3DSIH_ILT:
         case VKD3DSIH_INE:
-        case VKD3DSIH_LT:
-        case VKD3DSIH_NE:
+        case VKD3DSIH_LTO:
+        case VKD3DSIH_LTU:
+        case VKD3DSIH_NEO:
+        case VKD3DSIH_NEU:
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:
             spirv_compiler_emit_comparison_instruction(compiler, instruction);
