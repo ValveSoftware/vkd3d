@@ -1199,6 +1199,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser)
     struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     enum vkd3d_result result = VKD3D_OK;
 
+    if (parser->shader_desc.is_dxil)
+        return result;
+
     if (parser->shader_version.type == VKD3D_SHADER_TYPE_HULL
             && (result = instruction_array_flatten_hull_shader_phases(instructions)) >= 0)
     {
