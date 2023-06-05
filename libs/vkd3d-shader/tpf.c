@@ -3657,8 +3657,12 @@ static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
 
     modif.type = VKD3D_SM4_MODIFIER_AOFFIMMI;
     modif.u.aoffimmi.u = offset->value.u[0].i;
-    modif.u.aoffimmi.v = offset->value.u[1].i;
-    modif.u.aoffimmi.w = offset->value.u[2].i;
+    modif.u.aoffimmi.v = 0;
+    modif.u.aoffimmi.w = 0;
+    if (offset->node.data_type->dimx > 1)
+        modif.u.aoffimmi.v = offset->value.u[1].i;
+    if (offset->node.data_type->dimx > 2)
+        modif.u.aoffimmi.w = offset->value.u[2].i;
     if (modif.u.aoffimmi.u < -8 || modif.u.aoffimmi.u > 7
             || modif.u.aoffimmi.v < -8 || modif.u.aoffimmi.v > 7
             || modif.u.aoffimmi.w < -8 || modif.u.aoffimmi.w > 7)
