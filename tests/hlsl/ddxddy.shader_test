@@ -22,17 +22,21 @@ float4 main(float4 pos : sv_position) : sv_target
 
     pos /= 10.0;
     float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
-    return float4(nonlinear, ddx(nonlinear), ddy(nonlinear), 0.0);
+    float4 res = float4(nonlinear, ddx(nonlinear), ddy(nonlinear), 0.0);
+
+    // Each device may use either the coarse or the fine derivate, so use quantization.
+    return round(30 * res);
 }
 
 [test]
 draw quad
-probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 8
-probe (11, 10) rgba (-0.689999819, -0.164999843, 0.104999900, 0.0) 8
-probe (10, 11) rgba (-0.420000076, -0.164999843, 0.104999900, 0.0) 8
-probe (11, 11) rgba (-0.574999928, -0.164999843, 0.104999900, 0.0) 8
-probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 8
-probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 40
+probe (10, 10) rgba (-16.0, -5.0, 3.0, 0.0)
+probe (11, 10) rgba (-21.0, -5.0, 3.0, 0.0)
+probe (10, 11) rgba (-13.0, -5.0, 3.0, 0.0)
+probe (11, 11) rgba (-17.0, -5.0, 3.0, 0.0)
+probe (12, 10) rgba (-26.0, -6.0, 4.0, 0.0)
+probe (16, 16) rgba (-25.0, -7.0, 5.0, 0.0)
+probe (150, 150) rgba (-226.0, -47.0, 45.0, 0.0)
 
 
 [require]
@@ -44,17 +48,21 @@ float4 main(float4 pos : sv_position) : sv_target
 {
     pos /= 10.0;
     float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
-    return float4(nonlinear, ddx_coarse(nonlinear), ddy_coarse(nonlinear), 0.0);
+    float4 res = float4(nonlinear, ddx_coarse(nonlinear), ddy_coarse(nonlinear), 0.0);
+
+    // Each device may use either the coarse or the fine derivate, so use quantization.
+    return round(30 * res);
 }
 
 [test]
 todo draw quad
-probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 16
-probe (11, 10) rgba (-0.689999819, -0.164999843, 0.104999900, 0.0) 16
-probe (10, 11) rgba (-0.420000076, -0.164999843, 0.104999900, 0.0) 16
-probe (11, 11) rgba (-0.574999928, -0.164999843, 0.104999900, 0.0) 16
-probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 24
-probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 40
+probe (10, 10) rgba (-16.0, -5.0, 3.0, 0.0)
+probe (11, 10) rgba (-21.0, -5.0, 3.0, 0.0)
+probe (10, 11) rgba (-13.0, -5.0, 3.0, 0.0)
+probe (11, 11) rgba (-17.0, -5.0, 3.0, 0.0)
+probe (12, 10) rgba (-26.0, -6.0, 4.0, 0.0)
+probe (16, 16) rgba (-25.0, -7.0, 5.0, 0.0)
+probe (150, 150) rgba (-226.0, -47.0, 45.0, 0.0)
 
 
 [pixel shader todo]
