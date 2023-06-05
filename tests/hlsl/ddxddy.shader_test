@@ -24,3 +24,43 @@ probe (10, 11) rgba (-0.420000076, -0.164999843, 0.104999900, 0.0) 8
 probe (11, 11) rgba (-0.574999928, -0.164999843, 0.104999900, 0.0) 8
 probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 8
 probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 40
+
+
+[require]
+shader model >= 5.0
+
+
+[pixel shader todo]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    pos /= 10.0;
+    float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
+    return float4(nonlinear, ddx_coarse(nonlinear), ddy_coarse(nonlinear), 0.0);
+}
+
+[test]
+todo draw quad
+probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 16
+probe (11, 10) rgba (-0.689999819, -0.164999843, 0.104999900, 0.0) 16
+probe (10, 11) rgba (-0.420000076, -0.164999843, 0.104999900, 0.0) 16
+probe (11, 11) rgba (-0.574999928, -0.164999843, 0.104999900, 0.0) 16
+probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 24
+probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 40
+
+
+[pixel shader todo]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    pos /= 10.0;
+    float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
+    return float4(nonlinear, ddx_fine(nonlinear), ddy_fine(nonlinear), 0.0);
+}
+
+[test]
+todo draw quad
+probe (10, 10) rgba (-0.524999976, -0.164999843, 0.104999900, 0.0) 16
+probe (11, 10) rgba (-0.689999819, -0.164999843, 0.114999890, 0.0) 32
+probe (10, 11) rgba (-0.420000076, -0.154999852, 0.104999900, 0.0) 32
+probe (11, 11) rgba (-0.574999928, -0.154999852, 0.114999890, 0.0) 32
+probe (12, 10) rgba (-0.874999881, -0.205000162, 0.124999881, 0.0) 24
+probe (150, 150) rgba (-7.52500916, -1.56500244, 1.50500488, 0.0) 128
