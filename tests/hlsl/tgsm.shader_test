@@ -159,5 +159,5 @@ void main(uint local_idx : SV_GroupIndex)
 }
 
 [test]
-todo dispatch 1 1 1
+todo(sm<6) dispatch 1 1 1
 probe uav 1 (0) rui (39)

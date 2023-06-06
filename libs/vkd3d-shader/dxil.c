@@ -1938,6 +1938,25 @@ static const struct sm6_type *sm6_type_get_pointer_to_type(const struct sm6_type
     return NULL;
 }
 
+static const struct sm6_type *sm6_type_get_cmpxchg_result_struct(struct sm6_parser *sm6)
+{
+    const struct sm6_type *type;
+    unsigned int i;
+
+    for (i = 0; i < sm6->type_count; ++i)
+    {
+        type = &sm6->types[i];
+        if (sm6_type_is_struct(type) && type->u.struc->elem_count == 2
+                && sm6_type_is_i32(type->u.struc->elem_types[0])
+                && sm6_type_is_bool(type->u.struc->elem_types[1]))
+        {
+            return type;
+        }
+    }
+
+    return NULL;
+}
+
 /* Call for aggregate types only. */
 static const struct sm6_type *sm6_type_get_element_type_at_index(const struct sm6_type *type, uint64_t elem_idx)
 {
@@ -2663,6 +2682,18 @@ static bool sm6_value_validate_is_pointer_to_i32(const struct sm6_value *value, 
         WARN("Operand result type %u is not a pointer to i32.\n", value->type->class);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                 "An int32 pointer operand passed to a DXIL instruction is not an int32 pointer.");
+        return false;
+    }
+    return true;
+}
+
+static bool sm6_value_validate_is_i32(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_type_is_i32(value->type))
+    {
+        WARN("Operand result type %u is not i32.\n", value->type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "An int32 operand passed to a DXIL instruction is not an int32.");
         return false;
     }
     return true;
@@ -6251,6 +6282,87 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static void sm6_parser_emit_cmpxchg(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    uint64_t success_ordering, failure_ordering;
+    struct vkd3d_shader_dst_param *dst_params;
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_value *ptr, *cmp, *new;
+    const struct sm6_type *type;
+    unsigned int i = 0;
+    bool is_volatile;
+    uint64_t code;
+
+    if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
+            || !sm6_value_validate_is_pointer_to_i32(ptr, sm6))
+        return;
+
+    if (ptr->u.reg.type != VKD3DSPR_GROUPSHAREDMEM)
+    {
+        WARN("Register is not groupshared.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "The destination register for a cmpxchg instruction is not groupshared memory.");
+        return;
+    }
+
+    if (!(dst->type = sm6_type_get_cmpxchg_result_struct(sm6)))
+    {
+        WARN("Failed to find result struct.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                "Module does not define a result struct type for a cmpxchg instruction.");
+        return;
+    }
+
+    type = ptr->type->u.pointer.type;
+    cmp = sm6_parser_get_value_by_ref(sm6, record, type, &i);
+    new = sm6_parser_get_value_by_ref(sm6, record, type, &i);
+    if (!cmp || !new)
+        return;
+
+    if (!sm6_value_validate_is_i32(cmp, sm6)
+            || !sm6_value_validate_is_i32(new, sm6)
+            || !dxil_record_validate_operand_count(record, i + 3, i + 5, sm6))
+    {
+        return;
+    }
+
+    is_volatile = record->operands[i++];
+    success_ordering = record->operands[i++];
+
+    if ((code = record->operands[i++]) != 1)
+        FIXME("Ignoring synchronisation scope %"PRIu64".\n", code);
+
+    failure_ordering = (record->operand_count > i) ? record->operands[i++] : success_ordering;
+
+    /* It's currently not possible to specify an atomic ordering in HLSL, and it defaults to seq_cst. */
+    if (success_ordering != ORDERING_SEQCST)
+        FIXME("Unhandled success ordering %"PRIu64".\n", success_ordering);
+    if (success_ordering != failure_ordering)
+        FIXME("Unhandled failure ordering %"PRIu64".\n", failure_ordering);
+
+    if (record->operand_count > i && record->operands[i])
+        FIXME("Ignoring weak cmpxchg.\n");
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_IMM_ATOMIC_CMP_EXCH);
+    ins->flags = is_volatile ? VKD3DARF_SEQ_CST | VKD3DARF_VOLATILE : VKD3DARF_SEQ_CST;
+
+    if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+        return;
+    src_param_make_constant_uint(&src_params[0], 0);
+    src_param_init_from_value(&src_params[1], cmp);
+    src_param_init_from_value(&src_params[2], new);
+
+    if (!(dst_params = instruction_dst_params_alloc(ins, 2, sm6)))
+        return;
+    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    dst_param_init(&dst_params[0]);
+    dst_params[1].reg = ptr->u.reg;
+    dst_param_init(&dst_params[1]);
+
+    dst->u.reg = dst_params[0].reg;
+}
+
 static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -7254,6 +7366,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_CMP2:
                 sm6_parser_emit_cmp2(sm6, record, ins, dst);
+                break;
+            case FUNC_CODE_INST_CMPXCHG:
+                sm6_parser_emit_cmpxchg(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_EXTRACTVAL:
                 sm6_parser_emit_extractval(sm6, record, ins, dst);
