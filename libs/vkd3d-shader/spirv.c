@@ -6878,8 +6878,9 @@ static void spirv_compiler_emit_movc(struct spirv_compiler *compiler,
     component_count = vkd3d_write_mask_component_count(dst->write_mask);
     type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
 
-    condition_id = spirv_compiler_emit_int_to_bool(compiler,
-            VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, condition_id);
+    if (src[0].reg.data_type != VKD3D_DATA_BOOL)
+        condition_id = spirv_compiler_emit_int_to_bool(compiler,
+                VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, condition_id);
     val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, src1_id, src2_id);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
