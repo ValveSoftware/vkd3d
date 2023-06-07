@@ -3749,7 +3749,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateFence(ID3D12Device *iface,
     if (FAILED(hr = d3d12_fence_create(device, initial_value, flags, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12Fence_iface, &IID_ID3D12Fence, riid, fence);
+    return return_interface(&object->ID3D12Fence1_iface, &IID_ID3D12Fence1, riid, fence);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_GetDeviceRemovedReason(ID3D12Device *iface)

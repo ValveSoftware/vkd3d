@@ -2457,6 +2457,17 @@ interface ID3D12Fence : ID3D12Pageable
 }
 
 [
+    uuid(433685fe-e22b-4ca0-a8db-b5b4f4dd0e4a),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Fence1 : ID3D12Fence
+{
+    D3D12_FENCE_FLAGS GetCreationFlags();
+}
+
+[
     uuid(6102dee4-af59-4b09-b999-b44d73f09b24),
     object,
     local,

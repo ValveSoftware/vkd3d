@@ -616,9 +616,11 @@ struct vkd3d_signaled_semaphore
 /* ID3D12Fence */
 struct d3d12_fence
 {
-    ID3D12Fence ID3D12Fence_iface;
+    ID3D12Fence1 ID3D12Fence1_iface;
     LONG internal_refcount;
     LONG refcount;
+
+    D3D12_FENCE_FLAGS flags;
 
     uint64_t value;
     uint64_t max_pending_value;
