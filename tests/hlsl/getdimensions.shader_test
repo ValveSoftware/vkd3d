@@ -7,7 +7,7 @@ size (2, 3)
 1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
 1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
 
-[pixel shader todo]
+[pixel shader]
 Texture2D t : register(t0);
 
 float4 main() : sv_target
@@ -28,8 +28,8 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (2.0, 3.0, 2.0, 3.0)
+draw quad
+probe all rgba (2.0, 3.0, 2.0, 3.0)
 
 [texture 1]
 size (2, 2)
@@ -40,7 +40,7 @@ levels 2
 
 0.0 0.0 1.0 0.0
 
-[pixel shader todo]
+[pixel shader]
 Texture2D t : register(t1);
 
 float4 main() : sv_target
@@ -53,5 +53,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
-todo probe all rgba (2.0, 2.0, 1.0, 2.0)
+draw quad
+probe all rgba (2.0, 2.0, 1.0, 2.0)
