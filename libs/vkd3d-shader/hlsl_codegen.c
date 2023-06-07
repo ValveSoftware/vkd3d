@@ -4068,6 +4068,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, lower_int_modulus, body, NULL);
     hlsl_transform_ir(ctx, lower_int_abs, body, NULL);
     hlsl_transform_ir(ctx, lower_float_modulus, body, NULL);
+    hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
     do
     {
         progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
