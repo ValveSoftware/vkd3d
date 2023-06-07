@@ -4299,6 +4299,29 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     write_sm4_instruction(buffer, &instr);
 }
 
+static void write_sm4_sampleinfo(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        const struct hlsl_ir_resource_load *load)
+{
+    const struct hlsl_deref *resource = &load->resource;
+    const struct hlsl_ir_node *dst = &load->node;
+    struct sm4_instruction instr;
+
+    assert(dst->data_type->base_type == HLSL_TYPE_UINT || dst->data_type->base_type == HLSL_TYPE_FLOAT);
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
+    if (dst->data_type->base_type == HLSL_TYPE_UINT)
+        instr.opcode |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
+
+    sm4_dst_from_node(&instr.dsts[0], dst);
+    instr.dst_count = 1;
+
+    sm4_src_from_deref(ctx, &instr.srcs[0], resource, instr.dsts[0].writemask);
+    instr.src_count = 1;
+
+    write_sm4_instruction(buffer, &instr);
+}
+
 static bool type_is_float(const struct hlsl_type *type)
 {
     return type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF;
@@ -5119,6 +5142,9 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_RESOURCE_SAMPLE_INFO:
+            write_sm4_sampleinfo(ctx, buffer, load);
+            break;
+
         case HLSL_RESOURCE_RESINFO:
             hlsl_fixme(ctx, &load->node.loc, "Unsupported load type %u.\n", load->load_type);
             break;
