@@ -1,0 +1,57 @@
+[require]
+shader model >= 4.0
+
+[texture 0]
+size (2, 3)
+
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+
+[pixel shader todo]
+Texture2D t : register(t0);
+
+float4 main() : sv_target
+{
+    uint u1, u2;
+    float f1, f2;
+    float4 ret;
+
+    t.GetDimensions(u1, u2);
+    t.GetDimensions(f1, f2);
+    ret.x = u1;
+    ret.y = f2;
+    t.GetDimensions(u1, f2);
+    ret.z = u1;
+    t.GetDimensions(f1, u2);
+    ret.w = u2;
+    return ret;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (2.0, 3.0, 2.0, 3.0)
+
+[texture 1]
+size (2, 2)
+levels 2
+
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
+
+0.0 0.0 1.0 0.0
+
+[pixel shader todo]
+Texture2D t : register(t1);
+
+float4 main() : sv_target
+{
+    float4 ret;
+
+    t.GetDimensions(ret.x, ret.y);
+    t.GetDimensions(1, ret.z, ret.z, ret.w);
+    return ret;
+}
+
+[test]
+todo draw quad
+todo probe all rgba (2.0, 2.0, 1.0, 2.0)
