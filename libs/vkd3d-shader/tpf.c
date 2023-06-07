@@ -5117,6 +5117,11 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
             write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
                     HLSL_SWIZZLE(W, W, W, W), texel_offset);
             break;
+
+        case HLSL_RESOURCE_SAMPLE_INFO:
+        case HLSL_RESOURCE_RESINFO:
+            hlsl_fixme(ctx, &load->node.loc, "Unsupported load type %u.\n", load->load_type);
+            break;
     }
 }
 

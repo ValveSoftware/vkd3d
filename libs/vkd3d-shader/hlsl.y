@@ -3670,6 +3670,13 @@ static int intrinsic_function_name_compare(const void *a, const void *b)
     return strcmp(a, func->name);
 }
 
+static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+
+    return hlsl_new_expr(ctx, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc);
+}
+
 static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
         struct parse_initializer *args, const struct vkd3d_shader_location *loc)
 {
@@ -3744,10 +3751,9 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
         }
         else
         {
-            struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
             struct hlsl_ir_node *expr;
 
-            if (!(expr = hlsl_new_expr(ctx, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc)))
+            if (!(expr = hlsl_new_void_expr(ctx, loc)))
                 goto fail;
             hlsl_block_add_instr(args->instrs, expr);
         }
@@ -4179,6 +4185,182 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     return true;
 }
 
+static bool add_assignment_from_component(struct hlsl_ctx *ctx, struct hlsl_block *instrs, struct hlsl_ir_node *dest,
+        struct hlsl_ir_node *src, unsigned int component, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *load;
+
+    if (!dest)
+        return true;
+
+    if (!(load = hlsl_add_load_component(ctx, block_to_list(instrs), src, component, loc)))
+        return false;
+
+    if (!add_assignment(ctx, instrs, dest, ASSIGN_OP_ASSIGN, load))
+        return false;
+
+    return true;
+}
+
+static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
+        const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    const struct hlsl_type *object_type = object->data_type;
+    bool uint_resinfo, has_uint_arg, has_float_arg;
+    struct hlsl_resource_load_params load_params;
+    struct hlsl_ir_node *sample_info, *res_info;
+    struct hlsl_ir_node *zero = NULL, *void_ret;
+    struct hlsl_type *uint_type, *float_type;
+    unsigned int i, j;
+    enum func_argument
+    {
+        ARG_MIP_LEVEL,
+        ARG_WIDTH,
+        ARG_HEIGHT,
+        ARG_ELEMENT_COUNT,
+        ARG_LEVEL_COUNT,
+        ARG_SAMPLE_COUNT,
+        ARG_MAX_ARGS,
+    };
+    struct hlsl_ir_node *args[ARG_MAX_ARGS] = { 0 };
+    static const struct overload
+    {
+        enum hlsl_sampler_dim sampler_dim;
+        unsigned int args_count;
+        enum func_argument args[ARG_MAX_ARGS];
+    }
+    overloads[] =
+    {
+        { HLSL_SAMPLER_DIM_1D, 1, { ARG_WIDTH } },
+        { HLSL_SAMPLER_DIM_1D, 3, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_1DARRAY, 2, { ARG_WIDTH, ARG_ELEMENT_COUNT } },
+        { HLSL_SAMPLER_DIM_1DARRAY, 4, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_ELEMENT_COUNT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_2D, 2, { ARG_WIDTH, ARG_HEIGHT } },
+        { HLSL_SAMPLER_DIM_2D, 4, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_2DARRAY, 3, { ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT } },
+        { HLSL_SAMPLER_DIM_2DARRAY, 5, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_3D, 3, { ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT } },
+        { HLSL_SAMPLER_DIM_3D, 5, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_CUBE, 2, { ARG_WIDTH, ARG_HEIGHT } },
+        { HLSL_SAMPLER_DIM_CUBE, 4, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_CUBEARRAY, 3, { ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT } },
+        { HLSL_SAMPLER_DIM_CUBEARRAY, 5, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_LEVEL_COUNT } },
+        { HLSL_SAMPLER_DIM_2DMS, 3, { ARG_WIDTH, ARG_HEIGHT, ARG_SAMPLE_COUNT } },
+        { HLSL_SAMPLER_DIM_2DMSARRAY, 4, { ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_SAMPLE_COUNT } },
+    };
+    const struct overload *o = NULL;
+
+    if (object_type->sampler_dim > HLSL_SAMPLER_DIM_LAST_TEXTURE)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "GetDimensions() is not defined for this type.");
+    }
+
+    uint_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
+    float_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT);
+    has_uint_arg = has_float_arg = false;
+    for (i = 0; i < ARRAY_SIZE(overloads); ++i)
+    {
+        const struct overload *iter = &overloads[i];
+
+        if (iter->sampler_dim == object_type->sampler_dim && iter->args_count == params->args_count)
+        {
+            for (j = 0; j < params->args_count; ++j)
+            {
+                args[iter->args[j]] = params->args[j];
+
+                /* Input parameter. */
+                if (iter->args[j] == ARG_MIP_LEVEL)
+                {
+                    if (!(args[ARG_MIP_LEVEL] = add_implicit_conversion(ctx, block, args[ARG_MIP_LEVEL],
+                            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc)))
+                    {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                has_float_arg |= hlsl_types_are_equal(params->args[j]->data_type, float_type);
+                has_uint_arg |= hlsl_types_are_equal(params->args[j]->data_type, uint_type);
+
+                if (params->args[j]->data_type->class != HLSL_CLASS_SCALAR)
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Expected scalar arguments.");
+                    break;
+                }
+            }
+            o = iter;
+            break;
+        }
+    }
+    uint_resinfo = !has_float_arg && has_uint_arg;
+
+    if (!o)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, object_type)))
+        {
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                    "Unexpected number of arguments %u for %s.%s().", params->args_count, string->buffer, name);
+            hlsl_release_string_buffer(ctx, string);
+        }
+    }
+
+    if (!args[ARG_MIP_LEVEL])
+    {
+        if (!(zero = hlsl_new_uint_constant(ctx, 0, loc)))
+            return false;
+        hlsl_block_add_instr(block, zero);
+        args[ARG_MIP_LEVEL] = zero;
+    }
+
+    memset(&load_params, 0, sizeof(load_params));
+    load_params.type = HLSL_RESOURCE_RESINFO;
+    load_params.resource = object;
+    load_params.lod = args[ARG_MIP_LEVEL];
+    load_params.format = hlsl_get_vector_type(ctx, uint_resinfo ? HLSL_TYPE_UINT : HLSL_TYPE_FLOAT, 4);
+
+    if (!(res_info = hlsl_new_resource_load(ctx, &load_params, loc)))
+        return false;
+    hlsl_block_add_instr(block, res_info);
+
+    if (!add_assignment_from_component(ctx, block, args[ARG_WIDTH], res_info, 0, loc))
+        return false;
+
+    if (!add_assignment_from_component(ctx, block, args[ARG_HEIGHT], res_info, 1, loc))
+        return false;
+
+    if (!add_assignment_from_component(ctx, block, args[ARG_ELEMENT_COUNT], res_info,
+            object_type->sampler_dim == HLSL_SAMPLER_DIM_1DARRAY ? 1 : 2, loc))
+    {
+        return false;
+    }
+
+    if (!add_assignment_from_component(ctx, block, args[ARG_LEVEL_COUNT], res_info, 3, loc))
+        return false;
+
+    if (args[ARG_SAMPLE_COUNT])
+    {
+        memset(&load_params, 0, sizeof(load_params));
+        load_params.type = HLSL_RESOURCE_SAMPLE_INFO;
+        load_params.resource = object;
+        load_params.format = args[ARG_SAMPLE_COUNT]->data_type;
+        if (!(sample_info = hlsl_new_resource_load(ctx, &load_params, loc)))
+            return false;
+        hlsl_block_add_instr(block, sample_info);
+
+        if (!add_assignment(ctx, block, args[ARG_SAMPLE_COUNT], ASSIGN_OP_ASSIGN, sample_info))
+            return false;
+    }
+
+    if (!(void_ret = hlsl_new_void_expr(ctx, loc)))
+        return false;
+    hlsl_block_add_instr(block, void_ret);
+
+    return true;
+}
+
 static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -4333,6 +4515,8 @@ object_methods[] =
     { "GatherBlue",         add_gather_method_call },
     { "GatherGreen",        add_gather_method_call },
     { "GatherRed",          add_gather_method_call },
+
+    { "GetDimensions",      add_getdimensions_method_call },
 
     { "Load",               add_load_method_call },
 

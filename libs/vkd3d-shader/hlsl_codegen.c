@@ -2118,9 +2118,11 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         case HLSL_RESOURCE_GATHER_GREEN:
         case HLSL_RESOURCE_GATHER_BLUE:
         case HLSL_RESOURCE_GATHER_ALPHA:
+        case HLSL_RESOURCE_RESINFO:
         case HLSL_RESOURCE_SAMPLE_CMP:
         case HLSL_RESOURCE_SAMPLE_CMP_LZ:
         case HLSL_RESOURCE_SAMPLE_GRAD:
+        case HLSL_RESOURCE_SAMPLE_INFO:
             return false;
 
         case HLSL_RESOURCE_SAMPLE:
@@ -2974,7 +2976,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
                     load->sampler.offset.node->last_read = last_read;
             }
 
-            load->coords.node->last_read = last_read;
+            if (load->coords.node)
+                load->coords.node->last_read = last_read;
             if (load->texel_offset.node)
                 load->texel_offset.node->last_read = last_read;
             if (load->lod.node)

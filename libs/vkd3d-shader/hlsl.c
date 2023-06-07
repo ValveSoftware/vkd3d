@@ -2544,6 +2544,8 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
         [HLSL_RESOURCE_GATHER_GREEN] = "gather_green",
         [HLSL_RESOURCE_GATHER_BLUE] = "gather_blue",
         [HLSL_RESOURCE_GATHER_ALPHA] = "gather_alpha",
+        [HLSL_RESOURCE_SAMPLE_INFO] = "sample_info",
+        [HLSL_RESOURCE_RESINFO] = "resinfo",
     };
 
     assert(load->load_type < ARRAY_SIZE(type_names));
@@ -2551,8 +2553,11 @@ static void dump_ir_resource_load(struct vkd3d_string_buffer *buffer, const stru
     dump_deref(buffer, &load->resource);
     vkd3d_string_buffer_printf(buffer, ", sampler = ");
     dump_deref(buffer, &load->sampler);
-    vkd3d_string_buffer_printf(buffer, ", coords = ");
-    dump_src(buffer, &load->coords);
+    if (load->coords.node)
+    {
+        vkd3d_string_buffer_printf(buffer, ", coords = ");
+        dump_src(buffer, &load->coords);
+    }
     if (load->sample_index.node)
     {
         vkd3d_string_buffer_printf(buffer, ", sample index = ");
