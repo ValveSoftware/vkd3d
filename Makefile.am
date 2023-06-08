@@ -80,6 +80,7 @@ vkd3d_shader_tests = \
 	tests/hlsl-attributes.shader_test \
 	tests/hlsl-bool-cast.shader_test \
 	tests/hlsl-clamp.shader_test \
+	tests/hlsl-clip.shader_test \
 	tests/hlsl-comma.shader_test \
 	tests/hlsl-cross.shader_test \
 	tests/hlsl-d3dcolor-to-ubyte4.shader_test \
