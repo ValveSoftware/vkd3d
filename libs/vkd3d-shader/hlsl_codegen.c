@@ -666,7 +666,7 @@ static void insert_early_return_break(struct hlsl_ctx *ctx,
         return;
     list_add_after(&cf_instr->entry, &load->node.entry);
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &cf_instr->loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &cf_instr->loc)))
         return;
     hlsl_block_add_instr(&then_block, jump);
 
@@ -2848,8 +2848,15 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             index->idx.node->last_read = last_read;
             break;
         }
-        case HLSL_IR_CONSTANT:
         case HLSL_IR_JUMP:
+        {
+            struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
+
+            if (jump->condition.node)
+                jump->condition.node->last_read = last_read;
+            break;
+        }
+        case HLSL_IR_CONSTANT:
             break;
         }
     }

@@ -1432,7 +1432,7 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
 }
 
 struct hlsl_ir_node *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type type,
-        const struct vkd3d_shader_location *loc)
+        struct hlsl_ir_node *condition, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_jump *jump;
 
@@ -1440,6 +1440,7 @@ struct hlsl_ir_node *hlsl_new_jump(struct hlsl_ctx *ctx, enum hlsl_ir_jump_type 
         return NULL;
     init_node(&jump->node, HLSL_IR_JUMP, NULL, loc);
     jump->type = type;
+    hlsl_src_from_node(&jump->condition, condition);
     return &jump->node;
 }
 
@@ -1585,9 +1586,9 @@ static struct hlsl_ir_node *clone_if(struct hlsl_ctx *ctx, struct clone_instr_ma
     return dst;
 }
 
-static struct hlsl_ir_node *clone_jump(struct hlsl_ctx *ctx, struct hlsl_ir_jump *src)
+static struct hlsl_ir_node *clone_jump(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_jump *src)
 {
-    return hlsl_new_jump(ctx, src->type, &src->node.loc);
+    return hlsl_new_jump(ctx, src->type, map_instr(map, src->condition.node), &src->node.loc);
 }
 
 static struct hlsl_ir_node *clone_load(struct hlsl_ctx *ctx, struct clone_instr_map *map, struct hlsl_ir_load *src)
@@ -1728,7 +1729,7 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
             return clone_index(ctx, map, hlsl_ir_index(instr));
 
         case HLSL_IR_JUMP:
-            return clone_jump(ctx, hlsl_ir_jump(instr));
+            return clone_jump(ctx, map, hlsl_ir_jump(instr));
 
         case HLSL_IR_LOAD:
             return clone_load(ctx, map, hlsl_ir_load(instr));
@@ -2703,6 +2704,7 @@ static void free_ir_if(struct hlsl_ir_if *if_node)
 
 static void free_ir_jump(struct hlsl_ir_jump *jump)
 {
+    hlsl_src_remove(&jump->condition);
     vkd3d_free(jump);
 }
 

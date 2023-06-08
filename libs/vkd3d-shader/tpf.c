@@ -4782,17 +4782,11 @@ static void write_sm4_jump(struct hlsl_ctx *ctx,
 
         case HLSL_IR_JUMP_DISCARD:
         {
-            struct sm4_register *reg = &instr.srcs[0].reg;
-
             instr.opcode = VKD3D_SM4_OP_DISCARD | VKD3D_SM4_CONDITIONAL_NZ;
 
             memset(&instr.srcs[0], 0, sizeof(*instr.srcs));
-            instr.srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             instr.src_count = 1;
-            reg->type = VKD3D_SM4_RT_IMMCONST;
-            reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
-            reg->immconst_uint[0] = ~0u;
-
+            sm4_src_from_node(&instr.srcs[0], jump->condition.node, VKD3DSP_WRITEMASK_ALL);
             break;
         }
 

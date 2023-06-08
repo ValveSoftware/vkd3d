@@ -421,7 +421,7 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct list *cond_lis
 
     hlsl_block_init(&then_block);
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, &condition->loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &condition->loc)))
         return false;
     hlsl_block_add_instr(&then_block, jump);
 
@@ -656,7 +656,7 @@ static bool add_return(struct hlsl_ctx *ctx, struct list *instrs,
             hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RETURN, "Void functions cannot return a value.");
     }
 
-    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, loc)))
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_RETURN, NULL, loc)))
         return false;
     list_add_tail(instrs, &jump->entry);
 
@@ -5736,11 +5736,16 @@ jump_statement:
 discard_statement:
       KW_DISCARD ';'
         {
-            struct hlsl_ir_node *discard;
+            struct hlsl_ir_node *discard, *c;
 
             if (!($$ = make_empty_list(ctx)))
                 YYABORT;
-            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD, &@1)))
+
+            if (!(c = hlsl_new_uint_constant(ctx, ~0u, &@1)))
+                return false;
+            list_add_tail($$, &c->entry);
+
+            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD, c, &@1)))
                 return false;
             list_add_tail($$, &discard->entry);
         }
