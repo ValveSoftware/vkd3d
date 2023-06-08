@@ -2100,6 +2100,35 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     }
 }
 
+static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
+{
+    const struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
+
+    switch (jump->type)
+    {
+        case HLSL_IR_JUMP_DISCARD_NEG:
+        {
+            struct hlsl_reg *reg = &jump->condition.node->reg;
+
+            struct sm1_instruction instr =
+            {
+                .opcode = VKD3D_SM1_OP_TEXKILL,
+
+                .dst.type = D3DSPR_TEMP,
+                .dst.reg = reg->id,
+                .dst.writemask = reg->writemask,
+                .has_dst = 1,
+            };
+
+            write_sm1_instruction(ctx, buffer, &instr);
+            break;
+        }
+
+        default:
+            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.\n", hlsl_jump_type_to_string(jump->type));
+    }
+}
+
 static void write_sm1_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     const struct hlsl_ir_load *load = hlsl_ir_load(instr);
@@ -2292,6 +2321,10 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
             case HLSL_IR_EXPR:
                 write_sm1_expr(ctx, buffer, instr);
+                break;
+
+            case HLSL_IR_JUMP:
+                write_sm1_jump(ctx, buffer, instr);
                 break;
 
             case HLSL_IR_LOAD:

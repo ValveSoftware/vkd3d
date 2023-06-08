@@ -2584,6 +2584,61 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_node *zero, *bool_false, *or, *cmp, *load;
+    static const struct hlsl_constant_value zero_value;
+    struct hlsl_type *arg_type, *cmp_type;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
+    struct hlsl_ir_jump *jump;
+    unsigned int i, count;
+    struct list instrs;
+
+    if (instr->type != HLSL_IR_JUMP)
+        return false;
+    jump = hlsl_ir_jump(instr);
+    if (jump->type != HLSL_IR_JUMP_DISCARD_NEG)
+        return false;
+
+    list_init(&instrs);
+
+    arg_type = jump->condition.node->data_type;
+    if (!(zero = hlsl_new_constant(ctx, arg_type, &zero_value, &instr->loc)))
+        return false;
+    list_add_tail(&instrs, &zero->entry);
+
+    operands[0] = jump->condition.node;
+    operands[1] = zero;
+    cmp_type = hlsl_get_numeric_type(ctx, arg_type->class, HLSL_TYPE_BOOL, arg_type->dimx, arg_type->dimy);
+    if (!(cmp = hlsl_new_expr(ctx, HLSL_OP2_LESS, operands, cmp_type, &instr->loc)))
+        return false;
+    list_add_tail(&instrs, &cmp->entry);
+
+    if (!(bool_false = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &zero_value, &instr->loc)))
+        return false;
+    list_add_tail(&instrs, &bool_false->entry);
+
+    or = bool_false;
+
+    count = hlsl_type_component_count(cmp_type);
+    for (i = 0; i < count; ++i)
+    {
+        if (!(load = hlsl_add_load_component(ctx, &instrs, cmp, i, &instr->loc)))
+            return false;
+
+        if (!(or = hlsl_new_binary_expr(ctx, HLSL_OP2_LOGIC_OR, or, load)))
+                return NULL;
+        list_add_tail(&instrs, &or->entry);
+    }
+
+    list_move_tail(&instr->entry, &instrs);
+    hlsl_src_remove(&jump->condition);
+    hlsl_src_from_node(&jump->condition, or);
+    jump->type = HLSL_IR_JUMP_DISCARD_NZ;
+
+    return true;
+}
+
 static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     switch (instr->type)
@@ -4069,6 +4124,10 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         hlsl_error(ctx, &entry_func->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_ATTRIBUTE,
                 "Entry point \"%s\" is missing a [numthreads] attribute.", entry_func->func->name);
 
+    if (profile->major_version >= 4)
+    {
+        hlsl_transform_ir(ctx, lower_discard_neg, body, NULL);
+    }
     hlsl_transform_ir(ctx, lower_broadcasts, body, NULL);
     while (hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL));
     do
