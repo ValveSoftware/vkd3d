@@ -558,7 +558,8 @@ enum hlsl_ir_jump_type
 {
     HLSL_IR_JUMP_BREAK,
     HLSL_IR_JUMP_CONTINUE,
-    HLSL_IR_JUMP_DISCARD,
+    HLSL_IR_JUMP_DISCARD_NEG,
+    HLSL_IR_JUMP_DISCARD_NZ,
     HLSL_IR_JUMP_RETURN,
 };
 
@@ -566,7 +567,7 @@ struct hlsl_ir_jump
 {
     struct hlsl_ir_node node;
     enum hlsl_ir_jump_type type;
-    /* Argument used for HLSL_IR_JUMP_DISCARD. */
+    /* Argument used for HLSL_IR_JUMP_DISCARD_NZ and HLSL_IR_JUMP_DISCARD_NEG. */
     struct hlsl_src condition;
 };
 

@@ -2544,6 +2544,34 @@ static bool intrinsic_clamp(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MIN, max, params->args[2], loc);
 }
 
+static bool intrinsic_clip(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *condition, *jump;
+
+    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+        return false;
+
+    condition = params->args[0];
+
+    if (ctx->profile->major_version < 4 && hlsl_type_component_count(condition->data_type) > 4)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, condition->data_type)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Argument type cannot exceed 4 components, got type \"%s\".", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+        return false;
+    }
+
+    if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NEG, condition, loc)))
+        return false;
+    list_add_tail(params->instrs, &jump->entry);
+
+    return true;
+}
+
 static bool intrinsic_cos(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3482,6 +3510,7 @@ intrinsic_functions[] =
     {"asfloat",                             1, true,  intrinsic_asfloat},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"clamp",                               3, true,  intrinsic_clamp},
+    {"clip",                                1, true,  intrinsic_clip},
     {"cos",                                 1, true,  intrinsic_cos},
     {"cross",                               2, true,  intrinsic_cross},
     {"ddx",                                 1, true,  intrinsic_ddx},
@@ -5745,7 +5774,7 @@ discard_statement:
                 return false;
             list_add_tail($$, &c->entry);
 
-            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD, c, &@1)))
+            if (!(discard = hlsl_new_jump(ctx, HLSL_IR_JUMP_DISCARD_NZ, c, &@1)))
                 return false;
             list_add_tail($$, &discard->entry);
         }

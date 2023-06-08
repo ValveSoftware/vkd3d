@@ -2147,10 +2147,11 @@ const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type)
 {
     static const char * const names[] =
     {
-        "HLSL_IR_JUMP_BREAK",
-        "HLSL_IR_JUMP_CONTINUE",
-        "HLSL_IR_JUMP_DISCARD",
-        "HLSL_IR_JUMP_RETURN",
+        [HLSL_IR_JUMP_BREAK] = "HLSL_IR_JUMP_BREAK",
+        [HLSL_IR_JUMP_CONTINUE] = "HLSL_IR_JUMP_CONTINUE",
+        [HLSL_IR_JUMP_DISCARD_NEG] = "HLSL_IR_JUMP_DISCARD_NEG",
+        [HLSL_IR_JUMP_DISCARD_NZ] = "HLSL_IR_JUMP_DISCARD_NZ",
+        [HLSL_IR_JUMP_RETURN] = "HLSL_IR_JUMP_RETURN",
     };
 
     assert(type < ARRAY_SIZE(names));
@@ -2419,8 +2420,12 @@ static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_i
             vkd3d_string_buffer_printf(buffer, "continue");
             break;
 
-        case HLSL_IR_JUMP_DISCARD:
-            vkd3d_string_buffer_printf(buffer, "discard");
+        case HLSL_IR_JUMP_DISCARD_NEG:
+            vkd3d_string_buffer_printf(buffer, "discard_neg");
+            break;
+
+        case HLSL_IR_JUMP_DISCARD_NZ:
+            vkd3d_string_buffer_printf(buffer, "discard_nz");
             break;
 
         case HLSL_IR_JUMP_RETURN:

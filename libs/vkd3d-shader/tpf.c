@@ -4780,7 +4780,7 @@ static void write_sm4_jump(struct hlsl_ctx *ctx,
             instr.opcode = VKD3D_SM4_OP_BREAK;
             break;
 
-        case HLSL_IR_JUMP_DISCARD:
+        case HLSL_IR_JUMP_DISCARD_NZ:
         {
             instr.opcode = VKD3D_SM4_OP_DISCARD | VKD3D_SM4_CONDITIONAL_NZ;
 
