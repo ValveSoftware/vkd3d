@@ -406,6 +406,45 @@ static bool fold_equal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, co
     return true;
 }
 
+static bool fold_gequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
+{
+    unsigned int k;
+
+    assert(dst_type->base_type == HLSL_TYPE_BOOL);
+    assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (src1->node.data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].u = src1->value.u[k].f >= src2->value.u[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->u[k].u = src1->value.u[k].d >= src2->value.u[k].d;
+                break;
+
+            case HLSL_TYPE_INT:
+                dst->u[k].u = src1->value.u[k].i >= src2->value.u[k].i;
+                break;
+
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
+                dst->u[k].u = src1->value.u[k].u >= src2->value.u[k].u;
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+
+        dst->u[k].u *= ~0u;
+    }
+    return true;
+}
+
 static bool fold_less(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
@@ -684,6 +723,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP2_EQUAL:
             success = fold_equal(ctx, &res, instr->data_type, arg1, arg2);
+            break;
+
+        case HLSL_OP2_GEQUAL:
+            success = fold_gequal(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_LESS:
