@@ -223,7 +223,7 @@ static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
     enum hlsl_base_type type = dst_type->base_type;
@@ -238,18 +238,19 @@ static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
         {
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u & src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold bit and for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                FIXME("Fold bit/logic and for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
     return true;
 }
 
-static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
     enum hlsl_base_type type = dst_type->base_type;
@@ -264,11 +265,12 @@ static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
         {
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
                 dst->u[k].u = src1->value.u[k].u | src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold bit or for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                FIXME("Fold bit/logic or for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
@@ -724,11 +726,13 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             break;
 
         case HLSL_OP2_BIT_AND:
-            success = fold_bit_and(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_LOGIC_AND:
+            success = fold_and(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_OR:
-            success = fold_bit_or(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_LOGIC_OR:
+            success = fold_or(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_XOR:
