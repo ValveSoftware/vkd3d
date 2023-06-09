@@ -1649,7 +1649,7 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
     return progress;
 }
 
-static bool copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *block)
+bool hlsl_copy_propagation_execute(struct hlsl_ctx *ctx, struct hlsl_block *block)
 {
     struct copy_propagation_state state;
     bool progress;
@@ -4073,7 +4073,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     {
         progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
         progress |= hlsl_transform_ir(ctx, hlsl_fold_constant_swizzles, body, NULL);
-        progress |= copy_propagation_execute(ctx, body);
+        progress |= hlsl_copy_propagation_execute(ctx, body);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
     }
