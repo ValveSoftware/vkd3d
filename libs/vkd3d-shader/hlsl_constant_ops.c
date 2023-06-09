@@ -223,7 +223,7 @@ static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
     enum hlsl_base_type type = dst_type->base_type;
@@ -232,64 +232,71 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
-            case HLSL_TYPE_FLOAT:
-            case HLSL_TYPE_HALF:
-                dst->u[k].f = src1->value.u[k].f * src2->value.u[k].f;
-                break;
-
-            case HLSL_TYPE_DOUBLE:
-                dst->u[k].d = src1->value.u[k].d * src2->value.u[k].d;
-                break;
-
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->u[k].u = src1->value.u[k].u * src2->value.u[k].u;
+                dst->u[k].u = src1->value.u[k].u & src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold multiplication for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                FIXME("Fold bit and for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
     return true;
 }
 
-static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
+    enum hlsl_base_type type = dst_type->base_type;
     unsigned int k;
 
-    assert(dst_type->base_type == HLSL_TYPE_BOOL);
-    assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
-        switch (src1->node.data_type->base_type)
+        switch (type)
         {
-            case HLSL_TYPE_FLOAT:
-            case HLSL_TYPE_HALF:
-                dst->u[k].u = src1->value.u[k].f != src2->value.u[k].f;
-                break;
-
-            case HLSL_TYPE_DOUBLE:
-                dst->u[k].u = src1->value.u[k].d != src2->value.u[k].d;
-                break;
-
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-            case HLSL_TYPE_BOOL:
-                dst->u[k].u = src1->value.u[k].u != src2->value.u[k].u;
+                dst->u[k].u = src1->value.u[k].u | src2->value.u[k].u;
                 break;
 
             default:
-                vkd3d_unreachable();
+                FIXME("Fold bit or for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
         }
+    }
+    return true;
+}
 
-        dst->u[k].u *= ~0u;
+static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+                dst->u[k].u = src1->value.u[k].u ^ src2->value.u[k].u;
+                break;
+
+            default:
+                FIXME("Fold bit xor for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
     }
     return true;
 }
@@ -363,49 +370,6 @@ static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
-        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2,
-        const struct vkd3d_shader_location *loc)
-{
-    enum hlsl_base_type type = dst_type->base_type;
-    unsigned int k;
-
-    assert(type == src1->node.data_type->base_type);
-    assert(type == src2->node.data_type->base_type);
-
-    for (k = 0; k < dst_type->dimx; ++k)
-    {
-        switch (type)
-        {
-            case HLSL_TYPE_INT:
-                if (src2->value.u[k].i == 0)
-                {
-                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO, "Division by zero.");
-                    return false;
-                }
-                if (src1->value.u[k].i == INT_MIN && src2->value.u[k].i == -1)
-                    dst->u[k].i = 0;
-                else
-                    dst->u[k].i = src1->value.u[k].i % src2->value.u[k].i;
-                break;
-
-            case HLSL_TYPE_UINT:
-                if (src2->value.u[k].u == 0)
-                {
-                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO, "Division by zero.");
-                    return false;
-                }
-                dst->u[k].u = src1->value.u[k].u % src2->value.u[k].u;
-                break;
-
-            default:
-                FIXME("Fold modulus for type %s.\n", debug_hlsl_type(ctx, dst_type));
-                return false;
-        }
-    }
-    return true;
-}
-
 static bool fold_max(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
@@ -464,8 +428,9 @@ static bool fold_min(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
-static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
-        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
+static bool fold_mod(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2,
+        const struct vkd3d_shader_location *loc)
 {
     enum hlsl_base_type type = dst_type->base_type;
     unsigned int k;
@@ -478,19 +443,35 @@ static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
         switch (type)
         {
             case HLSL_TYPE_INT:
+                if (src2->value.u[k].i == 0)
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO, "Division by zero.");
+                    return false;
+                }
+                if (src1->value.u[k].i == INT_MIN && src2->value.u[k].i == -1)
+                    dst->u[k].i = 0;
+                else
+                    dst->u[k].i = src1->value.u[k].i % src2->value.u[k].i;
+                break;
+
             case HLSL_TYPE_UINT:
-                dst->u[k].u = src1->value.u[k].u ^ src2->value.u[k].u;
+                if (src2->value.u[k].u == 0)
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO, "Division by zero.");
+                    return false;
+                }
+                dst->u[k].u = src1->value.u[k].u % src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold bit xor for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                FIXME("Fold modulus for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
     return true;
 }
 
-static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
     enum hlsl_base_type type = dst_type->base_type;
@@ -499,45 +480,64 @@ static bool fold_bit_and(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < dst_type->dimx; ++k)
+    for (k = 0; k < 4; ++k)
     {
         switch (type)
         {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].f = src1->value.u[k].f * src2->value.u[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->u[k].d = src1->value.u[k].d * src2->value.u[k].d;
+                break;
+
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->u[k].u = src1->value.u[k].u & src2->value.u[k].u;
+                dst->u[k].u = src1->value.u[k].u * src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold bit and for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                FIXME("Fold multiplication for type %s.\n", debug_hlsl_type(ctx, dst_type));
                 return false;
         }
     }
     return true;
 }
 
-static bool fold_bit_or(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
-    enum hlsl_base_type type = dst_type->base_type;
     unsigned int k;
 
-    assert(type == src1->node.data_type->base_type);
-    assert(type == src2->node.data_type->base_type);
+    assert(dst_type->base_type == HLSL_TYPE_BOOL);
+    assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
-    for (k = 0; k < dst_type->dimx; ++k)
+    for (k = 0; k < 4; ++k)
     {
-        switch (type)
+        switch (src1->node.data_type->base_type)
         {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].u = src1->value.u[k].f != src2->value.u[k].f;
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->u[k].u = src1->value.u[k].d != src2->value.u[k].d;
+                break;
+
             case HLSL_TYPE_INT:
             case HLSL_TYPE_UINT:
-                dst->u[k].u = src1->value.u[k].u | src2->value.u[k].u;
+            case HLSL_TYPE_BOOL:
+                dst->u[k].u = src1->value.u[k].u != src2->value.u[k].u;
                 break;
 
             default:
-                FIXME("Fold bit or for type %s.\n", debug_hlsl_type(ctx, dst_type));
-                return false;
+                vkd3d_unreachable();
         }
+
+        dst->u[k].u *= ~0u;
     }
     return true;
 }
@@ -591,20 +591,20 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             success = fold_add(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
-        case HLSL_OP2_MUL:
-            success = fold_mul(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_BIT_AND:
+            success = fold_bit_and(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
-        case HLSL_OP2_NEQUAL:
-            success = fold_nequal(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_BIT_OR:
+            success = fold_bit_or(ctx, &res, instr->data_type, arg1, arg2);
+            break;
+
+        case HLSL_OP2_BIT_XOR:
+            success = fold_bit_xor(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:
             success = fold_div(ctx, &res, instr->data_type, arg1, arg2, &instr->loc);
-            break;
-
-        case HLSL_OP2_MOD:
-            success = fold_mod(ctx, &res, instr->data_type, arg1, arg2, &instr->loc);
             break;
 
         case HLSL_OP2_MAX:
@@ -615,16 +615,16 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
             success = fold_min(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
-        case HLSL_OP2_BIT_XOR:
-            success = fold_bit_xor(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_MOD:
+            success = fold_mod(ctx, &res, instr->data_type, arg1, arg2, &instr->loc);
             break;
 
-        case HLSL_OP2_BIT_AND:
-            success = fold_bit_and(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_MUL:
+            success = fold_mul(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
-        case HLSL_OP2_BIT_OR:
-            success = fold_bit_or(ctx, &res, instr->data_type, arg1, arg2);
+        case HLSL_OP2_NEQUAL:
+            success = fold_nequal(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         default:
