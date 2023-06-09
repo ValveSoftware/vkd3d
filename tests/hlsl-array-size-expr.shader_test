@@ -38,3 +38,16 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe all rgba (61, 62, 63, 64)
+
+[pixel shader todo]
+static const int size = 8;
+static const float array[size] = {1, 2, 3, 4, 5, 6, 7, 8};
+
+float4 main() : sv_target
+{
+    return float4(array[1], array[2], array[5], array[0]);
+}
+
+[test]
+todo draw quad
+todo probe all rgba (2, 3, 6, 1)
