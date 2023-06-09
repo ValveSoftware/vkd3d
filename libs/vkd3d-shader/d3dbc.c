@@ -1281,10 +1281,13 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+        unsigned int r;
 
-        if (!var->semantic.name && var->regs[regset].allocated)
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
         {
+            if (var->semantic.name || !var->regs[r].allocated)
+                continue;
+
             ++uniform_count;
 
             if (var->is_param && var->is_uniform)
@@ -1321,20 +1324,23 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+        unsigned int r;
 
-        if (!var->semantic.name && var->regs[regset].allocated)
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
         {
+            if (var->semantic.name || !var->regs[r].allocated)
+                continue;
+
             put_u32(buffer, 0); /* name */
-            if (regset == HLSL_REGSET_NUMERIC)
+            if (r == HLSL_REGSET_NUMERIC)
             {
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[regset].id));
-                put_u32(buffer, var->data_type->reg_size[regset] / 4);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_FLOAT4, var->regs[r].id));
+                put_u32(buffer, var->data_type->reg_size[r] / 4);
             }
             else
             {
-                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[regset].id));
-                put_u32(buffer, var->regs[regset].bind_count);
+                put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[r].id));
+                put_u32(buffer, var->regs[r].bind_count);
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */
@@ -1345,12 +1351,16 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        enum hlsl_regset regset = hlsl_type_get_regset(var->data_type);
+        unsigned int r;
 
-        if (!var->semantic.name && var->regs[regset].allocated)
+        for (r = 0; r <= HLSL_REGSET_LAST; ++r)
         {
-            size_t var_offset = vars_start + (uniform_count * 5 * sizeof(uint32_t));
-            size_t name_offset;
+            size_t var_offset, name_offset;
+
+            if (var->semantic.name || !var->regs[r].allocated)
+                continue;
+
+            var_offset = vars_start + (uniform_count * 5 * sizeof(uint32_t));
 
             name_offset = put_string(buffer, var->name);
             set_u32(buffer, var_offset, name_offset - ctab_start);
