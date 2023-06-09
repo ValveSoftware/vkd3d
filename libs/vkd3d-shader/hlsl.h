@@ -1232,7 +1232,7 @@ unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, 
 struct hlsl_type *hlsl_type_get_component_type(struct hlsl_ctx *ctx, struct hlsl_type *type,
         unsigned int index);
 unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        enum hlsl_regset regset, unsigned int index);
+        unsigned int index, enum hlsl_regset *regset);
 bool hlsl_type_is_row_major(const struct hlsl_type *type);
 unsigned int hlsl_type_minor_size(const struct hlsl_type *type);
 unsigned int hlsl_type_major_size(const struct hlsl_type *type);

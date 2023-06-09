@@ -3250,8 +3250,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 if (!hlsl_type_is_resource(component_type))
                     continue;
 
-                regset = hlsl_type_get_regset(component_type);
-                regset_offset = hlsl_type_get_component_offset(ctx, var->data_type, regset, k);
+                regset_offset = hlsl_type_get_component_offset(ctx, var->data_type, k, &regset);
 
                 if (regset_offset > var->regs[regset].allocation_size)
                     continue;

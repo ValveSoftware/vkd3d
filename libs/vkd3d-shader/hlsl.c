@@ -452,11 +452,11 @@ struct hlsl_type *hlsl_type_get_component_type(struct hlsl_ctx *ctx, struct hlsl
 }
 
 unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        enum hlsl_regset regset, unsigned int index)
+        unsigned int index, enum hlsl_regset *regset)
 {
+    unsigned int offset[HLSL_REGSET_LAST + 1] = {0};
     struct hlsl_type *next_type;
-    unsigned int offset = 0;
-    unsigned int idx;
+    unsigned int idx, r;
 
     while (!type_is_single_component(type))
     {
@@ -468,19 +468,22 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_SCALAR:
             case HLSL_CLASS_VECTOR:
             case HLSL_CLASS_MATRIX:
-                if (regset == HLSL_REGSET_NUMERIC)
-                    offset += idx;
+                offset[HLSL_REGSET_NUMERIC] += idx;
                 break;
 
             case HLSL_CLASS_STRUCT:
-                offset += type->e.record.fields[idx].reg_offset[regset];
+                for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+                    offset[r] += type->e.record.fields[idx].reg_offset[r];
                 break;
 
             case HLSL_CLASS_ARRAY:
-                if (regset == HLSL_REGSET_NUMERIC)
-                    offset += idx * align(type->e.array.type->reg_size[regset], 4);
-                else
-                    offset += idx * type->e.array.type->reg_size[regset];
+                for (r = 0; r <= HLSL_REGSET_LAST; ++r)
+                {
+                    if (r == HLSL_REGSET_NUMERIC)
+                        offset[r] += idx * align(type->e.array.type->reg_size[r], 4);
+                    else
+                        offset[r] += idx * type->e.array.type->reg_size[r];
+                }
                 break;
 
             case HLSL_CLASS_OBJECT:
@@ -493,7 +496,8 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
         type = next_type;
     }
 
-    return offset;
+    *regset = hlsl_type_get_regset(type);
+    return offset[*regset];
 }
 
 static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_var *var,
