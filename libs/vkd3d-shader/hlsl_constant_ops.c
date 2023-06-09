@@ -535,6 +535,15 @@ static bool fold_min(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     {
         switch (type)
         {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].f = fminf(src1->value.u[k].f, src2->value.u[k].f);
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->u[k].d = fmin(src1->value.u[k].d, src2->value.u[k].d);
+                break;
+
             case HLSL_TYPE_INT:
                 dst->u[k].i = min(src1->value.u[k].i, src2->value.u[k].i);
                 break;
