@@ -3296,38 +3296,43 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
         }
         else
         {
+            unsigned int r;
+
             if (!hlsl_type_is_resource(var->data_type))
                 continue;
-            regset = hlsl_type_get_regset(var->data_type);
-            if (!var->regs[regset].allocated)
-                continue;
 
-            if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
-                    sizeof(*extern_resources))))
+            for (r = 0; r <= HLSL_REGSET_LAST; ++r)
             {
-                sm4_free_extern_resources(extern_resources, *count);
-                *count = 0;
-                return NULL;
+                if (!var->regs[r].allocated)
+                    continue;
+
+                if (!(hlsl_array_reserve(ctx, (void **)&extern_resources, &capacity, *count + 1,
+                        sizeof(*extern_resources))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+
+                if (!(name = hlsl_strdup(ctx, string_skip_tag(var->name))))
+                {
+                    sm4_free_extern_resources(extern_resources, *count);
+                    *count = 0;
+                    return NULL;
+                }
+
+                extern_resources[*count].var = var;
+
+                extern_resources[*count].name = name;
+                extern_resources[*count].data_type = var->data_type;
+                extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
+
+                extern_resources[*count].regset = r;
+                extern_resources[*count].id = var->regs[r].id;
+                extern_resources[*count].bind_count = var->bind_count[r];
+
+                ++*count;
             }
-
-            if (!(name = hlsl_strdup(ctx, string_skip_tag(var->name))))
-            {
-                sm4_free_extern_resources(extern_resources, *count);
-                *count = 0;
-                return NULL;
-            }
-
-            extern_resources[*count].var = var;
-
-            extern_resources[*count].name = name;
-            extern_resources[*count].data_type = var->data_type;
-            extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
-
-            extern_resources[*count].regset = regset;
-            extern_resources[*count].id = var->regs[regset].id;
-            extern_resources[*count].bind_count = var->bind_count[regset];
-
-            ++*count;
         }
     }
 
