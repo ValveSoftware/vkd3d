@@ -796,9 +796,8 @@ struct hlsl_ctx
         struct hlsl_type *Void;
     } builtin_types;
 
-    /* List of the instruction nodes for initializing static variables; linked by the
-     *   hlsl_ir_node.entry fields. */
-    struct list static_initializers;
+    /* List of the instruction nodes for initializing static variables. */
+    struct hlsl_block static_initializers;
 
     /* Dynamic array of constant values that appear in the shader, associated to the 'c' registers.
      * Only used for SM1 profiles. */

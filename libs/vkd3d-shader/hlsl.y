@@ -2159,7 +2159,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
             }
 
             if (modifiers & HLSL_STORAGE_STATIC)
-                list_move_tail(&ctx->static_initializers, v->initializer.instrs);
+                list_move_tail(&ctx->static_initializers.instrs, v->initializer.instrs);
             else
                 list_move_tail(statements_list, v->initializer.instrs);
             vkd3d_free(v->initializer.args);
@@ -2182,9 +2182,9 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 vkd3d_free(v);
                 continue;
             }
-            list_add_tail(&ctx->static_initializers, &zero->entry);
+            hlsl_block_add_instr(&ctx->static_initializers, zero);
 
-            if (!(cast = add_cast(ctx, &ctx->static_initializers, zero, var->data_type, &var->loc)))
+            if (!(cast = add_cast(ctx, &ctx->static_initializers.instrs, zero, var->data_type, &var->loc)))
             {
                 vkd3d_free(v);
                 continue;
@@ -2195,7 +2195,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 vkd3d_free(v);
                 continue;
             }
-            list_add_tail(&ctx->static_initializers, &store->entry);
+            hlsl_block_add_instr(&ctx->static_initializers, store);
         }
         vkd3d_free(v);
     }

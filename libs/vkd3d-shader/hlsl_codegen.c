@@ -3977,7 +3977,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     unsigned int i;
     bool progress;
 
-    list_move_head(&body->instrs, &ctx->static_initializers);
+    list_move_head(&body->instrs, &ctx->static_initializers.instrs);
 
     memset(&recursive_call_ctx, 0, sizeof(recursive_call_ctx));
     hlsl_transform_ir(ctx, find_recursive_calls, body, &recursive_call_ctx);

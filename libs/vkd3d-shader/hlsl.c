@@ -3236,7 +3236,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
 
     rb_init(&ctx->functions, compare_function_rb);
 
-    list_init(&ctx->static_initializers);
+    hlsl_block_init(&ctx->static_initializers);
     list_init(&ctx->extern_vars);
 
     list_init(&ctx->buffers);
