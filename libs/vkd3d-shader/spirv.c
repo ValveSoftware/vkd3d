@@ -4479,7 +4479,8 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     element_idx = shader_register_get_io_indices(reg, array_sizes);
     signature_element = &shader_signature->elements[element_idx];
 
-    if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && !sysval && signature_element->sysval_semantic)
+    if ((compiler->shader_type == VKD3D_SHADER_TYPE_HULL || compiler->shader_type == VKD3D_SHADER_TYPE_GEOMETRY)
+            && !sysval && signature_element->sysval_semantic)
         sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
