@@ -2968,31 +2968,39 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        enum hlsl_regset regset;
+        unsigned int r;
 
         if (!hlsl_type_is_resource(var->data_type))
             continue;
-        regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.reg_type && var->regs[regset].allocation_size)
+        if (var->reg_reservation.reg_type)
         {
-            if (var->reg_reservation.reg_type != get_regset_name(regset))
+            for (r = 0; r <= HLSL_REGSET_LAST_OBJECT; ++r)
             {
-                struct vkd3d_string_buffer *type_string;
+                if (var->regs[r].allocation_size > 0)
+                {
+                    if (var->reg_reservation.reg_type != get_regset_name(r))
+                    {
+                        struct vkd3d_string_buffer *type_string;
 
-                type_string = hlsl_type_to_string(ctx, var->data_type);
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                        "Object of type '%s' must be bound to register type '%c'.",
-                        type_string->buffer, get_regset_name(regset));
-                hlsl_release_string_buffer(ctx, type_string);
-            }
-            else
-            {
-                var->regs[regset].allocated = true;
-                var->regs[regset].id = var->reg_reservation.reg_index;
-                TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
-                        var->reg_reservation.reg_index, var->reg_reservation.reg_type,
-                        var->reg_reservation.reg_index + var->regs[regset].allocation_size);
+                        /* We can throw this error because resources can only span across a single
+                         * regset, but we have to check for multiple regsets if we support register
+                         * reservations for structs for SM5. */
+                        type_string = hlsl_type_to_string(ctx, var->data_type);
+                        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                                "Object of type '%s' must be bound to register type '%c'.",
+                                type_string->buffer, get_regset_name(r));
+                        hlsl_release_string_buffer(ctx, type_string);
+                    }
+                    else
+                    {
+                        var->regs[r].allocated = true;
+                        var->regs[r].id = var->reg_reservation.reg_index;
+                        TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
+                                var->reg_reservation.reg_index, var->reg_reservation.reg_type,
+                                var->reg_reservation.reg_index + var->regs[r].allocation_size);
+                    }
+                }
             }
         }
     }
