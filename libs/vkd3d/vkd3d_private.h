@@ -147,8 +147,10 @@ struct vkd3d_vulkan_info
     unsigned int max_vertex_attrib_divisor;
 
     VkPhysicalDeviceLimits device_limits;
-    VkPhysicalDeviceSparseProperties sparse_properties;
     struct vkd3d_device_descriptor_limits descriptor_limits;
+
+    VkPhysicalDeviceSparseProperties sparse_properties;
+    bool sparse_binding;
 
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
 

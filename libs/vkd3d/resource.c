@@ -1740,6 +1740,12 @@ static HRESULT d3d12_resource_init(struct d3d12_resource *resource, struct d3d12
 
     resource->desc = *desc;
 
+    if (!heap_properties && !device->vk_info.sparse_binding)
+    {
+        WARN("The device does not support tiled images.\n");
+        return E_INVALIDARG;
+    }
+
     if (heap_properties && !d3d12_resource_validate_heap_properties(resource, heap_properties, initial_state))
         return E_INVALIDARG;
 

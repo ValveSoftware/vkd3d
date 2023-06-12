@@ -1464,6 +1464,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     vulkan_info->device_limits = physical_device_info->properties2.properties.limits;
     vulkan_info->sparse_properties = physical_device_info->properties2.properties.sparseProperties;
+    vulkan_info->sparse_binding = features->sparseBinding;
     vulkan_info->rasterization_stream = physical_device_info->xfb_properties.transformFeedbackRasterizationStreamSelect;
     vulkan_info->transform_feedback_queries = physical_device_info->xfb_properties.transformFeedbackQueries;
     vulkan_info->uav_read_without_format = features->shaderStorageImageReadWithoutFormat;
