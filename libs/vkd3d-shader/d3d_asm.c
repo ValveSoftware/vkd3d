@@ -578,17 +578,17 @@ static void shader_dump_resource_type(struct vkd3d_d3d_asm_compiler *compiler, e
 {
     static const char *const resource_type_names[] =
     {
-        /* VKD3D_SHADER_RESOURCE_NONE                 */ "none",
-        /* VKD3D_SHADER_RESOURCE_BUFFER               */ "buffer",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_1D           */ "texture1d",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_2D           */ "texture2d",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMS         */ "texture2dms",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_3D           */ "texture3d",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBE         */ "texturecube",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY      */ "texture1darray",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY      */ "texture2darray",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY    */ "texture2dmsarray",
-        /* VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY    */ "texturecubearray",
+        [VKD3D_SHADER_RESOURCE_NONE             ] = "none",
+        [VKD3D_SHADER_RESOURCE_BUFFER           ] = "buffer",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_1D       ] = "texture1d",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2D       ] = "texture2d",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMS     ] = "texture2dms",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_3D       ] = "texture3d",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBE     ] = "texturecube",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_1DARRAY  ] = "texture1darray",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY  ] = "texture2darray",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY] = "texture2dmsarray",
+        [VKD3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY] = "texturecubearray",
     };
 
     if (type < ARRAY_SIZE(resource_type_names))
@@ -601,19 +601,19 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, const
 {
     static const char *const data_type_names[] =
     {
-        /* VKD3D_DATA_FLOAT     */ "float",
-        /* VKD3D_DATA_INT       */ "int",
-        /* VKD3D_DATA_RESOURCE  */ "resource",
-        /* VKD3D_DATA_SAMPLER   */ "sampler",
-        /* VKD3D_DATA_UAV       */ "uav",
-        /* VKD3D_DATA_UINT      */ "uint",
-        /* VKD3D_DATA_UNORM     */ "unorm",
-        /* VKD3D_DATA_SNORM     */ "snorm",
-        /* VKD3D_DATA_OPAQUE    */ "opaque",
-        /* VKD3D_DATA_MIXED     */ "mixed",
-        /* VKD3D_DATA_DOUBLE    */ "double",
-        /* VKD3D_DATA_CONTINUED */ "<continued>",
-        /* VKD3D_DATA_UNUSED    */ "<unused>",
+        [VKD3D_DATA_FLOAT    ] = "float",
+        [VKD3D_DATA_INT      ] = "int",
+        [VKD3D_DATA_RESOURCE ] = "resource",
+        [VKD3D_DATA_SAMPLER  ] = "sampler",
+        [VKD3D_DATA_UAV      ] = "uav",
+        [VKD3D_DATA_UINT     ] = "uint",
+        [VKD3D_DATA_UNORM    ] = "unorm",
+        [VKD3D_DATA_SNORM    ] = "snorm",
+        [VKD3D_DATA_OPAQUE   ] = "opaque",
+        [VKD3D_DATA_MIXED    ] = "mixed",
+        [VKD3D_DATA_DOUBLE   ] = "double",
+        [VKD3D_DATA_CONTINUED] = "<continued>",
+        [VKD3D_DATA_UNUSED   ] = "<unused>",
     };
     const char *name;
     int i;

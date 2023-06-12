@@ -2124,18 +2124,18 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
 {
     static const char * const names[] =
     {
-        "HLSL_IR_CALL",
-        "HLSL_IR_CONSTANT",
-        "HLSL_IR_EXPR",
-        "HLSL_IR_IF",
-        "HLSL_IR_INDEX",
-        "HLSL_IR_LOAD",
-        "HLSL_IR_LOOP",
-        "HLSL_IR_JUMP",
-        "HLSL_IR_RESOURCE_LOAD",
-        "HLSL_IR_RESOURCE_STORE",
-        "HLSL_IR_STORE",
-        "HLSL_IR_SWIZZLE",
+        [HLSL_IR_CALL          ] = "HLSL_IR_CALL",
+        [HLSL_IR_CONSTANT      ] = "HLSL_IR_CONSTANT",
+        [HLSL_IR_EXPR          ] = "HLSL_IR_EXPR",
+        [HLSL_IR_IF            ] = "HLSL_IR_IF",
+        [HLSL_IR_INDEX         ] = "HLSL_IR_INDEX",
+        [HLSL_IR_LOAD          ] = "HLSL_IR_LOAD",
+        [HLSL_IR_LOOP          ] = "HLSL_IR_LOOP",
+        [HLSL_IR_JUMP          ] = "HLSL_IR_JUMP",
+        [HLSL_IR_RESOURCE_LOAD ] = "HLSL_IR_RESOURCE_LOAD",
+        [HLSL_IR_RESOURCE_STORE] = "HLSL_IR_RESOURCE_STORE",
+        [HLSL_IR_STORE         ] = "HLSL_IR_STORE",
+        [HLSL_IR_SWIZZLE       ] = "HLSL_IR_SWIZZLE",
     };
 
     if (type >= ARRAY_SIZE(names))
@@ -2147,11 +2147,11 @@ const char *hlsl_jump_type_to_string(enum hlsl_ir_jump_type type)
 {
     static const char * const names[] =
     {
-        [HLSL_IR_JUMP_BREAK] = "HLSL_IR_JUMP_BREAK",
-        [HLSL_IR_JUMP_CONTINUE] = "HLSL_IR_JUMP_CONTINUE",
+        [HLSL_IR_JUMP_BREAK]       = "HLSL_IR_JUMP_BREAK",
+        [HLSL_IR_JUMP_CONTINUE]    = "HLSL_IR_JUMP_CONTINUE",
         [HLSL_IR_JUMP_DISCARD_NEG] = "HLSL_IR_JUMP_DISCARD_NEG",
-        [HLSL_IR_JUMP_DISCARD_NZ] = "HLSL_IR_JUMP_DISCARD_NZ",
-        [HLSL_IR_JUMP_RETURN] = "HLSL_IR_JUMP_RETURN",
+        [HLSL_IR_JUMP_DISCARD_NZ]  = "HLSL_IR_JUMP_DISCARD_NZ",
+        [HLSL_IR_JUMP_RETURN]      = "HLSL_IR_JUMP_RETURN",
     };
 
     assert(type < ARRAY_SIZE(names));
