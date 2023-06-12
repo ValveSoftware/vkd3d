@@ -216,13 +216,15 @@ bool hlsl_type_is_resource(const struct hlsl_type *type)
     return false;
 }
 
-enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
+/* Only intended to be used for derefs (after copies have been lowered to components or vectors) or
+ * resources, since for both their data types span across a single regset. */
+static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
 {
     if (type->class <= HLSL_CLASS_LAST_NUMERIC)
         return HLSL_REGSET_NUMERIC;
 
     if (type->class == HLSL_CLASS_ARRAY)
-        return hlsl_type_get_regset(type->e.array.type);
+        return type_get_regset(type->e.array.type);
 
     if (type->class == HLSL_CLASS_OBJECT)
     {
@@ -243,6 +245,18 @@ enum hlsl_regset hlsl_type_get_regset(const struct hlsl_type *type)
     }
 
     vkd3d_unreachable();
+}
+
+enum hlsl_regset hlsl_deref_get_regset(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
+{
+    struct hlsl_type *type;
+
+    if (deref->data_type)
+        type = deref->data_type;
+    else
+        type = hlsl_deref_get_type(ctx, deref);
+
+    return type_get_regset(type);
 }
 
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset)
@@ -324,7 +338,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         {
             if (hlsl_type_is_resource(type))
             {
-                enum hlsl_regset regset = hlsl_type_get_regset(type);
+                enum hlsl_regset regset = type_get_regset(type);
 
                 type->reg_size[regset] = 1;
             }
@@ -496,7 +510,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
         type = next_type;
     }
 
-    *regset = hlsl_type_get_regset(type);
+    *regset = type_get_regset(type);
     return offset[*regset];
 }
 

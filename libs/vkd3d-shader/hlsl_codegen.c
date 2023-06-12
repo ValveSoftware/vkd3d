@@ -97,7 +97,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const struct hlsl_deref *deref, const struct vkd3d_shader_location *loc)
 {
-    enum hlsl_regset regset = hlsl_type_get_regset(deref->data_type);
+    enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
     struct hlsl_ir_node *offset = NULL;
     struct hlsl_type *type;
     unsigned int i;
@@ -2177,7 +2177,7 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         return false;
     }
 
-    assert(hlsl_type_get_regset(load->resource.var->data_type) == HLSL_REGSET_SAMPLERS);
+    assert(hlsl_deref_get_regset(ctx, &load->resource) == HLSL_REGSET_SAMPLERS);
 
     if (!(name = hlsl_get_string_buffer(ctx)))
         return false;
@@ -3339,7 +3339,7 @@ static bool track_object_components_sampler_dim(struct hlsl_ctx *ctx, struct hls
     load = hlsl_ir_resource_load(instr);
     var = load->resource.var;
 
-    regset = hlsl_type_get_regset(hlsl_deref_get_type(ctx, &load->resource));
+    regset = hlsl_deref_get_regset(ctx, &load->resource);
     if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
         return false;
 
@@ -3384,7 +3384,8 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
     load = hlsl_ir_resource_load(instr);
     var = load->resource.var;
 
-    regset = hlsl_type_get_regset(hlsl_deref_get_type(ctx, &load->resource));
+    regset = hlsl_deref_get_regset(ctx, &load->resource);
+
     if (!hlsl_regset_index_from_deref(ctx, &load->resource, regset, &index))
         return false;
 
@@ -4191,7 +4192,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
         return false;
 
     *offset = hlsl_ir_constant(offset_node)->value.u[0].u;
-    regset = hlsl_type_get_regset(deref->data_type);
+    regset = hlsl_deref_get_regset(ctx, deref);
 
     size = deref->var->data_type->reg_size[regset];
     if (*offset >= size)

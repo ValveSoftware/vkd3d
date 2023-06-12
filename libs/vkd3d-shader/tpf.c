@@ -3656,7 +3656,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
 
     if (var->is_uniform)
     {
-        enum hlsl_regset regset = hlsl_type_get_regset(data_type);
+        enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
 
         if (regset == HLSL_REGSET_TEXTURES)
         {
@@ -4433,7 +4433,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
     const struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, resource);
     bool multisampled = resource_type->base_type == HLSL_TYPE_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
-    bool uav = (hlsl_type_get_regset(resource_type) == HLSL_REGSET_UAVS);
+    bool uav = (hlsl_deref_get_regset(tpf->ctx, resource) == HLSL_REGSET_UAVS);
     unsigned int coords_writemask = VKD3DSP_WRITEMASK_ALL;
     struct sm4_instruction instr;
 
