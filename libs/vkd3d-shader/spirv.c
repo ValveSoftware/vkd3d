@@ -8324,7 +8324,6 @@ static void spirv_compiler_emit_ld_raw_structured_srv_uav(struct spirv_compiler 
                     type_id, val_id, 0);
         }
     }
-    assert(dst->reg.data_type == VKD3D_DATA_UINT);
     spirv_compiler_emit_store_dst_components(compiler, dst, VKD3D_SHADER_COMPONENT_UINT, constituents);
 }
 
