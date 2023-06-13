@@ -2210,6 +2210,8 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
                 return VKD3D_DATA_BOOL;
             case 8:
                 return VKD3D_DATA_UINT8;
+            case 16:
+                return VKD3D_DATA_UINT16;
             case 32:
                 return VKD3D_DATA_UINT;
             case 64:
@@ -2223,6 +2225,8 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     {
         switch (type->u.width)
         {
+            case 16:
+                return VKD3D_DATA_HALF;
             case 32:
                 return VKD3D_DATA_FLOAT;
             case 64:
@@ -2887,7 +2891,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 }
 
                 if (type->u.width == 16)
-                    FIXME("Half float type is not supported yet.\n");
+                    dst->u.reg.u.immconst_u32[0] = record->operands[0];
                 else if (type->u.width == 32)
                     dst->u.reg.u.immconst_f32[0] = bitcast_uint64_to_float(record->operands[0]);
                 else if (type->u.width == 64)
@@ -5130,7 +5134,10 @@ static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_
             break;
         case CAST_ZEXT:
         case CAST_SEXT:
-            /* nop or min precision. TODO: native 16-bit */
+            /* nop or min precision. TODO: native 16-bit.
+             * Extension instructions could be emitted for min precision, but in Windows
+             * the AMD RX 580 simply drops such instructions, which makes sense as no
+             * assumptions should be made about any behaviour which depends on bit width. */
             if (to->u.width == from->u.width || (to->u.width == 32 && from->u.width == 16))
             {
                 op = VKD3DSIH_NOP;

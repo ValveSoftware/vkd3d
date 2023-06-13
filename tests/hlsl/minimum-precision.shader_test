@@ -30,16 +30,26 @@ uint4 main() : sv_target
     return uint4(u.x + i, u.y + j, 0, 0);
 }
 
+[require]
+shader model >= 4.0
+shader model < 6.0
+
 [test]
 uniform 0 uint4 0 0 0 0
 draw quad
 probe all rgbaui (0x7fff, 0xffff, 0, 0)
 
+[require]
+shader model >= 6.0
+
+[test]
+uniform 0 uint4 0 0 0 0
+draw quad
+probe all rgbaui (0x7fff, 0xffffffff, 0, 0)
+
 
 % The code d3dcompiler_47 produces for this appears correct, but the result
 % is still zero in Windows.
-[require]
-shader model >= 6.0
 
 [pixel shader]
 uniform min16uint4 u;
@@ -55,7 +65,7 @@ uint4 main() : sv_target
 uniform 0 uint4 0 0 0 0
 uniform 4 uint 2
 draw quad
-probe all rgbaui (0x7fff, 0xffff, 0, 0)
+probe all rgbaui (0x7fff, 0xffffffff, 0, 0)
 uniform 0 uint4 0 0 0 0
 uniform 4 uint 0
 draw quad
