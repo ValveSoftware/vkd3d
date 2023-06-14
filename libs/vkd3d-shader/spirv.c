@@ -2440,6 +2440,7 @@ static bool is_in_fork_or_join_phase(const struct spirv_compiler *compiler)
 }
 
 static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *compiler);
+static size_t spirv_compiler_get_current_function_location(struct spirv_compiler *compiler);
 
 static const char *spirv_compiler_get_entry_point_name(const struct spirv_compiler *compiler)
 {
@@ -3520,11 +3521,13 @@ static uint32_t spirv_compiler_get_descriptor_index(struct spirv_compiler *compi
             index_ids[0] = compiler->descriptor_offsets_member_id;
             index_ids[1] = spirv_compiler_get_constant_uint(compiler, push_constant_index);
             ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassPushConstant, type_id);
+            vkd3d_spirv_begin_function_stream_insertion(builder,
+                    spirv_compiler_get_current_function_location(compiler));
             ptr_id = vkd3d_spirv_build_op_in_bounds_access_chain(builder, ptr_type_id,
                     compiler->push_constants_var_id, index_ids, 2);
             offset_id = vkd3d_spirv_build_op_load(builder, type_id, ptr_id, SpvMemoryAccessMaskNone);
-            if (!compiler->control_flow_depth)
-                compiler->descriptor_offset_ids[push_constant_index] = offset_id;
+            vkd3d_spirv_end_function_stream_insertion(builder);
+            compiler->descriptor_offset_ids[push_constant_index] = offset_id;
         }
         index_id = vkd3d_spirv_build_op_iadd(builder, type_id, index_id, offset_id);
     }
@@ -6664,6 +6667,9 @@ static void spirv_compiler_emit_hull_shader_main(struct spirv_compiler *compiler
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t void_id;
 
+    /* If a patch constant function used descriptor indexing the offsets must be reloaded. */
+    memset(compiler->descriptor_offset_ids, 0, compiler->offset_info.descriptor_table_count
+            * sizeof(*compiler->descriptor_offset_ids));
     vkd3d_spirv_builder_begin_main_function(builder);
 
     void_id = vkd3d_spirv_get_op_type_void(builder);
