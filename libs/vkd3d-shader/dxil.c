@@ -388,6 +388,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
     DX_BUFFER_STORE                 =  69,
+    DX_BUFFER_UPDATE_COUNTER        =  70,
     DX_GET_DIMENSIONS               =  72,
     DX_TEXTURE_GATHER               =  73,
     DX_TEXTURE_GATHER_CMP           =  74,
@@ -4134,6 +4135,43 @@ static void sm6_parser_emit_dx_barrier(struct sm6_parser *sm6, enum dx_intrinsic
     }
 }
 
+static void sm6_parser_emit_dx_buffer_update_counter(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_value *resource;
+    unsigned int i;
+    int8_t inc;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+
+    if (!sm6_value_is_constant(operands[1]))
+    {
+        FIXME("Unsupported dynamic update operand.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A dynamic update value for a UAV counter operation is not supported.");
+        return;
+    }
+    i = sm6_value_get_constant_uint(operands[1]);
+    if (i != 1 && i != 255)
+    {
+        WARN("Unexpected update value %#x.\n", i);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Update value %#x for a UAV counter operation is not supported.", i);
+    }
+    inc = i;
+
+    vsir_instruction_init(ins, &sm6->p.location, (inc < 0) ? VKD3DSIH_IMM_ATOMIC_CONSUME : VKD3DSIH_IMM_ATOMIC_ALLOC);
+    if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_param_init_vector_from_reg(&src_params[0], &resource->u.handle.reg);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4967,6 +5005,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_BUFFER_STORE                  ] = {"v", "Hiiooooc", sm6_parser_emit_dx_buffer_store},
+    [DX_BUFFER_UPDATE_COUNTER         ] = {"i", "H8",   sm6_parser_emit_dx_buffer_update_counter},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},

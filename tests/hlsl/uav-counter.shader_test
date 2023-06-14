@@ -16,7 +16,7 @@ void main()
 }
 
 [test]
-todo dispatch 3 1 1
+todo(sm<6) dispatch 3 1 1
 probe uav 1 (0) rui (12)
 
 
@@ -35,5 +35,5 @@ void main()
 }
 
 [test]
-todo dispatch 3 1 1
+todo(sm<6) dispatch 3 1 1
 probe uav 1 (0) ri (-12)
