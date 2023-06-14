@@ -382,6 +382,9 @@ enum dx_intrinsic_opcode
     DX_UMAD                         =  49,
     DX_IBFE                         =  51,
     DX_UBFE                         =  52,
+    DX_DOT2                         =  54,
+    DX_DOT3                         =  55,
+    DX_DOT4                         =  56,
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
     DX_SAMPLE                       =  60,
@@ -4480,6 +4483,48 @@ static void sm6_parser_emit_dx_discard(struct sm6_parser *sm6, enum dx_intrinsic
         src_param_init_from_value(src_param, operands[0]);
 }
 
+static void sm6_parser_emit_dx_dot(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register regs[2];
+    enum vkd3d_shader_opcode handler_idx;
+    unsigned int component_count;
+
+    switch (op)
+    {
+        case DX_DOT2:
+            handler_idx = VKD3DSIH_DP2;
+            component_count = 2;
+            break;
+        case DX_DOT3:
+            handler_idx = VKD3DSIH_DP3;
+            component_count = 3;
+            break;
+        case DX_DOT4:
+            handler_idx = VKD3DSIH_DP4;
+            component_count = 4;
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[0], component_count, state, &regs[0]))
+        return;
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[component_count], component_count, state, &regs[1]))
+        return;
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, handler_idx);
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    src_param_init_vector_from_reg(&src_params[0], &regs[0]);
+    src_param_init_vector_from_reg(&src_params[1], &regs[1]);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_fabs(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5356,6 +5401,9 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_DERIV_FINEX                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DERIV_FINEY                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DISCARD                       ] = {"v", "1",    sm6_parser_emit_dx_discard},
+    [DX_DOT2                          ] = {"g", "RRRR", sm6_parser_emit_dx_dot},
+    [DX_DOT3                          ] = {"g", "RRRRRR", sm6_parser_emit_dx_dot},
+    [DX_DOT4                          ] = {"g", "RRRRRRRR", sm6_parser_emit_dx_dot},
     [DX_EXP                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_FABS                          ] = {"g", "R",    sm6_parser_emit_dx_fabs},
     [DX_FIRST_BIT_HI                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
