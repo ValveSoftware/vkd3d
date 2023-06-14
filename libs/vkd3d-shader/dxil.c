@@ -343,6 +343,7 @@ enum dx_intrinsic_opcode
     DX_LOAD_INPUT                   =   4,
     DX_STORE_OUTPUT                 =   5,
     DX_FABS                         =   6,
+    DX_SATURATE                     =   7,
     DX_ISNAN                        =   8,
     DX_ISINF                        =   9,
     DX_ISFINITE                     =  10,
@@ -2380,14 +2381,18 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
     }
 }
 
-static void instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
+static bool instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
 {
-    struct vkd3d_shader_dst_param *param = instruction_dst_params_alloc(ins, 1, sm6);
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    struct vkd3d_shader_dst_param *param;
+
+    if (!(param = instruction_dst_params_alloc(ins, 1, sm6)))
+        return false;
 
     dst_param_init_ssa_scalar(param, dst->type, dst, sm6);
     param->write_mask = VKD3DSP_WRITEMASK_0;
     dst->u.reg = param->reg;
+    return true;
 }
 
 static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instruction *ins,
@@ -4771,6 +4776,21 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
     instruction_dst_param_init_ssa_vector(ins, component_count, sm6);
 }
 
+static void sm6_parser_emit_dx_saturate(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_param_init_from_value(src_param, operands[0]);
+
+    if (instruction_dst_param_init_ssa_scalar(ins, sm6))
+        ins->dst->modifiers = VKD3DSPDM_SATURATE;
+}
+
 static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5104,6 +5124,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_SAMPLE_C_LZ                   ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_GRAD                   ] = {"o", "HHffffiiifffffff", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_LOD                    ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
+    [DX_SATURATE                      ] = {"g", "R",    sm6_parser_emit_dx_saturate},
     [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
