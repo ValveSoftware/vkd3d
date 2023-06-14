@@ -331,6 +331,8 @@ enum dx_intrinsic_opcode
     DX_ISNAN                        =   8,
     DX_ISINF                        =   9,
     DX_ISFINITE                     =  10,
+    DX_COS                          =  12,
+    DX_SIN                          =  13,
     DX_EXP                          =  21,
     DX_FRC                          =  22,
     DX_LOG                          =  23,
@@ -3752,6 +3754,28 @@ static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intri
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
 
+static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_dst_param *dst_params;
+    struct vkd3d_shader_src_param *src_param;
+    unsigned int index;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SINCOS);
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(src_param, operands[0]);
+
+    index = op == DX_COS;
+    dst_params = instruction_dst_params_alloc(ins, 2, sm6);
+    dst_param_init(&dst_params[0]);
+    dst_param_init(&dst_params[1]);
+    register_init_ssa_scalar(&dst_params[index].reg, dst->type, sm6);
+    vsir_register_init(&dst_params[index ^ 1].reg, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
+    dst->u.reg = dst_params[index].reg;
+}
+
 static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -3834,6 +3858,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
+    [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
     [DX_DERIV_COARSEX                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
@@ -3861,6 +3886,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
