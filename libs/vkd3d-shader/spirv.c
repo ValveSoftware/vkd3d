@@ -4792,13 +4792,16 @@ static bool is_dual_source_blending(const struct spirv_compiler *compiler)
 
 static void calculate_clip_or_cull_distance_mask(const struct signature_element *e, uint32_t *mask)
 {
+    unsigned int write_mask;
+
     if (e->semantic_index >= sizeof(*mask) * CHAR_BIT / VKD3D_VEC4_SIZE)
     {
         FIXME("Invalid semantic index %u for clip/cull distance.\n", e->semantic_index);
         return;
     }
 
-    *mask |= (e->mask & VKD3DSP_WRITEMASK_ALL) << (VKD3D_VEC4_SIZE * e->semantic_index);
+    write_mask = e->mask >> vkd3d_write_mask_get_component_idx(e->mask);
+    *mask |= (write_mask & VKD3DSP_WRITEMASK_ALL) << (VKD3D_VEC4_SIZE * e->semantic_index);
 }
 
 /* Emits arrayed SPIR-V built-in variables. */
