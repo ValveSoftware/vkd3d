@@ -421,6 +421,7 @@ enum dx_intrinsic_opcode
     DX_SPLIT_DOUBLE                 = 102,
     DX_LOAD_OUTPUT_CONTROL_POINT    = 103,
     DX_LOAD_PATCH_CONSTANT          = 104,
+    DX_DOMAIN_LOCATION              = 105,
     DX_STORE_PATCH_CONSTANT         = 106,
     DX_PRIMITIVE_ID                 = 108,
     DX_LEGACY_F32TOF16              = 130,
@@ -4800,6 +4801,33 @@ static void sm6_parser_emit_dx_discard(struct sm6_parser *sm6, enum dx_intrinsic
         src_param_init_from_value(src_param, operands[0]);
 }
 
+static void sm6_parser_emit_dx_domain_location(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+    unsigned int component_idx;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    if ((component_idx = sm6_value_get_constant_uint(operands[0])) >= 3)
+    {
+        WARN("Invalid component index %u.\n", component_idx);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Invalid domain location component index %u.", component_idx);
+        component_idx = 0;
+    }
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    sm6_parser_dcl_register_builtin(sm6, VKD3DSIH_DCL_INPUT, VKD3DSPR_TESSCOORD, VKD3D_DATA_FLOAT, 3);
+    vsir_register_init(&src_param->reg, VKD3DSPR_TESSCOORD, VKD3D_DATA_FLOAT, 0);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+    src_param_init_scalar(src_param, component_idx);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_dot(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5818,6 +5846,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_DERIV_FINEX                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DERIV_FINEY                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
     [DX_DISCARD                       ] = {"v", "1",    sm6_parser_emit_dx_discard},
+    [DX_DOMAIN_LOCATION               ] = {"f", "c",    sm6_parser_emit_dx_domain_location},
     [DX_DOT2                          ] = {"g", "RRRR", sm6_parser_emit_dx_dot},
     [DX_DOT3                          ] = {"g", "RRRRRR", sm6_parser_emit_dx_dot},
     [DX_DOT4                          ] = {"g", "RRRRRRRR", sm6_parser_emit_dx_dot},
