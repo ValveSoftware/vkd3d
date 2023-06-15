@@ -403,6 +403,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_GATHER_CMP           =  74,
     DX_TEX2DMS_GET_SAMPLE_POS       =  75,
     DX_RT_GET_SAMPLE_POS            =  76,
+    DX_RT_GET_SAMPLE_COUNT          =  77,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_BARRIER                      =  80,
@@ -5213,6 +5214,25 @@ static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intr
     dst_param->reg = resource->u.handle.reg;
 }
 
+static void sm6_parser_emit_dx_get_sample_count(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SAMPLE_INFO);
+    ins->flags = VKD3DSI_SAMPLE_INFO_UINT;
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    vsir_register_init(&src_param->reg, VKD3DSPR_RASTERIZER, VKD3D_DATA_FLOAT, 0);
+    src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+    src_param_init(src_param);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+    ins->dst->reg.data_type = VKD3D_DATA_FLOAT;
+}
+
 static void sm6_parser_emit_dx_get_sample_pos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5695,6 +5715,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_RT_GET_SAMPLE_COUNT           ] = {"i", "",     sm6_parser_emit_dx_get_sample_count},
     [DX_RT_GET_SAMPLE_POS             ] = {"o", "i",    sm6_parser_emit_dx_get_sample_pos},
     [DX_SAMPLE                        ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_B                      ] = {"o", "HHffffiiiff", sm6_parser_emit_dx_sample},
