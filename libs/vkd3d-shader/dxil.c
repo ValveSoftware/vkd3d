@@ -401,6 +401,8 @@ enum dx_intrinsic_opcode
     DX_GET_DIMENSIONS               =  72,
     DX_TEXTURE_GATHER               =  73,
     DX_TEXTURE_GATHER_CMP           =  74,
+    DX_TEX2DMS_GET_SAMPLE_POS       =  75,
+    DX_RT_GET_SAMPLE_POS            =  76,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_BARRIER                      =  80,
@@ -2570,6 +2572,26 @@ static bool sm6_value_validate_is_texture_handle(const struct sm6_value *value, 
         WARN("Resource kind %u for op %u is not a texture.\n", kind, op);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE,
                 "Resource kind %u for texture operation %u is not a texture.", kind, op);
+        return false;
+    }
+
+    return true;
+}
+
+static bool sm6_value_validate_is_texture_2dms_handle(const struct sm6_value *value, enum dx_intrinsic_opcode op,
+        struct sm6_parser *sm6)
+{
+    enum dxil_resource_kind kind;
+
+    if (!sm6_value_validate_is_handle(value, sm6))
+        return false;
+
+    kind = value->u.handle.d->kind;
+    if (!resource_kind_is_multisampled(kind))
+    {
+        WARN("Resource kind %u for op %u is not a 2DMS texture.\n", kind, op);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE,
+                "Resource kind %u for texture operation %u is not a 2DMS texture.", kind, op);
         return false;
     }
 
@@ -5191,6 +5213,40 @@ static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intr
     dst_param->reg = resource->u.handle.reg;
 }
 
+static void sm6_parser_emit_dx_get_sample_pos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_value *resource = NULL;
+
+    if (op == DX_TEX2DMS_GET_SAMPLE_POS)
+    {
+        resource = operands[0];
+        if (!sm6_value_validate_is_texture_2dms_handle(resource, op, sm6))
+            return;
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SAMPLE_POS);
+
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    if (op == DX_TEX2DMS_GET_SAMPLE_POS)
+    {
+        src_param_init_vector_from_reg(&src_params[0], &resource->u.handle.reg);
+        src_param_init_from_value(&src_params[1], operands[1]);
+    }
+    else
+    {
+        src_param_init_vector(&src_params[0], 2);
+        vsir_register_init(&src_params[0].reg, VKD3DSPR_RASTERIZER, VKD3D_DATA_FLOAT, 0);
+        src_params[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        src_param_init_from_value(&src_params[1], operands[0]);
+    }
+
+    instruction_dst_param_init_ssa_vector(ins, 2, sm6);
+}
+
 static unsigned int sm6_value_get_texel_offset(const struct sm6_value *value)
 {
     return sm6_value_is_undef(value) ? 0 : sm6_value_get_constant_uint(value);
@@ -5639,6 +5695,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_RT_GET_SAMPLE_POS             ] = {"o", "i",    sm6_parser_emit_dx_get_sample_pos},
     [DX_SAMPLE                        ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_B                      ] = {"o", "HHffffiiiff", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_C                      ] = {"o", "HHffffiiiff", sm6_parser_emit_dx_sample},
@@ -5651,6 +5708,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_TEX2DMS_GET_SAMPLE_POS        ] = {"o", "Hi",   sm6_parser_emit_dx_get_sample_pos},
     [DX_TEXTURE_GATHER                ] = {"o", "HHffffiic", sm6_parser_emit_dx_texture_gather},
     [DX_TEXTURE_GATHER_CMP            ] = {"o", "HHffffiicf", sm6_parser_emit_dx_texture_gather},
     [DX_TEXTURE_LOAD                  ] = {"o", "HiiiiCCC", sm6_parser_emit_dx_texture_load},
