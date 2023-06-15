@@ -2885,6 +2885,122 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     return VKD3D_OK;
 }
 
+static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct sm6_value *dst)
+{
+    const struct sm6_type *elem_type, *pointee_type, *gep_type, *ptr_type;
+    struct sm6_value *operands[3];
+    unsigned int i, j, offset;
+    uint64_t value;
+
+    i = 0;
+    pointee_type = (record->operand_count & 1) ? sm6_parser_get_type(sm6, record->operands[i++]) : NULL;
+
+    if (!dxil_record_validate_operand_count(record, i + 6, i + 6, sm6))
+        return VKD3D_ERROR_INVALID_SHADER;
+
+    for (j = 0; i < record->operand_count; i += 2, ++j)
+    {
+        if (!(elem_type = sm6_parser_get_type(sm6, record->operands[i])))
+            return VKD3D_ERROR_INVALID_SHADER;
+
+        if ((value = record->operands[i + 1]) >= sm6->cur_max_value)
+        {
+            WARN("Invalid value index %"PRIu64".\n", value);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Invalid value index %"PRIu64".", value);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+        else if (value == sm6->value_count)
+        {
+            WARN("Invalid value self-reference at %"PRIu64".\n", value);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Invalid value self-reference for a constexpr GEP.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        operands[j] = &sm6->values[value];
+        if (value > sm6->value_count)
+        {
+            operands[j]->type = elem_type;
+        }
+        else if (operands[j]->type != elem_type)
+        {
+            WARN("Type mismatch.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                    "Type mismatch in constexpr GEP elements.");
+        }
+    }
+
+    if (operands[0]->u.reg.idx_count > 1)
+    {
+        WARN("Unsupported stacked GEP.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A GEP instruction on the result of a previous GEP is unsupported.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!sm6_value_is_constant_zero(operands[1]))
+    {
+        WARN("Expected constant zero.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "The pointer dereference index for a constexpr GEP instruction is not constant zero.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (!sm6_value_is_constant(operands[2]) || !sm6_type_is_integer(operands[2]->type))
+    {
+        WARN("Element index is not constant int.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A constexpr GEP element index is not a constant integer.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    dst->structure_stride = operands[0]->structure_stride;
+
+    ptr_type = operands[0]->type;
+    if (!sm6_type_is_pointer(ptr_type))
+    {
+        WARN("Constexpr GEP base value is not a pointer.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A constexpr GEP base value is not a pointer.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!pointee_type)
+    {
+        pointee_type = ptr_type->u.pointer.type;
+    }
+    else if (pointee_type != ptr_type->u.pointer.type)
+    {
+        WARN("Explicit pointee type mismatch.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Explicit pointee type for constexpr GEP does not match the element type.");
+    }
+
+    offset = sm6_value_get_constant_uint(operands[2]);
+    if (!(gep_type = sm6_type_get_element_type_at_index(pointee_type, offset)))
+    {
+        WARN("Failed to get element type.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Failed to get the element type of a constexpr GEP.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!(dst->type = sm6_type_get_pointer_to_type(gep_type, ptr_type->u.pointer.addr_space, sm6)))
+    {
+        WARN("Failed to get pointer type for type %u.\n", gep_type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                "Module does not define a pointer type for a constexpr GEP result.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    dst->u.reg = operands[0]->u.reg;
+    dst->u.reg.idx[1].offset = offset;
+    dst->u.reg.idx[1].is_in_bounds = record->code == CST_CODE_CE_INBOUNDS_GEP;
+    dst->u.reg.idx_count = 2;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const struct dxil_block *block)
 {
     enum vkd3d_shader_register_type reg_type = VKD3DSPR_INVALID;
@@ -3003,6 +3119,12 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 if ((ret = value_allocate_constant_array(dst, type, record->operands, sm6)) < 0)
                     return ret;
 
+                break;
+
+            case CST_CODE_CE_GEP:
+            case CST_CODE_CE_INBOUNDS_GEP:
+                if ((ret = sm6_parser_init_constexpr_gep(sm6, record, dst)) < 0)
+                    return ret;
                 break;
 
             case CST_CODE_UNDEF:
