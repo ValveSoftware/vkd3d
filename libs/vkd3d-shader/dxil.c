@@ -393,6 +393,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_GATHER_CMP           =  74,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
+    DX_BARRIER                      =  80,
     DX_DERIV_COARSEX                =  83,
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
@@ -463,6 +464,14 @@ enum dxil_atomic_binop_code
     ATOMIC_BINOP_UMAX,
     ATOMIC_BINOP_XCHG,
     ATOMIC_BINOP_INVALID,
+};
+
+enum dxil_sync_flags
+{
+    SYNC_THREAD_GROUP        = 0x1,
+    SYNC_GLOBAL_UAV          = 0x2,
+    SYNC_THREAD_GROUP_UAV    = 0x4,
+    SYNC_GROUP_SHARED_MEMORY = 0x8,
 };
 
 struct sm6_pointer_info
@@ -4104,6 +4113,27 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
     dst->u.reg = dst_params[0].reg;
 }
 
+static void sm6_parser_emit_dx_barrier(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    enum dxil_sync_flags flags;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SYNC);
+    flags = sm6_value_get_constant_uint(operands[0]);
+    ins->flags = flags & (SYNC_THREAD_GROUP | SYNC_THREAD_GROUP_UAV);
+    if (flags & SYNC_GLOBAL_UAV)
+        ins->flags |= VKD3DSSF_GLOBAL_UAV;
+    if (flags & SYNC_GROUP_SHARED_MEMORY)
+        ins->flags |= VKD3DSSF_GROUP_SHARED_MEMORY;
+    if (flags &= ~(SYNC_THREAD_GROUP | SYNC_GLOBAL_UAV | SYNC_THREAD_GROUP_UAV | SYNC_GROUP_SHARED_MEMORY))
+    {
+        FIXME("Unhandled flags %#x.\n", flags);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Barrier flags %#x are unhandled.", flags);
+    }
+}
+
 static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4933,6 +4963,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ATAN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ATOMIC_BINOP                  ] = {"o", "HciiiR", sm6_parser_emit_dx_atomic_binop},
     [DX_ATOMIC_CMP_XCHG               ] = {"o", "HiiiRR", sm6_parser_emit_dx_atomic_binop},
+    [DX_BARRIER                       ] = {"v", "c",    sm6_parser_emit_dx_barrier},
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_BUFFER_STORE                  ] = {"v", "Hiiooooc", sm6_parser_emit_dx_buffer_store},
