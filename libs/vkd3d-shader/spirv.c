@@ -4965,7 +4965,6 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
         component_type = builtin->component_type;
         if (!builtin->spirv_array_size)
             output_component_count = builtin->component_count;
-        component_idx = 0;
     }
     else
     {
@@ -4979,14 +4978,9 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
             || needs_private_io_variable(builtin))
     {
         use_private_variable = true;
-        reg_write_mask = write_mask;
-    }
-    else
-    {
-        component_idx = vkd3d_write_mask_get_component_idx(write_mask);
-        reg_write_mask = write_mask >> component_idx;
     }
 
+    reg_write_mask = write_mask >> component_idx;
     vkd3d_symbol_make_register(&reg_symbol, reg);
 
     if (rb_get(&compiler->symbol_table, &reg_symbol))
