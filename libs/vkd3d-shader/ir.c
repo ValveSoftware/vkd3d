@@ -636,10 +636,13 @@ static bool control_point_normaliser_is_in_control_point_phase(const struct cont
     return normaliser->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE;
 }
 
-static struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
+struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
         struct vkd3d_shader_instruction_array *instructions)
 {
     struct vkd3d_shader_src_param *rel_addr;
+
+    if (instructions->outpointid_param)
+        return instructions->outpointid_param;
 
     if (!(rel_addr = shader_src_param_allocator_get(&instructions->src_params, 1)))
         return NULL;
@@ -648,6 +651,7 @@ static struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
     rel_addr->swizzle = 0;
     rel_addr->modifiers = 0;
 
+    instructions->outpointid_param = rel_addr;
     return rel_addr;
 }
 
@@ -3343,6 +3347,14 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     struct vsir_block *current_block = NULL;
     enum vkd3d_result ret;
     size_t i;
+
+    if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
+    {
+        FIXME("Hull shaders are not supported.\n");
+        vkd3d_shader_error(message_context, NULL, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                "The structurizer does not support hull shaders.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
 
     memset(cfg, 0, sizeof(*cfg));
     cfg->message_context = message_context;

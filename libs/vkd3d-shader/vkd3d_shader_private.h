@@ -1300,6 +1300,8 @@ struct vkd3d_shader_instruction_array
     struct vkd3d_shader_immediate_constant_buffer **icbs;
     size_t icb_capacity;
     size_t icb_count;
+
+    struct vkd3d_shader_src_param *outpointid_param;
 };
 
 bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
@@ -1310,6 +1312,8 @@ bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *ins
         struct vkd3d_shader_immediate_constant_buffer *icb);
 bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
         unsigned int dst, unsigned int src);
+struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
+        struct vkd3d_shader_instruction_array *instructions);
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
 
 enum vkd3d_shader_config_flags
