@@ -419,6 +419,8 @@ enum dx_intrinsic_opcode
     DX_FLATTENED_THREAD_ID_IN_GROUP =  96,
     DX_MAKE_DOUBLE                  = 101,
     DX_SPLIT_DOUBLE                 = 102,
+    DX_LOAD_OUTPUT_CONTROL_POINT    = 103,
+    DX_LOAD_PATCH_CONSTANT          = 104,
     DX_PRIMITIVE_ID                 = 108,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
@@ -2434,10 +2436,12 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
     if (sm6_value_is_constant(address))
     {
         idx->offset = sm6_value_get_constant_uint(address);
+        idx->rel_addr = NULL;
     }
     else if (sm6_value_is_undef(address))
     {
         idx->offset = 0;
+        idx->rel_addr = NULL;
     }
     else
     {
@@ -5032,18 +5036,43 @@ static void sm6_parser_emit_dx_tertiary(struct sm6_parser *sm6, enum dx_intrinsi
 static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
+    bool is_control_point = op == DX_LOAD_OUTPUT_CONTROL_POINT;
+    bool is_patch_constant = op == DX_LOAD_PATCH_CONSTANT;
     struct vkd3d_shader_instruction *ins = state->ins;
+    unsigned int count, row_index, column_index;
+    const struct vkd3d_shader_dst_param *params;
     struct vkd3d_shader_src_param *src_param;
     const struct shader_signature *signature;
-    unsigned int row_index, column_index;
     const struct signature_element *e;
 
     row_index = sm6_value_get_constant_uint(operands[0]);
     column_index = sm6_value_get_constant_uint(operands[2]);
 
+    if (is_control_point && operands[3]->is_undefined)
+    {
+        /* dxcompiler will compile source which does this, so let it pass. */
+        WARN("Control point id is undefined.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_UNDEFINED_OPERAND,
+                "The index for a control point load is undefined.");
+    }
+
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    signature = &sm6->p.program.input_signature;
+    if (is_patch_constant)
+    {
+        signature = &sm6->p.program.patch_constant_signature;
+        params = sm6->patch_constant_params;
+    }
+    else if (is_control_point)
+    {
+        signature = &sm6->p.program.output_signature;
+        params = sm6->output_params;
+    }
+    else
+    {
+        signature = &sm6->p.program.input_signature;
+        params = sm6->input_params;
+    }
     if (row_index >= signature->element_count)
     {
         WARN("Invalid row index %u.\n", row_index);
@@ -5055,10 +5084,18 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
 
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
-    src_param->reg = sm6->input_params[row_index].reg;
+    src_param->reg = params[row_index].reg;
     src_param_init_scalar(src_param, column_index);
+    count = 0;
+
     if (e->register_count > 1)
-        register_index_address_init(&src_param->reg.idx[0], operands[1], sm6);
+        register_index_address_init(&src_param->reg.idx[count++], operands[1], sm6);
+
+    if (!is_patch_constant && !operands[3]->is_undefined)
+    {
+        assert(src_param->reg.idx_count > count);
+        register_index_address_init(&src_param->reg.idx[count], operands[3], sm6);
+    }
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5808,6 +5845,8 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_LEGACY_F16TOF32               ] = {"f", "i",    sm6_parser_emit_dx_unary},
     [DX_LEGACY_F32TOF16               ] = {"i", "f",    sm6_parser_emit_dx_unary},
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
+    [DX_LOAD_OUTPUT_CONTROL_POINT     ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
+    [DX_LOAD_PATCH_CONSTANT           ] = {"o", "ii8",  sm6_parser_emit_dx_load_input},
     [DX_LOG                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_MAKE_DOUBLE                   ] = {"d", "ii",   sm6_parser_emit_dx_make_double},
     [DX_PRIMITIVE_ID                  ] = {"i", "",     sm6_parser_emit_dx_primitive_id},
