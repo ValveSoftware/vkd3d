@@ -421,6 +421,7 @@ enum dx_intrinsic_opcode
     DX_SPLIT_DOUBLE                 = 102,
     DX_LOAD_OUTPUT_CONTROL_POINT    = 103,
     DX_LOAD_PATCH_CONSTANT          = 104,
+    DX_STORE_PATCH_CONSTANT         = 106,
     DX_PRIMITIVE_ID                 = 108,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
@@ -5553,6 +5554,7 @@ static void sm6_parser_emit_dx_split_double(struct sm6_parser *sm6, enum dx_intr
 static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
+    bool is_patch_constant = op == DX_STORE_PATCH_CONSTANT;
     struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_dst_param *dst_param;
@@ -5564,7 +5566,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
     row_index = sm6_value_get_constant_uint(operands[0]);
     column_index = sm6_value_get_constant_uint(operands[2]);
 
-    signature = &sm6->p.program.output_signature;
+    signature = is_patch_constant ? &sm6->p.program.patch_constant_signature : &sm6->p.program.output_signature;
     if (row_index >= signature->element_count)
     {
         WARN("Invalid row index %u.\n", row_index);
@@ -5596,7 +5598,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
     if (!(dst_param = instruction_dst_params_alloc(ins, 1, sm6)))
         return;
     dst_param_init_scalar(dst_param, column_index);
-    dst_param->reg = sm6->output_params[row_index].reg;
+    dst_param->reg = is_patch_constant ? sm6->patch_constant_params[row_index].reg : sm6->output_params[row_index].reg;
     if (e->register_count > 1)
         register_index_address_init(&dst_param->reg.idx[0], operands[1], sm6);
 
@@ -5870,6 +5872,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
+    [DX_STORE_PATCH_CONSTANT          ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_TEX2DMS_GET_SAMPLE_POS        ] = {"o", "Hi",   sm6_parser_emit_dx_get_sample_pos},
     [DX_TEXTURE_GATHER                ] = {"o", "HHffffiic", sm6_parser_emit_dx_texture_gather},
