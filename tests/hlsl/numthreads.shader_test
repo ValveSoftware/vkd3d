@@ -172,7 +172,7 @@ size (2d, 2, 2)
 1.0 1.0
 
 [compute shader]
-/* Attributes are taken from the first function, and dropped from the second. */
+/* In SM < 6.0, attributes are taken from the first function, and dropped from the second. */
 RWTexture2D<float> u;
 
     [numthreads(2, 1, 1)]
@@ -185,8 +185,10 @@ void main(uint2 id : sv_dispatchthreadid)
 }
 
 [test]
-todo(sm>=6 | glsl) dispatch 1 1 1
+todo(glsl) dispatch 1 1 1
 probe uav 0 (0, 0) r (2.0)
-probe uav 0 (0, 1) r (1.0)
-probe uav 0 (1, 0) r (2.0)
+if(sm<6) probe uav 0 (0, 1) r (1.0)
+if(sm<6) probe uav 0 (1, 0) r (2.0)
 probe uav 0 (1, 1) r (1.0)
+if(sm>=6) probe uav 0 (0, 1) r (2.0)
+if(sm>=6) probe uav 0 (1, 0) r (1.0)

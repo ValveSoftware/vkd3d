@@ -405,6 +405,10 @@ enum dx_intrinsic_opcode
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
     DX_DERIV_FINEY                  =  86,
+    DX_THREAD_ID                    =  93,
+    DX_GROUP_ID                     =  94,
+    DX_THREAD_ID_IN_GROUP           =  95,
+    DX_FLATTENED_THREAD_ID_IN_GROUP =  96,
     DX_SPLIT_DOUBLE                 = 102,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
@@ -758,6 +762,7 @@ struct sm6_parser
 
     struct vkd3d_shader_dst_param *output_params;
     struct vkd3d_shader_dst_param *input_params;
+    uint32_t input_regs_declared[(VKD3DSPR_COUNT + 0x1f) / 0x20];
 
     struct sm6_function *functions;
     size_t function_count;
@@ -4214,6 +4219,22 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
     instruction_dst_param_init_ssa_vector(ins, sm6_type_max_vector_size(type), sm6);
 }
 
+static void sm6_parser_dcl_register_builtin(struct sm6_parser *sm6,
+        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int component_count)
+{
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!bitmap_is_set(sm6->input_regs_declared, reg_type))
+    {
+        bitmap_set(sm6->input_regs_declared, reg_type);
+        ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_INPUT);
+        dst_param = &ins->declaration.dst;
+        vsir_register_init(&dst_param->reg, reg_type, data_type, 0);
+        dst_param_init_vector(dst_param, component_count);
+    }
+}
+
 static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_parser *sm6,
         enum vkd3d_shader_descriptor_type type, unsigned int id, const struct sm6_value *address)
 {
@@ -4286,6 +4307,48 @@ static void sm6_parser_emit_dx_fabs(struct sm6_parser *sm6, enum dx_intrinsic_op
         return;
     src_param_init_from_value(src_param, operands[0]);
     src_param->modifiers = VKD3DSPSM_ABS;
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
+static void sm6_parser_emit_dx_compute_builtin(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    unsigned int component_count = 3, component_idx = 0;
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+    enum vkd3d_shader_register_type reg_type;
+
+    switch (op)
+    {
+        case DX_THREAD_ID:
+            reg_type = VKD3DSPR_THREADID;
+            break;
+        case DX_GROUP_ID:
+            reg_type = VKD3DSPR_THREADGROUPID;
+            break;
+        case DX_THREAD_ID_IN_GROUP:
+            reg_type = VKD3DSPR_LOCALTHREADID;
+            break;
+        case DX_FLATTENED_THREAD_ID_IN_GROUP:
+            reg_type = VKD3DSPR_LOCALTHREADINDEX;
+            component_count = 1;
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    sm6_parser_dcl_register_builtin(sm6, reg_type, VKD3D_DATA_UINT, component_count);
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    vsir_register_init(&src_param->reg, reg_type, VKD3D_DATA_UINT, 0);
+    if (component_count > 1)
+    {
+        src_param->reg.dimension = VSIR_DIMENSION_VEC4;
+        component_idx = sm6_value_get_constant_uint(operands[0]);
+    }
+    src_param_init_scalar(src_param, component_idx);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5093,12 +5156,14 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_FIRST_BIT_HI                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_FIRST_BIT_LO                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_FIRST_BIT_SHI                 ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_FLATTENED_THREAD_ID_IN_GROUP  ] = {"i", "",     sm6_parser_emit_dx_compute_builtin},
     [DX_FMA                           ] = {"g", "RRR",  sm6_parser_emit_dx_ma},
     [DX_FMAD                          ] = {"g", "RRR",  sm6_parser_emit_dx_ma},
     [DX_FMAX                          ] = {"g", "RR",   sm6_parser_emit_dx_binary},
     [DX_FMIN                          ] = {"g", "RR",   sm6_parser_emit_dx_binary},
     [DX_FRC                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_GET_DIMENSIONS                ] = {"D", "Hi",   sm6_parser_emit_dx_get_dimensions},
+    [DX_GROUP_ID                      ] = {"i", "c",    sm6_parser_emit_dx_compute_builtin},
     [DX_IBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
     [DX_HCOS                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_HSIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
@@ -5136,6 +5201,8 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_TEXTURE_GATHER_CMP            ] = {"o", "HHffffiicf", sm6_parser_emit_dx_texture_gather},
     [DX_TEXTURE_LOAD                  ] = {"o", "HiiiiCCC", sm6_parser_emit_dx_texture_load},
     [DX_TEXTURE_STORE                 ] = {"v", "Hiiiooooc", sm6_parser_emit_dx_texture_store},
+    [DX_THREAD_ID                     ] = {"i", "c",    sm6_parser_emit_dx_compute_builtin},
+    [DX_THREAD_ID_IN_GROUP            ] = {"i", "c",    sm6_parser_emit_dx_compute_builtin},
     [DX_UBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
     [DX_UMAD                          ] = {"m", "RRR",  sm6_parser_emit_dx_ma},
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
