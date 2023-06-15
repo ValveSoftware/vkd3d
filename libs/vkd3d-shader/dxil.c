@@ -416,6 +416,7 @@ enum dx_intrinsic_opcode
     DX_FLATTENED_THREAD_ID_IN_GROUP =  96,
     DX_MAKE_DOUBLE                  = 101,
     DX_SPLIT_DOUBLE                 = 102,
+    DX_PRIMITIVE_ID                 = 108,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -4585,6 +4586,22 @@ static void sm6_parser_dcl_register_builtin(struct sm6_parser *sm6,
     }
 }
 
+static void sm6_parser_emit_dx_input_register_mov(struct sm6_parser *sm6,
+        struct vkd3d_shader_instruction *ins, enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type)
+{
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    sm6_parser_dcl_register_builtin(sm6, reg_type, data_type, 1);
+    vsir_register_init(&src_param->reg, reg_type, data_type, 0);
+    src_param_init(src_param);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_parser *sm6,
         enum vkd3d_shader_descriptor_type type, unsigned int id, const struct sm6_value *address)
 {
@@ -4944,6 +4961,12 @@ static void sm6_parser_emit_dx_make_double(struct sm6_parser *sm6, enum dx_intri
     src_param_init_vector(&src_params[0], 2);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
+static void sm6_parser_emit_dx_primitive_id(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    sm6_parser_emit_dx_input_register_mov(sm6, state->ins, VKD3DSPR_PRIMID, VKD3D_DATA_UINT);
 }
 
 static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -5608,6 +5631,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
     [DX_LOG                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_MAKE_DOUBLE                   ] = {"d", "ii",   sm6_parser_emit_dx_make_double},
+    [DX_PRIMITIVE_ID                  ] = {"i", "",     sm6_parser_emit_dx_primitive_id},
     [DX_RAW_BUFFER_LOAD               ] = {"o", "Hii8i", sm6_parser_emit_dx_raw_buffer_load},
     [DX_RAW_BUFFER_STORE              ] = {"v", "Hiioooocc", sm6_parser_emit_dx_raw_buffer_store},
     [DX_ROUND_NE                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
