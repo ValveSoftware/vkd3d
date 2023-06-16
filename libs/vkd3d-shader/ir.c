@@ -715,8 +715,7 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
         }
     }
     element_count = new_count;
-    /* Signature 's' is a copy of the original signature struct, so we can replace
-     * the 'elements' pointer without freeing it. */
+    vkd3d_free(s->elements);
     s->elements = elements;
     s->element_count = element_count;
 
