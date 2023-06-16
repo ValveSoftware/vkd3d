@@ -827,6 +827,11 @@ static bool shader_is_sm_5_1(const struct hlsl_ctx *ctx)
     return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
 }
 
+static bool shader_profile_version_ge(const struct hlsl_ctx *ctx, unsigned int major, unsigned int minor)
+{
+    return ctx->profile->major_version > major || (ctx->profile->major_version == major && ctx->profile->minor_version >= minor);
+}
+
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
         struct hlsl_type *type, unsigned int modifiers, struct list *defs)
 {
@@ -5287,7 +5292,12 @@ type_no_void:
         {
             validate_texture_format_type(ctx, $3, &@3);
 
-            /* TODO: unspecified sample count is not allowed for all targets */
+            if (!shader_profile_version_ge(ctx, 4, 1))
+            {
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Multisampled texture object declaration needs sample count for profile %s.", ctx->profile->name);
+            }
+
             $$ = hlsl_new_texture_type(ctx, $1, $3, 0);
         }
     | texture_ms_type '<' type ',' shift_expr '>'
