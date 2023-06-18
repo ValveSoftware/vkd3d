@@ -348,6 +348,34 @@ static bool fold_bit_xor(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
     return true;
 }
 
+static bool fold_dot(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+    assert(src1->node.data_type->dimx == src2->node.data_type->dimx);
+
+    dst->u[0].f = 0.0f;
+    for (k = 0; k < src1->node.data_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[0].f += src1->value.u[k].f * src2->value.u[k].f;
+                break;
+            default:
+                FIXME("Fold 'dot' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2,
         const struct vkd3d_shader_location *loc)
@@ -786,6 +814,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP2_BIT_XOR:
             success = fold_bit_xor(ctx, &res, instr->data_type, arg1, arg2);
+            break;
+
+        case HLSL_OP2_DOT:
+            success = fold_dot(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:

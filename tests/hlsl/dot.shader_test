@@ -74,6 +74,19 @@ uniform 4 float4 3.0 0.0 0.0 0.0
 draw quad
 probe all rgba (6.0, 6.0, 6.0, 6.0)
 
+[pixel shader]
+static const float4 x = float4(2.0, 3.0, 4.0, 5.0);
+static const float4 y = float4(6.0, 7.0, 8.0, 9.0);
+
+float4 main() : sv_target
+{
+    return dot(x, y);
+}
+
+[test]
+draw quad
+probe all rgba (110.0, 110.0, 110.0, 110.0)
+
 [pixel shader fail]
 uniform float1x1 x;
 uniform float4 y;
