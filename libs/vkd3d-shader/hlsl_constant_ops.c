@@ -376,6 +376,36 @@ static bool fold_dot(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
+static bool fold_dp2add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2, const struct hlsl_ir_constant *src3)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src1->node.data_type->base_type);
+    assert(type == src2->node.data_type->base_type);
+    assert(type == src3->node.data_type->base_type);
+    assert(src1->node.data_type->dimx == src2->node.data_type->dimx);
+    assert(src3->node.data_type->dimx == 1);
+
+    dst->u[0].f = src3->value.u[0].f;
+    for (k = 0; k < src1->node.data_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[0].f += src1->value.u[k].f * src2->value.u[k].f;
+                break;
+            default:
+                FIXME("Fold 'dp2add' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_div(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2,
         const struct vkd3d_shader_location *loc)
@@ -751,7 +781,7 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
 
 bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
-    struct hlsl_ir_constant *arg1, *arg2 = NULL;
+    struct hlsl_ir_constant *arg1, *arg2 = NULL, *arg3 = NULL;
     struct hlsl_constant_value res = {0};
     struct hlsl_ir_node *res_node;
     struct hlsl_ir_expr *expr;
@@ -779,6 +809,8 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     arg1 = hlsl_ir_constant(expr->operands[0].node);
     if (expr->operands[1].node)
         arg2 = hlsl_ir_constant(expr->operands[1].node);
+    if (expr->operands[2].node)
+        arg3 = hlsl_ir_constant(expr->operands[2].node);
 
     switch (expr->op)
     {
@@ -854,6 +886,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP2_NEQUAL:
             success = fold_nequal(ctx, &res, instr->data_type, arg1, arg2);
+            break;
+
+        case HLSL_OP3_DP2ADD:
+            success = fold_dp2add(ctx, &res, instr->data_type, arg1, arg2, arg3);
             break;
 
         default:
