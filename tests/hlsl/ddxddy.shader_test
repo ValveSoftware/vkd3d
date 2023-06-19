@@ -1,3 +1,6 @@
+[require]
+shader model >= 3.0
+
 [pixel shader]
 float4 main(float4 pos : sv_position) : sv_target
 {
@@ -8,9 +11,15 @@ float4 main(float4 pos : sv_position) : sv_target
 draw quad
 probe all rgba (1.0, 1.0, 0.0, 0.0)
 
+
 [pixel shader]
 float4 main(float4 pos : sv_position) : sv_target
 {
+    // Shader models < 4 don't add 0.5 to sv_position, so this adjustment is required to get the
+    // same outputs.
+    pos.x = floor(pos.x) + 0.5;
+    pos.y = floor(pos.y) + 0.5;
+
     pos /= 10.0;
     float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
     return float4(nonlinear, ddx(nonlinear), ddy(nonlinear), 0.0);
