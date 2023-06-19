@@ -503,8 +503,10 @@ enum hlsl_ir_expr_op
     HLSL_OP1_COS_REDUCED,    /* Reduced range [-pi, pi] */
     HLSL_OP1_DSX,
     HLSL_OP1_DSX_COARSE,
+    HLSL_OP1_DSX_FINE,
     HLSL_OP1_DSY,
     HLSL_OP1_DSY_COARSE,
+    HLSL_OP1_DSY_FINE,
     HLSL_OP1_EXP2,
     HLSL_OP1_FLOOR,
     HLSL_OP1_FRACT,
