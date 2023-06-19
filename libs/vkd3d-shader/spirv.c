@@ -3998,6 +3998,11 @@ static void spirv_compiler_emit_interpolation_decorations(struct spirv_compiler 
             vkd3d_spirv_enable_capability(builder, SpvCapabilitySampleRateShading);
             vkd3d_spirv_build_op_decorate(builder, id, SpvDecorationSample, NULL, 0);
             break;
+        case VKD3DSIM_LINEAR_NOPERSPECTIVE_SAMPLE:
+            vkd3d_spirv_build_op_decorate(builder, id, SpvDecorationNoPerspective, NULL, 0);
+            vkd3d_spirv_enable_capability(builder, SpvCapabilitySampleRateShading);
+            vkd3d_spirv_build_op_decorate(builder, id, SpvDecorationSample, NULL, 0);
+            break;
         default:
             FIXME("Unhandled interpolation mode %#x.\n", mode);
             break;
