@@ -4370,9 +4370,19 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_DERIV_RTX, &expr->node, arg1, 0);
             break;
 
+        case HLSL_OP1_DSX_COARSE:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTX_COARSE, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_DSY:
             assert(type_is_float(dst_type));
             write_sm4_unary_op(buffer, VKD3D_SM4_OP_DERIV_RTY, &expr->node, arg1, 0);
+            break;
+
+        case HLSL_OP1_DSY_COARSE:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTY_COARSE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_EXP2:
