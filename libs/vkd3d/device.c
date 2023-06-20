@@ -788,6 +788,11 @@ VkInstance vkd3d_instance_get_vk_instance(struct vkd3d_instance *instance)
     return instance->vk_instance;
 }
 
+static bool d3d12_device_environment_is_vulkan_min_1_1(struct d3d12_device *device)
+{
+    return device->environment == VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1;
+}
+
 struct vkd3d_physical_device_info
 {
     /* properties */
@@ -796,6 +801,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT texel_buffer_alignment_properties;
     VkPhysicalDeviceTransformFeedbackPropertiesEXT xfb_properties;
     VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT vertex_divisor_properties;
+    VkPhysicalDeviceSubgroupProperties subgroup_properties;
 
     VkPhysicalDeviceProperties2KHR properties2;
 
@@ -838,6 +844,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDevice4444FormatsFeaturesEXT *formats4444_features;
     VkPhysicalDeviceTransformFeedbackFeaturesEXT *xfb_features;
     struct vkd3d_vulkan_info *vulkan_info = &device->vk_info;
+    VkPhysicalDeviceSubgroupProperties *subgroup_properties;
 
     memset(info, 0, sizeof(*info));
     conditional_rendering_features = &info->conditional_rendering_features;
@@ -857,6 +864,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     formats4444_features = &info->formats4444_features;
     xfb_features = &info->xfb_features;
     xfb_properties = &info->xfb_properties;
+    subgroup_properties = &info->subgroup_properties;
 
     info->features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 
@@ -902,6 +910,9 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->properties2, xfb_properties);
     vertex_divisor_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT;
     vk_prepend_struct(&info->properties2, vertex_divisor_properties);
+    subgroup_properties->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+    if (d3d12_device_environment_is_vulkan_min_1_1(device))
+        vk_prepend_struct(&info->properties2, subgroup_properties);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceProperties2KHR(physical_device, &info->properties2));
@@ -1509,6 +1520,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         struct vkd3d_physical_device_info *physical_device_info,
         uint32_t *device_extension_count, bool **user_extension_supported)
 {
+    const VkPhysicalDeviceSubgroupProperties *subgroup_properties = &physical_device_info->subgroup_properties;
     const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
     VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *fragment_shader_interlock;
     const struct vkd3d_optional_device_extensions_info *optional_extensions;
@@ -1519,6 +1531,16 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     VkPhysicalDeviceFeatures *features;
     uint32_t count;
     VkResult vr;
+
+    /* SHUFFLE is required to implement WaveReadLaneAt with dynamically uniform index before SPIR-V 1.5 / Vulkan 1.2. */
+    static const VkSubgroupFeatureFlags required_subgroup_features = VK_SUBGROUP_FEATURE_ARITHMETIC_BIT
+            | VK_SUBGROUP_FEATURE_BASIC_BIT
+            | VK_SUBGROUP_FEATURE_BALLOT_BIT
+            | VK_SUBGROUP_FEATURE_SHUFFLE_BIT
+            | VK_SUBGROUP_FEATURE_QUAD_BIT
+            | VK_SUBGROUP_FEATURE_VOTE_BIT;
+
+    static const VkSubgroupFeatureFlags required_stages = VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     *device_extension_count = 0;
 
@@ -1583,10 +1605,12 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     device->feature_options.ResourceHeapTier = D3D12_RESOURCE_HEAP_TIER_2;
 
     /* Shader Model 6 support. */
-    device->feature_options1.WaveOps = FALSE;
-    device->feature_options1.WaveLaneCountMin = 0;
-    device->feature_options1.WaveLaneCountMax = 0;
-    device->feature_options1.TotalLaneCount = 0;
+    device->feature_options1.WaveOps = subgroup_properties->subgroupSize >= 4
+            && (subgroup_properties->supportedOperations & required_subgroup_features) == required_subgroup_features
+            && (subgroup_properties->supportedStages & required_stages) == required_stages;
+    device->feature_options1.WaveLaneCountMin = subgroup_properties->subgroupSize;
+    device->feature_options1.WaveLaneCountMax = subgroup_properties->subgroupSize;
+    device->feature_options1.TotalLaneCount = 32 * subgroup_properties->subgroupSize; /* approx. */
     device->feature_options1.ExpandedComputeResourceStates = TRUE;
     device->feature_options1.Int64ShaderOps = features->shaderInt64;
 
@@ -3434,7 +3458,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device9 
 
             TRACE("Request shader model %#x.\n", data->HighestShaderModel);
 
+#ifdef VKD3D_SHADER_UNSUPPORTED_DXIL
+            data->HighestShaderModel = D3D_SHADER_MODEL_6_0;
+#else
             data->HighestShaderModel = D3D_SHADER_MODEL_5_1;
+#endif
 
             TRACE("Shader model %#x.\n", data->HighestShaderModel);
             return S_OK;
