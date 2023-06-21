@@ -3626,11 +3626,23 @@ static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
-        if (!var->regs[regset].allocated)
+        if (var->reg_reservation.reg_type == get_regset_name(regset)
+                && var->data_type->reg_size[regset])
+        {
+            /* Vars with a reservation prevent non-reserved vars from being
+             * bound there even if the reserved vars aren't used. */
+            start = var->reg_reservation.reg_index;
+            count = var->data_type->reg_size[regset];
+        }
+        else if (var->regs[regset].allocated)
+        {
+            start = var->regs[regset].id;
+            count = var->regs[regset].bind_count;
+        }
+        else
+        {
             continue;
-
-        start = var->regs[regset].id;
-        count = var->regs[regset].bind_count;
+        }
 
         if (start <= index && index < start + count)
             return var;
