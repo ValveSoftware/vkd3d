@@ -1,17 +1,16 @@
-The Wine team is proud to announce that release 1.7 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.8 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Support for many more HLSL features and intrinsics.
-  - Much improved support for the Direct3D shader model 1/2/3 HLSL profiles.
-  - Public vkd3d-shader API for parsing and serialising DXBC blobs.
+  - Support for still many more HLSL features and intrinsics.
+  - Performance improvements to vkd3d descriptor updates.
   - Miscellaneous bug fixes.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.7.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.8.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -22,49 +21,73 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.7
+What's new in vkd3d 1.8
 =======================
+
+
+*** libvkd3d
+
+- Performance improvements have been made to the code that handles descriptor
+  updates. In some applications the improvement can be quite significant.
+
+- Host-visible descriptor heaps are persistently mapped on creation. Some
+  applications access resource data from the CPU after calling Unmap(), and
+  that's supposed to work in practice.
+
+- 1-dimensional texture unordered-access views and shader resource views are
+  implemented.
+
+- Shader resource view, unordered access view, and constant buffer view root
+  descriptors with NULL GPU addresses are supported.
+
+- Direct3D 12 descriptor heap destruction is delayed until all contained
+  resources are destroyed.
 
 
 *** libvkd3d-shader
 
 - New features for the HLSL source type:
-  - Support for calling user-defined functions.
-  - Support for array parameters to user-defined functions.
-  - Much improved support for the Direct3D shader model 1/2/3 profiles.
-  - Support for the SV_DispatchThreadID, SV_GroupID, and SV_GroupThreadID
-    compute shader system-value semantics.
-  - Support for the optional "offset" parameter of the texture object Load()
-    method.
-  - Support for the all() intrinsic function.
-  - Support for the distance() intrinsic function.
-  - Support for the exp() and exp2() intrinsic functions.
-  - Support for the frac() intrinsic function.
-  - Support for the lit() intrinsic function.
-  - Support for the reflect() intrinsic function.
-  - Support for the sin() and cos() intrinsic functions.
-  - Support for the smoothstep() intrinsic function.
-  - Support for the sqrt() and rsqrt() intrinsic functions.
-  - Support for the step() intrinsic function.
-  - Support for the transpose() intrinsic function.
-  - Support for the case-insensitive variants of the "float" and "dword" data
-    types.
-  - Partial support for minimum precision data types like "min16float". These
-    are currently interpreted as their regular counterparts.
-  - Improved constant propagation support, in particular to constant
-    propagation through swizzles.
+  - Support for the ternary conditional operator "?:".
+  - Support for "discard" statements.
+  - Support for the "packoffset" keyword.
+  - Support for semantics on array types.
+  - Support for RWBuffer loads and stores.
+  - Register allocation for arrays and structures of resources and samplers
+    is implemented.
+  - Support for the SV_IsFrontFace pixel shader system-value semantics.
+  - Support for using constant expressions as array sizes and indices.
+  - Support for dynamic selection of vector components.
+  - Support for the following intrinsic functions:
+    - D3DCOLORtoUBYTE4()
+    - any()
+    - asfloat()
+    - ddx() and ddy()
+    - fmod()
+    - log(), log2(), and log10()
+    - sign()
+    - trunc()
+  - The SampleBias(), SampleCmp(), SampleCmpLevelZero(), and SampleGrad()
+    texture object methods are implemented.
+  - Support for the case-insensitive variants of the "vector" and "matrix"
+    data types.
+  - Parser support for the "unroll" loop attribute. A warning is output for
+    "unroll" without iteration count, and an error is output when an iteration
+    count is specified. Actual unrolling is not implemented yet.
+  - Parser support for RWStructuredBuffer resources.
+  - Parser support for SamplerComparisonState objects. Note that outputting
+    compiled effects is not supported yet, but parsing these allows shaders
+    containing SamplerComparisonState state objects to be compiled.
 
-- HLSL static variables are now properly zero-initialised.
+- More improvements to HLSL support for the Direct3D shader model 1/2/3
+  profiles.
 
-- The Direct3D shader model 4 and 5 disassembler outputs sample counts for
-  multi-sampled resource declarations.
+- The section alignment of DXBC blobs produced by
+  vkd3d_shader_serialize_dxbc() matches those produced by d3dcompiler more
+  closely.
 
-- New interfaces:
-  - vkd3d_shader_parse_dxbc() provides support for parsing DXBC blobs.
-  - vkd3d_shader_serialize_dxbc() provides support for serialising DXBC blobs.
-  - vkd3d_shader_free_dxbc() is used to free vkd3d_shader_dxbc_desc
-    structures, as returned by vkd3d_shader_parse_dxbc().
-  - The VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE compile option
-    can be used to specify whether SPIR-V shaders targeting Vulkan
-    environments should write point sizes for geometry and tessellation
-    shaders. If left unspecified, point sizes will be written.
+- The "main" function for shaders produced by the SPIR-V target is always
+  terminated, even when the source was a TPF shader without explicit "ret"
+  instruction.
+
+- Relative addressing of shader input registers is supported by SPIR-V
+  targets.
