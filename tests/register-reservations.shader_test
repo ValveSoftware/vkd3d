@@ -114,7 +114,7 @@ probe all rgba (4.0, 4.0, 4.0, 99.0)
 
 
 % Overlapping reservations, both overlapping objects are unused.
-[pixel shader todo]
+[pixel shader]
 Texture2D tex1 : register(t0);
 Texture2D tex2 : register(t0);
 Texture2D tex3;
@@ -125,12 +125,12 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
 % Overlapping reservations
-[pixel shader todo]
+[pixel shader]
 Texture2D tex1 : register(t2);
 Texture2D tex2 : register(t2);
 
@@ -140,5 +140,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2.0, 2.0, 2.0, 99.0)

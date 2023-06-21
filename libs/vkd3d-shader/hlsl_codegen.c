@@ -2710,11 +2710,10 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
                         type_string->buffer, get_regset_name(regset));
                 hlsl_release_string_buffer(ctx, type_string);
             }
-            else
+            else if (var->regs[regset].bind_count)
             {
                 var->regs[regset].allocated = true;
                 var->regs[regset].id = var->reg_reservation.reg_index;
-                var->regs[regset].bind_count = var->data_type->reg_size[regset];
                 TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
                         var->reg_reservation.reg_index, var->reg_reservation.reg_type,
                         var->reg_reservation.reg_index + var->regs[regset].bind_count);
@@ -4124,9 +4123,9 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
 
-    allocate_register_reservations(ctx);
-
     calculate_resource_register_counts(ctx);
+
+    allocate_register_reservations(ctx);
 
     allocate_temp_registers(ctx, entry_func);
     if (profile->major_version < 4)
