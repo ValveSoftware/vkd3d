@@ -143,7 +143,7 @@ VKD3D_CHECK_FUNC([HAVE_BUILTIN_ADD_OVERFLOW], [__builtin_add_overflow], [__built
 VKD3D_CHECK_FUNC([HAVE_SYNC_ADD_AND_FETCH], [__sync_add_and_fetch], [__sync_add_and_fetch((int *)0, 0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_SUB_AND_FETCH], [__sync_sub_and_fetch], [__sync_sub_and_fetch((int *)0, 0)])
 VKD3D_CHECK_FUNC([HAVE_SYNC_BOOL_COMPARE_AND_SWAP], [__sync_bool_compare_and_swap], [__sync_bool_compare_and_swap((int *)0, 0, 0)])
-VKD3D_CHECK_FUNC([HAVE_ATOMIC_EXCHANGE_N], [__atomic_exchange_n], [__atomic_exchange_n((int *)0, 0)])
+VKD3D_CHECK_FUNC([HAVE_ATOMIC_EXCHANGE_N], [__atomic_exchange_n], [__atomic_exchange_n((int *)0, 0, 0)])
 
 dnl Makefiles
 case $host_os in
