@@ -70,7 +70,7 @@ probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
 % Register reservation with incorrect register type.
-[pixel shader todo]
+[pixel shader]
 Texture2D unused : register(s0);
 Texture2D tex;
 
@@ -80,12 +80,12 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 
 % Register reservation with incorrect register type.
-[pixel shader todo]
+[pixel shader]
 sampler2D unused : register(t0);
 Texture2D tex;
 
@@ -96,7 +96,7 @@ float4 main() : sv_target
 
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 [pixel shader]

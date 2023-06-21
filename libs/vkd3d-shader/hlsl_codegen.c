@@ -2698,7 +2698,7 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
             continue;
         regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.reg_type)
+        if (var->reg_reservation.reg_type && var->regs[regset].bind_count)
         {
             if (var->reg_reservation.reg_type != get_regset_name(regset))
             {
@@ -2710,7 +2710,7 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
                         type_string->buffer, get_regset_name(regset));
                 hlsl_release_string_buffer(ctx, type_string);
             }
-            else if (var->regs[regset].bind_count)
+            else
             {
                 var->regs[regset].allocated = true;
                 var->regs[regset].id = var->reg_reservation.reg_index;
