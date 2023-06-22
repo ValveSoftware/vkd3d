@@ -1,0 +1,52 @@
+[pixel shader todo]
+float4 main() : sv_target
+{
+    float a = 2.0, b = a + 1.0, c = b;
+
+    return float4(a, b, c, 0);
+}
+
+[test]
+todo draw quad
+probe all rgba (2, 3, 3, 0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float a = 2.0, b = c + 1.0, c = b;
+
+    return float4(0);
+}
+
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    struct apple {
+        float a;
+        int b;
+    } apple1 = {7.2, 8.1}, apple2 = apple1;
+
+    return float4(apple1.a, apple1.b, apple2.a, apple2.b);
+}
+
+[test]
+todo draw quad
+probe all rgba (7.2, 8.0, 7.2, 8.0)
+
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    struct apple {
+        float a;
+        int b;
+    } apple1 = {5.2, 9.1}, apples[2] = {apple1, apple1};
+
+    return float4(apples[0].a, apples[0].b, apples[1].a, apples[1].b);
+}
+
+[test]
+todo draw quad
+probe all rgba (5.2, 9.0, 5.2, 9.0)
