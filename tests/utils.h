@@ -82,6 +82,13 @@ static inline bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t
     return true;
 }
 
+static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
+{
+    unsigned int diff = x > y ? x - y : y - x;
+
+    return diff <= max_diff;
+}
+
 static bool compare_float(float f, float g, unsigned int ulps)
 {
     int x, y;
@@ -101,10 +108,7 @@ static bool compare_float(float f, float g, unsigned int ulps)
     if (y < 0)
         y = INT_MIN - y;
 
-    if (abs(x - y) > ulps)
-        return false;
-
-    return true;
+    return compare_uint(x, y, ulps);
 }
 
 static inline bool compare_uvec4(const struct uvec4 *v1, const struct uvec4 *v2)

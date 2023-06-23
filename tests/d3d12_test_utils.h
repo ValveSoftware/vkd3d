@@ -74,13 +74,6 @@ static void set_viewport(D3D12_VIEWPORT *vp, float x, float y,
     vp->MaxDepth = max_depth;
 }
 
-static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
-{
-    unsigned int diff = x > y ? x - y : y - x;
-
-    return diff <= max_diff;
-}
-
 static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
 {
     return compare_uint(c1 & 0xff, c2 & 0xff, max_diff)
