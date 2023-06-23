@@ -1889,7 +1889,7 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 
     if (rhs->type != HLSL_IR_LOAD)
     {
-        hlsl_fixme(ctx, &instr->loc, "Copying from unsupported node type.\n");
+        hlsl_fixme(ctx, &instr->loc, "Copying from unsupported node type.");
         return false;
     }
 

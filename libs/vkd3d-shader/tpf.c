@@ -4794,7 +4794,7 @@ static void write_sm4_jump(struct hlsl_ctx *ctx,
             vkd3d_unreachable();
 
         default:
-            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.\n", hlsl_jump_type_to_string(jump->type));
+            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
             return;
     }
 
@@ -5010,7 +5010,7 @@ static void write_sm4_resource_store(struct hlsl_ctx *ctx,
 
     if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        hlsl_fixme(ctx, &store->node.loc, "Structured buffers store is not implemented.\n");
+        hlsl_fixme(ctx, &store->node.loc, "Structured buffers store is not implemented.");
         return;
     }
 

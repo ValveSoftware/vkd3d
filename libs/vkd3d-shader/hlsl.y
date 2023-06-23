@@ -473,7 +473,7 @@ static struct list *create_loop(struct hlsl_ctx *ctx, enum loop_type type, const
             }
             else
             {
-                hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Loop unrolling is not implemented.\n");
+                hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Loop unrolling is not implemented.");
             }
         }
         else if (!strcmp(attr->name, "loop")
@@ -1564,8 +1564,7 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct lis
         struct vkd3d_string_buffer *string;
 
         if ((string = hlsl_type_to_string(ctx, arg1->data_type)))
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Invalid type %s.\n", string->buffer);
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Invalid type %s.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
         return NULL;
     }
@@ -1575,8 +1574,7 @@ static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct lis
         struct vkd3d_string_buffer *string;
 
         if ((string = hlsl_type_to_string(ctx, arg2->data_type)))
-            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Invalid type %s.\n", string->buffer);
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Invalid type %s.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
         return NULL;
     }
@@ -2076,7 +2074,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                     type_has_object_components(var->data_type, true))
             {
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Target profile doesn't support objects as struct members in uniform variables.\n");
+                        "Target profile doesn't support objects as struct members in uniform variables.");
             }
 
             if ((func = hlsl_get_func_decl(ctx, var->name)))
@@ -3343,7 +3341,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 
     if (params->args_count == 4)
     {
-        hlsl_fixme(ctx, loc, "Samples with gradients are not implemented.\n");
+        hlsl_fixme(ctx, loc, "Samples with gradients are not implemented.");
     }
 
     sampler_type = params->args[0]->data_type;
@@ -3404,7 +3402,7 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
 
         if ((string = hlsl_type_to_string(ctx, arg_type)))
             hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                   "Wrong type for argument 1 of transpose(): expected a matrix or scalar type, but got '%s'.\n",
+                   "Wrong type for argument 1 of transpose(): expected a matrix or scalar type, but got '%s'.",
                    string->buffer);
         hlsl_release_string_buffer(ctx, string);
         return false;
