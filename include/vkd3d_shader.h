@@ -620,7 +620,7 @@ enum vkd3d_shader_target_type
 {
     /**
      * The shader has no type or is to be ignored. This is not a valid value
-     * for vkd3d_shader_compile() or vkd3d_shader_scan().
+     * for vkd3d_shader_compile().
      */
     VKD3D_SHADER_TARGET_NONE,
     /**
@@ -1783,6 +1783,26 @@ VKD3D_SHADER_API int vkd3d_shader_convert_root_signature(struct vkd3d_shader_ver
 /**
  * Parse shader source code or byte code, returning various types of requested
  * information.
+ *
+ * The \a source_type member of \a compile_info must be set to the type of the
+ * shader.
+ *
+ * The \a target_type member may be set to VKD3D_SHADER_TARGET_NONE, in which
+ * case vkd3d_shader_scan() will return information about the shader in
+ * isolation. Alternatively, it may be set to a valid compilation target for the
+ * shader, in which case vkd3d_shader_scan() will return information that
+ * reflects the interface for a shader as it will be compiled to that target.
+ * In this case other chained structures may be appended to \a compile_info as
+ * they would be passed to vkd3d_shader_compile(), and interpreted accordingly,
+ * such as vkd3d_shader_spirv_target_info.
+ *
+ * (For a hypothetical example, suppose the source shader distinguishes float
+ * and integer texture data, but the target environment does not support integer
+ * textures. In this case vkd3d_shader_compile() might translate integer
+ * operations to float. Accordingly using VKD3D_SHADER_TARGET_NONE would
+ * accurately report whether the texture expects integer or float data, but
+ * using the relevant specific target type would report
+ * VKD3D_SHADER_RESOURCE_DATA_FLOAT.)
  *
  * Currently this function supports the following code types:
  * - VKD3D_SHADER_SOURCE_DXBC_TPF
