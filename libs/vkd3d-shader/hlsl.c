@@ -1544,7 +1544,7 @@ static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
             hlsl_block_cleanup(dst_block);
             return false;
         }
-        list_add_tail(&dst_block->instrs, &dst->entry);
+        hlsl_block_add_instr(dst_block, dst);
 
         if (!list_empty(&src->uses))
         {
