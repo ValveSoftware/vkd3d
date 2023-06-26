@@ -2475,11 +2475,11 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     return true;
 }
 
-static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
     static const struct hlsl_constant_value zero_value;
-    struct hlsl_ir_node *zero;
+    struct hlsl_ir_node *zero, *neq;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -2499,10 +2499,12 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     zero = hlsl_new_constant(ctx, arg_type, &zero_value, &instr->loc);
     if (!zero)
         return false;
-    list_add_before(&instr->entry, &zero->entry);
+    hlsl_block_add_instr(block, zero);
 
-    expr->op = HLSL_OP2_NEQUAL;
-    hlsl_src_from_node(&expr->operands[1], zero);
+    if (!(neq = hlsl_new_binary_expr(ctx, HLSL_OP2_NEQUAL, expr->operands[0].node, zero)))
+        return false;
+    neq->data_type = expr->node.data_type;
+    hlsl_block_add_instr(block, neq);
 
     return true;
 }
@@ -4388,7 +4390,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, split_matrix_copies, body, NULL);
 
     lower_ir(ctx, lower_narrowing_casts, body);
-    hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
+    lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
     lower_ir(ctx, lower_int_division, body);
     lower_ir(ctx, lower_int_modulus, body);
@@ -4406,7 +4408,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     while (progress);
 
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
-    hlsl_transform_ir(ctx, lower_casts_to_bool, body, NULL);
+    lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
 
     hlsl_transform_ir(ctx, validate_static_object_references, body, NULL);
