@@ -1949,211 +1949,233 @@ static bool type_has_numeric_components(struct hlsl_type *type)
     return false;
 }
 
-static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
-        unsigned int modifiers, const struct vkd3d_shader_location *modifiers_loc, struct list *var_list)
+static void check_invalid_in_out_modifiers(struct hlsl_ctx *ctx, unsigned int modifiers,
+        const struct vkd3d_shader_location *loc)
 {
-    struct parse_variable_def *v, *v_next;
+    modifiers &= (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
+    if (modifiers)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_modifiers_to_string(ctx, modifiers)))
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                    "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+}
+
+static void declare_var(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
+        unsigned int modifiers, const struct vkd3d_shader_location *modifiers_loc, struct parse_variable_def *v)
+{
     struct hlsl_ir_function_decl *func;
-    unsigned int invalid_modifiers;
-    struct list *statements_list;
+    struct hlsl_semantic new_semantic;
+    bool unbounded_res_array = false;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
     bool local = true;
+    char *var_name;
+    unsigned int i;
+
+    assert(basic_type);
 
     if (basic_type->class == HLSL_CLASS_MATRIX)
         assert(basic_type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
 
+    type = basic_type;
+
+    if (shader_is_sm_5_1(ctx) && type->class == HLSL_CLASS_OBJECT)
+    {
+        for (i = 0; i < v->arrays.count; ++i)
+            unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
+    }
+
+    if (unbounded_res_array)
+    {
+        if (v->arrays.count == 1)
+        {
+            hlsl_fixme(ctx, &v->loc, "Unbounded resource arrays.");
+            return;
+        }
+        else
+        {
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Unbounded resource arrays cannot be multi-dimensional.");
+        }
+    }
+    else
+    {
+        for (i = 0; i < v->arrays.count; ++i)
+        {
+            if (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
+            {
+                unsigned int size = initializer_size(&v->initializer);
+                unsigned int elem_components = hlsl_type_component_count(type);
+
+                if (i < v->arrays.count - 1)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Only innermost array size can be implicit.");
+                    v->initializer.args_count = 0;
+                }
+                else if (elem_components == 0)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Cannot declare an implicit size array of a size 0 type.");
+                    v->initializer.args_count = 0;
+                }
+                else if (size == 0)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "Implicit size arrays need to be initialized.");
+                    v->initializer.args_count = 0;
+                }
+                else if (size % elem_components != 0)
+                {
+                    hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
+                            "Cannot initialize implicit size array with %u components, expected a multiple of %u.",
+                            size, elem_components);
+                    v->initializer.args_count = 0;
+                }
+                else
+                {
+                    v->arrays.sizes[i] = size / elem_components;
+                }
+            }
+            type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
+        }
+    }
+
+    if (!(var_name = vkd3d_strdup(v->name)))
+        return;
+
+    new_semantic = v->semantic;
+    if (v->semantic.name)
+    {
+        if (!(new_semantic.name = vkd3d_strdup(v->semantic.name)))
+        {
+            vkd3d_free(var_name);
+            return;
+        }
+    }
+
+    if (!(var = hlsl_new_var(ctx, var_name, type, &v->loc, &new_semantic, modifiers, &v->reg_reservation)))
+    {
+        hlsl_cleanup_semantic(&new_semantic);
+        vkd3d_free(var_name);
+        return;
+    }
+
+    var->buffer = ctx->cur_buffer;
+
+    if (var->buffer == ctx->globals_buffer)
+    {
+        if (var->reg_reservation.offset_type)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                    "packoffset() is only allowed inside constant buffer declarations.");
+    }
+
+    if (ctx->cur_scope == ctx->globals)
+    {
+        local = false;
+
+        if ((modifiers & HLSL_STORAGE_UNIFORM) && (modifiers & HLSL_STORAGE_STATIC))
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                    "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
+
+        /* Mark it as uniform. We need to do this here since synthetic
+            * variables also get put in the global scope, but shouldn't be
+            * considered uniforms, and we have no way of telling otherwise. */
+        if (!(modifiers & HLSL_STORAGE_STATIC))
+            var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
+
+        if (ctx->profile->major_version < 5 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM) &&
+                type_has_object_components(var->data_type, true))
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Target profile doesn't support objects as struct members in uniform variables.");
+        }
+
+        if ((func = hlsl_get_func_decl(ctx, var->name)))
+        {
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                    "'%s' is already defined as a function.", var->name);
+            hlsl_note(ctx, &func->loc, VKD3D_SHADER_LOG_ERROR,
+                    "'%s' was previously defined here.", var->name);
+        }
+    }
+    else
+    {
+        static const unsigned int invalid = HLSL_STORAGE_EXTERN | HLSL_STORAGE_SHARED
+                | HLSL_STORAGE_GROUPSHARED | HLSL_STORAGE_UNIFORM;
+
+        if (modifiers & invalid)
+        {
+            struct vkd3d_string_buffer *string;
+
+            if ((string = hlsl_modifiers_to_string(ctx, modifiers & invalid)))
+                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers '%s' are not allowed on local variables.", string->buffer);
+            hlsl_release_string_buffer(ctx, string);
+        }
+        if (var->semantic.name)
+            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
+                    "Semantics are not allowed on local variables.");
+    }
+
+    if ((var->storage_modifiers & HLSL_STORAGE_STATIC) && type_has_numeric_components(var->data_type)
+            && type_has_object_components(var->data_type, false))
+    {
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Static variables cannot have both numeric and resource components.");
+    }
+
+    if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
+            && !(modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
+    {
+        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
+                "Const variable \"%s\" is missing an initializer.", var->name);
+        hlsl_free_var(var);
+        return;
+    }
+
+    if (!hlsl_add_var(ctx, var, local))
+    {
+        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
+
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                "Variable \"%s\" was already declared in this scope.", var->name);
+        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
+        hlsl_free_var(var);
+        return;
+    }
+}
+
+static struct list *initialize_vars(struct hlsl_ctx *ctx, struct list *var_list)
+{
+    struct parse_variable_def *v, *v_next;
+    struct list *statements_list;
+    struct hlsl_ir_var *var;
+    struct hlsl_type *type;
+
     if (!(statements_list = make_empty_list(ctx)))
     {
         LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
+        {
             free_parse_variable_def(v);
+        }
         vkd3d_free(var_list);
         return NULL;
     }
 
-    if (!var_list)
-        return statements_list;
-
-    invalid_modifiers = modifiers & (HLSL_STORAGE_IN | HLSL_STORAGE_OUT);
-    if (invalid_modifiers)
-    {
-        struct vkd3d_string_buffer *string;
-
-        if ((string = hlsl_modifiers_to_string(ctx, invalid_modifiers)))
-            hlsl_error(ctx, modifiers_loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                    "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
-        hlsl_release_string_buffer(ctx, string);
-    }
-
     LIST_FOR_EACH_ENTRY_SAFE(v, v_next, var_list, struct parse_variable_def, entry)
     {
-        bool unbounded_res_array = false;
-        unsigned int i;
-
-        type = basic_type;
-
-        if (shader_is_sm_5_1(ctx) && type->class == HLSL_CLASS_OBJECT)
-        {
-            for (i = 0; i < v->arrays.count; ++i)
-                unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
-        }
-
-        if (unbounded_res_array)
-        {
-            if (v->arrays.count == 1)
-            {
-                hlsl_fixme(ctx, &v->loc, "Unbounded resource arrays.");
-                free_parse_variable_def(v);
-                continue;
-            }
-            else
-            {
-                hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Unbounded resource arrays cannot be multi-dimensional.");
-            }
-        }
-        else
-        {
-            for (i = 0; i < v->arrays.count; ++i)
-            {
-                if (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT)
-                {
-                    unsigned int size = initializer_size(&v->initializer);
-                    unsigned int elem_components = hlsl_type_component_count(type);
-
-                    if (i < v->arrays.count - 1)
-                    {
-                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                "Only innermost array size can be implicit.");
-                        free_parse_initializer(&v->initializer);
-                        v->initializer.args_count = 0;
-                    }
-                    else if (elem_components == 0)
-                    {
-                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                "Cannot declare an implicit size array of a size 0 type.");
-                        free_parse_initializer(&v->initializer);
-                        v->initializer.args_count = 0;
-                    }
-                    else if (size == 0)
-                    {
-                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                "Implicit size arrays need to be initialized.");
-                        free_parse_initializer(&v->initializer);
-                        v->initializer.args_count = 0;
-
-                    }
-                    else if (size % elem_components != 0)
-                    {
-                        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
-                                "Cannot initialize implicit size array with %u components, expected a multiple of %u.",
-                                size, elem_components);
-                        free_parse_initializer(&v->initializer);
-                        v->initializer.args_count = 0;
-                    }
-                    else
-                    {
-                        v->arrays.sizes[i] = size / elem_components;
-                    }
-                }
-                type = hlsl_new_array_type(ctx, type, v->arrays.sizes[i]);
-            }
-        }
-        vkd3d_free(v->arrays.sizes);
-
-        if (!(var = hlsl_new_var(ctx, v->name, type, &v->loc, &v->semantic, modifiers, &v->reg_reservation)))
+        /* If this fails, the variable failed to be declared. */
+        if (!(var = hlsl_get_var(ctx->cur_scope, v->name)))
         {
             free_parse_variable_def(v);
             continue;
         }
-
-        var->buffer = ctx->cur_buffer;
-
-        if (var->buffer == ctx->globals_buffer)
-        {
-            if (var->reg_reservation.offset_type)
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
-                        "packoffset() is only allowed inside constant buffer declarations.");
-        }
-
-        if (ctx->cur_scope == ctx->globals)
-        {
-            local = false;
-
-            if ((modifiers & HLSL_STORAGE_UNIFORM) && (modifiers & HLSL_STORAGE_STATIC))
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                        "Variable '%s' is declared as both \"uniform\" and \"static\".", var->name);
-
-            /* Mark it as uniform. We need to do this here since synthetic
-             * variables also get put in the global scope, but shouldn't be
-             * considered uniforms, and we have no way of telling otherwise. */
-            if (!(modifiers & HLSL_STORAGE_STATIC))
-                var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
-
-            if (ctx->profile->major_version < 5 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM) &&
-                    type_has_object_components(var->data_type, true))
-            {
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Target profile doesn't support objects as struct members in uniform variables.");
-            }
-
-            if ((func = hlsl_get_func_decl(ctx, var->name)))
-            {
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                        "'%s' is already defined as a function.", var->name);
-                hlsl_note(ctx, &func->loc, VKD3D_SHADER_LOG_ERROR,
-                        "'%s' was previously defined here.", var->name);
-            }
-        }
-        else
-        {
-            static const unsigned int invalid = HLSL_STORAGE_EXTERN | HLSL_STORAGE_SHARED
-                    | HLSL_STORAGE_GROUPSHARED | HLSL_STORAGE_UNIFORM;
-
-            if (modifiers & invalid)
-            {
-                struct vkd3d_string_buffer *string;
-
-                if ((string = hlsl_modifiers_to_string(ctx, modifiers & invalid)))
-                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                            "Modifiers '%s' are not allowed on local variables.", string->buffer);
-                hlsl_release_string_buffer(ctx, string);
-            }
-            if (var->semantic.name)
-                hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
-                        "Semantics are not allowed on local variables.");
-        }
-
-        if ((var->storage_modifiers & HLSL_STORAGE_STATIC) && type_has_numeric_components(var->data_type)
-                && type_has_object_components(var->data_type, false))
-        {
-            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Static variables cannot have both numeric and resource components.");
-        }
-
-        if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
-                && !(modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
-        {
-            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
-                    "Const variable \"%s\" is missing an initializer.", var->name);
-            hlsl_free_var(var);
-            free_parse_initializer(&v->initializer);
-            vkd3d_free(v);
-            continue;
-        }
-
-        if (!hlsl_add_var(ctx, var, local))
-        {
-            struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
-
-            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
-                    "Variable \"%s\" was already declared in this scope.", var->name);
-            hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
-            hlsl_free_var(var);
-            free_parse_initializer(&v->initializer);
-            vkd3d_free(v);
-            continue;
-        }
+        type = var->data_type;
 
         if (v->initializer.args_count)
         {
@@ -2168,8 +2190,7 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                     hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                             "Expected %u components in initializer, but got %u.",
                             hlsl_type_component_count(type), size);
-                    free_parse_initializer(&v->initializer);
-                    vkd3d_free(v);
+                    free_parse_variable_def(v);
                     continue;
                 }
 
@@ -2188,12 +2209,10 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
                 add_assignment(ctx, block_to_list(v->initializer.instrs), &load->node, ASSIGN_OP_ASSIGN, v->initializer.args[0]);
             }
 
-            if (modifiers & HLSL_STORAGE_STATIC)
+            if (var->storage_modifiers & HLSL_STORAGE_STATIC)
                 hlsl_block_add_block(&ctx->static_initializers, v->initializer.instrs);
             else
                 list_move_tail(statements_list, &v->initializer.instrs->instrs);
-            vkd3d_free(v->initializer.args);
-            vkd3d_free(v->initializer.instrs);
         }
         else if (var->storage_modifiers & HLSL_STORAGE_STATIC)
         {
@@ -2203,32 +2222,33 @@ static struct list *declare_vars(struct hlsl_ctx *ctx, struct hlsl_type *basic_t
 
             if (type_has_object_components(var->data_type, false))
             {
-                vkd3d_free(v);
+                free_parse_variable_def(v);
                 continue;
             }
 
             if (!(zero = hlsl_new_uint_constant(ctx, 0, &var->loc)))
             {
-                vkd3d_free(v);
+                free_parse_variable_def(v);
                 continue;
             }
             hlsl_block_add_instr(&ctx->static_initializers, zero);
 
             if (!(cast = add_cast(ctx, &ctx->static_initializers.instrs, zero, var->data_type, &var->loc)))
             {
-                vkd3d_free(v);
+                free_parse_variable_def(v);
                 continue;
             }
 
             if (!(store = hlsl_new_simple_store(ctx, var, cast)))
             {
-                vkd3d_free(v);
+                free_parse_variable_def(v);
                 continue;
             }
             hlsl_block_add_instr(&ctx->static_initializers, store);
         }
-        vkd3d_free(v);
+        free_parse_variable_def(v);
     }
+
     vkd3d_free(var_list);
     return statements_list;
 }
@@ -4667,6 +4687,7 @@ preproc_directive:
 struct_declaration:
       var_modifiers struct_spec variables_def_optional ';'
         {
+            struct parse_variable_def *v, *v_next;
             struct hlsl_type *type;
             unsigned int modifiers = $1;
 
@@ -4682,7 +4703,24 @@ struct_declaration:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
-            $$ = declare_vars(ctx, type, modifiers, &@1, $3);
+
+            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+
+            if ($3)
+            {
+                LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $3, struct parse_variable_def, entry)
+                {
+                    declare_var(ctx, type, modifiers, &@1, v);
+                }
+
+                if (!($$ = initialize_vars(ctx, $3)))
+                    YYABORT;
+            }
+            else
+            {
+                if (!($$ = make_empty_list(ctx)))
+                    YYABORT;
+            }
         }
 
 struct_spec:
@@ -5526,12 +5564,22 @@ type_spec:
 declaration:
       var_modifiers type variables_def ';'
         {
+            struct parse_variable_def *v, *v_next;
             struct hlsl_type *type;
             unsigned int modifiers = $1;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
-            $$ = declare_vars(ctx, type, modifiers, &@1, $3);
+
+            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+
+            LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $3, struct parse_variable_def, entry)
+            {
+                declare_var(ctx, type, modifiers, &@1, v);
+            }
+
+            if (!($$ = initialize_vars(ctx, $3)))
+                YYABORT;
         }
 
 variables_def_optional:
