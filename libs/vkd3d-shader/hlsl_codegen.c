@@ -2655,10 +2655,10 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     return hlsl_add_conditional(ctx, block, and, neg, cast3);
 }
 
-static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_type *type = instr->data_type;
-    struct hlsl_ir_node *arg, *neg;
+    struct hlsl_ir_node *arg, *neg, *max;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -2676,10 +2676,11 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void
 
     if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg, &instr->loc)))
         return false;
-    list_add_before(&instr->entry, &neg->entry);
+    hlsl_block_add_instr(block, neg);
 
-    expr->op = HLSL_OP2_MAX;
-    hlsl_src_from_node(&expr->operands[1], neg);
+    if (!(max = hlsl_new_binary_expr(ctx, HLSL_OP2_MAX, arg, neg)))
+        return false;
+    hlsl_block_add_instr(block, max);
 
     return true;
 }
@@ -4394,7 +4395,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_ir(ctx, lower_int_dot, body);
     lower_ir(ctx, lower_int_division, body);
     lower_ir(ctx, lower_int_modulus, body);
-    hlsl_transform_ir(ctx, lower_int_abs, body, NULL);
+    lower_ir(ctx, lower_int_abs, body);
     lower_ir(ctx, lower_float_modulus, body);
     hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
     do
