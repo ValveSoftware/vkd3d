@@ -4554,11 +4554,10 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> shift_expr
 %type <list> statement
 %type <list> statement_list
-%type <list> struct_declaration
+%type <list> struct_declaration_without_vars
 %type <list> type_specs
 %type <list> unary_expr
 %type <list> variables_def
-%type <list> variables_def_optional
 %type <list> variables_def_typed
 
 %token <name> VAR_IDENTIFIER
@@ -4691,47 +4690,19 @@ preproc_directive:
             }
         }
 
-struct_declaration:
-      var_modifiers struct_spec variables_def_optional ';'
+struct_declaration_without_vars:
+      var_modifiers struct_spec ';'
         {
-            struct parse_variable_def *v, *v_next;
-            struct hlsl_type *type;
-            unsigned int modifiers = $1;
+            if (!$2->name)
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                    "Anonymous struct type must declare a variable.");
 
-            if (!$3)
-            {
-                if (!$2->name)
-                    hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
-                            "Anonymous struct type must declare a variable.");
-                if (modifiers)
-                    hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
-                            "Modifiers are not allowed on struct type declarations.");
-            }
+            if ($1)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
+                        "Modifiers are not allowed on struct type declarations.");
 
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
+            if (!($$ = make_empty_list(ctx)))
                 YYABORT;
-
-            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
-
-            if ($3)
-            {
-                LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $3, struct parse_variable_def, entry)
-                {
-                    v->basic_type = type;
-                    v->modifiers = modifiers;
-                    v->modifiers_loc = @1;
-
-                    declare_var(ctx, v);
-                }
-
-                if (!($$ = initialize_vars(ctx, $3)))
-                    YYABORT;
-            }
-            else
-            {
-                if (!($$ = make_empty_list(ctx)))
-                    YYABORT;
-            }
         }
 
 struct_spec:
@@ -5511,7 +5482,7 @@ type:
 
 declaration_statement:
       declaration
-    | struct_declaration
+    | struct_declaration_without_vars
     | typedef
         {
             if (!($$ = make_empty_list(ctx)))
@@ -5578,13 +5549,6 @@ declaration:
             if (!($$ = initialize_vars(ctx, $1)))
                 YYABORT;
         }
-
-variables_def_optional:
-      %empty
-        {
-            $$ = NULL;
-        }
-    | variables_def
 
 variables_def:
       variable_def
@@ -5668,7 +5632,22 @@ variable_def:
         }
 
 variable_def_typed:
-      var_modifiers type variable_def
+      var_modifiers struct_spec variable_def
+        {
+            unsigned int modifiers = $1;
+            struct hlsl_type *type;
+
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
+                YYABORT;
+
+            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+
+            $$ = $3;
+            $$->basic_type = type;
+            $$->modifiers = modifiers;
+            $$->modifiers_loc = @1;
+        }
+    | var_modifiers type variable_def
         {
             unsigned int modifiers = $1;
             struct hlsl_type *type;
