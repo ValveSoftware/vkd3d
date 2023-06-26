@@ -73,6 +73,10 @@ struct parse_variable_def
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
     struct parse_initializer initializer;
+
+    struct hlsl_type *basic_type;
+    unsigned int modifiers;
+    struct vkd3d_shader_location modifiers_loc;
 };
 
 struct parse_function
@@ -1964,11 +1968,12 @@ static void check_invalid_in_out_modifiers(struct hlsl_ctx *ctx, unsigned int mo
     }
 }
 
-static void declare_var(struct hlsl_ctx *ctx, struct hlsl_type *basic_type,
-        unsigned int modifiers, const struct vkd3d_shader_location *modifiers_loc, struct parse_variable_def *v)
+static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
 {
+    struct hlsl_type *basic_type = v->basic_type;
     struct hlsl_ir_function_decl *func;
     struct hlsl_semantic new_semantic;
+    uint32_t modifiers = v->modifiers;
     bool unbounded_res_array = false;
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -4554,6 +4559,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <list> unary_expr
 %type <list> variables_def
 %type <list> variables_def_optional
+%type <list> variables_def_typed
 
 %token <name> VAR_IDENTIFIER
 %token <name> NEW_IDENTIFIER
@@ -4616,6 +4622,7 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <variable_def> type_spec
 %type <variable_def> variable_decl
 %type <variable_def> variable_def
+%type <variable_def> variable_def_typed
 
 %%
 
@@ -4710,7 +4717,11 @@ struct_declaration:
             {
                 LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $3, struct parse_variable_def, entry)
                 {
-                    declare_var(ctx, type, modifiers, &@1, v);
+                    v->basic_type = type;
+                    v->modifiers = modifiers;
+                    v->modifiers_loc = @1;
+
+                    declare_var(ctx, v);
                 }
 
                 if (!($$ = initialize_vars(ctx, $3)))
@@ -5562,23 +5573,9 @@ type_spec:
         }
 
 declaration:
-      var_modifiers type variables_def ';'
+      variables_def_typed ';'
         {
-            struct parse_variable_def *v, *v_next;
-            struct hlsl_type *type;
-            unsigned int modifiers = $1;
-
-            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
-                YYABORT;
-
-            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
-
-            LIST_FOR_EACH_ENTRY_SAFE(v, v_next, $3, struct parse_variable_def, entry)
-            {
-                declare_var(ctx, type, modifiers, &@1, v);
-            }
-
-            if (!($$ = initialize_vars(ctx, $3)))
+            if (!($$ = initialize_vars(ctx, $1)))
                 YYABORT;
         }
 
@@ -5598,6 +5595,33 @@ variables_def:
         }
     | variables_def ',' variable_def
         {
+            $$ = $1;
+            list_add_tail($$, &$3->entry);
+        }
+
+variables_def_typed:
+      variable_def_typed
+        {
+            if (!($$ = make_empty_list(ctx)))
+                YYABORT;
+            list_add_head($$, &$1->entry);
+
+            declare_var(ctx, $1);
+        }
+    | variables_def_typed ',' variable_def
+        {
+            struct parse_variable_def *head_def;
+
+            assert(!list_empty($1));
+            head_def = LIST_ENTRY(list_head($1), struct parse_variable_def, entry);
+
+            assert(head_def->basic_type);
+            $3->basic_type = head_def->basic_type;
+            $3->modifiers = head_def->modifiers;
+            $3->modifiers_loc = head_def->modifiers_loc;
+
+            declare_var(ctx, $3);
+
             $$ = $1;
             list_add_tail($$, &$3->entry);
         }
@@ -5641,6 +5665,23 @@ variable_def:
         {
             $$ = $1;
             ctx->in_state_block = 0;
+        }
+
+variable_def_typed:
+      var_modifiers type variable_def
+        {
+            unsigned int modifiers = $1;
+            struct hlsl_type *type;
+
+            if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
+                YYABORT;
+
+            check_invalid_in_out_modifiers(ctx, modifiers, &@1);
+
+            $$ = $3;
+            $$->basic_type = type;
+            $$->modifiers = modifiers;
+            $$->modifiers_loc = @1;
         }
 
 arrays:

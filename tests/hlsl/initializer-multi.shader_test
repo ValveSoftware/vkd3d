@@ -1,4 +1,4 @@
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float a = 2.0, b = a + 1.0, c = b;
@@ -7,7 +7,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (2, 3, 3, 0)
 
 
