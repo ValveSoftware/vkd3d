@@ -2291,10 +2291,10 @@ static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, str
 }
 
 /* Lower SQRT to RSQ + RCP. */
-static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
+    struct hlsl_ir_node *rsq, *rcp;
     struct hlsl_ir_expr *expr;
-    struct hlsl_ir_node *rsq;
 
     if (instr->type != HLSL_IR_EXPR)
         return false;
@@ -2304,10 +2304,11 @@ static bool lower_sqrt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *c
 
     if (!(rsq = hlsl_new_unary_expr(ctx, HLSL_OP1_RSQ, expr->operands[0].node, &instr->loc)))
         return false;
-    list_add_before(&expr->node.entry, &rsq->entry);
-    expr->op = HLSL_OP1_RCP;
-    hlsl_src_remove(&expr->operands[0]);
-    hlsl_src_from_node(&expr->operands[0], rsq);
+    hlsl_block_add_instr(block, rsq);
+
+    if (!(rcp = hlsl_new_unary_expr(ctx, HLSL_OP1_RCP, rsq, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, rcp);
     return true;
 }
 
@@ -4426,7 +4427,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     if (profile->major_version < 4)
     {
         lower_ir(ctx, lower_division, body);
-        hlsl_transform_ir(ctx, lower_sqrt, body, NULL);
+        lower_ir(ctx, lower_sqrt, body);
         lower_ir(ctx, lower_dot, body);
         lower_ir(ctx, lower_round, body);
     }
