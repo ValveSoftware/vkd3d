@@ -6412,7 +6412,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
     if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
         ERR("Failed to add op.\n");
-        return;
+        goto done;
     }
     op->opcode = VKD3D_CS_OP_EXECUTE;
     op->u.execute.buffers = buffers;
@@ -6420,6 +6420,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_ExecuteCommandLists(ID3D12Comm
 
     d3d12_command_queue_submit_locked(command_queue);
 
+done:
     vkd3d_mutex_unlock(&command_queue->op_mutex);
     return;
 }
