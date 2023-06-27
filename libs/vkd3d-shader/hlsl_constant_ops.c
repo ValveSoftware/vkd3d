@@ -186,6 +186,51 @@ static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
     return true;
 }
 
+static bool fold_rcp(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src, const struct vkd3d_shader_location *loc)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < 4; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                if (ctx->profile->major_version >= 4 && src->value.u[k].f == 0.0f)
+                {
+                    hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
+                            "Floating point division by zero.");
+                }
+                dst->u[k].f = 1.0f / src->value.u[k].f;
+                if (ctx->profile->major_version < 4 && !isfinite(dst->u[k].f))
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_DIVISION_BY_ZERO,
+                            "Infinities and NaNs are not allowed by the shader model.");
+                }
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                if (src->value.u[k].d == 0.0)
+                {
+                    hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_DIVISION_BY_ZERO,
+                            "Floating point division by zero.");
+                }
+                dst->u[k].d = 1.0 / src->value.u[k].d;
+                break;
+
+            default:
+                FIXME("Fold 'rcp' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
 {
@@ -719,6 +764,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP1_NEG:
             success = fold_neg(ctx, &res, instr->data_type, arg1);
+            break;
+
+        case HLSL_OP1_RCP:
+            success = fold_rcp(ctx, &res, instr->data_type, arg1, &instr->loc);
             break;
 
         case HLSL_OP2_ADD:
