@@ -3689,7 +3689,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 }
 
 static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum hlsl_regset regset,
-        uint32_t index)
+        uint32_t index, bool allocated_only)
 {
     const struct hlsl_ir_var *var;
     unsigned int start, count;
@@ -3703,6 +3703,9 @@ static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum
              * bound there even if the reserved vars aren't used. */
             start = var->reg_reservation.reg_index;
             count = var->data_type->reg_size[regset];
+
+            if (!var->regs[regset].allocated && allocated_only)
+                continue;
         }
         else if (var->regs[regset].allocated)
         {
@@ -3743,6 +3746,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
         if (count == 0)
             continue;
 
+        /* The variable was already allocated if it has a reservation. */
         if (var->regs[regset].allocated)
         {
             const struct hlsl_ir_var *reserved_object, *last_reported = NULL;
@@ -3761,7 +3765,10 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
             {
                 index = var->regs[regset].id + i;
 
-                reserved_object = get_allocated_object(ctx, regset, index);
+                /* get_allocated_object() may return "var" itself, but we
+                 * actually want that, otherwise we'll end up reporting the
+                 * same conflict between the same two variables twice. */
+                reserved_object = get_allocated_object(ctx, regset, index, true);
                 if (reserved_object && reserved_object != var && reserved_object != last_reported)
                 {
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
@@ -3780,7 +3787,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
             while (available < count)
             {
-                if (get_allocated_object(ctx, regset, index))
+                if (get_allocated_object(ctx, regset, index, false))
                     available = 0;
                 else
                     ++available;
