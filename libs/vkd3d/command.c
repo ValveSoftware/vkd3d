@@ -6488,6 +6488,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Signal(ID3D12CommandQueue *
 
     if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
+        ERR("Failed to add op.\n");
         hr = E_OUTOFMEMORY;
         goto done;
     }
@@ -6826,6 +6827,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_Wait(ID3D12CommandQueue *if
 
     if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
+        ERR("Failed to add op.\n");
         hr = E_OUTOFMEMORY;
         goto done;
     }
