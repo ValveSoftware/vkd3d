@@ -6064,8 +6064,35 @@ static ULONG STDMETHODCALLTYPE d3d12_command_queue_AddRef(ID3D12CommandQueue *if
     return refcount;
 }
 
+static void d3d12_command_queue_destroy_op(struct vkd3d_cs_op_data *op)
+{
+    switch (op->opcode)
+    {
+        case VKD3D_CS_OP_WAIT:
+            d3d12_fence_decref(op->u.wait.fence);
+            break;
+
+        case VKD3D_CS_OP_SIGNAL:
+            d3d12_fence_decref(op->u.signal.fence);
+            break;
+
+        case VKD3D_CS_OP_EXECUTE:
+            vkd3d_free(op->u.execute.buffers);
+            break;
+
+        case VKD3D_CS_OP_UPDATE_MAPPINGS:
+        case VKD3D_CS_OP_COPY_MAPPINGS:
+            break;
+    }
+}
+
 static void d3d12_command_queue_op_array_destroy(struct d3d12_command_queue_op_array *array)
 {
+    unsigned int i;
+
+    for (i = 0; i < array->count; ++i)
+        d3d12_command_queue_destroy_op(&array->ops[i]);
+
     vkd3d_free(array->ops);
 }
 
@@ -6353,8 +6380,6 @@ static void d3d12_command_queue_execute(struct d3d12_command_queue *command_queu
         ERR("Failed to submit queue(s), vr %d.\n", vr);
 
     vkd3d_queue_release(vkd3d_queue);
-
-    vkd3d_free(buffers);
 }
 
 static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
@@ -7064,12 +7089,10 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
                         return d3d12_command_queue_fixup_after_flush_locked(queue);
                     }
                     d3d12_command_queue_wait_locked(queue, fence, op->u.wait.value);
-                    d3d12_fence_decref(fence);
                     break;
 
                 case VKD3D_CS_OP_SIGNAL:
                     d3d12_command_queue_signal(queue, op->u.signal.fence, op->u.signal.value);
-                    d3d12_fence_decref(op->u.signal.fence);
                     break;
 
                 case VKD3D_CS_OP_EXECUTE:
@@ -7088,6 +7111,8 @@ static HRESULT d3d12_command_queue_flush_ops_locked(struct d3d12_command_queue *
                 default:
                     vkd3d_unreachable();
             }
+
+            d3d12_command_queue_destroy_op(op);
 
             *flushed_any |= true;
         }
