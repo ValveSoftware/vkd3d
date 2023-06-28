@@ -51,3 +51,18 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (2, 3, 6, 1)
+
+% Additional level of indirection
+[pixel shader todo]
+static const float array[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+static const int idx = 2;
+static const float array2[array[idx]] = {1, 2, 3};
+
+float4 main() : sv_target
+{
+    return float4(array[1], array2[2], array[5], array[0]);
+}
+
+[test]
+todo draw quad
+probe all rgba (2, 3, 6, 1)

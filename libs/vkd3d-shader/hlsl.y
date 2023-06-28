@@ -1143,6 +1143,28 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
     unsigned int ret = 0;
     bool progress;
 
+    LIST_FOR_EACH_ENTRY(node, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        switch (node->type)
+        {
+            case HLSL_IR_CONSTANT:
+            case HLSL_IR_EXPR:
+            case HLSL_IR_SWIZZLE:
+            case HLSL_IR_LOAD:
+            case HLSL_IR_INDEX:
+                continue;
+            case HLSL_IR_CALL:
+            case HLSL_IR_IF:
+            case HLSL_IR_LOOP:
+            case HLSL_IR_JUMP:
+            case HLSL_IR_RESOURCE_LOAD:
+            case HLSL_IR_RESOURCE_STORE:
+            case HLSL_IR_STORE:
+                hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "Expected literal expression.");
+        }
+    }
+
     if (!hlsl_clone_block(ctx, &expr, &ctx->static_initializers))
         return 0;
     hlsl_block_add_block(&expr, block);
@@ -1169,7 +1191,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
     else
     {
         hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
-                "Failed to evaluate constant expression %d.", node->type);
+                "Failed to evaluate constant expression.");
     }
 
     hlsl_block_cleanup(&expr);
