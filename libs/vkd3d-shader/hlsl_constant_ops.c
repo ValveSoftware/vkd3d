@@ -80,7 +80,7 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         return false;
     }
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (src->node.data_type->base_type)
         {
@@ -160,7 +160,7 @@ static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
 
     assert(type == src->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
@@ -240,7 +240,7 @@ static bool fold_add(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
@@ -425,7 +425,7 @@ static bool fold_equal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, co
     assert(dst_type->base_type == HLSL_TYPE_BOOL);
     assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (src1->node.data_type->base_type)
         {
@@ -461,7 +461,7 @@ static bool fold_gequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
     assert(dst_type->base_type == HLSL_TYPE_BOOL);
     assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (src1->node.data_type->base_type)
         {
@@ -500,7 +500,7 @@ static bool fold_less(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, con
     assert(dst_type->base_type == HLSL_TYPE_BOOL);
     assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (src1->node.data_type->base_type)
         {
@@ -659,7 +659,7 @@ static bool fold_mul(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     assert(type == src1->node.data_type->base_type);
     assert(type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
@@ -693,7 +693,7 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
     assert(dst_type->base_type == HLSL_TYPE_BOOL);
     assert(src1->node.data_type->base_type == src2->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (src1->node.data_type->base_type)
         {
