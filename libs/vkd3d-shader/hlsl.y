@@ -1139,20 +1139,28 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
 {
     struct hlsl_ir_constant *constant;
     struct hlsl_ir_node *node;
+    struct hlsl_block expr;
     unsigned int ret = 0;
     bool progress;
 
-    if (!add_implicit_conversion(ctx, &block->instrs, node_from_list(&block->instrs),
-            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc))
+    if (!hlsl_clone_block(ctx, &expr, &ctx->static_initializers))
         return 0;
+    hlsl_block_add_block(&expr, block);
+
+    if (!add_implicit_conversion(ctx, &expr.instrs, node_from_list(&expr.instrs),
+            hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), loc))
+    {
+        hlsl_block_cleanup(&expr);
+        return 0;
+    }
 
     do
     {
-        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, block, NULL);
-        progress |= hlsl_copy_propagation_execute(ctx, block);
+        progress = hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, &expr, NULL);
+        progress |= hlsl_copy_propagation_execute(ctx, &expr);
     } while (progress);
 
-    node = node_from_list(&block->instrs);
+    node = node_from_list(&expr.instrs);
     if (node->type == HLSL_IR_CONSTANT)
     {
         constant = hlsl_ir_constant(node);
@@ -1163,6 +1171,8 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
         hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                 "Failed to evaluate constant expression %d.", node->type);
     }
+
+    hlsl_block_cleanup(&expr);
 
     return ret;
 }
@@ -5675,7 +5685,7 @@ arrays:
             uint32_t *new_array;
             unsigned int size;
 
-            hlsl_clone_block(ctx, &block, &ctx->static_initializers);
+            hlsl_block_init(&block);
             list_move_tail(&block.instrs, $2);
 
             size = evaluate_static_expression_as_uint(ctx, &block, &@2);
