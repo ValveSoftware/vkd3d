@@ -829,6 +829,8 @@ struct vkd3d_shader_desc
     struct shader_signature input_signature;
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
+
+    uint32_t temp_count;
 };
 
 struct vkd3d_shader_register_semantic

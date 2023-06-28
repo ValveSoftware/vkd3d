@@ -3217,7 +3217,7 @@ static bool spirv_compiler_get_register_info(const struct spirv_compiler *compil
     {
         assert(reg->idx[0].offset < compiler->temp_count);
         register_info->id = compiler->temp_id + reg->idx[0].offset;
-        register_info->storage_class = SpvStorageClassFunction;
+        register_info->storage_class = SpvStorageClassPrivate;
         register_info->descriptor_array = NULL;
         register_info->member_idx = 0;
         register_info->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
@@ -5258,8 +5258,7 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
         WARN("Unhandled global flags %#x.\n", flags);
 }
 
-static void spirv_compiler_emit_dcl_temps(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
+static void spirv_compiler_emit_temps(struct spirv_compiler *compiler, uint32_t count)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     size_t function_location;
@@ -5270,11 +5269,11 @@ static void spirv_compiler_emit_dcl_temps(struct spirv_compiler *compiler,
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
 
     assert(!compiler->temp_count);
-    compiler->temp_count = instruction->declaration.count;
+    compiler->temp_count = count;
     for (i = 0; i < compiler->temp_count; ++i)
     {
-        id = spirv_compiler_emit_variable(compiler, &builder->function_stream,
-                SpvStorageClassFunction, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
+        id = spirv_compiler_emit_variable(compiler, &builder->global_stream,
+                SpvStorageClassPrivate, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
         if (!i)
             compiler->temp_id = id;
         assert(id == compiler->temp_id + i);
@@ -6235,9 +6234,6 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
         spirv_compiler_emit_default_control_point_phase(compiler);
 
     vkd3d_spirv_build_op_function_end(builder);
-
-    compiler->temp_id = 0;
-    compiler->temp_count = 0;
 
     if (is_in_control_point_phase(compiler))
     {
@@ -9103,9 +9099,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_GLOBAL_FLAGS:
             spirv_compiler_emit_dcl_global_flags(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_TEMPS:
-            spirv_compiler_emit_dcl_temps(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             spirv_compiler_emit_dcl_indexable_temp(compiler, instruction);
             break;
@@ -9426,6 +9419,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_cut_stream(compiler, instruction);
             break;
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+        case VKD3DSIH_DCL_TEMPS:
         case VKD3DSIH_HS_DECLS:
         case VKD3DSIH_NOP:
             /* nothing to do */
@@ -9447,6 +9441,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
+
+    if (parser->shader_desc.temp_count)
+        spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
 
     compiler->location.column = 0;
     compiler->location.line = 1;
