@@ -1,0 +1,28 @@
+% Semantics can be used in uniforms even though they are ignored.
+
+[pixel shader]
+float a : SEMANTIC;
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 3.5
+draw quad
+probe all rgba (3.5, 3.5, 3.5, 3.5)
+
+
+[pixel shader]
+float2 a : sv_position;
+
+float4 main() : sv_target
+{
+    return float4(a, a);
+}
+
+[test]
+uniform 0 float4 4.0 5.0 6.0 7.0
+draw quad
+probe all rgba (4.0, 5.0, 4.0, 5.0)

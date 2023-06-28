@@ -174,6 +174,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/uav-rwbuffer.shader_test \
 	tests/hlsl/uav-rwstructuredbuffer.shader_test \
 	tests/hlsl/uav-rwtexture.shader_test \
+	tests/hlsl/uniform-semantics.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
 	tests/hlsl/vector-indexing.shader_test \
 	tests/hlsl/writemask-assignop-0.shader_test \
