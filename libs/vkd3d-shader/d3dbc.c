@@ -260,9 +260,9 @@ static const struct vkd3d_sm1_opcode_info vs_opcode_table[] =
     /* Declarations */
     {VKD3D_SM1_OP_DCL,          0, 2, VKD3DSIH_DCL},
     /* Constant definitions */
-    {VKD3D_SM1_OP_DEF,          1, 4, VKD3DSIH_DEF},
+    {VKD3D_SM1_OP_DEF,          1, 1, VKD3DSIH_DEF},
     {VKD3D_SM1_OP_DEFB,         1, 1, VKD3DSIH_DEFB},
-    {VKD3D_SM1_OP_DEFI,         1, 4, VKD3DSIH_DEFI},
+    {VKD3D_SM1_OP_DEFI,         1, 1, VKD3DSIH_DEFI},
     /* Control flow */
     {VKD3D_SM1_OP_REP,          0, 1, VKD3DSIH_REP,          {2, 0}, {~0u, ~0u}},
     {VKD3D_SM1_OP_ENDREP,       0, 0, VKD3DSIH_ENDREP,       {2, 0}, {~0u, ~0u}},
@@ -327,9 +327,9 @@ static const struct vkd3d_sm1_opcode_info ps_opcode_table[] =
     /* Declarations */
     {VKD3D_SM1_OP_DCL,          0, 2, VKD3DSIH_DCL},
     /* Constant definitions */
-    {VKD3D_SM1_OP_DEF,          1, 4, VKD3DSIH_DEF},
+    {VKD3D_SM1_OP_DEF,          1, 1, VKD3DSIH_DEF},
     {VKD3D_SM1_OP_DEFB,         1, 1, VKD3DSIH_DEFB},
-    {VKD3D_SM1_OP_DEFI,         1, 4, VKD3DSIH_DEFI},
+    {VKD3D_SM1_OP_DEFI,         1, 1, VKD3DSIH_DEFI},
     /* Control flow */
     {VKD3D_SM1_OP_REP,          0, 1, VKD3DSIH_REP,          {2, 1}, {~0u, ~0u}},
     {VKD3D_SM1_OP_ENDREP,       0, 0, VKD3DSIH_ENDREP,       {2, 1}, {~0u, ~0u}},
