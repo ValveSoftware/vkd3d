@@ -548,6 +548,7 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
 
     destroy_block(cond);
     destroy_block(body);
+    destroy_block(iter);
     return init;
 
 oom:
