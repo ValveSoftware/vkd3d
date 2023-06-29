@@ -70,6 +70,13 @@ enum bitcode_address_space
     ADDRESS_SPACE_GROUPSHARED,
 };
 
+enum bitcode_module_code
+{
+    MODULE_CODE_VERSION     =  1,
+    MODULE_CODE_GLOBALVAR   =  7,
+    MODULE_CODE_FUNCTION    =  8,
+};
+
 enum bitcode_type_code
 {
     TYPE_CODE_NUMENTRY     =  1,
@@ -1201,6 +1208,49 @@ static enum vkd3d_result sm6_parser_symtab_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
+{
+    const struct dxil_block *block = &sm6->root_block;
+    const struct dxil_record *record;
+    uint64_t version;
+    size_t i;
+
+    sm6->p.location.line = block->id;
+    sm6->p.location.column = 0;
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+        record = block->records[i];
+        switch (record->code)
+        {
+            case MODULE_CODE_FUNCTION:
+                FIXME("Functions are not implemented yet.\n");
+                break;
+
+            case MODULE_CODE_GLOBALVAR:
+                FIXME("Global variables are not implemented yet.\n");
+                break;
+
+            case MODULE_CODE_VERSION:
+                dxil_record_validate_operand_count(record, 1, 1, sm6);
+                if ((version = record->operands[0]) != 1)
+                {
+                    FIXME("Unsupported format version %#"PRIx64".\n", version);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNSUPPORTED_BITCODE_FORMAT,
+                            "Bitcode format version %#"PRIx64" is unsupported.", version);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
 {
     size_t i;
@@ -1408,6 +1458,12 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
                     "DXIL value symbol table is invalid.");
         else
             vkd3d_unreachable();
+        return ret;
+    }
+
+    if ((ret = sm6_parser_globals_init(sm6)) < 0)
+    {
+        WARN("Failed to load global declarations.\n");
         return ret;
     }
 
