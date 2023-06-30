@@ -4085,6 +4085,27 @@ static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type
     return params->instrs;
 }
 
+static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
+        struct hlsl_ir_node *cond, struct hlsl_ir_node *first, struct hlsl_ir_node *second)
+{
+    struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *common_type;
+
+    if (!(common_type = get_common_numeric_type(ctx, first, second, &first->loc)))
+        return false;
+
+    if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
+        return false;
+
+    if (!(second = add_implicit_conversion(ctx, block, second, common_type, &second->loc)))
+        return false;
+
+    args[0] = cond;
+    args[1] = first;
+    args[2] = second;
+    return add_expr(ctx, block, HLSL_OP3_TERNARY, args, common_type, &first->loc);
+}
+
 static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
 {
     switch (dim)
@@ -7202,27 +7223,13 @@ conditional_expr:
             struct hlsl_ir_node *cond = node_from_block($1);
             struct hlsl_ir_node *first = node_from_block($3);
             struct hlsl_ir_node *second = node_from_block($5);
-            struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = { 0 };
-            struct hlsl_type *common_type;
 
             hlsl_block_add_block($1, $3);
             hlsl_block_add_block($1, $5);
             destroy_block($3);
             destroy_block($5);
 
-            if (!(common_type = get_common_numeric_type(ctx, first, second, &@3)))
-                YYABORT;
-
-            if (!(first = add_implicit_conversion(ctx, $1, first, common_type, &@3)))
-                YYABORT;
-
-            if (!(second = add_implicit_conversion(ctx, $1, second, common_type, &@5)))
-                YYABORT;
-
-            args[0] = cond;
-            args[1] = first;
-            args[2] = second;
-            if (!add_expr(ctx, $1, HLSL_OP3_TERNARY, args, common_type, &@1))
+            if (!add_ternary(ctx, $1, cond, first, second))
                 YYABORT;
             $$ = $1;
         }
