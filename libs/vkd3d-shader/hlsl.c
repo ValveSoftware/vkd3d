@@ -3377,6 +3377,8 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     struct hlsl_type *type, *next_type;
     unsigned int i;
 
+    hlsl_block_cleanup(&ctx->static_initializers);
+
     for (i = 0; i < ctx->source_files_count; ++i)
         vkd3d_free((void *)ctx->source_files[i]);
     vkd3d_free(ctx->source_files);
