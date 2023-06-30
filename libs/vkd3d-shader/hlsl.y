@@ -292,6 +292,21 @@ static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_typ
     return hlsl_types_are_componentwise_equal(ctx, src, dst);
 }
 
+static void check_condition_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *cond)
+{
+    const struct hlsl_type *type = cond->data_type;
+
+    if (type->dimx > 1 || type->dimy > 1)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, type)))
+            hlsl_error(ctx, &cond->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Condition type '%s' is not a scalar numeric type.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+}
+
 static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *node, struct hlsl_type *dst_type, const struct vkd3d_shader_location *loc)
 {
@@ -431,6 +446,9 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
         return true;
 
     condition = node_from_block(cond_block);
+
+    check_condition_type(ctx, condition);
+
     if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, &condition->loc)))
         return false;
     hlsl_block_add_instr(cond_block, not);
@@ -6753,15 +6771,9 @@ selection_statement:
             }
             destroy_block($6.then_block);
             destroy_block($6.else_block);
-            if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
-            {
-                struct vkd3d_string_buffer *string;
 
-                if ((string = hlsl_type_to_string(ctx, condition->data_type)))
-                    hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "if condition type %s is not scalar.", string->buffer);
-                hlsl_release_string_buffer(ctx, string);
-            }
+            check_condition_type(ctx, condition);
+
             $$ = $4;
             hlsl_block_add_instr($$, instr);
         }
