@@ -2704,8 +2704,8 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     struct hlsl_type *arg_type, *cmp_type;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
     struct hlsl_ir_jump *jump;
+    struct hlsl_block block;
     unsigned int i, count;
-    struct list instrs;
 
     if (instr->type != HLSL_IR_JUMP)
         return false;
@@ -2713,38 +2713,38 @@ static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     if (jump->type != HLSL_IR_JUMP_DISCARD_NEG)
         return false;
 
-    list_init(&instrs);
+    hlsl_block_init(&block);
 
     arg_type = jump->condition.node->data_type;
     if (!(zero = hlsl_new_constant(ctx, arg_type, &zero_value, &instr->loc)))
         return false;
-    list_add_tail(&instrs, &zero->entry);
+    hlsl_block_add_instr(&block, zero);
 
     operands[0] = jump->condition.node;
     operands[1] = zero;
     cmp_type = hlsl_get_numeric_type(ctx, arg_type->class, HLSL_TYPE_BOOL, arg_type->dimx, arg_type->dimy);
     if (!(cmp = hlsl_new_expr(ctx, HLSL_OP2_LESS, operands, cmp_type, &instr->loc)))
         return false;
-    list_add_tail(&instrs, &cmp->entry);
+    hlsl_block_add_instr(&block, cmp);
 
     if (!(bool_false = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &zero_value, &instr->loc)))
         return false;
-    list_add_tail(&instrs, &bool_false->entry);
+    hlsl_block_add_instr(&block, bool_false);
 
     or = bool_false;
 
     count = hlsl_type_component_count(cmp_type);
     for (i = 0; i < count; ++i)
     {
-        if (!(load = hlsl_add_load_component(ctx, &instrs, cmp, i, &instr->loc)))
+        if (!(load = hlsl_add_load_component(ctx, &block.instrs, cmp, i, &instr->loc)))
             return false;
 
         if (!(or = hlsl_new_binary_expr(ctx, HLSL_OP2_LOGIC_OR, or, load)))
                 return NULL;
-        list_add_tail(&instrs, &or->entry);
+        hlsl_block_add_instr(&block, or);
     }
 
-    list_move_tail(&instr->entry, &instrs);
+    list_move_tail(&instr->entry, &block.instrs);
     hlsl_src_remove(&jump->condition);
     hlsl_src_from_node(&jump->condition, or);
     jump->type = HLSL_IR_JUMP_DISCARD_NZ;
