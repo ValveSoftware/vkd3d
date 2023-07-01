@@ -612,6 +612,7 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     VkDevice device = runner->device;
     VkPipeline pipeline;
     unsigned int i, j;
+    VkResult vr;
     int ret;
 
     memset(stage_desc, 0, sizeof(stage_desc));
@@ -714,7 +715,8 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     pipeline_desc.renderPass = render_pass;
     pipeline_desc.subpass = 0;
 
-    VK_CALL(vkCreateGraphicsPipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
+    vr = VK_CALL(vkCreateGraphicsPipelines(runner->device, VK_NULL_HANDLE, 1, &pipeline_desc, NULL, &pipeline));
+    ok(vr == VK_SUCCESS, "Failed to create graphics pipeline, vr %d.\n", vr);
 
     VK_CALL(vkDestroyShaderModule(device, stage_desc[0].module, NULL));
     VK_CALL(vkDestroyShaderModule(device, stage_desc[1].module, NULL));
