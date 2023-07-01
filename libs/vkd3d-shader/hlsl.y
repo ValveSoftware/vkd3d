@@ -296,7 +296,7 @@ static void check_condition_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node
 {
     const struct hlsl_type *type = cond->data_type;
 
-    if (type->dimx > 1 || type->dimy > 1)
+    if (type->class > HLSL_CLASS_LAST_NUMERIC || type->dimx > 1 || type->dimy > 1)
     {
         struct vkd3d_string_buffer *string;
 
