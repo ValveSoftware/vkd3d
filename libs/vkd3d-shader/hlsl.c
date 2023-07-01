@@ -953,6 +953,8 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         type->modifiers |= default_majority;
     type->sampler_dim = old->sampler_dim;
     type->is_minimum_precision = old->is_minimum_precision;
+    type->sample_count = old->sample_count;
+
     switch (old->class)
     {
         case HLSL_CLASS_ARRAY:
@@ -1002,11 +1004,11 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         }
 
         case HLSL_CLASS_OBJECT:
-        {
             if (type->base_type == HLSL_TYPE_TECHNIQUE)
                 type->e.version = old->e.version;
+            if (old->base_type == HLSL_TYPE_TEXTURE || old->base_type == HLSL_TYPE_UAV)
+                type->e.resource_format = old->e.resource_format;
             break;
-        }
 
         default:
             break;
