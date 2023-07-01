@@ -1,0 +1,131 @@
+% Condition to if/for/while must be numeric. They must also be 1-component
+% (although not per se scalar — vectors and matrices are allowed, but not
+% arrays).
+%
+% In theory an implicit conversion to bool is being performed, except that,
+% unlike other places where implicit conversions are performed (assignments,
+% return values) vectors are not truncated, but instead result in an error.
+
+[pixel shader fail]
+static const float2 f;
+float4 main() : sv_target
+{
+    if (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float f[1];
+float4 main() : sv_target
+{
+    if (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const Texture2D f;
+float4 main() : sv_target
+{
+    if (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float2 f;
+float4 main() : sv_target
+{
+    while (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float f[1];
+float4 main() : sv_target
+{
+    while (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const Texture2D f;
+float4 main() : sv_target
+{
+    while (f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float2 f;
+float4 main() : sv_target
+{
+    do; while(f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float f[1];
+float4 main() : sv_target
+{
+    do; while(f);
+    return 0;
+}
+
+[pixel shader fail]
+static const Texture2D f;
+float4 main() : sv_target
+{
+    do; while(f);
+    return 0;
+}
+
+[pixel shader fail]
+static const float2 f;
+float4 main() : sv_target
+{
+    for (; f;);
+    return 0;
+}
+
+[pixel shader fail]
+static const float f[1];
+float4 main() : sv_target
+{
+    for (; f;);
+    return 0;
+}
+
+[pixel shader fail]
+static const Texture2D f;
+float4 main() : sv_target
+{
+    for (; f;);
+    return 0;
+}
+
+[pixel shader todo]
+static const float1x1 f;
+float4 main() : sv_target
+{
+    if (f);
+    for (; f;);
+    while (f);
+    do; while (f);
+    return 0;
+}
+
+[pixel shader]
+uniform float1 f;
+float4 main() : sv_target
+{
+    if (f)
+        return 1;
+    return 0;
+}
+
+[test]
+uniform 0 float4 -2.0 0.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+uniform 0 float4 -0.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
