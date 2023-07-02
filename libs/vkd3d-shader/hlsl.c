@@ -3296,9 +3296,11 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 }
 
-static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
+static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info *compile_info,
         const struct hlsl_profile_info *profile, struct vkd3d_shader_message_context *message_context)
 {
+    unsigned int i;
+
     memset(ctx, 0, sizeof(*ctx));
 
     ctx->profile = profile;
@@ -3307,7 +3309,7 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
 
     if (!(ctx->source_files = hlsl_alloc(ctx, sizeof(*ctx->source_files))))
         return false;
-    if (!(ctx->source_files[0] = hlsl_strdup(ctx, source_name ? source_name : "<anonymous>")))
+    if (!(ctx->source_files[0] = hlsl_strdup(ctx, compile_info->source_name ? compile_info->source_name : "<anonymous>")))
     {
         vkd3d_free(ctx->source_files);
         return false;
@@ -3345,6 +3347,19 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const char *source_name,
             hlsl_strdup(ctx, "$Params"), NULL, &ctx->location)))
         return false;
     ctx->cur_buffer = ctx->globals_buffer;
+
+    for (i = 0; i < compile_info->option_count; ++i)
+    {
+        const struct vkd3d_shader_compile_option *option = &compile_info->options[i];
+
+        if (option->name == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER)
+        {
+            if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR)
+                ctx->matrix_majority = HLSL_MODIFIER_ROW_MAJOR;
+            else if (option->value == VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR)
+                ctx->matrix_majority = HLSL_MODIFIER_COLUMN_MAJOR;
+        }
+    }
 
     return true;
 }
@@ -3423,7 +3438,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
-    if (!hlsl_ctx_init(&ctx, compile_info->source_name, profile, message_context))
+    if (!hlsl_ctx_init(&ctx, compile_info, profile, message_context))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     if ((ret = hlsl_lexer_compile(&ctx, hlsl)) == 2)

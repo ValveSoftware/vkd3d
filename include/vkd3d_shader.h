@@ -139,6 +139,14 @@ enum vkd3d_shader_compile_option_formatting_flags
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FORMATTING_FLAGS),
 };
 
+enum vkd3d_shader_compile_option_pack_matrix_order
+{
+    VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR    = 0x00000001,
+    VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR = 0x00000002,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER),
+};
+
 enum vkd3d_shader_compile_option_name
 {
     /**
@@ -169,6 +177,15 @@ enum vkd3d_shader_compile_option_name
      * \since 1.7
      */
     VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE = 0x00000006,
+    /**
+     * This option specifies default matrix packing order. It's only supported for HLSL source type.
+     * Explicit variable modifiers or pragmas will take precedence.
+     *
+     * \a value is a member of enum vkd3d_shader_compile_option_pack_matrix_order.
+     *
+     * \since 1.9
+     */
+    VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER = 0x00000007,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };
