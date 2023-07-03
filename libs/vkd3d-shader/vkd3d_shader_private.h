@@ -1403,11 +1403,6 @@ void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void 
 void dxbc_writer_init(struct dxbc_writer *dxbc);
 int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
 
-enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *instructions);
-enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
-        struct vkd3d_shader_instruction_array *instructions, const struct shader_signature *input_signature);
-enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
-        enum vkd3d_shader_type shader_type, struct shader_signature *input_signature,
-        struct shader_signature *output_signature, struct shader_signature *patch_constant_signature);
+enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */

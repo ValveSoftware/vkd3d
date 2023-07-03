@@ -253,7 +253,7 @@ static void shader_instruction_init(struct vkd3d_shader_instruction *ins, enum v
     ins->handler_idx = handler_idx;
 }
 
-enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *src_instructions)
+static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *src_instructions)
 {
     struct hull_flattener flattener = {*src_instructions};
     struct vkd3d_shader_instruction_array *instructions;
@@ -388,7 +388,7 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
     return VKD3D_OK;
 }
 
-enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
+static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_io(
         struct vkd3d_shader_instruction_array *src_instructions, const struct shader_signature *input_signature)
 {
     struct vkd3d_shader_instruction_array *instructions;
@@ -999,7 +999,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
         shader_instruction_init(ins, VKD3DSIH_NOP);
 }
 
-enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
+static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
         enum vkd3d_shader_type shader_type, struct shader_signature *input_signature,
         struct shader_signature *output_signature, struct shader_signature *patch_constant_signature)
 {
@@ -1069,4 +1069,26 @@ enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_i
 
     *instructions = normaliser.instructions;
     return VKD3D_OK;
+}
+
+enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser)
+{
+    struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
+    enum vkd3d_result result = VKD3D_OK;
+
+    if (parser->shader_version.type == VKD3D_SHADER_TYPE_HULL
+            && (result = instruction_array_flatten_hull_shader_phases(instructions)) >= 0)
+    {
+        result = instruction_array_normalise_hull_shader_control_point_io(instructions,
+                &parser->shader_desc.input_signature);
+    }
+    if (result >= 0)
+        result = instruction_array_normalise_io_registers(instructions, parser->shader_version.type,
+                &parser->shader_desc.input_signature, &parser->shader_desc.output_signature,
+                &parser->shader_desc.patch_constant_signature);
+
+    if (result >= 0 && TRACE_ON())
+        vkd3d_shader_trace(instructions, &parser->shader_version);
+
+    return result;
 }

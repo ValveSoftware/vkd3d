@@ -2429,13 +2429,6 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
 
     compiler->shader_type = shader_version->type;
 
-    compiler->input_signature = shader_desc->input_signature;
-    compiler->output_signature = shader_desc->output_signature;
-    compiler->patch_constant_signature = shader_desc->patch_constant_signature;
-    memset(&shader_desc->input_signature, 0, sizeof(shader_desc->input_signature));
-    memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
-    memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
-
     if ((shader_interface = vkd3d_find_struct(compile_info->next, INTERFACE_INFO)))
     {
         compiler->xfb_info = vkd3d_find_struct(compile_info->next, TRANSFORM_FEEDBACK_INFO);
@@ -9443,6 +9436,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    struct vkd3d_shader_desc *shader_desc = &parser->shader_desc;
     struct vkd3d_shader_instruction_array instructions;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
@@ -9453,21 +9447,18 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     compiler->location.column = 0;
     compiler->location.line = 1;
 
+    if ((result = vkd3d_shader_normalise(parser)) < 0)
+        return result;
+
     instructions = parser->instructions;
     memset(&parser->instructions, 0, sizeof(parser->instructions));
 
-    if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL
-            && (result = instruction_array_flatten_hull_shader_phases(&instructions)) >= 0)
-    {
-        result = instruction_array_normalise_hull_shader_control_point_io(&instructions,
-                &compiler->input_signature);
-    }
-    if (result >= 0)
-        result = instruction_array_normalise_io_registers(&instructions, parser->shader_version.type,
-                &compiler->input_signature, &compiler->output_signature, &compiler->patch_constant_signature);
-
-    if (result >= 0 && TRACE_ON())
-        vkd3d_shader_trace(&instructions, &parser->shader_version);
+    compiler->input_signature = shader_desc->input_signature;
+    compiler->output_signature = shader_desc->output_signature;
+    compiler->patch_constant_signature = shader_desc->patch_constant_signature;
+    memset(&shader_desc->input_signature, 0, sizeof(shader_desc->input_signature));
+    memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
+    memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);
