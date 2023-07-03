@@ -3625,7 +3625,7 @@ static HRESULT d3d12_command_list_allocate_transfer_buffer(struct d3d12_command_
 static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_command_list *list,
         struct d3d12_resource *dst_resource, unsigned int dst_sub_resource_idx,
         const struct vkd3d_format *dst_format, struct d3d12_resource *src_resource,
-        unsigned int src_sub_resource_idx, const struct vkd3d_format *src_format)
+        unsigned int src_sub_resource_idx, const struct vkd3d_format *src_format, unsigned int layer_count)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     const D3D12_RESOURCE_DESC *dst_desc = &dst_resource->desc;
@@ -3652,6 +3652,7 @@ static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_com
     buffer_image_copy.bufferImageHeight = 0;
     vk_image_subresource_layers_from_d3d12(&buffer_image_copy.imageSubresource,
             src_format, src_sub_resource_idx, src_desc->MipLevels);
+    buffer_image_copy.imageSubresource.layerCount = layer_count;
     src_miplevel_idx = buffer_image_copy.imageSubresource.mipLevel;
     buffer_image_copy.imageOffset.x = 0;
     buffer_image_copy.imageOffset.y = 0;
@@ -3659,7 +3660,7 @@ static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_com
     vk_extent_3d_from_d3d12_miplevel(&buffer_image_copy.imageExtent, src_desc, src_miplevel_idx);
 
     buffer_size = src_format->byte_count * buffer_image_copy.imageExtent.width *
-            buffer_image_copy.imageExtent.height * buffer_image_copy.imageExtent.depth;
+            buffer_image_copy.imageExtent.height * buffer_image_copy.imageExtent.depth * layer_count;
     if (FAILED(hr = d3d12_command_list_allocate_transfer_buffer(list, buffer_size, &transfer_buffer)))
     {
         ERR("Failed to allocate transfer buffer, hr %#x.\n", hr);
@@ -3685,6 +3686,7 @@ static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_com
 
     vk_image_subresource_layers_from_d3d12(&buffer_image_copy.imageSubresource,
             dst_format, dst_sub_resource_idx, dst_desc->MipLevels);
+    buffer_image_copy.imageSubresource.layerCount = layer_count;
     dst_miplevel_idx = buffer_image_copy.imageSubresource.mipLevel;
 
     assert(d3d12_resource_desc_get_width(src_desc, src_miplevel_idx) ==
@@ -3814,7 +3816,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyTextureRegion(ID3D12Graphic
         {
             d3d12_command_list_copy_incompatible_texture_region(list,
                     dst_resource, dst->u.SubresourceIndex, dst_format,
-                    src_resource, src->u.SubresourceIndex, src_format);
+                    src_resource, src->u.SubresourceIndex, src_format, 1);
             return;
         }
 
@@ -3836,6 +3838,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyResource(ID3D12GraphicsComm
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList2(iface);
     struct d3d12_resource *dst_resource, *src_resource;
+    const struct vkd3d_format *dst_format, *src_format;
     const struct vkd3d_vk_device_procs *vk_procs;
     VkBufferCopy vk_buffer_copy;
     VkImageCopy vk_image_copy;
@@ -3868,16 +3871,29 @@ static void STDMETHODCALLTYPE d3d12_command_list_CopyResource(ID3D12GraphicsComm
     else
     {
         layer_count = d3d12_resource_desc_get_layer_count(&dst_resource->desc);
+        dst_format = dst_resource->format;
+        src_format = src_resource->format;
 
         assert(d3d12_resource_is_texture(dst_resource));
         assert(d3d12_resource_is_texture(src_resource));
         assert(dst_resource->desc.MipLevels == src_resource->desc.MipLevels);
         assert(layer_count == d3d12_resource_desc_get_layer_count(&src_resource->desc));
 
+        if (src_format->vk_aspect_mask != dst_format->vk_aspect_mask)
+        {
+            for (i = 0; i < dst_resource->desc.MipLevels; ++i)
+            {
+                d3d12_command_list_copy_incompatible_texture_region(list,
+                        dst_resource, i, dst_format,
+                        src_resource, i, src_format, layer_count);
+            }
+            return;
+        }
+
         for (i = 0; i < dst_resource->desc.MipLevels; ++i)
         {
             vk_image_copy_from_d3d12(&vk_image_copy, i, i, &src_resource->desc, &dst_resource->desc,
-                    src_resource->format, dst_resource->format, NULL, 0, 0, 0);
+                    src_format, dst_format, NULL, 0, 0, 0);
             vk_image_copy.dstSubresource.layerCount = layer_count;
             vk_image_copy.srcSubresource.layerCount = layer_count;
             VK_CALL(vkCmdCopyImage(list->vk_command_buffer, src_resource->u.vk_image,
