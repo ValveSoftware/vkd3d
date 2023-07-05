@@ -1,0 +1,29 @@
+.build:
+  stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
+  interruptible: true
+  needs:
+    - job: build-image
+      optional: true
+  dependencies: []
+  script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR
+    - git clean -fdx
+    - git reset --hard
+    - rm -fr .git/rebase-merge
+    - mkdir artifacts
+    - cat /proc/cpuinfo > artifacts/cpuinfo.txt
+    - cat /proc/meminfo > artifacts/meminfo.txt
+    - vulkaninfo > artifacts/vulkaninfo.txt
+    - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-linux
+    - if [ -f pipeline_failed ] ; then exit 1 ; fi
+  artifacts:
+    when: always
+    expire_in: 1 day
+    paths:
+      - artifacts
+
+build:
+  extends: .build

@@ -1,0 +1,40 @@
+# FROM line will be added dynamically
+
+WORKDIR /tmp
+
+RUN export DEBIAN_FRONTEND=noninteractive; \
+    echo 'path-exclude=/usr/share/doc/*' > /etc/dpkg/dpkg.cfg.d/99-exclude-cruft && \
+    echo 'path-exclude=/usr/share/locale/*' >> /etc/dpkg/dpkg.cfg.d/99-exclude-cruft && \
+    echo 'path-exclude=/usr/share/man/*' >> /etc/dpkg/dpkg.cfg.d/99-exclude-cruft && \
+    echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf && \
+    echo '#!/bin/sh' > /usr/sbin/policy-rc.d && \
+    echo 'exit 101' >> /usr/sbin/policy-rc.d && \
+    chmod +x /usr/sbin/policy-rc.d && \
+    dpkg --add-architecture i386 && \
+    apt-get update && \
+    apt-get dist-upgrade -y && \
+    apt-get install -y build-essential pkg-config gcc-multilib gcc-mingw-w64 \
+                       autoconf automake libtool flex bison \
+                       git ca-certificates rsync \
+                       doxygen doxygen-latex graphviz \
+                       mesa-vulkan-drivers mesa-vulkan-drivers:i386 \
+                       vulkan-tools spirv-headers \
+                       libvulkan-dev libvulkan-dev:i386 \
+                       libncurses-dev libncurses-dev:i386 \
+                       libxcb1-dev libxcb1-dev:i386 \
+                       libxcb-util-dev libxcb-util-dev:i386 \
+                       libxcb-icccm4-dev libxcb-icccm4-dev:i386 \
+                       libxcb-keysyms1-dev libxcb-keysyms1-dev:i386 && \
+    git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git && \
+    cd wine && \
+    mkdir build && \
+    cd build && \
+    ../configure --without-x --without-freetype && \
+    make tools/widl/widl && \
+    cp tools/widl/widl /usr/local/bin && \
+    cd ../.. && \
+    rm -rf wine && \
+    apt-get clean && \
+    useradd -m gitlab
+
+USER gitlab

@@ -1,0 +1,7 @@
+stages:
+  - image
+  - build
+
+include:
+  - local: "/gitlab/image.yml"
+  - local: "/gitlab/build.yml"
