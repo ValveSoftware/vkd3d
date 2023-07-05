@@ -113,6 +113,9 @@ struct demo_swapchain
     VkDevice vk_device;
     ID3D12CommandQueue *command_queue;
 
+    ID3D12Fence *present_fence;
+    unsigned long long present_count;
+
     uint32_t current_buffer;
     unsigned int buffer_count;
     ID3D12Resource *buffers[1];
@@ -529,6 +532,17 @@ static inline struct demo_swapchain *demo_swapchain_create(ID3D12CommandQueue *c
     }
     swapchain->buffer_count = image_count;
     free(vk_images);
+
+    if (FAILED(ID3D12Device_CreateFence(d3d12_device, 0, 0, &IID_ID3D12Fence, (void **)&swapchain->present_fence)))
+    {
+        for (i = 0; i < image_count; ++i)
+        {
+            ID3D12Resource_Release(swapchain->buffers[i]);
+        }
+        free(swapchain);
+        goto fail;
+    }
+    swapchain->present_count = 0;
     ID3D12Device_Release(d3d12_device);
 
     ID3D12CommandQueue_AddRef(swapchain->command_queue = command_queue);
@@ -574,6 +588,12 @@ static inline void demo_swapchain_present(struct demo_swapchain *swapchain)
     present_desc.pImageIndices = &swapchain->current_buffer;
     present_desc.pResults = NULL;
 
+    /* Synchronize vkd3d_acquire_vk_queue() with the Direct3D 12 work
+     * already submitted to the command queue. */
+    ++swapchain->present_count;
+    ID3D12CommandQueue_Signal(swapchain->command_queue, swapchain->present_fence, swapchain->present_count);
+    ID3D12Fence_SetEventOnCompletion(swapchain->present_fence, swapchain->present_count, NULL);
+
     vk_queue = vkd3d_acquire_vk_queue(swapchain->command_queue);
     vkQueuePresentKHR(vk_queue, &present_desc);
     vkd3d_release_vk_queue(swapchain->command_queue);
@@ -589,6 +609,7 @@ static inline void demo_swapchain_destroy(struct demo_swapchain *swapchain)
     unsigned int i;
 
     ID3D12CommandQueue_Release(swapchain->command_queue);
+    ID3D12Fence_Release(swapchain->present_fence);
     for (i = 0; i < swapchain->buffer_count; ++i)
     {
         ID3D12Resource_Release(swapchain->buffers[i]);
