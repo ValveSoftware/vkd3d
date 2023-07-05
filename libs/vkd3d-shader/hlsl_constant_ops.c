@@ -152,6 +152,51 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
     return true;
 }
 
+static bool fold_log2(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src, const struct vkd3d_shader_location *loc)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                if (ctx->profile->major_version >= 4 && src->value.u[k].f < 0.0f)
+                {
+                    hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_NON_FINITE_RESULT,
+                            "Indefinite logarithm result.");
+                }
+                dst->u[k].f = log2f(src->value.u[k].f);
+                if (ctx->profile->major_version < 4 && !isfinite(dst->u[k].f))
+                {
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NON_FINITE_RESULT,
+                            "Infinities and NaNs are not allowed by the shader model.");
+                }
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                if (src->value.u[k].d < 0.0)
+                {
+                    hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_NON_FINITE_RESULT,
+                            "Indefinite logarithm result.");
+                }
+                dst->u[k].d = log2(src->value.u[k].d);
+                break;
+
+            default:
+                FIXME("Fold 'log2' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_neg(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
@@ -865,6 +910,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP1_CAST:
             success = fold_cast(ctx, &res, instr->data_type, arg1);
+            break;
+
+        case HLSL_OP1_LOG2:
+            success = fold_log2(ctx, &res, instr->data_type, arg1, &instr->loc);
             break;
 
         case HLSL_OP1_NEG:
