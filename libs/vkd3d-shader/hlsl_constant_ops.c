@@ -239,7 +239,7 @@ static bool fold_rcp(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
 
     assert(type == src->node.data_type->base_type);
 
-    for (k = 0; k < 4; ++k)
+    for (k = 0; k < dst_type->dimx; ++k)
     {
         switch (type)
         {
