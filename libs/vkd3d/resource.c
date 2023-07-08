@@ -2411,13 +2411,11 @@ void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descr
     descriptor_writes_free_object_refs(&writes, device);
 }
 
-static void d3d12_desc_mark_as_modified(struct d3d12_desc *dst)
+static void d3d12_desc_mark_as_modified(struct d3d12_desc *dst, struct d3d12_descriptor_heap *descriptor_heap)
 {
-    struct d3d12_descriptor_heap *descriptor_heap;
     unsigned int i, head;
 
     i = dst->index;
-    descriptor_heap = d3d12_desc_get_descriptor_heap(dst);
     head = descriptor_heap->dirty_list_head;
 
     /* Only one thread can swap the value away from zero. */
@@ -2431,14 +2429,20 @@ static void d3d12_desc_mark_as_modified(struct d3d12_desc *dst)
     }
 }
 
-void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *src,
-        struct d3d12_device *device)
+static inline void descriptor_heap_write_atomic(struct d3d12_descriptor_heap *descriptor_heap, struct d3d12_desc *dst,
+        const struct d3d12_desc *src, struct d3d12_device *device)
 {
     void *object = src->s.u.object;
 
     d3d12_desc_replace(dst, object, device);
-    if (device->use_vk_heaps && object && !dst->next)
-        d3d12_desc_mark_as_modified(dst);
+    if (descriptor_heap->use_vk_heaps && object && !dst->next)
+        d3d12_desc_mark_as_modified(dst, descriptor_heap);
+}
+
+void d3d12_desc_write_atomic(struct d3d12_desc *dst, const struct d3d12_desc *src,
+        struct d3d12_device *device)
+{
+    descriptor_heap_write_atomic(d3d12_desc_get_descriptor_heap(dst), dst, src, device);
 }
 
 static void d3d12_desc_destroy(struct d3d12_desc *descriptor, struct d3d12_device *device)
@@ -2446,7 +2450,9 @@ static void d3d12_desc_destroy(struct d3d12_desc *descriptor, struct d3d12_devic
     d3d12_desc_replace(descriptor, NULL, device);
 }
 
-void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src,
+/* This is a major performance bottleneck for some games, so do not load the device
+ * pointer from dst_heap. In some cases device will not be used. */
+void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src, struct d3d12_descriptor_heap *dst_heap,
         struct d3d12_device *device)
 {
     struct d3d12_desc tmp;
@@ -2454,7 +2460,7 @@ void d3d12_desc_copy(struct d3d12_desc *dst, const struct d3d12_desc *src,
     assert(dst != src);
 
     tmp.s.u.object = d3d12_desc_get_object_ref(src, device);
-    d3d12_desc_write_atomic(dst, &tmp, device);
+    descriptor_heap_write_atomic(dst_heap, dst, &tmp, device);
 }
 
 static VkDeviceSize vkd3d_get_required_texel_buffer_alignment(const struct d3d12_device *device,
@@ -3987,6 +3993,7 @@ static HRESULT d3d12_descriptor_heap_init(struct d3d12_descriptor_heap *descript
     if (FAILED(hr = vkd3d_private_store_init(&descriptor_heap->private_store)))
         return hr;
 
+    descriptor_heap->use_vk_heaps = device->use_vk_heaps;
     d3d12_descriptor_heap_vk_descriptor_sets_init(descriptor_heap, device, desc);
     vkd3d_mutex_init(&descriptor_heap->vk_sets_mutex);
 
