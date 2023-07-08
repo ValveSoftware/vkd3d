@@ -3970,7 +3970,7 @@ static HRESULT d3d12_descriptor_heap_vk_descriptor_sets_init(struct d3d12_descri
     descriptor_heap->vk_descriptor_pool = VK_NULL_HANDLE;
     memset(descriptor_heap->vk_descriptor_sets, 0, sizeof(descriptor_heap->vk_descriptor_sets));
 
-    if (!device->use_vk_heaps || (desc->Type != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+    if (!descriptor_heap->use_vk_heaps || (desc->Type != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
             && desc->Type != D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER))
         return S_OK;
 
@@ -4001,7 +4001,7 @@ static HRESULT d3d12_descriptor_heap_init(struct d3d12_descriptor_heap *descript
     if (FAILED(hr = vkd3d_private_store_init(&descriptor_heap->private_store)))
         return hr;
 
-    descriptor_heap->use_vk_heaps = device->use_vk_heaps;
+    descriptor_heap->use_vk_heaps = device->use_vk_heaps && (desc->Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
     d3d12_descriptor_heap_vk_descriptor_sets_init(descriptor_heap, device, desc);
     vkd3d_mutex_init(&descriptor_heap->vk_sets_mutex);
 

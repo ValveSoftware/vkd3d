@@ -4425,6 +4425,7 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
 {
     struct vkd3d_pipeline_bindings *bindings = &list->pipeline_bindings[bind_point];
     const struct d3d12_root_signature *root_signature = bindings->root_signature;
+    struct d3d12_descriptor_heap *descriptor_heap;
     struct d3d12_desc *desc;
 
     assert(root_signature_get_descriptor_table(root_signature, index));
@@ -4434,6 +4435,15 @@ static void d3d12_command_list_set_descriptor_table(struct d3d12_command_list *l
 
     if (bindings->descriptor_tables[index] == desc)
         return;
+
+    descriptor_heap = d3d12_desc_get_descriptor_heap(desc);
+    if (!(descriptor_heap->desc.Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE))
+    {
+        /* GetGPUDescriptorHandleForHeapStart() returns a null handle in this case,
+         * but a CPU handle could be passed. */
+        WARN("Descriptor heap %p is not shader visible.\n", descriptor_heap);
+        return;
+    }
 
     bindings->descriptor_tables[index] = desc;
     bindings->descriptor_table_dirty_mask |= (uint64_t)1 << index;
