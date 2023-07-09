@@ -1071,6 +1071,129 @@ static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_s
     return VKD3D_OK;
 }
 
+struct flat_constant_def
+{
+    enum vkd3d_shader_d3dbc_constant_register set;
+    uint32_t index;
+    uint32_t value[4];
+};
+
+struct flat_constants_normaliser
+{
+    struct vkd3d_shader_parser *parser;
+    struct flat_constant_def *defs;
+    size_t def_count, defs_capacity;
+};
+
+static bool get_flat_constant_register_type(const struct vkd3d_shader_register *reg,
+        enum vkd3d_shader_d3dbc_constant_register *set, uint32_t *index)
+{
+    static const struct
+    {
+        enum vkd3d_shader_register_type type;
+        enum vkd3d_shader_d3dbc_constant_register set;
+        uint32_t offset;
+    }
+    regs[] =
+    {
+        {VKD3DSPR_CONST, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 0},
+        {VKD3DSPR_CONST2, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 2048},
+        {VKD3DSPR_CONST3, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 4096},
+        {VKD3DSPR_CONST4, VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, 6144},
+        {VKD3DSPR_CONSTINT, VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER, 0},
+        {VKD3DSPR_CONSTBOOL, VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER, 0},
+    };
+
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(regs); ++i)
+    {
+        if (reg->type == regs[i].type)
+        {
+            if (reg->idx[0].rel_addr)
+            {
+                FIXME("Unhandled relative address.\n");
+                return false;
+            }
+
+            *set = regs[i].set;
+            *index = regs[i].offset + reg->idx[0].offset;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_param *param,
+        const struct flat_constants_normaliser *normaliser)
+{
+    enum vkd3d_shader_d3dbc_constant_register set;
+    uint32_t index;
+    size_t i, j;
+
+    if (!get_flat_constant_register_type(&param->reg, &set, &index))
+        return;
+
+    for (i = 0; i < normaliser->def_count; ++i)
+    {
+        if (normaliser->defs[i].set == set && normaliser->defs[i].index == index)
+        {
+            param->reg.type = VKD3DSPR_IMMCONST;
+            param->reg.idx_count = 0;
+            param->reg.immconst_type = VKD3D_IMMCONST_VEC4;
+            for (j = 0; j < 4; ++j)
+                param->reg.u.immconst_uint[j] = normaliser->defs[i].value[j];
+            return;
+        }
+    }
+
+    param->reg.type = VKD3DSPR_CONSTBUFFER;
+    param->reg.idx[0].offset = set; /* register ID */
+    param->reg.idx[1].offset = set; /* register index */
+    param->reg.idx[2].offset = index; /* buffer index */
+    param->reg.idx_count = 3;
+}
+
+static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d_shader_parser *parser)
+{
+    struct flat_constants_normaliser normaliser = {.parser = parser};
+    unsigned int i, j;
+
+    for (i = 0; i < parser->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+
+        if (ins->handler_idx == VKD3DSIH_DEF || ins->handler_idx == VKD3DSIH_DEFI || ins->handler_idx == VKD3DSIH_DEFB)
+        {
+            struct flat_constant_def *def;
+
+            if (!vkd3d_array_reserve((void **)&normaliser.defs, &normaliser.defs_capacity,
+                    normaliser.def_count + 1, sizeof(*normaliser.defs)))
+            {
+                vkd3d_free(normaliser.defs);
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+            }
+
+            def = &normaliser.defs[normaliser.def_count++];
+
+            get_flat_constant_register_type((struct vkd3d_shader_register *)&ins->dst[0].reg, &def->set, &def->index);
+            for (j = 0; j < 4; ++j)
+                def->value[j] = ins->src[0].reg.u.immconst_uint[j];
+
+            vkd3d_shader_instruction_make_nop(ins);
+        }
+        else
+        {
+            for (j = 0; j < ins->src_count; ++j)
+                shader_register_normalise_flat_constants((struct vkd3d_shader_src_param *)&ins->src[j], &normaliser);
+        }
+    }
+
+    vkd3d_free(normaliser.defs);
+    return VKD3D_OK;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
@@ -1086,6 +1209,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser)
         result = instruction_array_normalise_io_registers(instructions, parser->shader_version.type,
                 &parser->shader_desc.input_signature, &parser->shader_desc.output_signature,
                 &parser->shader_desc.patch_constant_signature);
+
+    if (result >= 0)
+        result = instruction_array_normalise_flat_constants(parser);
 
     if (result >= 0 && TRACE_ON())
         vkd3d_shader_trace(instructions, &parser->shader_version);
