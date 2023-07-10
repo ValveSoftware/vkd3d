@@ -89,6 +89,12 @@ enum bitcode_type_code
     TYPE_CODE_FUNCTION     = 21,
 };
 
+enum bitcode_value_symtab_code
+{
+    VST_CODE_ENTRY   = 1,
+    VST_CODE_BBENTRY = 2,
+};
+
 struct sm6_pointer_info
 {
     const struct sm6_type *type;
@@ -149,6 +155,12 @@ struct dxil_record
     uint64_t operands[];
 };
 
+struct sm6_symbol
+{
+    unsigned int id;
+    const char *name;
+};
+
 struct dxil_block
 {
     const struct dxil_block *parent;
@@ -188,6 +200,9 @@ struct sm6_parser
 
     struct sm6_type *types;
     size_t type_count;
+
+    struct sm6_symbol *global_symbols;
+    size_t global_symbol_count;
 
     struct vkd3d_shader_parser p;
 };
@@ -818,16 +833,17 @@ static const struct dxil_block *sm6_parser_get_level_one_block(const struct sm6_
     return found;
 }
 
-static char *dxil_record_to_string(const struct dxil_record *record)
+static char *dxil_record_to_string(const struct dxil_record *record, unsigned int offset)
 {
     unsigned int i;
     char *str;
 
-    if (!(str = vkd3d_calloc(record->operand_count + 1, 1)))
+    assert(offset <= record->operand_count);
+    if (!(str = vkd3d_calloc(record->operand_count - offset + 1, 1)))
         return NULL;
 
-    for (i = 0; i < record->operand_count; ++i)
-        str[i] = record->operands[i];
+    for (i = offset; i < record->operand_count; ++i)
+        str[i - offset] = record->operands[i];
 
     return str;
 }
@@ -1079,7 +1095,7 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
                 break;
 
             case TYPE_CODE_STRUCT_NAME:
-                if (!(struct_name = dxil_record_to_string(record)))
+                if (!(struct_name = dxil_record_to_string(record, 0)))
                 {
                     ERR("Failed to allocate struct name.\n");
                     return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1111,6 +1127,80 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static int global_symbol_compare(const void *a, const void *b)
+{
+    return vkd3d_u32_compare(((const struct sm6_symbol *)a)->id, ((const struct sm6_symbol *)b)->id);
+}
+
+static enum vkd3d_result sm6_parser_symtab_init(struct sm6_parser *sm6)
+{
+    const struct dxil_record *record;
+    const struct dxil_block *block;
+    struct sm6_symbol *symbol;
+    size_t i, count;
+    bool is_unique;
+
+    sm6->p.location.line = 0;
+    sm6->p.location.column = 0;
+
+    if (!(block = sm6_parser_get_level_one_block(sm6, VALUE_SYMTAB_BLOCK, &is_unique)))
+    {
+        /* There should always be at least one symbol: the name of the entry point function. */
+        WARN("No value symtab block found.\n");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (!is_unique)
+        FIXME("Ignoring extra value symtab block(s).\n");
+
+    sm6->p.location.line = block->id;
+
+    for (i = 0, count = 0; i < block->record_count; ++i)
+        count += block->records[i]->code == VST_CODE_ENTRY;
+
+    if (!(sm6->global_symbols = vkd3d_calloc(count, sizeof(*sm6->global_symbols))))
+    {
+        ERR("Failed to allocate global symbols.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        sm6->p.location.column = i;
+        record = block->records[i];
+
+        if (record->code != VST_CODE_ENTRY)
+        {
+            FIXME("Unhandled symtab code %u.\n", record->code);
+            continue;
+        }
+        if (!dxil_record_validate_operand_min_count(record, 1, sm6))
+            continue;
+
+        symbol = &sm6->global_symbols[sm6->global_symbol_count];
+        symbol->id = record->operands[0];
+        if (!(symbol->name = dxil_record_to_string(record, 1)))
+        {
+            ERR("Failed to allocate symbol name.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+        ++sm6->global_symbol_count;
+    }
+
+    sm6->p.location.column = block->record_count;
+
+    qsort(sm6->global_symbols, sm6->global_symbol_count, sizeof(*sm6->global_symbols), global_symbol_compare);
+    for (i = 1; i < sm6->global_symbol_count; ++i)
+    {
+        if (sm6->global_symbols[i].id == sm6->global_symbols[i - 1].id)
+        {
+            WARN("Invalid duplicate symbol id %u.\n", sm6->global_symbols[i].id);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
 {
     size_t i;
@@ -1137,6 +1227,15 @@ static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
     vkd3d_free(types);
 }
 
+static void sm6_symtab_cleanup(struct sm6_symbol *symbols, size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; ++i)
+        vkd3d_free((void *)symbols[i].name);
+    vkd3d_free(symbols);
+}
+
 static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     struct sm6_parser *sm6 = sm6_parser(parser);
@@ -1145,6 +1244,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     dxil_global_abbrevs_cleanup(sm6->abbrevs, sm6->abbrev_count);
     shader_instruction_array_destroy(&parser->instructions);
     sm6_type_table_cleanup(sm6->types, sm6->type_count);
+    sm6_symtab_cleanup(sm6->global_symbols, sm6->global_symbol_count);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
 }
@@ -1293,6 +1393,19 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         else if (ret == VKD3D_ERROR_INVALID_SHADER)
             vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_TYPE_TABLE,
                     "DXIL type table is invalid.");
+        else
+            vkd3d_unreachable();
+        return ret;
+    }
+
+    if ((ret = sm6_parser_symtab_init(sm6)) < 0)
+    {
+        if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                    "Out of memory parsing DXIL value symbol table.");
+        else if (ret == VKD3D_ERROR_INVALID_SHADER)
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_VALUE_SYMTAB,
+                    "DXIL value symbol table is invalid.");
         else
             vkd3d_unreachable();
         return ret;
