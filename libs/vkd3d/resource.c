@@ -3859,7 +3859,15 @@ static D3D12_GPU_DESCRIPTOR_HANDLE * STDMETHODCALLTYPE d3d12_descriptor_heap_Get
 
     TRACE("iface %p, descriptor %p.\n", iface, descriptor);
 
-    descriptor->ptr = (uint64_t)(intptr_t)heap->descriptors;
+    if (heap->desc.Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+    {
+        descriptor->ptr = (uint64_t)(intptr_t)heap->descriptors;
+    }
+    else
+    {
+        WARN("Heap %p is not shader-visible.\n", iface);
+        descriptor->ptr = 0;
+    }
 
     return descriptor;
 }
