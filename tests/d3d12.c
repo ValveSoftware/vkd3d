@@ -2351,6 +2351,7 @@ done:
 
 static void test_create_descriptor_heap(void)
 {
+    D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle;
     D3D12_DESCRIPTOR_HEAP_DESC heap_desc;
     ID3D12Device *device, *tmp_device;
     ID3D12DescriptorHeap *heap;
@@ -2369,6 +2370,10 @@ static void test_create_descriptor_heap(void)
     heap_desc.NodeMask = 0;
     hr = ID3D12Device_CreateDescriptorHeap(device, &heap_desc, &IID_ID3D12DescriptorHeap, (void **)&heap);
     ok(hr == S_OK, "Failed to create descriptor heap, hr %#x.\n", hr);
+
+    gpu_handle = ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(heap);
+    todo
+    ok(!gpu_handle.ptr, "Got unexpected ptr %"PRIx64".\n", gpu_handle.ptr);
 
     refcount = get_refcount(device);
     ok(refcount == 2, "Got unexpected refcount %u.\n", (unsigned int)refcount);
