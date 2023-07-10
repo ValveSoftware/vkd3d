@@ -2830,6 +2830,22 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
             return D3D_SVT_VERTEXSHADER;
         case HLSL_TYPE_VOID:
             return D3D_SVT_VOID;
+        case HLSL_TYPE_UAV:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3D_SVT_RWTEXTURE1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3D_SVT_RWTEXTURE2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3D_SVT_RWTEXTURE3D;
+                case HLSL_SAMPLER_DIM_1DARRAY:
+                    return D3D_SVT_RWTEXTURE1DARRAY;
+                case HLSL_SAMPLER_DIM_2DARRAY:
+                    return D3D_SVT_RWTEXTURE2DARRAY;
+                default:
+                    vkd3d_unreachable();
+            }
         default:
             vkd3d_unreachable();
     }
