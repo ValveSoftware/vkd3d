@@ -97,3 +97,22 @@ todo probe all rgba (5.0, 6.0, 7.0, 8.0)
 uniform 0 float4 1 1 0 0
 todo draw quad
 todo probe all rgba (9.0, 10.0, 11.0, 12.0)
+
+
+[pixel shader todo]
+float4 a;
+
+float4 main() : sv_target
+{
+    float4 arr[] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120};
+
+    float4 tmp = float4(1, 2, 3, 4);
+    tmp.yz = arr[a.z].wx;
+
+    return tmp;
+}
+
+[test]
+uniform 0 float4 0 0 2.4 0
+todo draw quad
+probe all rgba (1.0, 120.0, 90.0, 4.0)
