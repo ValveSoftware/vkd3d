@@ -628,10 +628,10 @@ static enum vkd3d_result dxil_block_read(struct dxil_block *parent, struct sm6_p
     return VKD3D_ERROR_INVALID_SHADER;
 }
 
-static unsigned int sm6_parser_compute_global_abbrev_count_for_block_id(struct sm6_parser *sm6,
+static size_t sm6_parser_compute_global_abbrev_count_for_block_id(struct sm6_parser *sm6,
         unsigned int block_id)
 {
-    unsigned int i, count;
+    size_t i, count;
 
     for (i = 0, count = 0; i < sm6->abbrev_count; ++i)
         count += sm6->abbrevs[i]->block_id == block_id;
@@ -641,7 +641,7 @@ static unsigned int sm6_parser_compute_global_abbrev_count_for_block_id(struct s
 
 static void dxil_block_destroy(struct dxil_block *block)
 {
-    unsigned int i;
+    size_t i;
 
     for (i = 0; i < block->record_count; ++i)
         vkd3d_free(block->records[i]);
@@ -663,7 +663,7 @@ static void dxil_block_destroy(struct dxil_block *block)
 static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct dxil_block *parent,
         struct sm6_parser *sm6)
 {
-    unsigned int i, abbrev_count = 0;
+    size_t i, abbrev_count = 0;
     enum vkd3d_result ret;
 
     block->parent = parent;
@@ -705,9 +705,9 @@ static enum vkd3d_result dxil_block_init(struct dxil_block *block, const struct 
     return ret;
 }
 
-static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, unsigned int count)
+static void dxil_global_abbrevs_cleanup(struct dxil_global_abbrev **abbrevs, size_t count)
 {
-    unsigned int i;
+    size_t i;
 
     for (i = 0; i < count; ++i)
         vkd3d_free(abbrevs[i]);
@@ -735,11 +735,12 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
 {
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t version_token, dxil_version, token_count, magic;
-    unsigned int count, length, chunk_offset, chunk_size;
+    unsigned int chunk_offset, chunk_size;
     enum bitcode_block_abbreviation abbr;
     struct vkd3d_shader_version version;
     struct dxil_block *block;
     enum vkd3d_result ret;
+    size_t count, length;
 
     count = byte_code_size / sizeof(*byte_code);
     if (count < 6)
@@ -757,9 +758,9 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
 
     if (token_count < 6 || count < token_count)
     {
-        WARN("Invalid token count %u (word count %u).\n", token_count, count);
+        WARN("Invalid token count %u (word count %zu).\n", token_count, count);
         vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_CHUNK_SIZE,
-                "DXIL chunk token count %#x is invalid (word count %u).", token_count, count);
+                "DXIL chunk token count %#x is invalid (word count %zu).", token_count, count);
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
@@ -847,17 +848,17 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     length = sm6->ptr - sm6->start - block->start;
     if (length != block->length)
     {
-        WARN("Invalid block length %u; expected %u.\n", length, block->length);
+        WARN("Invalid block length %zu; expected %u.\n", length, block->length);
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_BLOCK_LENGTH,
-                "Root block ends with length %u but indicated length is %u.", length, block->length);
+                "Root block ends with length %zu but indicated length is %u.", length, block->length);
     }
     if (sm6->ptr != sm6->end)
     {
-        unsigned int expected_length = sm6->end - sm6->start;
+        size_t expected_length = sm6->end - sm6->start;
         length = sm6->ptr - sm6->start;
-        WARN("Invalid module length %u; expected %u.\n", length, expected_length);
+        WARN("Invalid module length %zu; expected %zu.\n", length, expected_length);
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_MODULE_LENGTH,
-                "Module ends with length %u but indicated length is %u.", length, expected_length);
+                "Module ends with length %zu but indicated length is %zu.", length, expected_length);
     }
 
     dxil_block_destroy(&sm6->root_block);
