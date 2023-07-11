@@ -2519,7 +2519,7 @@ static bool type_is_integer(const struct hlsl_type *type)
 }
 
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
-        bool output, unsigned int *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
+        bool output, enum vkd3d_shader_register_type *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
 {
     unsigned int i;
 
@@ -2529,24 +2529,24 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
         bool output;
         enum vkd3d_shader_type shader_type;
         enum vkd3d_sm4_swizzle_type swizzle_type;
-        enum vkd3d_sm4_register_type type;
+        enum vkd3d_shader_register_type type;
         bool has_idx;
     }
     register_table[] =
     {
-        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM5_RT_THREAD_ID,         false},
-        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM5_RT_THREAD_GROUP_ID,   false},
-        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM5_RT_LOCAL_THREAD_ID,   false},
+        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_THREADID,          false},
+        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_THREADGROUPID,     false},
+        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_LOCALTHREADID,     false},
 
-        {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SM4_SWIZZLE_NONE, VKD3D_SM4_RT_PRIMID,            false},
+        {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SM4_SWIZZLE_NONE, VKD3DSPR_PRIMID,            false},
 
         /* Put sv_target in this table, instead of letting it fall through to
          * default varying allocation, so that the register index matches the
          * usage index. */
-        {"color",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM4_RT_OUTPUT,            true},
-        {"depth",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM4_RT_DEPTHOUT,          false},
-        {"sv_depth",            true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM4_RT_DEPTHOUT,          false},
-        {"sv_target",           true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3D_SM4_RT_OUTPUT,            true},
+        {"color",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_OUTPUT,            true},
+        {"depth",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_DEPTHOUT,          false},
+        {"sv_depth",            true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_DEPTHOUT,          false},
+        {"sv_target",           true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_OUTPUT,            true},
     };
 
     for (i = 0; i < ARRAY_SIZE(register_table); ++i)
@@ -2656,7 +2656,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         unsigned int width = (1u << var->data_type->dimx) - 1, use_mask;
-        enum vkd3d_sm4_register_type type;
+        enum vkd3d_shader_register_type type;
         uint32_t usage_idx, reg_idx;
         D3D_NAME usage;
         bool has_idx;
@@ -3435,7 +3435,7 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
 
 struct sm4_register
 {
-    enum vkd3d_sm4_register_type type;
+    enum vkd3d_shader_register_type type;
     uint32_t idx[2];
     unsigned int idx_count;
     enum vkd3d_sm4_dimension dim;
@@ -3484,7 +3484,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
         if (regset == HLSL_REGSET_TEXTURES)
         {
-            reg->type = VKD3D_SM4_RT_RESOURCE;
+            reg->type = VKD3DSPR_RESOURCE;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
@@ -3496,7 +3496,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else if (regset == HLSL_REGSET_UAVS)
         {
-            reg->type = VKD3D_SM5_RT_UAV;
+            reg->type = VKD3DSPR_UAV;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
@@ -3508,7 +3508,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         }
         else if (regset == HLSL_REGSET_SAMPLERS)
         {
-            reg->type = VKD3D_SM4_RT_SAMPLER;
+            reg->type = VKD3DSPR_SAMPLER;
             reg->dim = VKD3D_SM4_DIMENSION_NONE;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
@@ -3523,7 +3523,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref) + var->buffer_offset;
 
             assert(data_type->class <= HLSL_CLASS_VECTOR);
-            reg->type = VKD3D_SM4_RT_CONSTBUFFER;
+            reg->type = VKD3DSPR_CONSTBUFFER;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
@@ -3555,7 +3555,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
             assert(hlsl_reg.allocated);
-            reg->type = VKD3D_SM4_RT_INPUT;
+            reg->type = VKD3DSPR_INPUT;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
@@ -3578,7 +3578,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 reg->idx_count = 1;
             }
 
-            if (reg->type == VKD3D_SM4_RT_DEPTHOUT)
+            if (reg->type == VKD3DSPR_DEPTHOUT)
                 reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
             else
                 reg->dim = VKD3D_SM4_DIMENSION_VEC4;
@@ -3589,7 +3589,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
             assert(hlsl_reg.allocated);
-            reg->type = VKD3D_SM4_RT_OUTPUT;
+            reg->type = VKD3DSPR_OUTPUT;
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             reg->idx[0] = hlsl_reg.id;
             reg->idx_count = 1;
@@ -3601,7 +3601,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
         assert(hlsl_reg.allocated);
-        reg->type = VKD3D_SM4_RT_TEMP;
+        reg->type = VKD3DSPR_TEMP;
         reg->dim = VKD3D_SM4_DIMENSION_VEC4;
         if (swizzle_type)
             *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
@@ -3625,7 +3625,7 @@ static void sm4_register_from_node(struct sm4_register *reg, unsigned int *write
         enum vkd3d_sm4_swizzle_type *swizzle_type, const struct hlsl_ir_node *instr)
 {
     assert(instr->reg.allocated);
-    reg->type = VKD3D_SM4_RT_TEMP;
+    reg->type = VKD3DSPR_TEMP;
     reg->dim = VKD3D_SM4_DIMENSION_VEC4;
     *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
     reg->idx[0] = instr->reg.id;
@@ -3644,7 +3644,7 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
         const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
 {
     src->swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-    src->reg.type = VKD3D_SM4_RT_IMMCONST;
+    src->reg.type = VKD3DSPR_IMMCONST;
     if (width == 1)
     {
         src->reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
@@ -3683,7 +3683,22 @@ static void sm4_src_from_node(struct sm4_src_register *src,
 
 static uint32_t sm4_encode_register(const struct sm4_register *reg)
 {
-    return (reg->type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
+    uint32_t sm4_reg_type = ~0u;
+    unsigned int i;
+
+    /* Find sm4 register type from vkd3d_shader_register_type. */
+    for (i = 0; i < ARRAY_SIZE(register_type_table); ++i)
+    {
+        if (reg->type == register_type_table[i])
+        {
+            if (sm4_reg_type != ~0u)
+                ERR("Multiple maps for register_type %#x.\n", reg->type);
+            sm4_reg_type = i;
+        }
+    }
+    assert(sm4_reg_type != ~0u);
+
+    return (sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
             | (reg->idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT)
             | (reg->dim << VKD3D_SM4_DIMENSION_SHIFT);
 }
@@ -3691,7 +3706,7 @@ static uint32_t sm4_encode_register(const struct sm4_register *reg)
 static uint32_t sm4_register_order(const struct sm4_register *reg)
 {
     uint32_t order = 1;
-    if (reg->type == VKD3D_SM4_RT_IMMCONST)
+    if (reg->type == VKD3DSPR_IMMCONST)
         order += reg->dim == VKD3D_SM4_DIMENSION_VEC4 ? 4 : 1;
     order += reg->idx_count;
     if (reg->mod)
@@ -3754,7 +3769,7 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
         for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
             put_u32(buffer, instr->srcs[i].reg.idx[j]);
 
-        if (instr->srcs[i].reg.type == VKD3D_SM4_RT_IMMCONST)
+        if (instr->srcs[i].reg.type == VKD3DSPR_IMMCONST)
         {
             put_u32(buffer, instr->srcs[i].reg.immconst_uint[0]);
             if (instr->srcs[i].reg.dim == VKD3D_SM4_DIMENSION_VEC4)
@@ -3807,7 +3822,7 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
         .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
 
         .srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
-        .srcs[0].reg.type = VKD3D_SM4_RT_CONSTBUFFER,
+        .srcs[0].reg.type = VKD3DSPR_CONSTBUFFER,
         .srcs[0].reg.idx = {cbuffer->reg.id, (cbuffer->used_size + 3) / 4},
         .srcs[0].reg.idx_count = 2,
         .srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_VEC4,
@@ -3826,7 +3841,7 @@ static void write_sm4_dcl_samplers(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     {
         .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
 
-        .dsts[0].reg.type = VKD3D_SM4_RT_SAMPLER,
+        .dsts[0].reg.type = VKD3DSPR_SAMPLER,
         .dsts[0].reg.idx_count = 1,
         .dst_count = 1,
     };
@@ -3867,7 +3882,7 @@ static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
         instr = (struct sm4_instruction)
         {
-            .dsts[0].reg.type = uav ? VKD3D_SM5_RT_UAV : VKD3D_SM4_RT_RESOURCE,
+            .dsts[0].reg.type = uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE,
             .dsts[0].reg.idx = {resource->id + i},
             .dsts[0].reg.idx_count = 1,
             .dst_count = 1,
@@ -3933,13 +3948,13 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     }
     else
     {
-        instr.dsts[0].reg.type = output ? VKD3D_SM4_RT_OUTPUT : VKD3D_SM4_RT_INPUT;
+        instr.dsts[0].reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         instr.dsts[0].reg.idx[0] = var->regs[HLSL_REGSET_NUMERIC].id;
         instr.dsts[0].reg.idx_count = 1;
         instr.dsts[0].writemask = var->regs[HLSL_REGSET_NUMERIC].writemask;
     }
 
-    if (instr.dsts[0].reg.type == VKD3D_SM4_RT_DEPTHOUT)
+    if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
         instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
 
     hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
@@ -4071,7 +4086,7 @@ static void write_sm4_unary_op_with_two_destinations(struct vkd3d_bytecode_buffe
     assert(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     assert(1 - dst_idx >= 0);
-    instr.dsts[1 - dst_idx].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
@@ -4131,7 +4146,7 @@ static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buff
     assert(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     assert(1 - dst_idx >= 0);
-    instr.dsts[1 - dst_idx].reg.type = VKD3D_SM4_RT_NULL;
+    instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
@@ -4203,7 +4218,7 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
             memset(&instr.srcs[2], 0, sizeof(instr.srcs[2]));
             instr.srcs[2].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-            reg->type = VKD3D_SM4_RT_IMMCONST;
+            reg->type = VKD3DSPR_IMMCONST;
             reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
             reg->immconst_uint[0] = index->value.u[0].u;
         }
@@ -4369,7 +4384,7 @@ static void write_sm4_cast_from_bool(struct hlsl_ctx *ctx,
 
     sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].writemask);
     instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-    instr.srcs[1].reg.type = VKD3D_SM4_RT_IMMCONST;
+    instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
     instr.srcs[1].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
     instr.srcs[1].reg.immconst_uint[0] = mask;
     instr.src_count = 2;
