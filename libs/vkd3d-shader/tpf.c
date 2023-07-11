@@ -2555,7 +2555,8 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
                 && output == register_table[i].output
                 && ctx->profile->type == register_table[i].shader_type)
         {
-            *type = register_table[i].type;
+            if (type)
+                *type = register_table[i].type;
             if (swizzle_type)
                 *swizzle_type = register_table[i].swizzle_type;
             *has_idx = register_table[i].has_idx;
@@ -2656,7 +2657,6 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         unsigned int width = (1u << var->data_type->dimx) - 1, use_mask;
-        enum vkd3d_shader_register_type type;
         uint32_t usage_idx, reg_idx;
         D3D_NAME usage;
         bool has_idx;
@@ -2670,14 +2670,13 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
             continue;
         usage_idx = var->semantic.index;
 
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &type, NULL, &has_idx))
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, NULL, NULL, &has_idx))
         {
             reg_idx = has_idx ? var->semantic.index : ~0u;
         }
         else
         {
             assert(var->regs[HLSL_REGSET_NUMERIC].allocated);
-            type = VKD3D_SM4_RT_INPUT;
             reg_idx = var->regs[HLSL_REGSET_NUMERIC].id;
         }
 
