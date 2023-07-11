@@ -27,7 +27,7 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_SED
 AC_PROG_MKDIR_P
-VKD3D_PROG_WIDL(3, 20)
+VKD3D_PROG_WIDL(3, 21)
 AS_IF([test "x$WIDL" = "xno"], [AC_MSG_WARN([widl is required to build header files.])])
 
 AC_CHECK_PROGS([FLEX], [flex], [none])
