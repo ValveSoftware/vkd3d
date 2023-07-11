@@ -3380,6 +3380,8 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
         vkd3d_free((void *)buffer->name);
         vkd3d_free(buffer);
     }
+
+    vkd3d_free(ctx->constant_defs.regs);
 }
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
