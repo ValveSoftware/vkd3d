@@ -1767,7 +1767,8 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
                 break;
 
             case MODULE_CODE_VERSION:
-                dxil_record_validate_operand_count(record, 1, 1, sm6);
+                if (!dxil_record_validate_operand_count(record, 1, 1, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
                 if ((version = record->operands[0]) != 1)
                 {
                     FIXME("Unsupported format version %#"PRIx64".\n", version);
