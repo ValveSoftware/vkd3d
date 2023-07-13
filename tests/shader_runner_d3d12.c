@@ -58,9 +58,9 @@ static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
 
 static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, const char *source, const char *type)
 {
+    UINT flags = runner->r.compile_options | D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
-    UINT flags = 0;
     HRESULT hr;
 
     static const char *const shader_models[] =
@@ -73,7 +73,6 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    flags |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
     hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
     ok(FAILED(hr) == !blob, "Got unexpected hr %#x, blob %p.\n", hr, blob);

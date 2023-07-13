@@ -111,6 +111,8 @@ static bool match_string(const char *line, const char *token, const char **const
 
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
+    unsigned int i;
+
     if (match_string(line, "shader model >=", &line))
     {
         static const char *const model_strings[] =
@@ -122,7 +124,6 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
             [SHADER_MODEL_5_0] = "5.0",
             [SHADER_MODEL_5_1] = "5.1",
         };
-        unsigned int i;
 
         for (i = 0; i < ARRAY_SIZE(model_strings); ++i)
         {
@@ -134,6 +135,27 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
         }
 
         fatal_error("Unknown shader model '%s'.\n", line);
+    }
+    else if (match_string(line, "options:", &line))
+    {
+        static const struct option
+        {
+            unsigned int option;
+            const char *name;
+        }
+        options[] =
+        {
+            { 0, "none" },
+            { D3DCOMPILE_PACK_MATRIX_ROW_MAJOR, "row-major" },
+            { D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR, "column-major" },
+        };
+
+        runner->compile_options = 0;
+        for (i = 0; i < ARRAY_SIZE(options); ++i)
+        {
+            if (match_string(line, options[i].name, &line))
+                runner->compile_options |= options[i].option;
+        }
     }
     else
     {
@@ -751,9 +773,9 @@ static HRESULT map_unidentified_hrs(HRESULT hr)
 
 static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
 {
+    UINT flags = runner->compile_options | D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
-    UINT flags = 0;
     HRESULT hr;
 
     static const char *const shader_models[] =
@@ -766,7 +788,6 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    flags |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
     hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
     hr = map_unidentified_hrs(hr);

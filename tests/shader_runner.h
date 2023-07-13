@@ -123,6 +123,8 @@ struct shader_runner
 
     struct input_element *input_elements;
     size_t input_element_count, input_element_capacity;
+
+    unsigned int compile_options;
 };
 
 struct shader_runner_ops

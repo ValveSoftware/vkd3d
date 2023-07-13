@@ -72,11 +72,11 @@ static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
     return CONTAINING_RECORD(r, struct d3d11_shader_runner, r);
 }
 
-static ID3D10Blob *compile_shader(const char *source, const char *type, enum shader_model shader_model)
+static ID3D10Blob *compile_shader(const struct d3d11_shader_runner *runner, const char *source, const char *type)
 {
+    UINT flags = runner->r.compile_options | D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
-    UINT flags = 0;
     HRESULT hr;
 
     static const char *const shader_models[] =
@@ -89,8 +89,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    flags |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
-    sprintf(profile, "%s_%s", type, shader_models[shader_model]);
+    sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
     hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
     ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
     if (errors)
@@ -477,7 +476,7 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     HRESULT hr;
     size_t i;
 
-    if (!(cs_code = compile_shader(runner->r.cs_source, "cs", runner->r.minimum_shader_model)))
+    if (!(cs_code = compile_shader(runner, runner->r.cs_source, "cs")))
         return false;
 
     hr = ID3D11Device_CreateComputeShader(device, ID3D10Blob_GetBufferPointer(cs_code),
@@ -550,10 +549,10 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     unsigned int i;
     HRESULT hr;
 
-    if (!(vs_code = compile_shader(runner->r.vs_source, "vs", runner->r.minimum_shader_model)))
+    if (!(vs_code = compile_shader(runner, runner->r.vs_source, "vs")))
         return false;
 
-    if (!(ps_code = compile_shader(runner->r.ps_source, "ps", runner->r.minimum_shader_model)))
+    if (!(ps_code = compile_shader(runner, runner->r.ps_source, "ps")))
     {
         ID3D10Blob_Release(vs_code);
         return false;

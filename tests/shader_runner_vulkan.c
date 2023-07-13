@@ -26,6 +26,7 @@
 #include "vulkan/vulkan.h"
 #include "vkd3d_shader.h"
 #include "vkd3d.h"
+#include "vkd3d_d3dcompiler.h"
 #include "shader_runner.h"
 #include "vkd3d_test.h"
 
@@ -386,8 +387,9 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
     struct vkd3d_shader_push_constant_buffer push_constants;
     struct vkd3d_shader_resource_binding *binding;
+    struct vkd3d_shader_compile_option options[1];
+    unsigned int i, compile_options;
     char profile[7];
-    unsigned int i;
     char *messages;
     int ret;
 
@@ -407,6 +409,30 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
     info.source_type = VKD3D_SHADER_SOURCE_HLSL;
     info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
     info.log_level = VKD3D_SHADER_LOG_WARNING;
+
+    info.options = options;
+    info.option_count = 0;
+    compile_options = runner->r.compile_options;
+    if (compile_options)
+    {
+        struct vkd3d_shader_compile_option *option;
+
+        if (compile_options & (D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
+        {
+            option = &options[info.option_count++];
+            option->name = VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER;
+            option->value = 0;
+            if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
+                option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR;
+            if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
+                option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR;
+
+            compile_options &= ~(D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR);
+        }
+
+        if (compile_options)
+            fatal_error("Unsupported compiler options %#x.\n", compile_options);
+    }
 
     hlsl_info.entry_point = "main";
     sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
