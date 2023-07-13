@@ -60,6 +60,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
+    UINT flags = 0;
     HRESULT hr;
 
     static const char *const shader_models[] =
@@ -69,7 +70,7 @@ static ID3D10Blob *compile_shader(const char *source, const char *type, enum sha
     };
 
     sprintf(profile, "%s_%s", type, shader_models[shader_model]);
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, 0, 0, &blob, &errors);
+    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
     ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
     if (errors)
     {
