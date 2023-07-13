@@ -223,3 +223,147 @@ uniform  8 float4 0.0 0.5 0.0 0.0
 uniform 12 float4 0.0 0.6 0.0 0.0
 draw quad
 probe all rgba (0.3, 0.4, 0.5, 0.6)
+
+% Compiler options
+[require]
+options: row-major
+
+[pixel shader]
+#pragma pack_matrix(column_major)
+uniform float4x4 m;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m[0].yz;
+    ret.zw = m[1].yz;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.5 0.9 1.3
+uniform  4 float4 0.2 0.6 1.0 1.4
+uniform  8 float4 0.3 0.7 1.1 1.5
+uniform 12 float4 0.4 0.8 1.2 1.6
+draw quad
+probe all rgba (0.2, 0.3, 0.6, 0.7) 1
+
+[require]
+options: column-major
+
+[pixel shader]
+uniform float4x4 m;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m[0].yz;
+    ret.zw = m[1].yz;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.5 0.9 1.3
+uniform  4 float4 0.2 0.6 1.0 1.4
+uniform  8 float4 0.3 0.7 1.1 1.5
+uniform 12 float4 0.4 0.8 1.2 1.6
+draw quad
+probe all rgba (0.2, 0.3, 0.6, 0.7) 1
+
+[require]
+options: row-major
+
+[pixel shader]
+uniform float4x4 m;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m[0].yz;
+    ret.zw = m[1].yz;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.5 0.9 1.3
+uniform  4 float4 0.2 0.6 1.0 1.4
+uniform  8 float4 0.3 0.7 1.1 1.5
+uniform 12 float4 0.4 0.8 1.2 1.6
+draw quad
+probe all rgba (0.5, 0.9, 0.6, 1.0) 1
+
+[require]
+options: column-major
+
+[pixel shader]
+uniform float4x4 m1;
+#pragma pack_matrix(row_major)
+uniform float4x4 m2;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m1[0].zw;
+    ret.zw = m2[0].zw;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.5 0.9 1.3
+uniform  4 float4 0.2 0.6 1.0 1.4
+uniform  8 float4 0.3 0.7 1.1 1.5
+uniform 12 float4 0.4 0.8 1.2 1.6
+uniform 16 float4 1.7 2.1 2.5 2.9
+uniform 20 float4 1.8 2.2 2.6 3.0
+uniform 24 float4 1.9 2.3 2.7 3.1
+uniform 28 float4 2.0 2.4 2.8 3.2
+draw quad
+probe all rgba (0.3, 0.4, 2.5, 2.9) 1
+
+[require]
+options: row-major
+
+[pixel shader]
+uniform float4x4 m1;
+#pragma pack_matrix(column_major)
+uniform float4x4 m2;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m1[3].zw;
+    ret.zw = m2[3].zw;
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.5 0.9 1.3
+uniform  4 float4 0.2 0.6 1.0 1.4
+uniform  8 float4 0.3 0.7 1.1 1.5
+uniform 12 float4 0.4 0.8 1.2 1.6
+uniform 16 float4 1.7 2.1 2.5 2.9
+uniform 20 float4 1.8 2.2 2.6 3.0
+uniform 24 float4 1.9 2.3 2.7 3.1
+uniform 28 float4 2.0 2.4 2.8 3.2
+draw quad
+probe all rgba (1.2, 1.6, 3.1, 3.2) 1
+
+[require]
+options: column-major row-major
+
+[pixel shader]
+uniform float2x2 m;
+
+float4 main() : sv_target
+{
+    float4 ret;
+    ret.xy = m[0];
+    ret.zw = m[1];
+    return ret;
+}
+
+[test]
+uniform  0 float4 0.1 0.2 0.0 0.0
+uniform  4 float4 0.3 0.4 0.0 0.0
+draw quad
+probe all rgba (0.1, 0.3, 0.2, 0.4) 1
