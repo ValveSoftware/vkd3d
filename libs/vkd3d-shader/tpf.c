@@ -3613,7 +3613,6 @@ struct sm4_register
     {
         uint32_t immconst_uint[4];
     } u;
-    unsigned int mod;
 };
 
 struct sm4_instruction
@@ -3635,6 +3634,7 @@ struct sm4_instruction
         struct sm4_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
         unsigned int swizzle;
+        unsigned int mod;
     } srcs[5];
     unsigned int src_count;
 
@@ -3920,12 +3920,12 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
         token |= (uint32_t)src->swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= src->swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
     }
-    if (src->reg.mod)
+    if (src->mod)
         token |= VKD3D_SM4_EXTENDED_OPERAND;
     put_u32(buffer, token);
 
-    if (src->reg.mod)
-        put_u32(buffer, (src->reg.mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+    if (src->mod)
+        put_u32(buffer, (src->mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
                 | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER);
 
     for (j = 0; j < src->reg.idx_count; ++j)
@@ -3946,13 +3946,22 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
     }
 }
 
-static uint32_t sm4_register_order(const struct sm4_register *reg)
+static uint32_t sm4_dst_register_order(const struct sm4_dst_register *dst)
 {
     uint32_t order = 1;
-    if (reg->type == VKD3DSPR_IMMCONST)
-        order += reg->dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
-    order += reg->idx_count;
-    if (reg->mod)
+    if (dst->reg.type == VKD3DSPR_IMMCONST)
+        order += dst->reg.dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
+    order += dst->reg.idx_count;
+    return order;
+}
+
+static uint32_t sm4_src_register_order(const struct sm4_src_register *src)
+{
+    uint32_t order = 1;
+    if (src->reg.type == VKD3DSPR_IMMCONST)
+        order += src->reg.dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
+    order += src->reg.idx_count;
+    if (src->mod)
         ++order;
     return order;
 }
@@ -3965,9 +3974,9 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
 
     size += instr->modifier_count;
     for (i = 0; i < instr->dst_count; ++i)
-        size += sm4_register_order(&instr->dsts[i].reg);
+        size += sm4_dst_register_order(&instr->dsts[i]);
     for (i = 0; i < instr->src_count; ++i)
-        size += sm4_register_order(&instr->srcs[i].reg);
+        size += sm4_src_register_order(&instr->srcs[i]);
     size += instr->idx_count;
     if (instr->byte_stride)
         ++size;
@@ -4281,7 +4290,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], src, instr.dsts[0].writemask);
-    instr.srcs[0].reg.mod = src_mod;
+    instr.srcs[0].mod = src_mod;
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
