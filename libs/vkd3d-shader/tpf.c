@@ -3610,11 +3610,7 @@ struct sm4_instruction
     struct sm4_instruction_modifier modifiers[1];
     unsigned int modifier_count;
 
-    struct sm4_dst_register
-    {
-        struct vkd3d_shader_register reg;
-        unsigned int write_mask;
-    } dsts[2];
+    struct vkd3d_shader_dst_param dsts[2];
     unsigned int dst_count;
 
     struct sm4_src_register
@@ -3794,7 +3790,7 @@ static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned i
     *writemask = instr->reg.writemask;
 }
 
-static void sm4_dst_from_node(struct sm4_dst_register *dst, const struct hlsl_ir_node *instr)
+static void sm4_dst_from_node(struct vkd3d_shader_dst_param *dst, const struct hlsl_ir_node *instr)
 {
     unsigned int swizzle_type;
 
@@ -3844,7 +3840,7 @@ static void sm4_src_from_node(struct sm4_src_register *src,
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
-static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct sm4_dst_register *dst)
+static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vkd3d_shader_dst_param *dst)
 {
     const struct vkd3d_sm4_register_type_info *register_type_info;
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
@@ -3934,7 +3930,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
     }
 }
 
-static uint32_t sm4_dst_register_order(const struct sm4_dst_register *dst)
+static uint32_t vkd3d_shader_dst_param_order(const struct vkd3d_shader_dst_param *dst)
 {
     uint32_t order = 1;
     if (dst->reg.type == VKD3DSPR_IMMCONST)
@@ -3962,7 +3958,7 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
 
     size += instr->modifier_count;
     for (i = 0; i < instr->dst_count; ++i)
-        size += sm4_dst_register_order(&instr->dsts[i]);
+        size += vkd3d_shader_dst_param_order(&instr->dsts[i]);
     for (i = 0; i < instr->src_count; ++i)
         size += sm4_src_register_order(&instr->srcs[i]);
     size += instr->idx_count;
