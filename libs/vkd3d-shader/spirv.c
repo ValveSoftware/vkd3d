@@ -6146,9 +6146,6 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
         spirv_compiler_emit_input(compiler, dst);
     else
         spirv_compiler_emit_input_register(compiler, dst);
-
-    if (dst->reg.type == VKD3DSPR_OUTCONTROLPOINT)
-        compiler->use_vocp = true;
 }
 
 static void spirv_compiler_emit_dcl_input_sysval(struct spirv_compiler *compiler,
@@ -9722,6 +9719,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     memset(&shader_desc->input_signature, 0, sizeof(shader_desc->input_signature));
     memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
     memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
+    compiler->use_vocp = parser->shader_desc.use_vocp;
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);

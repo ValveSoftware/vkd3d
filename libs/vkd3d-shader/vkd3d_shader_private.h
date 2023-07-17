@@ -958,6 +958,8 @@ struct vkd3d_shader_desc
     {
         uint32_t used, external;
     } flat_constant_count[3];
+
+    bool use_vocp;
 };
 
 struct vkd3d_shader_register_semantic

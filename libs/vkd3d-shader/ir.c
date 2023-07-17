@@ -550,6 +550,8 @@ struct io_normaliser
     uint8_t input_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
     uint8_t output_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
     uint8_t pc_range_map[MAX_REG_OUTPUT][VKD3D_VEC4_SIZE];
+
+    bool use_vocp;
 };
 
 static bool io_normaliser_is_in_fork_or_join_phase(const struct io_normaliser *normaliser)
@@ -1031,6 +1033,10 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
             {
                 reg = &ins->declaration.dst.reg;
+
+                if (reg->type == VKD3DSPR_OUTCONTROLPOINT)
+                    normaliser->use_vocp = true;
+
                 /* We don't need to keep OUTCONTROLPOINT or PATCHCONST input declarations since their
                 * equivalents were declared earlier, but INCONTROLPOINT may be the first occurrence. */
                 if (reg->type == VKD3DSPR_OUTCONTROLPOINT || reg->type == VKD3DSPR_PATCHCONST)
@@ -1138,6 +1144,7 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
         shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
 
     parser->instructions = normaliser.instructions;
+    parser->shader_desc.use_vocp = normaliser.use_vocp;
     return VKD3D_OK;
 }
 
