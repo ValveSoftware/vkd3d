@@ -4862,7 +4862,6 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
             spirv_compiler_emit_input_register(compiler, dst);
             return;
         case VKD3DSPR_OUTPOINTID: /* Emitted in spirv_compiler_emit_initial_declarations(). */
-        case VKD3DSPR_OUTCONTROLPOINT: /* See spirv_compiler_leave_shader_phase(). */
             return;
         default:
             FIXME("Unhandled shader phase input register %#x.\n", reg->type);
