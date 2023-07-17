@@ -3613,7 +3613,7 @@ struct sm4_instruction
     struct sm4_dst_register
     {
         struct vkd3d_shader_register reg;
-        unsigned int writemask;
+        unsigned int write_mask;
     } dsts[2];
     unsigned int dst_count;
 
@@ -3798,7 +3798,7 @@ static void sm4_dst_from_node(struct sm4_dst_register *dst, const struct hlsl_ir
 {
     unsigned int swizzle_type;
 
-    sm4_register_from_node(&dst->reg, &dst->writemask, &swizzle_type, instr);
+    sm4_register_from_node(&dst->reg, &dst->write_mask, &swizzle_type, instr);
 }
 
 static void sm4_src_from_constant_value(struct sm4_src_register *src,
@@ -3869,7 +3869,7 @@ static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct sm
     token |= dst->reg.idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
     token |= reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
     if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
-        token |= dst->writemask << VKD3D_SM4_WRITEMASK_SHIFT;
+        token |= dst->write_mask << VKD3D_SM4_WRITEMASK_SHIFT;
     put_u32(buffer, token);
 
     for (j = 0; j < dst->reg.idx_count; ++j)
@@ -4152,14 +4152,14 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
         {
             instr.dsts[0].reg.idx_count = 0;
         }
-        instr.dsts[0].writemask = (1 << var->data_type->dimx) - 1;
+        instr.dsts[0].write_mask = (1 << var->data_type->dimx) - 1;
     }
     else
     {
         instr.dsts[0].reg.type = output ? VKD3DSPR_OUTPUT : VKD3DSPR_INPUT;
         instr.dsts[0].reg.idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
         instr.dsts[0].reg.idx_count = 1;
-        instr.dsts[0].writemask = var->regs[HLSL_REGSET_NUMERIC].writemask;
+        instr.dsts[0].write_mask = var->regs[HLSL_REGSET_NUMERIC].writemask;
     }
 
     if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
@@ -4277,7 +4277,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[0].write_mask);
     instr.srcs[0].mod = src_mod;
     instr.src_count = 1;
 
@@ -4300,7 +4300,7 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
-    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[dst_idx].writemask);
+    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[dst_idx].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4317,8 +4317,8 @@ static void write_sm4_binary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opc
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].writemask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].write_mask);
+    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4360,8 +4360,8 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[dst_idx].writemask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[dst_idx].writemask);
+    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[dst_idx].write_mask);
+    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[dst_idx].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4379,9 +4379,9 @@ static void write_sm4_ternary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_op
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].writemask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].writemask);
-    sm4_src_from_node(&instr.srcs[2], src3, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].write_mask);
+    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].write_mask);
+    sm4_src_from_node(&instr.srcs[2], src3, instr.dsts[0].write_mask);
     instr.src_count = 3;
 
     write_sm4_instruction(tpf, &instr);
@@ -4432,7 +4432,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
 
     sm4_src_from_node(&instr.srcs[0], coords, coords_writemask);
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
 
     instr.src_count = 2;
 
@@ -4520,7 +4520,7 @@ static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
     sm4_src_from_deref(tpf->ctx, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 3;
 
@@ -4562,7 +4562,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[0], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[0], resource, instr.dsts[0].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4585,7 +4585,7 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], load->lod.node, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4607,7 +4607,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     sm4_dst_from_node(&instr.dsts[0], &expr->node);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].write_mask);
     instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
     instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
     instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
@@ -4734,7 +4734,7 @@ static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
 
-    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, dst);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].write_mask, NULL, dst);
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
@@ -5276,19 +5276,19 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
 
         instr.opcode = VKD3D_SM4_OP_MOVC;
 
-        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
+        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
 
         memset(&value, 0xff, sizeof(value));
-        sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].writemask);
+        sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].write_mask);
         memset(&value, 0, sizeof(value));
-        sm4_src_from_constant_value(&instr.srcs[2], &value, type->dimx, instr.dsts[0].writemask);
+        sm4_src_from_constant_value(&instr.srcs[2], &value, type->dimx, instr.dsts[0].write_mask);
         instr.src_count = 3;
     }
     else
     {
         instr.opcode = VKD3D_SM4_OP_MOV;
 
-        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
+        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
         instr.src_count = 1;
     }
 
@@ -5341,7 +5341,7 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
         }
     }
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].write_mask);
 
     src = &instr.srcs[instr.src_count++];
     sm4_src_from_deref(tpf->ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
@@ -5447,10 +5447,10 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
     instr.opcode = VKD3D_SM4_OP_MOV;
 
     sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs);
-    instr.dsts[0].writemask = hlsl_combine_writemasks(writemask, store->writemask);
+    instr.dsts[0].write_mask = hlsl_combine_writemasks(writemask, store->writemask);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], rhs, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[0], rhs, instr.dsts[0].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -5469,7 +5469,7 @@ static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir
 
     sm4_register_from_node(&instr.srcs[0].reg, &writemask, &instr.srcs[0].swizzle_type, swizzle->val.node);
     instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
-            swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].writemask);
+            swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
