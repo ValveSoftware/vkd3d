@@ -1071,24 +1071,22 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
     }
 }
 
-static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
-        enum vkd3d_shader_type shader_type, struct shader_signature *input_signature,
-        struct shader_signature *output_signature, struct shader_signature *patch_constant_signature)
+static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parser *parser)
 {
-    struct io_normaliser normaliser = {*instructions};
+    struct io_normaliser normaliser = {parser->instructions};
     struct vkd3d_shader_instruction *ins;
     bool has_control_point_phase;
     unsigned int i, j;
 
     normaliser.phase = VKD3DSIH_INVALID;
-    normaliser.shader_type = shader_type;
-    normaliser.input_signature = input_signature;
-    normaliser.output_signature = output_signature;
-    normaliser.patch_constant_signature = patch_constant_signature;
+    normaliser.shader_type = parser->shader_version.type;
+    normaliser.input_signature = &parser->shader_desc.input_signature;
+    normaliser.output_signature = &parser->shader_desc.output_signature;
+    normaliser.patch_constant_signature = &parser->shader_desc.patch_constant_signature;
 
-    for (i = 0, has_control_point_phase = false; i < instructions->count; ++i)
+    for (i = 0, has_control_point_phase = false; i < parser->instructions.count; ++i)
     {
-        ins = &instructions->elements[i];
+        ins = &parser->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -1127,11 +1125,11 @@ static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_s
         }
     }
 
-    if (!shader_signature_merge(input_signature, normaliser.input_range_map, false)
-            || !shader_signature_merge(output_signature, normaliser.output_range_map, false)
-            || !shader_signature_merge(patch_constant_signature, normaliser.pc_range_map, true))
+    if (!shader_signature_merge(&parser->shader_desc.input_signature, normaliser.input_range_map, false)
+            || !shader_signature_merge(&parser->shader_desc.output_signature, normaliser.output_range_map, false)
+            || !shader_signature_merge(&parser->shader_desc.patch_constant_signature, normaliser.pc_range_map, true))
     {
-        *instructions = normaliser.instructions;
+        parser->instructions = normaliser.instructions;
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
@@ -1139,7 +1137,7 @@ static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_s
     for (i = 0; i < normaliser.instructions.count; ++i)
         shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
 
-    *instructions = normaliser.instructions;
+    parser->instructions = normaliser.instructions;
     return VKD3D_OK;
 }
 
@@ -1444,9 +1442,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
                 &parser->shader_desc.input_signature);
     }
     if (result >= 0)
-        result = instruction_array_normalise_io_registers(instructions, parser->shader_version.type,
-                &parser->shader_desc.input_signature, &parser->shader_desc.output_signature,
-                &parser->shader_desc.patch_constant_signature);
+        result = shader_normalise_io_registers(parser);
 
     if (result >= 0)
         result = instruction_array_normalise_flat_constants(parser);
