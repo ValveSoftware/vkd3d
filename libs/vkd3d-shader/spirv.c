@@ -2141,14 +2141,22 @@ static void vkd3d_symbol_make_register(struct vkd3d_symbol *symbol,
     symbol->type = VKD3D_SYMBOL_REGISTER;
     memset(&symbol->key, 0, sizeof(symbol->key));
     symbol->key.reg.type = reg->type;
-    if (vkd3d_shader_register_is_input(reg) || vkd3d_shader_register_is_output(reg)
-            || vkd3d_shader_register_is_patch_constant(reg))
+
+    switch (reg->type)
     {
-        symbol->key.reg.idx = reg->idx_count ? reg->idx[reg->idx_count - 1].offset : ~0u;
-        assert(!reg->idx_count || symbol->key.reg.idx != ~0u);
+        case VKD3DSPR_INPUT:
+        case VKD3DSPR_OUTPUT:
+        case VKD3DSPR_PATCHCONST:
+            symbol->key.reg.idx = reg->idx_count ? reg->idx[reg->idx_count - 1].offset : ~0u;
+            assert(!reg->idx_count || symbol->key.reg.idx != ~0u);
+            break;
+
+        case VKD3DSPR_IMMCONSTBUFFER:
+            break;
+
+        default:
+            symbol->key.reg.idx = reg->idx_count ? reg->idx[0].offset : ~0u;
     }
-    else if (reg->type != VKD3DSPR_IMMCONSTBUFFER)
-        symbol->key.reg.idx = reg->idx_count ? reg->idx[0].offset : ~0u;
 }
 
 static void vkd3d_symbol_set_register_info(struct vkd3d_symbol *symbol,
@@ -3046,9 +3054,6 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
             break;
         case VKD3DSPR_INPUT:
             snprintf(buffer, buffer_size, "v%u", idx);
-            break;
-        case VKD3DSPR_INCONTROLPOINT:
-            snprintf(buffer, buffer_size, "vicp%u", idx);
             break;
         case VKD3DSPR_OUTPUT:
             snprintf(buffer, buffer_size, "o%u", idx);
@@ -4514,8 +4519,7 @@ static const struct vkd3d_spirv_builtin *vkd3d_get_spirv_builtin(const struct sp
     if ((builtin = get_spirv_builtin_for_register(reg_type)))
         return builtin;
 
-    if (sysval != VKD3D_SIV_NONE || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_COLOROUT
-            && reg_type != VKD3DSPR_PATCHCONST))
+    if (sysval != VKD3D_SIV_NONE || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_PATCHCONST))
         FIXME("Unhandled builtin (register type %#x, sysval %#x).\n", reg_type, sysval);
     return NULL;
 }
@@ -4884,7 +4888,6 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
     switch (reg->type)
     {
         case VKD3DSPR_INPUT:
-        case VKD3DSPR_INCONTROLPOINT:
         case VKD3DSPR_PATCHCONST:
             spirv_compiler_emit_input(compiler, dst);
             return;
@@ -6175,7 +6178,7 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
 
     if (spirv_compiler_get_current_shader_phase(compiler))
         spirv_compiler_emit_shader_phase_input(compiler, dst);
-    else if (vkd3d_shader_register_is_input(&dst->reg) || dst->reg.type == VKD3DSPR_PATCHCONST)
+    else if (dst->reg.type == VKD3DSPR_INPUT || dst->reg.type == VKD3DSPR_PATCHCONST)
         spirv_compiler_emit_input(compiler, dst);
     else
         spirv_compiler_emit_input_register(compiler, dst);
@@ -6192,8 +6195,8 @@ static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
 {
     const struct vkd3d_shader_dst_param *dst = &instruction->declaration.dst;
 
-    if (vkd3d_shader_register_is_output(&dst->reg)
-            || (is_in_fork_or_join_phase(compiler) && vkd3d_shader_register_is_patch_constant(&dst->reg)))
+    if (dst->reg.type == VKD3DSPR_OUTPUT
+            || (is_in_fork_or_join_phase(compiler) && dst->reg.type == VKD3DSPR_PATCHCONST))
         spirv_compiler_emit_output(compiler, dst);
     else
         spirv_compiler_emit_output_register(compiler, dst);

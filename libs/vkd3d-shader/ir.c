@@ -876,11 +876,13 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
     else if (reg->type == VKD3DSPR_OUTPUT || dst_param->reg.type == VKD3DSPR_COLOROUT)
     {
         signature = normaliser->output_signature;
+        reg->type = VKD3DSPR_OUTPUT;
         dcl_params = normaliser->output_dcl_params;
     }
     else if (dst_param->reg.type == VKD3DSPR_INCONTROLPOINT || dst_param->reg.type == VKD3DSPR_INPUT)
     {
         signature = normaliser->input_signature;
+        reg->type = VKD3DSPR_INPUT;
         dcl_params = normaliser->input_dcl_params;
     }
     else
@@ -980,15 +982,13 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
             signature = normaliser->patch_constant_signature;
             break;
         case VKD3DSPR_INCONTROLPOINT:
-            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
-                reg->type = VKD3DSPR_INPUT;
+            reg->type = VKD3DSPR_INPUT;
             /* fall through */
         case VKD3DSPR_INPUT:
             signature = normaliser->input_signature;
             break;
         case VKD3DSPR_OUTCONTROLPOINT:
-            if (normaliser->shader_type == VKD3D_SHADER_TYPE_HULL)
-                reg->type = VKD3DSPR_OUTPUT;
+            reg->type = VKD3DSPR_OUTPUT;
             /* fall through */
         case VKD3DSPR_OUTPUT:
             signature = normaliser->output_signature;
