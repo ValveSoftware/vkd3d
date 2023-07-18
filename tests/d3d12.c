@@ -3175,6 +3175,481 @@ static void test_create_graphics_pipeline_state(void)
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
 }
 
+static void test_create_pipeline_state(void)
+{
+    D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
+    ID3D12RootSignature *root_signature;
+    ID3D12PipelineState *pipeline_state;
+    ID3D12Device2 *device2;
+    ID3D12Device *device;
+    unsigned int i;
+    ULONG refcount;
+    HRESULT hr;
+
+    static const char cs_code[] =
+        "[numthreads(1, 1, 1)]\n"
+        "void main() { }\n";
+
+    static const char vs_code[] =
+        "float4 main(float4 pos : POS) : SV_POSITION\n"
+        "{\n"
+        "    return pos;\n"
+        "}\n";
+
+    static const char ps_code[] =
+        "float4 main() : SV_TARGET\n"
+        "{\n"
+        "    return float4(1.0f, 1.0f, 1.0f, 1.0f);\n"
+        "}\n";
+
+    struct d3d12_root_signature_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        ID3D12RootSignature *root_signature;
+    };
+
+    struct d3d12_shader_bytecode_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_SHADER_BYTECODE shader_bytecode;
+    };
+
+    struct d3d12_stream_output_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_STREAM_OUTPUT_DESC stream_output_desc;
+    };
+
+    struct d3d12_blend_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_BLEND_DESC blend_desc;
+    };
+
+    struct d3d12_sample_mask_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        UINT sample_mask;
+    };
+
+    struct d3d12_rasterizer_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_RASTERIZER_DESC rasterizer_desc;
+    };
+
+    struct d3d12_depth_stencil_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_DEPTH_STENCIL_DESC depth_stencil_desc;
+    };
+
+    struct d3d12_input_layout_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_INPUT_LAYOUT_DESC input_layout;
+    };
+
+    struct d3d12_ib_strip_cut_value_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_INDEX_BUFFER_STRIP_CUT_VALUE strip_cut_value;
+    };
+
+    struct d3d12_primitive_topology_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
+    };
+
+    struct d3d12_render_target_formats_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_RT_FORMAT_ARRAY render_target_formats;
+    };
+
+    struct d3d12_depth_stencil_format_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        DXGI_FORMAT depth_stencil_format;
+    };
+
+    struct d3d12_sample_desc_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        DXGI_SAMPLE_DESC sample_desc;
+    };
+
+    struct d3d12_node_mask_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        UINT node_mask;
+    };
+
+    struct d3d12_cached_pso_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_CACHED_PIPELINE_STATE cached_pso;
+    };
+
+    struct d3d12_flags_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_PIPELINE_STATE_FLAGS flags;
+    };
+
+    struct d3d12_depth_stencil1_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_DEPTH_STENCIL_DESC1 depth_stencil_desc;
+    };
+
+    struct d3d12_view_instancing_subobject
+    {
+        DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
+        D3D12_VIEW_INSTANCING_DESC view_instancing_desc;
+    };
+
+    static const struct d3d12_root_signature_subobject root_signature_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE,
+        NULL, /* fill in dynamically */
+    };
+
+    D3D12_SHADER_BYTECODE cs = shader_bytecode_from_blob(compile_shader(cs_code, sizeof(cs_code) - 1, "cs_4_0"));
+    D3D12_SHADER_BYTECODE ps = shader_bytecode_from_blob(compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0"));
+    D3D12_SHADER_BYTECODE vs = shader_bytecode_from_blob(compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0"));
+    const struct d3d12_shader_bytecode_subobject vs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, vs };
+    const struct d3d12_shader_bytecode_subobject ps_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, ps };
+    const struct d3d12_shader_bytecode_subobject cs_subobject = { D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS, cs };
+
+    static const D3D12_SO_DECLARATION_ENTRY so_entries[] =
+    {
+        { 0, "SV_POSITION", 0, 0, 4, 0 },
+    };
+
+    static const UINT so_strides[] = { 16u };
+
+    static const struct d3d12_stream_output_subobject stream_output_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_STREAM_OUTPUT,
+        {   so_entries, ARRAY_SIZE(so_entries),
+            so_strides, ARRAY_SIZE(so_strides),
+            D3D12_SO_NO_RASTERIZED_STREAM },
+    };
+
+    static const struct d3d12_blend_subobject blend_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND,
+        {   FALSE, TRUE,
+            {{  FALSE, FALSE,
+                D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+                D3D12_LOGIC_OP_NOOP, 0xf }},
+        }
+    };
+
+    static const struct d3d12_sample_mask_subobject sample_mask_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK,
+        0xffffffffu
+    };
+
+    static const struct d3d12_rasterizer_subobject rasterizer_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER,
+        {   D3D12_FILL_MODE_SOLID, D3D12_CULL_MODE_BACK,
+            FALSE, 0, 0.0f, 0.0f, TRUE, FALSE, FALSE, 0,
+            D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF },
+    };
+
+    static const struct d3d12_depth_stencil_subobject depth_stencil_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL,
+        {   TRUE, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_LESS_EQUAL, TRUE, 0xff, 0xff,
+            {   D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_INCR, D3D12_COMPARISON_FUNC_EQUAL },
+            {   D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_INCR, D3D12_COMPARISON_FUNC_EQUAL } },
+    };
+
+    static const D3D12_INPUT_ELEMENT_DESC input_elements[] =
+    {
+        { "POS", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+    };
+
+    static const struct d3d12_input_layout_subobject input_layout_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT,
+        { input_elements, ARRAY_SIZE(input_elements) },
+    };
+
+    static const struct d3d12_ib_strip_cut_value_subobject ib_strip_cut_value_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_IB_STRIP_CUT_VALUE,
+        D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_0xFFFFFFFF,
+    };
+
+    static const struct d3d12_primitive_topology_subobject primitive_topology_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY,
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+    };
+
+    static const struct d3d12_render_target_formats_subobject render_target_formats_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS,
+        { { DXGI_FORMAT_R8G8B8A8_UNORM }, 1 },
+    };
+
+    static const struct d3d12_depth_stencil_format_subobject depth_stencil_format_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT,
+        DXGI_FORMAT_D32_FLOAT_S8X24_UINT,
+    };
+
+    static const struct d3d12_sample_desc_subobject sample_desc_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC,
+        { 1, 0 },
+    };
+
+    static const struct d3d12_node_mask_subobject node_mask_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_NODE_MASK,
+        0x0,
+    };
+
+    static const struct d3d12_cached_pso_subobject cached_pso_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CACHED_PSO,
+        { NULL, 0 },
+    };
+
+    static const struct d3d12_flags_subobject flags_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_FLAGS,
+        D3D12_PIPELINE_STATE_FLAG_NONE,
+    };
+
+    static const struct d3d12_depth_stencil1_subobject depth_stencil1_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1,
+        {   TRUE, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_LESS_EQUAL, TRUE, 0xff, 0xff,
+            {   D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_INCR, D3D12_COMPARISON_FUNC_EQUAL },
+            {   D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_INCR, D3D12_COMPARISON_FUNC_EQUAL } },
+    };
+
+    static const struct d3d12_view_instancing_subobject view_instancing_subobject =
+    {
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING,
+        { 0, NULL, D3D12_VIEW_INSTANCING_FLAG_NONE },
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject vertex_shader;
+        struct d3d12_shader_bytecode_subobject pixel_shader;
+        struct d3d12_blend_subobject blend;
+        struct d3d12_sample_mask_subobject sample_mask;
+        struct d3d12_rasterizer_subobject rasterizer;
+        struct d3d12_depth_stencil1_subobject depth_stencil;
+        struct d3d12_input_layout_subobject input_layout;
+        struct d3d12_ib_strip_cut_value_subobject strip_cut;
+        struct d3d12_primitive_topology_subobject primitive_topology;
+        struct d3d12_render_target_formats_subobject render_target_formats;
+        struct d3d12_depth_stencil_format_subobject depth_stencil_format;
+        struct d3d12_sample_desc_subobject sample_desc;
+        struct d3d12_node_mask_subobject node_mask;
+        struct d3d12_cached_pso_subobject cached_pso;
+        struct d3d12_flags_subobject flags;
+        struct d3d12_view_instancing_subobject view_instancing;
+    }
+    pipeline_desc_1 =
+    {
+        root_signature_subobject,
+        vs_subobject,
+        ps_subobject,
+        blend_subobject,
+        sample_mask_subobject,
+        rasterizer_subobject,
+        depth_stencil1_subobject,
+        input_layout_subobject,
+        ib_strip_cut_value_subobject,
+        primitive_topology_subobject,
+        render_target_formats_subobject,
+        depth_stencil_format_subobject,
+        sample_desc_subobject,
+        node_mask_subobject,
+        cached_pso_subobject,
+        flags_subobject,
+        view_instancing_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject compute_shader;
+    }
+    pipeline_desc_2 =
+    {
+        root_signature_subobject, cs_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject vertex_shader;
+        struct d3d12_stream_output_subobject stream_output;
+        struct d3d12_input_layout_subobject input_layout;
+    }
+    pipeline_desc_3 =
+    {
+        root_signature_subobject, vs_subobject, stream_output_subobject,
+        input_layout_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+    }
+    pipeline_desc_4 =
+    {
+        root_signature_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject cs;
+        struct d3d12_shader_bytecode_subobject vs;
+    }
+    pipeline_desc_5 =
+    {
+        root_signature_subobject, cs_subobject, vs_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject cs;
+        struct d3d12_shader_bytecode_subobject ps;
+        struct d3d12_rasterizer_subobject rasterizer;
+    }
+    pipeline_desc_6 =
+    {
+        root_signature_subobject, cs_subobject, ps_subobject,
+        rasterizer_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_depth_stencil_subobject depth_stencil;
+        struct d3d12_depth_stencil_format_subobject depth_stencil_format;
+        struct d3d12_input_layout_subobject input_layout;
+        struct d3d12_shader_bytecode_subobject vertex_shader;
+    }
+    pipeline_desc_7 =
+    {
+        root_signature_subobject, depth_stencil_subobject, depth_stencil_format_subobject,
+        input_layout_subobject, vs_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject cs;
+        struct d3d12_shader_bytecode_subobject cs2;
+    }
+    pipeline_desc_8 =
+    {
+        root_signature_subobject, cs_subobject, cs_subobject,
+    };
+
+    struct
+    {
+        struct d3d12_root_signature_subobject root_signature;
+        struct d3d12_shader_bytecode_subobject vs;
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE extra_type;
+    }
+    pipeline_desc_9 =
+    {
+        root_signature_subobject, vs_subobject,
+        D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL
+    };
+
+    struct
+    {
+        D3D12_PIPELINE_STATE_STREAM_DESC stream_desc;
+        HRESULT expected_result;
+    }
+    tests[] =
+    {
+        { { sizeof(pipeline_desc_1), &pipeline_desc_1 }, S_OK },
+        { { sizeof(pipeline_desc_2), &pipeline_desc_2 }, S_OK },
+        { { sizeof(pipeline_desc_3), &pipeline_desc_3 }, S_OK },
+        { { sizeof(pipeline_desc_4), &pipeline_desc_4 }, E_INVALIDARG },
+        { { sizeof(pipeline_desc_5), &pipeline_desc_5 }, E_INVALIDARG },
+        { { sizeof(pipeline_desc_6), &pipeline_desc_6 }, S_OK },
+        { { sizeof(pipeline_desc_7), &pipeline_desc_7 }, S_OK },
+        { { sizeof(pipeline_desc_8), &pipeline_desc_8 }, E_INVALIDARG },
+        { { sizeof(pipeline_desc_9), &pipeline_desc_9 }, E_INVALIDARG },
+    };
+
+    if (!(device = create_device()))
+    {
+        skip("Failed to create device.\n");
+        return;
+    }
+
+    if (ID3D12Device_QueryInterface(device, &IID_ID3D12Device2, (void **)&device2))
+    {
+        skip("ID3D12Device2 not supported.\n");
+        ID3D12Device_Release(device);
+        return;
+    }
+
+    root_signature_desc.NumParameters = 0;
+    root_signature_desc.pParameters = NULL;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_STREAM_OUTPUT |
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        struct d3d12_root_signature_subobject *rs_subobject;
+        vkd3d_test_push_context("Test %u", i);
+
+        /* Assign root signature. To keep things simple, assume that the root
+         * signature is always the first element in each pipeline stream */
+        rs_subobject = tests[i].stream_desc.pPipelineStateSubobjectStream;
+
+        if (rs_subobject && rs_subobject->type == D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE)
+            rs_subobject->root_signature = root_signature;
+
+        hr = ID3D12Device2_CreatePipelineState(device2, &tests[i].stream_desc, &IID_ID3D12PipelineState, (void **)&pipeline_state);
+        ok(hr == tests[i].expected_result, "Got unexpected return value %#x.\n", hr);
+
+        if (hr == S_OK)
+        {
+            refcount = ID3D12PipelineState_Release(pipeline_state);
+            ok(!refcount, "ID3D12PipelineState has %u references left.\n", (unsigned int)refcount);
+        }
+
+        vkd3d_test_pop_context();
+    }
+
+    refcount = ID3D12RootSignature_Release(root_signature);
+    ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+    refcount = ID3D12Device2_Release(device2);
+    ok(refcount == 1, "ID3D12Device2 has %u references left.\n", (unsigned int)refcount);
+    refcount = ID3D12Device_Release(device);
+    ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
+}
+
 static void test_create_fence(void)
 {
     ID3D12Device *device, *tmp_device;
@@ -36992,6 +37467,7 @@ START_TEST(d3d12)
     run_test(test_root_signature_limits);
     run_test(test_create_compute_pipeline_state);
     run_test(test_create_graphics_pipeline_state);
+    run_test(test_create_pipeline_state);
     run_test(test_create_fence);
     run_test(test_object_interface);
     run_test(test_multithread_private_data);
