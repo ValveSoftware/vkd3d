@@ -35,13 +35,14 @@
 #include <term.h>
 #endif
 
-#define MAX_COMPILE_OPTIONS 4
+#define MAX_COMPILE_OPTIONS 5
 
 enum
 {
     OPTION_HELP = CHAR_MAX + 1,
     OPTION_BUFFER_UAV,
     OPTION_ENTRY,
+    OPTION_MATRIX_STORAGE_ORDER,
     OPTION_OUTPUT,
     OPTION_PRINT_SOURCE_TYPES,
     OPTION_PRINT_TARGET_TYPES,
@@ -184,6 +185,9 @@ static void print_usage(const char *program_name)
         "  --buffer-uav=<type>   Specify the buffer type to use for buffer UAV bindings.\n"
         "                        Valid values are 'buffer-texture' (default) and\n"
         "                        'storage-buffer'.\n"
+        "  --matrix-storage-order=<order>\n"
+        "                        Specify default matrix storage order. Valid values are\n"
+        "                        'column' (default) and 'row'.\n"
         "  -e, --entry=<name>    Use <name> as the entry point (default is \"main\").\n"
         "  -E                    Preprocess the source code instead of compiling it.\n"
         "  -o, --output=<file>   Write the output to <file>. If <file> is '-' or no\n"
@@ -332,6 +336,23 @@ static bool parse_formatting(uint32_t *formatting, bool *colour, char *arg)
     return true;
 }
 
+static bool parse_matrix_storage_order(enum vkd3d_shader_compile_option_pack_matrix_order *order, const char *arg)
+{
+    if (!strcmp(arg, "column"))
+    {
+        *order = VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR;
+        return true;
+    }
+
+    if (!strcmp(arg, "row"))
+    {
+        *order = VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR;
+        return true;
+    }
+
+    return false;
+}
+
 static enum vkd3d_shader_source_type parse_source_type(const char *source)
 {
     unsigned int i;
@@ -418,22 +439,24 @@ static bool validate_target_type(
 
 static bool parse_command_line(int argc, char **argv, struct options *options)
 {
+    enum vkd3d_shader_compile_option_pack_matrix_order pack_matrix_order;
     enum vkd3d_shader_compile_option_buffer_uav buffer_uav;
     int option;
 
     static struct option long_options[] =
     {
-        {"help",               no_argument,       NULL, OPTION_HELP},
-        {"buffer-uav",         required_argument, NULL, OPTION_BUFFER_UAV},
-        {"entry",              required_argument, NULL, OPTION_ENTRY},
-        {"output",             required_argument, NULL, OPTION_OUTPUT},
-        {"formatting",         required_argument, NULL, OPTION_TEXT_FORMATTING},
-        {"print-source-types", no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
-        {"print-target-types", no_argument,       NULL, OPTION_PRINT_TARGET_TYPES},
-        {"profile",            required_argument, NULL, OPTION_PROFILE},
-        {"strip-debug",        no_argument,       NULL, OPTION_STRIP_DEBUG},
-        {"version",            no_argument,       NULL, OPTION_VERSION},
-        {NULL,                 0,                 NULL, 0},
+        {"help",                 no_argument,       NULL, OPTION_HELP},
+        {"buffer-uav",           required_argument, NULL, OPTION_BUFFER_UAV},
+        {"entry",                required_argument, NULL, OPTION_ENTRY},
+        {"matrix-storage-order", required_argument, NULL, OPTION_MATRIX_STORAGE_ORDER},
+        {"output",               required_argument, NULL, OPTION_OUTPUT},
+        {"formatting",           required_argument, NULL, OPTION_TEXT_FORMATTING},
+        {"print-source-types",   no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
+        {"print-target-types",   no_argument,       NULL, OPTION_PRINT_TARGET_TYPES},
+        {"profile",              required_argument, NULL, OPTION_PROFILE},
+        {"strip-debug",          no_argument,       NULL, OPTION_STRIP_DEBUG},
+        {"version",              no_argument,       NULL, OPTION_VERSION},
+        {NULL,                   0,                 NULL, 0},
     };
 
     memset(options, 0, sizeof(*options));
@@ -483,6 +506,15 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
             case OPTION_OUTPUT:
             case 'o':
                 options->output_filename = optarg;
+                break;
+
+            case OPTION_MATRIX_STORAGE_ORDER:
+                if (!parse_matrix_storage_order(&pack_matrix_order, optarg))
+                {
+                    fprintf(stderr, "Invalid matrix storage order '%s' specified.\n", optarg);
+                    return false;
+                }
+                add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER, pack_matrix_order);
                 break;
 
             case OPTION_PROFILE:
