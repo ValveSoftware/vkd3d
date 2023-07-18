@@ -4880,28 +4880,6 @@ static void spirv_compiler_emit_input_register(struct spirv_compiler *compiler,
     spirv_compiler_emit_register_debug_name(builder, input_id, reg);
 }
 
-static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_dst_param *dst)
-{
-    const struct vkd3d_shader_register *reg = &dst->reg;
-
-    switch (reg->type)
-    {
-        case VKD3DSPR_INPUT:
-        case VKD3DSPR_PATCHCONST:
-            spirv_compiler_emit_input(compiler, dst);
-            return;
-        case VKD3DSPR_PRIMID:
-            spirv_compiler_emit_input_register(compiler, dst);
-            return;
-        case VKD3DSPR_OUTPOINTID: /* Emitted in spirv_compiler_emit_initial_declarations(). */
-            return;
-        default:
-            FIXME("Unhandled shader phase input register %#x.\n", reg->type);
-            return;
-    }
-}
-
 static unsigned int get_shader_output_swizzle(const struct spirv_compiler *compiler,
         unsigned int register_idx)
 {
@@ -6176,11 +6154,10 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
 {
     const struct vkd3d_shader_dst_param *dst = &instruction->declaration.dst;
 
-    if (spirv_compiler_get_current_shader_phase(compiler))
-        spirv_compiler_emit_shader_phase_input(compiler, dst);
-    else if (dst->reg.type == VKD3DSPR_INPUT || dst->reg.type == VKD3DSPR_PATCHCONST)
+    /* OUTPOINTID is handled in spirv_compiler_emit_hull_shader_builtins(). */
+    if (dst->reg.type == VKD3DSPR_INPUT || dst->reg.type == VKD3DSPR_PATCHCONST)
         spirv_compiler_emit_input(compiler, dst);
-    else
+    else if (dst->reg.type != VKD3DSPR_OUTPOINTID)
         spirv_compiler_emit_input_register(compiler, dst);
 }
 
