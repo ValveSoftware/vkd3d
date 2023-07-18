@@ -510,6 +510,8 @@ enum vkd3d_sm4_swizzle_type
     VKD3D_SM4_SWIZZLE_NONE            = 0x0, /* swizzle bitfield contains a mask */
     VKD3D_SM4_SWIZZLE_VEC4            = 0x1,
     VKD3D_SM4_SWIZZLE_SCALAR          = 0x2,
+
+    VKD3D_SM4_SWIZZLE_INVALID          = ~0u,
 };
 
 enum vkd3d_sm4_dimension
@@ -1526,6 +1528,9 @@ struct vkd3d_sm4_register_type_info
 {
     enum vkd3d_sm4_register_type sm4_type;
     enum vkd3d_shader_register_type vkd3d_type;
+
+    /* Swizzle type to be used for src registers when their dimension is VKD3D_SM4_DIMENSION_VEC4. */
+    enum vkd3d_sm4_swizzle_type default_src_swizzle_type;
 };
 
 static const enum vkd3d_shader_register_precision register_precision_table[] =
@@ -1565,42 +1570,42 @@ static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
 
     static const struct vkd3d_sm4_register_type_info register_type_table[] =
     {
-        {VKD3D_SM4_RT_TEMP,                    VKD3DSPR_TEMP},
-        {VKD3D_SM4_RT_INPUT,                   VKD3DSPR_INPUT},
-        {VKD3D_SM4_RT_OUTPUT,                  VKD3DSPR_OUTPUT},
-        {VKD3D_SM4_RT_INDEXABLE_TEMP,          VKD3DSPR_IDXTEMP},
-        {VKD3D_SM4_RT_IMMCONST,                VKD3DSPR_IMMCONST},
-        {VKD3D_SM4_RT_IMMCONST64,              VKD3DSPR_IMMCONST64},
-        {VKD3D_SM4_RT_SAMPLER,                 VKD3DSPR_SAMPLER},
-        {VKD3D_SM4_RT_RESOURCE,                VKD3DSPR_RESOURCE},
-        {VKD3D_SM4_RT_CONSTBUFFER,             VKD3DSPR_CONSTBUFFER},
-        {VKD3D_SM4_RT_IMMCONSTBUFFER,          VKD3DSPR_IMMCONSTBUFFER},
-        {VKD3D_SM4_RT_PRIMID,                  VKD3DSPR_PRIMID},
-        {VKD3D_SM4_RT_DEPTHOUT,                VKD3DSPR_DEPTHOUT},
-        {VKD3D_SM4_RT_NULL,                    VKD3DSPR_NULL},
-        {VKD3D_SM4_RT_RASTERIZER,              VKD3DSPR_RASTERIZER},
-        {VKD3D_SM4_RT_OMASK,                   VKD3DSPR_SAMPLEMASK},
-        {VKD3D_SM5_RT_STREAM,                  VKD3DSPR_STREAM},
-        {VKD3D_SM5_RT_FUNCTION_BODY,           VKD3DSPR_FUNCTIONBODY},
-        {VKD3D_SM5_RT_FUNCTION_POINTER,        VKD3DSPR_FUNCTIONPOINTER},
-        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT_ID, VKD3DSPR_OUTPOINTID},
-        {VKD3D_SM5_RT_FORK_INSTANCE_ID,        VKD3DSPR_FORKINSTID},
-        {VKD3D_SM5_RT_JOIN_INSTANCE_ID,        VKD3DSPR_JOININSTID},
-        {VKD3D_SM5_RT_INPUT_CONTROL_POINT,     VKD3DSPR_INCONTROLPOINT},
-        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT,    VKD3DSPR_OUTCONTROLPOINT},
-        {VKD3D_SM5_RT_PATCH_CONSTANT_DATA,     VKD3DSPR_PATCHCONST},
-        {VKD3D_SM5_RT_DOMAIN_LOCATION,         VKD3DSPR_TESSCOORD},
-        {VKD3D_SM5_RT_UAV,                     VKD3DSPR_UAV},
-        {VKD3D_SM5_RT_SHARED_MEMORY,           VKD3DSPR_GROUPSHAREDMEM},
-        {VKD3D_SM5_RT_THREAD_ID,               VKD3DSPR_THREADID},
-        {VKD3D_SM5_RT_THREAD_GROUP_ID,         VKD3DSPR_THREADGROUPID},
-        {VKD3D_SM5_RT_LOCAL_THREAD_ID,         VKD3DSPR_LOCALTHREADID},
-        {VKD3D_SM5_RT_COVERAGE,                VKD3DSPR_COVERAGE},
-        {VKD3D_SM5_RT_LOCAL_THREAD_INDEX,      VKD3DSPR_LOCALTHREADINDEX},
-        {VKD3D_SM5_RT_GS_INSTANCE_ID,          VKD3DSPR_GSINSTID},
-        {VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL,  VKD3DSPR_DEPTHOUTGE},
-        {VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL,     VKD3DSPR_DEPTHOUTLE},
-        {VKD3D_SM5_RT_OUTPUT_STENCIL_REF,      VKD3DSPR_OUTSTENCILREF},
+        {VKD3D_SM4_RT_TEMP,                    VKD3DSPR_TEMP,            VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_INPUT,                   VKD3DSPR_INPUT,           VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_OUTPUT,                  VKD3DSPR_OUTPUT,          VKD3D_SM4_SWIZZLE_INVALID},
+        {VKD3D_SM4_RT_INDEXABLE_TEMP,          VKD3DSPR_IDXTEMP,         VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_IMMCONST,                VKD3DSPR_IMMCONST,        VKD3D_SM4_SWIZZLE_NONE},
+        {VKD3D_SM4_RT_IMMCONST64,              VKD3DSPR_IMMCONST64,      VKD3D_SM4_SWIZZLE_NONE},
+        {VKD3D_SM4_RT_SAMPLER,                 VKD3DSPR_SAMPLER,         VKD3D_SM4_SWIZZLE_SCALAR},
+        {VKD3D_SM4_RT_RESOURCE,                VKD3DSPR_RESOURCE,        VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_CONSTBUFFER,             VKD3DSPR_CONSTBUFFER,     VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_IMMCONSTBUFFER,          VKD3DSPR_IMMCONSTBUFFER,  VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_PRIMID,                  VKD3DSPR_PRIMID,          VKD3D_SM4_SWIZZLE_NONE},
+        {VKD3D_SM4_RT_DEPTHOUT,                VKD3DSPR_DEPTHOUT,        VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_NULL,                    VKD3DSPR_NULL,            VKD3D_SM4_SWIZZLE_INVALID},
+        {VKD3D_SM4_RT_RASTERIZER,              VKD3DSPR_RASTERIZER,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM4_RT_OMASK,                   VKD3DSPR_SAMPLEMASK,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_STREAM,                  VKD3DSPR_STREAM,          VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_FUNCTION_BODY,           VKD3DSPR_FUNCTIONBODY,    VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_FUNCTION_POINTER,        VKD3DSPR_FUNCTIONPOINTER, VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT_ID, VKD3DSPR_OUTPOINTID,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_FORK_INSTANCE_ID,        VKD3DSPR_FORKINSTID,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_JOIN_INSTANCE_ID,        VKD3DSPR_JOININSTID,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_INPUT_CONTROL_POINT,     VKD3DSPR_INCONTROLPOINT,  VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT,    VKD3DSPR_OUTCONTROLPOINT, VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_PATCH_CONSTANT_DATA,     VKD3DSPR_PATCHCONST,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_DOMAIN_LOCATION,         VKD3DSPR_TESSCOORD,       VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_UAV,                     VKD3DSPR_UAV,             VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_SHARED_MEMORY,           VKD3DSPR_GROUPSHAREDMEM,  VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_THREAD_ID,               VKD3DSPR_THREADID,        VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_THREAD_GROUP_ID,         VKD3DSPR_THREADGROUPID,   VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_LOCAL_THREAD_ID,         VKD3DSPR_LOCALTHREADID,   VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_COVERAGE,                VKD3DSPR_COVERAGE,        VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_LOCAL_THREAD_INDEX,      VKD3DSPR_LOCALTHREADINDEX,VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_GS_INSTANCE_ID,          VKD3DSPR_GSINSTID,        VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL,  VKD3DSPR_DEPTHOUTGE,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL,     VKD3DSPR_DEPTHOUTLE,      VKD3D_SM4_SWIZZLE_VEC4},
+        {VKD3D_SM5_RT_OUTPUT_STENCIL_REF,      VKD3DSPR_OUTSTENCILREF,   VKD3D_SM4_SWIZZLE_VEC4},
     };
 
     memset(lookup, 0, sizeof(*lookup));
@@ -1634,6 +1639,16 @@ static const struct vkd3d_sm4_register_type_info *get_info_from_vkd3d_register_t
     if (vkd3d_type >= VKD3DSPR_COUNT)
         return NULL;
     return lookup->register_type_info_from_vkd3d[vkd3d_type];
+}
+
+static enum vkd3d_sm4_swizzle_type vkd3d_sm4_get_default_swizzle_type(
+        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_shader_register_type vkd3d_type)
+{
+    const struct vkd3d_sm4_register_type_info *register_type_info =
+            get_info_from_vkd3d_register_type(lookup, vkd3d_type);
+
+    assert(register_type_info);
+    return register_type_info->default_src_swizzle_type;
 }
 
 static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_register *reg)
@@ -2700,7 +2715,7 @@ static bool type_is_integer(const struct hlsl_type *type)
 }
 
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
-        bool output, enum vkd3d_shader_register_type *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx)
+        bool output, enum vkd3d_shader_register_type *type, bool *has_idx)
 {
     unsigned int i;
 
@@ -2709,25 +2724,24 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
         const char *semantic;
         bool output;
         enum vkd3d_shader_type shader_type;
-        enum vkd3d_sm4_swizzle_type swizzle_type;
         enum vkd3d_shader_register_type type;
         bool has_idx;
     }
     register_table[] =
     {
-        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_THREADID,          false},
-        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_THREADGROUPID,     false},
-        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,   VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_LOCALTHREADID,     false},
+        {"sv_dispatchthreadid", false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADID,      false},
+        {"sv_groupid",          false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_THREADGROUPID, false},
+        {"sv_groupthreadid",    false, VKD3D_SHADER_TYPE_COMPUTE,  VKD3DSPR_LOCALTHREADID, false},
 
-        {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY,  VKD3D_SM4_SWIZZLE_NONE, VKD3DSPR_PRIMID,            false},
+        {"sv_primitiveid",      false, VKD3D_SHADER_TYPE_GEOMETRY, VKD3DSPR_PRIMID,        false},
 
         /* Put sv_target in this table, instead of letting it fall through to
          * default varying allocation, so that the register index matches the
          * usage index. */
-        {"color",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_OUTPUT,            true},
-        {"depth",               true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_DEPTHOUT,          false},
-        {"sv_depth",            true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_DEPTHOUT,          false},
-        {"sv_target",           true,  VKD3D_SHADER_TYPE_PIXEL,     VKD3D_SM4_SWIZZLE_VEC4, VKD3DSPR_OUTPUT,            true},
+        {"color",               true,  VKD3D_SHADER_TYPE_PIXEL,    VKD3DSPR_OUTPUT,        true},
+        {"depth",               true,  VKD3D_SHADER_TYPE_PIXEL,    VKD3DSPR_DEPTHOUT,      false},
+        {"sv_depth",            true,  VKD3D_SHADER_TYPE_PIXEL,    VKD3DSPR_DEPTHOUT,      false},
+        {"sv_target",           true,  VKD3D_SHADER_TYPE_PIXEL,    VKD3DSPR_OUTPUT,        true},
     };
 
     for (i = 0; i < ARRAY_SIZE(register_table); ++i)
@@ -2738,8 +2752,6 @@ bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
         {
             if (type)
                 *type = register_table[i].type;
-            if (swizzle_type)
-                *swizzle_type = register_table[i].swizzle_type;
             *has_idx = register_table[i].has_idx;
             return true;
         }
@@ -2851,7 +2863,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
             continue;
         usage_idx = var->semantic.index;
 
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, NULL, NULL, &has_idx))
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, NULL, &has_idx))
         {
             reg_idx = has_idx ? var->semantic.index : ~0u;
         }
@@ -3639,8 +3651,7 @@ struct sm4_instruction
 };
 
 static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
-        unsigned int *writemask, enum vkd3d_sm4_swizzle_type *swizzle_type,
-        const struct hlsl_deref *deref)
+        unsigned int *writemask, const struct hlsl_deref *deref)
 {
     const struct hlsl_type *data_type = hlsl_deref_get_type(ctx, deref);
     const struct hlsl_ir_var *var = deref->var;
@@ -3653,8 +3664,6 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         {
             reg->type = VKD3DSPR_RESOURCE;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (swizzle_type)
-                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
             reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
             assert(regset == HLSL_REGSET_TEXTURES);
@@ -3665,8 +3674,6 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         {
             reg->type = VKD3DSPR_UAV;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (swizzle_type)
-                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
             reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
             assert(regset == HLSL_REGSET_UAVS);
@@ -3677,8 +3684,6 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         {
             reg->type = VKD3DSPR_SAMPLER;
             reg->dimension = VSIR_DIMENSION_NONE;
-            if (swizzle_type)
-                *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
             reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
             assert(regset == HLSL_REGSET_SAMPLERS);
@@ -3692,8 +3697,6 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
             assert(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3DSPR_CONSTBUFFER;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (swizzle_type)
-                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->buffer->reg.id;
             reg->idx[1].offset = offset / 4;
             reg->idx_count = 2;
@@ -3704,7 +3707,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
     {
         bool has_idx;
 
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, false, &reg->type, swizzle_type, &has_idx))
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, false, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
@@ -3724,8 +3727,6 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
             assert(hlsl_reg.allocated);
             reg->type = VKD3DSPR_INPUT;
             reg->dimension = VSIR_DIMENSION_VEC4;
-            if (swizzle_type)
-                *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
             reg->idx_count = 1;
             *writemask = hlsl_reg.writemask;
@@ -3735,7 +3736,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
     {
         bool has_idx;
 
-        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, true, &reg->type, swizzle_type, &has_idx))
+        if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, true, &reg->type, &has_idx))
         {
             unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
@@ -3770,21 +3771,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         assert(hlsl_reg.allocated);
         reg->type = VKD3DSPR_TEMP;
         reg->dimension = VSIR_DIMENSION_VEC4;
-        if (swizzle_type)
-            *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
         reg->idx[0].offset = hlsl_reg.id;
         reg->idx_count = 1;
         *writemask = hlsl_reg.writemask;
     }
 }
 
-static void sm4_src_from_deref(struct hlsl_ctx *ctx, struct sm4_src_register *src,
+static void sm4_src_from_deref(const struct tpf_writer *tpf, struct sm4_src_register *src,
         const struct hlsl_deref *deref, unsigned int map_writemask)
 {
     unsigned int writemask, hlsl_swizzle;
 
-    sm4_register_from_deref(ctx, &src->reg, &writemask, &src->swizzle_type, deref);
-    if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
+    sm4_register_from_deref(tpf->ctx, &src->reg, &writemask, deref);
+    if (vkd3d_sm4_get_default_swizzle_type(&tpf->lookup, src->reg.type) == VKD3D_SM4_SWIZZLE_VEC4)
     {
         hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
         src->swizzle = swizzle_from_sm4(hlsl_swizzle);
@@ -3792,12 +3791,11 @@ static void sm4_src_from_deref(struct hlsl_ctx *ctx, struct sm4_src_register *sr
 }
 
 static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned int *writemask,
-        enum vkd3d_sm4_swizzle_type *swizzle_type, const struct hlsl_ir_node *instr)
+        const struct hlsl_ir_node *instr)
 {
     assert(instr->reg.allocated);
     reg->type = VKD3DSPR_TEMP;
     reg->dimension = VSIR_DIMENSION_VEC4;
-    *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
     reg->idx[0].offset = instr->reg.id;
     reg->idx_count = 1;
     *writemask = instr->reg.writemask;
@@ -3805,16 +3803,13 @@ static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned i
 
 static void sm4_dst_from_node(struct vkd3d_shader_dst_param *dst, const struct hlsl_ir_node *instr)
 {
-    unsigned int swizzle_type;
-
-    sm4_register_from_node(&dst->reg, &dst->write_mask, &swizzle_type, instr);
+    sm4_register_from_node(&dst->reg, &dst->write_mask, instr);
 }
 
 static void sm4_src_from_constant_value(struct sm4_src_register *src,
         const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
 {
     src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
-    src->swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
     src->reg.type = VKD3DSPR_IMMCONST;
     if (width == 1)
     {
@@ -3836,7 +3831,7 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
     }
 }
 
-static void sm4_src_from_node(struct sm4_src_register *src,
+static void sm4_src_from_node(const struct tpf_writer *tpf, struct sm4_src_register *src,
         const struct hlsl_ir_node *instr, unsigned int map_writemask)
 {
     unsigned int writemask, hlsl_swizzle;
@@ -3849,8 +3844,8 @@ static void sm4_src_from_node(struct sm4_src_register *src,
         return;
     }
 
-    sm4_register_from_node(&src->reg, &writemask, &src->swizzle_type, instr);
-    if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
+    sm4_register_from_node(&src->reg, &writemask, instr);
+    if (vkd3d_sm4_get_default_swizzle_type(&tpf->lookup, src->reg.type) == VKD3D_SM4_SWIZZLE_VEC4)
     {
         hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
         src->swizzle = swizzle_from_sm4(hlsl_swizzle);
@@ -3918,7 +3913,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
     token |= reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
     if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
     {
-        token |= (uint32_t)src->swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+        token |= (uint32_t)register_type_info->default_src_swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= swizzle_to_sm4(src->swizzle) << VKD3D_SM4_SWIZZLE_SHIFT;
     }
 
@@ -4078,7 +4073,6 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
         .srcs[0].reg.idx[0].offset = cbuffer->reg.id,
         .srcs[0].reg.idx[1].offset = (cbuffer->used_size + 3) / 4,
         .srcs[0].reg.idx_count = 2,
-        .srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_VEC4,
         .srcs[0].swizzle = VKD3D_SHADER_NO_SWIZZLE,
         .src_count = 1,
     };
@@ -4185,7 +4179,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
         .dst_count = 1,
     };
 
-    if (hlsl_sm4_register_from_semantic(tpf->ctx, &var->semantic, output, &instr.dsts[0].reg.type, NULL, &has_idx))
+    if (hlsl_sm4_register_from_semantic(tpf->ctx, &var->semantic, output, &instr.dsts[0].reg.type, &has_idx))
     {
         if (has_idx)
         {
@@ -4321,7 +4315,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], src, instr.dsts[0].write_mask);
     instr.srcs[0].modifiers = src_mod;
     instr.src_count = 1;
 
@@ -4344,7 +4338,7 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
-    sm4_src_from_node(&instr.srcs[0], src, instr.dsts[dst_idx].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], src, instr.dsts[dst_idx].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4361,8 +4355,8 @@ static void write_sm4_binary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opc
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].write_mask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], src1, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[1], src2, instr.dsts[0].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4380,8 +4374,8 @@ static void write_sm4_binary_op_dot(const struct tpf_writer *tpf, enum vkd3d_sm4
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src1, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_node(&instr.srcs[1], src2, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[0], src1, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[1], src2, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4404,8 +4398,8 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[dst_idx].write_mask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[dst_idx].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], src1, instr.dsts[dst_idx].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[1], src2, instr.dsts[dst_idx].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4423,9 +4417,9 @@ static void write_sm4_ternary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_op
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].write_mask);
-    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].write_mask);
-    sm4_src_from_node(&instr.srcs[2], src3, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], src1, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[1], src2, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[2], src3, instr.dsts[0].write_mask);
     instr.src_count = 3;
 
     write_sm4_instruction(tpf, &instr);
@@ -4474,9 +4468,9 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
             coords_writemask = VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1 | VKD3DSP_WRITEMASK_3;
     }
 
-    sm4_src_from_node(&instr.srcs[0], coords, coords_writemask);
+    sm4_src_from_node(tpf, &instr.srcs[0], coords, coords_writemask);
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
 
     instr.src_count = 2;
 
@@ -4490,7 +4484,6 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
             index = hlsl_ir_constant(sample_index);
 
             memset(&instr.srcs[2], 0, sizeof(instr.srcs[2]));
-            instr.srcs[2].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->type = VKD3DSPR_IMMCONST;
             reg->dimension = VSIR_DIMENSION_SCALAR;
             reg->u.immconst_uint[0] = index->value.u[0].u;
@@ -4501,7 +4494,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
         }
         else
         {
-            sm4_src_from_node(&instr.srcs[2], sample_index, 0);
+            sm4_src_from_node(tpf, &instr.srcs[2], sample_index, 0);
         }
 
         ++instr.src_count;
@@ -4563,27 +4556,27 @@ static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 3;
 
     if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD
            || load->load_type == HLSL_RESOURCE_SAMPLE_LOD_BIAS)
     {
-        sm4_src_from_node(&instr.srcs[3], load->lod.node, VKD3DSP_WRITEMASK_ALL);
+        sm4_src_from_node(tpf, &instr.srcs[3], load->lod.node, VKD3DSP_WRITEMASK_ALL);
         ++instr.src_count;
     }
     else if (load->load_type == HLSL_RESOURCE_SAMPLE_GRAD)
     {
-        sm4_src_from_node(&instr.srcs[3], load->ddx.node, VKD3DSP_WRITEMASK_ALL);
-        sm4_src_from_node(&instr.srcs[4], load->ddy.node, VKD3DSP_WRITEMASK_ALL);
+        sm4_src_from_node(tpf, &instr.srcs[3], load->ddx.node, VKD3DSP_WRITEMASK_ALL);
+        sm4_src_from_node(tpf, &instr.srcs[4], load->ddy.node, VKD3DSP_WRITEMASK_ALL);
         instr.src_count += 2;
     }
     else if (load->load_type == HLSL_RESOURCE_SAMPLE_CMP
             || load->load_type == HLSL_RESOURCE_SAMPLE_CMP_LZ)
     {
-        sm4_src_from_node(&instr.srcs[3], load->cmp.node, VKD3DSP_WRITEMASK_ALL);
+        sm4_src_from_node(tpf, &instr.srcs[3], load->cmp.node, VKD3DSP_WRITEMASK_ALL);
         ++instr.src_count;
     }
 
@@ -4606,7 +4599,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[0], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[0], resource, instr.dsts[0].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4628,8 +4621,8 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], load->lod.node, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], load->lod.node, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4651,8 +4644,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     sm4_dst_from_node(&instr.dsts[0], &expr->node);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].write_mask);
-    instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
+    sm4_src_from_node(tpf, &instr.srcs[0], arg, instr.dsts[0].write_mask);
     instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
     instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
     instr.srcs[1].reg.u.immconst_uint[0] = mask;
@@ -4778,11 +4770,11 @@ static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
 
-    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].write_mask, NULL, dst);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].write_mask, dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_node(&instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -5239,7 +5231,7 @@ static void write_sm4_if(const struct tpf_writer *tpf, const struct hlsl_ir_if *
 
     assert(iff->condition.node->data_type->dimx == 1);
 
-    sm4_src_from_node(&instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
     write_sm4_instruction(tpf, &instr);
 
     write_sm4_block(tpf, &iff->then_block);
@@ -5274,7 +5266,7 @@ static void write_sm4_jump(const struct tpf_writer *tpf, const struct hlsl_ir_ju
 
             memset(&instr.srcs[0], 0, sizeof(*instr.srcs));
             instr.src_count = 1;
-            sm4_src_from_node(&instr.srcs[0], jump->condition.node, VKD3DSP_WRITEMASK_ALL);
+            sm4_src_from_node(tpf, &instr.srcs[0], jump->condition.node, VKD3DSP_WRITEMASK_ALL);
             break;
         }
 
@@ -5320,7 +5312,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
 
         instr.opcode = VKD3D_SM4_OP_MOVC;
 
-        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
+        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
 
         memset(&value, 0xff, sizeof(value));
         sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].write_mask);
@@ -5332,7 +5324,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     {
         instr.opcode = VKD3D_SM4_OP_MOV;
 
-        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
+        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
         instr.src_count = 1;
     }
 
@@ -5368,7 +5360,7 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[instr.src_count++], coords, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_node(tpf, &instr.srcs[instr.src_count++], coords, VKD3DSP_WRITEMASK_ALL);
 
     if (texel_offset)
     {
@@ -5381,16 +5373,15 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
                 return;
             }
             instr.opcode = VKD3D_SM5_OP_GATHER4_PO;
-            sm4_src_from_node(&instr.srcs[instr.src_count++], texel_offset, VKD3DSP_WRITEMASK_ALL);
+            sm4_src_from_node(tpf, &instr.srcs[instr.src_count++], texel_offset, VKD3DSP_WRITEMASK_ALL);
         }
     }
 
-    sm4_src_from_deref(tpf->ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[instr.src_count++], resource, instr.dsts[0].write_mask);
 
     src = &instr.srcs[instr.src_count++];
-    sm4_src_from_deref(tpf->ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf, src, sampler, VKD3DSP_WRITEMASK_ALL);
     src->reg.dimension = VSIR_DIMENSION_VEC4;
-    src->swizzle_type = VKD3D_SM4_SWIZZLE_SCALAR;
     src->swizzle = swizzle;
 
     write_sm4_instruction(tpf, &instr);
@@ -5490,11 +5481,11 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
 
-    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, &store->lhs);
     instr.dsts[0].write_mask = hlsl_combine_writemasks(writemask, store->writemask);
     instr.dst_count = 1;
 
-    sm4_src_from_node(&instr.srcs[0], rhs, instr.dsts[0].write_mask);
+    sm4_src_from_node(tpf, &instr.srcs[0], rhs, instr.dsts[0].write_mask);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -5511,7 +5502,7 @@ static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir
     sm4_dst_from_node(&instr.dsts[0], &swizzle->node);
     instr.dst_count = 1;
 
-    sm4_register_from_node(&instr.srcs[0].reg, &writemask, &instr.srcs[0].swizzle_type, swizzle->val.node);
+    sm4_register_from_node(&instr.srcs[0].reg, &writemask, swizzle->val.node);
     hlsl_swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
             swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].write_mask);
     instr.srcs[0].swizzle = swizzle_from_sm4(hlsl_swizzle);
