@@ -1522,9 +1522,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     device->feature_options1.ExpandedComputeResourceStates = TRUE;
     device->feature_options1.Int64ShaderOps = features->shaderInt64;
 
-    /* Depth bounds test is enabled in D3D12_DEPTH_STENCIL_DESC1, which is not
-     * supported. */
-    device->feature_options2.DepthBoundsTestSupported = FALSE;
+    device->feature_options2.DepthBoundsTestSupported = features->depthBounds;
     /* d3d12_command_list_SetSamplePositions() is not implemented. */
     device->feature_options2.ProgrammableSamplePositionsTier = D3D12_PROGRAMMABLE_SAMPLE_POSITIONS_TIER_NOT_SUPPORTED;
 
