@@ -1524,6 +1524,12 @@ static const enum vkd3d_shader_register_precision register_precision_table[] =
     /* VKD3D_SM4_REGISTER_PRECISION_MIN_UINT_16 */  VKD3D_SHADER_REGISTER_PRECISION_MIN_UINT_16,
 };
 
+struct tpf_writer
+{
+    struct hlsl_ctx *ctx;
+    struct vkd3d_bytecode_buffer *buffer;
+};
+
 static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode opcode)
 {
     unsigned int i;
@@ -1534,6 +1540,12 @@ static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode
     }
 
     return NULL;
+}
+
+static void tpf_writer_init(struct tpf_writer *tpf, struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
+{
+    tpf->ctx = ctx;
+    tpf->buffer = buffer;
 }
 
 static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_register *reg)
@@ -2502,7 +2514,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     return sm4->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }
 
-static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_block *block);
+static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block);
 
 static bool type_is_integer(const struct hlsl_type *type)
 {
@@ -3680,7 +3692,7 @@ static void sm4_src_from_node(struct sm4_src_register *src,
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
-static uint32_t sm4_encode_register(const struct sm4_register *reg)
+static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct sm4_register *reg)
 {
     uint32_t sm4_reg_type = ~0u;
     unsigned int i;
@@ -3713,8 +3725,9 @@ static uint32_t sm4_register_order(const struct sm4_register *reg)
     return order;
 }
 
-static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const struct sm4_instruction *instr)
+static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
 {
+    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     uint32_t token = instr->opcode;
     unsigned int size = 1, i, j;
 
@@ -3743,7 +3756,7 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
 
     for (i = 0; i < instr->dst_count; ++i)
     {
-        token = sm4_encode_register(&instr->dsts[i].reg);
+        token = sm4_encode_register(tpf, &instr->dsts[i].reg);
         if (instr->dsts[i].reg.dim == VKD3D_SM4_DIMENSION_VEC4)
             token |= instr->dsts[i].writemask << VKD3D_SM4_WRITEMASK_SHIFT;
         put_u32(buffer, token);
@@ -3757,7 +3770,7 @@ static void write_sm4_instruction(struct vkd3d_bytecode_buffer *buffer, const st
 
     for (i = 0; i < instr->src_count; ++i)
     {
-        token = sm4_encode_register(&instr->srcs[i].reg);
+        token = sm4_encode_register(tpf, &instr->srcs[i].reg);
         token |= (uint32_t)instr->srcs[i].swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= instr->srcs[i].swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
         if (instr->srcs[i].reg.mod)
@@ -3820,7 +3833,7 @@ static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
     return true;
 }
 
-static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, const struct hlsl_buffer *cbuffer)
+static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const struct hlsl_buffer *cbuffer)
 {
     const struct sm4_instruction instr =
     {
@@ -3835,11 +3848,10 @@ static void write_sm4_dcl_constant_buffer(struct vkd3d_bytecode_buffer *buffer, 
         .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
         .src_count = 1,
     };
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_samplers(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct extern_resource *resource)
+static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct extern_resource *resource)
 {
     struct hlsl_type *component_type;
     unsigned int i;
@@ -3852,7 +3864,7 @@ static void write_sm4_dcl_samplers(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         .dst_count = 1,
     };
 
-    component_type = hlsl_type_get_component_type(ctx, resource->data_type, 0);
+    component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
 
     if (component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
         instr.opcode |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
@@ -3865,12 +3877,12 @@ static void write_sm4_dcl_samplers(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             continue;
 
         instr.dsts[0].reg.idx[0].offset = resource->id + i;
-        write_sm4_instruction(buffer, &instr);
+        write_sm4_instruction(tpf, &instr);
     }
 }
 
-static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct extern_resource *resource, bool uav)
+static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct extern_resource *resource,
+        bool uav)
 {
     enum hlsl_regset regset = uav ? HLSL_REGSET_UAVS : HLSL_REGSET_TEXTURES;
     struct hlsl_type *component_type;
@@ -3879,7 +3891,7 @@ static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 
     assert(resource->regset == regset);
 
-    component_type = hlsl_type_get_component_type(ctx, resource->data_type, 0);
+    component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
 
     for (i = 0; i < resource->bind_count; ++i)
     {
@@ -3922,13 +3934,13 @@ static void write_sm4_dcl_textures(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             instr.opcode |= component_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
         }
 
-        write_sm4_instruction(buffer, &instr);
+        write_sm4_instruction(tpf, &instr);
     }
 }
 
-static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_var *var)
+static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hlsl_ir_var *var)
 {
-    const struct hlsl_profile_info *profile = ctx->profile;
+    const struct hlsl_profile_info *profile = tpf->ctx->profile;
     const bool output = var->is_output_semantic;
     D3D_NAME usage;
     bool has_idx;
@@ -3939,7 +3951,7 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         .dst_count = 1,
     };
 
-    if (hlsl_sm4_register_from_semantic(ctx, &var->semantic, output, &instr.dsts[0].reg.type, NULL, &has_idx))
+    if (hlsl_sm4_register_from_semantic(tpf->ctx, &var->semantic, output, &instr.dsts[0].reg.type, NULL, &has_idx))
     {
         if (has_idx)
         {
@@ -3963,7 +3975,7 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
         instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
 
-    hlsl_sm4_usage_from_semantic(ctx, &var->semantic, output, &usage);
+    hlsl_sm4_usage_from_semantic(tpf->ctx, &var->semantic, output, &usage);
     if (usage == ~0u)
         usage = D3D_NAME_UNDEFINED;
 
@@ -4023,10 +4035,10 @@ static void write_sm4_dcl_semantic(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             break;
     }
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_temps(struct vkd3d_bytecode_buffer *buffer, uint32_t temp_count)
+static void write_sm4_dcl_temps(const struct tpf_writer *tpf, uint32_t temp_count)
 {
     struct sm4_instruction instr =
     {
@@ -4036,10 +4048,10 @@ static void write_sm4_dcl_temps(struct vkd3d_bytecode_buffer *buffer, uint32_t t
         .idx_count = 1,
     };
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_dcl_thread_group(struct vkd3d_bytecode_buffer *buffer, const uint32_t thread_count[3])
+static void write_sm4_dcl_thread_group(const struct tpf_writer *tpf, const uint32_t thread_count[3])
 {
     struct sm4_instruction instr =
     {
@@ -4051,20 +4063,20 @@ static void write_sm4_dcl_thread_group(struct vkd3d_bytecode_buffer *buffer, con
         .idx_count = 3,
     };
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ret(struct vkd3d_bytecode_buffer *buffer)
+static void write_sm4_ret(const struct tpf_writer *tpf)
 {
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_RET,
     };
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, unsigned int src_mod)
 {
     struct sm4_instruction instr;
@@ -4079,12 +4091,11 @@ static void write_sm4_unary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_
     instr.srcs[0].reg.mod = src_mod;
     instr.src_count = 1;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_unary_op_with_two_destinations(struct vkd3d_bytecode_buffer *buffer,
-        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned dst_idx,
-        const struct hlsl_ir_node *src)
+static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, unsigned dst_idx, const struct hlsl_ir_node *src)
 {
     struct sm4_instruction instr;
 
@@ -4102,10 +4113,10 @@ static void write_sm4_unary_op_with_two_destinations(struct vkd3d_bytecode_buffe
     sm4_src_from_node(&instr.srcs[0], src, instr.dsts[dst_idx].writemask);
     instr.src_count = 1;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_binary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
     struct sm4_instruction instr;
@@ -4120,11 +4131,11 @@ static void write_sm4_binary_op(struct vkd3d_bytecode_buffer *buffer, enum vkd3d
     sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].writemask);
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
 /* dp# instructions don't map the swizzle. */
-static void write_sm4_binary_op_dot(struct vkd3d_bytecode_buffer *buffer, enum vkd3d_sm4_opcode opcode,
+static void write_sm4_binary_op_dot(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
         const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
     struct sm4_instruction instr;
@@ -4139,10 +4150,10 @@ static void write_sm4_binary_op_dot(struct vkd3d_bytecode_buffer *buffer, enum v
     sm4_src_from_node(&instr.srcs[1], src2, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buffer *buffer,
+static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *tpf,
         enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned dst_idx,
         const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
@@ -4163,15 +4174,15 @@ static void write_sm4_binary_op_with_two_destinations(struct vkd3d_bytecode_buff
     sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[dst_idx].writemask);
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_node *dst, const struct hlsl_deref *resource,
-        const struct hlsl_ir_node *coords, const struct hlsl_ir_node *sample_index,
-        const struct hlsl_ir_node *texel_offset, enum hlsl_sampler_dim dim)
+static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
+        const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
+        const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
+        enum hlsl_sampler_dim dim)
 {
-    const struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, resource);
+    const struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, resource);
     bool multisampled = resource_type->base_type == HLSL_TYPE_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
     bool uav = (hlsl_type_get_regset(resource_type) == HLSL_REGSET_UAVS);
@@ -4188,7 +4199,7 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     {
         if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
         {
-            hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+            hlsl_error(tpf->ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
                     "Offset must resolve to integer literal in the range -8 to 7.");
             return;
         }
@@ -4211,7 +4222,7 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
 
     sm4_src_from_node(&instr.srcs[0], coords, coords_writemask);
 
-    sm4_src_from_deref(ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
 
     instr.src_count = 2;
 
@@ -4230,9 +4241,9 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
             reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
             reg->immconst_uint[0] = index->value.u[0].u;
         }
-        else if (ctx->profile->major_version == 4 && ctx->profile->minor_version == 0)
+        else if (tpf->ctx->profile->major_version == 4 && tpf->ctx->profile->minor_version == 0)
         {
-            hlsl_error(ctx, &sample_index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Expected literal sample index.");
+            hlsl_error(tpf->ctx, &sample_index->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Expected literal sample index.");
         }
         else
         {
@@ -4242,11 +4253,10 @@ static void write_sm4_ld(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
         ++instr.src_count;
     }
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_resource_load *load)
+static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *coords = load->coords.node;
@@ -4290,7 +4300,7 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     {
         if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
         {
-            hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+            hlsl_error(tpf->ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
                     "Offset must resolve to integer literal in the range -8 to 7.");
             return;
         }
@@ -4300,8 +4310,8 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
-    sm4_src_from_deref(ctx, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 3;
 
     if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD
@@ -4323,11 +4333,10 @@ static void write_sm4_sample(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         ++instr.src_count;
     }
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_sampleinfo(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_resource_load *load)
+static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_deref *resource = &load->resource;
     const struct hlsl_ir_node *dst = &load->node;
@@ -4343,14 +4352,13 @@ static void write_sm4_sampleinfo(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buf
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_deref(ctx, &instr.srcs[0], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[0], resource, instr.dsts[0].writemask);
     instr.src_count = 1;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_resinfo(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_resource_load *load)
+static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_deref *resource = &load->resource;
     const struct hlsl_ir_node *dst = &load->node;
@@ -4367,10 +4375,10 @@ static void write_sm4_resinfo(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], load->lod.node, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[1], resource, instr.dsts[0].writemask);
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
 static bool type_is_float(const struct hlsl_type *type)
@@ -4378,8 +4386,7 @@ static bool type_is_float(const struct hlsl_type *type)
     return type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF;
 }
 
-static void write_sm4_cast_from_bool(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr,
+static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr,
         const struct hlsl_ir_node *arg, uint32_t mask)
 {
     struct sm4_instruction instr;
@@ -4397,11 +4404,10 @@ static void write_sm4_cast_from_bool(struct hlsl_ctx *ctx,
     instr.srcs[1].reg.immconst_uint[0] = mask;
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_cast(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
+static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr)
 {
     static const union
     {
@@ -4423,23 +4429,23 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_INT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_ITOF, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_ITOF, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_UTOF, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_UTOF, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1, one.u);
+                    write_sm4_cast_from_bool(tpf, expr, arg1, one.u);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to float.");
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to float.");
                     break;
 
                 default:
@@ -4452,20 +4458,20 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_FTOI, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_FTOI, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1, 1);
+                    write_sm4_cast_from_bool(tpf, expr, arg1, 1);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to int.");
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to int.");
                     break;
 
                 default:
@@ -4478,20 +4484,20 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_FTOU, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_FTOU, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
                     break;
 
                 case HLSL_TYPE_BOOL:
-                    write_sm4_cast_from_bool(ctx, buffer, expr, arg1, 1);
+                    write_sm4_cast_from_bool(tpf, expr, arg1, 1);
                     break;
 
                 case HLSL_TYPE_DOUBLE:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 cast from double to uint.");
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast from double to uint.");
                     break;
 
                 default:
@@ -4500,7 +4506,7 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
             break;
 
         case HLSL_TYPE_DOUBLE:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 cast to double.");
+            hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 cast to double.");
             break;
 
         case HLSL_TYPE_BOOL:
@@ -4510,26 +4516,25 @@ static void write_sm4_cast(struct hlsl_ctx *ctx,
     }
 }
 
-static void write_sm4_store_uav_typed(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_deref *dst, const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
+static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct hlsl_deref *dst,
+        const struct hlsl_ir_node *coords, const struct hlsl_ir_node *value)
 {
     struct sm4_instruction instr;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
 
-    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, dst);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].writemask, NULL, dst);
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
     sm4_src_from_node(&instr.srcs[1], value, VKD3DSP_WRITEMASK_ALL);
     instr.src_count = 2;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_expr(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_expr *expr)
+static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr)
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
@@ -4538,7 +4543,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 
     assert(expr->node.reg.allocated);
 
-    if (!(dst_type_string = hlsl_type_to_string(ctx, dst_type)))
+    if (!(dst_type_string = hlsl_type_to_string(tpf->ctx, dst_type)))
         return;
 
     switch (expr->op)
@@ -4547,181 +4552,181 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_ABS);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_ABS);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s absolute value expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s absolute value expression.", dst_type_string->buffer);
             }
             break;
 
         case HLSL_OP1_BIT_NOT:
             assert(type_is_integer(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_CAST:
-            write_sm4_cast(ctx, buffer, expr);
+            write_sm4_cast(tpf, expr);
             break;
 
         case HLSL_OP1_COS:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op_with_two_destinations(buffer, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
+            write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
             break;
 
         case HLSL_OP1_DSX:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_DERIV_RTX, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTX, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSX_COARSE:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTX_COARSE, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_COARSE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSX_FINE:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTX_FINE, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTX_FINE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_DERIV_RTY, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_DERIV_RTY, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY_COARSE:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTY_COARSE, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_COARSE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_DSY_FINE:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM5_OP_DERIV_RTY_FINE, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM5_OP_DERIV_RTY_FINE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_EXP2:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_EXP, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_FLOOR:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NI, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_FRACT:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_FRC, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_FRC, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_LOG2:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_LOG, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_LOGIC_NOT:
             assert(dst_type->base_type == HLSL_TYPE_BOOL);
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_NEG:
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_NEGATE);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_NEGATE);
                     break;
 
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_unary_op(buffer, VKD3D_SM4_OP_INEG, &expr->node, arg1, 0);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_INEG, &expr->node, arg1, 0);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s negation expression.", dst_type_string->buffer);
             }
             break;
 
         case HLSL_OP1_REINTERPRET:
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_ROUND:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_ROUND_NE, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_NE, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_RSQ:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_RSQ, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_RSQ, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_SAT:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_MOV
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV
                     | (VKD3D_SM4_INSTRUCTION_FLAG_SATURATE << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT),
                     &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_SIN:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op_with_two_destinations(buffer, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
+            write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 0, arg1);
             break;
 
         case HLSL_OP1_SQRT:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_SQRT, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_SQRT, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_TRUNC:
             assert(type_is_float(dst_type));
-            write_sm4_unary_op(buffer, VKD3D_SM4_OP_ROUND_Z, &expr->node, arg1, 0);
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_Z, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP2_ADD:
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_IADD, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IADD, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s addition expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s addition expression.", dst_type_string->buffer);
             }
             break;
 
         case HLSL_OP2_BIT_AND:
             assert(type_is_integer(dst_type));
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_OR:
             assert(type_is_integer(dst_type));
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_BIT_XOR:
             assert(type_is_integer(dst_type));
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_XOR, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_XOR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_DIV:
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_DIV, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_DIV, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_UDIV, &expr->node, 0, arg1, arg2);
+                    write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_UDIV, &expr->node, 0, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s division expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s division expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4732,15 +4737,15 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     switch (arg1->data_type->dimx)
                     {
                         case 4:
-                            write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP4, &expr->node, arg1, arg2);
+                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP4, &expr->node, arg1, arg2);
                             break;
 
                         case 3:
-                            write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP3, &expr->node, arg1, arg2);
+                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP3, &expr->node, arg1, arg2);
                             break;
 
                         case 2:
-                            write_sm4_binary_op_dot(buffer, VKD3D_SM4_OP_DP2, &expr->node, arg1, arg2);
+                            write_sm4_binary_op_dot(tpf, VKD3D_SM4_OP_DP2, &expr->node, arg1, arg2);
                             break;
 
                         case 1:
@@ -4750,7 +4755,7 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s dot expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s dot expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4763,18 +4768,18 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (src_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_EQ, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_EQ, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_IEQ, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IEQ, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 equality between \"%s\" operands.",
-                            debug_hlsl_type(ctx, src_type));
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 equality between \"%s\" operands.",
+                            debug_hlsl_type(tpf->ctx, src_type));
                     break;
             }
             break;
@@ -4789,21 +4794,21 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (src_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_GE, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_GE, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_IGE, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IGE, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_UGE, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UGE, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 greater-than-or-equal between \"%s\" operands.",
-                            debug_hlsl_type(ctx, src_type));
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 greater-than-or-equal between \"%s\" operands.",
+                            debug_hlsl_type(tpf->ctx, src_type));
                     break;
             }
             break;
@@ -4818,21 +4823,21 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (src_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_LT, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_LT, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_ILT, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ILT, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_ULT, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_ULT, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 less-than between \"%s\" operands.",
-                            debug_hlsl_type(ctx, src_type));
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 less-than between \"%s\" operands.",
+                            debug_hlsl_type(tpf->ctx, src_type));
                     break;
             }
             break;
@@ -4840,37 +4845,37 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
 
         case HLSL_OP2_LOGIC_AND:
             assert(dst_type->base_type == HLSL_TYPE_BOOL);
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LOGIC_OR:
             assert(dst_type->base_type == HLSL_TYPE_BOOL);
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LSHIFT:
             assert(type_is_integer(dst_type));
             assert(dst_type->base_type != HLSL_TYPE_BOOL);
-            write_sm4_binary_op(buffer, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
+            write_sm4_binary_op(tpf, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_MAX:
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_MAX, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MAX, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_IMAX, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IMAX, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_UMAX, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UMAX, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s maximum expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s maximum expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4878,19 +4883,19 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_MIN, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MIN, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_IMIN, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_IMIN, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_UMIN, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_UMIN, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s minimum expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s minimum expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4898,11 +4903,11 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_UDIV, &expr->node, 1, arg1, arg2);
+                    write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_UDIV, &expr->node, 1, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s modulus expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s modulus expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4910,18 +4915,18 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                     /* Using IMUL instead of UMUL because we're taking the low
                      * bits, and the native compiler generates IMUL. */
-                    write_sm4_binary_op_with_two_destinations(buffer, VKD3D_SM4_OP_IMUL, &expr->node, 1, arg1, arg2);
+                    write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_IMUL, &expr->node, 1, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 %s multiplication expression.", dst_type_string->buffer);
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s multiplication expression.", dst_type_string->buffer);
             }
             break;
 
@@ -4934,18 +4939,18 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
             switch (src_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_NE, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_NE, &expr->node, arg1, arg2);
                     break;
 
                 case HLSL_TYPE_BOOL:
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    write_sm4_binary_op(buffer, VKD3D_SM4_OP_INE, &expr->node, arg1, arg2);
+                    write_sm4_binary_op(tpf, VKD3D_SM4_OP_INE, &expr->node, arg1, arg2);
                     break;
 
                 default:
-                    hlsl_fixme(ctx, &expr->node.loc, "SM4 inequality between \"%s\" operands.",
-                            debug_hlsl_type(ctx, src_type));
+                    hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 inequality between \"%s\" operands.",
+                            debug_hlsl_type(tpf->ctx, src_type));
                     break;
             }
             break;
@@ -4954,18 +4959,18 @@ static void write_sm4_expr(struct hlsl_ctx *ctx,
         case HLSL_OP2_RSHIFT:
             assert(type_is_integer(dst_type));
             assert(dst_type->base_type != HLSL_TYPE_BOOL);
-            write_sm4_binary_op(buffer, dst_type->base_type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
+            write_sm4_binary_op(tpf, dst_type->base_type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
                     &expr->node, arg1, arg2);
             break;
 
         default:
-            hlsl_fixme(ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
+            hlsl_fixme(tpf->ctx, &expr->node.loc, "SM4 %s expression.", debug_hlsl_expr_op(expr->op));
     }
 
-    hlsl_release_string_buffer(ctx, dst_type_string);
+    hlsl_release_string_buffer(tpf->ctx, dst_type_string);
 }
 
-static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_if *iff)
+static void write_sm4_if(const struct tpf_writer *tpf, const struct hlsl_ir_if *iff)
 {
     struct sm4_instruction instr =
     {
@@ -4976,26 +4981,25 @@ static void write_sm4_if(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buf
     assert(iff->condition.node->data_type->dimx == 1);
 
     sm4_src_from_node(&instr.srcs[0], iff->condition.node, VKD3DSP_WRITEMASK_ALL);
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 
-    write_sm4_block(ctx, buffer, &iff->then_block);
+    write_sm4_block(tpf, &iff->then_block);
 
     if (!list_empty(&iff->else_block.instrs))
     {
         instr.opcode = VKD3D_SM4_OP_ELSE;
         instr.src_count = 0;
-        write_sm4_instruction(buffer, &instr);
+        write_sm4_instruction(tpf, &instr);
 
-        write_sm4_block(ctx, buffer, &iff->else_block);
+        write_sm4_block(tpf, &iff->else_block);
     }
 
     instr.opcode = VKD3D_SM4_OP_ENDIF;
     instr.src_count = 0;
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_jump(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_jump *jump)
+static void write_sm4_jump(const struct tpf_writer *tpf, const struct hlsl_ir_jump *jump)
 {
     struct sm4_instruction instr = {0};
 
@@ -5019,11 +5023,11 @@ static void write_sm4_jump(struct hlsl_ctx *ctx,
             vkd3d_unreachable();
 
         default:
-            hlsl_fixme(ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
+            hlsl_fixme(tpf->ctx, &jump->node.loc, "Jump type %s.", hlsl_jump_type_to_string(jump->type));
             return;
     }
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
 /* Does this variable's data come directly from the API user, rather than being
@@ -5037,8 +5041,7 @@ static bool var_is_user_input(struct hlsl_ctx *ctx, const struct hlsl_ir_var *va
     return var->is_input_semantic && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX;
 }
 
-static void write_sm4_load(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_load *load)
+static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_load *load)
 {
     const struct hlsl_type *type = load->node.data_type;
     struct sm4_instruction instr;
@@ -5049,7 +5052,7 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     instr.dst_count = 1;
 
     assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
-    if (type->base_type == HLSL_TYPE_BOOL && var_is_user_input(ctx, load->src.var))
+    if (type->base_type == HLSL_TYPE_BOOL && var_is_user_input(tpf->ctx, load->src.var))
     {
         struct hlsl_constant_value value;
 
@@ -5058,7 +5061,7 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
 
         instr.opcode = VKD3D_SM4_OP_MOVC;
 
-        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
+        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
 
         memset(&value, 0xff, sizeof(value));
         sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].writemask);
@@ -5070,32 +5073,31 @@ static void write_sm4_load(struct hlsl_ctx *ctx,
     {
         instr.opcode = VKD3D_SM4_OP_MOV;
 
-        sm4_src_from_deref(ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
+        sm4_src_from_deref(tpf->ctx, &instr.srcs[0], &load->src, instr.dsts[0].writemask);
         instr.src_count = 1;
     }
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_loop(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_loop *loop)
+static void write_sm4_loop(const struct tpf_writer *tpf, const struct hlsl_ir_loop *loop)
 {
     struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_LOOP,
     };
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 
-    write_sm4_block(ctx, buffer, &loop->body);
+    write_sm4_block(tpf, &loop->body);
 
     instr.opcode = VKD3D_SM4_OP_ENDLOOP;
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_ir_node *dst, const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
-        const struct hlsl_ir_node *coords, unsigned int swizzle, const struct hlsl_ir_node *texel_offset)
+static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
+        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,  const struct hlsl_ir_node *coords,
+        unsigned int swizzle, const struct hlsl_ir_node *texel_offset)
 {
     struct sm4_src_register *src;
     struct sm4_instruction instr;
@@ -5113,9 +5115,9 @@ static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     {
         if (!encode_texel_offset_as_aoffimmi(&instr, texel_offset))
         {
-            if (ctx->profile->major_version < 5)
+            if (tpf->ctx->profile->major_version < 5)
             {
-                hlsl_error(ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
+                hlsl_error(tpf->ctx, &texel_offset->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TEXEL_OFFSET,
                     "Offset must resolve to integer literal in the range -8 to 7 for profiles < 5.");
                 return;
             }
@@ -5124,19 +5126,18 @@ static void write_sm4_gather(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
         }
     }
 
-    sm4_src_from_deref(ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].writemask);
+    sm4_src_from_deref(tpf->ctx, &instr.srcs[instr.src_count++], resource, instr.dsts[0].writemask);
 
     src = &instr.srcs[instr.src_count++];
-    sm4_src_from_deref(ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf->ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
     src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
     src->swizzle_type = VKD3D_SM4_SWIZZLE_SCALAR;
     src->swizzle = swizzle;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_resource_load(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_load *load)
+static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct hlsl_ir_resource_load *load)
 {
     const struct hlsl_ir_node *texel_offset = load->texel_offset.node;
     const struct hlsl_ir_node *sample_index = load->sample_index.node;
@@ -5144,20 +5145,20 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
 
     if (load->sampler.var && !load->sampler.var->is_uniform)
     {
-        hlsl_fixme(ctx, &load->node.loc, "Sample using non-uniform sampler variable.");
+        hlsl_fixme(tpf->ctx, &load->node.loc, "Sample using non-uniform sampler variable.");
         return;
     }
 
     if (!load->resource.var->is_uniform)
     {
-        hlsl_fixme(ctx, &load->node.loc, "Load from non-uniform resource variable.");
+        hlsl_fixme(tpf->ctx, &load->node.loc, "Load from non-uniform resource variable.");
         return;
     }
 
     switch (load->load_type)
     {
         case HLSL_RESOURCE_LOAD:
-            write_sm4_ld(ctx, buffer, &load->node, &load->resource,
+            write_sm4_ld(tpf, &load->node, &load->resource,
                     coords, sample_index, texel_offset, load->sampling_dim);
             break;
 
@@ -5169,61 +5170,59 @@ static void write_sm4_resource_load(struct hlsl_ctx *ctx,
         case HLSL_RESOURCE_SAMPLE_GRAD:
             /* Combined sample expressions were lowered. */
             assert(load->sampler.var);
-            write_sm4_sample(ctx, buffer, load);
+            write_sm4_sample(tpf, load);
             break;
 
         case HLSL_RESOURCE_GATHER_RED:
-            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+            write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
                     HLSL_SWIZZLE(X, X, X, X), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_GREEN:
-            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+            write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
                     HLSL_SWIZZLE(Y, Y, Y, Y), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_BLUE:
-            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+            write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
                     HLSL_SWIZZLE(Z, Z, Z, Z), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_ALPHA:
-            write_sm4_gather(ctx, buffer, &load->node, &load->resource, &load->sampler, coords,
+            write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
                     HLSL_SWIZZLE(W, W, W, W), texel_offset);
             break;
 
         case HLSL_RESOURCE_SAMPLE_INFO:
-            write_sm4_sampleinfo(ctx, buffer, load);
+            write_sm4_sampleinfo(tpf, load);
             break;
 
         case HLSL_RESOURCE_RESINFO:
-            write_sm4_resinfo(ctx, buffer, load);
+            write_sm4_resinfo(tpf, load);
             break;
     }
 }
 
-static void write_sm4_resource_store(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_resource_store *store)
+static void write_sm4_resource_store(const struct tpf_writer *tpf, const struct hlsl_ir_resource_store *store)
 {
-    struct hlsl_type *resource_type = hlsl_deref_get_type(ctx, &store->resource);
+    struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, &store->resource);
 
     if (!store->resource.var->is_uniform)
     {
-        hlsl_fixme(ctx, &store->node.loc, "Store to non-uniform resource variable.");
+        hlsl_fixme(tpf->ctx, &store->node.loc, "Store to non-uniform resource variable.");
         return;
     }
 
     if (resource_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        hlsl_fixme(ctx, &store->node.loc, "Structured buffers store is not implemented.");
+        hlsl_fixme(tpf->ctx, &store->node.loc, "Structured buffers store is not implemented.");
         return;
     }
 
-    write_sm4_store_uav_typed(ctx, buffer, &store->resource, store->coords.node, store->value.node);
+    write_sm4_store_uav_typed(tpf, &store->resource, store->coords.node, store->value.node);
 }
 
-static void write_sm4_store(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_store *store)
+static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_store *store)
 {
     const struct hlsl_ir_node *rhs = store->rhs.node;
     struct sm4_instruction instr;
@@ -5232,18 +5231,17 @@ static void write_sm4_store(struct hlsl_ctx *ctx,
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
 
-    sm4_register_from_deref(ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, NULL, &store->lhs);
     instr.dsts[0].writemask = hlsl_combine_writemasks(writemask, store->writemask);
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], rhs, instr.dsts[0].writemask);
     instr.src_count = 1;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_swizzle(struct hlsl_ctx *ctx,
-        struct vkd3d_bytecode_buffer *buffer, const struct hlsl_ir_swizzle *swizzle)
+static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir_swizzle *swizzle)
 {
     struct sm4_instruction instr;
     unsigned int writemask;
@@ -5259,11 +5257,10 @@ static void write_sm4_swizzle(struct hlsl_ctx *ctx,
             swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].writemask);
     instr.src_count = 1;
 
-    write_sm4_instruction(buffer, &instr);
+    write_sm4_instruction(tpf, &instr);
 }
 
-static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
-        const struct hlsl_block *block)
+static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block)
 {
     const struct hlsl_ir_node *instr;
 
@@ -5273,12 +5270,12 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
         {
             if (instr->data_type->class == HLSL_CLASS_MATRIX)
             {
-                hlsl_fixme(ctx, &instr->loc, "Matrix operations need to be lowered.");
+                hlsl_fixme(tpf->ctx, &instr->loc, "Matrix operations need to be lowered.");
                 break;
             }
             else if (instr->data_type->class == HLSL_CLASS_OBJECT)
             {
-                hlsl_fixme(ctx, &instr->loc, "Object copy.");
+                hlsl_fixme(tpf->ctx, &instr->loc, "Object copy.");
                 break;
             }
 
@@ -5298,43 +5295,43 @@ static void write_sm4_block(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
                 vkd3d_unreachable();
 
             case HLSL_IR_EXPR:
-                write_sm4_expr(ctx, buffer, hlsl_ir_expr(instr));
+                write_sm4_expr(tpf, hlsl_ir_expr(instr));
                 break;
 
             case HLSL_IR_IF:
-                write_sm4_if(ctx, buffer, hlsl_ir_if(instr));
+                write_sm4_if(tpf, hlsl_ir_if(instr));
                 break;
 
             case HLSL_IR_JUMP:
-                write_sm4_jump(ctx, buffer, hlsl_ir_jump(instr));
+                write_sm4_jump(tpf, hlsl_ir_jump(instr));
                 break;
 
             case HLSL_IR_LOAD:
-                write_sm4_load(ctx, buffer, hlsl_ir_load(instr));
+                write_sm4_load(tpf, hlsl_ir_load(instr));
                 break;
 
             case HLSL_IR_RESOURCE_LOAD:
-                write_sm4_resource_load(ctx, buffer, hlsl_ir_resource_load(instr));
+                write_sm4_resource_load(tpf, hlsl_ir_resource_load(instr));
                 break;
 
             case HLSL_IR_RESOURCE_STORE:
-                write_sm4_resource_store(ctx, buffer, hlsl_ir_resource_store(instr));
+                write_sm4_resource_store(tpf, hlsl_ir_resource_store(instr));
                 break;
 
             case HLSL_IR_LOOP:
-                write_sm4_loop(ctx, buffer, hlsl_ir_loop(instr));
+                write_sm4_loop(tpf, hlsl_ir_loop(instr));
                 break;
 
             case HLSL_IR_STORE:
-                write_sm4_store(ctx, buffer, hlsl_ir_store(instr));
+                write_sm4_store(tpf, hlsl_ir_store(instr));
                 break;
 
             case HLSL_IR_SWIZZLE:
-                write_sm4_swizzle(ctx, buffer, hlsl_ir_swizzle(instr));
+                write_sm4_swizzle(tpf, hlsl_ir_swizzle(instr));
                 break;
 
             default:
-                hlsl_fixme(ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
+                hlsl_fixme(tpf->ctx, &instr->loc, "Instruction type %s.", hlsl_node_type_to_string(instr->type));
         }
     }
 }
@@ -5349,6 +5346,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     const struct hlsl_buffer *cbuffer;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
+    struct tpf_writer tpf;
 
     static const uint16_t shader_types[VKD3D_SHADER_TYPE_COUNT] =
     {
@@ -5363,6 +5361,8 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         VKD3D_SM4_LIB,
     };
 
+    tpf_writer_init(&tpf, ctx, &buffer);
+
     extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
 
     put_u32(&buffer, vkd3d_make_u32((profile->major_version << 4) | profile->minor_version, shader_types[profile->type]));
@@ -5371,7 +5371,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     LIST_FOR_EACH_ENTRY(cbuffer, &ctx->buffers, struct hlsl_buffer, entry)
     {
         if (cbuffer->reg.allocated)
-            write_sm4_dcl_constant_buffer(&buffer, cbuffer);
+            write_sm4_dcl_constant_buffer(&tpf, cbuffer);
     }
 
     for (i = 0; i < extern_resources_count; ++i)
@@ -5379,28 +5379,28 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
         const struct extern_resource *resource = &extern_resources[i];
 
         if (resource->regset == HLSL_REGSET_SAMPLERS)
-            write_sm4_dcl_samplers(ctx, &buffer, resource);
+            write_sm4_dcl_samplers(&tpf, resource);
         else if (resource->regset == HLSL_REGSET_TEXTURES)
-            write_sm4_dcl_textures(ctx, &buffer, resource, false);
+            write_sm4_dcl_textures(&tpf, resource, false);
         else if (resource->regset == HLSL_REGSET_UAVS)
-            write_sm4_dcl_textures(ctx, &buffer, resource, true);
+            write_sm4_dcl_textures(&tpf, resource, true);
     }
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if ((var->is_input_semantic && var->last_read) || (var->is_output_semantic && var->first_write))
-            write_sm4_dcl_semantic(ctx, &buffer, var);
+            write_sm4_dcl_semantic(&tpf, var);
     }
 
     if (profile->type == VKD3D_SHADER_TYPE_COMPUTE)
-        write_sm4_dcl_thread_group(&buffer, ctx->thread_count);
+        write_sm4_dcl_thread_group(&tpf, ctx->thread_count);
 
     if (ctx->temp_count)
-        write_sm4_dcl_temps(&buffer, ctx->temp_count);
+        write_sm4_dcl_temps(&tpf, ctx->temp_count);
 
-    write_sm4_block(ctx, &buffer, &entry_func->body);
+    write_sm4_block(&tpf, &entry_func->body);
 
-    write_sm4_ret(&buffer);
+    write_sm4_ret(&tpf);
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
