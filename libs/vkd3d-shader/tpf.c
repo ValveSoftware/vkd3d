@@ -430,6 +430,8 @@ enum vkd3d_sm4_register_type
     VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL  = 0x26,
     VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL     = 0x27,
     VKD3D_SM5_RT_OUTPUT_STENCIL_REF      = 0x29,
+
+    VKD3D_SM4_REGISTER_TYPE_COUNT,
 };
 
 enum vkd3d_sm4_extended_operand_type
@@ -571,6 +573,12 @@ struct sm4_index_range_array
     struct sm4_index_range ranges[MAX_REG_OUTPUT * 2];
 };
 
+struct vkd3d_sm4_lookup_tables
+{
+    const struct vkd3d_sm4_register_type_info *register_type_info_from_sm4[VKD3D_SM4_REGISTER_TYPE_COUNT];
+    const struct vkd3d_sm4_register_type_info *register_type_info_from_vkd3d[VKD3DSPR_COUNT];
+};
+
 struct vkd3d_shader_sm4_parser
 {
     const uint32_t *start, *end, *ptr;
@@ -586,6 +594,8 @@ struct vkd3d_shader_sm4_parser
     struct sm4_index_range_array input_index_ranges;
     struct sm4_index_range_array output_index_ranges;
     struct sm4_index_range_array patch_constant_index_ranges;
+
+    struct vkd3d_sm4_lookup_tables lookup;
 
     struct vkd3d_shader_parser p;
 };
@@ -1468,50 +1478,10 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM5_OP_CHECK_ACCESS_FULLY_MAPPED,        VKD3DSIH_CHECK_ACCESS_FULLY_MAPPED,        "u",    "u"},
 };
 
-static const enum vkd3d_shader_register_type register_type_table[] =
+struct vkd3d_sm4_register_type_info
 {
-    /* VKD3D_SM4_RT_TEMP */                    VKD3DSPR_TEMP,
-    /* VKD3D_SM4_RT_INPUT */                   VKD3DSPR_INPUT,
-    /* VKD3D_SM4_RT_OUTPUT */                  VKD3DSPR_OUTPUT,
-    /* VKD3D_SM4_RT_INDEXABLE_TEMP */          VKD3DSPR_IDXTEMP,
-    /* VKD3D_SM4_RT_IMMCONST */                VKD3DSPR_IMMCONST,
-    /* VKD3D_SM4_RT_IMMCONST64 */              VKD3DSPR_IMMCONST64,
-    /* VKD3D_SM4_RT_SAMPLER */                 VKD3DSPR_SAMPLER,
-    /* VKD3D_SM4_RT_RESOURCE */                VKD3DSPR_RESOURCE,
-    /* VKD3D_SM4_RT_CONSTBUFFER */             VKD3DSPR_CONSTBUFFER,
-    /* VKD3D_SM4_RT_IMMCONSTBUFFER */          VKD3DSPR_IMMCONSTBUFFER,
-    /* UNKNOWN */                              ~0u,
-    /* VKD3D_SM4_RT_PRIMID */                  VKD3DSPR_PRIMID,
-    /* VKD3D_SM4_RT_DEPTHOUT */                VKD3DSPR_DEPTHOUT,
-    /* VKD3D_SM4_RT_NULL */                    VKD3DSPR_NULL,
-    /* VKD3D_SM4_RT_RASTERIZER */              VKD3DSPR_RASTERIZER,
-    /* VKD3D_SM4_RT_OMASK */                   VKD3DSPR_SAMPLEMASK,
-    /* VKD3D_SM5_RT_STREAM */                  VKD3DSPR_STREAM,
-    /* VKD3D_SM5_RT_FUNCTION_BODY */           VKD3DSPR_FUNCTIONBODY,
-    /* UNKNOWN */                              ~0u,
-    /* VKD3D_SM5_RT_FUNCTION_POINTER */        VKD3DSPR_FUNCTIONPOINTER,
-    /* UNKNOWN */                              ~0u,
-    /* UNKNOWN */                              ~0u,
-    /* VKD3D_SM5_RT_OUTPUT_CONTROL_POINT_ID */ VKD3DSPR_OUTPOINTID,
-    /* VKD3D_SM5_RT_FORK_INSTANCE_ID */        VKD3DSPR_FORKINSTID,
-    /* VKD3D_SM5_RT_JOIN_INSTANCE_ID */        VKD3DSPR_JOININSTID,
-    /* VKD3D_SM5_RT_INPUT_CONTROL_POINT */     VKD3DSPR_INCONTROLPOINT,
-    /* VKD3D_SM5_RT_OUTPUT_CONTROL_POINT */    VKD3DSPR_OUTCONTROLPOINT,
-    /* VKD3D_SM5_RT_PATCH_CONSTANT_DATA */     VKD3DSPR_PATCHCONST,
-    /* VKD3D_SM5_RT_DOMAIN_LOCATION */         VKD3DSPR_TESSCOORD,
-    /* UNKNOWN */                              ~0u,
-    /* VKD3D_SM5_RT_UAV */                     VKD3DSPR_UAV,
-    /* VKD3D_SM5_RT_SHARED_MEMORY */           VKD3DSPR_GROUPSHAREDMEM,
-    /* VKD3D_SM5_RT_THREAD_ID */               VKD3DSPR_THREADID,
-    /* VKD3D_SM5_RT_THREAD_GROUP_ID */         VKD3DSPR_THREADGROUPID,
-    /* VKD3D_SM5_RT_LOCAL_THREAD_ID */         VKD3DSPR_LOCALTHREADID,
-    /* VKD3D_SM5_RT_COVERAGE */                VKD3DSPR_COVERAGE,
-    /* VKD3D_SM5_RT_LOCAL_THREAD_INDEX */      VKD3DSPR_LOCALTHREADINDEX,
-    /* VKD3D_SM5_RT_GS_INSTANCE_ID */          VKD3DSPR_GSINSTID,
-    /* VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL */  VKD3DSPR_DEPTHOUTGE,
-    /* VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL */     VKD3DSPR_DEPTHOUTLE,
-    /* VKD3D_SM5_RT_CYCLE_COUNTER */           ~0u,
-    /* VKD3D_SM5_RT_OUTPUT_STENCIL_REF */      VKD3DSPR_OUTSTENCILREF,
+    enum vkd3d_sm4_register_type sm4_type;
+    enum vkd3d_shader_register_type vkd3d_type;
 };
 
 static const enum vkd3d_shader_register_precision register_precision_table[] =
@@ -1528,6 +1498,7 @@ struct tpf_writer
 {
     struct hlsl_ctx *ctx;
     struct vkd3d_bytecode_buffer *buffer;
+    struct vkd3d_sm4_lookup_tables lookup;
 };
 
 static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode opcode)
@@ -1536,16 +1507,89 @@ static const struct vkd3d_sm4_opcode_info *get_opcode_info(enum vkd3d_sm4_opcode
 
     for (i = 0; i < sizeof(opcode_table) / sizeof(*opcode_table); ++i)
     {
-        if (opcode == opcode_table[i].opcode) return &opcode_table[i];
+        if (opcode == opcode_table[i].opcode)
+            return &opcode_table[i];
     }
 
     return NULL;
+}
+
+static void init_sm4_lookup_tables(struct vkd3d_sm4_lookup_tables *lookup)
+{
+    const struct vkd3d_sm4_register_type_info *info;
+    unsigned int i;
+
+    static const struct vkd3d_sm4_register_type_info register_type_table[] =
+    {
+        {VKD3D_SM4_RT_TEMP,                    VKD3DSPR_TEMP},
+        {VKD3D_SM4_RT_INPUT,                   VKD3DSPR_INPUT},
+        {VKD3D_SM4_RT_OUTPUT,                  VKD3DSPR_OUTPUT},
+        {VKD3D_SM4_RT_INDEXABLE_TEMP,          VKD3DSPR_IDXTEMP},
+        {VKD3D_SM4_RT_IMMCONST,                VKD3DSPR_IMMCONST},
+        {VKD3D_SM4_RT_IMMCONST64,              VKD3DSPR_IMMCONST64},
+        {VKD3D_SM4_RT_SAMPLER,                 VKD3DSPR_SAMPLER},
+        {VKD3D_SM4_RT_RESOURCE,                VKD3DSPR_RESOURCE},
+        {VKD3D_SM4_RT_CONSTBUFFER,             VKD3DSPR_CONSTBUFFER},
+        {VKD3D_SM4_RT_IMMCONSTBUFFER,          VKD3DSPR_IMMCONSTBUFFER},
+        {VKD3D_SM4_RT_PRIMID,                  VKD3DSPR_PRIMID},
+        {VKD3D_SM4_RT_DEPTHOUT,                VKD3DSPR_DEPTHOUT},
+        {VKD3D_SM4_RT_NULL,                    VKD3DSPR_NULL},
+        {VKD3D_SM4_RT_RASTERIZER,              VKD3DSPR_RASTERIZER},
+        {VKD3D_SM4_RT_OMASK,                   VKD3DSPR_SAMPLEMASK},
+        {VKD3D_SM5_RT_STREAM,                  VKD3DSPR_STREAM},
+        {VKD3D_SM5_RT_FUNCTION_BODY,           VKD3DSPR_FUNCTIONBODY},
+        {VKD3D_SM5_RT_FUNCTION_POINTER,        VKD3DSPR_FUNCTIONPOINTER},
+        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT_ID, VKD3DSPR_OUTPOINTID},
+        {VKD3D_SM5_RT_FORK_INSTANCE_ID,        VKD3DSPR_FORKINSTID},
+        {VKD3D_SM5_RT_JOIN_INSTANCE_ID,        VKD3DSPR_JOININSTID},
+        {VKD3D_SM5_RT_INPUT_CONTROL_POINT,     VKD3DSPR_INCONTROLPOINT},
+        {VKD3D_SM5_RT_OUTPUT_CONTROL_POINT,    VKD3DSPR_OUTCONTROLPOINT},
+        {VKD3D_SM5_RT_PATCH_CONSTANT_DATA,     VKD3DSPR_PATCHCONST},
+        {VKD3D_SM5_RT_DOMAIN_LOCATION,         VKD3DSPR_TESSCOORD},
+        {VKD3D_SM5_RT_UAV,                     VKD3DSPR_UAV},
+        {VKD3D_SM5_RT_SHARED_MEMORY,           VKD3DSPR_GROUPSHAREDMEM},
+        {VKD3D_SM5_RT_THREAD_ID,               VKD3DSPR_THREADID},
+        {VKD3D_SM5_RT_THREAD_GROUP_ID,         VKD3DSPR_THREADGROUPID},
+        {VKD3D_SM5_RT_LOCAL_THREAD_ID,         VKD3DSPR_LOCALTHREADID},
+        {VKD3D_SM5_RT_COVERAGE,                VKD3DSPR_COVERAGE},
+        {VKD3D_SM5_RT_LOCAL_THREAD_INDEX,      VKD3DSPR_LOCALTHREADINDEX},
+        {VKD3D_SM5_RT_GS_INSTANCE_ID,          VKD3DSPR_GSINSTID},
+        {VKD3D_SM5_RT_DEPTHOUT_GREATER_EQUAL,  VKD3DSPR_DEPTHOUTGE},
+        {VKD3D_SM5_RT_DEPTHOUT_LESS_EQUAL,     VKD3DSPR_DEPTHOUTLE},
+        {VKD3D_SM5_RT_OUTPUT_STENCIL_REF,      VKD3DSPR_OUTSTENCILREF},
+    };
+
+    memset(lookup, 0, sizeof(*lookup));
+
+    for (i = 0; i < ARRAY_SIZE(register_type_table); ++i)
+    {
+        info = &register_type_table[i];
+        lookup->register_type_info_from_sm4[info->sm4_type] = info;
+        lookup->register_type_info_from_vkd3d[info->vkd3d_type] = info;
+    }
 }
 
 static void tpf_writer_init(struct tpf_writer *tpf, struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer)
 {
     tpf->ctx = ctx;
     tpf->buffer = buffer;
+    init_sm4_lookup_tables(&tpf->lookup);
+}
+
+static const struct vkd3d_sm4_register_type_info *get_info_from_sm4_register_type(
+        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_sm4_register_type sm4_type)
+{
+    if (sm4_type >= VKD3D_SM4_REGISTER_TYPE_COUNT)
+        return NULL;
+    return lookup->register_type_info_from_sm4[sm4_type];
+}
+
+static const struct vkd3d_sm4_register_type_info *get_info_from_vkd3d_register_type(
+        const struct vkd3d_sm4_lookup_tables *lookup, enum vkd3d_shader_register_type vkd3d_type)
+{
+    if (vkd3d_type >= VKD3DSPR_COUNT)
+        return NULL;
+    return lookup->register_type_info_from_vkd3d[vkd3d_type];
 }
 
 static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_register *reg)
@@ -1654,6 +1698,7 @@ static bool sm4_register_is_descriptor(enum vkd3d_sm4_register_type register_typ
 static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr, const uint32_t *end,
         enum vkd3d_data_type data_type, struct vkd3d_shader_register *param, enum vkd3d_shader_src_modifier *modifier)
 {
+    const struct vkd3d_sm4_register_type_info *register_type_info;
     enum vkd3d_sm4_register_precision precision;
     enum vkd3d_sm4_register_type register_type;
     enum vkd3d_sm4_extended_operand_type type;
@@ -1668,15 +1713,15 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
     token = *(*ptr)++;
 
     register_type = (token & VKD3D_SM4_REGISTER_TYPE_MASK) >> VKD3D_SM4_REGISTER_TYPE_SHIFT;
-    if (register_type >= ARRAY_SIZE(register_type_table)
-            || register_type_table[register_type] == VKD3DSPR_INVALID)
+    register_type_info = get_info_from_sm4_register_type(&priv->lookup, register_type);
+    if (!register_type_info)
     {
         FIXME("Unhandled register type %#x.\n", register_type);
         param->type = VKD3DSPR_TEMP;
     }
     else
     {
-        param->type = register_type_table[register_type];
+        param->type = register_type_info->vkd3d_type;
     }
     param->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     param->non_uniform = false;
@@ -2375,6 +2420,8 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 
         sm4->output_map[e->register_index] = e->semantic_index;
     }
+
+    init_sm4_lookup_tables(&sm4->lookup);
 
     return true;
 }
@@ -3694,20 +3741,20 @@ static void sm4_src_from_node(struct sm4_src_register *src,
 
 static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct sm4_register *reg)
 {
-    uint32_t sm4_reg_type = ~0u;
-    unsigned int i;
+    const struct vkd3d_sm4_register_type_info *register_type_info;
+    uint32_t sm4_reg_type;
 
-    /* Find sm4 register type from vkd3d_shader_register_type. */
-    for (i = 0; i < ARRAY_SIZE(register_type_table); ++i)
+    register_type_info = get_info_from_vkd3d_register_type(&tpf->lookup, reg->type);
+
+    if (!register_type_info)
     {
-        if (reg->type == register_type_table[i])
-        {
-            if (sm4_reg_type != ~0u)
-                ERR("Multiple maps for register_type %#x.\n", reg->type);
-            sm4_reg_type = i;
-        }
+        FIXME("Unhandled vkd3d-shader register type %#x.\n", reg->type);
+        sm4_reg_type = VKD3D_SM4_RT_TEMP;
     }
-    assert(sm4_reg_type != ~0u);
+    else
+    {
+        sm4_reg_type = register_type_info->sm4_type;
+    }
 
     return (sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
             | (reg->idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT)

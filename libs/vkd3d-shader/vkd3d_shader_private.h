@@ -511,6 +511,8 @@ enum vkd3d_shader_register_type
     VKD3DSPR_OUTSTENCILREF,
     VKD3DSPR_UNDEF,
 
+    VKD3DSPR_COUNT,
+
     VKD3DSPR_INVALID = ~0u,
 };
 
