@@ -253,6 +253,11 @@ static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
 {
 }
 
+static inline unsigned int vkd3d_atomic_increment(unsigned int volatile *x)
+{
+    return InterlockedIncrement((LONG volatile *)x);
+}
+
 static inline unsigned int vkd3d_atomic_decrement(unsigned int volatile *x)
 {
     return InterlockedDecrement((LONG volatile *)x);
@@ -387,6 +392,15 @@ static inline unsigned int vkd3d_atomic_decrement(unsigned int volatile *x)
 }
 # else
 #  error "vkd3d_atomic_decrement() not implemented for this platform"
+# endif  /* HAVE_SYNC_SUB_AND_FETCH */
+
+# if HAVE_SYNC_ADD_AND_FETCH
+static inline unsigned int vkd3d_atomic_increment(unsigned int volatile *x)
+{
+    return __sync_add_and_fetch(x, 1);
+}
+# else
+#  error "vkd3d_atomic_increment() not implemented for this platform"
 # endif  /* HAVE_SYNC_ADD_AND_FETCH */
 
 # if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
@@ -1579,6 +1593,7 @@ struct d3d12_command_signature
 {
     ID3D12CommandSignature ID3D12CommandSignature_iface;
     LONG refcount;
+    unsigned int internal_refcount;
 
     D3D12_COMMAND_SIGNATURE_DESC desc;
 

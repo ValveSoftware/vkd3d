@@ -1905,6 +1905,28 @@ HRESULT d3d12_command_allocator_create(struct d3d12_device *device,
     return S_OK;
 }
 
+static void d3d12_command_signature_incref(struct d3d12_command_signature *signature)
+{
+    vkd3d_atomic_increment(&signature->internal_refcount);
+}
+
+static void d3d12_command_signature_decref(struct d3d12_command_signature *signature)
+{
+    unsigned int refcount = vkd3d_atomic_decrement(&signature->internal_refcount);
+
+    if (!refcount)
+    {
+        struct d3d12_device *device = signature->device;
+
+        vkd3d_private_store_destroy(&signature->private_store);
+
+        vkd3d_free((void *)signature->desc.pArgumentDescs);
+        vkd3d_free(signature);
+
+        d3d12_device_release(device);
+    }
+}
+
 /* ID3D12CommandList */
 static inline struct d3d12_command_list *impl_from_ID3D12GraphicsCommandList2(ID3D12GraphicsCommandList2 *iface)
 {
@@ -5738,6 +5760,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ExecuteIndirect(ID3D12GraphicsC
         return;
     }
 
+    d3d12_command_signature_incref(sig_impl);
+
     signature_desc = &sig_impl->desc;
     for (i = 0; i < signature_desc->NumArgumentDescs; ++i)
     {
@@ -5800,6 +5824,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ExecuteIndirect(ID3D12GraphicsC
                 if (!d3d12_command_list_update_compute_state(list))
                 {
                     WARN("Failed to update compute state, ignoring dispatch.\n");
+                    d3d12_command_signature_decref(sig_impl);
                     return;
                 }
 
@@ -5812,6 +5837,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ExecuteIndirect(ID3D12GraphicsC
                 break;
         }
     }
+
+    d3d12_command_signature_decref(sig_impl);
 }
 
 static void STDMETHODCALLTYPE d3d12_command_list_AtomicCopyBufferUINT(ID3D12GraphicsCommandList2 *iface,
@@ -7306,16 +7333,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_signature_Release(ID3D12CommandSign
     TRACE("%p decreasing refcount to %u.\n", signature, refcount);
 
     if (!refcount)
-    {
-        struct d3d12_device *device = signature->device;
-
-        vkd3d_private_store_destroy(&signature->private_store);
-
-        vkd3d_free((void *)signature->desc.pArgumentDescs);
-        vkd3d_free(signature);
-
-        d3d12_device_release(device);
-    }
+        d3d12_command_signature_decref(signature);
 
     return refcount;
 }
@@ -7422,6 +7440,7 @@ HRESULT d3d12_command_signature_create(struct d3d12_device *device, const D3D12_
 
     object->ID3D12CommandSignature_iface.lpVtbl = &d3d12_command_signature_vtbl;
     object->refcount = 1;
+    object->internal_refcount = 1;
 
     object->desc = *desc;
     if (!(object->desc.pArgumentDescs = vkd3d_calloc(desc->NumArgumentDescs, sizeof(*desc->pArgumentDescs))))
