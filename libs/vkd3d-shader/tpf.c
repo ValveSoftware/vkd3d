@@ -3739,16 +3739,18 @@ static void sm4_src_from_node(struct sm4_src_register *src,
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
-static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct sm4_register *reg)
+static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct sm4_dst_register *dst)
 {
     const struct vkd3d_sm4_register_type_info *register_type_info;
-    uint32_t sm4_reg_type;
+    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
+    uint32_t sm4_reg_type, reg_dim;
+    uint32_t token = 0;
+    unsigned int j;
 
-    register_type_info = get_info_from_vkd3d_register_type(&tpf->lookup, reg->type);
-
+    register_type_info = get_info_from_vkd3d_register_type(&tpf->lookup, dst->reg.type);
     if (!register_type_info)
     {
-        FIXME("Unhandled vkd3d-shader register type %#x.\n", reg->type);
+        FIXME("Unhandled vkd3d-shader register type %#x.\n", dst->reg.type);
         sm4_reg_type = VKD3D_SM4_RT_TEMP;
     }
     else
@@ -3756,9 +3758,20 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct s
         sm4_reg_type = register_type_info->sm4_type;
     }
 
-    return (sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT)
-            | (reg->idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT)
-            | (reg->dim << VKD3D_SM4_DIMENSION_SHIFT);
+    reg_dim = dst->reg.dim;
+
+    token |= sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT;
+    token |= dst->reg.idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
+    token |= reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
+    if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
+        token |= dst->writemask << VKD3D_SM4_WRITEMASK_SHIFT;
+    put_u32(buffer, token);
+
+    for (j = 0; j < dst->reg.idx_count; ++j)
+    {
+        put_u32(buffer, dst->reg.idx[j].offset);
+        assert(!dst->reg.idx[j].rel_addr);
+    }
 }
 
 static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm4_src_register *src)
@@ -3857,18 +3870,7 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
     }
 
     for (i = 0; i < instr->dst_count; ++i)
-    {
-        token = sm4_encode_register(tpf, &instr->dsts[i].reg);
-        if (instr->dsts[i].reg.dim == VKD3D_SM4_DIMENSION_VEC4)
-            token |= instr->dsts[i].writemask << VKD3D_SM4_WRITEMASK_SHIFT;
-        put_u32(buffer, token);
-
-        for (j = 0; j < instr->dsts[i].reg.idx_count; ++j)
-        {
-            put_u32(buffer, instr->dsts[i].reg.idx[j].offset);
-            assert(!instr->dsts[i].reg.idx[j].rel_addr);
-        }
-    }
+        sm4_write_dst_register(tpf, &instr->dsts[i]);
 
     for (i = 0; i < instr->src_count; ++i)
         sm4_write_src_register(tpf, &instr->srcs[i]);
