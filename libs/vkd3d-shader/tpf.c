@@ -3913,8 +3913,13 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
     token |= reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
     if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
     {
-        token |= (uint32_t)register_type_info->default_src_swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
-        token |= swizzle_to_sm4(src->swizzle) << VKD3D_SM4_SWIZZLE_SHIFT;
+        uint32_t swizzle_type = (uint32_t)register_type_info->default_src_swizzle_type;
+
+        token |= swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+        if (swizzle_type == VKD3D_SM4_SWIZZLE_SCALAR)
+            token |= (swizzle_to_sm4(src->swizzle) & 0x3) << VKD3D_SM4_SWIZZLE_SHIFT;
+        else
+            token |= swizzle_to_sm4(src->swizzle) << VKD3D_SM4_SWIZZLE_SHIFT;
     }
 
     switch (src->modifiers)
