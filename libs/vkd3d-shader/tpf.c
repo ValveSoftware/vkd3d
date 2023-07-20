@@ -3761,6 +3761,61 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct s
             | (reg->dim << VKD3D_SM4_DIMENSION_SHIFT);
 }
 
+static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm4_src_register *src)
+{
+    const struct vkd3d_sm4_register_type_info *register_type_info;
+    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
+    uint32_t sm4_reg_type, reg_dim;
+    uint32_t token = 0;
+    unsigned int j;
+
+    register_type_info = get_info_from_vkd3d_register_type(&tpf->lookup, src->reg.type);
+    if (!register_type_info)
+    {
+        FIXME("Unhandled vkd3d-shader register type %#x.\n", src->reg.type);
+        sm4_reg_type = VKD3D_SM4_RT_TEMP;
+    }
+    else
+    {
+        sm4_reg_type = register_type_info->sm4_type;
+    }
+
+    reg_dim = src->reg.dim;
+
+    token |= sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT;
+    token |= src->reg.idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
+    token |= reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
+    if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
+    {
+        token |= (uint32_t)src->swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+        token |= src->swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
+    }
+    if (src->reg.mod)
+        token |= VKD3D_SM4_EXTENDED_OPERAND;
+    put_u32(buffer, token);
+
+    if (src->reg.mod)
+        put_u32(buffer, (src->reg.mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+                | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER);
+
+    for (j = 0; j < src->reg.idx_count; ++j)
+    {
+        put_u32(buffer, src->reg.idx[j].offset);
+        assert(!src->reg.idx[j].rel_addr);
+    }
+
+    if (src->reg.type == VKD3DSPR_IMMCONST)
+    {
+        put_u32(buffer, src->reg.immconst_uint[0]);
+        if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
+        {
+            put_u32(buffer, src->reg.immconst_uint[1]);
+            put_u32(buffer, src->reg.immconst_uint[2]);
+            put_u32(buffer, src->reg.immconst_uint[3]);
+        }
+    }
+}
+
 static uint32_t sm4_register_order(const struct sm4_register *reg)
 {
     uint32_t order = 1;
@@ -3816,35 +3871,7 @@ static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4
     }
 
     for (i = 0; i < instr->src_count; ++i)
-    {
-        token = sm4_encode_register(tpf, &instr->srcs[i].reg);
-        token |= (uint32_t)instr->srcs[i].swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
-        token |= instr->srcs[i].swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
-        if (instr->srcs[i].reg.mod)
-            token |= VKD3D_SM4_EXTENDED_OPERAND;
-        put_u32(buffer, token);
-
-        if (instr->srcs[i].reg.mod)
-            put_u32(buffer, (instr->srcs[i].reg.mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
-                    | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER);
-
-        for (j = 0; j < instr->srcs[i].reg.idx_count; ++j)
-        {
-            put_u32(buffer, instr->srcs[i].reg.idx[j].offset);
-            assert(!instr->srcs[i].reg.idx[j].rel_addr);
-        }
-
-        if (instr->srcs[i].reg.type == VKD3DSPR_IMMCONST)
-        {
-            put_u32(buffer, instr->srcs[i].reg.immconst_uint[0]);
-            if (instr->srcs[i].reg.dim == VKD3D_SM4_DIMENSION_VEC4)
-            {
-                put_u32(buffer, instr->srcs[i].reg.immconst_uint[1]);
-                put_u32(buffer, instr->srcs[i].reg.immconst_uint[2]);
-                put_u32(buffer, instr->srcs[i].reg.immconst_uint[3]);
-            }
-        }
-    }
+        sm4_write_src_register(tpf, &instr->srcs[i]);
 
     if (instr->byte_stride)
         put_u32(buffer, instr->byte_stride);
