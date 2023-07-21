@@ -85,6 +85,75 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
         shader_register_eliminate_phase_addressing((struct vkd3d_shader_register *)&ins->dst[i].reg, instance_id);
 }
 
+static const struct vkd3d_shader_varying_map *find_varying_map(
+        const struct vkd3d_shader_next_stage_info *next_stage, unsigned int signature_idx)
+{
+    unsigned int i;
+
+    for (i = 0; i < next_stage->varying_count; ++i)
+    {
+        if (next_stage->varying_map[i].output_signature_index == signature_idx)
+            return &next_stage->varying_map[i];
+    }
+
+    return NULL;
+}
+
+static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_compile_info *compile_info)
+{
+    struct shader_signature *signature = &parser->shader_desc.output_signature;
+    const struct vkd3d_shader_next_stage_info *next_stage;
+    unsigned int i;
+
+    if (!(next_stage = vkd3d_find_struct(compile_info->next, NEXT_STAGE_INFO)))
+        return VKD3D_OK;
+
+    for (i = 0; i < signature->element_count; ++i)
+    {
+        const struct vkd3d_shader_varying_map *map = find_varying_map(next_stage, i);
+        struct signature_element *e = &signature->elements[i];
+
+        if (map)
+        {
+            unsigned int input_mask = map->input_mask;
+
+            e->target_location = map->input_register_index;
+
+            /* It is illegal in Vulkan if the next shader uses the same varying
+             * location with a different mask. */
+            if (input_mask && input_mask != e->mask)
+            {
+                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Aborting due to not yet implemented feature: "
+                        "Output mask %#x does not match input mask %#x.",
+                        e->mask, input_mask);
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
+            }
+        }
+        else
+        {
+            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                    "Aborting due to not yet implemented feature: "
+                    "This stage outputs varyings not consumed by the next stage.");
+            return VKD3D_ERROR_NOT_IMPLEMENTED;
+        }
+    }
+
+    for (i = 0; i < next_stage->varying_count; ++i)
+    {
+        if (next_stage->varying_map[i].output_signature_index >= signature->element_count)
+        {
+            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                    "Aborting due to not yet implemented feature: "
+                    "The next stage consumes varyings not written by this stage.");
+            return VKD3D_ERROR_NOT_IMPLEMENTED;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 struct hull_flattener
 {
     struct vkd3d_shader_instruction_array instructions;
@@ -1194,12 +1263,17 @@ static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d
     return VKD3D_OK;
 }
 
-enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser)
+enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_compile_info *compile_info)
 {
     struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
     enum vkd3d_result result = VKD3D_OK;
 
     if (parser->shader_desc.is_dxil)
+        return result;
+
+    if (parser->shader_version.type != VKD3D_SHADER_TYPE_PIXEL
+            && (result = remap_output_signature(parser, compile_info)) < 0)
         return result;
 
     if (parser->shader_version.type == VKD3D_SHADER_TYPE_HULL

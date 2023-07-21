@@ -9542,7 +9542,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     compiler->location.column = 0;
     compiler->location.line = 1;
 
-    if ((result = vkd3d_shader_normalise(parser)) < 0)
+    if ((result = vkd3d_shader_normalise(parser, compile_info)) < 0)
         return result;
 
     instructions = parser->instructions;

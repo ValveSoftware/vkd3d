@@ -90,6 +90,11 @@ enum vkd3d_shader_structure_type
      * \since 1.9
      */
     VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO,
+    /**
+     * The structure is a vkd3d_shader_next_stage_info structure.
+     * \since 1.9
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_NEXT_STAGE_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -1676,6 +1681,74 @@ struct vkd3d_shader_scan_signature_info
     struct vkd3d_shader_signature patch_constant;
 };
 
+/**
+ * Describes the mapping of a output varying register in a shader stage,
+ * to an input varying register in the following shader stage.
+ *
+ * This structure is used in struct vkd3d_shader_next_stage_info.
+ */
+struct vkd3d_shader_varying_map
+{
+    /**
+     * The signature index (in the output signature) of the output varying.
+     * If greater than or equal to the number of elements in the output
+     * signature, signifies that the varying is consumed by the next stage but
+     * not written by this one.
+     */
+    unsigned int output_signature_index;
+    /** The register index of the input varying to map this register to. */
+    unsigned int input_register_index;
+    /** The mask consumed by the destination register. */
+    unsigned int input_mask;
+};
+
+/**
+ * A chained structure which describes the next shader in the pipeline.
+ *
+ * This structure is optional, and should only be provided if there is in fact
+ * another shader in the pipeline.
+ * However, depending on the input and output formats, this structure may be
+ * necessary in order to generate shaders which correctly match each other.
+ * If the structure or its individual fields are not provided, vkd3d-shader
+ * will generate shaders which may be correct in isolation, but are not
+ * guaranteed to correctly match each other.
+ *
+ * This structure is passed to vkd3d_shader_compile() and extends
+ * vkd3d_shader_compile_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.9
+ */
+struct vkd3d_shader_next_stage_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_NEXT_STAGE_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /**
+     * A mapping of output varyings in this shader stage to input varyings
+     * in the next shader stage.
+     *
+     * This mapping should include exactly one element for each varying
+     * consumed by the next shader stage.
+     * If this shader stage outputs a varying that is not consumed by the next
+     * shader stage, that varying should be absent from this array.
+     *
+     * If this field is absent, vkd3d-shader will map varyings from one stage
+     * to another based on their register index.
+     * For Direct3D shader model 3.0, such a default mapping will be incorrect
+     * unless the registers are allocated in the same order, and hence this
+     * field is necessary to correctly match inter-stage varyings.
+     * This mapping may also be necessary under other circumstances where the
+     * varying interface does not match exactly.
+     */
+    const struct vkd3d_shader_varying_map *varying_map;
+    /** The number of registers provided in \ref varying_map. */
+    unsigned int varying_count;
+};
+
 #ifdef LIBVKD3D_SHADER_SOURCE
 # define VKD3D_SHADER_API VKD3D_EXPORT
 #else
@@ -1748,13 +1821,14 @@ VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported
  *
  * Depending on the source and target types, this function may support the
  * following chained structures:
+ * - vkd3d_shader_hlsl_source_info
  * - vkd3d_shader_interface_info
+ * - vkd3d_shader_next_stage_info
  * - vkd3d_shader_scan_descriptor_info
  * - vkd3d_shader_scan_signature_info
  * - vkd3d_shader_spirv_domain_shader_target_info
  * - vkd3d_shader_spirv_target_info
  * - vkd3d_shader_transform_feedback_info
- * - vkd3d_shader_hlsl_source_info
  *
  * \param compile_info A chained structure containing compilation parameters.
  *

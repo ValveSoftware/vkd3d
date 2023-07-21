@@ -168,6 +168,8 @@ enum vkd3d_shader_error
     VKD3D_SHADER_WARNING_DXIL_INVALID_BLOCK_LENGTH      = 8302,
     VKD3D_SHADER_WARNING_DXIL_INVALID_MODULE_LENGTH     = 8303,
     VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS         = 8304,
+
+    VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED             = 9000,
 };
 
 enum vkd3d_shader_opcode
@@ -1409,6 +1411,7 @@ void dxbc_writer_add_section(struct dxbc_writer *dxbc, uint32_t tag, const void 
 void dxbc_writer_init(struct dxbc_writer *dxbc);
 int dxbc_writer_write(struct dxbc_writer *dxbc, struct vkd3d_shader_code *code);
 
-enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser);
+enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
+        const struct vkd3d_shader_compile_info *compile_info);
 
 #endif  /* __VKD3D_SHADER_PRIVATE_H */
