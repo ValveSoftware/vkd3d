@@ -1771,9 +1771,6 @@ void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator,
 {
     void *params;
 
-    if (!count)
-        return NULL;
-
     if (count > allocator->count - allocator->index)
     {
         struct vkd3d_shader_param_node *next = shader_param_allocator_node_create(allocator);

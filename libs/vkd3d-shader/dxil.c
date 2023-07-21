@@ -290,6 +290,8 @@ struct sm6_parser
     struct sm6_symbol *global_symbols;
     size_t global_symbol_count;
 
+    struct vkd3d_shader_dst_param *output_params;
+
     struct sm6_function *functions;
     size_t function_count;
 
@@ -1951,6 +1953,81 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
     return VKD3D_OK;
 }
 
+static void dst_param_io_init(struct vkd3d_shader_dst_param *param,
+        const struct signature_element *e, enum vkd3d_shader_register_type reg_type)
+{
+    enum vkd3d_shader_component_type component_type;
+
+    param->write_mask = e->mask;
+    param->modifiers = 0;
+    param->shift = 0;
+    /* DXIL types do not have signedness. Load signed elements as unsigned. */
+    component_type = e->component_type == VKD3D_SHADER_COMPONENT_INT ? VKD3D_SHADER_COMPONENT_UINT : e->component_type;
+    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(component_type), 0);
+}
+
+static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shader_signature *s,
+        enum vkd3d_shader_register_type reg_type, struct vkd3d_shader_dst_param *params)
+{
+    struct vkd3d_shader_dst_param *param;
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < s->element_count; ++i)
+    {
+        e = &s->elements[i];
+
+        param = &params[i];
+        dst_param_io_init(param, e, reg_type);
+        param->reg.idx[0].offset = i;
+        param->reg.idx_count = 1;
+    }
+}
+
+static void sm6_parser_emit_signature(struct sm6_parser *sm6, const struct shader_signature *s,
+        enum vkd3d_shader_opcode handler_idx, enum vkd3d_shader_opcode siv_handler_idx,
+        struct vkd3d_shader_dst_param *params)
+{
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_dst_param *param;
+    const struct signature_element *e;
+    unsigned int i;
+
+    for (i = 0; i < s->element_count; ++i)
+    {
+        e = &s->elements[i];
+
+        /* Do not check e->used_mask because in some cases it is zero for used elements.
+         * TODO: scan ahead for used I/O elements. */
+
+        if (e->sysval_semantic != VKD3D_SHADER_SV_NONE && e->sysval_semantic != VKD3D_SHADER_SV_TARGET)
+        {
+            ins = sm6_parser_add_instruction(sm6, siv_handler_idx);
+            param = &ins->declaration.register_semantic.reg;
+            ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
+        }
+        else
+        {
+            ins = sm6_parser_add_instruction(sm6, handler_idx);
+            param = &ins->declaration.dst;
+        }
+
+        *param = params[i];
+    }
+}
+
+static void sm6_parser_init_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
+{
+    sm6_parser_init_signature(sm6, output_signature,
+            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSPR_COLOROUT : VKD3DSPR_OUTPUT,
+            sm6->output_params);
+}
+
+static void sm6_parser_emit_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
+{
+    sm6_parser_emit_signature(sm6, output_signature, VKD3DSIH_DCL_OUTPUT, VKD3DSIH_DCL_OUTPUT_SIV, sm6->output_params);
+}
+
 static const struct sm6_value *sm6_parser_next_function_definition(struct sm6_parser *sm6)
 {
     size_t i, count = sm6->function_count;
@@ -2365,6 +2442,7 @@ static const struct vkd3d_shader_parser_ops sm6_parser_ops =
 static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t *byte_code, size_t byte_code_size,
         const char *source_name, struct vkd3d_shader_message_context *message_context)
 {
+    const struct shader_signature *output_signature = &sm6->p.shader_desc.output_signature;
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t version_token, dxil_version, token_count, magic;
     unsigned int chunk_offset, chunk_size;
@@ -2520,6 +2598,14 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
+    if (!(sm6->output_params = shader_parser_get_dst_params(&sm6->p, output_signature->element_count)))
+    {
+        ERR("Failed to allocate output parameters.\n");
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating output parameters.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
     function_count = dxil_block_compute_function_count(&sm6->root_block);
     if (!(sm6->functions = vkd3d_calloc(function_count, sizeof(*sm6->functions))))
     {
@@ -2550,6 +2636,8 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
+    sm6_parser_init_output_signature(sm6, output_signature);
+
     if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
     {
         if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
@@ -2560,6 +2648,14 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
                     "DXIL module is invalid.");
         return ret;
     }
+
+    if (!sm6_parser_require_space(sm6, output_signature->element_count))
+    {
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory emitting shader signature declarations.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    sm6_parser_emit_output_signature(sm6, output_signature);
 
     for (i = 0; i < sm6->function_count; ++i)
     {
