@@ -882,8 +882,9 @@ static inline void *d3d12_desc_get_object_ref(const volatile struct d3d12_desc *
     {
         do
         {
-            view = src->s.u.object;
-        } while (view && !vkd3d_view_incref(view));
+            if (!(view = src->s.u.object))
+                return NULL;
+        } while (!vkd3d_view_incref(view));
 
         /* Check if the object is still in src to handle the case where it was
          * already freed and reused elsewhere when the refcount was incremented. */
