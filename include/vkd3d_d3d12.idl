@@ -1878,6 +1878,24 @@ typedef struct D3D12_WRITEBUFFERIMMEDIATE_PARAMETER
     UINT32 Value;
 } D3D12_WRITEBUFFERIMMEDIATE_PARAMETER;
 
+typedef enum D3D12_PROTECTED_RESOURCE_SESSION_FLAGS
+{
+    D3D12_PROTECTED_RESOURCE_SESSION_FLAG_NONE = 0,
+} D3D12_PROTECTED_RESOURCE_SESSION_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_PROTECTED_RESOURCE_SESSION_FLAGS);")
+
+typedef enum D3D12_PROTECTED_SESSION_STATUS
+{
+    D3D12_PROTECTED_SESSION_STATUS_OK = 0,
+    D3D12_PROTECTED_SESSION_STATUS_INVALID = 1,
+} D3D12_PROTECTED_SESSION_STATUS;
+
+typedef struct D3D12_PROTECTED_RESOURCE_SESSION_DESC
+{
+    UINT NodeMask;
+    D3D12_PROTECTED_RESOURCE_SESSION_FLAGS Flags;
+} D3D12_PROTECTED_RESOURCE_SESSION_DESC;
+
 [
     uuid(c4fec28f-7966-4e95-9f94-f431cb56c3b8),
     object,
@@ -2237,6 +2255,41 @@ interface ID3D12GraphicsCommandList2 : ID3D12GraphicsCommandList1
     void WriteBufferImmediate(UINT count,
             const D3D12_WRITEBUFFERIMMEDIATE_PARAMETER *parameters,
             const D3D12_WRITEBUFFERIMMEDIATE_MODE *modes);
+}
+
+[
+    uuid(a1533d18-0ac1-4084-85b9-89a96116806b),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12ProtectedSession : ID3D12DeviceChild
+{
+    HRESULT GetStatusFence(REFIID riid, void **fence);
+
+    D3D12_PROTECTED_SESSION_STATUS GetSessionStatus();
+}
+
+[
+    uuid(6cd696f4-f289-40cc-8091-5a6c0a099c3d),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12ProtectedResourceSession : ID3D12ProtectedSession
+{
+    D3D12_PROTECTED_RESOURCE_SESSION_DESC GetDesc();
+}
+
+[
+    uuid(6fda83a7-b84c-4e38-9ac8-c7bd22016b3d),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12GraphicsCommandList3 : ID3D12GraphicsCommandList2
+{
+    void SetProtectedResourceSession(ID3D12ProtectedResourceSession *protected_resource_session);
 }
 
 typedef enum D3D12_TILE_RANGE_FLAGS
