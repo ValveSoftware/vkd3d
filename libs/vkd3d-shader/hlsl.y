@@ -6562,6 +6562,7 @@ conditional_expr:
             struct hlsl_ir_node *cond = node_from_block($1);
             struct hlsl_ir_node *first = node_from_block($3);
             struct hlsl_ir_node *second = node_from_block($5);
+            struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = { 0 };
             struct hlsl_type *common_type;
 
             hlsl_block_add_block($1, $3);
@@ -6578,7 +6579,10 @@ conditional_expr:
             if (!(second = add_implicit_conversion(ctx, $1, second, common_type, &@5)))
                 YYABORT;
 
-            if (!hlsl_add_conditional(ctx, $1, cond, first, second))
+            args[0] = cond;
+            args[1] = first;
+            args[2] = second;
+            if (!add_expr(ctx, $1, HLSL_OP3_TERNARY, args, common_type, &@1))
                 YYABORT;
             $$ = $1;
         }

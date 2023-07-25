@@ -552,6 +552,9 @@ enum hlsl_ir_expr_op
 
     HLSL_OP3_DP2ADD,
     HLSL_OP3_LERP,
+    /* TERNARY is used specifically for ternary operator, and later lowered according to profile to e.g. MOVC. */
+    HLSL_OP3_MOVC,
+    HLSL_OP3_TERNARY,
 };
 
 #define HLSL_MAX_OPERANDS 3

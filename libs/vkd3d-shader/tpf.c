@@ -4341,6 +4341,26 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     write_sm4_instruction(tpf, &instr);
 }
 
+static void write_sm4_ternary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2,
+        const struct hlsl_ir_node *src3)
+{
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = opcode;
+
+    sm4_dst_from_node(&instr.dsts[0], dst);
+    instr.dst_count = 1;
+
+    sm4_src_from_node(&instr.srcs[0], src1, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[1], src2, instr.dsts[0].writemask);
+    sm4_src_from_node(&instr.srcs[2], src3, instr.dsts[0].writemask);
+    instr.src_count = 3;
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_ir_node *coords,
         const struct hlsl_ir_node *sample_index, const struct hlsl_ir_node *texel_offset,
@@ -4702,6 +4722,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
 {
     const struct hlsl_ir_node *arg1 = expr->operands[0].node;
     const struct hlsl_ir_node *arg2 = expr->operands[1].node;
+    const struct hlsl_ir_node *arg3 = expr->operands[2].node;
     const struct hlsl_type *dst_type = expr->node.data_type;
     struct vkd3d_string_buffer *dst_type_string;
 
@@ -5125,6 +5146,10 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             assert(dst_type->base_type != HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, dst_type->base_type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
                     &expr->node, arg1, arg2);
+            break;
+
+        case HLSL_OP3_MOVC:
+            write_sm4_ternary_op(tpf, VKD3D_SM4_OP_MOVC, &expr->node, arg1, arg2, arg3);
             break;
 
         default:

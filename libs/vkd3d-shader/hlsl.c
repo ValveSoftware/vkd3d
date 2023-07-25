@@ -2487,6 +2487,8 @@ const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op)
 
         [HLSL_OP3_DP2ADD]      = "dp2add",
         [HLSL_OP3_LERP]        = "lerp",
+        [HLSL_OP3_MOVC]        = "movc",
+        [HLSL_OP3_TERNARY]     = "ternary",
     };
 
     return op_names[op];
