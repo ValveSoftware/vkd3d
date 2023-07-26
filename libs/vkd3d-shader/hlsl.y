@@ -2913,6 +2913,7 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *x, *y, *div, *abs, *frac, *neg_frac, *ge, *select, *zero;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
     static const struct hlsl_constant_value zero_value;
 
     if (!(x = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
@@ -2940,7 +2941,10 @@ static bool intrinsic_fmod(struct hlsl_ctx *ctx, const struct parse_initializer 
     if (!(ge = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_GEQUAL, div, zero, loc)))
         return false;
 
-    if (!(select = hlsl_add_conditional(ctx, params->instrs, ge, frac, neg_frac)))
+    operands[0] = ge;
+    operands[1] = frac;
+    operands[2] = neg_frac;
+    if (!(select = add_expr(ctx, params->instrs, HLSL_OP3_TERNARY, operands, x->data_type, loc)))
         return false;
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, select, y, loc);
