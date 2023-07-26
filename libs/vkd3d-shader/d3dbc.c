@@ -2442,7 +2442,6 @@ static void write_sm1_instructions(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
 int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
     struct vkd3d_bytecode_buffer buffer = {0};
-    int ret;
 
     put_u32(&buffer, sm1_version(ctx->profile->type, ctx->profile->major_version, ctx->profile->minor_version));
 
@@ -2455,7 +2454,10 @@ int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
 
     put_u32(&buffer, D3DSIO_END);
 
-    if (!(ret = buffer.status))
+    if (buffer.status)
+        ctx->result = buffer.status;
+
+    if (!ctx->result)
     {
         out->code = buffer.data;
         out->size = buffer.size;
@@ -2464,5 +2466,5 @@ int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     {
         vkd3d_free(buffer.data);
     }
-    return ret;
+    return ctx->result;
 }
