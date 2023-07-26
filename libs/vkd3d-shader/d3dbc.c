@@ -2034,7 +2034,12 @@ static void write_sm1_sampler_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
             if (var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
             {
                 sampler_dim = var->objects_usage[HLSL_REGSET_SAMPLERS][i].sampler_dim;
-                assert(sampler_dim != HLSL_SAMPLER_DIM_GENERIC);
+                if (sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+                {
+                    /* These can appear in sm4-style combined sample instructions. */
+                    hlsl_fixme(ctx, &var->loc, "Generic samplers need to be lowered.");
+                    continue;
+                }
 
                 reg_id = var->regs[HLSL_REGSET_SAMPLERS].id + i;
                 write_sm1_sampler_dcl(ctx, buffer, reg_id, sampler_dim);
