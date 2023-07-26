@@ -2627,7 +2627,8 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semant
     return true;
 }
 
-static void add_section(struct dxbc_writer *dxbc, uint32_t tag, struct vkd3d_bytecode_buffer *buffer)
+static void add_section(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc,
+        uint32_t tag, struct vkd3d_bytecode_buffer *buffer)
 {
     /* Native D3DDisassemble() expects at least the sizes of the ISGN and OSGN
      * sections to be aligned. Without this, the sections themselves will be
@@ -2635,6 +2636,9 @@ static void add_section(struct dxbc_writer *dxbc, uint32_t tag, struct vkd3d_byt
     size_t size = bytecode_align(buffer);
 
     dxbc_writer_add_section(dxbc, tag, buffer->data, size);
+
+    if (buffer->status < 0)
+        ctx->result = buffer->status;
 }
 
 static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, bool output)
@@ -2742,7 +2746,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
 
     set_u32(&buffer, count_position, i);
 
-    add_section(dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
+    add_section(ctx, dxbc, output ? TAG_OSGN : TAG_ISGN, &buffer);
 }
 
 static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
@@ -3357,7 +3361,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
     creator_offset = put_string(&buffer, vkd3d_shader_get_version(NULL, NULL));
     set_u32(&buffer, creator_position, creator_offset);
 
-    add_section(dxbc, TAG_RDEF, &buffer);
+    add_section(ctx, dxbc, TAG_RDEF, &buffer);
 
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 }
@@ -5377,7 +5381,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
     set_u32(&buffer, token_count_position, bytecode_get_size(&buffer) / sizeof(uint32_t));
 
-    add_section(dxbc, TAG_SHDR, &buffer);
+    add_section(ctx, dxbc, TAG_SHDR, &buffer);
 
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 }
