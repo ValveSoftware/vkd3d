@@ -1710,6 +1710,15 @@ static uint32_t vkd3d_spirv_build_op_glsl_std450_cos(struct vkd3d_spirv_builder 
     return vkd3d_spirv_build_op_glsl_std450_tr1(builder, GLSLstd450Cos, result_type, operand);
 }
 
+static uint32_t vkd3d_spirv_build_op_glsl_std450_max(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t x, uint32_t y)
+{
+    uint32_t glsl_std450_id = vkd3d_spirv_get_glsl_std450_instr_set(builder);
+    uint32_t operands[] = {x, y};
+    return vkd3d_spirv_build_op_ext_inst(builder, result_type, glsl_std450_id,
+            GLSLstd450NMax, operands, ARRAY_SIZE(operands));
+}
+
 static uint32_t vkd3d_spirv_build_op_glsl_std450_nclamp(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t x, uint32_t min, uint32_t max)
 {
@@ -6522,7 +6531,6 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_DTOU,       SpvOpConvertFToU},
         {VKD3DSIH_FTOD,       SpvOpFConvert},
         {VKD3DSIH_FTOI,       SpvOpConvertFToS},
-        {VKD3DSIH_FTOU,       SpvOpConvertFToU},
         {VKD3DSIH_IADD,       SpvOpIAdd},
         {VKD3DSIH_INEG,       SpvOpSNegate},
         {VKD3DSIH_ISHL,       SpvOpShiftLeftLogical},
@@ -6986,6 +6994,33 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
 
         spirv_compiler_emit_store_dst(compiler, &dst[1], val_id);
     }
+}
+
+static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t src_type_id, type_id, src_id, zero_id, val_id;
+
+    assert(instruction->dst_count == 1);
+    assert(instruction->src_count == 1);
+
+    /* OpConvertFToU has undefined results if the result cannot be represented
+     * as an unsigned integer, but Direct3D expects the result to saturate,
+     * and for NaN to yield zero. */
+
+    src_type_id = spirv_compiler_get_type_id_for_reg(compiler, &src->reg, dst->write_mask);
+    type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
+    src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    zero_id = spirv_compiler_get_constant_float_vector(compiler, 0.0f,
+            vkd3d_write_mask_component_count(dst->write_mask));
+
+    val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, zero_id);
+    val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpConvertFToU, type_id, val_id);
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
 static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *compiler,
@@ -9260,7 +9295,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DTOU:
         case VKD3DSIH_FTOD:
         case VKD3DSIH_FTOI:
-        case VKD3DSIH_FTOU:
         case VKD3DSIH_IADD:
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISHL:
@@ -9320,6 +9354,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         case VKD3DSIH_UDIV:
             spirv_compiler_emit_udiv(compiler, instruction);
+            break;
+        case VKD3DSIH_FTOU:
+            spirv_compiler_emit_ftou(compiler, instruction);
             break;
         case VKD3DSIH_DEQ:
         case VKD3DSIH_DGE:
