@@ -2460,5 +2460,9 @@ int hlsl_sm1_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
         out->code = buffer.data;
         out->size = buffer.size;
     }
+    else
+    {
+        vkd3d_free(buffer.data);
+    }
     return ret;
 }
