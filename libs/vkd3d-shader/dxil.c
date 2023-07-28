@@ -9387,6 +9387,10 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
             e->used_mask <<= index;
         }
 
+        /* DXIL reads/writes uint for bool I/O. */
+        if (e->component_type == VKD3D_SHADER_COMPONENT_BOOL)
+            e->component_type = VKD3D_SHADER_COMPONENT_UINT;
+
         m = element_node->operands[4];
         if (!sm6_metadata_value_is_node(m))
         {
