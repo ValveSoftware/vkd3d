@@ -346,6 +346,34 @@ static bool preproc_push_expansion(struct preproc_ctx *ctx,
     return true;
 }
 
+static void preproc_stringify(struct preproc_ctx *ctx, struct vkd3d_string_buffer *buffer, const char *text)
+{
+    const struct preproc_text *expansion;
+    const char *p = text + 1;
+    unsigned int i;
+
+    while (*p == ' ' || *p == '\t')
+        ++p;
+
+    vkd3d_string_buffer_printf(buffer, "\"");
+    if ((expansion = find_arg_expansion(ctx, p)))
+    {
+        for (i = 0; i < expansion->text.content_size; ++i)
+        {
+            char c = expansion->text.buffer[i];
+
+            if (c == '\\' || c == '"')
+                vkd3d_string_buffer_printf(buffer, "\\");
+            vkd3d_string_buffer_printf(buffer, "%c", c);
+        }
+    }
+    else
+    {
+        vkd3d_string_buffer_printf(buffer, "%s", p);
+    }
+    vkd3d_string_buffer_printf(buffer, "\"");
+}
+
 int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 {
     struct preproc_ctx *ctx = yyget_extra(scanner);
@@ -463,33 +491,15 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 
                 if (token == T_HASHSTRING)
                 {
-                    const struct preproc_text *expansion;
-                    const char *p = text + 1;
-                    unsigned int i;
+                    struct vkd3d_string_buffer buffer;
 
                     if (ctx->current_directive)
                         return return_token(token, lval, text);
 
-                    while (*p == ' ' || *p == '\t')
-                        ++p;
-
-                    vkd3d_string_buffer_printf(&ctx->buffer, "\"");
-                    if ((expansion = find_arg_expansion(ctx, p)))
-                    {
-                        for (i = 0; i < expansion->text.content_size; ++i)
-                        {
-                            char c = expansion->text.buffer[i];
-
-                            if (c == '\\' || c == '"')
-                                vkd3d_string_buffer_printf(&ctx->buffer, "\\");
-                            vkd3d_string_buffer_printf(&ctx->buffer, "%c", c);
-                        }
-                    }
-                    else
-                    {
-                        vkd3d_string_buffer_printf(&ctx->buffer, "%s", p);
-                    }
-                    vkd3d_string_buffer_printf(&ctx->buffer, "\"");
+                    vkd3d_string_buffer_init(&buffer);
+                    preproc_stringify(ctx, &buffer, text);
+                    vkd3d_string_buffer_printf(&ctx->buffer, "%s", buffer.buffer);
+                    vkd3d_string_buffer_cleanup(&buffer);
                     break;
                 }
 
