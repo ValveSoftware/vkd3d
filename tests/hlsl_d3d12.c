@@ -194,6 +194,12 @@ static void test_preprocess(void)
             "\"apple\"",
         },
         {
+            "#define KEY(a) #a\n"
+            "KEY( \t\r\n apple \t\r\n )",
+
+            "\"apple\"",
+        },
+        {
             "#define KEY(if) #if\n"
             "KEY(apple)",
 

@@ -358,7 +358,16 @@ static void preproc_stringify(struct preproc_ctx *ctx, struct vkd3d_string_buffe
     vkd3d_string_buffer_printf(buffer, "\"");
     if ((expansion = find_arg_expansion(ctx, p)))
     {
-        for (i = 0; i < expansion->text.content_size; ++i)
+        size_t len = expansion->text.content_size;
+        size_t start = 0;
+
+        while (len && strchr(" \t\r\n", expansion->text.buffer[len - 1]))
+            --len;
+
+        while (start < len && strchr(" \t\r\n", expansion->text.buffer[start]))
+            ++start;
+
+        for (i = start; i < len; ++i)
         {
             char c = expansion->text.buffer[i];
 
