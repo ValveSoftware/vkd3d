@@ -301,3 +301,7 @@ fail
 [preproc]
 #define __LINE__ pass
 __LINE__
+
+[preproc]
+#define KEY pass
+apple # KEY

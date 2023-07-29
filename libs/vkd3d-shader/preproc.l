@@ -29,6 +29,13 @@
 
 #define YY_DECL static int preproc_lexer_lex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, yyscan_t yyscanner)
 
+static struct preproc_macro *preproc_get_top_macro(struct preproc_ctx *ctx)
+{
+    if (!ctx->expansion_count)
+        return NULL;
+    return ctx->expansion_stack[ctx->expansion_count - 1].macro;
+}
+
 static void update_location(struct preproc_ctx *ctx);
 
 #define YY_USER_ACTION update_location(yyget_extra(yyscanner));
@@ -124,7 +131,20 @@ INT_SUFFIX      [uUlL]{0,2}
         const char *p;
 
         if (!ctx->last_was_newline)
-            return T_HASHSTRING;
+        {
+            struct preproc_macro *macro;
+
+            /* Stringification is only done for function-like macro bodies.
+             * Anywhere else, we need to parse it as two separate tokens.
+             * We could use a state for this, but yyless() is easier and cheap.
+             */
+
+            if ((macro = preproc_get_top_macro(ctx)) && macro->arg_count)
+                return T_HASHSTRING;
+
+            yyless(1);
+            return T_TEXT;
+        }
 
         for (p = yytext + 1; strchr(" \t", *p); ++p)
             ;
@@ -216,13 +236,6 @@ static bool preproc_is_writing(struct preproc_ctx *ctx)
     if (!file->if_count)
         return true;
     return file->if_stack[file->if_count - 1].current_true;
-}
-
-static struct preproc_macro *preproc_get_top_macro(struct preproc_ctx *ctx)
-{
-    if (!ctx->expansion_count)
-        return NULL;
-    return ctx->expansion_stack[ctx->expansion_count - 1].macro;
 }
 
 /* Concatenation is not done for object-like macros, but is done for both
@@ -440,9 +453,6 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
         switch (func_state->state)
         {
             case STATE_NONE:
-            {
-                struct preproc_macro *macro;
-
                 if (token == T_CONCAT && should_concat(ctx))
                 {
                     while (ctx->buffer.content_size
@@ -451,9 +461,7 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                     break;
                 }
 
-                /* Stringification, however, is only done for function-like
-                 * macro bodies. */
-                if (token == T_HASHSTRING && (macro = preproc_get_top_macro(ctx)) && macro->arg_count)
+                if (token == T_HASHSTRING)
                 {
                     const struct preproc_text *expansion;
                     const char *p = text + 1;
@@ -585,7 +593,6 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                 else
                     vkd3d_string_buffer_printf(&ctx->buffer, "%s ", text);
                 break;
-            }
 
             case STATE_IDENTIFIER:
                 if (token == '(')
