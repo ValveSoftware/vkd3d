@@ -311,3 +311,9 @@ apple # KEY
 #define KEY(a) KEY2(a)
 
 KEY(pa)
+
+[preproc]
+#define KEY2(x) x
+#define KEY KEY2(fa il)
+KEY
+pass

@@ -746,6 +746,9 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                         if (current_arg)
                             preproc_text_add(current_arg, text);
                 }
+
+                if (current_arg)
+                    preproc_text_add(current_arg, " ");
                 break;
             }
         }
