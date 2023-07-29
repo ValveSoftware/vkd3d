@@ -305,3 +305,9 @@ __LINE__
 [preproc]
 #define KEY pass
 apple # KEY
+
+[preproc]
+#define KEY2(x) x ## ss
+#define KEY(a) KEY2(a)
+
+KEY(pa)

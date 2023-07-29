@@ -634,6 +634,26 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
 
                 switch (token)
                 {
+                    /* Most text gets left alone (e.g. if it contains macros,
+                     * the macros should be evaluated later).
+                     * Arguments are a special case, and are replaced with
+                     * their values immediately. */
+                    case T_IDENTIFIER:
+                    case T_IDENTIFIER_PAREN:
+                    {
+                        const struct preproc_text *expansion;
+
+                        if ((expansion = find_arg_expansion(ctx, text)))
+                        {
+                            preproc_push_expansion(ctx, expansion, NULL);
+                            continue;
+                        }
+
+                        if (current_arg)
+                            preproc_text_add(current_arg, text);
+                        break;
+                    }
+
                     case T_NEWLINE:
                         if (current_arg)
                             preproc_text_add(current_arg, " ");
