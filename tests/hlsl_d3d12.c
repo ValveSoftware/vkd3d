@@ -236,6 +236,27 @@ static void test_preprocess(void)
 
             "#",
         },
+        {
+            "#define KEY2(x) x\n"
+            "#define KEY(a) KEY2(#a)\n"
+            "KEY(apple)",
+
+            "\"apple\"",
+        },
+        {
+            "#define KEY2(x) #x\n"
+            "#define KEY(a) KEY2(#a)\n"
+            "KEY(apple)",
+
+            "\"\\\"apple\\\"\"",
+        },
+        {
+            "#define KEY2(x) #x\n"
+            "#define KEY(a) KEY2(#x)\n"
+            "KEY(apple)",
+
+            "\"\\\"x\\\"\"",
+        },
 
         /* #pragma is preserved. */
         {

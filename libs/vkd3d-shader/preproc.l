@@ -664,6 +664,21 @@ int yylex(YYSTYPE *lval, YYLTYPE *lloc, yyscan_t scanner)
                         break;
                     }
 
+                    /* Stringification is another special case. Unsurprisingly,
+                     * we need to stringify if this is an argument. More
+                     * surprisingly, we need to stringify even if it's not. */
+                    case T_HASHSTRING:
+                    {
+                        struct vkd3d_string_buffer buffer;
+
+                        vkd3d_string_buffer_init(&buffer);
+                        preproc_stringify(ctx, &buffer, text);
+                        if (current_arg)
+                            preproc_text_add(current_arg, buffer.buffer);
+                        vkd3d_string_buffer_cleanup(&buffer);
+                        break;
+                    }
+
                     case T_NEWLINE:
                         if (current_arg)
                             preproc_text_add(current_arg, " ");
