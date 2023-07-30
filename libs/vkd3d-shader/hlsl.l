@@ -166,7 +166,6 @@ while                   {return KW_WHILE;               }
 \<\<=                   {return OP_LEFTSHIFTASSIGN;     }
 \>\>                    {return OP_RIGHTSHIFT;          }
 \>\>=                   {return OP_RIGHTSHIFTASSIGN;    }
-\.\.\.                  {return OP_ELLIPSIS;            }
 \<=                     {return OP_LE;                  }
 \>=                     {return OP_GE;                  }
 !=                      {return OP_NE;                  }
@@ -178,10 +177,6 @@ while                   {return KW_WHILE;               }
 &=                      {return OP_ANDASSIGN;           }
 \|=                     {return OP_ORASSIGN;            }
 ^=                      {return OP_XORASSIGN;           }
-##                      {return OP_UNKNOWN1;            }
-#@                      {return OP_UNKNOWN2;            }
-::                      {return OP_UNKNOWN3;            }
-\-\>                    {return OP_UNKNOWN4;            }
 
 column_major            {return KW_COLUMN_MAJOR;        }
 row_major               {return KW_ROW_MAJOR;           }

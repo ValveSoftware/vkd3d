@@ -4861,7 +4861,6 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token OP_LEFTSHIFTASSIGN
 %token OP_RIGHTSHIFT
 %token OP_RIGHTSHIFTASSIGN
-%token OP_ELLIPSIS
 %token OP_LE
 %token OP_GE
 %token OP_NE
@@ -4873,10 +4872,6 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token OP_ANDASSIGN
 %token OP_ORASSIGN
 %token OP_XORASSIGN
-%token OP_UNKNOWN1
-%token OP_UNKNOWN2
-%token OP_UNKNOWN3
-%token OP_UNKNOWN4
 
 %token <floatval> C_FLOAT
 
