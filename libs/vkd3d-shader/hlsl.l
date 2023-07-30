@@ -53,7 +53,6 @@ RESERVED4               typename|union|unsigned|using|virtual
 
 WS                      [ \t]
 NEWLINE                 (\n)|(\r\n)
-DOUBLESLASHCOMMENT      "//"[^\n]*
 STRING                  \"[^\"]*\"
 IDENTIFIER              [A-Za-z_][A-Za-z0-9_]*
 
@@ -217,8 +216,6 @@ row_major               {return KW_ROW_MAJOR;           }
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }
-
-{DOUBLESLASHCOMMENT}    {}
 
 {WS}+                   {}
 {NEWLINE}               {
