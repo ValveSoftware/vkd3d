@@ -2632,20 +2632,18 @@ void d3d12_desc_flush_vk_heap_updates_locked(struct d3d12_descriptor_heap *descr
     for (; i != UINT_MAX; i = next)
     {
         src = &descriptors[i];
-        next = (int)src->next >> 1;
+        next = vkd3d_atomic_exchange(&src->next, 0);
+        next = (int)next >> 1;
 
+        /* A race exists here between updating src->next and getting the current object. The best
+         * we can do is get the object last, which may result in a harmless rewrite later. */
         u.object = d3d12_desc_get_object_ref(src, device);
 
         if (!u.object)
-        {
-            vkd3d_atomic_exchange(&src->next, 0);
             continue;
-        }
 
         writes.held_refs[writes.held_ref_count++] = u.object;
         d3d12_desc_write_vk_heap(descriptor_heap, i, &writes, u.object, device);
-
-        vkd3d_atomic_exchange(&src->next, 0);
     }
 
     /* Avoid thunk calls wherever possible. */
