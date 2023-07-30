@@ -2644,6 +2644,8 @@ static bool d3d12_command_list_update_compute_pipeline(struct d3d12_command_list
 {
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
 
+    vkd3d_cond_signal(&list->device->worker_cond);
+
     if (list->current_pipeline != VK_NULL_HANDLE)
         return true;
 
@@ -2664,6 +2666,8 @@ static bool d3d12_command_list_update_graphics_pipeline(struct d3d12_command_lis
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     VkRenderPass vk_render_pass;
     VkPipeline vk_pipeline;
+
+    vkd3d_cond_signal(&list->device->worker_cond);
 
     if (list->current_pipeline != VK_NULL_HANDLE)
         return true;

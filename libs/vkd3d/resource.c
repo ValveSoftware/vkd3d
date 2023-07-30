@@ -3995,6 +3995,9 @@ static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_Release(ID3D12DescriptorHea
             {
                 struct d3d12_desc *descriptors = (struct d3d12_desc *)heap->descriptors;
 
+                if (heap->use_vk_heaps)
+                    d3d12_device_remove_descriptor_heap(device, heap);
+
                 for (i = 0; i < heap->desc.NumDescriptors; ++i)
                 {
                     d3d12_desc_destroy(&descriptors[i], device);
@@ -4318,6 +4321,12 @@ HRESULT d3d12_descriptor_heap_create(struct d3d12_device *device,
             dst[i].next = 0;
         }
         object->dirty_list_head = UINT_MAX;
+
+        if (object->use_vk_heaps && FAILED(hr = d3d12_device_add_descriptor_heap(device, object)))
+        {
+            vkd3d_free(object);
+            return hr;
+        }
     }
     else
     {

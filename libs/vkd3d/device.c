@@ -2495,6 +2495,28 @@ static ULONG STDMETHODCALLTYPE d3d12_device_AddRef(ID3D12Device5 *iface)
     return refcount;
 }
 
+static HRESULT device_worker_stop(struct d3d12_device *device)
+{
+    HRESULT hr;
+
+    TRACE("device %p.\n", device);
+
+    vkd3d_mutex_lock(&device->worker_mutex);
+
+    device->worker_should_exit = true;
+    vkd3d_cond_signal(&device->worker_cond);
+
+    vkd3d_mutex_unlock(&device->worker_mutex);
+
+    if (FAILED(hr = vkd3d_join_thread(device->vkd3d_instance, &device->worker_thread)))
+        return hr;
+
+    vkd3d_mutex_destroy(&device->worker_mutex);
+    vkd3d_cond_destroy(&device->worker_cond);
+
+    return S_OK;
+}
+
 static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device5 *iface)
 {
     struct d3d12_device *device = impl_from_ID3D12Device5(iface);
@@ -2520,6 +2542,9 @@ static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device5 *iface)
         d3d12_device_destroy_vkd3d_queues(device);
         vkd3d_desc_object_cache_cleanup(&device->view_desc_cache);
         vkd3d_desc_object_cache_cleanup(&device->cbuffer_desc_cache);
+        if (device->use_vk_heaps)
+            device_worker_stop(device);
+        vkd3d_free(device->heaps);
         VK_CALL(vkDestroyDevice(device->vk_device, NULL));
         if (device->parent)
             IUnknown_Release(device->parent);
@@ -4251,6 +4276,40 @@ struct d3d12_device *unsafe_impl_from_ID3D12Device5(ID3D12Device5 *iface)
     return impl_from_ID3D12Device5(iface);
 }
 
+static void *device_worker_main(void *arg)
+{
+    struct d3d12_descriptor_heap *heap;
+    struct d3d12_device *device = arg;
+    size_t i;
+
+    vkd3d_set_thread_name("device_worker");
+
+    vkd3d_mutex_lock(&device->worker_mutex);
+
+    while (!device->worker_should_exit)
+    {
+        for (i = 0; i < device->heap_count; ++i)
+        {
+            /* Descriptor updates are not written to Vulkan descriptor sets until a command list
+             * is submitted to a queue, while the client is free to write d3d12 descriptors earlier,
+             * from any thread. This causes a delay right before command list execution, so
+             * handling these updates in a worker thread can speed up execution significantly. */
+            heap = device->heaps[i];
+            if (heap->dirty_list_head == UINT_MAX)
+                continue;
+            vkd3d_mutex_lock(&heap->vk_sets_mutex);
+            d3d12_desc_flush_vk_heap_updates_locked(heap, device);
+            vkd3d_mutex_unlock(&heap->vk_sets_mutex);
+        }
+
+        vkd3d_cond_wait(&device->worker_cond, &device->worker_mutex);
+    }
+
+    vkd3d_mutex_unlock(&device->worker_mutex);
+
+    return NULL;
+}
+
 static HRESULT d3d12_device_init(struct d3d12_device *device,
         struct vkd3d_instance *instance, const struct vkd3d_device_create_info *create_info)
 {
@@ -4269,6 +4328,14 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     device->removed_reason = S_OK;
 
     device->vk_device = VK_NULL_HANDLE;
+
+    device->heaps = NULL;
+    device->heap_capacity = 0;
+    device->heap_count = 0;
+    memset(&device->worker_thread, 0, sizeof(device->worker_thread));
+    device->worker_should_exit = false;
+    vkd3d_mutex_init(&device->worker_mutex);
+    vkd3d_cond_init(&device->worker_cond);
 
     if (FAILED(hr = vkd3d_create_vk_device(device, create_info)))
         goto out_free_instance;
@@ -4291,6 +4358,13 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     if (FAILED(hr = vkd3d_vk_descriptor_heap_layouts_init(device)))
         goto out_cleanup_uav_clear_state;
 
+    if (device->use_vk_heaps && FAILED(hr = vkd3d_create_thread(device->vkd3d_instance,
+            device_worker_main, device, &device->worker_thread)))
+    {
+        WARN("Failed to create worker thread, hr %#x.\n", hr);
+        goto out_cleanup_descriptor_heap_layouts;
+    }
+
     vkd3d_render_pass_cache_init(&device->render_pass_cache);
     vkd3d_gpu_va_allocator_init(&device->gpu_va_allocator);
     vkd3d_time_domains_init(device);
@@ -4308,6 +4382,8 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
 
     return S_OK;
 
+out_cleanup_descriptor_heap_layouts:
+    vkd3d_vk_descriptor_heap_layouts_cleanup(device);
 out_cleanup_uav_clear_state:
     vkd3d_uav_clear_state_cleanup(&device->uav_clear_state, device);
 out_destroy_null_resources:
@@ -4361,6 +4437,40 @@ void d3d12_device_mark_as_removed(struct d3d12_device *device, HRESULT reason,
     device->removed_reason = reason;
 }
 
+HRESULT d3d12_device_add_descriptor_heap(struct d3d12_device *device, struct d3d12_descriptor_heap *heap)
+{
+    vkd3d_mutex_lock(&device->worker_mutex);
+
+    if (!vkd3d_array_reserve((void **)&device->heaps, &device->heap_capacity, device->heap_count + 1,
+            sizeof(*device->heaps)))
+    {
+        vkd3d_mutex_unlock(&device->worker_mutex);
+        return E_OUTOFMEMORY;
+    }
+    device->heaps[device->heap_count++] = heap;
+
+    vkd3d_mutex_unlock(&device->worker_mutex);
+
+    return S_OK;
+}
+
+void d3d12_device_remove_descriptor_heap(struct d3d12_device *device, struct d3d12_descriptor_heap *heap)
+{
+    size_t i;
+
+    vkd3d_mutex_lock(&device->worker_mutex);
+
+    for (i = 0; i < device->heap_count; ++i)
+    {
+        if (device->heaps[i] == heap)
+        {
+            device->heaps[i] = device->heaps[--device->heap_count];
+            break;
+        }
+    }
+
+    vkd3d_mutex_unlock(&device->worker_mutex);
+}
 
 #ifdef _WIN32
 struct thread_data
