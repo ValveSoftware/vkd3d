@@ -75,6 +75,7 @@ Buffer                  {return KW_BUFFER;              }
 case                    {return KW_CASE;                }
 cbuffer                 {return KW_CBUFFER;             }
 centroid                {return KW_CENTROID;            }
+column_major            {return KW_COLUMN_MAJOR;        }
 compile                 {return KW_COMPILE;             }
 const                   {return KW_CONST;               }
 continue                {return KW_CONTINUE;            }
@@ -104,9 +105,10 @@ pass                    {return KW_PASS;                }
 PixelShader             {return KW_PIXELSHADER;         }
 precise                 {return KW_PRECISE;             }
 RasterizerState         {return KW_RASTERIZERSTATE;     }
+register                {return KW_REGISTER;            }
 RenderTargetView        {return KW_RENDERTARGETVIEW;    }
 return                  {return KW_RETURN;              }
-register                {return KW_REGISTER;            }
+row_major               {return KW_ROW_MAJOR;           }
 RWBuffer                {return KW_RWBUFFER;            }
 RWStructuredBuffer      {return KW_RWSTRUCTUREDBUFFER;  }
 RWTexture1D             {return KW_RWTEXTURE1D;         }
@@ -118,10 +120,10 @@ sampler                 {return KW_SAMPLER;             }
 sampler1D               {return KW_SAMPLER1D;           }
 sampler2D               {return KW_SAMPLER2D;           }
 sampler3D               {return KW_SAMPLER3D;           }
-samplerCUBE             {return KW_SAMPLERCUBE;         }
-sampler_state           {return KW_SAMPLER_STATE;       }
 SamplerComparisonState  {return KW_SAMPLERCOMPARISONSTATE;}
+samplerCUBE             {return KW_SAMPLERCUBE;         }
 SamplerState            {return KW_SAMPLER;             }
+sampler_state           {return KW_SAMPLER_STATE;       }
 shared                  {return KW_SHARED;              }
 stateblock              {return KW_STATEBLOCK;          }
 stateblock_state        {return KW_STATEBLOCK_STATE;    }
@@ -134,18 +136,18 @@ tbuffer                 {return KW_TBUFFER;             }
 technique10             {return KW_TECHNIQUE10;         }
 technique11             {return KW_TECHNIQUE11;         }
 texture                 {return KW_TEXTURE;             }
-texture1D               {return KW_TEXTURE1D;           }
 Texture1D               {return KW_TEXTURE1D;           }
+texture1D               {return KW_TEXTURE1D;           }
 Texture1DArray          {return KW_TEXTURE1DARRAY;      }
-texture2D               {return KW_TEXTURE2D;           }
 Texture2D               {return KW_TEXTURE2D;           }
+texture2D               {return KW_TEXTURE2D;           }
 Texture2DArray          {return KW_TEXTURE2DARRAY;      }
 Texture2DMS             {return KW_TEXTURE2DMS;         }
 Texture2DMSArray        {return KW_TEXTURE2DMSARRAY;    }
-texture3D               {return KW_TEXTURE3D;           }
 Texture3D               {return KW_TEXTURE3D;           }
-textureCUBE             {return KW_TEXTURECUBE;         }
+texture3D               {return KW_TEXTURE3D;           }
 TextureCube             {return KW_TEXTURECUBE;         }
+textureCUBE             {return KW_TEXTURECUBE;         }
 TextureCubeArray        {return KW_TEXTURECUBEARRAY;    }
 true                    {return KW_TRUE;                }
 typedef                 {return KW_TYPEDEF;             }
@@ -176,9 +178,6 @@ while                   {return KW_WHILE;               }
 &=                      {return OP_ANDASSIGN;           }
 \|=                     {return OP_ORASSIGN;            }
 ^=                      {return OP_XORASSIGN;           }
-
-column_major            {return KW_COLUMN_MAJOR;        }
-row_major               {return KW_ROW_MAJOR;           }
 
 {IDENTIFIER}            {
                             struct hlsl_ctx *ctx = yyget_extra(yyscanner);
