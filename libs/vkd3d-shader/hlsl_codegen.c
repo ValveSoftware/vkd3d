@@ -321,9 +321,10 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
     if (!semantic->name)
         return;
 
-    vector_type_src = hlsl_get_vector_type(ctx, type->base_type,
-            (ctx->profile->major_version < 4) ? 4 : hlsl_type_minor_size(type));
     vector_type_dst = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+    vector_type_src = vector_type_dst;
+    if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
+        vector_type_src = hlsl_get_vector_type(ctx, type->base_type, 4);
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
