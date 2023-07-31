@@ -765,9 +765,9 @@ static void vkd3d_shader_scan_record_uav_atomic_op(struct vkd3d_shader_scan_cont
 }
 
 static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *context,
-        enum vkd3d_shader_descriptor_type type, const struct vkd3d_shader_register_range *range,
-        enum vkd3d_shader_resource_type resource_type, enum vkd3d_shader_resource_data_type resource_data_type,
-        unsigned int flags)
+        enum vkd3d_shader_descriptor_type type, const struct vkd3d_shader_register *reg,
+        const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
+        enum vkd3d_shader_resource_data_type resource_data_type, unsigned int flags)
 {
     struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
     struct vkd3d_shader_descriptor_info1 *d;
@@ -781,6 +781,7 @@ static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *c
 
     d = &info->descriptors[info->descriptor_count];
     d->type = type;
+    d->register_id = reg->idx[0].offset;
     d->register_space = range->space;
     d->register_index = range->first;
     d->resource_type = resource_type;
@@ -817,7 +818,7 @@ static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_sc
     if (!context->scan_descriptor_info)
         return;
 
-    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &cb->range,
+    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &cb->src.reg, &cb->range,
             VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
 }
 
@@ -834,7 +835,7 @@ static void vkd3d_shader_scan_sampler_declaration(struct vkd3d_shader_scan_conte
         flags = VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
     else
         flags = 0;
-    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &sampler->range,
+    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &sampler->src.reg, &sampler->range,
             VKD3D_SHADER_RESOURCE_NONE, VKD3D_SHADER_RESOURCE_DATA_UINT, flags);
 }
 
@@ -851,7 +852,8 @@ static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_cont
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
     else
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
-    vkd3d_shader_scan_add_descriptor(context, type, &resource->range, resource_type, resource_data_type, 0);
+    vkd3d_shader_scan_add_descriptor(context, type, &resource->reg.reg, &resource->range,
+            resource_type, resource_data_type, 0);
     if (type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
         vkd3d_shader_scan_add_uav_range(context, resource->reg.reg.idx[0].offset,
                 context->scan_descriptor_info->descriptor_count - 1);
@@ -1178,9 +1180,10 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
     for (i = 0; i < ARRAY_SIZE(parser->shader_desc.flat_constant_count); ++i)
     {
         struct vkd3d_shader_register_range range = {.space = 0, .first = i, .last = i};
+        struct vkd3d_shader_register reg = {.idx[0].offset = i, .idx_count = 1};
 
         if (parser->shader_desc.flat_constant_count[i].external)
-            vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV,
+            vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
                     &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
     }
 
