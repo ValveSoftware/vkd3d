@@ -4602,7 +4602,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     }
     else
     {
-        unsigned int location = signature_element->register_index;
+        unsigned int location = signature_element->target_location;
 
         input_id = spirv_compiler_emit_array_variable(compiler, &builder->global_stream,
                 storage_class, component_type, input_component_count, array_sizes, 2);
@@ -4980,7 +4980,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     }
     else
     {
-        unsigned int location = signature_element->register_index;
+        unsigned int location = signature_element->target_location;
 
         if (is_patch_constant)
             location += shader_signature_next_location(&compiler->output_signature);
@@ -4989,10 +4989,10 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
                 storage_class, component_type, output_component_count, array_sizes, 2);
         vkd3d_spirv_add_iface_variable(builder, id);
 
-        if (is_dual_source_blending(compiler) && signature_element->register_index < 2)
+        if (is_dual_source_blending(compiler) && location < 2)
         {
             vkd3d_spirv_build_op_decorate1(builder, id, SpvDecorationLocation, 0);
-            vkd3d_spirv_build_op_decorate1(builder, id, SpvDecorationIndex, signature_element->register_index);
+            vkd3d_spirv_build_op_decorate1(builder, id, SpvDecorationIndex, location);
         }
         else
         {

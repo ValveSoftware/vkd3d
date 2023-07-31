@@ -815,11 +815,14 @@ struct signature_element
     unsigned int stream_index;
     enum vkd3d_shader_sysval_semantic sysval_semantic;
     enum vkd3d_shader_component_type component_type;
+    /* Register index in the source shader. */
     unsigned int register_index;
     unsigned int register_count;
     unsigned int mask;
     unsigned int used_mask;
     enum vkd3d_shader_minimum_precision min_precision;
+    /* Register index / location in the target shader. */
+    unsigned int target_location;
 };
 
 struct shader_signature

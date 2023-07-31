@@ -557,6 +557,7 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     element->sysval_semantic = sysval;
     element->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
     element->register_index = register_index;
+    element->target_location = register_index;
     element->register_count = 1;
     element->mask = mask;
     element->used_mask = is_dcl ? 0 : mask;

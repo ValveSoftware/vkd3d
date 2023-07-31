@@ -391,6 +391,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
         read_dword(&ptr, &e[i].sysval_semantic);
         read_dword(&ptr, &e[i].component_type);
         read_dword(&ptr, &e[i].register_index);
+        e[i].target_location = e[i].register_index;
         e[i].register_count = 1;
         read_dword(&ptr, &mask);
         e[i].mask = mask & 0xff;
