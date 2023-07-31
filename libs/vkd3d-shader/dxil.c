@@ -1911,6 +1911,14 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
     {
         sm6->p.location.column = i;
 
+        if (!code_block)
+        {
+            WARN("Invalid block count %zu.\n", function->block_count);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Invalid block count %zu.", function->block_count);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
         /* block->record_count - 1 is the instruction count, but some instructions
          * can emit >1 IR instruction, so extra may be used. */
         if (!vkd3d_array_reserve((void **)&code_block->instructions, &code_block->instruction_capacity,
