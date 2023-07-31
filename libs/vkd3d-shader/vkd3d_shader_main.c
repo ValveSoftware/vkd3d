@@ -703,18 +703,23 @@ static struct vkd3d_shader_cf_info *vkd3d_shader_scan_find_innermost_loop_cf_inf
     return NULL;
 }
 
-static struct vkd3d_shader_descriptor_info *vkd3d_shader_scan_get_uav_descriptor_info(
-        const struct vkd3d_shader_scan_context *context, unsigned int range_id)
+static void vkd3d_shader_scan_add_uav_flag(const struct vkd3d_shader_scan_context *context,
+        const struct vkd3d_shader_register *reg, uint32_t flag)
 {
+    unsigned int range_id = reg->idx[0].offset;
     unsigned int i;
+
+    if (!context->scan_descriptor_info)
+        return;
 
     for (i = 0; i < context->uav_range_count; ++i)
     {
         if (context->uav_ranges[i].id == range_id)
-            return &context->scan_descriptor_info->descriptors[context->uav_ranges[i].descriptor_idx];
+        {
+            context->scan_descriptor_info->descriptors[context->uav_ranges[i].descriptor_idx].flags |= flag;
+            break;
+        }
     }
-
-    return NULL;
 }
 
 static bool vkd3d_shader_instruction_is_uav_read(const struct vkd3d_shader_instruction *instruction)
@@ -730,13 +735,7 @@ static bool vkd3d_shader_instruction_is_uav_read(const struct vkd3d_shader_instr
 static void vkd3d_shader_scan_record_uav_read(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_register *reg)
 {
-    struct vkd3d_shader_descriptor_info *d;
-
-    if (!context->scan_descriptor_info)
-        return;
-
-    d = vkd3d_shader_scan_get_uav_descriptor_info(context, reg->idx[0].offset);
-    d->flags |= VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ;
+    vkd3d_shader_scan_add_uav_flag(context, reg, VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ);
 }
 
 static bool vkd3d_shader_instruction_is_uav_counter(const struct vkd3d_shader_instruction *instruction)
@@ -749,13 +748,7 @@ static bool vkd3d_shader_instruction_is_uav_counter(const struct vkd3d_shader_in
 static void vkd3d_shader_scan_record_uav_counter(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_register *reg)
 {
-    struct vkd3d_shader_descriptor_info *d;
-
-    if (!context->scan_descriptor_info)
-        return;
-
-    d = vkd3d_shader_scan_get_uav_descriptor_info(context, reg->idx[0].offset);
-    d->flags |= VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER;
+    vkd3d_shader_scan_add_uav_flag(context, reg, VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER);
 }
 
 static bool vkd3d_shader_instruction_is_uav_atomic_op(const struct vkd3d_shader_instruction *instruction)
@@ -768,13 +761,7 @@ static bool vkd3d_shader_instruction_is_uav_atomic_op(const struct vkd3d_shader_
 static void vkd3d_shader_scan_record_uav_atomic_op(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_register *reg)
 {
-    struct vkd3d_shader_descriptor_info *d;
-
-    if (!context->scan_descriptor_info)
-        return;
-
-    d = vkd3d_shader_scan_get_uav_descriptor_info(context, reg->idx[0].offset);
-    d->flags |= VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS;
+    vkd3d_shader_scan_add_uav_flag(context, reg, VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS);
 }
 
 static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *context,
