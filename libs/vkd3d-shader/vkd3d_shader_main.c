@@ -1132,11 +1132,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
     {
         instruction = &parser->instructions.elements[i];
         if ((ret = vkd3d_shader_scan_instruction(&context, instruction)) < 0)
-        {
-            if (scan_descriptor_info)
-                vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
             break;
-        }
     }
 
     for (i = 0; i < ARRAY_SIZE(parser->shader_desc.flat_constant_count); ++i)
@@ -1156,13 +1152,17 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
                 || !vkd3d_shader_signature_from_shader_signature(&signature_info->patch_constant,
                         &parser->shader_desc.patch_constant_signature))
         {
-            vkd3d_shader_free_scan_signature_info(signature_info);
-            if (scan_descriptor_info)
-                vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
             ret = VKD3D_ERROR_OUT_OF_MEMORY;
         }
     }
 
+    if (ret < 0)
+    {
+        if (scan_descriptor_info)
+            vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
+        if (signature_info)
+            vkd3d_shader_free_scan_signature_info(signature_info);
+    }
     vkd3d_shader_scan_context_cleanup(&context);
     return ret;
 }
