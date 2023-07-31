@@ -133,10 +133,7 @@ static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *pars
         }
         else
         {
-            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                    "Aborting due to not yet implemented feature: "
-                    "This stage outputs varyings not consumed by the next stage.");
-            return VKD3D_ERROR_NOT_IMPLEMENTED;
+            e->target_location = SIGNATURE_TARGET_LOCATION_UNUSED;
         }
     }
 

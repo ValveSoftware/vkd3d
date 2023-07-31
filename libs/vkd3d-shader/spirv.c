@@ -4978,6 +4978,12 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
         spirv_compiler_emit_register_execution_mode(compiler, &dst->reg);
     }
+    else if (signature_element->target_location == SIGNATURE_TARGET_LOCATION_UNUSED)
+    {
+        storage_class = SpvStorageClassPrivate;
+        id = spirv_compiler_emit_array_variable(compiler, &builder->global_stream,
+                storage_class, component_type, output_component_count, array_sizes, 2);
+    }
     else
     {
         unsigned int location = signature_element->target_location;

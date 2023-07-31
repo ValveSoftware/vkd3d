@@ -809,6 +809,8 @@ enum vkd3d_shader_input_sysval_semantic
     VKD3D_SIV_LINE_DENSITY_TESS_FACTOR     = 22,
 };
 
+#define SIGNATURE_TARGET_LOCATION_UNUSED (~0u)
+
 struct signature_element
 {
     unsigned int sort_index;
@@ -823,7 +825,8 @@ struct signature_element
     unsigned int mask;
     unsigned int used_mask;
     enum vkd3d_shader_minimum_precision min_precision;
-    /* Register index / location in the target shader. */
+    /* Register index / location in the target shader.
+     * If SIGNATURE_TARGET_LOCATION_UNUSED, this element should not be written. */
     unsigned int target_location;
 };
 
