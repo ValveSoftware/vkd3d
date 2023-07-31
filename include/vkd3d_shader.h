@@ -1743,6 +1743,8 @@ struct vkd3d_shader_next_stage_info
      * field is necessary to correctly match inter-stage varyings.
      * This mapping may also be necessary under other circumstances where the
      * varying interface does not match exactly.
+     *
+     * This mapping may be constructed by vkd3d_shader_build_varying_map().
      */
     const struct vkd3d_shader_varying_map *varying_map;
     /** The number of registers provided in \ref varying_map. */
@@ -2261,6 +2263,35 @@ VKD3D_SHADER_API int vkd3d_shader_serialize_dxbc(size_t section_count,
  * \since 1.9
  */
 VKD3D_SHADER_API void vkd3d_shader_free_scan_signature_info(struct vkd3d_shader_scan_signature_info *info);
+
+/**
+ * Build a mapping of output varyings in a shader stage to input varyings in
+ * the following shader stage.
+ *
+ * This mapping should be used in struct vkd3d_shader_next_stage_info to
+ * compile the first shader.
+ *
+ * \param output_signature The output signature of the first shader.
+ *
+ * \param input_signature The input signature of the second shader.
+ *
+ * \param count On output, contains the number of entries written into
+ * \ref varyings.
+ *
+ * \param varyings Pointer to an output array of varyings.
+ * This must point to space for N varyings, where N is the number of elements
+ * in the input signature.
+ *
+ * \remark Valid legacy Direct3D pixel shaders have at most 12 varying inputs:
+ * 10 inter-stage varyings, face, and position.
+ * Therefore, in practice, it is safe to call this function with a
+ * pre-allocated array with a fixed size of 12.
+ *
+ * \since 1.9
+ */
+VKD3D_SHADER_API void vkd3d_shader_build_varying_map(const struct vkd3d_shader_signature *output_signature,
+        const struct vkd3d_shader_signature *input_signature,
+        unsigned int *count, struct vkd3d_shader_varying_map *varyings);
 
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 

@@ -1891,3 +1891,41 @@ void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *ins
         vkd3d_free(instructions->icbs[i]);
     vkd3d_free(instructions->icbs);
 }
+
+void vkd3d_shader_build_varying_map(const struct vkd3d_shader_signature *output_signature,
+        const struct vkd3d_shader_signature *input_signature,
+        unsigned int *ret_count, struct vkd3d_shader_varying_map *varyings)
+{
+    unsigned int count = 0;
+    unsigned int i;
+
+    TRACE("output_signature %p, input_signature %p, ret_count %p, varyings %p.\n",
+            output_signature, input_signature, ret_count, varyings);
+
+    for (i = 0; i < input_signature->element_count; ++i)
+    {
+        const struct vkd3d_shader_signature_element *input_element, *output_element;
+
+        input_element = &input_signature->elements[i];
+
+        if (input_element->sysval_semantic != VKD3D_SHADER_SV_NONE)
+            continue;
+
+        varyings[count].input_register_index = input_element->register_index;
+        varyings[count].input_mask = input_element->mask;
+
+        if ((output_element = vkd3d_shader_find_signature_element(output_signature,
+                input_element->semantic_name, input_element->semantic_index, 0)))
+        {
+            varyings[count].output_signature_index = output_element - output_signature->elements;
+        }
+        else
+        {
+            varyings[count].output_signature_index = output_signature->element_count;
+        }
+
+        ++count;
+    }
+
+    *ret_count = count;
+}
