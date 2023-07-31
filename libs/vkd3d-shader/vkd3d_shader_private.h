@@ -1110,6 +1110,23 @@ static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parse
     parser->ops->parser_destroy(parser);
 }
 
+struct vkd3d_shader_descriptor_info1
+{
+    enum vkd3d_shader_descriptor_type type;
+    unsigned int register_space;
+    unsigned int register_index;
+    enum vkd3d_shader_resource_type resource_type;
+    enum vkd3d_shader_resource_data_type resource_data_type;
+    unsigned int flags;
+    unsigned int count;
+};
+
+struct vkd3d_shader_scan_descriptor_info1
+{
+    struct vkd3d_shader_descriptor_info1 *descriptors;
+    unsigned int descriptor_count;
+};
+
 void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instructions,
         const struct vkd3d_shader_version *shader_version);
 
@@ -1232,7 +1249,7 @@ void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
 #define SPIRV_MAX_SRC_COUNT 6
 
 int spirv_compile(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
+        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
 

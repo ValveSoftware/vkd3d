@@ -2310,7 +2310,7 @@ struct spirv_compiler
 
     uint32_t binding_idx;
 
-    const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
+    const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info;
     unsigned int input_control_point_count;
     unsigned int output_control_point_count;
     bool use_vocp;
@@ -2380,7 +2380,7 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 
 static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
         struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
-        const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
+        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
 {
     const struct shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
@@ -5695,13 +5695,13 @@ static SpvImageFormat image_format_for_image_read(enum vkd3d_shader_component_ty
     }
 }
 
-static const struct vkd3d_shader_descriptor_info *spirv_compiler_get_descriptor_info(
+static const struct vkd3d_shader_descriptor_info1 *spirv_compiler_get_descriptor_info(
         struct spirv_compiler *compiler, enum vkd3d_shader_descriptor_type type,
         const struct vkd3d_shader_register_range *range)
 {
-    const struct vkd3d_shader_scan_descriptor_info *descriptor_info = compiler->scan_descriptor_info;
+    const struct vkd3d_shader_scan_descriptor_info1 *descriptor_info = compiler->scan_descriptor_info;
     unsigned int register_last = (range->last == ~0u) ? range->first : range->last;
-    const struct vkd3d_shader_descriptor_info *d;
+    const struct vkd3d_shader_descriptor_info1 *d;
     unsigned int i;
 
     for (i = 0; i < descriptor_info->descriptor_count; ++i)
@@ -5721,7 +5721,7 @@ static uint32_t spirv_compiler_get_image_type_id(struct spirv_compiler *compiler
         bool raw_structured, uint32_t depth)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_descriptor_info *d;
+    const struct vkd3d_shader_descriptor_info1 *d;
     bool uav_read, uav_atomics;
     uint32_t sampled_type_id;
     SpvImageFormat format;
@@ -5756,7 +5756,7 @@ static void spirv_compiler_emit_combined_sampler_declarations(struct spirv_compi
     const struct vkd3d_shader_combined_resource_sampler *current;
     uint32_t image_type_id, type_id, ptr_type_id, var_id;
     enum vkd3d_shader_binding_flag resource_type_flag;
-    const struct vkd3d_shader_descriptor_info *d;
+    const struct vkd3d_shader_descriptor_info1 *d;
     struct vkd3d_symbol symbol;
     unsigned int i;
     bool depth;
@@ -5889,7 +5889,7 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
 
     if (is_uav)
     {
-        const struct vkd3d_shader_descriptor_info *d;
+        const struct vkd3d_shader_descriptor_info1 *d;
 
         d = spirv_compiler_get_descriptor_info(compiler,
                 VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, &resource->range);
@@ -9635,7 +9635,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 }
 
 int spirv_compile(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
+        const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {

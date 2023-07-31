@@ -579,7 +579,7 @@ static bool vkd3d_shader_signature_from_shader_signature(struct vkd3d_shader_sig
 
 struct vkd3d_shader_scan_context
 {
-    struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
+    struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info;
     size_t descriptors_size;
 
     struct vkd3d_shader_message_context *message_context;
@@ -612,7 +612,7 @@ struct vkd3d_shader_scan_context
 
 static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info,
+        struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context)
 {
     unsigned int i;
@@ -769,8 +769,8 @@ static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *c
         enum vkd3d_shader_resource_type resource_type, enum vkd3d_shader_resource_data_type resource_data_type,
         unsigned int flags)
 {
-    struct vkd3d_shader_scan_descriptor_info *info = context->scan_descriptor_info;
-    struct vkd3d_shader_descriptor_info *d;
+    struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
+    struct vkd3d_shader_descriptor_info1 *d;
 
     if (!vkd3d_array_reserve((void **)&info->descriptors, &context->descriptors_size,
             info->descriptor_count + 1, sizeof(*info->descriptors)))
@@ -1104,24 +1104,64 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     return VKD3D_OK;
 }
 
-static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser *parser)
+static enum vkd3d_result convert_descriptor_info(struct vkd3d_shader_scan_descriptor_info *info,
+        const struct vkd3d_shader_scan_descriptor_info1 *info1)
 {
-    struct vkd3d_shader_scan_descriptor_info *scan_descriptor_info;
+    unsigned int i;
+
+    if (!(info->descriptors = vkd3d_calloc(info1->descriptor_count, sizeof(*info->descriptors))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    for (i = 0; i < info1->descriptor_count; ++i)
+    {
+        const struct vkd3d_shader_descriptor_info1 *src = &info1->descriptors[i];
+        struct vkd3d_shader_descriptor_info *dst = &info->descriptors[i];
+
+        dst->type = src->type;
+        dst->register_space = src->register_space;
+        dst->register_index = src->register_index;
+        dst->resource_type = src->resource_type;
+        dst->resource_data_type = src->resource_data_type;
+        dst->flags = src->flags;
+        dst->count = src->count;
+    }
+    info->descriptor_count = info1->descriptor_count;
+
+    return VKD3D_OK;
+}
+
+static void vkd3d_shader_free_scan_descriptor_info1(struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info)
+{
+    TRACE("scan_descriptor_info %p.\n", scan_descriptor_info);
+
+    vkd3d_free(scan_descriptor_info->descriptors);
+}
+
+static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_message_context *message_context,
+        struct vkd3d_shader_scan_descriptor_info1 *descriptor_info1, struct vkd3d_shader_parser *parser)
+{
+    struct vkd3d_shader_scan_descriptor_info1 local_descriptor_info1 = {0};
+    struct vkd3d_shader_scan_descriptor_info *descriptor_info;
     struct vkd3d_shader_scan_signature_info *signature_info;
     struct vkd3d_shader_instruction *instruction;
     struct vkd3d_shader_scan_context context;
     int ret = VKD3D_OK;
     unsigned int i;
 
-    if ((scan_descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO)))
+    descriptor_info = vkd3d_find_struct(compile_info->next, SCAN_DESCRIPTOR_INFO);
+    if (descriptor_info1)
     {
-        scan_descriptor_info->descriptors = NULL;
-        scan_descriptor_info->descriptor_count = 0;
+        descriptor_info1->descriptors = NULL;
+        descriptor_info1->descriptor_count = 0;
+    }
+    else if (descriptor_info)
+    {
+        descriptor_info1 = &local_descriptor_info1;
     }
     signature_info = vkd3d_find_struct(compile_info->next, SCAN_SIGNATURE_INFO);
 
-    vkd3d_shader_scan_context_init(&context, compile_info, scan_descriptor_info, message_context);
+    vkd3d_shader_scan_context_init(&context, compile_info, descriptor_info1, message_context);
 
     if (TRACE_ON())
     {
@@ -1156,12 +1196,21 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
         }
     }
 
+    if (!ret && descriptor_info)
+        ret = convert_descriptor_info(descriptor_info, descriptor_info1);
+
     if (ret < 0)
     {
-        if (scan_descriptor_info)
-            vkd3d_shader_free_scan_descriptor_info(scan_descriptor_info);
+        if (descriptor_info)
+            vkd3d_shader_free_scan_descriptor_info(descriptor_info);
+        if (descriptor_info1)
+            vkd3d_shader_free_scan_descriptor_info1(descriptor_info1);
         if (signature_info)
             vkd3d_shader_free_scan_signature_info(signature_info);
+    }
+    else
+    {
+        vkd3d_shader_free_scan_descriptor_info1(&local_descriptor_info1);
     }
     vkd3d_shader_scan_context_cleanup(&context);
     return ret;
@@ -1179,7 +1228,7 @@ static int scan_dxbc(const struct vkd3d_shader_compile_info *compile_info,
         return ret;
     }
 
-    ret = scan_with_parser(compile_info, message_context, parser);
+    ret = scan_with_parser(compile_info, message_context, NULL, parser);
     vkd3d_shader_parser_destroy(parser);
 
     return ret;
@@ -1197,7 +1246,7 @@ static int scan_d3dbc(const struct vkd3d_shader_compile_info *compile_info,
         return ret;
     }
 
-    ret = scan_with_parser(compile_info, message_context, parser);
+    ret = scan_with_parser(compile_info, message_context, NULL, parser);
     vkd3d_shader_parser_destroy(parser);
 
     return ret;
@@ -1215,7 +1264,7 @@ static int scan_dxil(const struct vkd3d_shader_compile_info *compile_info,
         return ret;
     }
 
-    ret = scan_with_parser(compile_info, message_context, parser);
+    ret = scan_with_parser(compile_info, message_context, NULL, parser);
     vkd3d_shader_parser_destroy(parser);
 
     return ret;
@@ -1274,7 +1323,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
-    struct vkd3d_shader_scan_descriptor_info scan_descriptor_info;
+    struct vkd3d_shader_scan_descriptor_info1 scan_descriptor_info;
     struct vkd3d_glsl_generator *glsl_generator;
     struct vkd3d_shader_compile_info scan_info;
     int ret;
@@ -1282,11 +1331,8 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
 
     scan_info = *compile_info;
-    scan_descriptor_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_DESCRIPTOR_INFO;
-    scan_descriptor_info.next = scan_info.next;
-    scan_info.next = &scan_descriptor_info;
 
-    if ((ret = scan_with_parser(&scan_info, message_context, parser)) < 0)
+    if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
         return ret;
 
     switch (compile_info->target_type)
@@ -1300,7 +1346,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
                     message_context, &parser->location)))
             {
                 ERR("Failed to create GLSL generator.\n");
-                vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+                vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
                 return VKD3D_ERROR;
             }
 
@@ -1318,7 +1364,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
             assert(0);
     }
 
-    vkd3d_shader_free_scan_descriptor_info(&scan_descriptor_info);
+    vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
     return ret;
 }
 
