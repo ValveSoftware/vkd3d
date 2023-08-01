@@ -599,14 +599,6 @@ struct vkd3d_shader_scan_context
     size_t cf_info_size;
     size_t cf_info_count;
 
-    struct
-    {
-        unsigned int id;
-        unsigned int descriptor_idx;
-    } *uav_ranges;
-    size_t uav_ranges_size;
-    size_t uav_range_count;
-
     enum vkd3d_shader_api_version api_version;
 };
 
@@ -635,7 +627,6 @@ static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *con
 
 static void vkd3d_shader_scan_context_cleanup(struct vkd3d_shader_scan_context *context)
 {
-    vkd3d_free(context->uav_ranges);
     vkd3d_free(context->cf_info);
 }
 
@@ -712,11 +703,11 @@ static void vkd3d_shader_scan_add_uav_flag(const struct vkd3d_shader_scan_contex
     if (!context->scan_descriptor_info)
         return;
 
-    for (i = 0; i < context->uav_range_count; ++i)
+    for (i = 0; i < context->scan_descriptor_info->descriptor_count; ++i)
     {
-        if (context->uav_ranges[i].id == range_id)
+        if (context->scan_descriptor_info->descriptors[i].register_id == range_id)
         {
-            context->scan_descriptor_info->descriptors[context->uav_ranges[i].descriptor_idx].flags |= flag;
+            context->scan_descriptor_info->descriptors[i].flags |= flag;
             break;
         }
     }
@@ -793,23 +784,6 @@ static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *c
     return true;
 }
 
-static bool vkd3d_shader_scan_add_uav_range(struct vkd3d_shader_scan_context *context,
-        unsigned int id, unsigned int descriptor_idx)
-{
-    if (!vkd3d_array_reserve((void **)&context->uav_ranges, &context->uav_ranges_size,
-            context->uav_range_count + 1, sizeof(*context->uav_ranges)))
-    {
-        ERR("Failed to allocate UAV range.\n");
-        return false;
-    }
-
-    context->uav_ranges[context->uav_range_count].id = id;
-    context->uav_ranges[context->uav_range_count].descriptor_idx = descriptor_idx;
-    ++context->uav_range_count;
-
-    return true;
-}
-
 static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -854,9 +828,6 @@ static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_cont
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
     vkd3d_shader_scan_add_descriptor(context, type, &resource->reg.reg, &resource->range,
             resource_type, resource_data_type, 0);
-    if (type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
-        vkd3d_shader_scan_add_uav_range(context, resource->reg.reg.idx[0].offset,
-                context->scan_descriptor_info->descriptor_count - 1);
 }
 
 static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_scan_context *context,
