@@ -1123,6 +1123,7 @@ struct vkd3d_shader_descriptor_info1
     enum vkd3d_shader_resource_data_type resource_data_type;
     unsigned int flags;
     unsigned int sample_count;
+    unsigned int buffer_size;
     unsigned int count;
 };
 

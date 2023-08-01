@@ -788,12 +788,15 @@ static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_sc
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_constant_buffer *cb = &instruction->declaration.cb;
+    struct vkd3d_shader_descriptor_info1 *d;
 
     if (!context->scan_descriptor_info)
         return;
 
-    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &cb->src.reg, &cb->range,
-            VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT);
+    if (!(d = vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV,
+            &cb->src.reg, &cb->range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT)))
+        return;
+    d->buffer_size = cb->size * 16;
 }
 
 static void vkd3d_shader_scan_sampler_declaration(struct vkd3d_shader_scan_context *context,
@@ -1153,12 +1156,17 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
 
     for (i = 0; i < ARRAY_SIZE(parser->shader_desc.flat_constant_count); ++i)
     {
+        unsigned int size = parser->shader_desc.flat_constant_count[i].external;
         struct vkd3d_shader_register_range range = {.space = 0, .first = i, .last = i};
         struct vkd3d_shader_register reg = {.idx[0].offset = i, .idx_count = 1};
+        struct vkd3d_shader_descriptor_info1 *d;
 
         if (parser->shader_desc.flat_constant_count[i].external)
-            vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
-                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT);
+        {
+            if ((d = vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
+                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT)))
+                d->buffer_size = size * 16;
+        }
     }
 
     if (!ret && signature_info)
