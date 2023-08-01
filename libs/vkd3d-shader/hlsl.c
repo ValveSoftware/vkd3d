@@ -759,7 +759,7 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim 
 {
     struct hlsl_type *type;
 
-    if (!(type = vkd3d_calloc(1, sizeof(*type))))
+    if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
     type->class = HLSL_CLASS_OBJECT;
     type->base_type = HLSL_TYPE_UAV;
@@ -1617,7 +1617,7 @@ static bool clone_block(struct hlsl_ctx *ctx, struct hlsl_block *dst_block,
 
         if (!list_empty(&src->uses))
         {
-            if (!vkd3d_array_reserve((void **)&map->instrs, &map->capacity, map->count + 1, sizeof(*map->instrs)))
+            if (!hlsl_array_reserve(ctx, (void **)&map->instrs, &map->capacity, map->count + 1, sizeof(*map->instrs)))
             {
                 hlsl_block_cleanup(dst_block);
                 return false;
