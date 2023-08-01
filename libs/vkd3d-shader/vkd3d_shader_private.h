@@ -1124,6 +1124,7 @@ struct vkd3d_shader_descriptor_info1
     unsigned int flags;
     unsigned int sample_count;
     unsigned int buffer_size;
+    unsigned int structure_stride;
     unsigned int count;
 };
 

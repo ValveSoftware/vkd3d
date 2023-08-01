@@ -818,7 +818,8 @@ static void vkd3d_shader_scan_sampler_declaration(struct vkd3d_shader_scan_conte
 
 static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_resource *resource, enum vkd3d_shader_resource_type resource_type,
-        enum vkd3d_shader_resource_data_type resource_data_type, unsigned int sample_count)
+        enum vkd3d_shader_resource_data_type resource_data_type,
+        unsigned int sample_count, unsigned int structure_stride)
 {
     struct vkd3d_shader_descriptor_info1 *d;
     enum vkd3d_shader_descriptor_type type;
@@ -834,6 +835,7 @@ static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_cont
             &resource->range, resource_type, resource_data_type)))
         return;
     d->sample_count = sample_count;
+    d->structure_stride = structure_stride;
 }
 
 static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_scan_context *context,
@@ -892,7 +894,7 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
     }
 
     vkd3d_shader_scan_resource_declaration(context, &semantic->resource,
-            semantic->resource_type, resource_data_type, semantic->sample_count);
+            semantic->resource_type, resource_data_type, semantic->sample_count, 0);
 }
 
 static void vkd3d_shader_scan_error(struct vkd3d_shader_scan_context *context,
@@ -926,12 +928,13 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         case VKD3DSIH_DCL_RESOURCE_RAW:
         case VKD3DSIH_DCL_UAV_RAW:
             vkd3d_shader_scan_resource_declaration(context, &instruction->declaration.raw_resource.resource,
-                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
+                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0, 0);
             break;
         case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
         case VKD3DSIH_DCL_UAV_STRUCTURED:
             vkd3d_shader_scan_resource_declaration(context, &instruction->declaration.structured_resource.resource,
-                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
+                    VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0,
+                    instruction->declaration.structured_resource.byte_stride);
             break;
         case VKD3DSIH_IF:
             cf_info = vkd3d_shader_scan_push_cf_info(context);
