@@ -3632,6 +3632,7 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
 struct sm4_instruction
 {
     enum vkd3d_sm4_opcode opcode;
+    uint32_t extra_bits;
 
     struct sm4_instruction_modifier modifiers[1];
     unsigned int modifier_count;
@@ -3981,7 +3982,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
 static void write_sm4_instruction(const struct tpf_writer *tpf, const struct sm4_instruction *instr)
 {
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
-    uint32_t token = instr->opcode;
+    uint32_t token = instr->opcode | instr->extra_bits;
     unsigned int size, i, j;
     size_t token_position;
 
@@ -4076,7 +4077,7 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
     component_type = hlsl_type_get_component_type(tpf->ctx, resource->data_type, 0);
 
     if (component_type->sampler_dim == HLSL_SAMPLER_DIM_COMPARISON)
-        instr.opcode |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
+        instr.extra_bits |= VKD3D_SM4_SAMPLER_COMPARISON << VKD3D_SM4_SAMPLER_MODE_SHIFT;
 
     assert(resource->regset == HLSL_REGSET_SAMPLERS);
 
@@ -4135,12 +4136,12 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
         {
             instr.opcode = VKD3D_SM4_OP_DCL_RESOURCE;
         }
-        instr.opcode |= (sm4_resource_dimension(component_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT);
+        instr.extra_bits |= (sm4_resource_dimension(component_type) << VKD3D_SM4_RESOURCE_TYPE_SHIFT);
 
         if (component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
                 || component_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
         {
-            instr.opcode |= component_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
+            instr.extra_bits |= component_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
         }
 
         write_sm4_instruction(tpf, &instr);
@@ -4217,7 +4218,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
             if ((var->storage_modifiers & HLSL_STORAGE_NOINTERPOLATION) || type_is_integer(var->data_type))
                 mode = VKD3DSIM_CONSTANT;
 
-            instr.opcode |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
+            instr.extra_bits |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
         }
     }
     else
@@ -4575,7 +4576,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
     if (dst->data_type->base_type == HLSL_TYPE_UINT)
-        instr.opcode |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
+        instr.extra_bits |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
 
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
@@ -4597,7 +4598,7 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_RESINFO;
     if (dst->data_type->base_type == HLSL_TYPE_UINT)
-        instr.opcode |= VKD3DSI_RESINFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
+        instr.extra_bits |= VKD3DSI_RESINFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
 
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
