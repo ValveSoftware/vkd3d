@@ -10,6 +10,7 @@ Makefile
 Makefile.in
 test-suite.log
 /vkd3d-compiler
+/vkd3d-dxbc
 
 vkd3d-*.tar.xz
 

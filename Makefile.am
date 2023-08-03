@@ -353,10 +353,14 @@ EXTRA_DIST += \
 	libs/vkd3d-shader/libvkd3d-shader.pc.in \
 	libs/vkd3d-utils/libvkd3d-utils.pc.in
 
-bin_PROGRAMS = vkd3d-compiler
+bin_PROGRAMS = vkd3d-compiler vkd3d-dxbc
+
 vkd3d_compiler_SOURCES = programs/vkd3d-compiler/main.c
 vkd3d_compiler_CFLAGS = $(AM_CFLAGS) @NCURSES_CFLAGS@
 vkd3d_compiler_LDADD = libvkd3d-shader.la @NCURSES_LIBS@
+
+vkd3d_dxbc_SOURCES = programs/vkd3d-dxbc/main.c
+vkd3d_dxbc_LDADD = libvkd3d-shader.la
 
 LDADD = libvkd3d.la libvkd3d-shader.la libvkd3d-utils.la
 AM_DEFAULT_SOURCE_EXT = .c
