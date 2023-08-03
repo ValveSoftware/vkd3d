@@ -47,8 +47,8 @@ commas or semicolons.
 
  * NO_COLOR - this is an alias of NO_COLOUR.
 
- * NO_COLOUR - when set, vkd3d-compiler will default to monochrome output,
-   even when the output supports colour.
+ * NO_COLOUR - when set, vkd3d-compiler and vkd3d-dxbc will default to
+   monochrome output, even when the output supports colour.
 
  * VKD3D_CONFIG - a list of options that change the behavior of libvkd3d.
     * virtual_heaps - Create descriptors for each D3D12 root signature

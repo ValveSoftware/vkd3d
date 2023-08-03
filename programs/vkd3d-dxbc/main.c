@@ -25,21 +25,57 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <getopt.h>
+#include <sys/stat.h>
 
 #include "vkd3d_common.h"
 #include "vkd3d_shader.h"
+#ifdef HAVE_NCURSES
+#include <term.h>
+#endif
 
 enum
 {
-    OPTION_HELP = CHAR_MAX + 1,
+    OPTION_COLOUR = CHAR_MAX + 1,
+    OPTION_HELP,
+    OPTION_LIST,
+    OPTION_NO_COLOUR,
     OPTION_VERSION,
 };
 
 struct options
 {
+    const char *input_filename;
     bool print_help;
+    bool list;
     bool print_version;
+
+    struct colours
+    {
+        const char *reset;
+        const char *index;
+        const char *label;
+    } colours;
 };
+
+static bool has_colour(void)
+{
+#ifdef HAVE_NCURSES
+    bool supported;
+    int ret;
+
+    if (!isatty(fileno(stdout)))
+        return false;
+    setupterm(NULL, fileno(stdout), &ret);
+    if (ret != 1)
+        return false;
+    supported = !!tigetstr("setaf");
+    del_curterm(cur_term);
+
+    return supported;
+#else
+    return false;
+#endif
+}
 
 static bool parse_command_line(int argc, char **argv, struct options *options)
 {
@@ -47,24 +83,58 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     static struct option long_options[] =
     {
+        {"colour",    no_argument,       NULL, OPTION_COLOUR},
         {"help",      no_argument,       NULL, OPTION_HELP},
+        {"list",      no_argument,       NULL, OPTION_LIST},
+        {"no-colour", no_argument,       NULL, OPTION_NO_COLOUR},
         {"version",   no_argument,       NULL, OPTION_VERSION},
         {NULL,        0,                 NULL, 0},
     };
 
+    static const struct colours colours =
+    {
+        .reset = "\x1b[m",
+        .index = "\x1b[92m",
+        .label = "\x1b[93m",
+    };
+
+    static const struct colours no_colours =
+    {
+        .reset = "",
+        .index = "",
+        .label = "",
+    };
+
     memset(options, 0, sizeof(*options));
+    if (!getenv("NO_COLOUR") && !getenv("NO_COLOR") && has_colour())
+        options->colours = colours;
+    else
+        options->colours = no_colours;
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "hV", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "htV", long_options, NULL)) == -1)
             break;
 
         switch (option)
         {
+            case OPTION_COLOUR:
+                options->colours = colours;
+                break;
+
             case 'h':
             case OPTION_HELP:
                 options->print_help = true;
                 return true;
+
+            case 't':
+            case OPTION_LIST:
+                options->list = true;
+                break;
+
+            case OPTION_NO_COLOUR:
+                options->colours = no_colours;
+                break;
 
             case 'V':
             case OPTION_VERSION:
@@ -76,25 +146,161 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         }
     }
 
+    if (optind < argc)
+        options->input_filename = argv[argc - 1];
+
     return true;
 }
 
 static void print_usage(const char *program_name)
 {
     static const char usage[] =
-        "[options...]\n"
+        "[options...] [file]\n"
         "Options:\n"
+        "  --colour                 Enable colour, even when not supported by the output.\n"
         "  -h, --help               Display this information and exit.\n"
+        "  -t, --list               List the contents of the DXBC blob.\n"
+        "  --no-colour              Disable colour, even when supported by the output.\n"
         "  -V, --version            Display version information and exit.\n"
         "  --                       Stop option processing. Any subsequent argument is\n"
-        "                           interpreted as a filename.\n";
+        "                           interpreted as a filename.\n"
+        "\n"
+        "If the input file is '-' or not specified, input will be read from standard\n"
+        "input.\n";
 
     fprintf(stderr, "Usage: %s %s", program_name, usage);
 }
 
+static FILE *open_input(const char *filename, bool *close)
+{
+    FILE *f;
+
+    *close = false;
+
+    if (!filename || !strcmp(filename, "-"))
+        return stdin;
+
+    if (!(f = fopen(filename, "rb")))
+    {
+        fprintf(stderr, "Unable to open '%s' for reading.\n", filename);
+        return NULL;
+    }
+
+    *close = true;
+    return f;
+}
+
+static bool read_input(FILE *f, struct vkd3d_shader_code *dxbc)
+{
+    size_t size = 4096;
+    struct stat st;
+    size_t pos = 0;
+    uint8_t *data;
+    size_t ret;
+
+    memset(dxbc, 0, sizeof(*dxbc));
+
+    if (fstat(fileno(f), &st) == -1)
+    {
+        fprintf(stderr, "Could not stat input.\n");
+        return false;
+    }
+
+    if (S_ISREG(st.st_mode))
+        size = st.st_size;
+
+    if (!(data = malloc(size)))
+    {
+        fprintf(stderr, "Out of memory.\n");
+        return false;
+    }
+
+    for (;;)
+    {
+        if (pos >= size)
+        {
+            if (size > SIZE_MAX / 2 || !(data = realloc(data, size * 2)))
+            {
+                fprintf(stderr, "Out of memory.\n");
+                free(data);
+                return false;
+            }
+            size *= 2;
+        }
+
+        if (!(ret = fread(&data[pos], 1, size - pos, f)))
+            break;
+        pos += ret;
+    }
+
+    if (!feof(f))
+    {
+        free(data);
+        return false;
+    }
+
+    dxbc->code = data;
+    dxbc->size = pos;
+
+    return true;
+}
+
+static const char *dump_tag(char *out, uint32_t tag)
+{
+    unsigned int i;
+
+    memcpy(out, &tag, sizeof(tag));
+    for (i = 0; i < sizeof(tag); ++i)
+    {
+        if (!isprint(out[i]))
+            out[i] = '.';
+    }
+
+    return out;
+}
+
+static void dump_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const struct options *options)
+{
+    const struct colours *colours = &options->colours;
+    struct vkd3d_shader_dxbc_section_desc *section;
+    char tag[4];
+    size_t i;
+
+    printf("         %stag%s: %08x (%.4s)\n",
+            colours->label, colours->reset,
+            dxbc_desc->tag, dump_tag(tag, dxbc_desc->tag));
+    printf("    %schecksum%s: %08x %08x %08x %08x\n",
+            colours->label, colours->reset,
+            dxbc_desc->checksum[0], dxbc_desc->checksum[1],
+            dxbc_desc->checksum[2], dxbc_desc->checksum[3]);
+    printf("     %sversion%s: %u\n", colours->label, colours->reset, dxbc_desc->version);
+    printf("        %ssize%s: %#zx (%zu) bytes\n", colours->label, colours->reset, dxbc_desc->size, dxbc_desc->size);
+    printf("    %ssections%s: %zu\n\n", colours->label, colours->reset, dxbc_desc->section_count);
+
+    printf(" %s#%s  %stag%s              %ssize%s\n",
+            colours->label, colours->reset,
+            colours->label, colours->reset,
+            colours->label, colours->reset);
+    for (i = 0; i < dxbc_desc->section_count; ++i)
+    {
+        section = &dxbc_desc->sections[i];
+        printf("%s%2zu%s  %08x (%.4s)  0x%08zx (%zu) bytes\n",
+                colours->index, i, colours->reset,
+                section->tag, dump_tag(tag, section->tag),
+                section->data.size, section->data.size);
+    }
+}
+
 int main(int argc, char **argv)
 {
+    struct vkd3d_shader_dxbc_desc dxbc_desc;
+    struct vkd3d_shader_code dxbc;
     struct options options;
+    bool close_input;
+    char *messages;
+    int fail = 1;
+    FILE *input;
+    int ret;
 
     if (!parse_command_line(argc, argv, &options))
     {
@@ -116,5 +322,30 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    return 0;
+    if (!(input = open_input(options.input_filename, &close_input)))
+        goto done;
+
+    if (!read_input(input, &dxbc))
+    {
+        fprintf(stderr, "Failed to read input blob.\n");
+        goto done;
+    }
+
+    ret = vkd3d_shader_parse_dxbc(&dxbc, 0, &dxbc_desc, &messages);
+    if (messages)
+        fputs(messages, stderr);
+    vkd3d_shader_free_messages(messages);
+    if (ret < 0)
+        goto done;
+
+    if (options.list)
+        dump_dxbc(&dxbc_desc, &options);
+
+    vkd3d_shader_free_dxbc(&dxbc_desc);
+    vkd3d_shader_free_shader_code(&dxbc);
+    fail = 0;
+done:
+    if (close_input)
+        fclose(input);
+    return fail;
 }

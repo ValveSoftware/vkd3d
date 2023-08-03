@@ -360,7 +360,8 @@ vkd3d_compiler_CFLAGS = $(AM_CFLAGS) @NCURSES_CFLAGS@
 vkd3d_compiler_LDADD = libvkd3d-shader.la @NCURSES_LIBS@
 
 vkd3d_dxbc_SOURCES = programs/vkd3d-dxbc/main.c
-vkd3d_dxbc_LDADD = libvkd3d-shader.la
+vkd3d_dxbc_CFLAGS = $(AM_CFLAGS) @NCURSES_CFLAGS@
+vkd3d_dxbc_LDADD = libvkd3d-shader.la @NCURSES_LIBS@
 
 LDADD = libvkd3d.la libvkd3d-shader.la libvkd3d-utils.la
 AM_DEFAULT_SOURCE_EXT = .c
