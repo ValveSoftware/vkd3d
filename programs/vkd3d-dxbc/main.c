@@ -38,6 +38,7 @@ enum
     OPTION_COLOUR = CHAR_MAX + 1,
     OPTION_HELP,
     OPTION_LIST,
+    OPTION_LIST_DATA,
     OPTION_NO_COLOUR,
     OPTION_VERSION,
 };
@@ -47,12 +48,14 @@ struct options
     const char *input_filename;
     bool print_help;
     bool list;
+    bool list_data;
     bool print_version;
 
     struct colours
     {
         const char *reset;
         const char *index;
+        const char *offset;
         const char *label;
     } colours;
 };
@@ -86,6 +89,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         {"colour",    no_argument,       NULL, OPTION_COLOUR},
         {"help",      no_argument,       NULL, OPTION_HELP},
         {"list",      no_argument,       NULL, OPTION_LIST},
+        {"list-data", no_argument,       NULL, OPTION_LIST_DATA},
         {"no-colour", no_argument,       NULL, OPTION_NO_COLOUR},
         {"version",   no_argument,       NULL, OPTION_VERSION},
         {NULL,        0,                 NULL, 0},
@@ -95,6 +99,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     {
         .reset = "\x1b[m",
         .index = "\x1b[92m",
+        .offset = "\x1b[36m",
         .label = "\x1b[93m",
     };
 
@@ -102,6 +107,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     {
         .reset = "",
         .index = "",
+        .offset = "",
         .label = "",
     };
 
@@ -132,6 +138,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 options->list = true;
                 break;
 
+            case OPTION_LIST_DATA:
+                options->list_data = true;
+                break;
+
             case OPTION_NO_COLOUR:
                 options->colours = no_colours;
                 break;
@@ -160,6 +170,7 @@ static void print_usage(const char *program_name)
         "  --colour                 Enable colour, even when not supported by the output.\n"
         "  -h, --help               Display this information and exit.\n"
         "  -t, --list               List the contents of the DXBC blob.\n"
+        "  --list-data              List the data contained in the DXBC sections.\n"
         "  --no-colour              Disable colour, even when supported by the output.\n"
         "  -V, --version            Display version information and exit.\n"
         "  --                       Stop option processing. Any subsequent argument is\n"
@@ -259,6 +270,59 @@ static const char *dump_tag(char *out, uint32_t tag)
     return out;
 }
 
+static void dump_line(const struct colours *colours, const char *prefix,
+        const uint8_t *data, size_t offset, size_t count)
+{
+    const uint8_t *ptr = &data[offset];
+    size_t i;
+
+    if (!count)
+        return;
+
+    printf("%s%s%08zx%s  ", prefix, colours->offset, offset, colours->reset);
+    for (i = 0; i < count; ++i)
+    {
+        printf("%02x ", ptr[i]);
+        if (i == 7)
+            printf(" ");
+    }
+
+    while (i < 16)
+    {
+        printf("   ");
+        if (i == 7)
+            printf(" ");
+        ++i;
+    }
+    printf(" %s|%s", colours->offset, colours->reset);
+
+    for (i = 0; i < count; ++i)
+    {
+        printf("%c", isprint(ptr[i]) ? ptr[i] : '.');
+    }
+    printf("%s|%s\n", colours->offset, colours->reset);
+}
+
+static void dump_data(const struct colours *colours, const char *prefix, const struct vkd3d_shader_code *data)
+{
+    size_t line_count, remainder, i;
+    const uint8_t *ptr;
+
+    ptr = data->code;
+    line_count = data->size / 16;
+    remainder = data->size % 16;
+
+    for (i = 0; i < line_count; ++i, ptr += 16)
+    {
+        dump_line(colours, prefix, data->code, i * 16, 16);
+    }
+    if (remainder)
+    {
+        dump_line(colours, prefix, data->code, i * 16, remainder);
+    }
+    printf("%s%s%08zx%s\n", prefix, colours->offset, data->size, colours->reset);
+}
+
 static void dump_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const struct options *options)
 {
     const struct colours *colours = &options->colours;
@@ -288,6 +352,12 @@ static void dump_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const stru
                 colours->index, i, colours->reset,
                 section->tag, dump_tag(tag, section->tag),
                 section->data.size, section->data.size);
+
+        if (!options->list_data)
+            continue;
+        printf("\n");
+        dump_data(colours, "  ", &section->data);
+        printf("\n");
     }
 }
 
@@ -338,7 +408,7 @@ int main(int argc, char **argv)
     if (ret < 0)
         goto done;
 
-    if (options.list)
+    if (options.list || options.list_data)
         dump_dxbc(&dxbc_desc, &options);
 
     vkd3d_shader_free_dxbc(&dxbc_desc);
