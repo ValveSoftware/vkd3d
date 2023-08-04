@@ -3275,6 +3275,7 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
         return false;
 
     var->objects_usage[regset][index].used = true;
+    var->bind_count[regset] = max(var->bind_count[regset], index + 1);
     if (load->sampler.var)
     {
         var = load->sampler.var;
@@ -3282,6 +3283,7 @@ static bool track_object_components_usage(struct hlsl_ctx *ctx, struct hlsl_ir_n
             return false;
 
         var->objects_usage[HLSL_REGSET_SAMPLERS][index].used = true;
+        var->bind_count[HLSL_REGSET_SAMPLERS] = max(var->bind_count[HLSL_REGSET_SAMPLERS], index + 1);
     }
 
     return false;

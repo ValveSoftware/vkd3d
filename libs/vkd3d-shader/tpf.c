@@ -3192,7 +3192,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
             extern_resources[*count].regset = regset;
             extern_resources[*count].id = var->regs[regset].id;
-            extern_resources[*count].bind_count = var->regs[regset].allocation_size;
+            extern_resources[*count].bind_count = var->bind_count[regset];
 
             ++*count;
         }

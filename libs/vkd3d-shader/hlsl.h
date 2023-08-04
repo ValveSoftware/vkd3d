@@ -417,6 +417,9 @@ struct hlsl_ir_var
         enum hlsl_sampler_dim sampler_dim;
         struct vkd3d_shader_location first_sampler_dim_loc;
     } *objects_usage[HLSL_REGSET_LAST_OBJECT + 1];
+    /* Minimum number of binds required to include all object components actually used in the shader.
+     * It may be less than the allocation size, e.g. for texture arrays. */
+    unsigned int bind_count[HLSL_REGSET_LAST_OBJECT + 1];
 
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;
