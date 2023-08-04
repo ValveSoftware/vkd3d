@@ -60,7 +60,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (10, 10, 10, 11)
+probe all rgba (10, 10, 10, 11)
 
 
 [pixel shader]
@@ -74,7 +74,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (21, 21, 21, 11)
+probe all rgba (21, 21, 21, 11)
 
 
 [pixel shader]
@@ -105,7 +105,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (104, 104, 104, 111)
+probe all rgba (104, 104, 104, 111)
 
 
 % Sampler arrays with components that have different usage dimensions are only forbidden in SM4 upwards.

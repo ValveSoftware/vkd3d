@@ -131,7 +131,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (450, 139, 876, 333)
+probe all rgba (450, 139, 876, 333)
 
 
 % Same as the first test, but inverting the declaration order.
@@ -184,7 +184,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (450, 138, 796, 333)
+probe all rgba (450, 138, 796, 333)
 
 
 % Same as the first test, but inverting the resource loads order.
@@ -237,7 +237,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (478, 913, 256, 333)
+probe all rgba (478, 913, 256, 333)
 
 
 % We can conclude that for declared texture arrays, if they are used, the "allocation size" is the
@@ -270,7 +270,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (215, 215, 215, 111)
+probe all rgba (215, 215, 215, 111)
 
 
 % Test that textures created from SM1-style samples allocation order is in decreasing "bind count".
@@ -300,4 +300,4 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (5, 4, 2, 0)
+probe all rgba (5, 4, 2, 0)

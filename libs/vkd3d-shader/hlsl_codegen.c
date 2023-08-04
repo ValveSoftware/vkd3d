@@ -2191,6 +2191,44 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     return true;
 }
 
+static void insert_ensuring_decreasing_bind_count(struct list *list, struct hlsl_ir_var *to_add,
+        enum hlsl_regset regset)
+{
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, list, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->bind_count[regset] < to_add->bind_count[regset])
+        {
+            list_add_before(&var->extern_entry, &to_add->extern_entry);
+            return;
+        }
+    }
+
+    list_add_tail(list, &to_add->extern_entry);
+}
+
+static bool sort_synthetic_separated_samplers_first(struct hlsl_ctx *ctx)
+{
+    struct list separated_resources;
+    struct hlsl_ir_var *var, *next;
+
+    list_init(&separated_resources);
+
+    LIST_FOR_EACH_ENTRY_SAFE(var, next, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (var->is_separated_resource)
+        {
+            list_remove(&var->extern_entry);
+            insert_ensuring_decreasing_bind_count(&separated_resources, var, HLSL_REGSET_TEXTURES);
+        }
+    }
+
+    list_move_head(&ctx->extern_vars, &separated_resources);
+
+    return false;
+}
+
 /* Lower DIV to RCP + MUL. */
 static bool lower_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
@@ -4318,6 +4356,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     if (profile->major_version >= 4)
         hlsl_transform_ir(ctx, lower_combined_samples, body, NULL);
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
+    sort_synthetic_separated_samplers_first(ctx);
 
     if (profile->major_version < 4)
     {
