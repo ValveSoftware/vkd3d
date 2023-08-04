@@ -1686,7 +1686,7 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
             else
             {
                 put_u32(buffer, vkd3d_make_u32(D3DXRS_SAMPLER, var->regs[r].id));
-                put_u32(buffer, var->regs[r].bind_count);
+                put_u32(buffer, var->regs[r].allocation_size);
             }
             put_u32(buffer, 0); /* type */
             put_u32(buffer, 0); /* FIXME: default value */
@@ -2033,7 +2033,7 @@ static void write_sm1_sampler_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
         if (!var->regs[HLSL_REGSET_SAMPLERS].allocated)
             continue;
 
-        count = var->regs[HLSL_REGSET_SAMPLERS].bind_count;
+        count = var->regs[HLSL_REGSET_SAMPLERS].allocation_size;
 
         for (i = 0; i < count; ++i)
         {

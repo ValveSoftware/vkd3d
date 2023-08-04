@@ -3119,7 +3119,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                 regset = hlsl_type_get_regset(component_type);
                 regset_offset = hlsl_type_get_component_offset(ctx, var->data_type, regset, k);
 
-                if (regset_offset > var->regs[regset].bind_count)
+                if (regset_offset > var->regs[regset].allocation_size)
                     continue;
 
                 if (var->objects_usage[regset][regset_offset].used)
@@ -3192,7 +3192,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
             extern_resources[*count].regset = regset;
             extern_resources[*count].id = var->regs[regset].id;
-            extern_resources[*count].bind_count = var->regs[regset].bind_count;
+            extern_resources[*count].bind_count = var->regs[regset].allocation_size;
 
             ++*count;
         }

@@ -2868,7 +2868,7 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
             continue;
         regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.reg_type && var->regs[regset].bind_count)
+        if (var->reg_reservation.reg_type && var->regs[regset].allocation_size)
         {
             if (var->reg_reservation.reg_type != get_regset_name(regset))
             {
@@ -2886,7 +2886,7 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
                 var->regs[regset].id = var->reg_reservation.reg_index;
                 TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
                         var->reg_reservation.reg_index, var->reg_reservation.reg_type,
-                        var->reg_reservation.reg_index + var->regs[regset].bind_count);
+                        var->reg_reservation.reg_index + var->regs[regset].allocation_size);
             }
         }
     }
@@ -3144,7 +3144,7 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
     record_allocation(ctx, allocator, reg_idx, writemask, first_write, last_read);
 
     ret.id = reg_idx;
-    ret.bind_count = 1;
+    ret.allocation_size = 1;
     ret.writemask = hlsl_combine_writemasks(writemask, (1u << component_count) - 1);
     ret.allocated = true;
     return ret;
@@ -3180,7 +3180,7 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allo
         record_allocation(ctx, allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, first_write, last_read);
 
     ret.id = reg_idx;
-    ret.bind_count = align(reg_size, 4) / 4;
+    ret.allocation_size = align(reg_size, 4) / 4;
     ret.allocated = true;
     return ret;
 }
@@ -3306,7 +3306,7 @@ static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
                 /* Samplers (and textures separated from them) are only allocated until the last
                  * used one. */
                 if (var->objects_usage[k][i].used)
-                    var->regs[k].bind_count = (k == HLSL_REGSET_SAMPLERS || is_separated) ? i + 1 : type->reg_size[k];
+                    var->regs[k].allocation_size = (k == HLSL_REGSET_SAMPLERS || is_separated) ? i + 1 : type->reg_size[k];
             }
         }
     }
@@ -3613,7 +3613,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
     {
         var->regs[HLSL_REGSET_NUMERIC].allocated = true;
         var->regs[HLSL_REGSET_NUMERIC].id = (*counter)++;
-        var->regs[HLSL_REGSET_NUMERIC].bind_count = 1;
+        var->regs[HLSL_REGSET_NUMERIC].allocation_size = 1;
         var->regs[HLSL_REGSET_NUMERIC].writemask = (1 << var->data_type->dimx) - 1;
         TRACE("Allocated %s to %s.\n", var->name, debug_register(output ? 'o' : 'v',
                 var->regs[HLSL_REGSET_NUMERIC], var->data_type));
@@ -3792,7 +3792,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
                 }
 
                 buffer->reg.id = buffer->reservation.reg_index;
-                buffer->reg.bind_count = 1;
+                buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
                 TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
             }
@@ -3802,7 +3802,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
                     ++index;
 
                 buffer->reg.id = index;
-                buffer->reg.bind_count = 1;
+                buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
                 TRACE("Allocated %s to cb%u.\n", buffer->name, index);
                 ++index;
@@ -3842,7 +3842,7 @@ static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum
         else if (var->regs[regset].allocated)
         {
             start = var->regs[regset].id;
-            count = var->regs[regset].bind_count;
+            count = var->regs[regset].allocation_size;
         }
         else
         {
@@ -3873,7 +3873,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        unsigned int count = var->regs[regset].bind_count;
+        unsigned int count = var->regs[regset].allocation_size;
 
         if (count == 0)
             continue;

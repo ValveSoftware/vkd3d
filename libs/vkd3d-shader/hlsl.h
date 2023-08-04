@@ -257,7 +257,7 @@ struct hlsl_reg
     /* Number of registers to be allocated.
      * Unlike the variable's type's regsize, it is not expressed in register components, but rather
      *  in whole registers, and may depend on which components are used within the shader. */
-    uint32_t bind_count;
+    uint32_t allocation_size;
     /* For numeric registers, a writemask can be provided to indicate the reservation of only some
      *   of the 4 components. */
     unsigned int writemask;
