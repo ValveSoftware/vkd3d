@@ -6530,7 +6530,6 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_DTOI,       SpvOpConvertFToS},
         {VKD3DSIH_DTOU,       SpvOpConvertFToU},
         {VKD3DSIH_FTOD,       SpvOpFConvert},
-        {VKD3DSIH_FTOI,       SpvOpConvertFToS},
         {VKD3DSIH_IADD,       SpvOpIAdd},
         {VKD3DSIH_INEG,       SpvOpSNegate},
         {VKD3DSIH_ISHL,       SpvOpShiftLeftLogical},
@@ -6994,6 +6993,33 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
 
         spirv_compiler_emit_store_dst(compiler, &dst[1], val_id);
     }
+}
+
+static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t src_type_id, type_id, src_id, int_min_id, val_id;
+
+    assert(instruction->dst_count == 1);
+    assert(instruction->src_count == 1);
+
+    /* OpConvertFToI has undefined results if the result cannot be represented
+     * as a signed integer, but Direct3D expects the result to saturate,
+     * and for NaN to yield zero. */
+
+    src_type_id = spirv_compiler_get_type_id_for_reg(compiler, &src->reg, dst->write_mask);
+    type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
+    src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    int_min_id = spirv_compiler_get_constant_float_vector(compiler, -2147483648.0f,
+            vkd3d_write_mask_component_count(dst->write_mask));
+
+    val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, int_min_id);
+    val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpConvertFToS, type_id, val_id);
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
 static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
@@ -9304,7 +9330,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DTOI:
         case VKD3DSIH_DTOU:
         case VKD3DSIH_FTOD:
-        case VKD3DSIH_FTOI:
         case VKD3DSIH_IADD:
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISHL:
@@ -9364,6 +9389,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         case VKD3DSIH_UDIV:
             spirv_compiler_emit_udiv(compiler, instruction);
+            break;
+        case VKD3DSIH_FTOI:
+            spirv_compiler_emit_ftoi(compiler, instruction);
             break;
         case VKD3DSIH_FTOU:
             spirv_compiler_emit_ftou(compiler, instruction);
