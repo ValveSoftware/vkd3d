@@ -3331,7 +3331,7 @@ static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
 {
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
-    unsigned int i, k;
+    unsigned int k;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -3339,15 +3339,10 @@ static void calculate_resource_register_counts(struct hlsl_ctx *ctx)
 
         for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
         {
-            for (i = 0; i < type->reg_size[k]; ++i)
-            {
-                bool is_separated = var->is_separated_resource;
+            bool is_separated = var->is_separated_resource;
 
-                /* Samplers (and textures separated from them) are only allocated until the last
-                 * used one. */
-                if (var->objects_usage[k][i].used)
-                    var->regs[k].allocation_size = (k == HLSL_REGSET_SAMPLERS || is_separated) ? i + 1 : type->reg_size[k];
-            }
+            if (var->bind_count[k] > 0)
+                var->regs[k].allocation_size = (k == HLSL_REGSET_SAMPLERS || is_separated) ? var->bind_count[k] : type->reg_size[k];
         }
     }
 }
