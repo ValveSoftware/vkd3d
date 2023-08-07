@@ -2330,6 +2330,92 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
     return args.decl;
 }
 
+static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+
+    return hlsl_new_expr(ctx, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc);
+}
+
+static bool add_user_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *func,
+        const struct parse_initializer *args, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *call;
+    unsigned int i;
+
+    assert(args->args_count == func->parameters.count);
+
+    for (i = 0; i < func->parameters.count; ++i)
+    {
+        struct hlsl_ir_var *param = func->parameters.vars[i];
+        struct hlsl_ir_node *arg = args->args[i];
+
+        if (!hlsl_types_are_equal(arg->data_type, param->data_type))
+        {
+            struct hlsl_ir_node *cast;
+
+            if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
+                return false;
+            args->args[i] = cast;
+            arg = cast;
+        }
+
+        if (param->storage_modifiers & HLSL_STORAGE_IN)
+        {
+            struct hlsl_ir_node *store;
+
+            if (!(store = hlsl_new_simple_store(ctx, param, arg)))
+                return false;
+            hlsl_block_add_instr(args->instrs, store);
+        }
+    }
+
+    if (!(call = hlsl_new_call(ctx, func, loc)))
+        return false;
+    hlsl_block_add_instr(args->instrs, call);
+
+    for (i = 0; i < func->parameters.count; ++i)
+    {
+        struct hlsl_ir_var *param = func->parameters.vars[i];
+        struct hlsl_ir_node *arg = args->args[i];
+
+        if (param->storage_modifiers & HLSL_STORAGE_OUT)
+        {
+            struct hlsl_ir_load *load;
+
+            if (arg->data_type->modifiers & HLSL_MODIFIER_CONST)
+                hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
+                        "Output argument to \"%s\" is const.", func->func->name);
+
+            if (!(load = hlsl_new_var_load(ctx, param, &arg->loc)))
+                return false;
+            hlsl_block_add_instr(args->instrs, &load->node);
+
+            if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node))
+                return false;
+        }
+    }
+
+    if (func->return_var)
+    {
+        struct hlsl_ir_load *load;
+
+        if (!(load = hlsl_new_var_load(ctx, func->return_var, loc)))
+            return false;
+        hlsl_block_add_instr(args->instrs, &load->node);
+    }
+    else
+    {
+        struct hlsl_ir_node *expr;
+
+        if (!(expr = hlsl_new_void_expr(ctx, loc)))
+            return false;
+        hlsl_block_add_instr(args->instrs, expr);
+    }
+
+    return true;
+}
+
 static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, struct hlsl_ir_node *arg, const struct vkd3d_shader_location *loc)
 {
@@ -3666,13 +3752,6 @@ static int intrinsic_function_name_compare(const void *a, const void *b)
     return strcmp(a, func->name);
 }
 
-static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
-{
-    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
-
-    return hlsl_new_expr(ctx, HLSL_OP0_VOID, operands, ctx->builtin_types.Void, loc);
-}
-
 static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
         struct parse_initializer *args, const struct vkd3d_shader_location *loc)
 {
@@ -3681,78 +3760,8 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
 
     if ((decl = find_function_call(ctx, name, args, loc)))
     {
-        struct hlsl_ir_node *call;
-        unsigned int i;
-
-        assert(args->args_count == decl->parameters.count);
-
-        for (i = 0; i < decl->parameters.count; ++i)
-        {
-            struct hlsl_ir_var *param = decl->parameters.vars[i];
-            struct hlsl_ir_node *arg = args->args[i];
-
-            if (!hlsl_types_are_equal(arg->data_type, param->data_type))
-            {
-                struct hlsl_ir_node *cast;
-
-                if (!(cast = add_cast(ctx, args->instrs, arg, param->data_type, &arg->loc)))
-                    goto fail;
-                args->args[i] = cast;
-                arg = cast;
-            }
-
-            if (param->storage_modifiers & HLSL_STORAGE_IN)
-            {
-                struct hlsl_ir_node *store;
-
-                if (!(store = hlsl_new_simple_store(ctx, param, arg)))
-                    goto fail;
-                hlsl_block_add_instr(args->instrs, store);
-            }
-        }
-
-        if (!(call = hlsl_new_call(ctx, decl, loc)))
+        if (!add_user_call(ctx, decl, args, loc))
             goto fail;
-        hlsl_block_add_instr(args->instrs, call);
-
-        for (i = 0; i < decl->parameters.count; ++i)
-        {
-            struct hlsl_ir_var *param = decl->parameters.vars[i];
-            struct hlsl_ir_node *arg = args->args[i];
-
-            if (param->storage_modifiers & HLSL_STORAGE_OUT)
-            {
-                struct hlsl_ir_load *load;
-
-                if (arg->data_type->modifiers & HLSL_MODIFIER_CONST)
-                    hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_MODIFIES_CONST,
-                            "Output argument to \"%s\" is const.", decl->func->name);
-
-                if (!(load = hlsl_new_var_load(ctx, param, &arg->loc)))
-                    goto fail;
-                hlsl_block_add_instr(args->instrs, &load->node);
-
-                if (!add_assignment(ctx, args->instrs, arg, ASSIGN_OP_ASSIGN, &load->node))
-                    goto fail;
-            }
-        }
-
-        if (decl->return_var)
-        {
-            struct hlsl_ir_load *load;
-
-            if (!(load = hlsl_new_var_load(ctx, decl->return_var, loc)))
-                goto fail;
-            hlsl_block_add_instr(args->instrs, &load->node);
-        }
-        else
-        {
-            struct hlsl_ir_node *expr;
-
-            if (!(expr = hlsl_new_void_expr(ctx, loc)))
-                goto fail;
-            hlsl_block_add_instr(args->instrs, expr);
-        }
     }
     else if ((intrinsic = bsearch(name, intrinsic_functions, ARRAY_SIZE(intrinsic_functions),
             sizeof(*intrinsic_functions), intrinsic_function_name_compare)))
