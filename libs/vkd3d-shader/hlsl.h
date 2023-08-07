@@ -837,6 +837,12 @@ struct hlsl_ctx
      *   compute shader profiles. It is set using the numthreads() attribute in the entry point. */
     uint32_t thread_count[3];
 
+    /* In some cases we generate opcodes by parsing an HLSL function and then
+     * invoking it. If not NULL, this field is the name of the function that we
+     * are currently parsing, "mangled" with an internal prefix to avoid
+     * polluting the user namespace. */
+    const char *internal_func_name;
+
     /* Whether the parser is inside a state block (effects' metadata) inside a variable declaration. */
     uint32_t in_state_block : 1;
     /* Whether the numthreads() attribute has been provided in the entry-point function. */
@@ -1262,6 +1268,8 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx,
 bool hlsl_sm4_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, enum vkd3d_shader_register_type *type, enum vkd3d_sm4_swizzle_type *swizzle_type, bool *has_idx);
 int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out);
+
+struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ctx, const char *name, const char *hlsl);
 
 int hlsl_lexer_compile(struct hlsl_ctx *ctx, const struct vkd3d_shader_code *hlsl);
 

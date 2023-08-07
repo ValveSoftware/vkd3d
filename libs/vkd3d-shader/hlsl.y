@@ -3422,58 +3422,29 @@ static bool intrinsic_sin(struct hlsl_ctx *ctx,
 static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *min_arg, *max_arg, *x_arg, *p, *p_num, *p_denom, *res, *one, *minus_two, *three;
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_type *type;
+    char *body;
 
-    if (!elementwise_intrinsic_float_convert_args(ctx, params, loc))
+    static const char template[] =
+            "%s smoothstep(%s low, %s high, %s x)\n"
+            "{\n"
+            "    %s p = saturate((x - low) / (high - low));\n"
+            "    return (p * p) * (3 - 2 * p);\n"
+            "}";
+
+    if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+        return false;
+    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template, type->name, type->name, type->name, type->name, type->name)))
+        return false;
+    func = hlsl_compile_internal_function(ctx, "smoothstep", body);
+    vkd3d_free(body);
+    if (!func)
         return false;
 
-    min_arg = params->args[0];
-    max_arg = params->args[1];
-    x_arg = params->args[2];
-
-    if (!(min_arg = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_NEG, min_arg, loc)))
-        return false;
-
-    if (!(p_num = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, x_arg, min_arg, loc)))
-        return false;
-
-    if (!(p_denom = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, max_arg, min_arg, loc)))
-        return false;
-
-    if (!(one = hlsl_new_float_constant(ctx, 1.0, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, one);
-
-    if (!(p_denom = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, one, p_denom, loc)))
-        return false;
-
-    if (!(p = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p_num, p_denom, loc)))
-        return false;
-
-    if (!(p = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SAT, p, loc)))
-        return false;
-
-    if (!(minus_two = hlsl_new_float_constant(ctx, -2.0, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, minus_two);
-
-    if (!(three = hlsl_new_float_constant(ctx, 3.0, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, three);
-
-    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, minus_two, p, loc)))
-        return false;
-
-    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, three, res, loc)))
-        return false;
-
-    if (!(p = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p, p, loc)))
-        return false;
-
-    if (!(res = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, p, res, loc)))
-        return false;
-
-    return true;
+    return add_user_call(ctx, func, params, loc);
 }
 
 static bool intrinsic_sqrt(struct hlsl_ctx *ctx,
