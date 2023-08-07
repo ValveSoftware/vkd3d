@@ -3034,14 +3034,17 @@ static struct hlsl_ir_node * add_pow_expr(struct hlsl_ctx *ctx,
 static bool intrinsic_lit(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *n_l_neg, *n_h_neg, *specular_or, *specular_pow, *load;
-    struct hlsl_ir_node *n_l, *n_h, *m, *diffuse, *zero, *store, *init;
-    struct hlsl_constant_value init_value;
-    struct hlsl_ir_load *var_load;
-    struct hlsl_deref var_deref;
-    struct hlsl_type *ret_type;
-    struct hlsl_ir_var *var;
-    struct hlsl_block block;
+    struct hlsl_ir_function_decl *func;
+
+    static const char body[] =
+            "float4 lit(float n_l, float n_h, float m)\n"
+            "{\n"
+            "    float4 ret;\n"
+            "    ret.xw = 1.0;\n"
+            "    ret.y = max(n_l, 0);\n"
+            "    ret.z = (n_l < 0 || n_h < 0) ? 0 : pow(n_h, m);\n"
+            "    return ret;\n"
+            "}";
 
     if (params->args[0]->data_type->class != HLSL_CLASS_SCALAR
             || params->args[1]->data_type->class != HLSL_CLASS_SCALAR
@@ -3051,70 +3054,10 @@ static bool intrinsic_lit(struct hlsl_ctx *ctx,
         return false;
     }
 
-    if (!(n_l = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+    if (!(func = hlsl_compile_internal_function(ctx, "lit", body)))
         return false;
 
-    if (!(n_h = intrinsic_float_convert_arg(ctx, params, params->args[1], loc)))
-        return false;
-
-    if (!(m = intrinsic_float_convert_arg(ctx, params, params->args[2], loc)))
-        return false;
-
-    ret_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
-
-    if (!(var = hlsl_new_synthetic_var(ctx, "lit", ret_type, loc)))
-        return false;
-    hlsl_init_simple_deref_from_var(&var_deref, var);
-
-    init_value.u[0].f = 1.0f;
-    init_value.u[1].f = 0.0f;
-    init_value.u[2].f = 0.0f;
-    init_value.u[3].f = 1.0f;
-    if (!(init = hlsl_new_constant(ctx, ret_type, &init_value, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, init);
-
-    if (!(store = hlsl_new_simple_store(ctx, var, init)))
-        return false;
-    hlsl_block_add_instr(params->instrs, store);
-
-    if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, zero);
-
-    /* Diffuse component. */
-    if (!(diffuse = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MAX, n_l, zero, loc)))
-        return false;
-
-    if (!hlsl_new_store_component(ctx, &block, &var_deref, 1, diffuse))
-        return false;
-    hlsl_block_add_block(params->instrs, &block);
-
-    /* Specular component. */
-    if (!(n_h_neg = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, n_h, zero, loc)))
-        return false;
-
-    if (!(n_l_neg = add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_LESS, n_l, zero, loc)))
-        return false;
-
-    if (!(specular_or = add_binary_logical_expr(ctx, params->instrs, HLSL_OP2_LOGIC_OR, n_l_neg, n_h_neg, loc)))
-        return false;
-
-    if (!(specular_pow = add_pow_expr(ctx, params->instrs, n_h, m, loc)))
-        return false;
-
-    if (!(load = hlsl_add_conditional(ctx, params->instrs, specular_or, zero, specular_pow)))
-        return false;
-
-    if (!hlsl_new_store_component(ctx, &block, &var_deref, 2, load))
-        return false;
-    hlsl_block_add_block(params->instrs, &block);
-
-    if (!(var_load = hlsl_new_var_load(ctx, var, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, &var_load->node);
-
-    return true;
+    return add_user_call(ctx, func, params, loc);
 }
 
 static bool intrinsic_log(struct hlsl_ctx *ctx,

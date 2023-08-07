@@ -19,6 +19,17 @@ uniform 0 float4 1.2 2.0 3.0 0.0
 draw quad
 probe all rgba (1.0, 1.2, 8.0, 1.0)
 
+[pixel shader]
+float4 main(uniform float4 u) : sv_target
+{
+    return lit(u.x, u.y, u.z) + lit(u.x, u.y, u.z);
+}
+
+[test]
+uniform 0 float4 1.2 2.0 3.0 0.0
+draw quad
+probe all rgba (2.0, 2.4, 16.0, 2.0)
+
 [pixel shader fail]
 float4 main(uniform float4 u) : sv_target
 {
