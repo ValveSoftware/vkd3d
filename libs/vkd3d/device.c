@@ -3639,7 +3639,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource(ID3D12Devi
         return hr;
     }
 
-    return return_interface(&object->ID3D12Resource_iface, &IID_ID3D12Resource, iid, resource);
+    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap(ID3D12Device5 *iface,
@@ -3682,7 +3682,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePlacedResource(ID3D12Device5
             desc, initial_state, optimized_clear_value, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12Resource_iface, &IID_ID3D12Resource, iid, resource);
+    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateReservedResource(ID3D12Device5 *iface,
@@ -3700,7 +3700,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateReservedResource(ID3D12Devic
             desc, initial_state, optimized_clear_value, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12Resource_iface, &IID_ID3D12Resource, iid, resource);
+    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateSharedHandle(ID3D12Device5 *iface,
@@ -4035,7 +4035,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource1(ID3D12Dev
         return hr;
     }
 
-    return return_interface(&object->ID3D12Resource_iface, &IID_ID3D12Resource, iid, resource);
+    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap1(ID3D12Device5 *iface,

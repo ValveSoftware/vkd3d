@@ -718,7 +718,7 @@ struct d3d12_resource_tile_info
 /* ID3D12Resource */
 struct d3d12_resource
 {
-    ID3D12Resource ID3D12Resource_iface;
+    ID3D12Resource1 ID3D12Resource1_iface;
     LONG refcount;
     LONG internal_refcount;
 
@@ -750,7 +750,12 @@ struct d3d12_resource
 
 static inline struct d3d12_resource *impl_from_ID3D12Resource(ID3D12Resource *iface)
 {
-    return CONTAINING_RECORD(iface, struct d3d12_resource, ID3D12Resource_iface);
+    return CONTAINING_RECORD(iface, struct d3d12_resource, ID3D12Resource1_iface);
+}
+
+static inline struct d3d12_resource *impl_from_ID3D12Resource1(ID3D12Resource1 *iface)
+{
+    return CONTAINING_RECORD(iface, struct d3d12_resource, ID3D12Resource1_iface);
 }
 
 static inline bool d3d12_resource_is_buffer(const struct d3d12_resource *resource)
