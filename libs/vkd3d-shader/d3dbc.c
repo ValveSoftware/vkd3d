@@ -1638,17 +1638,12 @@ static void write_sm1_uniforms(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffe
 
             if (var->is_param && var->is_uniform)
             {
-                struct vkd3d_string_buffer *name;
+                char *new_name;
 
-                if (!(name = hlsl_get_string_buffer(ctx)))
-                {
-                    buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
+                if (!(new_name = hlsl_sprintf_alloc(ctx, "$%s", var->name)))
                     return;
-                }
-                vkd3d_string_buffer_printf(name, "$%s", var->name);
                 vkd3d_free((char *)var->name);
-                var->name = hlsl_strdup(ctx, name->buffer);
-                hlsl_release_string_buffer(ctx, name);
+                var->name = new_name;
             }
         }
     }

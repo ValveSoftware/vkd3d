@@ -72,6 +72,27 @@ void hlsl_fixme(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc, c
         ctx->result = VKD3D_ERROR_NOT_IMPLEMENTED;
 }
 
+char *hlsl_sprintf_alloc(struct hlsl_ctx *ctx, const char *fmt, ...)
+{
+    struct vkd3d_string_buffer *string;
+    va_list args;
+    char *ret;
+
+    if (!(string = hlsl_get_string_buffer(ctx)))
+        return NULL;
+    va_start(args, fmt);
+    if (vkd3d_string_buffer_vprintf(string, fmt, args) < 0)
+    {
+        va_end(args);
+        hlsl_release_string_buffer(ctx, string);
+        return NULL;
+    }
+    va_end(args);
+    ret = hlsl_strdup(ctx, string->buffer);
+    hlsl_release_string_buffer(ctx, string);
+    return ret;
+}
+
 bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var)
 {
     struct hlsl_scope *scope = ctx->cur_scope;

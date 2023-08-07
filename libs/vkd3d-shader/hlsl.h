@@ -1069,6 +1069,8 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
     }
 }
 
+char *hlsl_sprintf_alloc(struct hlsl_ctx *ctx, const char *fmt, ...) VKD3D_PRINTF_FUNC(2, 3);
+
 const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
 const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type);
 const char *debug_hlsl_writemask(unsigned int writemask);

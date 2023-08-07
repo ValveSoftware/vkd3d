@@ -163,10 +163,10 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
  * work. */
 static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_var *temp)
 {
-    struct vkd3d_string_buffer *name;
     struct hlsl_ir_var *uniform;
     struct hlsl_ir_node *store;
     struct hlsl_ir_load *load;
+    char *new_name;
 
     /* Use the synthetic name for the temp, rather than the uniform, so that we
      * can write the uniform name into the shader reflection data. */
@@ -180,11 +180,9 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
     uniform->is_param = temp->is_param;
     uniform->buffer = temp->buffer;
 
-    if (!(name = hlsl_get_string_buffer(ctx)))
+    if (!(new_name = hlsl_sprintf_alloc(ctx, "<temp-%s>", temp->name)))
         return;
-    vkd3d_string_buffer_printf(name, "<temp-%s>", temp->name);
-    temp->name = hlsl_strdup(ctx, name->buffer);
-    hlsl_release_string_buffer(ctx, name);
+    temp->name = new_name;
 
     if (!(load = hlsl_new_var_load(ctx, uniform, &temp->loc)))
         return;
@@ -235,16 +233,15 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
         uint32_t index, bool output, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_semantic new_semantic;
-    struct vkd3d_string_buffer *name;
     struct hlsl_ir_var *ext_var;
+    char *new_name;
 
-    if (!(name = hlsl_get_string_buffer(ctx)))
+    if (!(new_name = hlsl_sprintf_alloc(ctx, "<%s-%s%u>", output ? "output" : "input", semantic->name, index)))
         return NULL;
-    vkd3d_string_buffer_printf(name, "<%s-%s%u>", output ? "output" : "input", semantic->name, index);
 
     LIST_FOR_EACH_ENTRY(ext_var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (!ascii_strcasecmp(ext_var->name, name->buffer))
+        if (!ascii_strcasecmp(ext_var->name, new_name))
         {
             if (output)
             {
@@ -271,25 +268,23 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
                 }
             }
 
-            hlsl_release_string_buffer(ctx, name);
+            vkd3d_free(new_name);
             return ext_var;
         }
     }
 
     if (!(new_semantic.name = hlsl_strdup(ctx, semantic->name)))
     {
-        hlsl_release_string_buffer(ctx, name);
+        vkd3d_free(new_name);
         return NULL;
     }
     new_semantic.index = index;
-    if (!(ext_var = hlsl_new_var(ctx, hlsl_strdup(ctx, name->buffer), type, loc, &new_semantic,
-            modifiers, NULL)))
+    if (!(ext_var = hlsl_new_var(ctx, new_name, type, loc, &new_semantic, modifiers, NULL)))
     {
-        hlsl_release_string_buffer(ctx, name);
+        vkd3d_free(new_name);
         hlsl_cleanup_semantic(&new_semantic);
         return NULL;
     }
-    hlsl_release_string_buffer(ctx, name);
     if (output)
         ext_var->is_output_semantic = 1;
     else
