@@ -2111,8 +2111,9 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
 static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_dst_param *dst_param)
 {
+    enum vkd3d_sm4_swizzle_type swizzle_type;
     enum vkd3d_shader_src_modifier modifier;
-    unsigned int dimension;
+    unsigned int dimension, swizzle;
     DWORD token;
 
     if (*ptr >= end)
@@ -2145,7 +2146,30 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
             break;
 
         case VKD3D_SM4_DIMENSION_VEC4:
-            dst_param->write_mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+            swizzle_type = (token & VKD3D_SM4_SWIZZLE_TYPE_MASK) >> VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+            switch (swizzle_type)
+            {
+                case VKD3D_SM4_SWIZZLE_NONE:
+                    dst_param->write_mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+                    break;
+
+                case VKD3D_SM4_SWIZZLE_VEC4:
+                    swizzle = swizzle_from_sm4((token & VKD3D_SM4_SWIZZLE_MASK) >> VKD3D_SM4_SWIZZLE_SHIFT);
+                    if (swizzle != VKD3D_SHADER_NO_SWIZZLE)
+                    {
+                        FIXME("Unhandled swizzle %#x.\n", swizzle);
+                        vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_REGISTER_SWIZZLE,
+                                "Unhandled destination register swizzle %#x.", swizzle);
+                    }
+                    dst_param->write_mask = VKD3DSP_WRITEMASK_ALL;
+                    break;
+
+                default:
+                    FIXME("Unhandled swizzle type %#x.\n", swizzle_type);
+                    vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_SWIZZLE,
+                            "Destination register swizzle type %#x is invalid.", swizzle_type);
+                    break;
+            }
             break;
 
         default:
