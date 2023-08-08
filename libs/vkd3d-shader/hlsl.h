@@ -356,6 +356,7 @@ struct hlsl_attribute
 #define HLSL_MODIFIER_COLUMN_MAJOR   0x00000400
 #define HLSL_STORAGE_IN              0x00000800
 #define HLSL_STORAGE_OUT             0x00001000
+#define HLSL_MODIFIER_INLINE         0x00002000
 
 #define HLSL_TYPE_MODIFIERS_MASK     (HLSL_MODIFIER_PRECISE | HLSL_MODIFIER_VOLATILE | \
                                       HLSL_MODIFIER_CONST | HLSL_MODIFIER_ROW_MAJOR | \

@@ -5129,6 +5129,9 @@ func_prototype_no_attrs:
             struct hlsl_ir_var *var;
             struct hlsl_type *type;
 
+            /* Functions are unconditionally inlined. */
+            modifiers &= ~HLSL_MODIFIER_INLINE;
+
             if (modifiers & ~HLSL_MODIFIERS_MAJORITY_MASK)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_MODIFIER,
                         "Only majority modifiers are allowed on functions.");
@@ -5969,6 +5972,10 @@ var_modifiers:
     | KW_INOUT var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_STORAGE_IN | HLSL_STORAGE_OUT, &@1);
+        }
+    | KW_INLINE var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_INLINE, &@1);
         }
 
 
