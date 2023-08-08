@@ -1690,9 +1690,17 @@ struct vkd3d_uav_clear_state
 HRESULT vkd3d_uav_clear_state_init(struct vkd3d_uav_clear_state *state, struct d3d12_device *device);
 void vkd3d_uav_clear_state_cleanup(struct vkd3d_uav_clear_state *state, struct d3d12_device *device);
 
+struct desc_object_cache_head
+{
+    void *head;
+    unsigned int spinlock;
+};
+
 struct vkd3d_desc_object_cache
 {
-    void * volatile head;
+    struct desc_object_cache_head heads[16];
+    unsigned int next_index;
+    unsigned int free_count;
     size_t size;
 };
 

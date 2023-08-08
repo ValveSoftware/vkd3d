@@ -2435,19 +2435,23 @@ static void device_init_descriptor_pool_sizes(struct d3d12_device *device)
 
 static void vkd3d_desc_object_cache_init(struct vkd3d_desc_object_cache *cache, size_t size)
 {
-    cache->head = NULL;
+    memset(cache, 0, sizeof(*cache));
     cache->size = size;
 }
 
 static void vkd3d_desc_object_cache_cleanup(struct vkd3d_desc_object_cache *cache)
 {
     union d3d12_desc_object u;
+    unsigned int i;
     void *next;
 
-    for (u.object = cache->head; u.object; u.object = next)
+    for (i = 0; i < ARRAY_SIZE(cache->heads); ++i)
     {
-        next = u.header->next;
-        vkd3d_free(u.object);
+        for (u.object = cache->heads[i].head; u.object; u.object = next)
+        {
+            next = u.header->next;
+            vkd3d_free(u.object);
+        }
     }
 }
 

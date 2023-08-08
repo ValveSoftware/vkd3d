@@ -2282,37 +2282,66 @@ ULONG vkd3d_resource_decref(ID3D12Resource *resource)
     return d3d12_resource_decref(impl_from_ID3D12Resource(resource));
 }
 
-/* Objects are cached so that vkd3d_view_incref() can safely check the refcount
- * of an object freed by another thread. */
+#define HEAD_INDEX_MASK (ARRAY_SIZE(cache->heads) - 1)
+
+/* Objects are cached so that vkd3d_view_incref() can safely check the refcount of an
+ * object freed by another thread. This could be implemented as a single atomic linked
+ * list, but it requires handling the ABA problem, which brings issues with cross-platform
+ * support, compiler support, and non-universal x86-64 support for 128-bit CAS. */
 static void *vkd3d_desc_object_cache_get(struct vkd3d_desc_object_cache *cache)
 {
     union d3d12_desc_object u;
-    void *next;
+    unsigned int i;
 
-    do
+    STATIC_ASSERT(!(ARRAY_SIZE(cache->heads) & HEAD_INDEX_MASK));
+
+    i = (vkd3d_atomic_increment(&cache->next_index)) & HEAD_INDEX_MASK;
+    for (;;)
     {
-        u.object = cache->head;
-        if (!u.object)
+        if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
+        {
+            if ((u.object = cache->heads[i].head))
+            {
+                vkd3d_atomic_decrement(&cache->free_count);
+                cache->heads[i].head = u.header->next;
+                vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+                return u.object;
+            }
+            vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+        }
+        /* Keeping a free count avoids uncertainty over when this loop should terminate,
+         * which could result in excess allocations gradually increasing without limit. */
+        if (cache->free_count < ARRAY_SIZE(cache->heads))
             return vkd3d_malloc(cache->size);
-        next = u.header->next;
-    }
-    while (!vkd3d_atomic_compare_exchange_pointer(&cache->head, u.object, next));
 
-    return u.object;
+        i = (i + 1) & HEAD_INDEX_MASK;
+    }
 }
 
 static void vkd3d_desc_object_cache_push(struct vkd3d_desc_object_cache *cache, void *object)
 {
     union d3d12_desc_object u = {object};
+    unsigned int i;
     void *head;
 
-    do
+    /* Using the same index as above may result in a somewhat uneven distribution,
+     * but the main objective is to avoid costly spinlock contention. */
+    i = (vkd3d_atomic_increment(&cache->next_index)) & HEAD_INDEX_MASK;
+    for (;;)
     {
-        head = cache->head;
-        u.header->next = head;
+        if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
+            break;
+        i = (i + 1) & HEAD_INDEX_MASK;
     }
-    while (!vkd3d_atomic_compare_exchange_pointer(&cache->head, head, u.object));
+
+    head = cache->heads[i].head;
+    u.header->next = head;
+    cache->heads[i].head = u.object;
+    vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
+    vkd3d_atomic_increment(&cache->free_count);
 }
+
+#undef HEAD_INDEX_MASK
 
 static struct vkd3d_cbuffer_desc *vkd3d_cbuffer_desc_create(struct d3d12_device *device)
 {
