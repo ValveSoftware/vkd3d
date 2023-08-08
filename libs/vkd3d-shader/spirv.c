@@ -2643,6 +2643,16 @@ static void VKD3D_PRINTF_FUNC(3, 4) spirv_compiler_error(struct spirv_compiler *
     compiler->failed = true;
 }
 
+static void VKD3D_PRINTF_FUNC(3, 4) spirv_compiler_warning(struct spirv_compiler *compiler,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(compiler->message_context, &compiler->location, error, format, args);
+    va_end(args);
+}
+
 static struct vkd3d_string_buffer *vkd3d_shader_register_range_string(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register_range *range)
 {
@@ -7466,7 +7476,13 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
             assert(compiler->control_flow_depth);
             assert(cf_info->current_block == VKD3D_BLOCK_SWITCH);
 
-            assert(src->swizzle == VKD3D_SHADER_NO_SWIZZLE && src->reg.type == VKD3DSPR_IMMCONST);
+            if (src->swizzle != VKD3D_SHADER_SWIZZLE(X, X, X, X))
+            {
+                WARN("Unexpected src swizzle %#x.\n", src->swizzle);
+                spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE,
+                        "The swizzle for a switch case value is not scalar.");
+            }
+            assert(src->reg.type == VKD3DSPR_IMMCONST);
             value = *src->reg.u.immconst_uint;
 
             if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.case_blocks, &cf_info->u.switch_.case_blocks_size,

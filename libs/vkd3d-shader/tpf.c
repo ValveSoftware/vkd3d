@@ -2026,6 +2026,7 @@ static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_pa
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param)
 {
+    unsigned int dimension;
     DWORD token;
 
     if (*ptr >= end)
@@ -2041,37 +2042,50 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
         return false;
     }
 
-    if (src_param->reg.type == VKD3DSPR_IMMCONST || src_param->reg.type == VKD3DSPR_IMMCONST64)
+    switch ((dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT))
     {
-        src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
-    }
-    else
-    {
-        enum vkd3d_sm4_swizzle_type swizzle_type =
-                (token & VKD3D_SM4_SWIZZLE_TYPE_MASK) >> VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
+        case VKD3D_SM4_DIMENSION_NONE:
+        case VKD3D_SM4_DIMENSION_SCALAR:
+            src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+            break;
 
-        switch (swizzle_type)
+        case VKD3D_SM4_DIMENSION_VEC4:
         {
-            case VKD3D_SM4_SWIZZLE_NONE:
-                if (shader_sm4_is_scalar_register(&src_param->reg))
-                    src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
-                else
-                    src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
-                break;
+            enum vkd3d_sm4_swizzle_type swizzle_type =
+                    (token & VKD3D_SM4_SWIZZLE_TYPE_MASK) >> VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
 
-            case VKD3D_SM4_SWIZZLE_SCALAR:
-                src_param->swizzle = (token & VKD3D_SM4_SWIZZLE_MASK) >> VKD3D_SM4_SWIZZLE_SHIFT;
-                src_param->swizzle = (src_param->swizzle & 0x3) * 0x01010101;
-                break;
+            switch (swizzle_type)
+            {
+                case VKD3D_SM4_SWIZZLE_NONE:
+                    if (shader_sm4_is_scalar_register(&src_param->reg))
+                        src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+                    else
+                        src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+                    break;
 
-            case VKD3D_SM4_SWIZZLE_VEC4:
-                src_param->swizzle = swizzle_from_sm4((token & VKD3D_SM4_SWIZZLE_MASK) >> VKD3D_SM4_SWIZZLE_SHIFT);
-                break;
+                case VKD3D_SM4_SWIZZLE_SCALAR:
+                    src_param->swizzle = (token & VKD3D_SM4_SWIZZLE_MASK) >> VKD3D_SM4_SWIZZLE_SHIFT;
+                    src_param->swizzle = (src_param->swizzle & 0x3) * 0x01010101;
+                    break;
 
-            default:
-                FIXME("Unhandled swizzle type %#x.\n", swizzle_type);
-                break;
+                case VKD3D_SM4_SWIZZLE_VEC4:
+                    src_param->swizzle = swizzle_from_sm4((token & VKD3D_SM4_SWIZZLE_MASK) >> VKD3D_SM4_SWIZZLE_SHIFT);
+                    break;
+
+                default:
+                    FIXME("Unhandled swizzle type %#x.\n", swizzle_type);
+                    vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_SWIZZLE,
+                            "Source register swizzle type %#x is invalid.", swizzle_type);
+                    break;
+            }
+            break;
         }
+
+        default:
+            FIXME("Unhandled dimension %#x.\n", dimension);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_DIMENSION,
+                    "Source register dimension %#x is invalid.", dimension);
+            break;
     }
 
     if (register_is_input_output(&src_param->reg) && !shader_sm4_validate_input_output_register(priv,
