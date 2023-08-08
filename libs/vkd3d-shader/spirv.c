@@ -204,11 +204,6 @@ static inline bool register_is_undef(const struct vkd3d_shader_register *reg)
     return reg->type == VKD3DSPR_UNDEF;
 }
 
-static inline bool register_is_constant(const struct vkd3d_shader_register *reg)
-{
-    return (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_IMMCONST64);
-}
-
 static inline bool register_is_constant_or_undef(const struct vkd3d_shader_register *reg)
 {
     return register_is_constant(reg) || register_is_undef(reg);

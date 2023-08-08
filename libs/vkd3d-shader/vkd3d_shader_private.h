@@ -84,6 +84,7 @@ enum vkd3d_shader_error
 
     VKD3D_SHADER_WARNING_TPF_MASK_NOT_CONTIGUOUS        = 1300,
     VKD3D_SHADER_WARNING_TPF_UNHANDLED_INDEX_RANGE_MASK = 1301,
+    VKD3D_SHADER_WARNING_TPF_UNHANDLED_REGISTER_MASK    = 1302,
 
     VKD3D_SHADER_ERROR_SPV_DESCRIPTOR_BINDING_NOT_FOUND = 2000,
     VKD3D_SHADER_ERROR_SPV_INVALID_REGISTER_TYPE        = 2001,
@@ -1016,6 +1017,11 @@ static inline bool vkd3d_shader_register_is_output(const struct vkd3d_shader_reg
 static inline bool vkd3d_shader_register_is_patch_constant(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_PATCHCONST;
+}
+
+static inline bool register_is_constant(const struct vkd3d_shader_register *reg)
+{
+    return (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_IMMCONST64);
 }
 
 struct vkd3d_shader_location

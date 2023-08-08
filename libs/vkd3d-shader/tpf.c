@@ -507,7 +507,7 @@ enum vkd3d_sm4_input_primitive_type
 
 enum vkd3d_sm4_swizzle_type
 {
-    VKD3D_SM4_SWIZZLE_NONE            = 0x0,
+    VKD3D_SM4_SWIZZLE_NONE            = 0x0, /* swizzle bitfield contains a mask */
     VKD3D_SM4_SWIZZLE_VEC4            = 0x1,
     VKD3D_SM4_SWIZZLE_SCALAR          = 0x2,
 };
@@ -2026,7 +2026,7 @@ static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_pa
 static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr,
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param)
 {
-    unsigned int dimension;
+    unsigned int dimension, mask;
     DWORD token;
 
     if (*ptr >= end)
@@ -2057,10 +2057,23 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
             switch (swizzle_type)
             {
                 case VKD3D_SM4_SWIZZLE_NONE:
-                    if (shader_sm4_is_scalar_register(&src_param->reg))
-                        src_param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
-                    else
-                        src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+                    src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+                    mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+                    /* Mask seems only to be used for vec4 constants and is always zero. */
+                    if (!register_is_constant(&src_param->reg))
+                    {
+                        FIXME("Source mask %#x is not for a constant.\n", mask);
+                        vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_REGISTER_MASK,
+                                "Unhandled mask %#x for a non-constant source register.", mask);
+                    }
+                    else if (mask)
+                    {
+                        FIXME("Unhandled mask %#x.\n", mask);
+                        vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_REGISTER_MASK,
+                                "Unhandled source register mask %#x.", mask);
+                    }
+
                     break;
 
                 case VKD3D_SM4_SWIZZLE_SCALAR:
