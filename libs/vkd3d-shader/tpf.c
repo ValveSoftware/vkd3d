@@ -2112,6 +2112,7 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_dst_param *dst_param)
 {
     enum vkd3d_shader_src_modifier modifier;
+    unsigned int dimension;
     DWORD token;
 
     if (*ptr >= end)
@@ -2133,10 +2134,30 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
         return false;
     }
 
-    dst_param->write_mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+    switch ((dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT))
+    {
+        case VKD3D_SM4_DIMENSION_NONE:
+            dst_param->write_mask = 0;
+            break;
+
+        case VKD3D_SM4_DIMENSION_SCALAR:
+            dst_param->write_mask = VKD3DSP_WRITEMASK_0;
+            break;
+
+        case VKD3D_SM4_DIMENSION_VEC4:
+            dst_param->write_mask = (token & VKD3D_SM4_WRITEMASK_MASK) >> VKD3D_SM4_WRITEMASK_SHIFT;
+            break;
+
+        default:
+            FIXME("Unhandled dimension %#x.\n", dimension);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_REGISTER_DIMENSION,
+                    "Destination register dimension %#x is invalid.", dimension);
+            break;
+    }
+
     if (data_type == VKD3D_DATA_DOUBLE)
         dst_param->write_mask = vkd3d_write_mask_64_from_32(dst_param->write_mask);
-    /* Scalar registers are declared with no write mask in shader bytecode. */
+    /* Some scalar registers are declared with no write mask in shader bytecode. */
     if (!dst_param->write_mask && shader_sm4_is_scalar_register(&dst_param->reg))
         dst_param->write_mask = VKD3DSP_WRITEMASK_0;
     dst_param->modifiers = 0;
