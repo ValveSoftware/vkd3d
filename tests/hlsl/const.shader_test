@@ -1,4 +1,4 @@
-[pixel shader todo]
+[pixel shader]
 const float4 f1;
 const uniform float4 f2;
 
@@ -10,8 +10,8 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
 uniform 4 float4 0.1 0.2 0.3 0.4
-todo draw quad
-todo probe all rgba (1.1, 2.2, 3.3, 4.4)
+draw quad
+probe all rgba (1.1, 2.2, 3.3, 4.4)
 
 [pixel shader fail]
 float4 main() : sv_target

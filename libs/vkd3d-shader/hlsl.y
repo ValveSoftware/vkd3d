@@ -2131,6 +2131,12 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         if (var->semantic.name)
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                     "Semantics are not allowed on local variables.");
+
+        if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count && !(modifiers & HLSL_STORAGE_STATIC))
+        {
+            hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
+                "Const variable \"%s\" is missing an initializer.", var->name);
+        }
     }
 
     if ((var->storage_modifiers & HLSL_STORAGE_STATIC) && type_has_numeric_components(var->data_type)
@@ -2138,15 +2144,6 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     {
         hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                 "Static variables cannot have both numeric and resource components.");
-    }
-
-    if ((type->modifiers & HLSL_MODIFIER_CONST) && !v->initializer.args_count
-            && !(modifiers & (HLSL_STORAGE_STATIC | HLSL_STORAGE_UNIFORM)))
-    {
-        hlsl_error(ctx, &v->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_INITIALIZER,
-                "Const variable \"%s\" is missing an initializer.", var->name);
-        hlsl_free_var(var);
-        return;
     }
 
     if (!hlsl_add_var(ctx, var, local))
