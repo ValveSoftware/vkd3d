@@ -74,6 +74,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/comma.shader_test \
 	tests/hlsl/compute.shader_test \
 	tests/hlsl/conditional.shader_test \
+	tests/hlsl/const.shader_test \
 	tests/hlsl/cross.shader_test \
 	tests/hlsl/d3dcolor-to-ubyte4.shader_test \
 	tests/hlsl/ddxddy.shader_test \
