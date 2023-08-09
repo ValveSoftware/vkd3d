@@ -1339,6 +1339,8 @@ enum vkd3d_shader_descriptor_info_flag
     /** The descriptor is a UAV resource, on which the shader performs
      *  atomic ops. \since 1.6 */
     VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS             = 0x00000008,
+    /** The descriptor is a raw (byte-addressed) buffer. \since 1.9 */
+    VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER              = 0x00000010,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_DESCRIPTOR_INFO_FLAG),
 };
