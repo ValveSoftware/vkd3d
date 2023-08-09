@@ -1215,10 +1215,14 @@ static uint32_t vkd3d_spirv_build_op_function_call(struct vkd3d_spirv_builder *b
             SpvOpFunctionCall, result_type, function_id, arguments, argument_count);
 }
 
-static uint32_t vkd3d_spirv_build_op_undef(struct vkd3d_spirv_builder *builder,
-        struct vkd3d_spirv_stream *stream, uint32_t type_id)
+static uint32_t vkd3d_spirv_build_op_undef(struct vkd3d_spirv_builder *builder, uint32_t type_id)
 {
-    return vkd3d_spirv_build_op_tr(builder, stream, SpvOpUndef, type_id);
+    return vkd3d_spirv_build_op_tr(builder, &builder->global_stream, SpvOpUndef, type_id);
+}
+
+static uint32_t vkd3d_spirv_get_op_undef(struct vkd3d_spirv_builder *builder, uint32_t type_id)
+{
+    return vkd3d_spirv_build_once1(builder, SpvOpUndef, type_id, vkd3d_spirv_build_op_undef);
 }
 
 static uint32_t vkd3d_spirv_build_op_access_chain(struct vkd3d_spirv_builder *builder,
@@ -2864,7 +2868,7 @@ static uint32_t spirv_compiler_get_constant(struct spirv_compiler *compiler,
             break;
         default:
             FIXME("Unhandled component_type %#x.\n", component_type);
-            return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
+            return vkd3d_spirv_get_op_undef(builder, type_id);
     }
 
     if (component_count == 1)
@@ -2893,7 +2897,7 @@ static uint32_t spirv_compiler_get_constant64(struct spirv_compiler *compiler,
     if (component_type != VKD3D_SHADER_COMPONENT_DOUBLE)
     {
         FIXME("Unhandled component_type %#x.\n", component_type);
-        return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
+        return vkd3d_spirv_get_op_undef(builder, type_id);
     }
 
     if (component_count == 1)
@@ -3651,7 +3655,7 @@ static uint32_t spirv_compiler_emit_load_undef(struct spirv_compiler *compiler,
     assert(reg->type == VKD3DSPR_UNDEF);
 
     type_id = vkd3d_spirv_get_type_id_for_data_type(builder, reg->data_type, component_count);
-    return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
+    return vkd3d_spirv_get_op_undef(builder, type_id);
 }
 
 static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
@@ -3744,7 +3748,7 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
     if (!spirv_compiler_get_register_info(compiler, reg, &reg_info))
     {
         type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
-        return vkd3d_spirv_build_op_undef(builder, &builder->global_stream, type_id);
+        return vkd3d_spirv_get_op_undef(builder, type_id);
     }
     assert(reg_info.component_type != VKD3D_SHADER_COMPONENT_DOUBLE);
     spirv_compiler_emit_dereference_register(compiler, reg, &reg_info);
