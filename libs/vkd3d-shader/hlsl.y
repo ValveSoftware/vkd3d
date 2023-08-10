@@ -6108,19 +6108,39 @@ jump_statement:
         }
 
 selection_statement:
-      KW_IF '(' expr ')' if_body
+      attribute_list_optional KW_IF '(' expr ')' if_body
         {
-            struct hlsl_ir_node *condition = node_from_block($3);
+            struct hlsl_ir_node *condition = node_from_block($4);
+            const struct parse_attribute_list *attributes = &$1;
             struct hlsl_ir_node *instr;
+            unsigned int i;
 
-            if (!(instr = hlsl_new_if(ctx, condition, $5.then_block, $5.else_block, &@1)))
+            if (attribute_list_has_duplicates(attributes))
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
+
+            for (i = 0; i < attributes->count; ++i)
             {
-                destroy_block($5.then_block);
-                destroy_block($5.else_block);
+                const struct hlsl_attribute *attr = attributes->attrs[i];
+
+                if (!strcmp(attr->name, "branch")
+                        || !strcmp(attr->name, "flatten"))
+                {
+                    hlsl_warning(ctx, &@1, VKD3D_SHADER_WARNING_HLSL_IGNORED_ATTRIBUTE, "Unhandled attribute '%s'.", attr->name);
+                }
+                else
+                {
+                    hlsl_warning(ctx, &@1, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE, "Unrecognized attribute '%s'.", attr->name);
+                }
+            }
+
+            if (!(instr = hlsl_new_if(ctx, condition, $6.then_block, $6.else_block, &@2)))
+            {
+                destroy_block($6.then_block);
+                destroy_block($6.else_block);
                 YYABORT;
             }
-            destroy_block($5.then_block);
-            destroy_block($5.else_block);
+            destroy_block($6.then_block);
+            destroy_block($6.else_block);
             if (condition->data_type->dimx > 1 || condition->data_type->dimy > 1)
             {
                 struct vkd3d_string_buffer *string;
@@ -6130,7 +6150,7 @@ selection_statement:
                             "if condition type %s is not scalar.", string->buffer);
                 hlsl_release_string_buffer(ctx, string);
             }
-            $$ = $3;
+            $$ = $4;
             hlsl_block_add_instr($$, instr);
         }
 

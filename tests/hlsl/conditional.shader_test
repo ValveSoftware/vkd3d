@@ -15,7 +15,7 @@ uniform 0 float4 0.1 0.0 0.0 0.0
 draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
 
-[pixel shader todo]
+[pixel shader]
 float4 main(uniform float4 u) : sv_target
 {
     [attr1]
@@ -25,7 +25,7 @@ float4 main(uniform float4 u) : sv_target
         return float4(0.9, 0.8, 0.7, 0.6);
 }
 
-[pixel shader todo]
+[pixel shader]
 float4 main(uniform float4 u) : sv_target
 {
     [flatten]
@@ -37,8 +37,8 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
-todo probe all rgba (0.9, 0.8, 0.7, 0.6)
+draw quad
+probe all rgba (0.9, 0.8, 0.7, 0.6)
 
 [pixel shader fail]
 float4 u;
@@ -52,7 +52,7 @@ float main() : sv_target
         return float4(0.9, 0.8, 0.7, 0.6);
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 float4 u;
 
 float main() : sv_target
@@ -68,7 +68,7 @@ float main() : sv_target
 [require]
 shader model >= 3.0
 
-[pixel shader todo]
+[pixel shader]
 float4 main(uniform float4 u) : sv_target
 {
     [branch]
@@ -80,5 +80,5 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
-todo probe all rgba (0.9, 0.8, 0.7, 0.6)
+draw quad
+probe all rgba (0.9, 0.8, 0.7, 0.6)
