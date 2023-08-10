@@ -2623,7 +2623,7 @@ static bool spirv_compiler_has_combined_sampler_for_resource(const struct spirv_
 }
 
 static bool spirv_compiler_has_combined_sampler_for_sampler(const struct spirv_compiler *compiler,
-        const struct vkd3d_shader_sampler *sampler)
+        const struct vkd3d_shader_register_range *range)
 {
     const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
     const struct vkd3d_shader_combined_resource_sampler *combined_sampler;
@@ -2632,7 +2632,7 @@ static bool spirv_compiler_has_combined_sampler_for_sampler(const struct spirv_c
     if (!shader_interface->combined_sampler_count)
         return false;
 
-    if (sampler->range.last != sampler->range.first)
+    if (range->last != range->first)
         return false;
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
@@ -2642,8 +2642,8 @@ static bool spirv_compiler_has_combined_sampler_for_sampler(const struct spirv_c
         if (!spirv_compiler_check_shader_visibility(compiler, combined_sampler->shader_visibility))
             continue;
 
-        if (combined_sampler->sampler_space == sampler->range.space
-                && combined_sampler->sampler_index == sampler->range.first)
+        if (combined_sampler->sampler_space == range->space
+                && combined_sampler->sampler_index == range->first)
             return true;
     }
 
@@ -5656,29 +5656,34 @@ static void spirv_compiler_emit_dcl_immediate_constant_buffer(struct spirv_compi
     spirv_compiler_put_symbol(compiler, &reg_symbol);
 }
 
-static void spirv_compiler_emit_dcl_sampler(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
+static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_register_range *range, unsigned int register_id)
 {
-    const struct vkd3d_shader_sampler *sampler = &instruction->declaration.sampler;
     const SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_register *reg = &sampler->src.reg;
     struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_symbol reg_symbol;
     uint32_t type_id, var_id;
 
-    vkd3d_symbol_make_sampler(&reg_symbol, reg);
-    reg_symbol.info.sampler.range = sampler->range;
+    const struct vkd3d_shader_register reg =
+    {
+        .type = VKD3DSPR_SAMPLER,
+        .idx[0].offset = register_id,
+        .idx_count = 1,
+    };
+
+    vkd3d_symbol_make_sampler(&reg_symbol, &reg);
+    reg_symbol.info.sampler.range = *range;
     spirv_compiler_put_symbol(compiler, &reg_symbol);
 
-    if (spirv_compiler_has_combined_sampler_for_sampler(compiler, sampler))
+    if (spirv_compiler_has_combined_sampler_for_sampler(compiler, range))
         return;
 
     type_id = vkd3d_spirv_get_op_type_sampler(builder);
-    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
-            &sampler->range, VKD3D_SHADER_RESOURCE_NONE, false, &var_info);
+    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, &reg,
+            range, VKD3D_SHADER_RESOURCE_NONE, false, &var_info);
 
-    vkd3d_symbol_make_register(&reg_symbol, reg);
+    vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
     reg_symbol.descriptor_array = var_info.array_symbol;
@@ -9214,9 +9219,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
             spirv_compiler_emit_dcl_immediate_constant_buffer(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_SAMPLER:
-            spirv_compiler_emit_dcl_sampler(compiler, instruction);
-            break;
         case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_UAV_TYPED:
             spirv_compiler_emit_dcl_resource(compiler, instruction);
@@ -9525,6 +9527,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_cut_stream(compiler, instruction);
             break;
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+        case VKD3DSIH_DCL_SAMPLER:
         case VKD3DSIH_DCL_TEMPS:
         case VKD3DSIH_HS_DECLS:
         case VKD3DSIH_NOP:
@@ -9535,6 +9538,39 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
     }
 
     return ret;
+}
+
+static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *compiler)
+{
+    unsigned int i;
+
+    for (i = 0; i < compiler->scan_descriptor_info->descriptor_count; ++i)
+    {
+        const struct vkd3d_shader_descriptor_info1 *descriptor = &compiler->scan_descriptor_info->descriptors[i];
+        struct vkd3d_shader_register_range range;
+
+        range.first = descriptor->register_index;
+        if (descriptor->count == ~0u)
+            range.last = ~0u;
+        else
+            range.last = descriptor->register_index + descriptor->count - 1;
+        range.space = descriptor->register_space;
+
+        switch (descriptor->type)
+        {
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
+                spirv_compiler_emit_sampler_declaration(compiler, &range, descriptor->register_id);
+                break;
+
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
 }
 
 static void spirv_compiler_emit_sm1_constant_buffer(struct spirv_compiler *compiler,
@@ -9571,6 +9607,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (parser->shader_desc.temp_count)
         spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
+
+    spirv_compiler_emit_descriptor_declarations(compiler);
 
     spirv_compiler_emit_sm1_constant_buffer(compiler, &parser->shader_desc,
             VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, VKD3D_DATA_FLOAT);
