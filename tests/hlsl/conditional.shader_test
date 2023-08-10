@@ -14,3 +14,71 @@ probe all rgba (0.9, 0.8, 0.7, 0.6)
 uniform 0 float4 0.1 0.0 0.0 0.0
 draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+[pixel shader todo]
+float4 main(uniform float4 u) : sv_target
+{
+    [attr1]
+    if (u.x > 0.0)
+        return float4(0.1, 0.2, 0.3, 0.4);
+    else
+        return float4(0.9, 0.8, 0.7, 0.6);
+}
+
+[pixel shader todo]
+float4 main(uniform float4 u) : sv_target
+{
+    [flatten]
+    if (u.x > 0.0)
+        return float4(0.1, 0.2, 0.3, 0.4);
+    else
+        return float4(0.9, 0.8, 0.7, 0.6);
+}
+
+[test]
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+todo probe all rgba (0.9, 0.8, 0.7, 0.6)
+
+[pixel shader fail]
+float4 u;
+
+float main() : sv_target
+{
+    [branch] [branch]
+    if (u.x > 0.0)
+        return float4(0.1, 0.2, 0.3, 0.4);
+    else
+        return float4(0.9, 0.8, 0.7, 0.6);
+}
+
+[pixel shader fail]
+float4 u;
+
+float main() : sv_target
+{
+    [branch] [flatten]
+    if (u.x > 0.0)
+        return float4(0.1, 0.2, 0.3, 0.4);
+    else
+        return float4(0.9, 0.8, 0.7, 0.6);
+}
+
+% Using older profiles fails to compile with forced control flow instruction
+[require]
+shader model >= 3.0
+
+[pixel shader todo]
+float4 main(uniform float4 u) : sv_target
+{
+    [branch]
+    if (u.x > 0.0)
+        return float4(0.1, 0.2, 0.3, 0.4);
+    else
+        return float4(0.9, 0.8, 0.7, 0.6);
+}
+
+[test]
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+todo probe all rgba (0.9, 0.8, 0.7, 0.6)
