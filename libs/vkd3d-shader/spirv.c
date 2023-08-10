@@ -2594,8 +2594,8 @@ static struct vkd3d_push_constant_buffer_binding *spirv_compiler_find_push_const
     return NULL;
 }
 
-static bool spirv_compiler_has_combined_sampler(const struct spirv_compiler *compiler,
-        const struct vkd3d_shader_resource *resource, const struct vkd3d_shader_sampler *sampler)
+static bool spirv_compiler_has_combined_sampler_for_resource(const struct spirv_compiler *compiler,
+        const struct vkd3d_shader_resource *resource)
 {
     const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
     const struct vkd3d_shader_combined_resource_sampler *combined_sampler;
@@ -2604,10 +2604,7 @@ static bool spirv_compiler_has_combined_sampler(const struct spirv_compiler *com
     if (!shader_interface->combined_sampler_count)
         return false;
 
-    if (resource && (resource->reg.reg.type == VKD3DSPR_UAV || resource->range.last != resource->range.first))
-        return false;
-
-    if (sampler && sampler->range.first != sampler->range.last)
+    if (resource->reg.reg.type == VKD3DSPR_UAV || resource->range.last != resource->range.first)
         return false;
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
@@ -2617,10 +2614,36 @@ static bool spirv_compiler_has_combined_sampler(const struct spirv_compiler *com
         if (!spirv_compiler_check_shader_visibility(compiler, combined_sampler->shader_visibility))
             continue;
 
-        if ((!resource || (combined_sampler->resource_space == resource->range.space
+        if ((combined_sampler->resource_space == resource->range.space
                 && combined_sampler->resource_index == resource->range.first))
-                && (!sampler || (combined_sampler->sampler_space == sampler->range.space
-                && combined_sampler->sampler_index == sampler->range.first)))
+            return true;
+    }
+
+    return false;
+}
+
+static bool spirv_compiler_has_combined_sampler_for_sampler(const struct spirv_compiler *compiler,
+        const struct vkd3d_shader_sampler *sampler)
+{
+    const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
+    const struct vkd3d_shader_combined_resource_sampler *combined_sampler;
+    unsigned int i;
+
+    if (!shader_interface->combined_sampler_count)
+        return false;
+
+    if (sampler->range.last != sampler->range.first)
+        return false;
+
+    for (i = 0; i < shader_interface->combined_sampler_count; ++i)
+    {
+        combined_sampler = &shader_interface->combined_samplers[i];
+
+        if (!spirv_compiler_check_shader_visibility(compiler, combined_sampler->shader_visibility))
+            continue;
+
+        if (combined_sampler->sampler_space == sampler->range.space
+                && combined_sampler->sampler_index == sampler->range.first)
             return true;
     }
 
@@ -5648,7 +5671,7 @@ static void spirv_compiler_emit_dcl_sampler(struct spirv_compiler *compiler,
     reg_symbol.info.sampler.range = sampler->range;
     spirv_compiler_put_symbol(compiler, &reg_symbol);
 
-    if (spirv_compiler_has_combined_sampler(compiler, NULL, sampler))
+    if (spirv_compiler_has_combined_sampler_for_sampler(compiler, sampler))
         return;
 
     type_id = vkd3d_spirv_get_op_type_sampler(builder);
@@ -5860,7 +5883,7 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
 
     sampled_type = vkd3d_component_type_from_data_type(resource_data_type);
 
-    if (spirv_compiler_has_combined_sampler(compiler, resource, NULL))
+    if (spirv_compiler_has_combined_sampler_for_resource(compiler, resource))
     {
         spirv_compiler_emit_combined_sampler_declarations(compiler, reg, &resource->range,
                 resource_type, sampled_type, structure_stride, raw, resource_type_info);
