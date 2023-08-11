@@ -5566,8 +5566,8 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
     return var_id;
 }
 
-static void spirv_compiler_emit_constant_buffer(struct spirv_compiler *compiler, unsigned int size,
-        const struct vkd3d_shader_register_range *range, const struct vkd3d_shader_register *reg)
+static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_register_range *range, unsigned int register_id, unsigned int size)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t vec4_id, array_type_id, length_id, struct_id, var_id;
@@ -5576,13 +5576,20 @@ static void spirv_compiler_emit_constant_buffer(struct spirv_compiler *compiler,
     struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_symbol reg_symbol;
 
+    struct vkd3d_shader_register reg =
+    {
+        .type = VKD3DSPR_CONSTBUFFER,
+        .idx[0].offset = register_id,
+        .idx_count = 1,
+    };
+
     if ((push_cb = spirv_compiler_find_push_constant_buffer(compiler, range)))
     {
         /* Push constant buffers are handled in
          * spirv_compiler_emit_push_constant_buffers().
          */
         unsigned int cb_size_in_bytes = size * VKD3D_VEC4_SIZE * sizeof(uint32_t);
-        push_cb->reg = *reg;
+        push_cb->reg = reg;
         push_cb->size = size;
         if (cb_size_in_bytes > push_cb->pc.size)
         {
@@ -5603,24 +5610,14 @@ static void spirv_compiler_emit_constant_buffer(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_name(builder, struct_id, "cb%u_struct", size);
 
     var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, struct_id,
-            reg, range, VKD3D_SHADER_RESOURCE_BUFFER, false, &var_info);
+            &reg, range, VKD3D_SHADER_RESOURCE_BUFFER, false, &var_info);
 
-    vkd3d_symbol_make_register(&reg_symbol, reg);
+    vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, var_id, storage_class,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
     reg_symbol.descriptor_array = var_info.array_symbol;
     reg_symbol.info.reg.binding_base_idx = var_info.binding_base_idx;
     spirv_compiler_put_symbol(compiler, &reg_symbol);
-}
-
-static void spirv_compiler_emit_dcl_constant_buffer(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_constant_buffer *cb = &instruction->declaration.cb;
-
-    assert(!(instruction->flags & ~VKD3DSI_INDEXED_DYNAMIC));
-
-    spirv_compiler_emit_constant_buffer(compiler, cb->size, &cb->range, &cb->src.reg);
 }
 
 static void spirv_compiler_emit_dcl_immediate_constant_buffer(struct spirv_compiler *compiler,
@@ -9213,9 +9210,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_INDEXABLE_TEMP:
             spirv_compiler_emit_dcl_indexable_temp(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_CONSTANT_BUFFER:
-            spirv_compiler_emit_dcl_constant_buffer(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
             spirv_compiler_emit_dcl_immediate_constant_buffer(compiler, instruction);
             break;
@@ -9526,6 +9520,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_CUT_STREAM:
             spirv_compiler_emit_cut_stream(compiler, instruction);
             break;
+        case VKD3DSIH_DCL_CONSTANT_BUFFER:
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
         case VKD3DSIH_DCL_SAMPLER:
         case VKD3DSIH_DCL_TEMPS:
@@ -9563,6 +9558,9 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+                spirv_compiler_emit_cbv_declaration(compiler, &range, descriptor->register_id, descriptor->buffer_size);
+                break;
+
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
             case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
                 break;
@@ -9571,26 +9569,6 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
                 vkd3d_unreachable();
         }
     }
-}
-
-static void spirv_compiler_emit_sm1_constant_buffer(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_desc *desc, enum vkd3d_shader_d3dbc_constant_register set,
-        enum vkd3d_data_type data_type)
-{
-    struct vkd3d_shader_register_range range = {.space = 0, .first = set, .last = set};
-    uint32_t count = desc->flat_constant_count[set].external;
-    struct vkd3d_shader_register reg =
-    {
-        .type = VKD3DSPR_CONSTBUFFER,
-        .idx[0].offset = set, /* register ID */
-        .idx[1].offset = set, /* register index */
-        .idx[2].offset = count, /* size */
-        .idx_count = 3,
-        .data_type = data_type,
-    };
-
-    if (count)
-        spirv_compiler_emit_constant_buffer(compiler, count, &range, &reg);
 }
 
 static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
@@ -9609,13 +9587,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
-
-    spirv_compiler_emit_sm1_constant_buffer(compiler, &parser->shader_desc,
-            VKD3D_SHADER_D3DBC_FLOAT_CONSTANT_REGISTER, VKD3D_DATA_FLOAT);
-    spirv_compiler_emit_sm1_constant_buffer(compiler, &parser->shader_desc,
-            VKD3D_SHADER_D3DBC_INT_CONSTANT_REGISTER, VKD3D_DATA_INT);
-    spirv_compiler_emit_sm1_constant_buffer(compiler, &parser->shader_desc,
-            VKD3D_SHADER_D3DBC_BOOL_CONSTANT_REGISTER, VKD3D_DATA_UINT);
 
     compiler->location.column = 0;
     compiler->location.line = 1;
