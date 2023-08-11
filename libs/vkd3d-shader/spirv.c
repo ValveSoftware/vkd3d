@@ -2595,7 +2595,7 @@ static struct vkd3d_push_constant_buffer_binding *spirv_compiler_find_push_const
 }
 
 static bool spirv_compiler_has_combined_sampler_for_resource(const struct spirv_compiler *compiler,
-        const struct vkd3d_shader_resource *resource)
+        const struct vkd3d_shader_register_range *range)
 {
     const struct vkd3d_shader_interface_info *shader_interface = &compiler->shader_interface;
     const struct vkd3d_shader_combined_resource_sampler *combined_sampler;
@@ -2604,7 +2604,7 @@ static bool spirv_compiler_has_combined_sampler_for_resource(const struct spirv_
     if (!shader_interface->combined_sampler_count)
         return false;
 
-    if (resource->reg.reg.type == VKD3DSPR_UAV || resource->range.last != resource->range.first)
+    if (range->last != range->first)
         return false;
 
     for (i = 0; i < shader_interface->combined_sampler_count; ++i)
@@ -2614,8 +2614,8 @@ static bool spirv_compiler_has_combined_sampler_for_resource(const struct spirv_
         if (!spirv_compiler_check_shader_visibility(compiler, combined_sampler->shader_visibility))
             continue;
 
-        if ((combined_sampler->resource_space == resource->range.space
-                && combined_sampler->resource_index == resource->range.first))
+        if ((combined_sampler->resource_space == range->space
+                && combined_sampler->resource_index == range->first))
             return true;
     }
 
@@ -5862,20 +5862,30 @@ static void spirv_compiler_emit_combined_sampler_declarations(struct spirv_compi
 }
 
 static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_resource *resource, enum vkd3d_shader_resource_type resource_type,
-        enum vkd3d_data_type resource_data_type, unsigned int structure_stride, bool raw)
+        const struct vkd3d_shader_register_range *range, unsigned int register_id,
+        unsigned int sample_count, bool is_uav, enum vkd3d_shader_resource_type resource_type,
+        enum vkd3d_shader_resource_data_type resource_data_type, unsigned int structure_stride, bool raw)
 {
     struct vkd3d_descriptor_variable_info var_info, counter_var_info = {0};
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     uint32_t counter_type_id, type_id, var_id, counter_var_id = 0;
-    const struct vkd3d_shader_register *reg = &resource->reg.reg;
     const struct vkd3d_spirv_resource_type *resource_type_info;
     enum vkd3d_shader_component_type sampled_type;
     struct vkd3d_symbol resource_symbol;
-    bool is_uav;
 
-    is_uav = reg->type == VKD3DSPR_UAV;
+    struct vkd3d_shader_register reg =
+    {
+        .type = is_uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE,
+        .idx[0].offset = register_id,
+        .idx_count = 1,
+    };
+
+    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS && sample_count == 1)
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
+    else if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY && sample_count == 1)
+        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY;
+
     if (!(resource_type_info = spirv_compiler_enable_resource_type(compiler,
             resource_type, is_uav)))
     {
@@ -5883,11 +5893,11 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
         return;
     }
 
-    sampled_type = vkd3d_component_type_from_data_type(resource_data_type);
+    sampled_type = vkd3d_component_type_from_resource_data_type(resource_data_type);
 
-    if (spirv_compiler_has_combined_sampler_for_resource(compiler, resource))
+    if (!is_uav && spirv_compiler_has_combined_sampler_for_resource(compiler, range))
     {
-        spirv_compiler_emit_combined_sampler_declarations(compiler, reg, &resource->range,
+        spirv_compiler_emit_combined_sampler_declarations(compiler, &reg, range,
                 resource_type, sampled_type, structure_stride, raw, resource_type_info);
         return;
     }
@@ -5910,19 +5920,18 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
     }
     else
     {
-        type_id = spirv_compiler_get_image_type_id(compiler, reg, &resource->range,
+        type_id = spirv_compiler_get_image_type_id(compiler, &reg, range,
                 resource_type_info, sampled_type, structure_stride || raw, 0);
     }
 
-    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
-            &resource->range, resource_type, false, &var_info);
+    var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, &reg,
+            range, resource_type, false, &var_info);
 
     if (is_uav)
     {
         const struct vkd3d_shader_descriptor_info1 *d;
 
-        d = spirv_compiler_get_descriptor_info(compiler,
-                VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, &resource->range);
+        d = spirv_compiler_get_descriptor_info(compiler, VKD3D_SHADER_DESCRIPTOR_TYPE_UAV, range);
 
         if (!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ))
             vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
@@ -5954,15 +5963,15 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
                 type_id = struct_id;
             }
 
-            counter_var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class, type_id, reg,
-                    &resource->range, resource_type, true, &counter_var_info);
+            counter_var_id = spirv_compiler_build_descriptor_variable(compiler, storage_class,
+                    type_id, &reg, range, resource_type, true, &counter_var_info);
         }
     }
 
-    vkd3d_symbol_make_resource(&resource_symbol, reg);
+    vkd3d_symbol_make_resource(&resource_symbol, &reg);
     resource_symbol.id = var_id;
     resource_symbol.descriptor_array = var_info.array_symbol;
-    resource_symbol.info.resource.range = resource->range;
+    resource_symbol.info.resource.range = *range;
     resource_symbol.info.resource.sampled_type = sampled_type;
     resource_symbol.info.resource.type_id = type_id;
     resource_symbol.info.resource.resource_type_info = resource_type_info;
@@ -5973,58 +5982,6 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
     resource_symbol.info.resource.uav_counter_array = counter_var_info.array_symbol;
     resource_symbol.info.resource.uav_counter_base_idx = counter_var_info.binding_base_idx;
     spirv_compiler_put_symbol(compiler, &resource_symbol);
-}
-
-static void spirv_compiler_emit_dcl_resource(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_semantic *semantic = &instruction->declaration.semantic;
-    enum vkd3d_shader_resource_type resource_type = semantic->resource_type;
-    uint32_t flags = instruction->flags;
-
-    /* We don't distinguish between APPEND and COUNTER UAVs. */
-    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
-    if (flags)
-        FIXME("Unhandled UAV flags %#x.\n", flags);
-
-    if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS && semantic->sample_count == 1)
-        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
-    else if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY && semantic->sample_count == 1)
-        resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2DARRAY;
-
-    spirv_compiler_emit_resource_declaration(compiler, &semantic->resource,
-            resource_type, semantic->resource_data_type[0], 0, false);
-}
-
-static void spirv_compiler_emit_dcl_resource_raw(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_raw_resource *resource = &instruction->declaration.raw_resource;
-    uint32_t flags = instruction->flags;
-
-    /* We don't distinguish between APPEND and COUNTER UAVs. */
-    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
-    if (flags)
-        FIXME("Unhandled UAV flags %#x.\n", flags);
-
-    spirv_compiler_emit_resource_declaration(compiler, &resource->resource,
-            VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, 0, true);
-}
-
-static void spirv_compiler_emit_dcl_resource_structured(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_structured_resource *resource = &instruction->declaration.structured_resource;
-    unsigned int stride = resource->byte_stride;
-    uint32_t flags = instruction->flags;
-
-    /* We don't distinguish between APPEND and COUNTER UAVs. */
-    flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
-    if (flags)
-        FIXME("Unhandled UAV flags %#x.\n", flags);
-
-    spirv_compiler_emit_resource_declaration(compiler, &resource->resource,
-            VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_DATA_UINT, stride / 4, false);
 }
 
 static void spirv_compiler_emit_workgroup_memory(struct spirv_compiler *compiler,
@@ -9213,18 +9170,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
             spirv_compiler_emit_dcl_immediate_constant_buffer(compiler, instruction);
             break;
-        case VKD3DSIH_DCL:
-        case VKD3DSIH_DCL_UAV_TYPED:
-            spirv_compiler_emit_dcl_resource(compiler, instruction);
-            break;
-        case VKD3DSIH_DCL_RESOURCE_RAW:
-        case VKD3DSIH_DCL_UAV_RAW:
-            spirv_compiler_emit_dcl_resource_raw(compiler, instruction);
-            break;
-        case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
-        case VKD3DSIH_DCL_UAV_STRUCTURED:
-            spirv_compiler_emit_dcl_resource_structured(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_TGSM_RAW:
             spirv_compiler_emit_dcl_tgsm_raw(compiler, instruction);
             break;
@@ -9520,10 +9465,16 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_CUT_STREAM:
             spirv_compiler_emit_cut_stream(compiler, instruction);
             break;
+        case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+        case VKD3DSIH_DCL_RESOURCE_RAW:
+        case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
         case VKD3DSIH_DCL_SAMPLER:
         case VKD3DSIH_DCL_TEMPS:
+        case VKD3DSIH_DCL_UAV_RAW:
+        case VKD3DSIH_DCL_UAV_STRUCTURED:
+        case VKD3DSIH_DCL_UAV_TYPED:
         case VKD3DSIH_HS_DECLS:
         case VKD3DSIH_NOP:
             /* nothing to do */
@@ -9562,7 +9513,15 @@ static void spirv_compiler_emit_descriptor_declarations(struct spirv_compiler *c
                 break;
 
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
+                spirv_compiler_emit_resource_declaration(compiler, &range, descriptor->register_id,
+                        descriptor->sample_count, false, descriptor->resource_type, descriptor->resource_data_type,
+                        descriptor->structure_stride / 4, descriptor->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER);
+                break;
+
             case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+                spirv_compiler_emit_resource_declaration(compiler, &range, descriptor->register_id,
+                        descriptor->sample_count, true, descriptor->resource_type, descriptor->resource_data_type,
+                        descriptor->structure_stride / 4, descriptor->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER);
                 break;
 
             default:
