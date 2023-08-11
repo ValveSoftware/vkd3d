@@ -1350,6 +1350,74 @@ static void remove_dead_code(struct vkd3d_shader_parser *parser)
     }
 }
 
+static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser *parser)
+{
+    unsigned int i;
+
+    for (i = 0; i < parser->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+        struct vkd3d_shader_src_param *srcs;
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_TEX:
+                if (!(srcs = shader_src_param_allocator_get(&parser->instructions.src_params, 3)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                memset(srcs, 0, sizeof(*srcs) * 3);
+
+                ins->handler_idx = VKD3DSIH_SAMPLE;
+
+                srcs[0] = ins->src[0];
+
+                srcs[1].reg.type = VKD3DSPR_RESOURCE;
+                srcs[1].reg.idx[0] = ins->src[1].reg.idx[0];
+                srcs[1].reg.idx[1] = ins->src[1].reg.idx[0];
+                srcs[1].reg.idx_count = 2;
+                srcs[1].reg.data_type = VKD3D_DATA_RESOURCE;
+                srcs[1].swizzle = VKD3D_SHADER_NO_SWIZZLE;
+
+                srcs[2].reg.type = VKD3DSPR_SAMPLER;
+                srcs[2].reg.idx[0] = ins->src[1].reg.idx[0];
+                srcs[2].reg.idx[1] = ins->src[1].reg.idx[0];
+                srcs[2].reg.idx_count = 2;
+                srcs[2].reg.data_type = VKD3D_DATA_SAMPLER;
+
+                ins->src = srcs;
+                ins->src_count = 3;
+                break;
+
+            case VKD3DSIH_TEXBEM:
+            case VKD3DSIH_TEXBEML:
+            case VKD3DSIH_TEXCOORD:
+            case VKD3DSIH_TEXDEPTH:
+            case VKD3DSIH_TEXDP3:
+            case VKD3DSIH_TEXDP3TEX:
+            case VKD3DSIH_TEXLDD:
+            case VKD3DSIH_TEXLDL:
+            case VKD3DSIH_TEXM3x2PAD:
+            case VKD3DSIH_TEXM3x2TEX:
+            case VKD3DSIH_TEXM3x3DIFF:
+            case VKD3DSIH_TEXM3x3PAD:
+            case VKD3DSIH_TEXM3x3SPEC:
+            case VKD3DSIH_TEXM3x3TEX:
+            case VKD3DSIH_TEXM3x3VSPEC:
+            case VKD3DSIH_TEXREG2AR:
+            case VKD3DSIH_TEXREG2GB:
+            case VKD3DSIH_TEXREG2RGB:
+                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Aborting due to not yet implemented feature: "
+                        "Combined sampler instruction %#x.", ins->handler_idx);
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
+
+            default:
+                break;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -1379,6 +1447,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
     if (result >= 0)
         remove_dead_code(parser);
+
+    if (result >= 0)
+        result = normalise_combined_samplers(parser);
 
     if (result >= 0 && TRACE_ON())
         vkd3d_shader_trace(instructions, &parser->shader_version);
