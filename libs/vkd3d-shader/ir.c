@@ -72,7 +72,7 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
             reg->idx[2].offset = ~0u;
             reg->idx[2].rel_addr = NULL;
             reg->idx_count = 0;
-            reg->immconst_type = VKD3D_IMMCONST_SCALAR;
+            reg->dimension = VSIR_DIMENSION_SCALAR;
             reg->u.immconst_uint[0] = instance_id;
             continue;
         }
@@ -310,7 +310,7 @@ void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_reg
     reg->idx[2].offset = ~0u;
     reg->idx[2].rel_addr = NULL;
     reg->idx_count = idx_count;
-    reg->immconst_type = VKD3D_IMMCONST_SCALAR;
+    reg->dimension = VSIR_DIMENSION_SCALAR;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
@@ -1207,7 +1207,7 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
         {
             param->reg.type = VKD3DSPR_IMMCONST;
             param->reg.idx_count = 0;
-            param->reg.immconst_type = VKD3D_IMMCONST_VEC4;
+            param->reg.dimension = VSIR_DIMENSION_VEC4;
             for (j = 0; j < 4; ++j)
                 param->reg.u.immconst_uint[j] = normaliser->defs[i].value[j];
             return;

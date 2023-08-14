@@ -571,10 +571,11 @@ static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
     return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT;
 }
 
-enum vkd3d_immconst_type
+enum vsir_dimension
 {
-    VKD3D_IMMCONST_SCALAR,
-    VKD3D_IMMCONST_VEC4,
+    VSIR_DIMENSION_NONE,
+    VSIR_DIMENSION_SCALAR,
+    VSIR_DIMENSION_VEC4,
 };
 
 enum vkd3d_shader_src_modifier
@@ -740,7 +741,7 @@ struct vkd3d_shader_register
     enum vkd3d_data_type data_type;
     struct vkd3d_shader_register_index idx[3];
     unsigned int idx_count;
-    enum vkd3d_immconst_type immconst_type;
+    enum vsir_dimension dimension;
     union
     {
         DWORD immconst_uint[VKD3D_VEC4_SIZE];

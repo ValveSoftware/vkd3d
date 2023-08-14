@@ -3600,7 +3600,7 @@ static uint32_t spirv_compiler_emit_load_constant(struct spirv_compiler *compile
 
     assert(reg->type == VKD3DSPR_IMMCONST);
 
-    if (reg->immconst_type == VKD3D_IMMCONST_SCALAR)
+    if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
         for (i = 0; i < component_count; ++i)
             values[i] = *reg->u.immconst_uint;
@@ -3627,7 +3627,7 @@ static uint32_t spirv_compiler_emit_load_constant64(struct spirv_compiler *compi
 
     assert(reg->type == VKD3DSPR_IMMCONST64);
 
-    if (reg->immconst_type == VKD3D_IMMCONST_SCALAR)
+    if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
         for (i = 0; i < component_count; ++i)
             values[i] = *reg->u.immconst_uint64;

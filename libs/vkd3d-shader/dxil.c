@@ -1498,7 +1498,7 @@ static unsigned int register_get_uint_value(const struct vkd3d_shader_register *
     if (!register_is_constant(reg) || !data_type_is_integer(reg->data_type))
         return UINT_MAX;
 
-    if (reg->immconst_type == VKD3D_IMMCONST_VEC4)
+    if (reg->dimension == VSIR_DIMENSION_VEC4)
         WARN("Returning vec4.x.\n");
 
     if (reg->type == VKD3DSPR_IMMCONST64)
@@ -1968,7 +1968,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         dst->type = type;
         dst->value_type = VALUE_TYPE_REG;
         dst->u.reg.type = reg_type;
-        dst->u.reg.immconst_type = VKD3D_IMMCONST_SCALAR;
+        dst->u.reg.dimension = VSIR_DIMENSION_SCALAR;
         dst->u.reg.data_type = reg_data_type;
 
         switch (record->code)

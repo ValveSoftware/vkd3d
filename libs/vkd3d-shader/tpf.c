@@ -1857,7 +1857,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         switch (dimension)
         {
             case VKD3D_SM4_DIMENSION_SCALAR:
-                param->immconst_type = VKD3D_IMMCONST_SCALAR;
+                param->dimension = VSIR_DIMENSION_SCALAR;
                 dword_count = 1 + (register_type == VKD3D_SM4_RT_IMMCONST64);
                 if (end - *ptr < dword_count)
                 {
@@ -1869,7 +1869,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                 break;
 
             case VKD3D_SM4_DIMENSION_VEC4:
-                param->immconst_type = VKD3D_IMMCONST_VEC4;
+                param->dimension = VSIR_DIMENSION_VEC4;
                 if (end - *ptr < VKD3D_VEC4_SIZE)
                 {
                     WARN("Invalid ptr %p, end %p.\n", *ptr, end);

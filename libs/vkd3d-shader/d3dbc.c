@@ -951,9 +951,9 @@ static void shader_sm1_read_semantic(struct vkd3d_shader_sm1_parser *sm1,
 }
 
 static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const uint32_t **ptr,
-        struct vkd3d_shader_src_param *src_param, enum vkd3d_immconst_type type, enum vkd3d_data_type data_type)
+        struct vkd3d_shader_src_param *src_param, enum vsir_dimension dimension, enum vkd3d_data_type data_type)
 {
-    unsigned int count = type == VKD3D_IMMCONST_VEC4 ? 4 : 1;
+    unsigned int count = dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
 
     if (*ptr >= sm1->end || sm1->end - *ptr < count)
     {
@@ -975,7 +975,7 @@ static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const 
     src_param->reg.idx[2].offset = ~0u;
     src_param->reg.idx[2].rel_addr = NULL;
     src_param->reg.idx_count = 0;
-    src_param->reg.immconst_type = type;
+    src_param->reg.dimension = dimension;
     memcpy(src_param->reg.u.immconst_uint, *ptr, count * sizeof(uint32_t));
     src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     src_param->modifiers = 0;
@@ -1132,19 +1132,19 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     else if (ins->handler_idx == VKD3DSIH_DEF)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
-        shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_VEC4, VKD3D_DATA_FLOAT);
+        shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VKD3D_DATA_FLOAT);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else if (ins->handler_idx == VKD3DSIH_DEFB)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
-        shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_SCALAR, VKD3D_DATA_UINT);
+        shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_SCALAR, VKD3D_DATA_UINT);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else if (ins->handler_idx == VKD3DSIH_DEFI)
     {
         shader_sm1_read_dst_param(sm1, &p, dst_param);
-        shader_sm1_read_immconst(sm1, &p, &src_params[0], VKD3D_IMMCONST_VEC4, VKD3D_DATA_INT);
+        shader_sm1_read_immconst(sm1, &p, &src_params[0], VSIR_DIMENSION_VEC4, VKD3D_DATA_INT);
         shader_sm1_scan_register(sm1, &dst_param->reg, dst_param->write_mask, true);
     }
     else

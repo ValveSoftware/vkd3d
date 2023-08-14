@@ -1082,9 +1082,9 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     if (reg->type == VKD3DSPR_IMMCONST)
     {
         shader_addline(buffer, "%s(", compiler->colours.reset);
-        switch (reg->immconst_type)
+        switch (reg->dimension)
         {
-            case VKD3D_IMMCONST_SCALAR:
+            case VSIR_DIMENSION_SCALAR:
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
@@ -1104,7 +1104,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 }
                 break;
 
-            case VKD3D_IMMCONST_VEC4:
+            case VSIR_DIMENSION_VEC4:
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
@@ -1134,7 +1134,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 break;
 
             default:
-                shader_addline(buffer, "<unhandled immconst_type %#x>", reg->immconst_type);
+                shader_addline(buffer, "<unhandled immconst dimension %#x>", reg->dimension);
                 break;
         }
         shader_addline(buffer, ")");
@@ -1142,13 +1142,13 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     else if (reg->type == VKD3DSPR_IMMCONST64)
     {
         shader_addline(buffer, "%s(", compiler->colours.reset);
-        /* A double2 vector is treated as a float4 vector in enum vkd3d_immconst_type. */
-        if (reg->immconst_type == VKD3D_IMMCONST_SCALAR || reg->immconst_type == VKD3D_IMMCONST_VEC4)
+        /* A double2 vector is treated as a float4 vector in enum vsir_dimension. */
+        if (reg->dimension == VSIR_DIMENSION_SCALAR || reg->dimension == VSIR_DIMENSION_VEC4)
         {
             if (reg->data_type == VKD3D_DATA_DOUBLE)
             {
                 shader_print_double_literal(compiler, "", reg->u.immconst_double[0], "");
-                if (reg->immconst_type == VKD3D_IMMCONST_VEC4)
+                if (reg->dimension == VSIR_DIMENSION_VEC4)
                     shader_print_double_literal(compiler, ", ", reg->u.immconst_double[1], "");
             }
             else
@@ -1158,7 +1158,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
         }
         else
         {
-            shader_addline(buffer, "<unhandled immconst_type %#x>", reg->immconst_type);
+            shader_addline(buffer, "<unhandled immconst64 dimension %#x>", reg->dimension);
         }
         shader_addline(buffer, ")");
     }
