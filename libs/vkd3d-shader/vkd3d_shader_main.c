@@ -755,10 +755,10 @@ static void vkd3d_shader_scan_record_uav_atomic_op(struct vkd3d_shader_scan_cont
     vkd3d_shader_scan_add_uav_flag(context, reg, VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_ATOMICS);
 }
 
-static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *context,
+static struct vkd3d_shader_descriptor_info1 *vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *context,
         enum vkd3d_shader_descriptor_type type, const struct vkd3d_shader_register *reg,
         const struct vkd3d_shader_register_range *range, enum vkd3d_shader_resource_type resource_type,
-        enum vkd3d_shader_resource_data_type resource_data_type, unsigned int flags)
+        enum vkd3d_shader_resource_data_type resource_data_type)
 {
     struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
     struct vkd3d_shader_descriptor_info1 *d;
@@ -767,21 +767,21 @@ static bool vkd3d_shader_scan_add_descriptor(struct vkd3d_shader_scan_context *c
             info->descriptor_count + 1, sizeof(*info->descriptors)))
     {
         ERR("Failed to allocate descriptor info.\n");
-        return false;
+        return NULL;
     }
 
     d = &info->descriptors[info->descriptor_count];
+    memset(d, 0, sizeof(*d));
     d->type = type;
     d->register_id = reg->idx[0].offset;
     d->register_space = range->space;
     d->register_index = range->first;
     d->resource_type = resource_type;
     d->resource_data_type = resource_data_type;
-    d->flags = flags;
     d->count = (range->last == ~0u) ? ~0u : range->last - range->first + 1;
     ++info->descriptor_count;
 
-    return true;
+    return d;
 }
 
 static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_scan_context *context,
@@ -793,24 +793,24 @@ static void vkd3d_shader_scan_constant_buffer_declaration(struct vkd3d_shader_sc
         return;
 
     vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &cb->src.reg, &cb->range,
-            VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
+            VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT);
 }
 
 static void vkd3d_shader_scan_sampler_declaration(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_instruction *instruction)
 {
     const struct vkd3d_shader_sampler *sampler = &instruction->declaration.sampler;
-    unsigned int flags;
+    struct vkd3d_shader_descriptor_info1 *d;
 
     if (!context->scan_descriptor_info)
         return;
 
+    if (!(d = vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER,
+            &sampler->src.reg, &sampler->range, VKD3D_SHADER_RESOURCE_NONE, VKD3D_SHADER_RESOURCE_DATA_UINT)))
+        return;
+
     if (instruction->flags & VKD3DSI_SAMPLER_COMPARISON_MODE)
-        flags = VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
-    else
-        flags = 0;
-    vkd3d_shader_scan_add_descriptor(context, VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, &sampler->src.reg, &sampler->range,
-            VKD3D_SHADER_RESOURCE_NONE, VKD3D_SHADER_RESOURCE_DATA_UINT, flags);
+        d->flags |= VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_SAMPLER_COMPARISON_MODE;
 }
 
 static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_context *context,
@@ -827,7 +827,7 @@ static void vkd3d_shader_scan_resource_declaration(struct vkd3d_shader_scan_cont
     else
         type = VKD3D_SHADER_DESCRIPTOR_TYPE_SRV;
     vkd3d_shader_scan_add_descriptor(context, type, &resource->reg.reg, &resource->range,
-            resource_type, resource_data_type, 0);
+            resource_type, resource_data_type);
 }
 
 static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_scan_context *context,
@@ -1155,7 +1155,7 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
 
         if (parser->shader_desc.flat_constant_count[i].external)
             vkd3d_shader_scan_add_descriptor(&context, VKD3D_SHADER_DESCRIPTOR_TYPE_CBV, &reg,
-                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT, 0);
+                    &range, VKD3D_SHADER_RESOURCE_BUFFER, VKD3D_SHADER_RESOURCE_DATA_UINT);
     }
 
     if (!ret && signature_info)
