@@ -519,6 +519,22 @@ enum vkd3d_sm4_dimension
     VKD3D_SM4_DIMENSION_VEC4    = 0x2,
 };
 
+static enum vsir_dimension vsir_dimension_from_sm4_dimension(enum vkd3d_sm4_dimension dim)
+{
+    switch (dim)
+    {
+        case VKD3D_SM4_DIMENSION_NONE:
+            return VSIR_DIMENSION_NONE;
+        case VKD3D_SM4_DIMENSION_SCALAR:
+            return VSIR_DIMENSION_SCALAR;
+        case VKD3D_SM4_DIMENSION_VEC4:
+            return VSIR_DIMENSION_VEC4;
+        default:
+            FIXME("Unknown SM4 dimension %#x.\n", dim);
+            return VSIR_DIMENSION_NONE;
+    }
+}
+
 enum vkd3d_sm4_resource_type
 {
     VKD3D_SM4_RESOURCE_BUFFER             = 0x1,
@@ -1718,6 +1734,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
     enum vkd3d_sm4_register_type register_type;
     enum vkd3d_sm4_extended_operand_type type;
     enum vkd3d_sm4_register_modifier m;
+    enum vkd3d_sm4_dimension sm4_dimension;
     uint32_t token, order, extended;
 
     if (*ptr >= end)
@@ -1849,15 +1866,16 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         return false;
     }
 
+    sm4_dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT;
+    param->dimension = vsir_dimension_from_sm4_dimension(sm4_dimension);
+
     if (register_type == VKD3D_SM4_RT_IMMCONST || register_type == VKD3D_SM4_RT_IMMCONST64)
     {
-        enum vkd3d_sm4_dimension dimension = (token & VKD3D_SM4_DIMENSION_MASK) >> VKD3D_SM4_DIMENSION_SHIFT;
         unsigned int dword_count;
 
-        switch (dimension)
+        switch (param->dimension)
         {
-            case VKD3D_SM4_DIMENSION_SCALAR:
-                param->dimension = VSIR_DIMENSION_SCALAR;
+            case VSIR_DIMENSION_SCALAR:
                 dword_count = 1 + (register_type == VKD3D_SM4_RT_IMMCONST64);
                 if (end - *ptr < dword_count)
                 {
@@ -1868,8 +1886,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                 *ptr += dword_count;
                 break;
 
-            case VKD3D_SM4_DIMENSION_VEC4:
-                param->dimension = VSIR_DIMENSION_VEC4;
+            case VSIR_DIMENSION_VEC4:
                 if (end - *ptr < VKD3D_VEC4_SIZE)
                 {
                     WARN("Invalid ptr %p, end %p.\n", *ptr, end);
@@ -1880,7 +1897,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                 break;
 
             default:
-                FIXME("Unhandled dimension %#x.\n", dimension);
+                FIXME("Unhandled dimension %#x.\n", param->dimension);
                 break;
         }
     }
