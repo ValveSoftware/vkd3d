@@ -6237,6 +6237,9 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
         if (!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ))
             vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
 
+        if (d->uav_flags & VKD3DSUF_GLOBALLY_COHERENT)
+            vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
+
         if (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER)
         {
             assert(structure_stride); /* counters are valid only for structured buffers */

@@ -1339,6 +1339,7 @@ struct vkd3d_shader_descriptor_info1
     unsigned int buffer_size;
     unsigned int structure_stride;
     unsigned int count;
+    uint32_t uav_flags;
 };
 
 struct vkd3d_shader_scan_descriptor_info1
