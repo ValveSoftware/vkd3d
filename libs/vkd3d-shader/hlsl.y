@@ -493,11 +493,11 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
                 || !strcmp(attr->name, "fastopt")
                 || !strcmp(attr->name, "allow_uav_condition"))
         {
-            hlsl_fixme(ctx, loc, "Unhandled attribute %s.", attr->name);
+            hlsl_fixme(ctx, loc, "Unhandled attribute '%s'.", attr->name);
         }
         else
         {
-            hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Unrecognized attribute %s.", attr->name);
+            hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE, "Unrecognized attribute '%s'.", attr->name);
         }
     }
 
