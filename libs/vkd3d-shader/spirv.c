@@ -9346,7 +9346,7 @@ static void spirv_compiler_emit_sync(struct spirv_compiler *compiler,
     if (flags & VKD3DSSF_GLOBAL_UAV)
     {
         memory_scope = SpvScopeDevice;
-        memory_semantics |= SpvMemorySemanticsImageMemoryMask;
+        memory_semantics |= SpvMemorySemanticsUniformMemoryMask | SpvMemorySemanticsImageMemoryMask;
         flags &= ~VKD3DSSF_GLOBAL_UAV;
     }
 
