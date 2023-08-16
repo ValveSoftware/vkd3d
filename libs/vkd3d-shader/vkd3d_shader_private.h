@@ -99,6 +99,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_SPV_INVALID_SHADER               = 2009,
 
     VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE            = 2300,
+    VKD3D_SHADER_WARNING_SPV_INVALID_UAV_FLAGS          = 2301,
 
     VKD3D_SHADER_ERROR_RS_OUT_OF_MEMORY                 = 3000,
     VKD3D_SHADER_ERROR_RS_INVALID_VERSION               = 3001,
@@ -730,6 +731,7 @@ enum vkd3d_shader_sync_flags
 {
     VKD3DSSF_THREAD_GROUP        = 0x1,
     VKD3DSSF_GROUP_SHARED_MEMORY = 0x2,
+    VKD3DSSF_THREAD_GROUP_UAV    = 0x4,
     VKD3DSSF_GLOBAL_UAV          = 0x8,
 };
 

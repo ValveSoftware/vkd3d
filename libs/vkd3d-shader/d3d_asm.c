@@ -445,6 +445,11 @@ static void shader_dump_sync_flags(struct vkd3d_d3d_asm_compiler *compiler, uint
         vkd3d_string_buffer_printf(&compiler->buffer, "_uglobal");
         sync_flags &= ~VKD3DSSF_GLOBAL_UAV;
     }
+    if (sync_flags & VKD3DSSF_THREAD_GROUP_UAV)
+    {
+        vkd3d_string_buffer_printf(&compiler->buffer, "_ugroup");
+        sync_flags &= ~VKD3DSSF_THREAD_GROUP_UAV;
+    }
     if (sync_flags & VKD3DSSF_GROUP_SHARED_MEMORY)
     {
         vkd3d_string_buffer_printf(&compiler->buffer, "_g");

@@ -9343,11 +9343,20 @@ static void spirv_compiler_emit_sync(struct spirv_compiler *compiler,
         flags &= ~VKD3DSSF_THREAD_GROUP;
     }
 
-    if (flags & VKD3DSSF_GLOBAL_UAV)
+    if (flags & (VKD3DSSF_THREAD_GROUP_UAV | VKD3DSSF_GLOBAL_UAV))
     {
-        memory_scope = SpvScopeDevice;
+        bool group_uav = flags & VKD3DSSF_THREAD_GROUP_UAV;
+        bool global_uav = flags & VKD3DSSF_GLOBAL_UAV;
+
+        if (group_uav && global_uav)
+        {
+            WARN("Invalid UAV sync flag combination; assuming global.\n");
+            spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_UAV_FLAGS,
+                    "The flags for a UAV sync instruction are contradictory; assuming global sync.");
+        }
+        memory_scope = global_uav ? SpvScopeDevice : SpvScopeWorkgroup;
         memory_semantics |= SpvMemorySemanticsUniformMemoryMask | SpvMemorySemanticsImageMemoryMask;
-        flags &= ~VKD3DSSF_GLOBAL_UAV;
+        flags &= ~(VKD3DSSF_THREAD_GROUP_UAV | VKD3DSSF_GLOBAL_UAV);
     }
 
     if (flags)
