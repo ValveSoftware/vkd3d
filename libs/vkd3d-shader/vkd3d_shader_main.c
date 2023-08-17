@@ -1773,7 +1773,7 @@ static struct vkd3d_shader_param_node *shader_param_allocator_node_create(
 static void shader_param_allocator_init(struct vkd3d_shader_param_allocator *allocator,
         unsigned int count, unsigned int stride)
 {
-    allocator->count = max(count, 4);
+    allocator->count = max(count, MAX_REG_OUTPUT);
     allocator->stride = stride;
     allocator->head = NULL;
     allocator->current = NULL;
