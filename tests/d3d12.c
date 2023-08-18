@@ -25682,6 +25682,51 @@ static void test_copy_texture(void)
                 D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
     }
 
+    for (i = 0; i < ARRAY_SIZE(depth_values); ++i)
+    {
+        init_depth_stencil(&ds, device, context.render_target_desc.Width,
+                context.render_target_desc.Height, 1, 1, DXGI_FORMAT_D32_FLOAT,
+                DXGI_FORMAT_D32_FLOAT, NULL);
+        ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, ds.dsv_handle,
+                D3D12_CLEAR_FLAG_DEPTH, depth_values[i], 0, 0, NULL);
+        transition_sub_resource_state(command_list, ds.texture, 0,
+                D3D12_RESOURCE_STATE_DEPTH_WRITE, resource_states[i % ARRAY_SIZE(resource_states)]);
+
+        dst_texture = create_default_texture(device, 32, 32, DXGI_FORMAT_R32_FLOAT,
+                0, D3D12_RESOURCE_STATE_COPY_DEST);
+        ID3D12Device_CreateShaderResourceView(device, dst_texture, NULL,
+                ID3D12DescriptorHeap_GetCPUDescriptorHandleForHeapStart(heap));
+
+        ID3D12GraphicsCommandList_CopyResource(command_list, dst_texture, ds.texture);
+        transition_sub_resource_state(command_list, dst_texture, 0,
+                D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+        ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+        ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+        ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+
+        ID3D12GraphicsCommandList_SetDescriptorHeaps(command_list, 1, &heap);
+
+        ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+        ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+        ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, 0,
+                ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(heap));
+        ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 1, 0, 0);
+
+        transition_sub_resource_state(command_list, context.render_target, 0,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        check_sub_resource_float(context.render_target, 0, queue, command_list, depth_values[i], 2);
+
+        destroy_depth_stencil(&ds);
+        ID3D12Resource_Release(dst_texture);
+
+        reset_command_list(command_list, context.allocator);
+        transition_sub_resource_state(command_list, context.render_target, 0,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    }
+
     ID3D12DescriptorHeap_Release(heap);
     destroy_test_context(&context);
 }
