@@ -3715,8 +3715,10 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
         src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
         for (i = 0; i < 4; ++i)
         {
-            if (map_writemask & (1u << i))
+            if ((map_writemask & (1u << i)) && (j < width))
                 src->reg.immconst_uint[i] = value->u[j++].u;
+            else
+                src->reg.immconst_uint[i] = 0;
         }
     }
 }
