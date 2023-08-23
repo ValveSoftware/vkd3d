@@ -3225,7 +3225,10 @@ static void command_list_add_descriptor_heap(struct d3d12_command_list *list, st
         {
             /* Descriptors can be written after binding. */
             FIXME("Flushing descriptor updates while list %p is not closed.\n", list);
-            command_list_flush_vk_heap_updates(list);
+            vkd3d_mutex_lock(&heap->vk_sets_mutex);
+            d3d12_desc_flush_vk_heap_updates_locked(heap, list->device);
+            vkd3d_mutex_unlock(&heap->vk_sets_mutex);
+            return;
         }
         list->descriptor_heaps[list->descriptor_heap_count++] = heap;
     }
