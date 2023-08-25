@@ -74,7 +74,6 @@ static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
 
 static ID3D10Blob *compile_shader(const struct d3d11_shader_runner *runner, const char *source, const char *type)
 {
-    UINT flags = runner->r.compile_options | D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -90,7 +89,7 @@ static ID3D10Blob *compile_shader(const struct d3d11_shader_runner *runner, cons
     };
 
     sprintf(profile, "%s_%s", type, shader_models[runner->r.minimum_shader_model]);
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
+    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
     ok(hr == S_OK, "Failed to compile shader, hr %#lx.\n", hr);
     if (errors)
     {

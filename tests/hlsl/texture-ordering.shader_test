@@ -83,6 +83,9 @@ size (1, 1)
 % The "allocation size" for textures affects the starting register id for the next resource in the
 % table, and may be larger than the "bind count".
 
+[require]
+options: backcompat
+
 [pixel shader]
 // Name                                 Type  Format         Dim      HLSL Bind  Count
 // ------------------------------ ---------- ------- ----------- -------------- ------

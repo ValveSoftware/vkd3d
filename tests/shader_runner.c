@@ -148,6 +148,7 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
             { 0, "none" },
             { D3DCOMPILE_PACK_MATRIX_ROW_MAJOR, "row-major" },
             { D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR, "column-major" },
+            { D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY, "backcompat" },
         };
 
         runner->compile_options = 0;
@@ -773,7 +774,6 @@ static HRESULT map_unidentified_hrs(HRESULT hr)
 
 static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
 {
-    UINT flags = runner->compile_options | D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -789,7 +789,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     };
 
     sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
-    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, flags, 0, &blob, &errors);
+    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     hr = map_unidentified_hrs(hr);
     ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)

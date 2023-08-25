@@ -430,6 +430,10 @@ static bool compile_shader(const struct vulkan_shader_runner *runner, const char
             compile_options &= ~(D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR);
         }
 
+        /* FIXME: ignore compatibility flag for now */
+        if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
+            compile_options &= ~D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
+
         if (compile_options)
             fatal_error("Unsupported compiler options %#x.\n", compile_options);
     }
