@@ -707,6 +707,19 @@ static void shader_sm4_read_conditional_op(struct vkd3d_shader_instruction *ins,
             VKD3D_SHADER_CONDITIONAL_OP_NZ : VKD3D_SHADER_CONDITIONAL_OP_Z;
 }
 
+static void shader_sm4_read_case_condition(struct vkd3d_shader_instruction *ins, uint32_t opcode,
+        uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
+{
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT,
+            (struct vkd3d_shader_src_param *)&ins->src[0]);
+    if (ins->src[0].reg.type != VKD3DSPR_IMMCONST)
+    {
+        FIXME("Switch case value is not a 32-bit constant.\n");
+        vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_CASE_VALUE,
+                "Switch case value is not a 32-bit immediate constant register.");
+    }
+}
+
 static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,
         const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
@@ -1215,7 +1228,8 @@ static const struct vkd3d_sm4_opcode_info opcode_table[] =
     {VKD3D_SM4_OP_BREAK,                            VKD3DSIH_BREAK,                            "",     ""},
     {VKD3D_SM4_OP_BREAKC,                           VKD3DSIH_BREAKP,                           "",     "u",
             shader_sm4_read_conditional_op},
-    {VKD3D_SM4_OP_CASE,                             VKD3DSIH_CASE,                             "",     "u"},
+    {VKD3D_SM4_OP_CASE,                             VKD3DSIH_CASE,                             "",     "u",
+            shader_sm4_read_case_condition},
     {VKD3D_SM4_OP_CONTINUE,                         VKD3DSIH_CONTINUE,                         "",     ""},
     {VKD3D_SM4_OP_CONTINUEC,                        VKD3DSIH_CONTINUEP,                        "",     "u",
             shader_sm4_read_conditional_op},
