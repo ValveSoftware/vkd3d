@@ -1,0 +1,139 @@
+% Tests for register space reservation syntax. We don't bother testing register
+% space here, since it's specific to d3d12 and would require reworking a lot of
+% the shader test code.
+
+[require]
+shader model >= 5.1
+
+[srv 0]
+size (2d, 1, 1)
+0.0 0.0 0.0 99.0
+
+[srv 1]
+size (2d, 1, 1)
+1.0 1.0 1.0 99.0
+
+[srv 2]
+size (2d, 1, 1)
+2.0 2.0 2.0 99.0
+
+[pixel shader todo]
+Texture2D tex1 : register(t1, space0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader todo fail(sm>=6)]
+Texture2D tex1 : register(t1, sPaCe0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader fail todo]
+Texture2D tex1 : register(space0, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail(sm<6)]
+Texture2D tex1 : register(ps, space0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0, 0, 0, 99)
+
+
+[pixel shader fail(sm<6)]
+Texture2D tex1 : register(space0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (0, 0, 0, 99)
+
+
+% Specifying a profile is just broken. The first reservation (or, with sm6, the
+% last) is taken regardless of whether it actually matches the current profile.
+
+[pixel shader todo]
+Texture2D tex1 : register(vs, t1, space0) : register(ps, t2, space0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (2, 2, 2, 99)
+if(sm<6)  probe all rgba (1, 1, 1, 99)
+
+
+% This actually inheres to 5.1+; it doesn't matter whether "space" is specified.
+
+[pixel shader todo]
+Texture2D tex1 : register(vs, t1) : register(ps, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (2, 2, 2, 99)
+if(sm<6)  probe all rgba (1, 1, 1, 99)
+
+
+% It's still illegal to specify multiple contradictory reservations with the
+% same profile...
+
+[pixel shader fail todo]
+Texture2D tex1 : register(vs, t1) : register(vs, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+% ...but it's not illegal to specify e.g. ps alongside ps_5_1.
+
+[pixel shader todo]
+Texture2D tex1 : register(ps, t1) : register(ps_5_1, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (2, 2, 2, 99)
+if(sm<6)  probe all rgba (1, 1, 1, 99)
