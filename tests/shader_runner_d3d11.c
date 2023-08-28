@@ -336,6 +336,16 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     return buffer;
 }
 
+static bool d3d11_runner_check_requirements(struct shader_runner *r)
+{
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+
+    if (runner->r.minimum_shader_model >= SHADER_MODEL_5_1)
+        return false;
+
+    return true;
+}
+
 static struct resource *d3d11_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
@@ -724,6 +734,7 @@ static void d3d11_runner_release_readback(struct shader_runner *r, struct resour
 
 static const struct shader_runner_ops d3d11_runner_ops =
 {
+    .check_requirements = d3d11_runner_check_requirements,
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
     .dispatch = d3d11_runner_dispatch,
