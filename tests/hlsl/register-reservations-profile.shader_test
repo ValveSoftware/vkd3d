@@ -1,0 +1,261 @@
+% Tests for register reservations that use the "profile" syntax.
+
+[require]
+shader model >= 4.0
+
+[srv 0]
+size (2d, 1, 1)
+0.0 0.0 0.0 99.0
+
+[srv 1]
+size (2d, 1, 1)
+1.0 1.0 1.0 99.0
+
+[srv 2]
+size (2d, 1, 1)
+2.0 2.0 2.0 99.0
+
+[pixel shader todo]
+Texture2D tex1 : register(vs, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+% sm6 seems to ignore profile qualifiers entirely.
+if(sm>=6) probe all rgba (1, 1, 1, 99)
+if(sm<6)  probe all rgba (0, 0, 0, 99)
+
+
+[pixel shader todo]
+Texture2D tex1 : register(cs, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (1, 1, 1, 99)
+if(sm<6)  probe all rgba (0, 0, 0, 99)
+
+
+[pixel shader todo]
+Texture2D tex1 : register(ps, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader fail todo]
+Texture2D tex1 : register(PS, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail todo]
+Texture2D tex1 : register(qs, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail]
+Texture2D tex1 : register(ps);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail(sm<6) todo]
+Texture2D tex1 : register(ps_4, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader todo]
+Texture2D tex1 : register(ps_4_0, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader fail]
+Texture2D tex1 : register(ps.4.0, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader todo]
+Texture2D tex1 : register(ps_4_1, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (1, 1, 1, 99)
+if(sm<6)  probe all rgba (0, 0, 0, 99)
+
+
+[pixel shader todo]
+Texture2D tex1 : register(ps_4_1, t1) : register(ps_4_0, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (2, 2, 2, 99)
+
+% The documentation explicitly gives this case as an example, implying that a
+% more specific profile takes precedence over a less specific one. It doesn't.
+% If we're not on the specific version, the compiler silently chooses the
+% general case; if we are, the compiler detects a conflict and fails.
+
+% sm6 is of course different. It seems to detect conflicts if the exact same
+% reservation is given, but if two different reservations are given it instead
+% just picks the last one, without regard to version.
+
+[pixel shader todo]
+Texture2D tex1 : register(ps, t1) : register(ps_5_0, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+if(sm>=6) probe all rgba (2, 2, 2, 99)
+if(sm<6)  probe all rgba (1, 1, 1, 99)
+
+
+[pixel shader fail(sm<6) todo]
+Texture2D tex1 : register(ps, t1) : register(ps_4_0, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (2, 2, 2, 99)
+
+
+[pixel shader fail(sm<6) todo]
+Texture2D tex1 : register(ps_4_0, t1) : register(ps, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (2, 2, 2, 99)
+
+
+[pixel shader fail(sm<6) todo]
+Texture2D tex1 : register(ps_6_0, t1) : register(ps, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+draw quad
+probe all rgba (2, 2, 2, 99)
+
+
+[pixel shader fail todo]
+Texture2D tex1 : register(ps_4_0, t1) : register(t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail]
+Texture2D tex1 : register(t1, ps_4_0);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+% It's also illegal to specify contradictory register reservations with the
+% *same* profile, even if they aren't the current one.
+
+[pixel shader fail todo]
+Texture2D tex1 : register(vs_4_0, t1) : register(vs_4_0, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+[pixel shader fail todo]
+Texture2D tex1 : register(vs, t1) : register(vs, t2);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+
+% Specifying the same reservation twice is fine, though.
+
+[pixel shader todo]
+Texture2D tex1 : register(ps, t1) : register(ps, t1);
+
+float4 main() : sv_target
+{
+    return tex1.Load(int3(0, 0, 0));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (1, 1, 1, 99)
