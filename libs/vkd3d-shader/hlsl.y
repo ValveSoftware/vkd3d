@@ -4792,8 +4792,8 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 %type <parameters> param_list
 %type <parameters> parameters
 
-%type <reg_reservation> register_opt
-%type <reg_reservation> packoffset_opt
+%type <reg_reservation> register_reservation
+%type <reg_reservation> packoffset_reservation
 
 %type <sampler_dim> texture_type texture_ms_type uav_type
 
@@ -5290,12 +5290,12 @@ colon_attribute:
             $$.reg_reservation.reg_type = 0;
             $$.reg_reservation.offset_type = 0;
         }
-    | register_opt
+    | register_reservation
         {
             $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation = $1;
         }
-    | packoffset_opt
+    | packoffset_reservation
         {
             $$.semantic = (struct hlsl_semantic){0};
             $$.reg_reservation = $1;
@@ -5317,7 +5317,7 @@ semantic:
         }
 
 /* FIXME: Writemasks */
-register_opt:
+register_reservation:
       ':' KW_REGISTER '(' any_identifier ')'
         {
             $$ = parse_reg_reservation($4);
@@ -5332,7 +5332,7 @@ register_opt:
             vkd3d_free($6);
         }
 
-packoffset_opt:
+packoffset_reservation:
       ':' KW_PACKOFFSET '(' any_identifier ')'
         {
             $$ = parse_packoffset(ctx, $4, NULL, &@$);
