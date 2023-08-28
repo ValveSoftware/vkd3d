@@ -682,7 +682,8 @@ enum vkd3d_shader_sync_flags
 
 enum vkd3d_shader_uav_flags
 {
-    VKD3DSUF_GLOBALLY_COHERENT = 0x2,
+    VKD3DSUF_GLOBALLY_COHERENT        = 0x002,
+    VKD3DSUF_RASTERISER_ORDERED_VIEW  = 0x004,
     VKD3DSUF_ORDER_PRESERVING_COUNTER = 0x100,
 };
 

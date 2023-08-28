@@ -478,6 +478,11 @@ static void shader_dump_uav_flags(struct vkd3d_d3d_asm_compiler *compiler, uint3
         vkd3d_string_buffer_printf(&compiler->buffer, "_opc");
         uav_flags &= ~VKD3DSUF_ORDER_PRESERVING_COUNTER;
     }
+    if (uav_flags & VKD3DSUF_RASTERISER_ORDERED_VIEW)
+    {
+        vkd3d_string_buffer_printf(&compiler->buffer, "_rov");
+        uav_flags &= ~VKD3DSUF_RASTERISER_ORDERED_VIEW;
+    }
 
     if (uav_flags)
         vkd3d_string_buffer_printf(&compiler->buffer, "_unknown_flags(%#x)", uav_flags);
