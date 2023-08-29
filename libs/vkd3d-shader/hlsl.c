@@ -1060,11 +1060,10 @@ struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *tem
 {
     struct vkd3d_string_buffer *string;
     struct hlsl_ir_var *var;
-    static LONG counter;
 
     if (!(string = hlsl_get_string_buffer(ctx)))
         return NULL;
-    vkd3d_string_buffer_printf(string, "<%s-%u>", template, InterlockedIncrement(&counter));
+    vkd3d_string_buffer_printf(string, "<%s-%u>", template, ctx->internal_name_counter++);
     var = hlsl_new_synthetic_var_named(ctx, string->buffer, type, loc, true);
     hlsl_release_string_buffer(ctx, string);
     return var;

@@ -798,6 +798,9 @@ struct hlsl_ctx
     /* Pointer to the current function; changes as the parser reads the code. */
     const struct hlsl_ir_function_decl *cur_function;
 
+    /* Counter for generating unique internal variable names. */
+    unsigned int internal_name_counter;
+
     /* Default matrix majority for matrix types. Can be set by a pragma within the HLSL source. */
     unsigned int matrix_majority;
 
