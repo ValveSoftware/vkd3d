@@ -35,6 +35,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     cd ../.. && \
     rm -rf wine && \
     apt-get clean && \
-    useradd -m gitlab
+    groupadd host-render -g 800 && \
+    useradd -m gitlab -G host-render
 
 USER gitlab
