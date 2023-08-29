@@ -184,6 +184,7 @@ enum vkd3d_shader_error
 
     VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED             = 9000,
     VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER             = 9001,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE       = 9002,
 };
 
 enum vkd3d_shader_opcode

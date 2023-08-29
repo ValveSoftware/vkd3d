@@ -1322,11 +1322,38 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
     vkd3d_string_buffer_cleanup(&buf);
 }
 
+static void vsir_validate_register(struct validation_context *ctx,
+        const struct vkd3d_shader_register *reg)
+{
+    if (reg->type >= VKD3DSPR_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE, "Invalid register type %#x.",
+                reg->type);
+}
+
+static void vsir_validate_dst_param(struct validation_context *ctx,
+        const struct vkd3d_shader_dst_param *dst)
+{
+    vsir_validate_register(ctx, &dst->reg);
+}
+
+static void vsir_validate_src_param(struct validation_context *ctx,
+        const struct vkd3d_shader_src_param *src)
+{
+    vsir_validate_register(ctx, &src->reg);
+}
+
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
     const struct vkd3d_shader_instruction *instruction = &ctx->parser->instructions.elements[ctx->instruction_idx];
+    size_t i;
 
     ctx->parser->location = instruction->location;
+
+    for (i = 0; i < instruction->dst_count; ++i)
+        vsir_validate_dst_param(ctx, &instruction->dst[i]);
+
+    for (i = 0; i < instruction->src_count; ++i)
+        vsir_validate_src_param(ctx, &instruction->src[i]);
 
     if (instruction->handler_idx >= VKD3DSIH_INVALID)
     {
