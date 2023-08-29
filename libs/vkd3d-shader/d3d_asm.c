@@ -1374,7 +1374,7 @@ static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
     if (mmask & VKD3DSPDM_PARTIALPRECISION) shader_addline(buffer, "_pp");
     if (mmask & VKD3DSPDM_MSAMPCENTROID)    shader_addline(buffer, "_centroid");
 
-    mmask &= ~(VKD3DSPDM_SATURATE | VKD3DSPDM_PARTIALPRECISION | VKD3DSPDM_MSAMPCENTROID);
+    mmask &= ~VKD3DSPDM_MASK;
     if (mmask) FIXME("Unrecognised modifier %#x.\n", mmask);
 }
 

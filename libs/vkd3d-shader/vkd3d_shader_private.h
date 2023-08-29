@@ -185,6 +185,9 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED             = 9000,
     VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER             = 9001,
     VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE       = 9002,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK          = 9003,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS           = 9004,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT               = 9005,
 };
 
 enum vkd3d_shader_opcode
@@ -601,6 +604,7 @@ enum vkd3d_shader_dst_modifier
     VKD3DSPDM_SATURATE = 1,
     VKD3DSPDM_PARTIALPRECISION = 2,
     VKD3DSPDM_MSAMPCENTROID = 4,
+    VKD3DSPDM_MASK = 7,
 };
 
 enum vkd3d_shader_interpolation_mode

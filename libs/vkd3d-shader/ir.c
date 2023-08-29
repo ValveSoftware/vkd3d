@@ -1334,6 +1334,30 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         const struct vkd3d_shader_dst_param *dst)
 {
     vsir_validate_register(ctx, &dst->reg);
+
+    if (dst->write_mask & ~VKD3DSP_WRITEMASK_ALL)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK, "Destination has invalid write mask %#x.",
+                dst->write_mask);
+
+    if (dst->modifiers & ~VKD3DSPDM_MASK)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Destination has invalid modifiers %#x.",
+                dst->modifiers);
+
+    switch (dst->shift)
+    {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 13:
+        case 14:
+        case 15:
+            break;
+
+        default:
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT, "Destination has invalid shift %#x.",
+                    dst->shift);
+    }
 }
 
 static void vsir_validate_src_param(struct validation_context *ctx,
