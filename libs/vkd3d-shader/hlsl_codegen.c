@@ -3670,13 +3670,14 @@ static void allocate_semantic_registers(struct hlsl_ctx *ctx)
     }
 }
 
-static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t index)
+static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint32_t space, uint32_t index)
 {
     const struct hlsl_buffer *buffer;
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, const struct hlsl_buffer, entry)
     {
-        if (buffer->used_size && buffer->reservation.reg_type == 'b' && buffer->reservation.reg_index == index)
+        if (buffer->used_size && buffer->reservation.reg_type == 'b'
+                && buffer->reservation.reg_space == space && buffer->reservation.reg_index == index)
             return buffer;
     }
     return NULL;
@@ -3815,34 +3816,41 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 
         if (buffer->type == HLSL_BUFFER_CONSTANT)
         {
-            if (buffer->reservation.reg_type == 'b')
+            const struct hlsl_reg_reservation *reservation = &buffer->reservation;
+
+            if (reservation->reg_type == 'b')
             {
-                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx, buffer->reservation.reg_index);
+                const struct hlsl_buffer *reserved_buffer = get_reserved_buffer(ctx,
+                        reservation->reg_space, reservation->reg_index);
 
                 if (reserved_buffer && reserved_buffer != buffer)
                 {
                     hlsl_error(ctx, &buffer->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                            "Multiple buffers bound to cb%u.", buffer->reservation.reg_index);
+                            "Multiple buffers bound to space %u, index %u.",
+                            reservation->reg_space, reservation->reg_index);
                     hlsl_note(ctx, &reserved_buffer->loc, VKD3D_SHADER_LOG_ERROR,
-                            "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.reg_index);
+                            "Buffer %s is already bound to space %u, index %u.",
+                            reserved_buffer->name, reservation->reg_space, reservation->reg_index);
                 }
 
-                buffer->reg.index = buffer->reservation.reg_index;
+                buffer->reg.space = reservation->reg_space;
+                buffer->reg.index = reservation->reg_index;
                 buffer->reg.id = id++;
                 buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
-                TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
+                TRACE("Allocated reserved %s to space%u, cb%u.\n", buffer->name, buffer->reg.space, buffer->reg.index);
             }
-            else if (!buffer->reservation.reg_type)
+            else if (!reservation->reg_type)
             {
-                while (get_reserved_buffer(ctx, index))
+                while (get_reserved_buffer(ctx, 0, index))
                     ++index;
 
+                buffer->reg.space = 0;
                 buffer->reg.index = index;
                 buffer->reg.id = id++;
                 buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
-                TRACE("Allocated %s to cb%u.\n", buffer->name, index);
+                TRACE("Allocated %s to space0, cb%u.\n", buffer->name, index);
                 ++index;
             }
             else
