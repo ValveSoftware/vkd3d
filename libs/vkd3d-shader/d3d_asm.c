@@ -1164,7 +1164,8 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     }
     else if (reg->type != VKD3DSPR_RASTOUT
             && reg->type != VKD3DSPR_MISCTYPE
-            && reg->type != VKD3DSPR_NULL)
+            && reg->type != VKD3DSPR_NULL
+            && reg->type != VKD3DSPR_DEPTHOUT)
     {
         if (offset != ~0u)
         {
