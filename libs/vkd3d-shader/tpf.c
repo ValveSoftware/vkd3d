@@ -2647,6 +2647,11 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     return sm4->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
 }
 
+static bool hlsl_profile_is_sm_5_1(const struct hlsl_ctx *ctx)
+{
+    return ctx->profile->major_version == 5 && ctx->profile->minor_version >= 1;
+}
+
 static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block);
 
 static bool type_is_integer(const struct hlsl_type *type)
@@ -3145,7 +3150,7 @@ struct extern_resource
     bool is_user_packed;
 
     enum hlsl_regset regset;
-    unsigned int id, bind_count;
+    unsigned int id, index, bind_count;
 };
 
 static int sm4_compare_extern_resources(const void *a, const void *b)
@@ -3240,7 +3245,8 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
                     extern_resources[*count].is_user_packed = false;
 
                     extern_resources[*count].regset = regset;
-                    extern_resources[*count].id = var->regs[regset].id + regset_offset;
+                    extern_resources[*count].id = var->regs[regset].id;
+                    extern_resources[*count].index = var->regs[regset].index + regset_offset;
                     extern_resources[*count].bind_count = 1;
 
                     ++*count;
@@ -3278,6 +3284,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
             extern_resources[*count].regset = regset;
             extern_resources[*count].id = var->regs[regset].id;
+            extern_resources[*count].index = var->regs[regset].index;
             extern_resources[*count].bind_count = var->bind_count[regset];
 
             ++*count;
@@ -3392,7 +3399,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         put_u32(&buffer, 0); /* return type */
         put_u32(&buffer, 0); /* dimension */
         put_u32(&buffer, 0); /* multisample count */
-        put_u32(&buffer, cbuffer->reg.id); /* bind point */
+        put_u32(&buffer, cbuffer->reg.index); /* bind point */
         put_u32(&buffer, 1); /* bind count */
         put_u32(&buffer, flags); /* flags */
     }
@@ -3580,7 +3587,7 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
 struct sm4_register
 {
     enum vkd3d_shader_register_type type;
-    struct vkd3d_shader_register_index idx[2];
+    struct vkd3d_shader_register_index idx[3];
     unsigned int idx_count;
     enum vkd3d_sm4_dimension dim;
     uint32_t immconst_uint[4];
@@ -3632,10 +3639,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
-            reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            if (hlsl_profile_is_sm_5_1(ctx))
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
+                reg->idx[1].offset = var->regs[HLSL_REGSET_TEXTURES].index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].index;
+                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+                reg->idx_count = 1;
+            }
             assert(regset == HLSL_REGSET_TEXTURES);
-            reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (regset == HLSL_REGSET_UAVS)
@@ -3644,10 +3660,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
-            reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            if (hlsl_profile_is_sm_5_1(ctx))
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
+                reg->idx[1].offset = var->regs[HLSL_REGSET_UAVS].index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].index;
+                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+                reg->idx_count = 1;
+            }
             assert(regset == HLSL_REGSET_UAVS);
-            reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else if (regset == HLSL_REGSET_SAMPLERS)
@@ -3656,10 +3681,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_NONE;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
-            reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
-            reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+            if (hlsl_profile_is_sm_5_1(ctx))
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
+                reg->idx[1].offset = var->regs[HLSL_REGSET_SAMPLERS].index; /* FIXME: array index */
+                reg->idx_count = 2;
+            }
+            else
+            {
+                reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].index;
+                reg->idx[0].offset += hlsl_offset_from_deref_safe(ctx, deref);
+                reg->idx_count = 1;
+            }
             assert(regset == HLSL_REGSET_SAMPLERS);
-            reg->idx_count = 1;
             *writemask = VKD3DSP_WRITEMASK_ALL;
         }
         else
@@ -3671,9 +3705,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             reg->dim = VKD3D_SM4_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
-            reg->idx[0].offset = var->buffer->reg.id;
-            reg->idx[1].offset = offset / 4;
-            reg->idx_count = 2;
+            if (hlsl_profile_is_sm_5_1(ctx))
+            {
+                reg->idx[0].offset = var->buffer->reg.id;
+                reg->idx[1].offset = var->buffer->reg.index; /* FIXME: array index */
+                reg->idx[2].offset = offset / 4;
+                reg->idx_count = 3;
+            }
+            else
+            {
+                reg->idx[0].offset = var->buffer->reg.index;
+                reg->idx[1].offset = offset / 4;
+                reg->idx_count = 2;
+            }
             *writemask = ((1u << data_type->dimx) - 1) << (offset & 3);
         }
     }
@@ -3999,19 +4043,36 @@ static bool encode_texel_offset_as_aoffimmi(struct sm4_instruction *instr,
 
 static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const struct hlsl_buffer *cbuffer)
 {
-    const struct sm4_instruction instr =
+    size_t size = (cbuffer->used_size + 3) / 4;
+
+    struct sm4_instruction instr =
     {
         .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
 
         .srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
         .srcs[0].reg.type = VKD3DSPR_CONSTBUFFER,
-        .srcs[0].reg.idx[0].offset = cbuffer->reg.id,
-        .srcs[0].reg.idx[1].offset = (cbuffer->used_size + 3) / 4,
-        .srcs[0].reg.idx_count = 2,
         .srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_VEC4,
         .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
         .src_count = 1,
     };
+
+    if (hlsl_profile_is_sm_5_1(tpf->ctx))
+    {
+        instr.srcs[0].reg.idx[0].offset = cbuffer->reg.id;
+        instr.srcs[0].reg.idx[1].offset = cbuffer->reg.index;
+        instr.srcs[0].reg.idx[2].offset = cbuffer->reg.index; /* FIXME: array end */
+        instr.srcs[0].reg.idx_count = 3;
+
+        instr.idx[0] = size;
+        instr.idx_count = 1;
+    }
+    else
+    {
+        instr.srcs[0].reg.idx[0].offset = cbuffer->reg.index;
+        instr.srcs[0].reg.idx[1].offset = size;
+        instr.srcs[0].reg.idx_count = 2;
+    }
+
     write_sm4_instruction(tpf, &instr);
 }
 
@@ -4024,7 +4085,6 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
         .opcode = VKD3D_SM4_OP_DCL_SAMPLER,
 
         .dsts[0].reg.type = VKD3DSPR_SAMPLER,
-        .dsts[0].reg.idx_count = 1,
         .dst_count = 1,
     };
 
@@ -4040,7 +4100,19 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
         if (resource->var && !resource->var->objects_usage[HLSL_REGSET_SAMPLERS][i].used)
             continue;
 
-        instr.dsts[0].reg.idx[0].offset = resource->id + i;
+        if (hlsl_profile_is_sm_5_1(tpf->ctx))
+        {
+            assert(!i);
+            instr.dsts[0].reg.idx[0].offset = resource->id;
+            instr.dsts[0].reg.idx[1].offset = resource->index;
+            instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
+            instr.dsts[0].reg.idx_count = 3;
+        }
+        else
+        {
+            instr.dsts[0].reg.idx[0].offset = resource->index + i;
+            instr.dsts[0].reg.idx_count = 1;
+        }
         write_sm4_instruction(tpf, &instr);
     }
 }
@@ -4072,6 +4144,20 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             .idx[0] = sm4_resource_format(component_type) * 0x1111,
             .idx_count = 1,
         };
+
+        if (hlsl_profile_is_sm_5_1(tpf->ctx))
+        {
+            assert(!i);
+            instr.dsts[0].reg.idx[0].offset = resource->id;
+            instr.dsts[0].reg.idx[1].offset = resource->index;
+            instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
+            instr.dsts[0].reg.idx_count = 3;
+        }
+        else
+        {
+            instr.dsts[0].reg.idx[0].offset = resource->index + i;
+            instr.dsts[0].reg.idx_count = 1;
+        }
 
         if (uav)
         {
