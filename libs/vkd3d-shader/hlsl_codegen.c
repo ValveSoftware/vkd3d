@@ -2901,15 +2901,16 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
+        const struct hlsl_reg_reservation *reservation = &var->reg_reservation;
         enum hlsl_regset regset;
 
         if (!hlsl_type_is_resource(var->data_type))
             continue;
         regset = hlsl_type_get_regset(var->data_type);
 
-        if (var->reg_reservation.reg_type && var->regs[regset].allocation_size)
+        if (reservation->reg_type && var->regs[regset].allocation_size)
         {
-            if (var->reg_reservation.reg_type != get_regset_name(regset))
+            if (reservation->reg_type != get_regset_name(regset))
             {
                 struct vkd3d_string_buffer *type_string;
 
@@ -2922,10 +2923,11 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
             else
             {
                 var->regs[regset].allocated = true;
-                var->regs[regset].index = var->reg_reservation.reg_index;
-                TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
-                        var->reg_reservation.reg_index, var->reg_reservation.reg_type,
-                        var->reg_reservation.reg_index + var->regs[regset].allocation_size);
+                var->regs[regset].space = reservation->reg_space;
+                var->regs[regset].index = reservation->reg_index;
+                TRACE("Allocated reserved %s to space%u, %c%u-%c%u.\n", var->name, reservation->reg_space,
+                        reservation->reg_type, reservation->reg_index,
+                        reservation->reg_type, reservation->reg_index + var->regs[regset].allocation_size);
             }
         }
     }
@@ -3867,13 +3869,16 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
 }
 
 static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum hlsl_regset regset,
-        uint32_t index, bool allocated_only)
+        uint32_t space, uint32_t index, bool allocated_only)
 {
     const struct hlsl_ir_var *var;
     unsigned int start, count;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, const struct hlsl_ir_var, extern_entry)
     {
+        if (var->reg_reservation.reg_space != space)
+            continue;
+
         if (var->reg_reservation.reg_type == get_regset_name(regset)
                 && var->data_type->reg_size[regset])
         {
@@ -3928,7 +3933,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
         if (var->regs[regset].allocated)
         {
             const struct hlsl_ir_var *reserved_object, *last_reported = NULL;
-            unsigned int index, i;
+            unsigned int i;
 
             if (var->regs[regset].index < min_index)
             {
@@ -3941,19 +3946,20 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
             for (i = 0; i < count; ++i)
             {
-                index = var->regs[regset].index + i;
+                unsigned int space = var->regs[regset].space;
+                unsigned int index = var->regs[regset].index + i;
 
                 /* get_allocated_object() may return "var" itself, but we
                  * actually want that, otherwise we'll end up reporting the
                  * same conflict between the same two variables twice. */
-                reserved_object = get_allocated_object(ctx, regset, index, true);
+                reserved_object = get_allocated_object(ctx, regset, space, index, true);
                 if (reserved_object && reserved_object != var && reserved_object != last_reported)
                 {
                     hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
-                            "Multiple variables bound to %c%u.", regset_name, index);
+                            "Multiple variables bound to space %u, %c%u.", regset_name, space, index);
                     hlsl_note(ctx, &reserved_object->loc, VKD3D_SHADER_LOG_ERROR,
-                            "Variable '%s' is already bound to %c%u.", reserved_object->name,
-                            regset_name, index);
+                            "Variable '%s' is already bound to space %u, %c%u.",
+                            reserved_object->name, regset_name, space, index);
                     last_reported = reserved_object;
                 }
             }
@@ -3967,7 +3973,7 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 
             while (available < count)
             {
-                if (get_allocated_object(ctx, regset, index, false))
+                if (get_allocated_object(ctx, regset, 0, index, false))
                     available = 0;
                 else
                     ++available;
@@ -3975,11 +3981,12 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
             }
             index -= count;
 
+            var->regs[regset].space = 0;
             var->regs[regset].index = index;
             var->regs[regset].id = id++;
             var->regs[regset].allocated = true;
-            TRACE("Allocated variable %s to %c%u-%c%u.\n", var->name, regset_name, index, regset_name,
-                    index + count);
+            TRACE("Allocated variable %s to space0, %c%u-%c%u.\n",
+                    var->name, regset_name, index, regset_name, index + count);
             ++index;
         }
     }
