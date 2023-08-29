@@ -259,9 +259,9 @@ struct hlsl_struct_field
  *   struct. */
 struct hlsl_reg
 {
-    /* Register index used for binding declarations.
+    /* Register space and index used for binding declarations.
      * Unused for temporary, varying, etc. registers. */
-    uint32_t index;
+    uint32_t space, index;
     /* Unique ID. */
     uint32_t id;
     /* Number of registers to be allocated.
