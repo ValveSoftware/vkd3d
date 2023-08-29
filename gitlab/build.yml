@@ -30,12 +30,14 @@ build-radv-64:
     - amd-gpu
   variables:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
+    VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-llvmpipe-64:
   extends: .build-linux
   allow_failure: true
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
+    VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-radv-32:
   extends: .build-linux
@@ -44,6 +46,7 @@ build-radv-32:
   variables:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
     CC: 'gcc -m32'
+    VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-llvmpipe-32:
   extends: .build-linux
@@ -51,6 +54,7 @@ build-llvmpipe-32:
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
     CC: 'gcc -m32'
+    VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-mac:
   stage: build
@@ -87,6 +91,7 @@ build-mac:
     - if [ -f pipeline_failed ] ; then exit 1 ; fi
   variables:
     VKD3D_DISABLE_EXTENSIONS: "VK_EXT_descriptor_indexing"
+    VKD3D_SHADER_CONFIG: 'force_validation'
   artifacts:
     when: always
     paths:

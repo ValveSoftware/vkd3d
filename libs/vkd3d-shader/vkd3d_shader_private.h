@@ -1095,6 +1095,11 @@ bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_
         unsigned int dst, unsigned int src);
 void shader_instruction_array_destroy(struct vkd3d_shader_instruction_array *instructions);
 
+enum vkd3d_shader_config_flags
+{
+    VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION = 0x00000001,
+};
+
 struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
@@ -1105,6 +1110,8 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_version shader_version;
     const struct vkd3d_shader_parser_ops *ops;
     struct vkd3d_shader_instruction_array instructions;
+
+    uint64_t config_flags;
 };
 
 struct vkd3d_shader_parser_ops
@@ -1292,6 +1299,8 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
+
+void vsir_validate(struct vkd3d_shader_parser *parser);
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type(
         enum vkd3d_data_type data_type)

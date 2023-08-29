@@ -2642,6 +2642,9 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL && !sm4->has_control_point_phase && !sm4->p.failed)
         shader_sm4_validate_default_phase_index_ranges(sm4);
 
+    if (!sm4->p.failed)
+        vsir_validate(&sm4->p);
+
     if (sm4->p.failed)
     {
         WARN("Failed to parse shader.\n");

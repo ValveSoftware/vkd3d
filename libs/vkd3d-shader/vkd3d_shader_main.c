@@ -454,6 +454,25 @@ static void init_scan_signature_info(const struct vkd3d_shader_compile_info *inf
     }
 }
 
+static const struct vkd3d_debug_option vkd3d_shader_config_options[] =
+{
+    {"force_validation", VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION}, /* force validation of internal shader representations */
+};
+
+static uint64_t vkd3d_shader_init_config_flags(void)
+{
+    uint64_t config_flags;
+    const char *config;
+
+    config = getenv("VKD3D_SHADER_CONFIG");
+    config_flags = vkd3d_parse_debug_options(config, vkd3d_shader_config_options, ARRAY_SIZE(vkd3d_shader_config_options));
+
+    if (config_flags)
+        TRACE("VKD3D_SHADER_CONFIG='%s'.\n", config);
+
+    return config_flags;
+}
+
 bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_message_context *message_context, const char *source_name,
         const struct vkd3d_shader_version *version, const struct vkd3d_shader_parser_ops *ops,
@@ -465,6 +484,7 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
     parser->location.column = 0;
     parser->shader_version = *version;
     parser->ops = ops;
+    parser->config_flags = vkd3d_shader_init_config_flags();
     return shader_instruction_array_init(&parser->instructions, instruction_reserve);
 }
 

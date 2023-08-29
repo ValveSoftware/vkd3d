@@ -1290,5 +1290,22 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (result >= 0 && TRACE_ON())
         vkd3d_shader_trace(instructions, &parser->shader_version);
 
+    if (result >= 0 && !parser->failed)
+        vsir_validate(parser);
+
+    if (result >= 0 && parser->failed)
+        result = VKD3D_ERROR_INVALID_SHADER;
+
     return result;
+}
+
+struct validation_context
+{
+    struct vkd3d_shader_parser *parser;
+};
+
+void vsir_validate(struct vkd3d_shader_parser *parser)
+{
+    if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
+        return;
 }
