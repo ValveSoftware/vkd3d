@@ -1302,10 +1302,46 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 struct validation_context
 {
     struct vkd3d_shader_parser *parser;
+    size_t instruction_idx;
 };
+
+static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *ctx,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    struct vkd3d_string_buffer buf;
+    va_list args;
+
+    vkd3d_string_buffer_init(&buf);
+
+    va_start(args, format);
+    vkd3d_string_buffer_vprintf(&buf, format, args);
+    va_end(args);
+
+    vkd3d_shader_parser_error(ctx->parser, error, "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
+
+    vkd3d_string_buffer_cleanup(&buf);
+}
+
+static void vsir_validate_instruction(struct validation_context *ctx)
+{
+    const struct vkd3d_shader_instruction *instruction = &ctx->parser->instructions.elements[ctx->instruction_idx];
+
+    ctx->parser->location = instruction->location;
+
+    if (instruction->handler_idx >= VKD3DSIH_INVALID)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Invalid instruction handler %#x.",
+                instruction->handler_idx);
+    }
+}
 
 void vsir_validate(struct vkd3d_shader_parser *parser)
 {
+    struct validation_context ctx = { .parser = parser };
+
     if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
         return;
+
+    for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
+        vsir_validate_instruction(&ctx);
 }
