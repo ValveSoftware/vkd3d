@@ -4783,6 +4783,8 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
 
 %type <if_body> if_body
 
+%type <intval> array
+
 %type <modifiers> var_modifiers
 
 %type <name> any_identifier
@@ -5891,52 +5893,37 @@ variable_def_typed:
             $$->modifiers_loc = @1;
         }
 
+array:
+      '[' ']'
+        {
+            $$ = HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT;
+        }
+    | '[' expr ']'
+        {
+            $$ = evaluate_static_expression_as_uint(ctx, $2, &@2);
+
+            if (!$$)
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Array size is not a positive integer constant.");
+
+            if ($$ > 65536)
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
+                        "Array size %u is not between 1 and 65536.", $$);
+
+            destroy_block($2);
+        }
+
 arrays:
       %empty
         {
             $$.sizes = NULL;
             $$.count = 0;
         }
-    | '[' expr ']' arrays
-        {
-            uint32_t *new_array;
-            unsigned int size;
-
-            size = evaluate_static_expression_as_uint(ctx, $2, &@2);
-
-            destroy_block($2);
-
-            $$ = $4;
-
-            if (!size)
-            {
-                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Array size is not a positive integer constant.");
-                vkd3d_free($$.sizes);
-                YYABORT;
-            }
-
-            if (size > 65536)
-            {
-                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_SIZE,
-                        "Array size %u is not between 1 and 65536.", size);
-                vkd3d_free($$.sizes);
-                YYABORT;
-            }
-
-            if (!(new_array = hlsl_realloc(ctx, $$.sizes, ($$.count + 1) * sizeof(*new_array))))
-            {
-                vkd3d_free($$.sizes);
-                YYABORT;
-            }
-            $$.sizes = new_array;
-            $$.sizes[$$.count++] = size;
-        }
-    | '[' ']' arrays
+    | array arrays
         {
             uint32_t *new_array;
 
-            $$ = $3;
+            $$ = $2;
 
             if (!(new_array = hlsl_realloc(ctx, $$.sizes, ($$.count + 1) * sizeof(*new_array))))
             {
@@ -5945,7 +5932,7 @@ arrays:
             }
 
             $$.sizes = new_array;
-            $$.sizes[$$.count++] = HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT;
+            $$.sizes[$$.count++] = $1;
         }
 
 var_modifiers:
