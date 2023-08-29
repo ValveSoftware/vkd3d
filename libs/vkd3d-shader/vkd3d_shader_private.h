@@ -188,6 +188,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK          = 9003,
     VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS           = 9004,
     VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT               = 9005,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE             = 9006,
 };
 
 enum vkd3d_shader_opcode
@@ -590,6 +591,7 @@ enum vkd3d_shader_src_modifier
     VKD3DSPSM_ABS = 11,
     VKD3DSPSM_ABSNEG = 12,
     VKD3DSPSM_NOT = 13,
+    VKD3DSPSM_COUNT,
 };
 
 #define VKD3DSP_WRITEMASK_0   0x1u /* .x r */

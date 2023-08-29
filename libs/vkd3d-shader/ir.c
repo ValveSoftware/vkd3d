@@ -1364,6 +1364,14 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         const struct vkd3d_shader_src_param *src)
 {
     vsir_validate_register(ctx, &src->reg);
+
+    if (src->swizzle & ~0x03030303u)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE, "Source has invalid swizzle %#x.",
+                src->swizzle);
+
+    if (src->modifiers >= VKD3DSPSM_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
+                src->modifiers);
 }
 
 static void vsir_validate_instruction(struct validation_context *ctx)
