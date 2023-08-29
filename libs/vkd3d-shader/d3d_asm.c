@@ -1264,7 +1264,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
 
     shader_dump_register(compiler, &param->reg, is_declaration);
 
-    if (write_mask)
+    if (write_mask && param->reg.dimension == VSIR_DIMENSION_VEC4)
     {
         static const char write_mask_chars[] = "xyzw";
 
