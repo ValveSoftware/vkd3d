@@ -465,6 +465,12 @@ static void shader_sm1_parse_src_param(uint32_t param, const struct vkd3d_shader
     src->reg.non_uniform = false;
     src->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
     src->reg.idx[0].rel_addr = rel_addr;
+    if (src->reg.type == VKD3DSPR_SAMPLER)
+        src->reg.dimension = VSIR_DIMENSION_NONE;
+    else if (src->reg.type == VKD3DSPR_DEPTHOUT)
+        src->reg.dimension = VSIR_DIMENSION_SCALAR;
+    else
+        src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle = swizzle_from_sm1((param & VKD3D_SM1_SWIZZLE_MASK) >> VKD3D_SM1_SWIZZLE_SHIFT);
     src->modifiers = (param & VKD3D_SM1_SRC_MODIFIER_MASK) >> VKD3D_SM1_SRC_MODIFIER_SHIFT;
 }
@@ -480,6 +486,12 @@ static void shader_sm1_parse_dst_param(uint32_t param, const struct vkd3d_shader
     dst->reg.non_uniform = false;
     dst->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
     dst->reg.idx[0].rel_addr = rel_addr;
+    if (dst->reg.type == VKD3DSPR_SAMPLER)
+        dst->reg.dimension = VSIR_DIMENSION_NONE;
+    else if (dst->reg.type == VKD3DSPR_DEPTHOUT)
+        dst->reg.dimension = VSIR_DIMENSION_SCALAR;
+    else
+        dst->reg.dimension = VSIR_DIMENSION_VEC4;
     dst->write_mask = (param & VKD3D_SM1_WRITEMASK_MASK) >> VKD3D_SM1_WRITEMASK_SHIFT;
     dst->modifiers = (param & VKD3D_SM1_DST_MODIFIER_MASK) >> VKD3D_SM1_DST_MODIFIER_SHIFT;
     dst->shift = (param & VKD3D_SM1_DSTSHIFT_MASK) >> VKD3D_SM1_DSTSHIFT_SHIFT;
