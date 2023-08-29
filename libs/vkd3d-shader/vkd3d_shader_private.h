@@ -751,7 +751,7 @@ struct vkd3d_shader_register
     } u;
 };
 
-void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
+void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count);
 
 struct vkd3d_shader_dst_param

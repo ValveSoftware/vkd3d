@@ -296,7 +296,7 @@ static enum vkd3d_result flattener_flatten_phases(struct hull_flattener *normali
     return VKD3D_OK;
 }
 
-void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
+void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count)
 {
     reg->type = reg_type;
@@ -372,7 +372,7 @@ static struct vkd3d_shader_src_param *instruction_array_create_outpointid_param(
     if (!(rel_addr = shader_src_param_allocator_get(&instructions->src_params, 1)))
         return NULL;
 
-    shader_register_init(&rel_addr->reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT, 0);
+    vsir_register_init(&rel_addr->reg, VKD3DSPR_OUTPOINTID, VKD3D_DATA_UINT, 0);
     rel_addr->swizzle = 0;
     rel_addr->modifiers = 0;
 
@@ -402,7 +402,7 @@ static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param, const
     param->write_mask = e->mask;
     param->modifiers = 0;
     param->shift = 0;
-    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
+    vsir_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(e->component_type), idx_count);
 }
 
 static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_point_normaliser *normaliser,

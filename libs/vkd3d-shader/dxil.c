@@ -1590,7 +1590,7 @@ static struct vkd3d_shader_dst_param *instruction_dst_params_alloc(struct vkd3d_
 static void register_init_with_id(struct vkd3d_shader_register *reg,
         enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int id)
 {
-    shader_register_init(reg, reg_type, data_type, 1);
+    vsir_register_init(reg, reg_type, data_type, 1);
     reg->idx[0].offset = id;
 }
 
@@ -2119,7 +2119,7 @@ static void dst_param_io_init(struct vkd3d_shader_dst_param *param,
     param->shift = 0;
     /* DXIL types do not have signedness. Load signed elements as unsigned. */
     component_type = e->component_type == VKD3D_SHADER_COMPONENT_INT ? VKD3D_SHADER_COMPONENT_UINT : e->component_type;
-    shader_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(component_type), 0);
+    vsir_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(component_type), 0);
 }
 
 static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shader_signature *s,
@@ -2396,7 +2396,7 @@ static void sm6_parser_emit_unhandled(struct sm6_parser *sm6, struct vkd3d_shade
         return;
 
     type = sm6_type_get_scalar_type(dst->type, 0);
-    shader_register_init(&dst->u.reg, VKD3DSPR_UNDEF, vkd3d_data_type_from_sm6_type(type), 0);
+    vsir_register_init(&dst->u.reg, VKD3DSPR_UNDEF, vkd3d_data_type_from_sm6_type(type), 0);
     /* dst->is_undefined is not set here because it flags only explicitly undefined values. */
 }
 
