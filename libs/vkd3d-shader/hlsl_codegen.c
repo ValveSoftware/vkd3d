@@ -3838,7 +3838,7 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
                     else
                     {
                         var->regs[r].allocated = true;
-                        var->regs[r].id = var->reg_reservation.reg_index;
+                        var->regs[r].index = var->reg_reservation.reg_index;
                         TRACE("Allocated reserved %s to %c%u-%c%u.\n", var->name, var->reg_reservation.reg_type,
                                 var->reg_reservation.reg_index, var->reg_reservation.reg_type,
                                 var->reg_reservation.reg_index + var->regs[r].allocation_size);
@@ -4847,8 +4847,8 @@ void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx)
 static void allocate_buffers(struct hlsl_ctx *ctx)
 {
     struct hlsl_buffer *buffer;
+    uint32_t index = 0, id = 0;
     struct hlsl_ir_var *var;
-    uint32_t index = 0;
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -4881,7 +4881,8 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
                             "Buffer %s is already bound to cb%u.", reserved_buffer->name, buffer->reservation.reg_index);
                 }
 
-                buffer->reg.id = buffer->reservation.reg_index;
+                buffer->reg.index = buffer->reservation.reg_index;
+                buffer->reg.id = id++;
                 buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
                 TRACE("Allocated reserved %s to cb%u.\n", buffer->name, index);
@@ -4891,7 +4892,8 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
                 while (get_reserved_buffer(ctx, index))
                     ++index;
 
-                buffer->reg.id = index;
+                buffer->reg.index = index;
+                buffer->reg.id = id++;
                 buffer->reg.allocation_size = 1;
                 buffer->reg.allocated = true;
                 TRACE("Allocated %s to cb%u.\n", buffer->name, index);
@@ -4931,7 +4933,7 @@ static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum
         }
         else if (var->regs[regset].allocated)
         {
-            start = var->regs[regset].id;
+            start = var->regs[regset].index;
             count = var->regs[regset].allocation_size;
         }
         else
@@ -4948,8 +4950,8 @@ static const struct hlsl_ir_var *get_allocated_object(struct hlsl_ctx *ctx, enum
 static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
 {
     char regset_name = get_regset_name(regset);
+    uint32_t min_index = 0, id = 0;
     struct hlsl_ir_var *var;
-    uint32_t min_index = 0;
 
     if (regset == HLSL_REGSET_UAVS)
     {
@@ -4974,18 +4976,18 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
             const struct hlsl_ir_var *reserved_object, *last_reported = NULL;
             unsigned int index, i;
 
-            if (var->regs[regset].id < min_index)
+            if (var->regs[regset].index < min_index)
             {
                 assert(regset == HLSL_REGSET_UAVS);
                 hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_OVERLAPPING_RESERVATIONS,
                         "UAV index (%u) must be higher than the maximum render target index (%u).",
-                        var->regs[regset].id, min_index - 1);
+                        var->regs[regset].index, min_index - 1);
                 continue;
             }
 
             for (i = 0; i < count; ++i)
             {
-                index = var->regs[regset].id + i;
+                index = var->regs[regset].index + i;
 
                 /* get_allocated_object() may return "var" itself, but we
                  * actually want that, otherwise we'll end up reporting the
@@ -5001,6 +5003,8 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
                     last_reported = reserved_object;
                 }
             }
+
+            var->regs[regset].id = id++;
         }
         else
         {
@@ -5017,7 +5021,8 @@ static void allocate_objects(struct hlsl_ctx *ctx, enum hlsl_regset regset)
             }
             index -= count;
 
-            var->regs[regset].id = index;
+            var->regs[regset].index = index;
+            var->regs[regset].id = id++;
             var->regs[regset].allocated = true;
             TRACE("Allocated variable %s to %c%u-%c%u.\n", var->name, regset_name, index, regset_name,
                     index + count);
@@ -5200,6 +5205,7 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     assert(deref->data_type);
     assert(hlsl_is_numeric_type(deref->data_type));
 
+    ret.index += offset / 4;
     ret.id += offset / 4;
 
     ret.writemask = 0xf & (0xf << (offset % 4));

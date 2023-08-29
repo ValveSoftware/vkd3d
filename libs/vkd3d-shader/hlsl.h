@@ -259,7 +259,10 @@ struct hlsl_struct_field
  *   struct. */
 struct hlsl_reg
 {
-    /* Index of the first register allocated. */
+    /* Register index used for binding declarations.
+     * Unused for temporary, varying, etc. registers. */
+    uint32_t index;
+    /* Unique ID. */
     uint32_t id;
     /* Number of registers to be allocated.
      * Unlike the variable's type's regsize, it is not expressed in register components, but rather

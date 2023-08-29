@@ -2238,7 +2238,7 @@ static void write_sm1_sampler_dcls(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
                     continue;
                 }
 
-                reg_id = var->regs[HLSL_REGSET_SAMPLERS].id + i;
+                reg_id = var->regs[HLSL_REGSET_SAMPLERS].index + i;
                 write_sm1_sampler_dcl(ctx, buffer, reg_id, sampler_dim);
             }
         }
@@ -2543,7 +2543,7 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
     struct sm1_instruction sm1_instr;
 
     sampler_offset = hlsl_offset_from_deref_safe(ctx, &load->resource);
-    reg_id = load->resource.var->regs[HLSL_REGSET_SAMPLERS].id + sampler_offset;
+    reg_id = load->resource.var->regs[HLSL_REGSET_SAMPLERS].index + sampler_offset;
 
     sm1_instr = (struct sm1_instruction)
     {
