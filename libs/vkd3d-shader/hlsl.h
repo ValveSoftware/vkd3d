@@ -259,8 +259,18 @@ struct hlsl_struct_field
  *   struct. */
 struct hlsl_reg
 {
-    /* Index of the first register allocated. */
+    /* Register number of the first register allocated. */
     uint32_t id;
+    /* For descriptors (buffer, texture, sampler, UAV) this is the base binding
+     * index of the descriptor.
+     * For 5.1 and above descriptors have space and may be arrayed, in which
+     * case the array shares a single register ID but has a range of register
+     * indices, and "id" and "index" are as a rule not equal.
+     * For versions below 5.1, the register number for descriptors is the same
+     * as its external binding index, so only "index" is used, and "id" is
+     * ignored.
+     * For numeric registers "index" is not used. */
+    uint32_t index;
     /* Number of registers to be allocated.
      * Unlike the variable's type's regsize, it is not expressed in register components, but rather
      *  in whole registers, and may depend on which components are used within the shader. */
