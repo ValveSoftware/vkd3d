@@ -3150,7 +3150,7 @@ struct extern_resource
     bool is_user_packed;
 
     enum hlsl_regset regset;
-    unsigned int id, index, bind_count;
+    unsigned int id, space, index, bind_count;
 };
 
 static int sm4_compare_extern_resources(const void *a, const void *b)
@@ -3246,6 +3246,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
                     extern_resources[*count].regset = regset;
                     extern_resources[*count].id = var->regs[regset].id;
+                    extern_resources[*count].space = var->regs[regset].space;
                     extern_resources[*count].index = var->regs[regset].index + regset_offset;
                     extern_resources[*count].bind_count = 1;
 
@@ -3284,6 +3285,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
             extern_resources[*count].regset = regset;
             extern_resources[*count].id = var->regs[regset].id;
+            extern_resources[*count].space = var->regs[regset].space;
             extern_resources[*count].index = var->regs[regset].index;
             extern_resources[*count].bind_count = var->bind_count[regset];
 
@@ -4064,7 +4066,8 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
         instr.srcs[0].reg.idx_count = 3;
 
         instr.idx[0] = size;
-        instr.idx_count = 1;
+        instr.idx[1] = cbuffer->reg.space;
+        instr.idx_count = 2;
     }
     else
     {
@@ -4107,6 +4110,9 @@ static void write_sm4_dcl_samplers(const struct tpf_writer *tpf, const struct ex
             instr.dsts[0].reg.idx[1].offset = resource->index;
             instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
             instr.dsts[0].reg.idx_count = 3;
+
+            instr.idx[0] = resource->space;
+            instr.idx_count = 1;
         }
         else
         {
@@ -4152,6 +4158,9 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             instr.dsts[0].reg.idx[1].offset = resource->index;
             instr.dsts[0].reg.idx[2].offset = resource->index; /* FIXME: array end */
             instr.dsts[0].reg.idx_count = 3;
+
+            instr.idx[1] = resource->space;
+            instr.idx_count = 2;
         }
         else
         {
