@@ -271,6 +271,8 @@ struct hlsl_reg
      * ignored.
      * For numeric registers "index" is not used. */
     uint32_t index;
+    /* Register space of a descriptor. Not used for numeric registers. */
+    uint32_t space;
     /* Number of registers to be allocated.
      * Unlike the variable's type's regsize, it is not expressed in register components, but rather
      *  in whole registers, and may depend on which components are used within the shader. */
