@@ -137,3 +137,32 @@ float4 main() : sv_target
 todo(sm<6) draw quad
 if(sm>=6) probe all rgba (2, 2, 2, 99)
 if(sm<6)  probe all rgba (1, 1, 1, 99)
+
+
+% Test conflicts.
+
+[pixel shader fail]
+Texture2D t : register(t1, space1);
+Texture2D t2 : register(t1, space1);
+
+float4 main() : sv_target
+{
+    return t.Load(0) + t2.Load(0);
+}
+
+[pixel shader fail]
+
+cbuffer a : register(b1, space1)
+{
+    float4 f;
+}
+
+cbuffer a : register(b1, space1)
+{
+    float4 g;
+}
+
+float4 main() : sv_target
+{
+    return f + g;
+}
