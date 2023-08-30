@@ -1855,15 +1855,10 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
 {
     struct vkd3d_shader_instruction *ins;
     const struct dxil_record *record;
+    bool ret_found, is_terminator;
     struct sm6_block *code_block;
     struct sm6_value *dst;
     size_t i, block_idx;
-    bool ret_found;
-    enum
-    {
-        RESULT_VALUE,
-        RESULT_TERMINATE,
-    } result_type;
 
     if (sm6->function_count)
     {
@@ -1934,14 +1929,14 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         dst = sm6_parser_get_current_value(sm6);
         dst->type = NULL;
         dst->value_type = VALUE_TYPE_REG;
-        result_type = RESULT_VALUE;
+        is_terminator = false;
 
         record = block->records[i];
         switch (record->code)
         {
             case FUNC_CODE_INST_RET:
                 sm6_parser_emit_ret(sm6, record, code_block, ins);
-                result_type = RESULT_TERMINATE;
+                is_terminator = true;
                 ret_found = true;
                 break;
             default:
@@ -1949,7 +1944,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 return VKD3D_ERROR_INVALID_SHADER;
         }
 
-        if (result_type == RESULT_TERMINATE)
+        if (is_terminator)
         {
             ++block_idx;
             code_block = (block_idx < function->block_count) ? function->blocks[block_idx] : NULL;
