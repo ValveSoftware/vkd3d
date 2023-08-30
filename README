@@ -82,3 +82,14 @@ commas or semicolons.
    conditions in tests.
 
  * VKD3D_TEST_BUG - set to 0 to disable bug_if() conditions in tests.
+
+================
+Developing vkd3d
+================
+
+Development of vkd3d happens on the Wine GitLab instance
+(https://gitlab.winehq.org/wine/vkd3d/). Contributors are encouraged
+to submit their patches using the merge request tool.
+
+Each merge request is automatically tested with the GitLab CI
+system. See gitlab/README in the Git tree for more details.

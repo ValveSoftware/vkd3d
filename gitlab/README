@@ -1,0 +1,42 @@
+=====================
+vkd3d testing scripts
+=====================
+
+These scripts are used by the GitLab CI feature to automatically run
+the vkd3d tests on each merge request.
+
+The CI target build-image, in the file image.yml, builds a Docker
+image based on Debian bookworm with all the packages required for
+testing, and uploads it to the GitLab container registry. The Docker
+script is in the file image.docker.
+
+The file build.yml contains the actual testing targets. Currently
+vkd3d is tested on Linux x86-64, with two different Vulkan drivers
+(both from Mesa): llvmpipe (a software implementation) and RADV (a
+hardware implementation backed by an AMD GPU). The testing logs are
+available as CI artifacts.
+
+Some custom runner configuration is required in order to run the tests
+on an AMD GPU. Specifically, a runner tagged with `amd-gpu' must be
+available with the following features:
+
+ * of course a sufficiently recent AMD GPU must be available to the
+   host;
+
+ * the host kernel must have the appropriate driver and firmware
+   installed;
+
+ * the runner must forward the DRI nodes to the guest; this can be
+   configured by adding the line
+
+     devices = ["/dev/dri"]
+
+   to the relevant [runners.docker] section in the config.toml file;
+
+ * the DRI render nodes must be readable and writable by GID 800,
+   either because they belong to that group (e.g. because the group
+   `render', which typically owns those files, has GID 800) or via a
+   FS ACL; such stipulation is needed because in Debian group `render'
+   is created dynamically, therefore has no predictable GID: the use
+   of a fixed GID enables the guest system to be set up so that the
+   user running the tests can access the render nodes.
