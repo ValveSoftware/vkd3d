@@ -296,6 +296,7 @@ struct sm6_parser
     size_t global_symbol_count;
 
     struct vkd3d_shader_dst_param *output_params;
+    struct vkd3d_shader_dst_param *input_params;
 
     struct sm6_function *functions;
     size_t function_count;
@@ -2112,6 +2113,8 @@ static void sm6_parser_emit_signature(struct sm6_parser *sm6, const struct shade
             param = &ins->declaration.dst;
         }
 
+        /* TODO: set the interpolation mode when signatures are loaded from DXIL metadata. */
+        ins->flags = (handler_idx == VKD3DSIH_DCL_INPUT_PS) ? VKD3DSIM_LINEAR_NOPERSPECTIVE : 0;
         *param = params[i];
     }
 }
@@ -2123,9 +2126,22 @@ static void sm6_parser_init_output_signature(struct sm6_parser *sm6, const struc
             sm6->output_params);
 }
 
+static void sm6_parser_init_input_signature(struct sm6_parser *sm6, const struct shader_signature *input_signature)
+{
+    sm6_parser_init_signature(sm6, input_signature, VKD3DSPR_INPUT, sm6->input_params);
+}
+
 static void sm6_parser_emit_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
 {
     sm6_parser_emit_signature(sm6, output_signature, VKD3DSIH_DCL_OUTPUT, VKD3DSIH_DCL_OUTPUT_SIV, sm6->output_params);
+}
+
+static void sm6_parser_emit_input_signature(struct sm6_parser *sm6, const struct shader_signature *input_signature)
+{
+    sm6_parser_emit_signature(sm6, input_signature,
+            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSIH_DCL_INPUT_PS : VKD3DSIH_DCL_INPUT,
+            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSIH_DCL_INPUT_PS_SIV : VKD3DSIH_DCL_INPUT_SIV,
+            sm6->input_params);
 }
 
 static const struct sm6_value *sm6_parser_next_function_definition(struct sm6_parser *sm6)
@@ -2683,6 +2699,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         const char *source_name, struct vkd3d_shader_message_context *message_context)
 {
     const struct shader_signature *output_signature = &sm6->p.shader_desc.output_signature;
+    const struct shader_signature *input_signature = &sm6->p.shader_desc.input_signature;
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t version_token, dxil_version, token_count, magic;
     unsigned int chunk_offset, chunk_size;
@@ -2838,11 +2855,12 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
-    if (!(sm6->output_params = shader_parser_get_dst_params(&sm6->p, output_signature->element_count)))
+    if (!(sm6->output_params = shader_parser_get_dst_params(&sm6->p, output_signature->element_count))
+            || !(sm6->input_params = shader_parser_get_dst_params(&sm6->p, input_signature->element_count)))
     {
-        ERR("Failed to allocate output parameters.\n");
+        ERR("Failed to allocate input/output parameters.\n");
         vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
-                "Out of memory allocating output parameters.");
+                "Out of memory allocating input/output parameters.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
@@ -2877,6 +2895,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
 
     sm6_parser_init_output_signature(sm6, output_signature);
+    sm6_parser_init_input_signature(sm6, input_signature);
 
     if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
     {
@@ -2889,13 +2908,14 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
-    if (!sm6_parser_require_space(sm6, output_signature->element_count))
+    if (!sm6_parser_require_space(sm6, output_signature->element_count + input_signature->element_count))
     {
         vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory emitting shader signature declarations.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
     sm6_parser_emit_output_signature(sm6, output_signature);
+    sm6_parser_emit_input_signature(sm6, input_signature);
 
     for (i = 0; i < sm6->function_count; ++i)
     {
