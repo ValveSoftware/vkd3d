@@ -1,0 +1,19 @@
+#!/bin/bash
+
+echo "Building $(git log -1)"
+echo "---"
+
+COMMIT=$(git rev-parse --short HEAD)
+
+set -Eeuxo pipefail
+
+./autogen.sh
+rm -fr build
+mkdir build
+cd build
+../configure && make -j$(sysctl -n hw.ncpu) && make -j$(sysctl -n hw.ncpu) crosstest && make -j$(sysctl -n hw.ncpu) check || touch ../pipeline_failed
+
+mkdir -p ../artifacts/$COMMIT
+rsync -Rr tests/*.exe test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT
+
+git reset --hard
