@@ -452,7 +452,7 @@ static int isgn_handler(const struct vkd3d_shader_dxbc_section_desc *section,
 {
     struct shader_signature *is = ctx;
 
-    if (section->tag != TAG_ISGN)
+    if (section->tag != TAG_ISGN && section->tag != TAG_ISG1)
         return VKD3D_OK;
 
     if (is->elements)
