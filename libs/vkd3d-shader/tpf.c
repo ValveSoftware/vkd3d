@@ -535,6 +535,20 @@ static enum vsir_dimension vsir_dimension_from_sm4_dimension(enum vkd3d_sm4_dime
     }
 }
 
+static enum vkd3d_sm4_dimension sm4_dimension_from_vsir_dimension(enum vsir_dimension dim)
+{
+    switch (dim)
+    {
+        case VSIR_DIMENSION_NONE:
+            return VKD3D_SM4_DIMENSION_NONE;
+        case VSIR_DIMENSION_SCALAR:
+            return VKD3D_SM4_DIMENSION_SCALAR;
+        case VSIR_DIMENSION_VEC4:
+            return VKD3D_SM4_DIMENSION_VEC4;
+    }
+    vkd3d_unreachable();
+}
+
 enum vkd3d_sm4_resource_type
 {
     VKD3D_SM4_RESOURCE_BUFFER             = 0x1,
@@ -3594,7 +3608,7 @@ struct sm4_register
     enum vkd3d_shader_register_type type;
     struct vkd3d_shader_register_index idx[2];
     unsigned int idx_count;
-    enum vkd3d_sm4_dimension dim;
+    enum vsir_dimension dimension;
     uint32_t immconst_uint[4];
     unsigned int mod;
 };
@@ -3641,7 +3655,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         if (regset == HLSL_REGSET_TEXTURES)
         {
             reg->type = VKD3DSPR_RESOURCE;
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->regs[HLSL_REGSET_TEXTURES].id;
@@ -3653,7 +3667,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         else if (regset == HLSL_REGSET_UAVS)
         {
             reg->type = VKD3DSPR_UAV;
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->regs[HLSL_REGSET_UAVS].id;
@@ -3665,7 +3679,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
         else if (regset == HLSL_REGSET_SAMPLERS)
         {
             reg->type = VKD3DSPR_SAMPLER;
-            reg->dim = VKD3D_SM4_DIMENSION_NONE;
+            reg->dimension = VSIR_DIMENSION_NONE;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->idx[0].offset = var->regs[HLSL_REGSET_SAMPLERS].id;
@@ -3680,7 +3694,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
             assert(data_type->class <= HLSL_CLASS_VECTOR);
             reg->type = VKD3DSPR_CONSTBUFFER;
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = var->buffer->reg.id;
@@ -3703,7 +3717,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
                 reg->idx_count = 1;
             }
 
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             *writemask = ((1u << data_type->dimx) - 1) << (offset % 4);
         }
         else
@@ -3712,7 +3726,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3DSPR_INPUT;
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             if (swizzle_type)
                 *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
@@ -3735,9 +3749,9 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
             }
 
             if (reg->type == VKD3DSPR_DEPTHOUT)
-                reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
+                reg->dimension = VSIR_DIMENSION_SCALAR;
             else
-                reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+                reg->dimension = VSIR_DIMENSION_VEC4;
             *writemask = ((1u << data_type->dimx) - 1) << (offset % 4);
         }
         else
@@ -3746,7 +3760,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
             assert(hlsl_reg.allocated);
             reg->type = VKD3DSPR_OUTPUT;
-            reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+            reg->dimension = VSIR_DIMENSION_VEC4;
             reg->idx[0].offset = hlsl_reg.id;
             reg->idx_count = 1;
             *writemask = hlsl_reg.writemask;
@@ -3758,7 +3772,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *r
 
         assert(hlsl_reg.allocated);
         reg->type = VKD3DSPR_TEMP;
-        reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+        reg->dimension = VSIR_DIMENSION_VEC4;
         if (swizzle_type)
             *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
         reg->idx[0].offset = hlsl_reg.id;
@@ -3782,7 +3796,7 @@ static void sm4_register_from_node(struct sm4_register *reg, unsigned int *write
 {
     assert(instr->reg.allocated);
     reg->type = VKD3DSPR_TEMP;
-    reg->dim = VKD3D_SM4_DIMENSION_VEC4;
+    reg->dimension = VSIR_DIMENSION_VEC4;
     *swizzle_type = VKD3D_SM4_SWIZZLE_VEC4;
     reg->idx[0].offset = instr->reg.id;
     reg->idx_count = 1;
@@ -3803,14 +3817,14 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
     src->reg.type = VKD3DSPR_IMMCONST;
     if (width == 1)
     {
-        src->reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+        src->reg.dimension = VSIR_DIMENSION_SCALAR;
         src->reg.immconst_uint[0] = value->u[0].u;
     }
     else
     {
         unsigned int i, j = 0;
 
-        src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+        src->reg.dimension = VSIR_DIMENSION_VEC4;
         for (i = 0; i < 4; ++i)
         {
             if ((map_writemask & (1u << i)) && (j < width))
@@ -3858,7 +3872,7 @@ static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct sm
         sm4_reg_type = register_type_info->sm4_type;
     }
 
-    reg_dim = dst->reg.dim;
+    reg_dim = sm4_dimension_from_vsir_dimension(dst->reg.dimension);
 
     token |= sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT;
     token |= dst->reg.idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
@@ -3893,7 +3907,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
         sm4_reg_type = register_type_info->sm4_type;
     }
 
-    reg_dim = src->reg.dim;
+    reg_dim = sm4_dimension_from_vsir_dimension(src->reg.dimension);
 
     token |= sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT;
     token |= src->reg.idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
@@ -3933,7 +3947,7 @@ static uint32_t sm4_register_order(const struct sm4_register *reg)
 {
     uint32_t order = 1;
     if (reg->type == VKD3DSPR_IMMCONST)
-        order += reg->dim == VKD3D_SM4_DIMENSION_VEC4 ? 4 : 1;
+        order += reg->dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
     order += reg->idx_count;
     if (reg->mod)
         ++order;
@@ -4015,7 +4029,7 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
     {
         .opcode = VKD3D_SM4_OP_DCL_CONSTANT_BUFFER,
 
-        .srcs[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
+        .srcs[0].reg.dimension = VSIR_DIMENSION_VEC4,
         .srcs[0].reg.type = VKD3DSPR_CONSTBUFFER,
         .srcs[0].reg.idx[0].offset = cbuffer->reg.id,
         .srcs[0].reg.idx[1].offset = (cbuffer->used_size + 3) / 4,
@@ -4123,7 +4137,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
 
     struct sm4_instruction instr =
     {
-        .dsts[0].reg.dim = VKD3D_SM4_DIMENSION_VEC4,
+        .dsts[0].reg.dimension = VSIR_DIMENSION_VEC4,
         .dst_count = 1,
     };
 
@@ -4149,7 +4163,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
     }
 
     if (instr.dsts[0].reg.type == VKD3DSPR_DEPTHOUT)
-        instr.dsts[0].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+        instr.dsts[0].reg.dimension = VSIR_DIMENSION_SCALAR;
 
     hlsl_sm4_usage_from_semantic(tpf->ctx, &var->semantic, output, &usage);
     if (usage == ~0u)
@@ -4282,7 +4296,7 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     assert(1 - dst_idx >= 0);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
-    instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
@@ -4342,7 +4356,7 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
     assert(1 - dst_idx >= 0);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
-    instr.dsts[1 - dst_idx].reg.dim = VKD3D_SM4_DIMENSION_NONE;
+    instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
     instr.dst_count = 2;
 
@@ -4434,7 +4448,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
             memset(&instr.srcs[2], 0, sizeof(instr.srcs[2]));
             instr.srcs[2].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->type = VKD3DSPR_IMMCONST;
-            reg->dim = VKD3D_SM4_DIMENSION_SCALAR;
+            reg->dimension = VSIR_DIMENSION_SCALAR;
             reg->immconst_uint[0] = index->value.u[0].u;
         }
         else if (tpf->ctx->profile->major_version == 4 && tpf->ctx->profile->minor_version == 0)
@@ -4596,7 +4610,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     sm4_src_from_node(&instr.srcs[0], arg, instr.dsts[0].writemask);
     instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
     instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
-    instr.srcs[1].reg.dim = VKD3D_SM4_DIMENSION_SCALAR;
+    instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
     instr.srcs[1].reg.immconst_uint[0] = mask;
     instr.src_count = 2;
 
@@ -5331,7 +5345,7 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
 
     src = &instr.srcs[instr.src_count++];
     sm4_src_from_deref(tpf->ctx, src, sampler, VKD3DSP_WRITEMASK_ALL);
-    src->reg.dim = VKD3D_SM4_DIMENSION_VEC4;
+    src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle_type = VKD3D_SM4_SWIZZLE_SCALAR;
     src->swizzle = swizzle;
 
