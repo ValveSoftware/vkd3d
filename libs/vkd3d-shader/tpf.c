@@ -3628,7 +3628,7 @@ struct sm4_instruction
         struct vkd3d_shader_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
         DWORD swizzle;
-        unsigned int mod;
+        enum vkd3d_shader_src_modifier modifiers;
     } srcs[5];
     unsigned int src_count;
 
@@ -3897,7 +3897,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
     const struct vkd3d_sm4_register_type_info *register_type_info;
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
     uint32_t sm4_reg_type, reg_dim;
-    uint32_t token = 0;
+    uint32_t token = 0, mod_token = 0;
     unsigned int j;
 
     register_type_info = get_info_from_vkd3d_register_type(&tpf->lookup, src->reg.type);
@@ -3921,13 +3921,44 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
         token |= (uint32_t)src->swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
         token |= swizzle_to_sm4(src->swizzle) << VKD3D_SM4_SWIZZLE_SHIFT;
     }
-    if (src->mod)
-        token |= VKD3D_SM4_EXTENDED_OPERAND;
-    put_u32(buffer, token);
 
-    if (src->mod)
-        put_u32(buffer, (src->mod << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
-                | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER);
+    switch (src->modifiers)
+    {
+        case VKD3DSPSM_NONE:
+            mod_token = VKD3D_SM4_REGISTER_MODIFIER_NONE;
+            break;
+
+        case VKD3DSPSM_ABS:
+            mod_token = (VKD3D_SM4_REGISTER_MODIFIER_ABS << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+                    | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER;
+            break;
+
+        case VKD3DSPSM_NEG:
+            mod_token = (VKD3D_SM4_REGISTER_MODIFIER_NEGATE << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+                    | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER;
+            break;
+
+        case VKD3DSPSM_ABSNEG:
+            mod_token = (VKD3D_SM4_REGISTER_MODIFIER_ABS_NEGATE << VKD3D_SM4_REGISTER_MODIFIER_SHIFT)
+                    | VKD3D_SM4_EXTENDED_OPERAND_MODIFIER;
+            break;
+
+        default:
+            ERR("Unhandled register modifier %#x.\n", src->modifiers);
+            vkd3d_unreachable();
+            break;
+    }
+
+    if (src->modifiers)
+    {
+        token |= VKD3D_SM4_EXTENDED_OPERAND;
+        put_u32(buffer, token);
+        put_u32(buffer, mod_token);
+    }
+    else
+    {
+        put_u32(buffer, token);
+    }
 
     for (j = 0; j < src->reg.idx_count; ++j)
     {
@@ -3962,7 +3993,7 @@ static uint32_t sm4_src_register_order(const struct sm4_src_register *src)
     if (src->reg.type == VKD3DSPR_IMMCONST)
         order += src->reg.dimension == VSIR_DIMENSION_VEC4 ? 4 : 1;
     order += src->reg.idx_count;
-    if (src->mod)
+    if (src->modifiers)
         ++order;
     return order;
 }
@@ -4280,7 +4311,7 @@ static void write_sm4_ret(const struct tpf_writer *tpf)
 }
 
 static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, unsigned int src_mod)
+        const struct hlsl_ir_node *dst, const struct hlsl_ir_node *src, enum vkd3d_shader_src_modifier src_mod)
 {
     struct sm4_instruction instr;
 
@@ -4291,7 +4322,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
     instr.dst_count = 1;
 
     sm4_src_from_node(&instr.srcs[0], src, instr.dsts[0].write_mask);
-    instr.srcs[0].mod = src_mod;
+    instr.srcs[0].modifiers = src_mod;
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4776,7 +4807,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_ABS);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_ABS);
                     break;
 
                 default:
@@ -4857,7 +4888,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             switch (dst_type->base_type)
             {
                 case HLSL_TYPE_FLOAT:
-                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3D_SM4_REGISTER_MODIFIER_NEGATE);
+                    write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_NEG);
                     break;
 
                 case HLSL_TYPE_INT:
