@@ -11,10 +11,10 @@ testing, and uploads it to the GitLab container registry. The Docker
 script is in the file image.docker.
 
 The file build.yml contains the actual testing targets. Currently
-vkd3d is tested on Linux x86-64, with two different Vulkan drivers
-(both from Mesa): llvmpipe (a software implementation) and RADV (a
-hardware implementation backed by an AMD GPU). The testing logs are
-available as CI artifacts.
+vkd3d is tested on Linux, on x86-64 and i386, each architecture with
+two different Vulkan drivers (both from Mesa): llvmpipe (a software
+implementation) and RADV (a hardware implementation backed by an AMD
+GPU). The testing logs are available as CI artifacts.
 
 Some custom runner configuration is required in order to run the tests
 on an AMD GPU. Specifically, a runner tagged with `amd-gpu' must be

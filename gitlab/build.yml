@@ -25,15 +25,30 @@
     paths:
       - artifacts
 
-build-radv:
+build-radv-64:
   extends: .build
   tags:
     - amd-gpu
   variables:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
 
-build-llvmpipe:
+build-llvmpipe-64:
   extends: .build
   allow_failure: true
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
+
+build-radv-32:
+  extends: .build
+  tags:
+    - amd-gpu
+  variables:
+    VK_LOADER_DRIVERS_SELECT: 'radeon_*'
+    CC: 'gcc -m32'
+
+build-llvmpipe-32:
+  extends: .build
+  allow_failure: true
+  variables:
+    VK_LOADER_DRIVERS_SELECT: 'lvp_*'
+    CC: 'gcc -m32'
