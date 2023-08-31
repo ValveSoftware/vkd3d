@@ -3603,18 +3603,6 @@ static uint32_t sm4_encode_instruction_modifier(const struct sm4_instruction_mod
     return word;
 }
 
-struct sm4_register
-{
-    enum vkd3d_shader_register_type type;
-    struct vkd3d_shader_register_index idx[2];
-    unsigned int idx_count;
-    enum vsir_dimension dimension;
-    union
-    {
-        uint32_t immconst_uint[4];
-    } u;
-};
-
 struct sm4_instruction
 {
     enum vkd3d_sm4_opcode opcode;
@@ -3624,14 +3612,14 @@ struct sm4_instruction
 
     struct sm4_dst_register
     {
-        struct sm4_register reg;
+        struct vkd3d_shader_register reg;
         unsigned int writemask;
     } dsts[2];
     unsigned int dst_count;
 
     struct sm4_src_register
     {
-        struct sm4_register reg;
+        struct vkd3d_shader_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
         unsigned int swizzle;
         unsigned int mod;
@@ -3644,7 +3632,7 @@ struct sm4_instruction
     unsigned int idx_count;
 };
 
-static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct sm4_register *reg,
+static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
         unsigned int *writemask, enum vkd3d_sm4_swizzle_type *swizzle_type,
         const struct hlsl_deref *deref)
 {
@@ -3794,7 +3782,7 @@ static void sm4_src_from_deref(struct hlsl_ctx *ctx, struct sm4_src_register *sr
         src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
 }
 
-static void sm4_register_from_node(struct sm4_register *reg, unsigned int *writemask,
+static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned int *writemask,
         enum vkd3d_sm4_swizzle_type *swizzle_type, const struct hlsl_ir_node *instr)
 {
     assert(instr->reg.allocated);
@@ -4452,7 +4440,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
     {
         if (sample_index->type == HLSL_IR_CONSTANT)
         {
-            struct sm4_register *reg = &instr.srcs[2].reg;
+            struct vkd3d_shader_register *reg = &instr.srcs[2].reg;
             struct hlsl_ir_constant *index;
 
             index = hlsl_ir_constant(sample_index);
