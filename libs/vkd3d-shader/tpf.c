@@ -1954,6 +1954,16 @@ static uint32_t swizzle_from_sm4(uint32_t s)
     return vkd3d_shader_create_swizzle(s & 0x3, (s >> 2) & 0x3, (s >> 4) & 0x3, (s >> 6) & 0x3);
 }
 
+static uint32_t swizzle_to_sm4(uint32_t s)
+{
+    uint32_t ret = 0;
+    ret |= ((vkd3d_swizzle_get_component(s, 0)) & 0x3);
+    ret |= ((vkd3d_swizzle_get_component(s, 1)) & 0x3) << 2;
+    ret |= ((vkd3d_swizzle_get_component(s, 2)) & 0x3) << 4;
+    ret |= ((vkd3d_swizzle_get_component(s, 3)) & 0x3) << 6;
+    return ret;
+}
+
 static bool register_is_input_output(const struct vkd3d_shader_register *reg)
 {
     switch (reg->type)
@@ -3617,7 +3627,7 @@ struct sm4_instruction
     {
         struct vkd3d_shader_register reg;
         enum vkd3d_sm4_swizzle_type swizzle_type;
-        unsigned int swizzle;
+        DWORD swizzle;
         unsigned int mod;
     } srcs[5];
     unsigned int src_count;
@@ -3771,11 +3781,14 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
 static void sm4_src_from_deref(struct hlsl_ctx *ctx, struct sm4_src_register *src,
         const struct hlsl_deref *deref, unsigned int map_writemask)
 {
-    unsigned int writemask;
+    unsigned int writemask, hlsl_swizzle;
 
     sm4_register_from_deref(ctx, &src->reg, &writemask, &src->swizzle_type, deref);
     if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
-        src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
+    {
+        hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
+        src->swizzle = swizzle_from_sm4(hlsl_swizzle);
+    }
 }
 
 static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned int *writemask,
@@ -3800,6 +3813,7 @@ static void sm4_dst_from_node(struct vkd3d_shader_dst_param *dst, const struct h
 static void sm4_src_from_constant_value(struct sm4_src_register *src,
         const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
 {
+    src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     src->swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
     src->reg.type = VKD3DSPR_IMMCONST;
     if (width == 1)
@@ -3825,7 +3839,7 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
 static void sm4_src_from_node(struct sm4_src_register *src,
         const struct hlsl_ir_node *instr, unsigned int map_writemask)
 {
-    unsigned int writemask;
+    unsigned int writemask, hlsl_swizzle;
 
     if (instr->type == HLSL_IR_CONSTANT)
     {
@@ -3837,7 +3851,10 @@ static void sm4_src_from_node(struct sm4_src_register *src,
 
     sm4_register_from_node(&src->reg, &writemask, &src->swizzle_type, instr);
     if (src->swizzle_type == VKD3D_SM4_SWIZZLE_VEC4)
-        src->swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
+    {
+        hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
+        src->swizzle = swizzle_from_sm4(hlsl_swizzle);
+    }
 }
 
 static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vkd3d_shader_dst_param *dst)
@@ -3902,7 +3919,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
     if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
     {
         token |= (uint32_t)src->swizzle_type << VKD3D_SM4_SWIZZLE_TYPE_SHIFT;
-        token |= src->swizzle << VKD3D_SM4_SWIZZLE_SHIFT;
+        token |= swizzle_to_sm4(src->swizzle) << VKD3D_SM4_SWIZZLE_SHIFT;
     }
     if (src->mod)
         token |= VKD3D_SM4_EXTENDED_OPERAND;
@@ -4031,7 +4048,7 @@ static void write_sm4_dcl_constant_buffer(const struct tpf_writer *tpf, const st
         .srcs[0].reg.idx[1].offset = (cbuffer->used_size + 3) / 4,
         .srcs[0].reg.idx_count = 2,
         .srcs[0].swizzle_type = VKD3D_SM4_SWIZZLE_VEC4,
-        .srcs[0].swizzle = HLSL_SWIZZLE(X, Y, Z, W),
+        .srcs[0].swizzle = VKD3D_SHADER_NO_SWIZZLE,
         .src_count = 1,
     };
     write_sm4_instruction(tpf, &instr);
@@ -5307,8 +5324,8 @@ static void write_sm4_loop(const struct tpf_writer *tpf, const struct hlsl_ir_lo
 }
 
 static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
-        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,  const struct hlsl_ir_node *coords,
-        unsigned int swizzle, const struct hlsl_ir_node *texel_offset)
+        const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
+        const struct hlsl_ir_node *coords, DWORD swizzle, const struct hlsl_ir_node *texel_offset)
 {
     struct sm4_src_register *src;
     struct sm4_instruction instr;
@@ -5386,22 +5403,22 @@ static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct h
 
         case HLSL_RESOURCE_GATHER_RED:
             write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
-                    HLSL_SWIZZLE(X, X, X, X), texel_offset);
+                    VKD3D_SHADER_SWIZZLE(X, X, X, X), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_GREEN:
             write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
-                    HLSL_SWIZZLE(Y, Y, Y, Y), texel_offset);
+                    VKD3D_SHADER_SWIZZLE(Y, Y, Y, Y), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_BLUE:
             write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
-                    HLSL_SWIZZLE(Z, Z, Z, Z), texel_offset);
+                    VKD3D_SHADER_SWIZZLE(Z, Z, Z, Z), texel_offset);
             break;
 
         case HLSL_RESOURCE_GATHER_ALPHA:
             write_sm4_gather(tpf, &load->node, &load->resource, &load->sampler, coords,
-                    HLSL_SWIZZLE(W, W, W, W), texel_offset);
+                    VKD3D_SHADER_SWIZZLE(W, W, W, W), texel_offset);
             break;
 
         case HLSL_RESOURCE_SAMPLE_INFO:
@@ -5454,8 +5471,8 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
 
 static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir_swizzle *swizzle)
 {
+    unsigned int writemask, hlsl_swizzle;
     struct sm4_instruction instr;
-    unsigned int writemask;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
@@ -5464,8 +5481,9 @@ static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir
     instr.dst_count = 1;
 
     sm4_register_from_node(&instr.srcs[0].reg, &writemask, &instr.srcs[0].swizzle_type, swizzle->val.node);
-    instr.srcs[0].swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
+    hlsl_swizzle = hlsl_map_swizzle(hlsl_combine_swizzles(hlsl_swizzle_from_writemask(writemask),
             swizzle->swizzle, swizzle->node.data_type->dimx), instr.dsts[0].write_mask);
+    instr.srcs[0].swizzle = swizzle_from_sm4(hlsl_swizzle);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
