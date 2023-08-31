@@ -3423,6 +3423,20 @@ static bool intrinsic_step(struct hlsl_ctx *ctx,
     return !!add_implicit_conversion(ctx, params->instrs, ge, type, loc);
 }
 
+static bool intrinsic_tan(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg = params->args[0], *sin, *cos;
+
+    if (!(sin = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SIN, arg, loc)))
+        return false;
+
+    if (!(cos = add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_COS, arg, loc)))
+        return false;
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, sin, cos, loc);
+}
+
 static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *params,
         const struct vkd3d_shader_location *loc, const char *name, enum hlsl_sampler_dim dim)
 {
@@ -3697,6 +3711,7 @@ intrinsic_functions[] =
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
+    {"tan",                                 1, true,  intrinsic_tan},
     {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
     {"tex3D",                              -1, false, intrinsic_tex3D},
