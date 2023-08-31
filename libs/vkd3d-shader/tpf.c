@@ -3609,7 +3609,10 @@ struct sm4_register
     struct vkd3d_shader_register_index idx[2];
     unsigned int idx_count;
     enum vsir_dimension dimension;
-    uint32_t immconst_uint[4];
+    union
+    {
+        uint32_t immconst_uint[4];
+    } u;
     unsigned int mod;
 };
 
@@ -3818,7 +3821,7 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
     if (width == 1)
     {
         src->reg.dimension = VSIR_DIMENSION_SCALAR;
-        src->reg.immconst_uint[0] = value->u[0].u;
+        src->reg.u.immconst_uint[0] = value->u[0].u;
     }
     else
     {
@@ -3828,9 +3831,9 @@ static void sm4_src_from_constant_value(struct sm4_src_register *src,
         for (i = 0; i < 4; ++i)
         {
             if ((map_writemask & (1u << i)) && (j < width))
-                src->reg.immconst_uint[i] = value->u[j++].u;
+                src->reg.u.immconst_uint[i] = value->u[j++].u;
             else
-                src->reg.immconst_uint[i] = 0;
+                src->reg.u.immconst_uint[i] = 0;
         }
     }
 }
@@ -3933,12 +3936,12 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct sm
 
     if (src->reg.type == VKD3DSPR_IMMCONST)
     {
-        put_u32(buffer, src->reg.immconst_uint[0]);
+        put_u32(buffer, src->reg.u.immconst_uint[0]);
         if (reg_dim == VKD3D_SM4_DIMENSION_VEC4)
         {
-            put_u32(buffer, src->reg.immconst_uint[1]);
-            put_u32(buffer, src->reg.immconst_uint[2]);
-            put_u32(buffer, src->reg.immconst_uint[3]);
+            put_u32(buffer, src->reg.u.immconst_uint[1]);
+            put_u32(buffer, src->reg.u.immconst_uint[2]);
+            put_u32(buffer, src->reg.u.immconst_uint[3]);
         }
     }
 }
@@ -4449,7 +4452,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
             instr.srcs[2].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
             reg->type = VKD3DSPR_IMMCONST;
             reg->dimension = VSIR_DIMENSION_SCALAR;
-            reg->immconst_uint[0] = index->value.u[0].u;
+            reg->u.immconst_uint[0] = index->value.u[0].u;
         }
         else if (tpf->ctx->profile->major_version == 4 && tpf->ctx->profile->minor_version == 0)
         {
@@ -4611,7 +4614,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     instr.srcs[1].swizzle_type = VKD3D_SM4_SWIZZLE_NONE;
     instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
     instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
-    instr.srcs[1].reg.immconst_uint[0] = mask;
+    instr.srcs[1].reg.u.immconst_uint[0] = mask;
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
