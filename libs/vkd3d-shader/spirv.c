@@ -5564,7 +5564,7 @@ static uint32_t spirv_compiler_build_descriptor_variable(struct spirv_compiler *
 }
 
 static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register_range *range, unsigned int register_id, unsigned int size)
+        const struct vkd3d_shader_register_range *range, unsigned int register_id, unsigned int size_in_bytes)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t vec4_id, array_type_id, length_id, struct_id, var_id;
@@ -5572,6 +5572,7 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     struct vkd3d_push_constant_buffer_binding *push_cb;
     struct vkd3d_descriptor_variable_info var_info;
     struct vkd3d_symbol reg_symbol;
+    unsigned int size;
 
     struct vkd3d_shader_register reg =
     {
@@ -5580,18 +5581,19 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
         .idx_count = 1,
     };
 
+    size = size_in_bytes / (VKD3D_VEC4_SIZE * sizeof(uint32_t));
+
     if ((push_cb = spirv_compiler_find_push_constant_buffer(compiler, range)))
     {
         /* Push constant buffers are handled in
          * spirv_compiler_emit_push_constant_buffers().
          */
-        unsigned int cb_size_in_bytes = size * VKD3D_VEC4_SIZE * sizeof(uint32_t);
         push_cb->reg = reg;
         push_cb->size = size;
-        if (cb_size_in_bytes > push_cb->pc.size)
+        if (size_in_bytes > push_cb->pc.size)
         {
             WARN("Constant buffer size %u exceeds push constant size %u.\n",
-                    cb_size_in_bytes, push_cb->pc.size);
+                    size_in_bytes, push_cb->pc.size);
         }
         return;
     }
