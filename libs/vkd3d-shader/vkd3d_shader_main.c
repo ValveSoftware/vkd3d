@@ -705,7 +705,8 @@ static void vkd3d_shader_scan_add_uav_flag(const struct vkd3d_shader_scan_contex
 
     for (i = 0; i < context->scan_descriptor_info->descriptor_count; ++i)
     {
-        if (context->scan_descriptor_info->descriptors[i].register_id == range_id)
+        if (context->scan_descriptor_info->descriptors[i].type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV
+                && context->scan_descriptor_info->descriptors[i].register_id == range_id)
         {
             context->scan_descriptor_info->descriptors[i].flags |= flag;
             break;
