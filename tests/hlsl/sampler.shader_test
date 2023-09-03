@@ -60,3 +60,11 @@ float4 main() : sv_target
 {
     return texCUBE(s, float3(0.0, 0.0, 0.0));
 }
+
+[pixel shader]
+sampler1D s;
+
+float4 main() : sv_target
+{
+    return tex1D(s, 0.0);
+}

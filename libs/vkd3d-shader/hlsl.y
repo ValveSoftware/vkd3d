@@ -3466,6 +3466,12 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     return true;
 }
 
+static bool intrinsic_tex1D(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex1D", HLSL_SAMPLER_DIM_1D);
+}
+
 static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3652,6 +3658,7 @@ intrinsic_functions[] =
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
+    {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
     {"tex3D",                              -1, false, intrinsic_tex3D},
     {"texCUBE",                            -1, false, intrinsic_texCUBE},
