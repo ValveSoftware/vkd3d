@@ -472,18 +472,14 @@ static void shader_sm1_parse_src_param(uint32_t param, const struct vkd3d_shader
 static void shader_sm1_parse_dst_param(uint32_t param, const struct vkd3d_shader_src_param *rel_addr,
         struct vkd3d_shader_dst_param *dst)
 {
-    dst->reg.type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
+    enum vkd3d_shader_register_type reg_type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
             | ((param & VKD3D_SM1_REGISTER_TYPE_MASK2) >> VKD3D_SM1_REGISTER_TYPE_SHIFT2);
+
+    vsir_register_init(&dst->reg, reg_type, VKD3D_DATA_FLOAT, 1);
     dst->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     dst->reg.non_uniform = false;
-    dst->reg.data_type = VKD3D_DATA_FLOAT;
     dst->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
     dst->reg.idx[0].rel_addr = rel_addr;
-    dst->reg.idx[1].offset = ~0u;
-    dst->reg.idx[1].rel_addr = NULL;
-    dst->reg.idx[2].offset = ~0u;
-    dst->reg.idx[2].rel_addr = NULL;
-    dst->reg.idx_count = 1;
     dst->write_mask = (param & VKD3D_SM1_WRITEMASK_MASK) >> VKD3D_SM1_WRITEMASK_SHIFT;
     dst->modifiers = (param & VKD3D_SM1_DST_MODIFIER_MASK) >> VKD3D_SM1_DST_MODIFIER_SHIFT;
     dst->shift = (param & VKD3D_SM1_DSTSHIFT_MASK) >> VKD3D_SM1_DSTSHIFT_SHIFT;
