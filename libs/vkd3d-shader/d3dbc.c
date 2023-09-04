@@ -457,18 +457,14 @@ static uint32_t swizzle_from_sm1(uint32_t swizzle)
 static void shader_sm1_parse_src_param(uint32_t param, const struct vkd3d_shader_src_param *rel_addr,
         struct vkd3d_shader_src_param *src)
 {
-    src->reg.type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
+    enum vkd3d_shader_register_type reg_type = ((param & VKD3D_SM1_REGISTER_TYPE_MASK) >> VKD3D_SM1_REGISTER_TYPE_SHIFT)
             | ((param & VKD3D_SM1_REGISTER_TYPE_MASK2) >> VKD3D_SM1_REGISTER_TYPE_SHIFT2);
+
+    vsir_register_init(&src->reg, reg_type, VKD3D_DATA_FLOAT, 1);
     src->reg.precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     src->reg.non_uniform = false;
-    src->reg.data_type = VKD3D_DATA_FLOAT;
     src->reg.idx[0].offset = param & VKD3D_SM1_REGISTER_NUMBER_MASK;
     src->reg.idx[0].rel_addr = rel_addr;
-    src->reg.idx[1].offset = ~0u;
-    src->reg.idx[1].rel_addr = NULL;
-    src->reg.idx[2].offset = ~0u;
-    src->reg.idx[2].rel_addr = NULL;
-    src->reg.idx_count = 1;
     src->swizzle = swizzle_from_sm1((param & VKD3D_SM1_SWIZZLE_MASK) >> VKD3D_SM1_SWIZZLE_SHIFT);
     src->modifiers = (param & VKD3D_SM1_SRC_MODIFIER_MASK) >> VKD3D_SM1_SRC_MODIFIER_SHIFT;
 }
