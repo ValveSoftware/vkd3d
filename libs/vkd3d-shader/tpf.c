@@ -1713,6 +1713,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         enum vkd3d_data_type data_type, struct vkd3d_shader_register *param, enum vkd3d_shader_src_modifier *modifier)
 {
     const struct vkd3d_sm4_register_type_info *register_type_info;
+    enum vkd3d_shader_register_type vsir_register_type;
     enum vkd3d_sm4_register_precision precision;
     enum vkd3d_sm4_register_type register_type;
     enum vkd3d_sm4_extended_operand_type type;
@@ -1731,15 +1732,18 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
     if (!register_type_info)
     {
         FIXME("Unhandled register type %#x.\n", register_type);
-        param->type = VKD3DSPR_TEMP;
+        vsir_register_type = VKD3DSPR_TEMP;
     }
     else
     {
-        param->type = register_type_info->vkd3d_type;
+        vsir_register_type = register_type_info->vkd3d_type;
     }
+
+    order = (token & VKD3D_SM4_REGISTER_ORDER_MASK) >> VKD3D_SM4_REGISTER_ORDER_SHIFT;
+
+    vsir_register_init(param, vsir_register_type, data_type, order);
     param->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
     param->non_uniform = false;
-    param->data_type = data_type;
 
     *modifier = VKD3DSPSM_NONE;
     if (token & VKD3D_SM4_EXTENDED_OPERAND)
@@ -1809,14 +1813,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         }
     }
 
-    order = (token & VKD3D_SM4_REGISTER_ORDER_MASK) >> VKD3D_SM4_REGISTER_ORDER_SHIFT;
-
-    if (order < 1)
-    {
-        param->idx[0].offset = ~0u;
-        param->idx[0].rel_addr = NULL;
-    }
-    else
+    if (order >= 1)
     {
         DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK0) >> VKD3D_SM4_ADDRESSING_SHIFT0;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[0])))
@@ -1826,12 +1823,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         }
     }
 
-    if (order < 2)
-    {
-        param->idx[1].offset = ~0u;
-        param->idx[1].rel_addr = NULL;
-    }
-    else
+    if (order >= 2)
     {
         DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK1) >> VKD3D_SM4_ADDRESSING_SHIFT1;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[1])))
@@ -1841,12 +1833,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         }
     }
 
-    if (order < 3)
-    {
-        param->idx[2].offset = ~0u;
-        param->idx[2].rel_addr = NULL;
-    }
-    else
+    if (order >= 3)
     {
         DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK2) >> VKD3D_SM4_ADDRESSING_SHIFT2;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[2])))
@@ -1861,8 +1848,6 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         WARN("Unhandled order %u.\n", order);
         return false;
     }
-
-    param->idx_count = order;
 
     if (register_type == VKD3D_SM4_RT_IMMCONST || register_type == VKD3D_SM4_RT_IMMCONST64)
     {
