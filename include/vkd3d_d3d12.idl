@@ -3311,6 +3311,20 @@ interface ID3D12StateObject : ID3D12Pageable
 {
 }
 
+[
+    uuid(de5fa827-9bf9-4f26-89ff-d7f56fde3860),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12StateObjectProperties : IUnknown
+{
+    void *GetShaderIdentifier(const WCHAR *export_name);
+    UINT64 GetShaderStackSize(const WCHAR *export_name);
+    UINT64 GetPipelineStackSize();
+    void SetPipelineStackSize(UINT64 pipeline_stack_size_in_bytes);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
