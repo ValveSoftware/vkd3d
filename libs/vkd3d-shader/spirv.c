@@ -5917,13 +5917,10 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
     const struct vkd3d_spirv_resource_type *resource_type_info;
     enum vkd3d_shader_component_type sampled_type;
     struct vkd3d_symbol resource_symbol;
+    struct vkd3d_shader_register reg;
 
-    struct vkd3d_shader_register reg =
-    {
-        .type = is_uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE,
-        .idx[0].offset = register_id,
-        .idx_count = 1,
-    };
+    vsir_register_init(&reg, is_uav ? VKD3DSPR_UAV : VKD3DSPR_RESOURCE, VKD3D_DATA_FLOAT, 1);
+    reg.idx[0].offset = register_id;
 
     if (resource_type == VKD3D_SHADER_RESOURCE_TEXTURE_2DMS && sample_count == 1)
         resource_type = VKD3D_SHADER_RESOURCE_TEXTURE_2D;
