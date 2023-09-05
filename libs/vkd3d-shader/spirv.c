@@ -4411,11 +4411,7 @@ static uint32_t spirv_compiler_get_invocation_id(struct spirv_compiler *compiler
 
     assert(compiler->shader_type == VKD3D_SHADER_TYPE_HULL);
 
-    memset(&r, 0, sizeof(r));
-    r.type = VKD3DSPR_OUTPOINTID;
-    r.idx[0].offset = ~0u;
-    r.idx[1].offset = ~0u;
-    r.idx_count = 0;
+    vsir_register_init(&r, VKD3DSPR_OUTPOINTID, VKD3D_DATA_FLOAT, 0);
     return spirv_compiler_get_register_id(compiler, &r);
 }
 
