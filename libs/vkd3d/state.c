@@ -2045,6 +2045,9 @@ static ULONG STDMETHODCALLTYPE d3d12_pipeline_state_Release(ID3D12PipelineState 
 
         d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
 
+        if (state->implicit_root_signature)
+            d3d12_root_signature_Release(state->implicit_root_signature);
+
         vkd3d_free(state);
 
         d3d12_device_release(device);
@@ -2413,8 +2416,8 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     struct vkd3d_shader_interface_info shader_interface;
     struct vkd3d_shader_descriptor_offset_info offset_info;
-    const struct d3d12_root_signature *root_signature;
     struct vkd3d_shader_spirv_target_info target_info;
+    struct d3d12_root_signature *root_signature;
     VkPipelineLayout vk_pipeline_layout;
     HRESULT hr;
 
@@ -2425,13 +2428,27 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
 
     if (!(root_signature = unsafe_impl_from_ID3D12RootSignature(desc->root_signature)))
     {
-        WARN("Root signature is NULL.\n");
-        return E_INVALIDARG;
+        TRACE("Root signature is NULL, looking for an embedded signature.\n");
+        if (FAILED(hr = d3d12_root_signature_create(device,
+                desc->cs.pShaderBytecode, desc->cs.BytecodeLength, &root_signature)))
+        {
+            WARN("Failed to find an embedded root signature, hr %s.\n", debugstr_hresult(hr));
+            return hr;
+        }
+        state->implicit_root_signature = &root_signature->ID3D12RootSignature_iface;
+    }
+    else
+    {
+        state->implicit_root_signature = NULL;
     }
 
     if (FAILED(hr = d3d12_pipeline_state_find_and_init_uav_counters(state, device, root_signature,
             &desc->cs, VK_SHADER_STAGE_COMPUTE_BIT)))
+    {
+        if (state->implicit_root_signature)
+            d3d12_root_signature_Release(state->implicit_root_signature);
         return hr;
+    }
 
     memset(&target_info, 0, sizeof(target_info));
     target_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SPIRV_TARGET_INFO;
@@ -2476,6 +2493,8 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     {
         WARN("Failed to create Vulkan compute pipeline, hr %s.\n", debugstr_hresult(hr));
         d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
+        if (state->implicit_root_signature)
+            d3d12_root_signature_Release(state->implicit_root_signature);
         return hr;
     }
 
@@ -2483,6 +2502,8 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     {
         VK_CALL(vkDestroyPipeline(device->vk_device, state->u.compute.vk_pipeline, NULL));
         d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
+        if (state->implicit_root_signature)
+            d3d12_root_signature_Release(state->implicit_root_signature);
         return hr;
     }
 
@@ -3484,6 +3505,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
         goto fail;
 
     state->vk_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    state->implicit_root_signature = NULL;
     d3d12_device_add_ref(state->device = device);
 
     return S_OK;

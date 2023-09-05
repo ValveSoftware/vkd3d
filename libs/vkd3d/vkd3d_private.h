@@ -1213,6 +1213,7 @@ struct d3d12_pipeline_state
 
     struct d3d12_pipeline_uav_counter_state uav_counters;
 
+    ID3D12RootSignature *implicit_root_signature;
     struct d3d12_device *device;
 
     struct vkd3d_private_store private_store;

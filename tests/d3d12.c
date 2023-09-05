@@ -3135,9 +3135,8 @@ static void test_create_compute_pipeline_state(void)
     pipeline_state_desc.CS = shader_bytecode(cs_with_rs, sizeof(cs_with_rs));
     hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D12PipelineState_Release(pipeline_state);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ID3D12PipelineState_Release(pipeline_state);
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
