@@ -692,6 +692,13 @@ typedef struct D3D12_RESOURCE_ALLOCATION_INFO
     UINT64 Alignment;
 } D3D12_RESOURCE_ALLOCATION_INFO;
 
+typedef struct D3D12_RESOURCE_ALLOCATION_INFO1
+{
+    UINT64 Offset;
+    UINT64 Alignment;
+    UINT64 SizeInBytes;
+} D3D12_RESOURCE_ALLOCATION_INFO1;
+
 typedef struct D3D12_DRAW_ARGUMENTS
 {
     UINT VertexCountPerInstance;
@@ -3197,6 +3204,58 @@ interface ID3D12VersionedRootSignatureDeserializer : IUnknown
 
     const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *GetUnconvertedRootSignatureDesc();
 };
+
+typedef enum D3D12_COMMAND_LIST_FLAGS
+{
+    D3D12_COMMAND_LIST_FLAG_NONE = 0x0,
+} D3D12_COMMAND_LIST_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_COMMAND_LIST_FLAGS);")
+
+[
+    uuid(e865df17-a9ee-46f9-a463-3098315aa2e5),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device4 : ID3D12Device3
+{
+    HRESULT CreateCommandList1(
+            UINT node_mask, D3D12_COMMAND_LIST_TYPE type,
+            D3D12_COMMAND_LIST_FLAGS flags, REFIID riid,
+            void **command_list);
+
+    HRESULT CreateProtectedResourceSession(
+            const D3D12_PROTECTED_RESOURCE_SESSION_DESC *desc, REFIID riid,
+            void **session);
+
+    HRESULT CreateCommittedResource1(
+            const D3D12_HEAP_PROPERTIES *heap_properties,
+            D3D12_HEAP_FLAGS heap_flags,
+            const D3D12_RESOURCE_DESC *desc,
+            D3D12_RESOURCE_STATES initial_resource_state,
+            const D3D12_CLEAR_VALUE *optimized_clear_value,
+            ID3D12ProtectedResourceSession *protected_session,
+            REFIID riid_resource,
+            void **resource);
+
+    HRESULT CreateHeap1(
+            const D3D12_HEAP_DESC *desc,
+            ID3D12ProtectedResourceSession *protected_session,
+            REFIID riid, void **heap);
+
+    HRESULT CreateReservedResource1(
+            const D3D12_RESOURCE_DESC *desc,
+            D3D12_RESOURCE_STATES initial_state,
+            const D3D12_CLEAR_VALUE *optimized_clear_value,
+            ID3D12ProtectedResourceSession *protected_session,
+            REFIID riid, void **resource);
+
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo1(
+            UINT visible_mask,
+            UINT resource_descs_count,
+            const D3D12_RESOURCE_DESC *resource_descs,
+            D3D12_RESOURCE_ALLOCATION_INFO1 *resource_allocation_info1);
+}
 
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
