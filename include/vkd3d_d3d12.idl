@@ -3257,6 +3257,23 @@ interface ID3D12Device4 : ID3D12Device3
             D3D12_RESOURCE_ALLOCATION_INFO1 *resource_allocation_info1);
 }
 
+typedef enum D3D12_LIFETIME_STATE
+{
+    D3D12_LIFETIME_STATE_IN_USE = 0x0,
+    D3D12_LIFETIME_STATE_NOT_IN_USE = 0x1,
+} D3D12_LIFETIME_STATE;
+
+[
+    uuid(e667af9f-cd56-4f46-83ce-032e595d70a8),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12LifetimeOwner : IUnknown
+{
+    void LifetimeStateUpdated(D3D12_LIFETIME_STATE NewState);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
