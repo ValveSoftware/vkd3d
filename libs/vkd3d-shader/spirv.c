@@ -5443,11 +5443,8 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     if (temp->component_count != 4)
         FIXME("Unhandled component count %u.\n", temp->component_count);
 
-    memset(&reg, 0, sizeof(reg));
-    reg.type = VKD3DSPR_IDXTEMP;
+    vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
-    reg.idx[1].offset = ~0u;
-    reg.idx_count = 1;
 
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
