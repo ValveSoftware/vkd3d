@@ -5706,15 +5706,12 @@ static void spirv_compiler_emit_sampler_declaration(struct spirv_compiler *compi
     const SpvStorageClass storage_class = SpvStorageClassUniformConstant;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_descriptor_variable_info var_info;
+    struct vkd3d_shader_register reg;
     struct vkd3d_symbol reg_symbol;
     uint32_t type_id, var_id;
 
-    const struct vkd3d_shader_register reg =
-    {
-        .type = VKD3DSPR_SAMPLER,
-        .idx[0].offset = register_id,
-        .idx_count = 1,
-    };
+    vsir_register_init(&reg, VKD3DSPR_SAMPLER, VKD3D_DATA_FLOAT, 1);
+    reg.idx[0].offset = register_id;
 
     vkd3d_symbol_make_sampler(&reg_symbol, &reg);
     reg_symbol.info.sampler.range = *range;
