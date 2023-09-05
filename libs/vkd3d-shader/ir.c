@@ -31,7 +31,9 @@ static bool shader_instruction_is_dcl(const struct vkd3d_shader_instruction *ins
 
 static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *ins)
 {
-    vsir_instruction_init(ins, VKD3DSIH_NOP);
+    struct vkd3d_shader_location location = ins->location;
+
+    vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
 }
 
 static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
@@ -157,6 +159,7 @@ struct hull_flattener
     unsigned int instance_count;
     unsigned int phase_body_idx;
     enum vkd3d_shader_opcode phase;
+    struct vkd3d_shader_location last_ret_location;
 };
 
 static bool flattener_is_in_fork_or_join_phase(const struct hull_flattener *flattener)
@@ -229,6 +232,7 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
 
     if (ins->handler_idx == VKD3DSIH_RET)
     {
+        normaliser->last_ret_location = ins->location;
         vkd3d_shader_instruction_make_nop(ins);
         if (locations->count >= ARRAY_SIZE(locations->locations))
         {
@@ -309,9 +313,11 @@ void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_r
     reg->immconst_type = VKD3D_IMMCONST_SCALAR;
 }
 
-void vsir_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx)
+void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_opcode handler_idx)
 {
     memset(ins, 0, sizeof(*ins));
+    ins->location = *location;
     ins->handler_idx = handler_idx;
 }
 
@@ -339,7 +345,7 @@ static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd
 
         if (!shader_instruction_array_reserve(&flattener.instructions, flattener.instructions.count + 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        vsir_instruction_init(&instructions->elements[instructions->count++], VKD3DSIH_RET);
+        vsir_instruction_init(&instructions->elements[instructions->count++], &flattener.last_ret_location, VKD3DSIH_RET);
     }
 
     *src_instructions = flattener.instructions;
@@ -400,7 +406,8 @@ static void shader_dst_param_io_init(struct vkd3d_shader_dst_param *param, const
 }
 
 static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_point_normaliser *normaliser,
-        const struct shader_signature *s, unsigned int input_control_point_count, unsigned int dst)
+        const struct shader_signature *s, unsigned int input_control_point_count, unsigned int dst,
+        const struct vkd3d_shader_location *location)
 {
     struct vkd3d_shader_instruction *ins;
     struct vkd3d_shader_dst_param *param;
@@ -418,7 +425,7 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
     normaliser->instructions.count += count;
 
     ins = &normaliser->instructions.elements[dst];
-    vsir_instruction_init(ins, VKD3DSIH_HS_CONTROL_POINT_PHASE);
+    vsir_instruction_init(ins, location, VKD3DSIH_HS_CONTROL_POINT_PHASE);
     ins->flags = 1;
     ++ins;
 
@@ -430,13 +437,13 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 
         if (e->sysval_semantic != VKD3D_SHADER_SV_NONE)
         {
-            vsir_instruction_init(ins, VKD3DSIH_DCL_INPUT_SIV);
+            vsir_instruction_init(ins, location, VKD3DSIH_DCL_INPUT_SIV);
             param = &ins->declaration.register_semantic.reg;
             ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
         }
         else
         {
-            vsir_instruction_init(ins, VKD3DSIH_DCL_INPUT);
+            vsir_instruction_init(ins, location, VKD3DSIH_DCL_INPUT);
             param = &ins->declaration.dst;
         }
 
@@ -507,7 +514,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
             case VKD3DSIH_HS_FORK_PHASE:
             case VKD3DSIH_HS_JOIN_PHASE:
                 ret = control_point_normaliser_emit_hs_input(&normaliser, input_signature,
-                        input_control_point_count, i);
+                        input_control_point_count, i, &ins->location);
                 *src_instructions = normaliser.instructions;
                 return ret;
             default:

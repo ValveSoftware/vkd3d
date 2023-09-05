@@ -968,8 +968,15 @@ struct vkd3d_shader_primitive_type
     unsigned int patch_vertex_count;
 };
 
+struct vkd3d_shader_location
+{
+    const char *source_name;
+    unsigned int line, column;
+};
+
 struct vkd3d_shader_instruction
 {
+    struct vkd3d_shader_location location;
     enum vkd3d_shader_opcode handler_idx;
     DWORD flags;
     unsigned int dst_count;
@@ -1008,7 +1015,8 @@ struct vkd3d_shader_instruction
     } declaration;
 };
 
-void vsir_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx);
+void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_opcode handler_idx);
 
 static inline bool vkd3d_shader_instruction_has_texel_offset(const struct vkd3d_shader_instruction *ins)
 {
@@ -1034,12 +1042,6 @@ static inline bool register_is_constant(const struct vkd3d_shader_register *reg)
 {
     return (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_IMMCONST64);
 }
-
-struct vkd3d_shader_location
-{
-    const char *source_name;
-    unsigned int line, column;
-};
 
 struct vkd3d_shader_param_node
 {

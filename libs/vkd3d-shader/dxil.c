@@ -1999,7 +1999,7 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
 {
     struct vkd3d_shader_instruction *ins = sm6_parser_require_space(sm6, 1);
     assert(ins);
-    vsir_instruction_init(ins, handler_idx);
+    vsir_instruction_init(ins, &sm6->p.location, handler_idx);
     ++sm6->p.instructions.count;
     return ins;
 }
@@ -2190,7 +2190,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, struct sm6_b
         return;
     }
 
-    vsir_instruction_init(ins, VKD3DSIH_MOV);
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
     if (!(dst_param = instruction_dst_params_alloc(ins, 1, sm6)))
         return;
