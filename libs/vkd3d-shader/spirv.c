@@ -5693,8 +5693,7 @@ static void spirv_compiler_emit_dcl_immediate_constant_buffer(struct spirv_compi
     vkd3d_spirv_build_op_name(builder, icb_id, "icb");
     vkd3d_free(elements);
 
-    memset(&reg, 0, sizeof(reg));
-    reg.type = VKD3DSPR_IMMCONSTBUFFER;
+    vsir_register_init(&reg, VKD3DSPR_IMMCONSTBUFFER, VKD3D_DATA_FLOAT, 0);
     vkd3d_symbol_make_register(&reg_symbol, &reg);
     vkd3d_symbol_set_register_info(&reg_symbol, icb_id, SpvStorageClassPrivate,
             VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
