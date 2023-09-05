@@ -21,7 +21,6 @@
     - if [ -f pipeline_failed ] ; then exit 1 ; fi
   artifacts:
     when: always
-    expire_in: 1 day
     paths:
       - artifacts
 
