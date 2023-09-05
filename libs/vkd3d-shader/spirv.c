@@ -5623,15 +5623,12 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     const SpvStorageClass storage_class = SpvStorageClassUniform;
     struct vkd3d_push_constant_buffer_binding *push_cb;
     struct vkd3d_descriptor_variable_info var_info;
+    struct vkd3d_shader_register reg;
     struct vkd3d_symbol reg_symbol;
     unsigned int size;
 
-    struct vkd3d_shader_register reg =
-    {
-        .type = VKD3DSPR_CONSTBUFFER,
-        .idx[0].offset = register_id,
-        .idx_count = 1,
-    };
+    vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 1);
+    reg.idx[0].offset = register_id;
 
     size = size_in_bytes / (VKD3D_VEC4_SIZE * sizeof(uint32_t));
 
