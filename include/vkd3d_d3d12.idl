@@ -3301,6 +3301,16 @@ interface ID3D12LifetimeTracker : ID3D12DeviceChild
     HRESULT DestroyOwnedObject(ID3D12DeviceChild *object);
 }
 
+[
+    uuid(47016943-fca8-4594-93ea-af258b55346d),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12StateObject : ID3D12Pageable
+{
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
