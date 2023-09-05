@@ -3274,6 +3274,22 @@ interface ID3D12LifetimeOwner : IUnknown
     void LifetimeStateUpdated(D3D12_LIFETIME_STATE NewState);
 }
 
+[
+    uuid(f1df64b6-57fd-49cd-8807-c0eb88b45c8f),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12SwapChainAssistant : IUnknown
+{
+    LUID GetLUID();
+    HRESULT GetSwapChainObject(REFIID riid, void **ppv);
+    HRESULT GetCurrentResourceAndCommandQueue(
+            REFIID riid_resource, void **resource,
+            REFIID riid_queue, void **queue);
+    HRESULT InsertImplicitSync();
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
