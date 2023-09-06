@@ -997,6 +997,13 @@ typedef enum D3D12_RESOURCE_FLAGS
 } D3D12_RESOURCE_FLAGS;
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_RESOURCE_FLAGS);")
 
+typedef struct D3D12_MIP_REGION
+{
+    UINT Width;
+    UINT Height;
+    UINT Depth;
+} D3D12_MIP_REGION;
+
 typedef struct D3D12_RESOURCE_DESC
 {
     D3D12_RESOURCE_DIMENSION Dimension;
@@ -1010,6 +1017,21 @@ typedef struct D3D12_RESOURCE_DESC
     D3D12_TEXTURE_LAYOUT Layout;
     D3D12_RESOURCE_FLAGS Flags;
 } D3D12_RESOURCE_DESC;
+
+typedef struct D3D12_RESOURCE_DESC1
+{
+    D3D12_RESOURCE_DIMENSION Dimension;
+    UINT64 Alignment;
+    UINT64 Width;
+    UINT Height;
+    UINT16 DepthOrArraySize;
+    UINT16 MipLevels;
+    DXGI_FORMAT Format;
+    DXGI_SAMPLE_DESC SampleDesc;
+    D3D12_TEXTURE_LAYOUT Layout;
+    D3D12_RESOURCE_FLAGS Flags;
+    D3D12_MIP_REGION SamplerFeedbackMipRegion;
+} D3D12_RESOURCE_DESC1;
 
 typedef enum D3D12_RESOLVE_MODE
 {
@@ -4110,6 +4132,53 @@ interface ID3D12Device7 : ID3D12Device6
     HRESULT CreateProtectedResourceSession1(
             const D3D12_PROTECTED_RESOURCE_SESSION_DESC1 *desc,
             REFIID riid, void **session);
+}
+
+[
+    uuid(9218e6bb-f944-4f7e-a75c-b1b2c7b701f3),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device8 : ID3D12Device7
+{
+    D3D12_RESOURCE_ALLOCATION_INFO GetResourceAllocationInfo2(
+            UINT visible_mask,
+            UINT resource_descs_count,
+            const D3D12_RESOURCE_DESC1 *resource_descs,
+            D3D12_RESOURCE_ALLOCATION_INFO1 *resource_allocation_info1);
+
+    HRESULT CreateCommittedResource2(
+            const D3D12_HEAP_PROPERTIES *heap_properties,
+            D3D12_HEAP_FLAGS heap_flags,
+            const D3D12_RESOURCE_DESC1 *desc,
+            D3D12_RESOURCE_STATES initial_resource_state,
+            const D3D12_CLEAR_VALUE *optimized_clear_value,
+            ID3D12ProtectedResourceSession *protected_session,
+            REFIID riid_resource, void **resource);
+
+    HRESULT CreatePlacedResource1(
+            ID3D12Heap *heap,
+            UINT64 heap_offset,
+            const D3D12_RESOURCE_DESC1 *desc,
+            D3D12_RESOURCE_STATES initial_state,
+            const D3D12_CLEAR_VALUE *optimized_clear_value,
+            REFIID riid, void **resource);
+
+    void CreateSamplerFeedbackUnorderedAccessView(
+            ID3D12Resource *targeted_resource,
+            ID3D12Resource *feedback_resource,
+            D3D12_CPU_DESCRIPTOR_HANDLE dst_descriptor);
+
+    void GetCopyableFootprints1(
+            const D3D12_RESOURCE_DESC1 *resource_desc,
+            UINT first_subresource,
+            UINT subresources_count,
+            UINT64 base_offset,
+            D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts,
+            UINT *rows_count,
+            UINT64 *row_size_in_bytes,
+            UINT64 *total_bytes);
 }
 
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
