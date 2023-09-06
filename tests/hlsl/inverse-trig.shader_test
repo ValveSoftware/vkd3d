@@ -1,0 +1,92 @@
+% TPF does not define instructions for inverse trig; these intrinsics are
+% decomposed into other instructions. FXC emits code which may vary wrt other
+% implementations. DXIL defines intrinsics for inverse trig, to be implemented
+% by the backend.
+
+[pixel shader todo]
+uniform float4 a;
+
+float4 main() : sv_target
+{
+    return float4(acos(a.x), 0.0, 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 -1.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (3.14159274, 0.0, 0.0, 0.0) 128
+
+uniform 0 float4 -0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (2.094441441, 0.0, 0.0, 0.0) 256
+
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (1.57072878, 0.0, 0.0, 0.0) 1024
+
+uniform 0 float4 0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (1.04715133, 0.0, 0.0, 0.0) 512
+
+uniform 0 float4 1.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0) 128
+
+[pixel shader todo]
+uniform float4 a;
+
+float4 main() : sv_target
+{
+    float4 result = float4(asin(a.x), 0.0, 0.0, 0.0);
+    // Quantize to cover implementation variations, which are quite large for asin().
+    return round(result * 20000.0);
+}
+
+[test]
+uniform 0 float4 -1.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (-31416.0, 0.0, 0.0, 0.0)
+
+[require]
+shader model < 6.0
+
+[test]
+uniform 0 float4 -0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (-10473.0, 0.0, 0.0, 0.0)
+
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (1.0, 0.0, 0.0, 0.0)
+
+uniform 0 float4 0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (10473.0, 0.0, 0.0, 0.0)
+
+[require]
+shader model >= 6.0
+
+% We implement SM 6.0 inverse trig instructions using the native equivalents
+% available in the backend. The values below are from the AMD Windows drivers,
+% which are very close to those from Ubuntu's calculator app. Results from
+% RADV are a bit lower than these, hence the large max ulp difference.
+[test]
+uniform 0 float4 -0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (-10472.0, 0.0, 0.0, 0.0) 4096
+
+uniform 0 float4 0.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+uniform 0 float4 0.5 0.0 0.0 0.0
+todo draw quad
+probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
+
+[require]
+% reset requirements
+
+[test]
+uniform 0 float4 1.0 0.0 0.0 0.0
+todo draw quad
+probe all rgba (31416.0, 0.0, 0.0, 0.0)
