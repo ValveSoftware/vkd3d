@@ -4026,6 +4026,39 @@ interface ID3D12Device6 : ID3D12Device5
             BOOL *further_measurements_desired);
 }
 
+cpp_quote("DEFINE_GUID(D3D12_PROTECTED_RESOURCES_SESSION_HARDWARE_PROTECTED, 0x62b0084e, 0xc70e, 0x4daa, 0xa1, 0x09, 0x30, 0xff, 0x8d, 0x5a, 0x04, 0x82);")
+
+typedef struct D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPE_COUNT
+{
+    UINT NodeIndex;
+    UINT Count;
+} D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPE_COUNT;
+
+typedef struct D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPES
+{
+    UINT NodeIndex;
+    UINT Count;
+    GUID *pTypes;
+} D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_TYPES;
+
+typedef struct D3D12_PROTECTED_RESOURCE_SESSION_DESC1
+{
+    UINT NodeMask;
+    D3D12_PROTECTED_RESOURCE_SESSION_FLAGS Flags;
+    GUID ProtectionType;
+} D3D12_PROTECTED_RESOURCE_SESSION_DESC1;
+
+[
+    uuid(d6f12dd6-76fb-406e-8961-4296eefc0409),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12ProtectedResourceSession1 : ID3D12ProtectedResourceSession
+{
+    D3D12_PROTECTED_RESOURCE_SESSION_DESC1 GetDesc1();
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
