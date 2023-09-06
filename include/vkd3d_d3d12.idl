@@ -4181,6 +4181,28 @@ interface ID3D12Device8 : ID3D12Device7
             UINT64 *total_bytes);
 }
 
+[
+    uuid(9d5e227a-4430-4161-88b3-3eca6bb16e19),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Resource1 : ID3D12Resource
+{
+    HRESULT GetProtectedResourceSession(REFIID riid, void **protected_session);
+}
+
+[
+    uuid(be36ec3b-ea85-4aeb-a45a-e9d76404a495),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Resource2 : ID3D12Resource1
+{
+    D3D12_RESOURCE_DESC1 GetDesc1();
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
