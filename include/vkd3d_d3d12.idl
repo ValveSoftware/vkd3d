@@ -4059,6 +4059,24 @@ interface ID3D12ProtectedResourceSession1 : ID3D12ProtectedResourceSession
     D3D12_PROTECTED_RESOURCE_SESSION_DESC1 GetDesc1();
 }
 
+[
+    uuid(5c014b53-68a1-4b9b-8bd1-dd6046b9358b),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device7 : ID3D12Device6
+{
+    HRESULT AddToStateObject(
+            const D3D12_STATE_OBJECT_DESC *addition,
+            ID3D12StateObject *state_object_to_grow_from,
+            REFIID riid, void **new_state_object);
+
+    HRESULT CreateProtectedResourceSession1(
+            const D3D12_PROTECTED_RESOURCE_SESSION_DESC1 *desc,
+            REFIID riid, void **session);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
