@@ -4203,6 +4203,17 @@ interface ID3D12Resource2 : ID3D12Resource1
     D3D12_RESOURCE_DESC1 GetDesc1();
 }
 
+[
+    uuid(572f7389-2168-49e3-9693-d6df5871bf6d),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Heap1 : ID3D12Heap
+{
+    HRESULT GetProtectedResourceSession(REFIID riid, void **protected_session);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
