@@ -608,6 +608,12 @@ typedef enum D3D12_SHARED_RESOURCE_COMPATIBILITY_TIER
     D3D12_SHARED_RESOURCE_COMPATIBILITY_TIER_2 = 0x2,
 }  D3D12_SHARED_RESOURCE_COMPATIBILITY_TIER;
 
+typedef struct D3D12_FEATURE_DATA_DISPLAYABLE
+{
+    BOOL DisplayableTexture;
+    D3D12_SHARED_RESOURCE_COMPATIBILITY_TIER SharedResourceCompatibilityTier;
+} D3D12_FEATURE_DATA_DISPLAYABLE;
+
 typedef enum D3D12_HEAP_SERIALIZATION_TIER
 {
     D3D12_HEAP_SERIALIZATION_TIER_0 = 0x0,
@@ -685,6 +691,13 @@ typedef struct D3D12_SUBRESOURCE_RANGE_UINT64
     UINT Subresource;
     D3D12_RANGE_UINT64 Range;
 } D3D12_SUBRESOURCE_RANGE_UINT64;
+
+typedef struct D3D12_SUBRESOURCE_INFO
+{
+    UINT64 Offset;
+    UINT RowPitch;
+    UINT DepthPitch;
+} D3D12_SUBRESOURCE_INFO;
 
 typedef struct D3D12_RESOURCE_ALLOCATION_INFO
 {
@@ -1276,6 +1289,21 @@ typedef enum D3D12_FILTER_REDUCTION_TYPE
 const UINT D3D12_FILTER_REDUCTION_TYPE_MASK = 0x3;
 const UINT D3D12_FILTER_REDUCTION_TYPE_SHIFT = 7;
 
+cpp_quote("#define D3D12_ENCODE_BASIC_FILTER(min, mag, mip, reduction) \\")
+cpp_quote("    ((D3D12_FILTER) ( \\")
+cpp_quote("    (((min) & D3D12_FILTER_TYPE_MASK) << D3D12_MIN_FILTER_SHIFT) \\")
+cpp_quote("    | (((mag) & D3D12_FILTER_TYPE_MASK) << D3D12_MAG_FILTER_SHIFT) \\")
+cpp_quote("    | (((mip) & D3D12_FILTER_TYPE_MASK) << D3D12_MIP_FILTER_SHIFT) \\")
+cpp_quote("    | (((reduction) & D3D12_FILTER_REDUCTION_TYPE_MASK) << D3D12_FILTER_REDUCTION_TYPE_SHIFT)))")
+
+cpp_quote("#define D3D12_ENCODE_ANISOTROPIC_FILTER(reduction) \\")
+cpp_quote("    ((D3D12_FILTER) ( \\")
+cpp_quote("     D3D12_ANISOTROPIC_FILTERING_BIT \\")
+cpp_quote("     | D3D12_ENCODE_BASIC_FILTER(D3D12_FILTER_TYPE_LINEAR, \\")
+cpp_quote("                                 D3D12_FILTER_TYPE_LINEAR, \\")
+cpp_quote("                                 D3D12_FILTER_TYPE_LINEAR, \\")
+cpp_quote("                                 reduction)))")
+
 cpp_quote("#define D3D12_DECODE_MAG_FILTER(filter) \\")
 cpp_quote("    ((D3D12_FILTER_TYPE)(((filter) >> D3D12_MAG_FILTER_SHIFT) & D3D12_FILTER_TYPE_MASK))")
 
@@ -1855,6 +1883,19 @@ typedef struct D3D12_DEPTH_STENCIL_DESC
     D3D12_DEPTH_STENCILOP_DESC BackFace;
 } D3D12_DEPTH_STENCIL_DESC;
 
+typedef struct D3D12_DEPTH_STENCIL_DESC1
+{
+    BOOL DepthEnable;
+    D3D12_DEPTH_WRITE_MASK DepthWriteMask;
+    D3D12_COMPARISON_FUNC DepthFunc;
+    BOOL StencilEnable;
+    UINT8 StencilReadMask;
+    UINT8 StencilWriteMask;
+    D3D12_DEPTH_STENCILOP_DESC FrontFace;
+    D3D12_DEPTH_STENCILOP_DESC BackFace;
+    BOOL DepthBoundsTestEnable;
+} D3D12_DEPTH_STENCIL_DESC1;
+
 typedef enum D3D12_BLEND
 {
     D3D12_BLEND_ZERO = 1,
@@ -2340,6 +2381,72 @@ typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS7
     D3D12_SAMPLER_FEEDBACK_TIER SamplerFeedbackTier;
 } D3D12_FEATURE_DATA_D3D12_OPTIONS7;
 
+typedef struct D3D12_FEATURE_DATA_QUERY_META_COMMAND
+{
+    GUID CommandId;
+    UINT NodeMask;
+    const void *pQueryInputData;
+    SIZE_T QueryInputDataSizeInBytes;
+    void *pQueryOutputData;
+    SIZE_T QueryOutputDataSizeInBytes;
+} D3D12_FEATURE_DATA_QUERY_META_COMMAND;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS8
+{
+    BOOL UnalignedBlockTexturesSupported;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS8;
+
+typedef enum D3D12_WAVE_MMA_TIER
+{
+    D3D12_WAVE_MMA_TIER_NOT_SUPPORTED = 0x0,
+    D3D12_WAVE_MMA_TIER_1_0 = 0xa,
+} D3D12_WAVE_MMA_TIER;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS9
+{
+    BOOL MeshShaderPipelineStatsSupported;
+    BOOL MeshShaderSupportsFullRangeRenderTargetArrayIndex;
+    BOOL AtomicInt64OnTypedResourceSupported;
+    BOOL AtomicInt64OnGroupSharedSupported;
+    BOOL DerivativesInMeshAndAmplificationShadersSupported;
+    D3D12_WAVE_MMA_TIER WaveMMATier;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS9;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS10
+{
+    BOOL VariableRateShadingSumCombinerSupported;
+    BOOL MeshShaderPerPrimitiveShadingRateSupported;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS10;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS11
+{
+    BOOL AtomicInt64OnDescriptorHeapResourceSupported;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS11;
+
+typedef enum D3D12_TRI_STATE
+{
+    D3D12_TRI_STATE_UNKNOWN = -0x1,
+    D3D12_TRI_STATE_FALSE = 0x0,
+    D3D12_TRI_STATE_TRUE = 0x1,
+} D3D12_TRI_STATE;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS12
+{
+    D3D12_TRI_STATE MSPrimitivesPipelineStatisticIncludesCulledPrimitives;
+    BOOL EnhancedBarriersSupported;
+    BOOL RelaxedFormatCastingSupported;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS12;
+
+typedef struct D3D12_FEATURE_DATA_D3D12_OPTIONS13
+{
+    BOOL UnrestrictedBufferTextureCopyPitchSupported;
+    BOOL UnrestrictedVertexElementAlignmentSupported;
+    BOOL InvertedViewportHeightFlipsYSupported;
+    BOOL InvertedViewportDepthFlipsZSupported;
+    BOOL TextureCopyBetweenDimensionsSupported;
+    BOOL AlphaBlendFactorSupported;
+} D3D12_FEATURE_DATA_D3D12_OPTIONS13;
+
 typedef enum D3D12_FEATURE
 {
     D3D12_FEATURE_D3D12_OPTIONS = 0,
@@ -2586,6 +2693,24 @@ typedef struct D3D12_QUERY_DATA_PIPELINE_STATISTICS
     UINT64 CSInvocations;
 } D3D12_QUERY_DATA_PIPELINE_STATISTICS;
 
+typedef struct D3D12_QUERY_DATA_PIPELINE_STATISTICS1
+{
+    UINT64 IAVertices;
+    UINT64 IAPrimitives;
+    UINT64 VSInvocations;
+    UINT64 GSInvocations;
+    UINT64 GSPrimitives;
+    UINT64 CInvocations;
+    UINT64 CPrimitives;
+    UINT64 PSInvocations;
+    UINT64 HSInvocations;
+    UINT64 DSInvocations;
+    UINT64 CSInvocations;
+    UINT64 ASInvocations;
+    UINT64 MSInvocations;
+    UINT64 MSPrimitives;
+} D3D12_QUERY_DATA_PIPELINE_STATISTICS1;
+
 typedef struct D3D12_QUERY_DATA_SO_STATISTICS
 {
     UINT64 NumPrimitivesWritten;
@@ -2807,6 +2932,19 @@ interface ID3D12ProtectedSession : ID3D12DeviceChild
 
     D3D12_PROTECTED_SESSION_STATUS GetSessionStatus();
 }
+
+typedef enum D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS
+{
+    D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_NONE = 0x0,
+    D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG_SUPPORTED = 0x1,
+} D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS);")
+
+typedef struct D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT
+{
+    UINT NodeIndex;
+    D3D12_PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS Support;
+} D3D12_FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT;
 
 [
     uuid(6cd696f4-f289-40cc-8091-5a6c0a099c3d),
@@ -3273,6 +3411,18 @@ typedef enum D3D12_COMMAND_LIST_FLAGS
     D3D12_COMMAND_LIST_FLAG_NONE = 0x0,
 } D3D12_COMMAND_LIST_FLAGS;
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_COMMAND_LIST_FLAGS);")
+
+typedef enum D3D12_COMMAND_POOL_FLAGS
+{
+    D3D12_COMMAND_POOL_FLAG_NONE = 0x0,
+} D3D12_COMMAND_POOL_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_COMMAND_POOL_FLAGS);")
+
+typedef enum D3D12_COMMAND_RECORDER_FLAGS
+{
+    D3D12_COMMAND_RECORDER_FLAG_NONE = 0x0,
+} D3D12_COMMAND_RECORDER_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_COMMAND_RECORDER_FLAGS);")
 
 [
     uuid(e865df17-a9ee-46f9-a463-3098315aa2e5),
