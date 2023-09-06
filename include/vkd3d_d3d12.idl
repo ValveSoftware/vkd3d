@@ -4464,6 +4464,46 @@ interface ID3D12ShaderCacheSession : ID3D12DeviceChild
     D3D12_SHADER_CACHE_SESSION_DESC GetDesc();
 }
 
+typedef enum D3D12_SHADER_CACHE_KIND_FLAGS
+{
+    D3D12_SHADER_CACHE_KIND_FLAG_IMPLICIT_D3D_CACHE_FOR_DRIVER = 0x1,
+    D3D12_SHADER_CACHE_KIND_FLAG_IMPLICIT_D3D_CONVERSIONS = 0x2,
+    D3D12_SHADER_CACHE_KIND_FLAG_IMPLICIT_DRIVER_MANAGED = 0x4,
+    D3D12_SHADER_CACHE_KIND_FLAG_APPLICATION_MANAGED = 0x8,
+} D3D12_SHADER_CACHE_KIND_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_SHADER_CACHE_KIND_FLAGS);")
+
+typedef enum D3D12_SHADER_CACHE_CONTROL_FLAGS
+{
+    D3D12_SHADER_CACHE_CONTROL_FLAG_DISABLE = 0x1,
+    D3D12_SHADER_CACHE_CONTROL_FLAG_ENABLE = 0x2,
+    D3D12_SHADER_CACHE_CONTROL_FLAG_CLEAR = 0x4,
+} D3D12_SHADER_CACHE_CONTROL_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_SHADER_CACHE_CONTROL_FLAGS);")
+
+[
+    uuid(4c80e962-f032-4f60-bc9e-ebc2cfa1d83c),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12Device9 : ID3D12Device8
+{
+    HRESULT CreateShaderCacheSession(
+            const D3D12_SHADER_CACHE_SESSION_DESC *desc,
+            REFIID riid, void **session);
+
+    HRESULT ShaderCacheControl(
+            D3D12_SHADER_CACHE_KIND_FLAGS kinds,
+            D3D12_SHADER_CACHE_CONTROL_FLAGS control);
+
+    HRESULT CreateCommandQueue1(
+            const D3D12_COMMAND_QUEUE_DESC *desc,
+            REFIID creator_id,
+            REFIID riid,
+            void **command_queue);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
