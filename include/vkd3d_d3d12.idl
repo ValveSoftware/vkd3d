@@ -4413,6 +4413,57 @@ interface ID3D12GraphicsCommandList4 : ID3D12GraphicsCommandList3
     void DispatchRays(const D3D12_DISPATCH_RAYS_DESC *desc);
 }
 
+typedef enum D3D12_SHADER_CACHE_MODE
+{
+    D3D12_SHADER_CACHE_MODE_MEMORY = 0x0,
+    D3D12_SHADER_CACHE_MODE_DISK = 0x1,
+} D3D12_SHADER_CACHE_MODE;
+
+typedef enum D3D12_SHADER_CACHE_FLAGS
+{
+    D3D12_SHADER_CACHE_FLAG_NONE = 0x0,
+    D3D12_SHADER_CACHE_FLAG_DRIVER_VERSIONED = 0x1,
+    D3D12_SHADER_CACHE_FLAG_USE_WORKING_DIR = 0x2,
+} D3D12_SHADER_CACHE_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_SHADER_CACHE_FLAGS);")
+
+typedef struct D3D12_SHADER_CACHE_SESSION_DESC
+{
+    GUID Identifier;
+    D3D12_SHADER_CACHE_MODE Mode;
+    D3D12_SHADER_CACHE_FLAGS Flags;
+
+    UINT MaximumInMemoryCacheSizeBytes;
+    UINT MaximumInMemoryCacheEntries;
+
+    UINT MaximumValueFileSizeBytes;
+
+    UINT64 Version;
+} D3D12_SHADER_CACHE_SESSION_DESC;
+
+[
+    uuid(28e2495d-0f64-4ae4-a6ec-129255dc49a8),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12ShaderCacheSession : ID3D12DeviceChild
+{
+    HRESULT FindValue(
+            const void *key,
+            UINT key_size,
+            void *value,
+            UINT *value_size);
+    HRESULT StoreValue(
+            const void *key,
+            UINT key_size,
+            const void *value,
+            UINT value_size);
+
+    void SetDeleteOnDestroy();
+    D3D12_SHADER_CACHE_SESSION_DESC GetDesc();
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
