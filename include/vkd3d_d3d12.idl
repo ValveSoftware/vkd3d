@@ -4214,6 +4214,19 @@ interface ID3D12Heap1 : ID3D12Heap
     HRESULT GetProtectedResourceSession(REFIID riid, void **protected_session);
 }
 
+[
+    uuid(dbb84c27-36ce-4fc9-b801-f048c46ac570),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12MetaCommand : ID3D12Pageable
+{
+    UINT64 GetRequiredParameterResourceSize(
+            D3D12_META_COMMAND_PARAMETER_STAGE stage,
+            UINT parameter_index);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
