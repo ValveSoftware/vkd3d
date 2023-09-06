@@ -164,6 +164,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/struct-assignment.shader_test \
 	tests/hlsl/struct-semantics.shader_test \
 	tests/hlsl/swizzle-constant-prop.shader_test \
+	tests/hlsl/swizzle-matrix.shader_test \
 	tests/hlsl/swizzles.shader_test \
 	tests/hlsl/ternary.shader_test \
 	tests/hlsl/texture-load-offset.shader_test \

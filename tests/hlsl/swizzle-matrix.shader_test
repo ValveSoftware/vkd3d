@@ -1,0 +1,202 @@
+[pixel shader]
+float3x2 mat;
+
+float4 main() : sv_target
+{
+    return mat._21_31_11_12;
+}
+
+[test]
+uniform 0 float4 11 21 31 -1
+uniform 4 float4 12 22 32 -1
+draw quad
+todo probe all rgba (21.0, 31.0, 11.0, 12.0)
+
+
+[pixel shader]
+float3x2 mat;
+
+float4 main() : sv_target
+{
+    return mat._m00_m20_m01_m21;
+}
+
+[test]
+uniform 0 float4 11 21 31 -1
+uniform 4 float4 12 22 32 -1
+draw quad
+todo probe all rgba (11.0, 31.0, 12.0, 32.0)
+
+
+[pixel shader]
+row_major float3x2 mat;
+
+float4 main() : sv_target
+{
+    return mat._11_31_12_32;
+}
+
+[test]
+uniform 0 float4 11 12 -1 -1
+uniform 4 float4 21 22 -1 -1
+uniform 8 float4 31 32 -1 -1
+draw quad
+todo probe all rgba (11.0, 31.0, 12.0, 32.0)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float2 p = mat._11_32;
+
+    return float4(p, p);
+}
+
+[test]
+draw quad
+todo probe all rgba (1.0, 6.0, 1.0, 6.0)
+
+
+% zero-based and one-based subscripts cannot be used in the same swizzle.
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float2 p = mat._11_m00;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat._41;
+
+    return 0.0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat._33;
+
+    return 0.0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat._m30;
+
+    return 0.0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat._m22;
+
+    return 0.0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat._00;
+
+    return 0.0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+
+    return mat._11_11_11_11_11;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3x2 mat = {1, 2, 3, 4, 5, 6};
+    float p = mat.x
+
+    return 0;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float3 vec = {1, 2, 3};
+    float p = vec._11;
+
+    return 0;
+}
+
+% Like with vectors, a single-component swizzle is scalar.
+[pixel shader]
+float4 main() : SV_TARGET
+{
+    float4 vec = {10, 20, 30, 40};
+    int2x3 idx = {0, 1, 2, 3, 4, 5};
+
+    return vec[idx._21];
+}
+
+[test]
+draw quad
+todo probe all rgba (40.0, 40.0, 40.0, 40.0)
+
+
+[pixel shader todo]
+float3 a;
+
+float4 main() : sv_target
+{
+    float2x2 mat = {1, 2, 3, 4};
+
+    mat._11 = 10;
+    mat._m01_m10_m11 = a;
+    return float4(mat);
+}
+
+[test]
+uniform 0 float4 20 30 40 -1
+todo draw quad
+todo probe all rgba (10.0, 20.0, 30.0, 40.0)
+
+
+[pixel shader todo]
+float3 a;
+
+float4 main() : sv_target
+{
+    row_major float4x2 mat = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    mat._11 = 10;
+    mat._m01_m10_m31 = a;
+    return float4(mat._m31_m10_m01_m00);
+}
+
+[test]
+uniform 0 float4 20 30 80 -1
+todo draw quad
+todo probe all rgba (80.0, 30.0, 20.0, 10.0)
+
+
+% Cannot repeat components when assigning to a swizzle.
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float2x2 mat = {1, 2, 3, 4};
+
+    mat._m01_m01 = float2(20, 20);
+    return 0;
+}
