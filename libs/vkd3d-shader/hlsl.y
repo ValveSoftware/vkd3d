@@ -3155,6 +3155,94 @@ static bool intrinsic_ddy_fine(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSY_FINE, arg, loc);
 }
 
+static bool intrinsic_determinant(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    static const char determinant2x2[] =
+            "%s determinant(%s2x2 m)\n"
+            "{\n"
+            "    return m._11 * m._22 - m._12 * m._21;\n"
+            "}";
+    static const char determinant3x3[] =
+            "%s determinant(%s3x3 m)\n"
+            "{\n"
+            "    %s2x2 m1 = { m._22, m._23, m._32, m._33 };\n"
+            "    %s2x2 m2 = { m._21, m._23, m._31, m._33 };\n"
+            "    %s2x2 m3 = { m._21, m._22, m._31, m._32 };\n"
+            "    %s3 v1 = { m._11, -m._12, m._13 };\n"
+            "    %s3 v2 = { determinant(m1), determinant(m2), determinant(m3) };\n"
+            "    return dot(v1, v2);\n"
+            "}";
+    static const char determinant4x4[] =
+            "%s determinant(%s4x4 m)\n"
+            "{\n"
+            "    %s3x3 m1 = { m._22, m._23, m._24, m._32, m._33, m._34, m._42, m._43, m._44 };\n"
+            "    %s3x3 m2 = { m._21, m._23, m._24, m._31, m._33, m._34, m._41, m._43, m._44 };\n"
+            "    %s3x3 m3 = { m._21, m._22, m._24, m._31, m._32, m._34, m._41, m._42, m._44 };\n"
+            "    %s3x3 m4 = { m._21, m._22, m._23, m._31, m._32, m._33, m._41, m._42, m._43 };\n"
+            "    %s4 v1 = { m._11, -m._12, m._13, -m._14 };\n"
+            "    %s4 v2 = { determinant(m1), determinant(m2), determinant(m3), determinant(m4) };\n"
+            "    return dot(v1, v2);\n"
+            "}";
+    static const char *templates[] =
+    {
+        [2] = determinant2x2,
+        [3] = determinant3x3,
+        [4] = determinant4x4,
+    };
+
+    struct hlsl_ir_node *arg = params->args[0];
+    const struct hlsl_type *type = arg->data_type;
+    struct hlsl_ir_function_decl *func;
+    const char *typename, *template;
+    unsigned int dim;
+    char *body;
+
+    if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_MATRIX)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Invalid argument type.");
+        return false;
+    }
+
+    dim = min(type->dimx, type->dimy);
+    if (dim == 1)
+    {
+        if (!(arg = intrinsic_float_convert_arg(ctx, params, arg, loc)))
+            return false;
+        return hlsl_add_load_component(ctx, params->instrs, arg, 0, loc);
+    }
+
+    typename = type->base_type == HLSL_TYPE_HALF ? "half" : "float";
+    template = templates[dim];
+
+    switch (dim)
+    {
+        case 2:
+            body = hlsl_sprintf_alloc(ctx, template, typename, typename);
+            break;
+        case 3:
+            body = hlsl_sprintf_alloc(ctx, template, typename, typename, typename,
+                    typename, typename, typename, typename);
+            break;
+        case 4:
+            body = hlsl_sprintf_alloc(ctx, template, typename, typename, typename,
+                    typename, typename, typename, typename, typename);
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (!body)
+        return false;
+
+    func = hlsl_compile_internal_function(ctx, "determinant", body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
 static bool intrinsic_distance(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -4138,6 +4226,7 @@ intrinsic_functions[] =
     {"ddy_coarse",                          1, true,  intrinsic_ddy_coarse},
     {"ddy_fine",                            1, true,  intrinsic_ddy_fine},
     {"degrees",                             1, true,  intrinsic_degrees},
+    {"determinant",                         1, true,  intrinsic_determinant},
     {"distance",                            2, true,  intrinsic_distance},
     {"dot",                                 2, true,  intrinsic_dot},
     {"exp",                                 1, true,  intrinsic_exp},

@@ -1,0 +1,116 @@
+[pixel shader]
+float s;
+
+float4 main() : sv_target
+{
+    return determinant(s);
+}
+
+[test]
+uniform 0 float4 9.0 2.0 3.0 4.0
+draw quad
+probe all rgba (9.0, 9.0, 9.0, 9.0)
+
+[pixel shader]
+float1x1 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+float2x2 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+probe all rgba (-4.0, -4.0, -4.0, -4.0)
+
+[pixel shader]
+float2x1 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 6.0 7.0 8.0
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[pixel shader]
+float3x3 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 5.0 -6.0 7.0 8.0
+uniform 8 float4 9.0 10.0 11.0 12.0
+draw quad
+probe all rgba (192.0, 192.0, 192.0, 192.0)
+
+[pixel shader]
+float4x4 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform  0 float4  1.0 -2.0  3.0  4.0
+uniform  4 float4  5.0  6.0 -7.0  8.0
+uniform  8 float4  9.0 10.0 11.0 12.0
+uniform 12 float4 13.0 14.0 15.0 16.0
+draw quad
+probe all rgba (-672.0, -672.0, -672.0, -672.0)
+
+[pixel shader]
+float3x4 m;
+
+float4 main() : sv_target
+{
+    return determinant(m);
+}
+
+[test]
+uniform  0 float4  1.0  2.0  3.0 0.0
+uniform  4 float4  5.0 -6.0  7.0 0.0
+uniform  8 float4  9.0 10.0 11.0 0.0
+uniform 12 float4  0.0  0.0  0.0 0.0
+draw quad
+probe all rgba (192.0, 192.0, 192.0, 192.0)
+
+[pixel shader fail]
+float1 v;
+
+float4 main() : sv_target
+{
+    return determinant(v);
+}
+
+[pixel shader fail]
+float2 v;
+
+float4 main() : sv_target
+{
+    return determinant(v);
+}

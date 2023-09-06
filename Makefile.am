@@ -86,6 +86,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/cross.shader_test \
 	tests/hlsl/d3dcolor-to-ubyte4.shader_test \
 	tests/hlsl/ddxddy.shader_test \
+	tests/hlsl/determinant.shader_test \
 	tests/hlsl/discard.shader_test \
 	tests/hlsl/distance.shader_test \
 	tests/hlsl/dot.shader_test \
