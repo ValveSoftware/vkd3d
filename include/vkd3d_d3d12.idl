@@ -4583,6 +4583,24 @@ interface ID3D12Device10 : ID3D12Device9
             void **resource);
 }
 
+[
+    uuid(bc66d368-7373-4943-8757-fc87dc79e476),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12VirtualizationGuestDevice : IUnknown
+{
+    HRESULT ShareWithHost(
+            ID3D12DeviceChild *object,
+            HANDLE *handle);
+
+    HRESULT CreateFenceFd(
+            ID3D12Fence *fence,
+            UINT64 fence_value,
+            int *fence_fd);
+}
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
