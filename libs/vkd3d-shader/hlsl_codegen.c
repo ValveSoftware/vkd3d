@@ -934,6 +934,55 @@ static struct hlsl_ir_node *add_zero_mipmap_level(struct hlsl_ctx *ctx, struct h
     return &coords_load->node;
 }
 
+/* hlsl_ir_swizzle nodes that directly point to a matrix value are only a parse-time construct that
+ * represents matrix swizzles (e.g. mat._m01_m23) before we know if they will be used in the lhs of
+ * an assignment or as a value made from different components of the matrix. The former cases should
+ * have already been split into several separate assignments, but the latter are lowered by this
+ * pass. */
+static bool lower_matrix_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_swizzle *swizzle;
+    struct hlsl_ir_load *var_load;
+    struct hlsl_deref var_deref;
+    struct hlsl_type *matrix_type;
+    struct hlsl_ir_var *var;
+    unsigned int x, y, k, i;
+
+    if (instr->type != HLSL_IR_SWIZZLE)
+        return false;
+    swizzle = hlsl_ir_swizzle(instr);
+    matrix_type = swizzle->val.node->data_type;
+    if (matrix_type->class != HLSL_CLASS_MATRIX)
+        return false;
+
+    if (!(var = hlsl_new_synthetic_var(ctx, "matrix-swizzle", instr->data_type, &instr->loc)))
+        return false;
+    hlsl_init_simple_deref_from_var(&var_deref, var);
+
+    for (i = 0; i < instr->data_type->dimx; ++i)
+    {
+        struct hlsl_block store_block;
+        struct hlsl_ir_node *load;
+
+        y = (swizzle->swizzle >> (8 * i + 4)) & 0xf;
+        x = (swizzle->swizzle >> 8 * i) & 0xf;
+        k = y * matrix_type->dimx + x;
+
+        if (!(load = hlsl_add_load_component(ctx, block, swizzle->val.node, k, &instr->loc)))
+            return false;
+
+        if (!hlsl_new_store_component(ctx, &store_block, &var_deref, i, load))
+            return false;
+        hlsl_block_add_block(block, &store_block);
+    }
+
+    if (!(var_load = hlsl_new_var_load(ctx, var, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, &var_load->node);
+
+    return true;
+}
+
 /* hlsl_ir_index nodes are a parse-time construct used to represent array indexing and struct
  * record access before knowing if they will be used in the lhs of an assignment --in which case
  * they are lowered into a deref-- or as the load of an element within a larger value.
@@ -4295,6 +4344,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     while (hlsl_transform_ir(ctx, lower_calls, body, NULL));
 
+    lower_ir(ctx, lower_matrix_swizzles, body);
     hlsl_transform_ir(ctx, lower_index_loads, body, NULL);
 
     LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
