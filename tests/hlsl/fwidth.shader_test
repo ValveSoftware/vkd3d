@@ -1,0 +1,26 @@
+[require]
+shader model >= 3.0
+
+[pixel shader]
+float4 main(float4 pos : sv_position) : sv_target
+{
+    // Shader models < 4 don't add 0.5 to sv_position, so this adjustment is required to get the
+    // same outputs.
+    pos.x = floor(pos.x) + 0.5;
+    pos.y = floor(pos.y) + 0.5;
+
+    pos /= 10.0;
+    float nonlinear = pos.x * pos.y - pos.x * (pos.x + 0.5);
+    float4 res = fwidth(nonlinear);
+
+    // Each device may use either the coarse or the fine derivate, so use quantization.
+    return round(30 * res);
+}
+
+[test]
+draw quad
+probe (10, 10) rgba (8.0, 8.0, 8.0, 8.0)
+probe (11, 10) rgba (8.0, 8.0, 8.0, 8.0)
+probe (12, 10) rgba (10.0, 10.0, 10.0, 10.0)
+probe (16, 16) rgba (12.0, 12.0, 12.0, 12.0)
+probe (150, 150) rgba (92.0, 92.0, 92.0, 92.0)
