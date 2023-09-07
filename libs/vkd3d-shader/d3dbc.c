@@ -1341,12 +1341,19 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
         ++instructions->count;
     }
 
-    *parser = &sm1->p;
-
     for (i = 0; i < ARRAY_SIZE(sm1->p.shader_desc.flat_constant_count); ++i)
         sm1->p.shader_desc.flat_constant_count[i].external = get_external_constant_count(sm1, i);
 
-    return sm1->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
+    if (sm1->p.failed)
+    {
+        WARN("Failed to parse shader.\n");
+        shader_sm1_destroy(&sm1->p);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    *parser = &sm1->p;
+
+    return VKD3D_OK;
 }
 
 bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
