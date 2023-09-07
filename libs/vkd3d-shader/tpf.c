@@ -2642,9 +2642,16 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL && !sm4->has_control_point_phase && !sm4->p.failed)
         shader_sm4_validate_default_phase_index_ranges(sm4);
 
+    if (sm4->p.failed)
+    {
+        WARN("Failed to parse shader.\n");
+        shader_sm4_destroy(&sm4->p);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
     *parser = &sm4->p;
 
-    return sm4->p.failed ? VKD3D_ERROR_INVALID_SHADER : VKD3D_OK;
+    return VKD3D_OK;
 }
 
 static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_block *block);
