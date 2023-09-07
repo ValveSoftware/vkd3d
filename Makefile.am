@@ -165,6 +165,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/precise-modifier.shader_test \
 	tests/hlsl/rasteriser-ordered-views.shader_test \
 	tests/hlsl/reflect.shader_test \
+	tests/hlsl/refract.shader_test \
 	tests/hlsl/register-reservations-numeric.shader_test \
 	tests/hlsl/register-reservations-resources.shader_test \
 	tests/hlsl/return-implicit-conversion.shader_test \

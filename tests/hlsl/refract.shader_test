@@ -1,0 +1,233 @@
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.550931, -0.453954, 0.3654653, -1.0248856) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    float2 _r = float2(r.x, r.y);
+    float2 _n = float2(n.x, n.y);
+    return float4(refract(_r, _n, i), 0, 0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    float2 _r = float2(r.x, r.y);
+    return float4(refract(_r, n, i), 0, 0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    float2 _n = float2(n.x, n.y);
+    return float4(refract(r, _n, i), 0, 0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    float1 _r = float1(r.x);
+    float1 _n = float1(n.x);
+    return float4(refract(_r, _n, i), 0, 0, 0);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.524978, 0.0, 0.0, 0.0) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n.x, i);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float 0.2
+todo(sm<6 | glsl) draw quad
+probe all rgba (-0.5562381, -0.6762381, -0.6162381, -0.5962381) 32
+uniform 8 float 100.0
+todo(sm<6 | glsl) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader fail(sm>=6) todo(sm<6)]
+float4 r;
+float4 n;
+float4 i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[test]
+uniform 0 float4 0.5 -0.1 0.2 0.3
+uniform 4 float4 0.6 0.4 -0.3 1.0
+uniform 8 float4 0.2 0.3 0.4 0.5
+if(sm<6) todo(sm<6 | glsl) draw quad
+if(sm<6) probe all rgba (-0.550931, -0.453954, 0.3654653, -1.0248856) 32
+uniform 8 float 100.0
+if(sm<6) todo(sm<6 | glsl) draw quad
+if(sm<6) probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader fail]
+float4x1 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader fail]
+float1x4 r;
+float4 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader fail]
+float4 r;
+float1x4 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader fail]
+float4 r;
+float4x1 n;
+float i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader fail]
+float4 r;
+float4 n;
+float1x4 i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader fail]
+float4 r;
+float4 n;
+float4x1 i;
+
+float4 main() : sv_target
+{
+    return refract(r, n, i);
+}
+
+[pixel shader todo(sm<6)]
+float4 r;
+float4 n;
+float i;
+
+float detect(float4 x)
+{
+    return 1;
+}
+
+float detect(half4 x)
+{
+    return 2;
+}
+
+float4 main() : sv_target
+{
+    return float4(detect(refract((half4)r, (half4)n, (half)i)),
+                  detect(refract(r, n, (half)i)),
+                  detect(refract(r, (half4)n, i)),
+                  detect(refract((half4)r, n, i)));
+}
+
+[test]
+todo(sm<6 | glsl) draw quad
+if(sm<6) probe all rgba (2.0, 1.0, 1.0, 1.0)
+if(sm>=6) probe all rgba (1.0, 1.0, 1.0, 1.0)
