@@ -3740,6 +3740,59 @@ static bool intrinsic_reflect(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_ADD, i, neg, loc);
 }
 
+static bool intrinsic_refract(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_type *r_type = params->args[0]->data_type;
+    struct hlsl_type *n_type = params->args[1]->data_type;
+    struct hlsl_type *i_type = params->args[2]->data_type;
+    struct hlsl_type *res_type, *idx_type, *scal_type;
+    struct parse_initializer mut_params;
+    struct hlsl_ir_function_decl *func;
+    enum hlsl_base_type base;
+    char *body;
+
+    static const char template[] =
+            "%s refract(%s r, %s n, %s i)\n"
+            "{\n"
+            "    %s d, t;\n"
+            "    d = dot(r, n);\n"
+            "    t = 1 - i.x * i.x * (1 - d * d);\n"
+            "    return t >= 0.0 ? i.x * r - (i.x * d + sqrt(t)) * n : 0;\n"
+            "}";
+
+    if (r_type->class == HLSL_CLASS_MATRIX
+            || n_type->class == HLSL_CLASS_MATRIX
+            || i_type->class == HLSL_CLASS_MATRIX)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "Matrix arguments are not supported.");
+        return false;
+    }
+
+    assert(params->args_count == 3);
+    mut_params = *params;
+    mut_params.args_count = 2;
+    if (!(res_type = elementwise_intrinsic_get_common_type(ctx, &mut_params, loc)))
+        return false;
+
+    base = expr_common_base_type(res_type->base_type, i_type->base_type);
+    base = base == HLSL_TYPE_HALF ? HLSL_TYPE_HALF : HLSL_TYPE_FLOAT;
+    res_type = convert_numeric_type(ctx, res_type, base);
+    idx_type = convert_numeric_type(ctx, i_type, base);
+    scal_type = hlsl_get_scalar_type(ctx, base);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template, res_type->name, res_type->name,
+            res_type->name, idx_type->name, scal_type->name)))
+        return false;
+
+    func = hlsl_compile_internal_function(ctx, "refract", body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
 static bool intrinsic_round(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -4255,6 +4308,7 @@ intrinsic_functions[] =
     {"pow",                                 2, true,  intrinsic_pow},
     {"radians",                             1, true,  intrinsic_radians},
     {"reflect",                             2, true,  intrinsic_reflect},
+    {"refract",                             3, true,  intrinsic_refract},
     {"round",                               1, true,  intrinsic_round},
     {"rsqrt",                               1, true,  intrinsic_rsqrt},
     {"saturate",                            1, true,  intrinsic_saturate},

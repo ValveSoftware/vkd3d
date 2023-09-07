@@ -1,4 +1,4 @@
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -12,13 +12,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-0.550931, -0.453954, 0.3654653, -1.0248856) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -34,13 +34,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -55,13 +55,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -76,13 +76,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (-0.519904912, -0.4332699, 0.0, 0.0) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(sm<4 | glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -98,13 +98,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-0.524978, 0.0, 0.0, 0.0) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader todo(sm<6)]
+[pixel shader]
 float4 r;
 float4 n;
 float i;
@@ -118,13 +118,13 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float 0.2
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (-0.5562381, -0.6762381, -0.6162381, -0.5962381) 32
 uniform 8 float 100.0
-todo(sm<6 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
-[pixel shader fail(sm>=6) todo(sm<6)]
+[pixel shader fail(sm>=6)]
 float4 r;
 float4 n;
 float4 i;
@@ -138,10 +138,10 @@ float4 main() : sv_target
 uniform 0 float4 0.5 -0.1 0.2 0.3
 uniform 4 float4 0.6 0.4 -0.3 1.0
 uniform 8 float4 0.2 0.3 0.4 0.5
-if(sm<6) todo(sm<6 | glsl) draw quad
+if(sm<6) todo(glsl) draw quad
 if(sm<6) probe all rgba (-0.550931, -0.453954, 0.3654653, -1.0248856) 32
 uniform 8 float 100.0
-if(sm<6) todo(sm<6 | glsl) draw quad
+if(sm<6) todo(glsl) draw quad
 if(sm<6) probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 [pixel shader fail]
