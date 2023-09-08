@@ -16,6 +16,7 @@ float4 main() : sv_target
     return 0;
 }
 
+
 [pixel shader todo]
 /* Test a basic overload. */
 float func(int arg)
@@ -38,3 +39,57 @@ float4 main() : sv_target
 [test]
 todo(sm<6) draw quad
 probe all rgba (0.1, 0.2, 0.1, 0.2)
+
+
+% float and float1 can be defined separately...
+
+[pixel shader todo]
+void func(float arg) {}
+void func(float1 arg) {}
+
+float4 main() : sv_target
+{
+    return 1.0;
+}
+
+
+% ...but invoking them is considered ambiguous and fails.
+
+[pixel shader fail]
+
+void func(float arg) {}
+void func(float1 arg) {}
+
+float4 main() : sv_target
+{
+    float x = 1.0;
+    func(x);
+    return 1.0;
+}
+
+[pixel shader fail]
+
+void func(float arg) {}
+void func(float1 arg) {}
+
+float4 main() : sv_target
+{
+    float1 x = {1.0};
+    func(x);
+    return 1.0;
+}
+
+
+% This holds true even if one variant isn't actually defined.
+
+[pixel shader fail todo]
+
+void func(float arg);
+void func(float1 arg) {}
+
+float4 main() : sv_target
+{
+    float1 x = {1.0};
+    func(x);
+    return 1.0;
+}
