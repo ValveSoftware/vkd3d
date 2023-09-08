@@ -2048,56 +2048,6 @@ void hlsl_pop_scope(struct hlsl_ctx *ctx)
     ctx->cur_scope = prev_scope;
 }
 
-static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hlsl_type *t2)
-{
-    int r;
-
-    if ((r = vkd3d_u32_compare(t1->class, t2->class)))
-        return r;
-    if ((r = vkd3d_u32_compare(t1->base_type, t2->base_type)))
-        return r;
-    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)
-    {
-        if ((r = vkd3d_u32_compare(t1->sampler_dim, t2->sampler_dim)))
-            return r;
-        if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
-                && (r = compare_param_hlsl_types(t1->e.resource_format, t2->e.resource_format)))
-            return r;
-    }
-    if ((r = vkd3d_u32_compare(t1->dimx, t2->dimx)))
-        return r;
-    if ((r = vkd3d_u32_compare(t1->dimy, t2->dimy)))
-        return r;
-    if (t1->class == HLSL_CLASS_STRUCT)
-    {
-        size_t i;
-
-        if (t1->e.record.field_count != t2->e.record.field_count)
-            return t1->e.record.field_count - t2->e.record.field_count;
-
-        for (i = 0; i < t1->e.record.field_count; ++i)
-        {
-            const struct hlsl_struct_field *field1 = &t1->e.record.fields[i];
-            const struct hlsl_struct_field *field2 = &t2->e.record.fields[i];
-
-            if ((r = compare_param_hlsl_types(field1->type, field2->type)))
-                return r;
-
-            if ((r = strcmp(field1->name, field2->name)))
-                return r;
-        }
-        return 0;
-    }
-    if (t1->class == HLSL_CLASS_ARRAY)
-    {
-        if ((r = vkd3d_u32_compare(t1->e.array.elements_count, t2->e.array.elements_count)))
-            return r;
-        return compare_param_hlsl_types(t1->e.array.type, t2->e.array.type);
-    }
-
-    return 0;
-}
-
 static bool func_decl_matches(const struct hlsl_ir_function_decl *decl,
         const struct hlsl_func_parameters *parameters)
 {
@@ -2108,7 +2058,7 @@ static bool func_decl_matches(const struct hlsl_ir_function_decl *decl,
 
     for (i = 0; i < parameters->count; ++i)
     {
-        if (compare_param_hlsl_types(parameters->vars[i]->data_type, decl->parameters.vars[i]->data_type))
+        if (!hlsl_types_are_equal(parameters->vars[i]->data_type, decl->parameters.vars[i]->data_type))
             return false;
     }
     return true;
