@@ -2098,21 +2098,20 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     return 0;
 }
 
-static int compare_function_decl(const struct hlsl_ir_function_decl *decl,
+static bool func_decl_matches(const struct hlsl_ir_function_decl *decl,
         const struct hlsl_func_parameters *parameters)
 {
     size_t i;
-    int r;
 
-    if ((r = vkd3d_u32_compare(parameters->count, decl->parameters.count)))
-        return r;
+    if (parameters->count != decl->parameters.count)
+        return false;
 
     for (i = 0; i < parameters->count; ++i)
     {
-        if ((r = compare_param_hlsl_types(parameters->vars[i]->data_type, decl->parameters.vars[i]->data_type)))
-            return r;
+        if (compare_param_hlsl_types(parameters->vars[i]->data_type, decl->parameters.vars[i]->data_type))
+            return false;
     }
-    return 0;
+    return true;
 }
 
 struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name,
@@ -2126,7 +2125,7 @@ struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const cha
 
     LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
     {
-        if (!compare_function_decl(decl, parameters))
+        if (func_decl_matches(decl, parameters))
             return decl;
     }
 
