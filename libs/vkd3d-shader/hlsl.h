@@ -450,7 +450,7 @@ struct hlsl_ir_function
     const char *name;
     /* Tree containing function definitions, stored as hlsl_ir_function_decl structures, which would
      *   be more than one in case of function overloading. */
-    struct rb_tree overloads;
+    struct list overloads;
 };
 
 struct hlsl_ir_function_decl
@@ -460,8 +460,8 @@ struct hlsl_ir_function_decl
     struct hlsl_ir_var *return_var;
 
     struct vkd3d_shader_location loc;
-    /* Item entry in hlsl_ir_function.overloads. The parameters' types are used as key. */
-    struct rb_entry entry;
+    /* Item entry in hlsl_ir_function.overloads. */
+    struct list entry;
 
     /* Function to which this declaration corresponds. */
     struct hlsl_ir_function *func;
@@ -1173,6 +1173,8 @@ void hlsl_free_var(struct hlsl_ir_var *decl);
 
 struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *name);
 struct hlsl_ir_function_decl *hlsl_get_first_func_decl(struct hlsl_ctx *ctx, const char *name);
+struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name,
+        const struct hlsl_func_parameters *parameters);
 const struct hlsl_profile_info *hlsl_get_target_info(const char *target);
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive, bool case_insensitive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);

@@ -3277,21 +3277,17 @@ static unsigned int index_instructions(struct hlsl_block *block, unsigned int in
     return index;
 }
 
-static void dump_function_decl(struct rb_entry *entry, void *context)
-{
-    struct hlsl_ir_function_decl *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
-    struct hlsl_ctx *ctx = context;
-
-    if (func->has_body)
-        hlsl_dump_function(ctx, func);
-}
-
 static void dump_function(struct rb_entry *entry, void *context)
 {
     struct hlsl_ir_function *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
+    struct hlsl_ir_function_decl *decl;
     struct hlsl_ctx *ctx = context;
 
-    rb_for_each_entry(&func->overloads, dump_function_decl, ctx);
+    LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+    {
+        if (decl->has_body)
+            hlsl_dump_function(ctx, decl);
+    }
 }
 
 static bool mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_deref *deref,

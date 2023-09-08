@@ -1158,22 +1158,6 @@ static struct hlsl_reg_reservation parse_packoffset(struct hlsl_ctx *ctx, const 
     return reservation;
 }
 
-static struct hlsl_ir_function_decl *get_func_decl(struct rb_tree *funcs,
-        const char *name, const struct hlsl_func_parameters *parameters)
-{
-    struct hlsl_ir_function *func;
-    struct rb_entry *entry;
-
-    if ((entry = rb_get(funcs, name)))
-    {
-        func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
-
-        if ((entry = rb_get(&func->overloads, parameters)))
-            return RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
-    }
-    return NULL;
-}
-
 static struct hlsl_block *make_block(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr)
 {
     struct hlsl_block *block;
@@ -2341,56 +2325,42 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
     return initializers;
 }
 
-struct find_function_call_args
+static bool func_is_exact_match(const struct hlsl_ir_function_decl *decl, const struct parse_initializer *args)
 {
-    struct hlsl_ctx *ctx;
-    const struct parse_initializer *params;
-    struct hlsl_ir_function_decl *decl;
-    unsigned int compatible_overloads_count;
-};
-
-static void find_function_call_exact(struct rb_entry *entry, void *context)
-{
-    struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
-    struct find_function_call_args *args = context;
     unsigned int i;
 
-    if (decl->parameters.count != args->params->args_count)
-        return;
+    if (decl->parameters.count != args->args_count)
+        return false;
 
     for (i = 0; i < decl->parameters.count; ++i)
     {
-        if (!hlsl_types_are_equal(decl->parameters.vars[i]->data_type, args->params->args[i]->data_type))
-            return;
+        if (!hlsl_types_are_equal(decl->parameters.vars[i]->data_type, args->args[i]->data_type))
+            return false;
     }
-    args->decl = decl;
+    return true;
 }
 
-static void find_function_call_compatible(struct rb_entry *entry, void *context)
+static bool func_is_compatible_match(struct hlsl_ctx *ctx,
+        const struct hlsl_ir_function_decl *decl, const struct parse_initializer *args)
 {
-    struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry);
-    struct find_function_call_args *args = context;
     unsigned int i;
 
-    if (decl->parameters.count != args->params->args_count)
-        return;
+    if (decl->parameters.count != args->args_count)
+        return false;
 
     for (i = 0; i < decl->parameters.count; ++i)
     {
-        if (!implicit_compatible_data_types(args->ctx, args->params->args[i]->data_type,
-                decl->parameters.vars[i]->data_type))
-            return;
+        if (!implicit_compatible_data_types(ctx, args->args[i]->data_type, decl->parameters.vars[i]->data_type))
+            return false;
     }
-
-    args->compatible_overloads_count++;
-    args->decl = decl;
+    return true;
 }
 
 static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
-        const char *name, const struct parse_initializer *params,
+        const char *name, const struct parse_initializer *args,
         const struct vkd3d_shader_location *loc)
 {
-    struct find_function_call_args args = {.ctx = ctx, .params = params};
+    struct hlsl_ir_function_decl *decl, *compatible_match = NULL;
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
 
@@ -2398,16 +2368,23 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
         return NULL;
     func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
 
-    rb_for_each_entry(&func->overloads, find_function_call_exact, &args);
-    if (!args.decl)
+    LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
     {
-        rb_for_each_entry(&func->overloads, find_function_call_compatible, &args);
-        if (args.compatible_overloads_count > 1)
+        if (func_is_exact_match(decl, args))
+            return decl;
+
+        if (func_is_compatible_match(ctx, decl, args))
         {
-            hlsl_fixme(ctx, loc, "Prioritize between multiple compatible function overloads.");
+            if (compatible_match)
+            {
+                hlsl_fixme(ctx, loc, "Prioritize between multiple compatible function overloads.");
+                break;
+            }
+            compatible_match = decl;
         }
     }
-    return args.decl;
+
+    return compatible_match;
 }
 
 static struct hlsl_ir_node *hlsl_new_void_expr(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc)
@@ -5415,7 +5392,7 @@ func_prototype_no_attrs:
                 hlsl_error(ctx, &@5, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
                         "packoffset() is not allowed on functions.");
 
-            if (($$.decl = get_func_decl(&ctx->functions, $3, &$5)))
+            if (($$.decl = hlsl_get_func_decl(ctx, $3, &$5)))
             {
                 const struct hlsl_func_parameters *params = &$$.decl->parameters;
                 size_t i;

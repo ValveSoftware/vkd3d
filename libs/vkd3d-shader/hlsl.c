@@ -827,15 +827,13 @@ struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *nam
 
 struct hlsl_ir_function_decl *hlsl_get_first_func_decl(struct hlsl_ctx *ctx, const char *name)
 {
-    struct hlsl_ir_function_decl *decl;
     struct hlsl_ir_function *func;
     struct rb_entry *entry;
 
     if ((entry = rb_get(&ctx->functions, name)))
     {
         func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
-        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
-            return decl;
+        return LIST_ENTRY(list_head(&func->overloads), struct hlsl_ir_function_decl, entry);
     }
 
     return NULL;
@@ -2104,10 +2102,9 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     return 0;
 }
 
-static int compare_function_decl_rb(const void *key, const struct rb_entry *entry)
+static int compare_function_decl(const struct hlsl_ir_function_decl *decl,
+        const struct hlsl_func_parameters *parameters)
 {
-    const struct hlsl_ir_function_decl *decl = RB_ENTRY_VALUE(entry, const struct hlsl_ir_function_decl, entry);
-    const struct hlsl_func_parameters *parameters = key;
     size_t i;
     int r;
 
@@ -2120,6 +2117,24 @@ static int compare_function_decl_rb(const void *key, const struct rb_entry *entr
             return r;
     }
     return 0;
+}
+
+struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name,
+        const struct hlsl_func_parameters *parameters)
+{
+    struct hlsl_ir_function_decl *decl;
+    struct hlsl_ir_function *func;
+
+    if (!(func = hlsl_get_function(ctx, name)))
+        return NULL;
+
+    LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+    {
+        if (!compare_function_decl(decl, parameters))
+            return decl;
+    }
+
+    return NULL;
 }
 
 struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const struct hlsl_type *type)
@@ -3138,14 +3153,12 @@ static void free_function_decl(struct hlsl_ir_function_decl *decl)
     vkd3d_free(decl);
 }
 
-static void free_function_decl_rb(struct rb_entry *entry, void *context)
-{
-    free_function_decl(RB_ENTRY_VALUE(entry, struct hlsl_ir_function_decl, entry));
-}
-
 static void free_function(struct hlsl_ir_function *func)
 {
-    rb_destroy(&func->overloads, free_function_decl_rb, NULL);
+    struct hlsl_ir_function_decl *decl, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(decl, next, &func->overloads, struct hlsl_ir_function_decl, entry)
+        free_function_decl(decl);
     vkd3d_free((void *)func->name);
     vkd3d_free(func);
 }
@@ -3175,17 +3188,15 @@ void hlsl_add_function(struct hlsl_ctx *ctx, char *name, struct hlsl_ir_function
     {
         func = RB_ENTRY_VALUE(func_entry, struct hlsl_ir_function, entry);
         decl->func = func;
-
-        if (rb_put(&func->overloads, &decl->parameters, &decl->entry) == -1)
-            ERR("Failed to insert function overload.\n");
+        list_add_tail(&func->overloads, &decl->entry);
         vkd3d_free(name);
         return;
     }
     func = hlsl_alloc(ctx, sizeof(*func));
     func->name = name;
-    rb_init(&func->overloads, compare_function_decl_rb);
+    list_init(&func->overloads);
     decl->func = func;
-    rb_put(&func->overloads, &decl->parameters, &decl->entry);
+    list_add_tail(&func->overloads, &decl->entry);
     rb_put(&ctx->functions, func->name, &func->entry);
 }
 
@@ -3674,7 +3685,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
 
     if ((func = hlsl_get_function(&ctx, entry_point)))
     {
-        RB_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
+        LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
         {
             if (!decl->has_body)
                 continue;
