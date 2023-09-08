@@ -7004,7 +7004,7 @@ static void spirv_compiler_emit_udiv(struct spirv_compiler *compiler,
 static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    uint32_t src_id, int_min_id, int_max_id, float_max_id, condition_id, val_id;
+    uint32_t src_id, int_min_id, int_max_id, zero_id, float_max_id, condition_id, val_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
@@ -7034,6 +7034,10 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
 
     val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpConvertFToS, dst_type_id, val_id);
     val_id = vkd3d_spirv_build_op_select(builder, dst_type_id, condition_id, int_max_id, val_id);
+
+    zero_id = spirv_compiler_get_constant_int_vector(compiler, 0, component_count);
+    condition_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpIsNan, condition_type_id, src_id);
+    val_id = vkd3d_spirv_build_op_select(builder, dst_type_id, condition_id, zero_id, val_id);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
