@@ -2325,21 +2325,6 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
     return initializers;
 }
 
-static bool func_is_exact_match(const struct hlsl_ir_function_decl *decl, const struct parse_initializer *args)
-{
-    unsigned int i;
-
-    if (decl->parameters.count != args->args_count)
-        return false;
-
-    for (i = 0; i < decl->parameters.count; ++i)
-    {
-        if (!hlsl_types_are_equal(decl->parameters.vars[i]->data_type, args->args[i]->data_type))
-            return false;
-    }
-    return true;
-}
-
 static bool func_is_compatible_match(struct hlsl_ctx *ctx,
         const struct hlsl_ir_function_decl *decl, const struct parse_initializer *args)
 {
@@ -2370,9 +2355,6 @@ static struct hlsl_ir_function_decl *find_function_call(struct hlsl_ctx *ctx,
 
     LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
     {
-        if (func_is_exact_match(decl, args))
-            return decl;
-
         if (func_is_compatible_match(ctx, decl, args))
         {
             if (compatible_match)
