@@ -261,7 +261,7 @@ static const struct vkd3d_sm1_opcode_info vs_opcode_table[] =
     {VKD3D_SM1_OP_M3x3,         1, 2, VKD3DSIH_M3x3},
     {VKD3D_SM1_OP_M3x2,         1, 2, VKD3DSIH_M3x2},
     /* Declarations */
-    {VKD3D_SM1_OP_DCL,          0, 2, VKD3DSIH_DCL},
+    {VKD3D_SM1_OP_DCL,          0, 0, VKD3DSIH_DCL},
     /* Constant definitions */
     {VKD3D_SM1_OP_DEF,          1, 1, VKD3DSIH_DEF},
     {VKD3D_SM1_OP_DEFB,         1, 1, VKD3DSIH_DEFB},
@@ -328,7 +328,7 @@ static const struct vkd3d_sm1_opcode_info ps_opcode_table[] =
     {VKD3D_SM1_OP_M3x3,         1, 2, VKD3DSIH_M3x3},
     {VKD3D_SM1_OP_M3x2,         1, 2, VKD3DSIH_M3x2},
     /* Declarations */
-    {VKD3D_SM1_OP_DCL,          0, 2, VKD3DSIH_DCL},
+    {VKD3D_SM1_OP_DCL,          0, 0, VKD3DSIH_DCL},
     /* Constant definitions */
     {VKD3D_SM1_OP_DEF,          1, 1, VKD3DSIH_DEF},
     {VKD3D_SM1_OP_DEFB,         1, 1, VKD3DSIH_DEFB},
@@ -851,6 +851,14 @@ static void shader_sm1_skip_opcode(const struct vkd3d_shader_sm1_parser *sm1, co
         length = (opcode_token & VKD3D_SM1_INSTRUCTION_LENGTH_MASK) >> VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
         *ptr += length;
         return;
+    }
+
+    /* DCL instructions do not have sources or destinations, but they
+     * read two tokens to a semantic. See
+     * shader_sm1_read_semantic(). */
+    if (opcode_info->vkd3d_opcode == VKD3DSIH_DCL)
+    {
+        *ptr += 2;
     }
 
     *ptr += (opcode_info->dst_count + opcode_info->src_count);
