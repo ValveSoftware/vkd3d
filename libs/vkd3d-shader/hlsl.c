@@ -2053,11 +2053,7 @@ static int compare_param_hlsl_types(const struct hlsl_type *t1, const struct hls
     int r;
 
     if ((r = vkd3d_u32_compare(t1->class, t2->class)))
-    {
-        if (!((t1->class == HLSL_CLASS_SCALAR && t2->class == HLSL_CLASS_VECTOR)
-                || (t1->class == HLSL_CLASS_VECTOR && t2->class == HLSL_CLASS_SCALAR)))
-            return r;
-    }
+        return r;
     if ((r = vkd3d_u32_compare(t1->base_type, t2->base_type)))
         return r;
     if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE)

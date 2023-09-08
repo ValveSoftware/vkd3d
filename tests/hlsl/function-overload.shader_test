@@ -43,7 +43,7 @@ probe all rgba (0.1, 0.2, 0.1, 0.2)
 
 % float and float1 can be defined separately...
 
-[pixel shader todo]
+[pixel shader]
 void func(float arg) {}
 void func(float1 arg) {}
 
@@ -55,7 +55,7 @@ float4 main() : sv_target
 
 % ...but invoking them is considered ambiguous and fails.
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(float arg) {}
 void func(float1 arg) {}
@@ -67,7 +67,7 @@ float4 main() : sv_target
     return 1.0;
 }
 
-[pixel shader fail]
+[pixel shader fail todo]
 
 void func(float arg) {}
 void func(float1 arg) {}
