@@ -2186,7 +2186,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
                     "Target profile doesn't support objects as struct members in uniform variables.");
         }
 
-        if ((func = hlsl_get_func_decl(ctx, var->name)))
+        if ((func = hlsl_get_first_func_decl(ctx, var->name)))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
                     "'%s' is already defined as a function.", var->name);

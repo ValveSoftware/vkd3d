@@ -825,7 +825,7 @@ struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *nam
     return NULL;
 }
 
-struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name)
+struct hlsl_ir_function_decl *hlsl_get_first_func_decl(struct hlsl_ctx *ctx, const char *name)
 {
     struct hlsl_ir_function_decl *decl;
     struct hlsl_ir_function *func;
@@ -3740,7 +3740,7 @@ struct hlsl_ir_function_decl *hlsl_compile_internal_function(struct hlsl_ctx *ct
         hlsl_release_string_buffer(ctx, internal_name);
         return NULL;
     }
-    func = hlsl_get_func_decl(ctx, internal_name->buffer);
+    func = hlsl_get_first_func_decl(ctx, internal_name->buffer);
     hlsl_release_string_buffer(ctx, internal_name);
     return func;
 }
