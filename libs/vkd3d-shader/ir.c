@@ -1010,7 +1010,6 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
         struct io_normaliser *normaliser)
 {
     struct vkd3d_shader_register *reg;
-    bool keep = true;
     unsigned int i;
 
     switch (ins->handler_idx)
@@ -1029,15 +1028,16 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             /* fall through */
         case VKD3DSIH_DCL_INPUT_PS:
         case VKD3DSIH_DCL_OUTPUT:
-            keep = shader_dst_param_io_normalise(&ins->declaration.dst, true, normaliser);
+            if (!shader_dst_param_io_normalise(&ins->declaration.dst, true, normaliser))
+                vkd3d_shader_instruction_make_nop(ins);
             break;
         case VKD3DSIH_DCL_INPUT_SGV:
         case VKD3DSIH_DCL_INPUT_SIV:
         case VKD3DSIH_DCL_INPUT_PS_SGV:
         case VKD3DSIH_DCL_INPUT_PS_SIV:
         case VKD3DSIH_DCL_OUTPUT_SIV:
-            keep = shader_dst_param_io_normalise(&ins->declaration.register_semantic.reg, true,
-                    normaliser);
+            if (!shader_dst_param_io_normalise(&ins->declaration.register_semantic.reg, true, normaliser))
+                vkd3d_shader_instruction_make_nop(ins);
             break;
         case VKD3DSIH_HS_CONTROL_POINT_PHASE:
         case VKD3DSIH_HS_FORK_PHASE:
@@ -1056,9 +1056,6 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
                 shader_src_param_io_normalise((struct vkd3d_shader_src_param *)&ins->src[i], normaliser);
             break;
     }
-
-    if (!keep)
-        vsir_instruction_init(ins, VKD3DSIH_NOP);
 }
 
 static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,
