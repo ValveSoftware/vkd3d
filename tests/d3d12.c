@@ -5474,39 +5474,32 @@ static void test_multiple_render_targets(void)
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    D3D12_SHADER_BYTECODE ps;
+    ID3D10Blob *bytecode;
     unsigned int i;
     HRESULT hr;
 
-    static const DWORD ps_code[] =
-    {
-#if 0
-        void main(out float4 target0 : SV_Target0, out float4 target1 : SV_Target1,
-                out float4 target2 : SV_Target2)
-        {
-            target0 = float4(1.0f, 0.0f, 0.0f, 1.0f);
-            target1 = float4(2.0f, 0.0f, 0.0f, 1.0f);
-            target2 = float4(3.0f, 0.0f, 0.0f, 1.0f);
-        }
-#endif
-        0x43425844, 0xc4325131, 0x8ba4a693, 0x08d15431, 0xcb990885, 0x00000001, 0x0000013c, 0x00000003,
-        0x0000002c, 0x0000003c, 0x000000a0, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x0000005c, 0x00000003, 0x00000008, 0x00000050, 0x00000000, 0x00000000, 0x00000003, 0x00000000,
-        0x0000000f, 0x00000050, 0x00000001, 0x00000000, 0x00000003, 0x00000001, 0x0000000f, 0x00000050,
-        0x00000002, 0x00000000, 0x00000003, 0x00000002, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074,
-        0x58454853, 0x00000094, 0x00000050, 0x00000025, 0x0100086a, 0x03000065, 0x001020f2, 0x00000000,
-        0x03000065, 0x001020f2, 0x00000001, 0x03000065, 0x001020f2, 0x00000002, 0x08000036, 0x001020f2,
-        0x00000000, 0x00004002, 0x3f800000, 0x00000000, 0x00000000, 0x3f800000, 0x08000036, 0x001020f2,
-        0x00000001, 0x00004002, 0x40000000, 0x00000000, 0x00000000, 0x3f800000, 0x08000036, 0x001020f2,
-        0x00000002, 0x00004002, 0x40400000, 0x00000000, 0x00000000, 0x3f800000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char ps_code[] =
+            "void main(out float4 target0 : SV_Target0, out float4 target1 : SV_Target1,\n"
+            "        out float4 target2 : SV_Target2)\n"
+            "{\n"
+            "    target0 = float4(1.0f, 0.0f, 0.0f, 1.0f);\n"
+            "    target1 = float4(2.0f, 0.0f, 0.0f, 1.0f);\n"
+            "    target2 = float4(3.0f, 0.0f, 0.0f, 1.0f);\n"
+            "}\n";
+
+    bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(bytecode);
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     desc.rt_descriptor_count = ARRAY_SIZE(rtvs);
     desc.no_pipeline = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -5588,6 +5581,8 @@ static void test_multiple_render_targets(void)
     for (i = 0; i < ARRAY_SIZE(render_targets); ++i)
         ID3D12Resource_Release(render_targets[i]);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(bytecode);
 }
 
 static void test_unknown_rtv_format(void)
