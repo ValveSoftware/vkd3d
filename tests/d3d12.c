@@ -5700,40 +5700,37 @@ static void test_unknown_dsv_format(void)
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
     struct depth_stencil_resource ds;
+    D3D12_SHADER_BYTECODE ps_color;
     D3D12_CLEAR_VALUE clear_value;
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    ID3D10Blob *bytecode;
     HRESULT hr;
 
-    static const DWORD ps_color_code[] =
-    {
-#if 0
-        float4 color;
+    static const char ps_color_code[] =
+            "float4 color;\n"
+            "\n"
+            "float4 main(float4 position : SV_POSITION) : SV_Target\n"
+            "{\n"
+            "    return color;\n"
+            "}\n";
 
-        float4 main(float4 position : SV_POSITION) : SV_Target
-        {
-            return color;
-        }
-#endif
-        0x43425844, 0xd18ead43, 0x8b8264c1, 0x9c0a062d, 0xfc843226, 0x00000001, 0x000000e0, 0x00000003,
-        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
-        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x505f5653, 0x5449534f, 0x004e4f49,
-        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
-        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000044, 0x00000050,
-        0x00000011, 0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2,
-        0x00000000, 0x06000036, 0x001020f2, 0x00000000, 0x00208e46, 0x00000000, 0x00000000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps_color = {ps_color_code, sizeof(ps_color_code)};
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     static const struct vec4 green = {0.0f, 1.0f, 0.0f, 1.0f};
     static const struct vec4 red = {1.0f, 0.0f, 0.0f, 1.0f};
+
+    bytecode = compile_shader(ps_color_code, sizeof(ps_color_code) - 1, "ps_4_0");
+    ps_color = shader_bytecode_from_blob(bytecode);
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     desc.no_root_signature = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -5895,6 +5892,8 @@ static void test_unknown_dsv_format(void)
 
     destroy_depth_stencil(&ds);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(bytecode);
 }
 
 static void test_append_aligned_element(void)
