@@ -2523,36 +2523,19 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
-    struct hlsl_block then_block, else_block;
-    struct hlsl_ir_node *iff, *store;
-    struct hlsl_ir_load *load;
-    struct hlsl_ir_var *var;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
+    struct hlsl_ir_node *cond;
 
     assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
 
-    if (!(var = hlsl_new_synthetic_var(ctx, "conditional", if_true->data_type, &condition->loc)))
-        return NULL;
+    operands[0] = condition;
+    operands[1] = if_true;
+    operands[2] = if_false;
+    if (!(cond = hlsl_new_expr(ctx, HLSL_OP3_TERNARY, operands, if_true->data_type, &condition->loc)))
+        return false;
+    hlsl_block_add_instr(instrs, cond);
 
-    hlsl_block_init(&then_block);
-    hlsl_block_init(&else_block);
-
-    if (!(store = hlsl_new_simple_store(ctx, var, if_true)))
-        return NULL;
-    hlsl_block_add_instr(&then_block, store);
-
-    if (!(store = hlsl_new_simple_store(ctx, var, if_false)))
-        return NULL;
-    hlsl_block_add_instr(&else_block, store);
-
-    if (!(iff = hlsl_new_if(ctx, condition, &then_block, &else_block, &condition->loc)))
-        return NULL;
-    hlsl_block_add_instr(instrs, iff);
-
-    if (!(load = hlsl_new_var_load(ctx, var, &condition->loc)))
-        return NULL;
-    hlsl_block_add_instr(instrs, &load->node);
-
-    return &load->node;
+    return cond;
 }
 
 static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)

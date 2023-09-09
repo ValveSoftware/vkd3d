@@ -100,3 +100,22 @@ float4 main() : SV_TARGET
 uniform 0 float4 5.0 -7.0 0.0 -10.0
 draw quad
 probe all rgba (5.0, 7.0, 0.0, 10.0)
+
+[pixel shader]
+uniform float4 a;
+uniform float4 b;
+
+float4 main() : sv_target
+{
+    int2 x = a.xz;
+    int2 y = a.yw;
+    int2 z = b.xy;
+    int2 w = b.zw;
+    return float4(x / y, z % w);
+}
+
+[test]
+uniform 0 float4 45.0 5.0 50.0 10.0
+uniform 4 float4 3.0 8.0 2.0 5.0
+draw quad
+probe all rgba (9.0, 5.0, 1.0, 3.0)

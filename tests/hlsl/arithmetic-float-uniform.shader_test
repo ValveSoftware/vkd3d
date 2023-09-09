@@ -58,6 +58,20 @@ uniform 0 float4 45.0 5.0 0.0 0.0
 draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
+[pixel shader]
+float4 x, y;
+
+float4 main() : sv_target
+{
+    return x % y;
+}
+
+[test]
+uniform 0 float4 5.0 -42.1 4.0 45.0
+uniform 4 float4 15.0 -5.0 4.1 5.0
+draw quad
+probe all rgba (5.0, -2.1, 4.0, 0.0) 4
+
 [require]
 % Infinities are not allowed in SM1
 shader model >= 4.0
