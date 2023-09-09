@@ -88,6 +88,11 @@ static D3D12_SHADER_BYTECODE shader_bytecode(const DWORD *code, size_t size)
     return shader_bytecode;
 }
 
+static inline D3D12_SHADER_BYTECODE shader_bytecode_from_blob(ID3D10Blob *blob)
+{
+    return shader_bytecode(ID3D10Blob_GetBufferPointer(blob), ID3D10Blob_GetBufferSize(blob));
+}
+
 static void exec_command_list(ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *list)
 {
     ID3D12CommandList *lists[] = {(ID3D12CommandList *)list};

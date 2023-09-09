@@ -28,6 +28,20 @@ struct test_options test_options = {0};
 static PFN_D3D12_CREATE_VERSIONED_ROOT_SIGNATURE_DESERIALIZER pfn_D3D12CreateVersionedRootSignatureDeserializer;
 static PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE pfn_D3D12SerializeVersionedRootSignature;
 
+static ID3D10Blob *compile_shader(const char *source, size_t len, const char *profile)
+{
+    ID3D10Blob *bytecode = NULL, *errors = NULL;
+    HRESULT hr;
+
+    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, 0, 0, &bytecode, &errors);
+    ok(hr == S_OK, "Cannot compile shader, hr %#x.\n", hr);
+    ok(!!bytecode, "Compilation didn't produce any bytecode.\n");
+    if (errors)
+        ID3D10Blob_Release(errors);
+
+    return bytecode;
+}
+
 struct dvec2
 {
     double x, y;
@@ -2885,24 +2899,23 @@ static void test_create_compute_pipeline_state(void)
     ID3D12RootSignature *root_signature;
     ID3D12PipelineState *pipeline_state;
     ID3D12Device *device, *tmp_device;
+    ID3D10Blob *bytecode;
     ULONG refcount;
     HRESULT hr;
 
-    static const DWORD dxbc_code[] =
-    {
-#if 0
-        [numthreads(1, 1, 1)]
-        void main() { }
-#endif
-        0x43425844, 0x1acc3ad0, 0x71c7b057, 0xc72c4306, 0xf432cb57, 0x00000001, 0x00000074, 0x00000003,
-        0x0000002c, 0x0000003c, 0x0000004c, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x00000008, 0x00000000, 0x00000008, 0x58454853, 0x00000020, 0x00050050, 0x00000008, 0x0100086a,
-        0x0400009b, 0x00000001, 0x00000001, 0x00000001, 0x0100003e,
-    };
+    static const char shader_code[] =
+            "[numthreads(1, 1, 1)]\n"
+            "void main() { }\n";
+
+    bytecode = compile_shader(shader_code, sizeof(shader_code) - 1, "cs_4_0");
 
     if (!(device = create_device()))
     {
         skip("Failed to create device.\n");
+
+        refcount = ID3D10Blob_Release(bytecode);
+        ok(!refcount, "ID3D10Blob has %u references left.\n", (unsigned int)refcount);
+
         return;
     }
 
@@ -2919,7 +2932,7 @@ static void test_create_compute_pipeline_state(void)
 
     memset(&pipeline_state_desc, 0, sizeof(pipeline_state_desc));
     pipeline_state_desc.pRootSignature = root_signature;
-    pipeline_state_desc.CS = shader_bytecode(dxbc_code, sizeof(dxbc_code));
+    pipeline_state_desc.CS = shader_bytecode_from_blob(bytecode);
     pipeline_state_desc.NodeMask = 0;
     pipeline_state_desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 
@@ -2951,6 +2964,9 @@ static void test_create_compute_pipeline_state(void)
 
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
+
+    refcount = ID3D10Blob_Release(bytecode);
+    ok(!refcount, "ID3D10Blob has %u references left.\n", (unsigned int)refcount);
 }
 
 static void test_create_graphics_pipeline_state(void)
