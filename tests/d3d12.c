@@ -5598,35 +5598,30 @@ static void test_unknown_rtv_format(void)
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    D3D12_SHADER_BYTECODE ps;
+    ID3D10Blob *bytecode;
     unsigned int i;
     HRESULT hr;
 
-    static const DWORD ps_code[] =
-    {
-#if 0
-        void main(out float4 target1 : SV_Target1, out float4 target2 : SV_Target2)
-        {
-            target1 = float4(2.0f, 0.0f, 0.0f, 1.0f);
-            target2 = float4(3.0f, 0.0f, 0.0f, 1.0f);
-        }
-#endif
-        0x43425844, 0x980554be, 0xb8743fb0, 0xf5bb8deb, 0x639feaf8, 0x00000001, 0x000000f4, 0x00000003,
-        0x0000002c, 0x0000003c, 0x00000088, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x00000044, 0x00000002, 0x00000008, 0x00000038, 0x00000001, 0x00000000, 0x00000003, 0x00000001,
-        0x0000000f, 0x00000038, 0x00000002, 0x00000000, 0x00000003, 0x00000002, 0x0000000f, 0x545f5653,
-        0x65677261, 0xabab0074, 0x52444853, 0x00000064, 0x00000040, 0x00000019, 0x03000065, 0x001020f2,
-        0x00000001, 0x03000065, 0x001020f2, 0x00000002, 0x08000036, 0x001020f2, 0x00000001, 0x00004002,
-        0x40000000, 0x00000000, 0x00000000, 0x3f800000, 0x08000036, 0x001020f2, 0x00000002, 0x00004002,
-        0x40400000, 0x00000000, 0x00000000, 0x3f800000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char ps_code[] =
+            "void main(out float4 target1 : SV_Target1, out float4 target2 : SV_Target2)\n"
+            "{\n"
+            "    target1 = float4(2.0f, 0.0f, 0.0f, 1.0f);\n"
+            "    target2 = float4(3.0f, 0.0f, 0.0f, 1.0f);\n"
+            "}\n";
+
+    bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(bytecode);
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     desc.rt_descriptor_count = 16;
     desc.no_pipeline = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -5696,6 +5691,8 @@ static void test_unknown_rtv_format(void)
         ID3D12Resource_Release(render_targets[i]);
     destroy_depth_stencil(&ds);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(bytecode);
 }
 
 static void test_unknown_dsv_format(void)
