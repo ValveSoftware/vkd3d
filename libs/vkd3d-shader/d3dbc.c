@@ -1982,10 +1982,6 @@ static void write_sm1_sampler_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_bu
 
     switch (sampler_dim)
     {
-        case HLSL_SAMPLER_DIM_1D:
-            res_type = VKD3D_SM1_RESOURCE_TEXTURE_1D;
-            break;
-
         case HLSL_SAMPLER_DIM_2D:
             res_type = VKD3D_SM1_RESOURCE_TEXTURE_2D;
             break;
