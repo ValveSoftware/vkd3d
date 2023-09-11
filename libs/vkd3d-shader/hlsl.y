@@ -3457,7 +3457,42 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 
     if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, hlsl_sampler_dim_count(dim)), loc)))
-        coords = params->args[1];
+    {
+        return false;
+    }
+
+    /* tex1D() functions never produce 1D resource declarations. For newer profiles half offset
+       is used for the second coordinate, while older ones appear to replicate first coordinate.*/
+    if (dim == HLSL_SAMPLER_DIM_1D)
+    {
+        struct hlsl_ir_load *load;
+        struct hlsl_ir_node *half;
+        struct hlsl_ir_var *var;
+        unsigned int idx = 0;
+
+        if (!(var = hlsl_new_synthetic_var(ctx, "coords", hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 2), loc)))
+            return false;
+
+        initialize_var_components(ctx, params->instrs, var, &idx, coords);
+        if (shader_profile_version_ge(ctx, 4, 0))
+        {
+            if (!(half = hlsl_new_float_constant(ctx, 0.5f, loc)))
+                return false;
+            hlsl_block_add_instr(params->instrs, half);
+
+            initialize_var_components(ctx, params->instrs, var, &idx, half);
+        }
+        else
+            initialize_var_components(ctx, params->instrs, var, &idx, coords);
+
+        if (!(load = hlsl_new_var_load(ctx, var, loc)))
+            return false;
+        hlsl_block_add_instr(params->instrs, &load->node);
+
+        coords = &load->node;
+
+        dim = HLSL_SAMPLER_DIM_2D;
+    }
 
     load_params.coords = coords;
     load_params.resource = params->args[0];
