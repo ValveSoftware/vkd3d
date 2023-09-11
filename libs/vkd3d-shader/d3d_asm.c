@@ -714,7 +714,7 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
                 break;
 
             case VKD3D_DECL_USAGE_TEXCOORD:
-                shader_addline(buffer, "texture%u", semantic->usage_idx);
+                shader_addline(buffer, "texcoord%u", semantic->usage_idx);
                 break;
 
             case VKD3D_DECL_USAGE_TANGENT:
