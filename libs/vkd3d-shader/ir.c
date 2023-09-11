@@ -31,11 +31,7 @@ static bool shader_instruction_is_dcl(const struct vkd3d_shader_instruction *ins
 
 static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *ins)
 {
-    ins->handler_idx = VKD3DSIH_NOP;
-    ins->dst_count = 0;
-    ins->src_count = 0;
-    ins->dst = NULL;
-    ins->src = NULL;
+    vsir_instruction_init(ins, VKD3DSIH_NOP);
 }
 
 static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
