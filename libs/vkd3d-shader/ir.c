@@ -313,7 +313,7 @@ void shader_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_r
     reg->immconst_type = VKD3D_IMMCONST_SCALAR;
 }
 
-void shader_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx)
+void vsir_instruction_init(struct vkd3d_shader_instruction *ins, enum vkd3d_shader_opcode handler_idx)
 {
     memset(ins, 0, sizeof(*ins));
     ins->handler_idx = handler_idx;
@@ -343,7 +343,7 @@ static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd
 
         if (!shader_instruction_array_reserve(&flattener.instructions, flattener.instructions.count + 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
-        shader_instruction_init(&instructions->elements[instructions->count++], VKD3DSIH_RET);
+        vsir_instruction_init(&instructions->elements[instructions->count++], VKD3DSIH_RET);
     }
 
     *src_instructions = flattener.instructions;
@@ -422,7 +422,7 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
     normaliser->instructions.count += count;
 
     ins = &normaliser->instructions.elements[dst];
-    shader_instruction_init(ins, VKD3DSIH_HS_CONTROL_POINT_PHASE);
+    vsir_instruction_init(ins, VKD3DSIH_HS_CONTROL_POINT_PHASE);
     ins->flags = 1;
     ++ins;
 
@@ -434,13 +434,13 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 
         if (e->sysval_semantic != VKD3D_SHADER_SV_NONE)
         {
-            shader_instruction_init(ins, VKD3DSIH_DCL_INPUT_SIV);
+            vsir_instruction_init(ins, VKD3DSIH_DCL_INPUT_SIV);
             param = &ins->declaration.register_semantic.reg;
             ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
         }
         else
         {
-            shader_instruction_init(ins, VKD3DSIH_DCL_INPUT);
+            vsir_instruction_init(ins, VKD3DSIH_DCL_INPUT);
             param = &ins->declaration.dst;
         }
 
@@ -1062,7 +1062,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
     }
 
     if (!keep)
-        shader_instruction_init(ins, VKD3DSIH_NOP);
+        vsir_instruction_init(ins, VKD3DSIH_NOP);
 }
 
 static enum vkd3d_result instruction_array_normalise_io_registers(struct vkd3d_shader_instruction_array *instructions,

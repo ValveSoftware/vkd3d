@@ -2327,7 +2327,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
         return;
     }
 
-    ins->handler_idx = opcode_info->handler_idx;
+    vsir_instruction_init(ins, opcode_info->handler_idx);
     if (ins->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE || ins->handler_idx == VKD3DSIH_HS_FORK_PHASE
             || ins->handler_idx == VKD3DSIH_HS_JOIN_PHASE)
         sm4->phase = ins->handler_idx;

@@ -1090,7 +1090,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         goto fail;
     }
 
-    ins->handler_idx = opcode_info->vkd3d_opcode;
+    vsir_instruction_init(ins, opcode_info->vkd3d_opcode);
     ins->flags = (opcode_token & VKD3D_SM1_INSTRUCTION_FLAGS_MASK) >> VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
     ins->coissue = opcode_token & VKD3D_SM1_COISSUE;
     ins->raw = false;
