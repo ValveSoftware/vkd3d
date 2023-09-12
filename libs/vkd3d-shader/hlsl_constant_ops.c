@@ -869,6 +869,40 @@ static bool fold_nequal(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, c
     return true;
 }
 
+static bool fold_ternary(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2, const struct hlsl_ir_constant *src3)
+{
+    unsigned int k;
+
+    assert(dst_type->base_type == src2->node.data_type->base_type);
+    assert(dst_type->base_type == src3->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (src1->node.data_type->base_type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k] = src1->value.u[k].f != 0.0f ? src2->value.u[k] : src3->value.u[k];
+                break;
+
+            case HLSL_TYPE_DOUBLE:
+                dst->u[k] = src1->value.u[k].d != 0.0 ? src2->value.u[k] : src3->value.u[k];
+                break;
+
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
+                dst->u[k] = src1->value.u[k].u ? src2->value.u[k] : src3->value.u[k];
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+    return true;
+}
+
 bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *arg3 = NULL;
@@ -988,6 +1022,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP3_DP2ADD:
             success = fold_dp2add(ctx, &res, instr->data_type, arg1, arg2, arg3);
+            break;
+
+        case HLSL_OP3_TERNARY:
+            success = fold_ternary(ctx, &res, instr->data_type, arg1, arg2, arg3);
             break;
 
         default:
