@@ -88,6 +88,31 @@ static int32_t float_to_int(float x)
     return x;
 }
 
+static uint32_t double_to_uint(double x)
+{
+    if (isnan(x) || x <= 0)
+        return 0;
+
+    if (x >= 4294967296.0)
+        return UINT32_MAX;
+
+    return x;
+}
+
+static int32_t double_to_int(double x)
+{
+    if (isnan(x))
+        return 0;
+
+    if (x <= -2147483648.0)
+        return INT32_MIN;
+
+    if (x >= 2147483648.0)
+        return INT32_MAX;
+
+    return x;
+}
+
 static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
@@ -118,8 +143,8 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
                 break;
 
             case HLSL_TYPE_DOUBLE:
-                u = src->value.u[k].d;
-                i = src->value.u[k].d;
+                u = double_to_uint(src->value.u[k].d);
+                i = double_to_int(src->value.u[k].d);
                 f = src->value.u[k].d;
                 d = src->value.u[k].d;
                 break;
