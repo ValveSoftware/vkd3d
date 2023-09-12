@@ -202,6 +202,32 @@ static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
     return true;
 }
 
+static bool fold_exp2(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
+        const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].f = exp2f(src->value.u[k].f);
+                break;
+
+            default:
+                FIXME("Fold 'exp2' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_fract(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
@@ -1021,6 +1047,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP1_CAST:
             success = fold_cast(ctx, &res, instr->data_type, arg1);
+            break;
+
+        case HLSL_OP1_EXP2:
+            success = fold_exp2(ctx, &res, instr->data_type, arg1);
             break;
 
         case HLSL_OP1_FRACT:
