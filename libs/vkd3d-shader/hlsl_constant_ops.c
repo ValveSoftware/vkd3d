@@ -379,6 +379,32 @@ static bool fold_rcp(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, cons
     return true;
 }
 
+static bool fold_sat(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_FLOAT:
+            case HLSL_TYPE_HALF:
+                dst->u[k].f = min(max(0.0f, src->value.u[k].f), 1.0f);
+                break;
+
+            default:
+                FIXME("Fold 'sat' for type %s.\n", debug_hlsl_type(ctx, dst_type));
+                return false;
+        }
+    }
+
+    return true;
+}
+
 static bool fold_sqrt(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
         const struct hlsl_ir_constant *src, const struct vkd3d_shader_location *loc)
 {
@@ -1067,6 +1093,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP1_RCP:
             success = fold_rcp(ctx, &res, instr->data_type, arg1, &instr->loc);
+            break;
+
+        case HLSL_OP1_SAT:
+            success = fold_sat(ctx, &res, instr->data_type, arg1);
             break;
 
         case HLSL_OP1_SQRT:
