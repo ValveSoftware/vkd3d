@@ -17,7 +17,7 @@ uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
 uniform  8 float4 0.1 0.3 0.0 0.0
 uniform 12 float4 0.2 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.17, 0.39, 0.17, 0.39) 1
 
 
@@ -40,7 +40,7 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 
@@ -61,7 +61,7 @@ uniform  0 float4 0.0 0.0 0.0 0.0
 uniform  4 float4 0.0 0.0 0.0 0.0
 uniform  8 float4 0.5 0.6 0.0 0.0
 uniform 12 float4 0.7 0.8 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.5, 0.6, 0.7, 0.8)
 
 
@@ -90,7 +90,7 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.23, 0.34, 0.5, 0.5) 1
 
 
@@ -111,7 +111,7 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 
@@ -149,7 +149,7 @@ uniform  0 float4 0.3 0.4 0.0 0.0
 uniform  4 float4 0.0 0.0 0.0 0.0
 uniform  8 float4 0.0 0.0 0.0 0.0
 uniform 12 float4 0.5 0.6 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.3, 0.4, 0.5, 0.6)
 
 
@@ -173,7 +173,7 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 
@@ -201,7 +201,7 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.2 0.4 0.0 0.0
 uniform  4 float4 0.3 0.5 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.2, 0.3, 0.4, 0.5)
 
 
@@ -221,7 +221,7 @@ uniform  0 float4 0.3 0.0 0.0 0.0
 uniform  4 float4 0.4 0.0 0.0 0.0
 uniform  8 float4 0.0 0.5 0.0 0.0
 uniform 12 float4 0.0 0.6 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.3, 0.4, 0.5, 0.6)
 
 % Compiler options
@@ -245,7 +245,7 @@ uniform  0 float4 0.1 0.5 0.9 1.3
 uniform  4 float4 0.2 0.6 1.0 1.4
 uniform  8 float4 0.3 0.7 1.1 1.5
 uniform 12 float4 0.4 0.8 1.2 1.6
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.2, 0.3, 0.6, 0.7) 1
 
 [require]
@@ -267,7 +267,7 @@ uniform  0 float4 0.1 0.5 0.9 1.3
 uniform  4 float4 0.2 0.6 1.0 1.4
 uniform  8 float4 0.3 0.7 1.1 1.5
 uniform 12 float4 0.4 0.8 1.2 1.6
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.2, 0.3, 0.6, 0.7) 1
 
 [require]
@@ -289,7 +289,7 @@ uniform  0 float4 0.1 0.5 0.9 1.3
 uniform  4 float4 0.2 0.6 1.0 1.4
 uniform  8 float4 0.3 0.7 1.1 1.5
 uniform 12 float4 0.4 0.8 1.2 1.6
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.5, 0.9, 0.6, 1.0) 1
 
 [require]
@@ -317,7 +317,7 @@ uniform 16 float4 1.7 2.1 2.5 2.9
 uniform 20 float4 1.8 2.2 2.6 3.0
 uniform 24 float4 1.9 2.3 2.7 3.1
 uniform 28 float4 2.0 2.4 2.8 3.2
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.3, 0.4, 2.5, 2.9) 1
 
 [require]
@@ -345,7 +345,7 @@ uniform 16 float4 1.7 2.1 2.5 2.9
 uniform 20 float4 1.8 2.2 2.6 3.0
 uniform 24 float4 1.9 2.3 2.7 3.1
 uniform 28 float4 2.0 2.4 2.8 3.2
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.2, 1.6, 3.1, 3.2) 1
 
 [require]
@@ -365,5 +365,5 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.1, 0.3, 0.2, 0.4) 1

@@ -36,7 +36,7 @@ float4 main() : sv_target1
 }
 
 % Object types
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 RWStructuredBuffer<Texture2D> u;
 
 float4 main() : sv_target1

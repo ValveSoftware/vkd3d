@@ -36,6 +36,7 @@ enum shader_model
     SHADER_MODEL_4_1,
     SHADER_MODEL_5_0,
     SHADER_MODEL_5_1,
+    SHADER_MODEL_6_0,
 };
 
 enum shader_type
@@ -118,6 +119,7 @@ struct shader_runner
     char *ps_source;
     char *cs_source;
     enum shader_model minimum_shader_model;
+    enum shader_model maximum_shader_model;
 
     bool last_render_failed;
 
@@ -158,8 +160,11 @@ void fatal_error(const char *format, ...) VKD3D_NORETURN VKD3D_PRINTF_FUNC(1, 2)
 
 unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot);
 void init_resource(struct resource *resource, const struct resource_params *params);
+HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, unsigned int compile_options,
+        const char *hlsl, ID3D10Blob **blob_out, ID3D10Blob **errors_out);
 
-void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops);
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops, void *dxc_compiler,
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model);
 
 #ifdef _WIN32
 void run_shader_tests_d3d9(void);
@@ -167,4 +172,5 @@ void run_shader_tests_d3d11(void);
 #else
 void run_shader_tests_vulkan(void);
 #endif
-void run_shader_tests_d3d12(void);
+void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader_model,
+        enum shader_model maximum_shader_model);

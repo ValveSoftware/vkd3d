@@ -1,4 +1,4 @@
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s
 {
     foo = float;
@@ -9,7 +9,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s = sampler_state
 {
     foo = float;
@@ -20,7 +20,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s
 {
     2 = 3;
@@ -31,7 +31,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s
 {
     2;
@@ -42,7 +42,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s
 {
     foo;
@@ -53,7 +53,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 sampler s
 {
     foo = bar
@@ -104,7 +104,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float f
 {
     foo = (sampler)2;
@@ -115,7 +115,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float f
 {
     foo = (faketype)2;
@@ -126,7 +126,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float f
 {
     foo = (sampler)bar;
@@ -137,7 +137,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float f
 {
     foo = bar();

@@ -120,6 +120,12 @@ AS_IF([test "x$SONAME_LIBVULKAN" = "x"],
       [VKD3D_CHECK_VULKAN],
       [AC_DEFINE_UNQUOTED([SONAME_LIBVULKAN],["$SONAME_LIBVULKAN"],[Define to the shared object name of the Vulkan library.])])
 
+AC_ARG_VAR([SONAME_LIBDXCOMPILER], [shared object name for the dxcompiler library])
+AC_ARG_VAR([DXCOMPILER_LIBS], [linker flags for the dxcompiler library])
+AS_IF([test "x$SONAME_LIBDXCOMPILER" = "x"],
+      [VKD3D_CHECK_SONAME([dxcompiler], [DxcCreateInstance], [HAVE_DXCOMPILER=yes], [HAVE_DXCOMPILER=no], [$DXCOMPILER_LIBS])],
+      [AC_DEFINE_UNQUOTED([SONAME_LIBDXCOMPILER],["$SONAME_LIBDXCOMPILER"],[Define to the shared object name of the dxcompiler library.])])
+
 AS_IF([test "x$with_ncurses" != "xno"],
       [PKG_CHECK_MODULES([NCURSES], [ncurses],
                          [AC_DEFINE([HAVE_NCURSES], [1], [Define to 1 if you have ncurses.]) with_ncurses=yes],
@@ -183,6 +189,7 @@ AS_ECHO(["
   Have ncurses: ${with_ncurses}
   Have SPIRV-Tools: ${with_spirv_tools}
   Have xcb: ${HAVE_XCB}
+  Have dxcompiler: ${HAVE_DXCOMPILER}
 
   Building demos: ${enable_demos}
   Building tests: ${enable_tests}

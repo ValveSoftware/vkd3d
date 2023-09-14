@@ -37,27 +37,27 @@ size (640, 480)
 format r32 float
 size (640, 480)
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 row_major float4x1 main() : sv_target
 {
     return float4(1.0, 2.0, 3.0, 4.0);
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (3.0)
 probe render target 3 all r (4.0)
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 float1x4 main() : sv_target
 {
     return float4(1.0, 2.0, 3.0, 4.0);
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (3.0)
@@ -70,7 +70,7 @@ void main(out float1x2 x : sv_target0, out float1x2 y : sv_target1)
     y = float2(5.0, 6.0);
 }
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 void main(out float1x2 x : sv_target0, out float1x2 y : sv_target2)
 {
     x = float2(1.0, 2.0);
@@ -78,7 +78,7 @@ void main(out float1x2 x : sv_target0, out float1x2 y : sv_target2)
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe render target 0 all r (1.0)
 probe render target 1 all r (2.0)
 probe render target 2 all r (5.0)
@@ -88,7 +88,7 @@ probe render target 3 all r (6.0)
 format r32g32b32a32 float
 size (640, 480)
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 void main(out row_major float1x4 x : sv_target0, out float1x2 y : sv_target1)
 {
     x = float4(1.0, 2.0, 3.0, 4.0);
@@ -96,7 +96,7 @@ void main(out row_major float1x4 x : sv_target0, out float1x2 y : sv_target1)
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe render target 0 all rgba (1.0, 2.0, 3.0, 4.0)
 probe render target 1 all r (5.0)
 probe render target 2 all r (6.0)

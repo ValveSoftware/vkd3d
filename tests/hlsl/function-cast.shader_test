@@ -22,8 +22,10 @@ todo draw quad
 probe all rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but cast "x" to float4 first.
+% In SM 6 a cast seems to implicitly promote the type to const,
+% so it fails to match the parameter of func().
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 
 uniform float4 f;
 
@@ -46,7 +48,7 @@ probe all rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but declare "x" as float4 and cast it to int4.
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 
 uniform float4 f;
 
@@ -71,13 +73,14 @@ probe all rgba (-1.0, -1.0, 2.0, 4.0)
 shader model >= 4.0
 
 [pixel shader todo]
+uniform int4 i;
 
 void func(inout float4 a)
 {
     a += 0.1;
 }
 
-float4 main(uniform int4 i) : sv_target
+float4 main() : sv_target
 {
     int4 x = i;
     func(x);

@@ -27,7 +27,7 @@ float4 main() : SV_TARGET
 draw quad
 probe all rgba (5.0, 5.0, 4294967296.0, 3.0)
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : SV_TARGET
 {
     uint x = 1;
@@ -36,7 +36,11 @@ float4 main() : SV_TARGET
     return x / y;
 }
 
-[pixel shader fail]
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+[pixel shader fail(sm<6)]
 float4 main() : SV_TARGET
 {
     uint x = 1;
@@ -44,3 +48,7 @@ float4 main() : SV_TARGET
 
     return x % y;
 }
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)

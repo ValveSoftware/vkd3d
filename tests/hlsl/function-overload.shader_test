@@ -36,5 +36,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.1, 0.2, 0.1, 0.2)

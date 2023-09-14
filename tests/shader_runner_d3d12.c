@@ -23,6 +23,7 @@
 #define VKD3D_TEST_NO_DEFS
 #include "d3d12_crosstest.h"
 #include "shader_runner.h"
+#include "dxcompiler.h"
 
 struct d3d12_resource
 {
@@ -49,6 +50,8 @@ struct d3d12_shader_runner
     ID3D12CommandQueue *compute_queue;
     ID3D12CommandAllocator *compute_allocator;
     ID3D12GraphicsCommandList *compute_list;
+
+    IDxcCompiler3 *dxc_compiler;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -70,10 +73,19 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",
         [SHADER_MODEL_5_1] = "5_1",
+        [SHADER_MODEL_6_0] = "6_0",
     };
 
-    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
-    hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
+    if (runner->r.minimum_shader_model >= SHADER_MODEL_6_0)
+    {
+        assert(runner->dxc_compiler);
+        hr = dxc_compiler_compile_shader(runner->dxc_compiler, type, runner->r.compile_options, source, &blob, &errors);
+    }
+    else
+    {
+        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->r.minimum_shader_model]);
+        hr = D3DCompile(source, strlen(source), NULL, NULL, NULL, "main", profile, runner->r.compile_options, 0, &blob, &errors);
+    }
     ok(FAILED(hr) == !blob, "Got unexpected hr %#x, blob %p.\n", hr, blob);
     if (errors)
     {
@@ -311,7 +323,7 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
     size_t i;
 
     cs_code = compile_shader(runner, runner->r.cs_source, SHADER_TYPE_CS);
-    todo_if (runner->r.is_todo) ok(cs_code, "Failed to compile shader.\n");
+    todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0) ok(cs_code, "Failed to compile shader.\n");
     if (!cs_code)
         return false;
 
@@ -319,8 +331,16 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
 
     cs.pShaderBytecode = ID3D10Blob_GetBufferPointer(cs_code);
     cs.BytecodeLength = ID3D10Blob_GetBufferSize(cs_code);
+    todo_if(runner->r.is_todo)
     pso = create_compute_pipeline_state(device, root_signature, cs);
     ID3D10Blob_Release(cs_code);
+
+    if (!pso)
+    {
+        ID3D12RootSignature_Release(root_signature);
+        return false;
+    }
+
     add_pso(test_context, pso);
 
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
@@ -387,7 +407,8 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     ps_code = compile_shader(runner, runner->r.ps_source, SHADER_TYPE_PS);
     vs_code = compile_shader(runner, runner->r.vs_source, SHADER_TYPE_VS);
-    todo_if (runner->r.is_todo) ok(ps_code && vs_code, "Failed to compile shaders.\n");
+    todo_if(runner->r.is_todo && runner->r.minimum_shader_model < SHADER_MODEL_6_0)
+    ok(ps_code && vs_code, "Failed to compile shaders.\n");
 
     if (!ps_code || !vs_code)
     {
@@ -445,10 +466,14 @@ static bool d3d12_runner_draw(struct shader_runner *r,
 
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&pso);
-    ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
+    todo_if(runner->r.is_todo) ok(hr == S_OK, "Failed to create state, hr %#x.\n", hr);
     ID3D10Blob_Release(vs_code);
     ID3D10Blob_Release(ps_code);
     free(input_element_descs);
+
+    if (FAILED(hr))
+        return false;
+
     add_pso(test_context, pso);
 
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, test_context->root_signature);
@@ -550,7 +575,8 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .release_readback = d3d12_runner_release_readback,
 };
 
-void run_shader_tests_d3d12(void)
+void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader_model,
+        enum shader_model maximum_shader_model)
 {
     static const struct test_context_desc desc =
     {
@@ -569,6 +595,8 @@ void run_shader_tests_d3d12(void)
         return;
     device = runner.test_context.device;
 
+    runner.dxc_compiler = dxc_compiler;
+
     runner.compute_queue = create_command_queue(device,
             D3D12_COMMAND_LIST_TYPE_COMPUTE, D3D12_COMMAND_QUEUE_PRIORITY_NORMAL);
 
@@ -580,7 +608,7 @@ void run_shader_tests_d3d12(void)
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    run_shader_tests(&runner.r, &d3d12_runner_ops);
+    run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, minimum_shader_model, maximum_shader_model);
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
     ID3D12CommandAllocator_Release(runner.compute_allocator);

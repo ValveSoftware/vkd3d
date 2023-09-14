@@ -1,73 +1,86 @@
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return lit(u.x, u.y, u.z);
 }
 
 [test]
 uniform 0 float4 -0.1 10.0 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 0.0, 0.0, 1.0)
 
 [test]
 uniform 0 float4 1.2 -0.1 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 1.2, 0.0, 1.0)
 
 [test]
 uniform 0 float4 1.2 2.0 3.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 1.2, 8.0, 1.0)
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return lit(u.x, u.y, u.z) + lit(u.x, u.y, u.z);
 }
 
 [test]
 uniform 0 float4 1.2 2.0 3.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (2.0, 2.4, 16.0, 2.0)
 
 [pixel shader fail]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return lit(u.xy, u.y, u.z);
 }
 
 [pixel shader fail]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return lit(u.x, u.xy, u.z);
 }
 
 [pixel shader fail]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return lit(u.x, u.y, u.yz);
 }
 
 [pixel shader fail]
 uniform float4x4 m;
+uniform float4 u;
 
-float4 main(uniform float4 u) : sv_target
+float4 main() : sv_target
 {
     return lit(m, u.y, u.z);
 }
 
 [pixel shader fail]
 uniform float4x4 m;
+uniform float4 u;
 
-float4 main(uniform float4 u) : sv_target
+float4 main() : sv_target
 {
     return lit(u.x, m, u.z);
 }
 
 [pixel shader fail]
 uniform float4x4 m;
+uniform float4 u;
 
-float4 main(uniform float4 u) : sv_target
+float4 main() : sv_target
 {
     return lit(u.x, u.y, m);
 }

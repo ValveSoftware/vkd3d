@@ -14,7 +14,8 @@ widl_headers = \
 	include/vkd3d_dxgi1_4.h \
 	include/vkd3d_dxgibase.h \
 	include/vkd3d_dxgiformat.h \
-	include/vkd3d_dxgitype.h
+	include/vkd3d_dxgitype.h \
+	tests/dxcompiler.h
 
 vkd3d_public_headers = \
 	include/vkd3d.h \
@@ -181,6 +182,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/uav-rwbuffer.shader_test \
 	tests/hlsl/uav-rwstructuredbuffer.shader_test \
 	tests/hlsl/uav-rwtexture.shader_test \
+	tests/hlsl/uniform-parameters.shader_test \
 	tests/hlsl/uniform-semantics.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
 	tests/hlsl/vector-indexing.shader_test \
@@ -198,6 +200,7 @@ vkd3d_shader_tests = \
 vkd3d_test_headers = \
 	tests/d3d12_crosstest.h \
 	tests/d3d12_test_utils.h \
+	tests/dxcompiler.h \
 	tests/shader_runner.h \
 	tests/utils.h \
 	tests/vulkan_procs.h
@@ -380,6 +383,7 @@ tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @DL_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @DL_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @DL_LIBS@
 tests_shader_runner_LDADD = $(LDADD) @DL_LIBS@
+tests_shader_runner_CFLAGS = $(AM_CFLAGS) -I$(builddir)/tests
 tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
 	tests/shader_runner_d3d9.c \
@@ -420,7 +424,7 @@ endif
 EXTRA_DIST += $(widl_headers) $(widl_headers:.h=.idl)
 $(widl_headers): %.h: %.idl
 if HAVE_WIDL
-	$(VKD3D_V_WIDL)$(WIDL) -h -o $@ $<
+	$(VKD3D_V_WIDL)$(WIDL) -I$(srcdir)/include -h -o $@ $<
 else
 	@echo "widl is required to generate $@"
 endif
@@ -464,7 +468,7 @@ dummy-vkd3d-version:
 
 ## Cross-compile tests
 cross_implibs = crosslibs/d3d12
-CROSS_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/include
+CROSS_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/include -I$(builddir)/tests
 CROSS_CFLAGS = -g -O2 -Wall -municode ${CROSS_CPPFLAGS} -D__USE_MINGW_ANSI_STDIO=0 -DVKD3D_CROSSTEST=1
 EXTRA_DIST += $(cross_implibs:=.cross32.def) $(cross_implibs:=.cross64.def)
 EXTRA_DIST += tests/shader_runner_d3d11.c tests/shader_runner_d3d9.c

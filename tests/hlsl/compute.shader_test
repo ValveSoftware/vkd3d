@@ -17,5 +17,5 @@ void main()
 }
 
 [test]
-dispatch 1 1 1
+todo(sm>=6) dispatch 1 1 1
 probe uav 0 (0, 0) r (-123.0)

@@ -2,32 +2,32 @@
 % we need to get the parsing syntax right. Most of the following tests which
 % succeed print warnings.
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 
     [numthreads]
 float4 main() : sv_target { return 0; }
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 
     [ numthreads ]
 float4 main() : sv_target { return 0; }
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 
     [numthreads(1)]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 
     [numthreads("")]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 
     [numthreads("one")]
 float4 main() : sv_target { return 0; }
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 
 uniform float4 f;
 
@@ -77,12 +77,12 @@ float4 main() : sv_target { return 0; }
     [one][two]
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail todo]
+[pixel shader fail(sm<6) todo]
 
     [one][one]
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail todo]
+[pixel shader fail(sm<6) todo]
 
     [one][one(1)]
 float4 main() : sv_target { return 0; }
@@ -92,7 +92,7 @@ float4 main() : sv_target { return 0; }
     [one][One]
 float4 main() : sv_target { return 0; }
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 
     [numthreads]
 float4 main();
@@ -112,7 +112,7 @@ static int i = 1;
     [three(i = 4)]
 float4 main() : sv_target { return 0; }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 
     [one]
 float4 f;

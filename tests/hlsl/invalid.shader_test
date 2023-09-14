@@ -58,14 +58,14 @@ float4 main(float2 pos : TEXCOORD0) : sv_target
     return pos;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float a[0];
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float a[65537];
@@ -126,7 +126,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     const float4 x;
@@ -186,7 +186,7 @@ void main(out float4 o : sv_target)
     sub(o);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 void sub(in out uniform float4 o)
 {
 }
@@ -211,7 +211,7 @@ float4 main(void) : sv_target
     return 0;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 const const float4 c;
 
 float4 main() : sv_target
@@ -233,7 +233,7 @@ float4 main() : sv_target
     return a.a;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 struct apple
 {
     sampler sam;

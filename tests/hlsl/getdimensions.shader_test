@@ -28,7 +28,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (2.0, 3.0, 2.0, 3.0)
 
 [texture 1]
@@ -53,5 +53,5 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (2.0, 2.0, 1.0, 2.0)

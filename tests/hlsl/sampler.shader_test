@@ -17,7 +17,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.25, 0, 0.25, 0)
 
 [pixel shader]
@@ -30,7 +30,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.25, 0, 0.25, 0)
 
 [pixel shader fail]
@@ -53,7 +53,7 @@ float4 main() : sv_target
 [require]
 options: backcompat
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 samplerCUBE s;
 
 float4 main() : sv_target
@@ -61,7 +61,7 @@ float4 main() : sv_target
     return texCUBE(s, float3(0.0, 0.0, 0.0));
 }
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 sampler1D s;
 
 float4 main() : sv_target

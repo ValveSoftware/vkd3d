@@ -1,5 +1,7 @@
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     if (u.x > 0.0)
         return float4(0.1, 0.2, 0.3, 0.4);
@@ -9,14 +11,16 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.9, 0.8, 0.7, 0.6)
 uniform 0 float4 0.1 0.0 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.1, 0.2, 0.3, 0.4)
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     [attr1]
     if (u.x > 0.0)
@@ -26,7 +30,9 @@ float4 main(uniform float4 u) : sv_target
 }
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     [flatten]
     if (u.x > 0.0)
@@ -37,10 +43,10 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.9, 0.8, 0.7, 0.6)
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 u;
 
 float main() : sv_target
@@ -69,7 +75,9 @@ float main() : sv_target
 shader model >= 3.0
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     [branch]
     if (u.x > 0.0)
@@ -80,7 +88,7 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 0.0 0.0 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.9, 0.8, 0.7, 0.6)
 
 [pixel shader]

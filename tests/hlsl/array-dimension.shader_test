@@ -5,7 +5,12 @@ float4 main() : sv_target
 {
     const int dim = 4;
     float a[2 * 2] = {0.1, 0.2, 0.3, 0.4};
+#ifdef __hlsl_dx_compiler
+    /* float array dimensions are not valid. */
+    float b[4] = a;
+#else
     float b[4.1] = a;
+#endif
     float c[dim] = b;
     float d[true] = {c[0]};
     float e[65536];
@@ -13,5 +18,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.1, 0.1, 0.2, 0.4)

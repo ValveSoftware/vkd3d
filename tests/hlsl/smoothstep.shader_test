@@ -27,7 +27,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (0, 0.104, 0.896, 1.000000) 5
+probe all rgba (0, 0.104, 0.896, 1.000000) 6
 
 
 [pixel shader]

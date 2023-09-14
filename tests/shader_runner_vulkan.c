@@ -1381,7 +1381,7 @@ void run_shader_tests_vulkan(void)
     if (!init_vulkan_runner(&runner))
         return;
 
-    run_shader_tests(&runner.r, &vulkan_runner_ops);
+    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_5_1);
 
     cleanup_vulkan_runner(&runner);
 }

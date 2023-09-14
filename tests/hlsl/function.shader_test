@@ -89,7 +89,7 @@ float4 main() : sv_target
     return func();
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 
 void foo()
 {
@@ -226,7 +226,7 @@ probe all rgba (0.6, 0.1, 0.5, 0)
 
 % Recursion is forbidden.
 
-[pixel shader notimpl]
+[pixel shader notimpl(sm<6) fail(sm>=6)]
 
 void bar();
 
@@ -246,7 +246,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[pixel shader notimpl]
+[pixel shader notimpl(sm<6) fail(sm>=6)]
 
 % Even trivially finite recursion is forbidden.
 
@@ -317,7 +317,7 @@ probe all rgba (2.0, 3.0, 6.0, 7.0)
 
 % Inline modifier used on entry point
 
-[pixel shader]
+[pixel shader fail(sm>=6)]
 float func(float a)
 {
     return a + 1;

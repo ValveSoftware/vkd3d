@@ -46,7 +46,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (77.77, 77.77, 77.77, 77.77)
 
 
@@ -73,7 +73,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.5, 0.7, 0.6, 0.8)
 probe (0, 1) rgba (0.6, 0.5, 0.2, 0.1)
@@ -111,7 +111,7 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (312, 312, 312, 111)
 
 
@@ -134,11 +134,11 @@ float4 main() : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (2132, 2132, 2132, 1111)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 Texture2D tex[3];
 uniform int n;
 
@@ -158,7 +158,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 // Note: Only valid in shader model 5.1
 Texture2D tex[3];
 uniform int n;
@@ -169,7 +169,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 // Note: Only valid in shader model 5.1
 RWTexture2D<float4> tex[3];
 uniform int n;
@@ -202,7 +202,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 10.0
-draw quad
+todo(sm>=6) draw quad
 probe (0, 0) rgba (11.0, 12.0, 13.0, 11.0)
 
 
@@ -223,7 +223,7 @@ shader model >= 5.0
 size (1, 1)
 1.0 2.0 3.0 4.0
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 struct apple {
     Texture2D tex;
     float4 fo : COLOR;

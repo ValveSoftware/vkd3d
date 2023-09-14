@@ -38,6 +38,23 @@ size (1, 1)
 
 [pixel shader]
 typedef int myint_t;
+Texture2D<float> f1;
+Texture2D<myint_t> i1;
+Texture2D<uint2> u2;
+float4 main() : sv_target
+{
+    const float3 pos = float3(0.5, 0.5, 0);
+    return float4(f1.Load(pos), i1.Load(pos), u2.Load(pos));
+}
+
+[test]
+todo(sm>=6) draw quad
+probe all rgba (0.8, -3.0, 4294967295.0, 123.0)
+
+% lowercase 'texture2D'
+
+[pixel shader fail(sm>=6)]
+typedef int myint_t;
 texture2D<float> f1;
 Texture2D<myint_t> i1;
 Texture2D<uint2> u2;

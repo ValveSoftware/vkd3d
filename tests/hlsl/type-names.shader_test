@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader fail(sm>=6)]
 typedef float2 Dword;
 typedef float3 dWord;
 typedef float2 fLoat;
@@ -73,7 +73,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 f()
 {
     typedef float2 matrix;
@@ -85,7 +85,7 @@ float4 main() : SV_TARGET
     return f();
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 f()
 {
     typedef float2 vector;

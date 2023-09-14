@@ -11,6 +11,10 @@ draw quad
 probe all rgba (50, 60, 70, 80)
 
 
+% dxcompiler emits a nop shader which returns immediately.
+[require]
+shader model < 6.0
+
 [pixel shader]
 float4 main() : sv_target
 {
@@ -22,8 +26,10 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (5.0, 6.0, 7.0, 8.0)
+todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
 
+[require]
+% reset requirements
 
 [pixel shader]
 float4 main() : sv_target
@@ -121,7 +127,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 // Implicit size array as function argument
 float4 fun(float4 arr[])
 {
@@ -150,38 +156,13 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
-// Implicit size array as a cast
-float4 main() : sv_target
-{
-    float2 arr1[4] = {1, 2, 3, 4, 5, 6, 7, 8};
-    float4 arr2[2] = (float4 []) arr1;
-
-    return 0.0;
-}
-
-
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 // Implicit size array as a typedef
 typedef float4 arrtype[];
 
 float4 main() : sv_target
 {
     arrtype arr1 = {1, 2, 3, 4, 5, 6, 7, 8};
-
-    return 0.0;
-}
-
-
-[pixel shader fail]
-// Implicit size array of elements of size 0
-struct emp
-{
-};
-
-float4 main() : sv_target
-{
-    struct emp arr[] = {1, 2, 3, 4};
 
     return 0.0;
 }
@@ -202,16 +183,6 @@ float4 main() : sv_target
 
 
 [pixel shader fail]
-// Broadcast to an implicit size array
-float4 main() : sv_target
-{
-    int a[4] = (int[]) 0;
-
-    return 0.0;
-}
-
-
-[pixel shader fail]
 // Implicit size array with an initializer of size 0
 struct emp
 {
@@ -220,6 +191,46 @@ struct emp
 float4 main() : sv_target
 {
     float4 arr[] = (struct emp) 42;
+
+    return 0.0;
+}
+
+
+% dxcompiler crashes.
+[require]
+shader model < 6.0
+
+
+[pixel shader fail]
+// Implicit size array as a cast
+float4 main() : sv_target
+{
+    float2 arr1[4] = {1, 2, 3, 4, 5, 6, 7, 8};
+    float4 arr2[2] = (float4 []) arr1;
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Implicit size array of elements of size 0
+struct emp
+{
+};
+
+float4 main() : sv_target
+{
+    struct emp arr[] = {1, 2, 3, 4};
+
+    return 0.0;
+}
+
+
+[pixel shader fail]
+// Broadcast to an implicit size array
+float4 main() : sv_target
+{
+    int a[4] = (int[]) 0;
 
     return 0.0;
 }

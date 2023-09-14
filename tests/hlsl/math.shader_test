@@ -1,5 +1,8 @@
 [pixel shader]
-float4 main(uniform float4 a, uniform float2 b) : SV_TARGET
+uniform float4 a;
+uniform float2 b;
+
+float4 main() : SV_TARGET
 {
     float u = a.x, v = a.y, w = a.z, x = a.w, y = b.x, z = b.y;
     return float4(x * y - z / w + --u / -v,
@@ -11,5 +14,5 @@ float4 main(uniform float4 a, uniform float2 b) : SV_TARGET
 [test]
 uniform 0 float4 2.5 0.3 0.2 0.7
 uniform 4 float4 0.1 1.5 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (-12.43, 9.833333, 1.6, 35.0) 1

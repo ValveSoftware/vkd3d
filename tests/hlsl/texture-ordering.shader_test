@@ -1,5 +1,6 @@
 [require]
 shader model >= 4.0
+shader model < 6.0
 
 [sampler 0]
 filter linear linear linear
@@ -84,6 +85,8 @@ size (1, 1)
 % table, and may be larger than the "bind count".
 
 [require]
+shader model >= 4.0
+shader model < 6.0
 options: backcompat
 
 [pixel shader]

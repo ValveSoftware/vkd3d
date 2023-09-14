@@ -61,7 +61,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (5.0, -2.1, 4.0, 0.0) 4
+probe all rgba (5.0, -2.1, 4.0, 0.0) 6
 
 [require]
 % Infinities are not allowed in SM1

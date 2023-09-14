@@ -27,6 +27,11 @@ draw quad
 probe all rgba (11.0, 11.0, 11.0, 11.0)
 
 
+% dxcompiler performs the first call to func() before the array index call.
+[require]
+shader model < 6.0
+
+
 [pixel shader]
 float4 func(void)
 {

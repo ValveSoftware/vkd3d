@@ -111,7 +111,7 @@ float4 main() : sv_target
 
 
 % Implicit size arrays are not allowed.
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float fun(float a[])
 {
     return 0;

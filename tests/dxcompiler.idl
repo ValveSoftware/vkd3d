@@ -1,0 +1,168 @@
+/*
+ * Copyright 2023 Conor McCarthy for CodeWeavers
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+import "vkd3d_windows.h";
+
+#include "vkd3d_unknown.idl"
+
+/* The linux build of dxcompiler does not apply the ms_abi calling convention to its COM interfaces,
+ * so they default to sysv_abi. The '__stdcall' macro is set in vkd3d_windows.h to ms_abi, and widl
+ * emits STDMETHODCALLTYPE for COM interfaces, so '__stdcall' must be temporarily undefined. Doing
+ * this in a PE build (x86 or x64) is unnecessary since the default calling convention is identical.
+ * A 32-bit linux release of dxcompiler is not available.
+ * TODO: modily widl to optionally omit STDMETHODCALLTYPE? */
+cpp_quote("#if defined(__x86_64__) && !defined(_WIN32)")
+cpp_quote("# pragma push_macro(\"__stdcall\")")
+cpp_quote("# undef __stdcall")
+cpp_quote("# define __stdcall")
+cpp_quote("#endif")
+
+static const HRESULT DXC_E_LLVM_CAST_ERROR = 0x80aa001d;
+
+[
+    uuid(73e22d93-e6ce-47f3-b5bf-f0664f39c1b0)
+]
+coclass DxcCompiler
+{
+}
+
+[
+    uuid(8ba5fb08-5195-40e2-ac58-0d989c3a0102),
+    object,
+    local,
+]
+interface IDxcBlob : IUnknown
+{
+    void *GetBufferPointer();
+    SIZE_T GetBufferSize();
+}
+
+[
+    uuid(7241d424-2646-4191-97c0-98e96e42fc68),
+    object,
+    local,
+]
+interface IDxcBlobEncoding : IDxcBlob
+{
+    HRESULT GetEncoding(BOOL *known, UINT32 *code_page);
+}
+
+[
+    uuid(3da636c9-ba71-4024-a301-30cbf125305b),
+    object,
+    local,
+]
+interface IDxcBlobUtf8 : IDxcBlobEncoding
+{
+    const char *GetStringPointer();
+    SIZE_T GetStringLength();
+}
+
+[
+    uuid(a3f84eab-0faa-497e-a39c-ee6ed60b2d84),
+    object,
+    local,
+]
+interface IDxcBlobUtf16 : IDxcBlobEncoding
+{
+    const WCHAR *GetStringPointer();
+    SIZE_T GetStringLength();
+}
+
+[
+    uuid(7f61fc7d-950d-467f-b3e3-3c02fb49187c),
+    object,
+    local,
+]
+interface IDxcIncludeHandler : IUnknown
+{
+    HRESULT LoadSource(const WCHAR *filename, IDxcBlob **include_source);
+}
+
+typedef struct DxcBuffer
+{
+    const void *Ptr;
+    SIZE_T Size;
+    UINT Encoding;
+} DxcBuffer;
+
+[
+    uuid(cedb484a-d4e9-445a-b991-ca21ca157dc2),
+    object,
+    local,
+]
+interface IDxcOperationResult : IUnknown
+{
+    HRESULT GetStatus(HRESULT *status);
+
+    HRESULT GetResult(IDxcBlob **result);
+
+    HRESULT GetErrorBuffer(IDxcBlobEncoding **errors);
+}
+
+typedef enum DXC_OUT_KIND
+{
+    DXC_OUT_NONE = 0,
+    DXC_OUT_OBJECT = 1,
+    DXC_OUT_ERRORS = 2,
+    DXC_OUT_PDB = 3,
+    DXC_OUT_SHADER_HASH = 4,
+    DXC_OUT_DISASSEMBLY = 5,
+    DXC_OUT_HLSL = 6,
+    DXC_OUT_TEXT = 7,
+    DXC_OUT_REFLECTION = 8,
+    DXC_OUT_ROOT_SIGNATURE = 9,
+    DXC_OUT_EXTRA_OUTPUTS  = 10,
+
+    DXC_OUT_FORCE_DWORD = 0xFFFFFFFF
+} DXC_OUT_KIND;
+
+[
+    uuid(58346cda-dde7-4497-9461-6f87af5e0659),
+    object,
+    local,
+]
+interface IDxcResult : IDxcOperationResult
+{
+    BOOL HasOutput(DXC_OUT_KIND dxc_out_kind);
+    HRESULT GetOutput(DXC_OUT_KIND dxc_out_kind,
+            REFIID iid, void **object, IDxcBlobUtf16 **output_name);
+
+    UINT32 GetNumOutputs();
+    DXC_OUT_KIND GetOutputByIndex(UINT32 index);
+    DXC_OUT_KIND PrimaryOutput();
+}
+
+[
+    uuid(228b4687-5a6a-4730-900c-9702b2203f54),
+    object,
+    local,
+]
+interface IDxcCompiler3 : IUnknown
+{
+    HRESULT Compile(const DxcBuffer *source, const WCHAR **arguments, UINT32 arg_count,
+            IDxcIncludeHandler *include_handler, REFIID riid, void **result);
+
+    HRESULT Disassemble(const DxcBuffer *object, REFIID riid, void **result);
+}
+
+typedef HRESULT (__stdcall *DxcCreateInstanceProc)(const IID *rclsid, REFIID riid, void **ppv);
+
+cpp_quote("#if defined(__x86_64__) && !defined(_WIN32)")
+cpp_quote("# pragma pop_macro(\"__stdcall\")")
+cpp_quote("#endif")

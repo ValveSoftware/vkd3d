@@ -262,7 +262,7 @@ draw quad
 probe all rgba (41.0, 42.0, 43.0, 44.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 struct apple
 {
     float2 aa;
@@ -301,7 +301,7 @@ draw quad
 probe all rgba (55.0, 56.0, 57.0, 58.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 struct apple
 {
     float2 aa;
@@ -333,7 +333,7 @@ draw quad
 probe all rgba (61.0, 62.0, 63.0, 64.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float arr[5] = {1, 2, 3, 4, 5};
@@ -359,7 +359,7 @@ draw quad
 probe all rgba (71.0, 72.0, 73.0, 74.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float2x2 mat = {1, 2, 3, 4};
@@ -381,7 +381,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float arr[5] = {1, 2, 3, 4, 5};
@@ -440,7 +440,7 @@ draw quad
 probe all rgba (11.0, 12.0, 13.0, 0.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 struct apple
 {
     float3 aa;
@@ -541,7 +541,7 @@ draw quad
 probe all rgba (51.0, 52.0, 53.0, 0.0)
 
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     float4 vec = {1, 2, 3, 4};

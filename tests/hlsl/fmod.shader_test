@@ -1,27 +1,31 @@
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return float4(fmod(u.x, u.y), 0, 0, 0);
 }
 
 [test]
 uniform 0 float4 -0.5 6.5 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (-0.5, 0.0, 0.0, 0.0) 4
 uniform 0 float4 1.1 0.3 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.2, 0.0, 0.0, 0.0) 4
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     return float4(fmod(u.xy, u.z), 0, 0);
 }
 
 [test]
 uniform 0 float4 -0.5 6.5 2.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (-0.5, 0.5, 0.0, 0.0) 4
 uniform 0 float4 1.1 0.3 3.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 0.3, 0.0, 0.0) 4

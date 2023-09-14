@@ -60,6 +60,7 @@ typedef int HRESULT;
 #include "vkd3d_d3dcompiler.h"
 #include "vkd3d_test.h"
 #include "shader_runner.h"
+#include "dxcompiler.h"
 
 struct test_options test_options = {0};
 
@@ -129,9 +130,11 @@ static bool match_directive_substring(const char *line, const char *token, const
 
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
+    bool less_than = false;
     unsigned int i;
 
-    if (match_string(line, "shader model >=", &line))
+    if (match_string(line, "shader model >=", &line)
+            || (less_than = match_string(line, "shader model <", &line)))
     {
         static const char *const model_strings[] =
         {
@@ -141,13 +144,23 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
             [SHADER_MODEL_4_1] = "4.1",
             [SHADER_MODEL_5_0] = "5.0",
             [SHADER_MODEL_5_1] = "5.1",
+            [SHADER_MODEL_6_0] = "6.0",
         };
 
         for (i = 0; i < ARRAY_SIZE(model_strings); ++i)
         {
             if (match_string(line, model_strings[i], &line))
             {
-                runner->minimum_shader_model = i;
+                if (less_than)
+                {
+                    if (!i)
+                        fatal_error("Shader model < '%s' is invalid.\n", line);
+                    runner->maximum_shader_model = min(runner->maximum_shader_model, i - 1);
+                }
+                else
+                {
+                    runner->minimum_shader_model = max(runner->minimum_shader_model, i);
+                }
                 return;
             }
         }
@@ -485,6 +498,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
     if (match_string(line, "todo", &line))
         runner->is_todo = true;
+    else if (match_string(line, "todo(sm<6)", &line))
+        runner->is_todo = runner->minimum_shader_model < SHADER_MODEL_6_0;
+    else if (match_string(line, "todo(sm>=6)", &line))
+        runner->is_todo = runner->minimum_shader_model >= SHADER_MODEL_6_0;
 
     if (match_string(line, "dispatch", &line))
     {
@@ -802,9 +819,125 @@ const char *shader_type_string(enum shader_type type)
     return shader_types[type];
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len, enum shader_type type,
-        HRESULT expect)
+/* Avoid issues with calling convention mismatch and different methods for string
+ * retrieval by copying all IDxcBlob objects to a new ID3D10Blob. */
+
+static void d3d10_blob_from_dxc_blob_utf8(IDxcBlobUtf8 *blob, ID3D10Blob **blob_out)
 {
+    ID3D10Blob *d3d_blob;
+    size_t size;
+    HRESULT hr;
+
+    size = IDxcBlobUtf8_GetStringLength(blob) + 1;
+    if (FAILED(hr = D3DCreateBlob(size, (ID3DBlob **)&d3d_blob)))
+    {
+        trace("Failed to create blob, hr %#x.\n", hr);
+        return;
+    }
+
+    memcpy(ID3D10Blob_GetBufferPointer(d3d_blob), IDxcBlobUtf8_GetStringPointer(blob), size);
+    *blob_out = d3d_blob;
+}
+
+static HRESULT d3d10_blob_from_dxc_blob(IDxcBlob *blob, ID3D10Blob **blob_out)
+{
+    ID3D10Blob *d3d_blob;
+    size_t size;
+    HRESULT hr;
+
+    size = IDxcBlob_GetBufferSize(blob);
+    if (FAILED(hr = D3DCreateBlob(size, (ID3DBlob **)&d3d_blob)))
+    {
+        trace("Failed to create blob, hr %#x.\n", hr);
+        return hr;
+    }
+
+    memcpy(ID3D10Blob_GetBufferPointer(d3d_blob), IDxcBlob_GetBufferPointer(blob), size);
+    *blob_out = d3d_blob;
+
+    return S_OK;
+}
+
+HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, unsigned int compile_options,
+        const char *hlsl, ID3D10Blob **blob_out, ID3D10Blob **errors_out)
+{
+    DxcBuffer src_buf = {hlsl, strlen(hlsl), 65001};
+    IDxcCompiler3 *compiler = dxc_compiler;
+    HRESULT hr, compile_hr;
+    IDxcBlobUtf8 *errors;
+    IDxcResult *result;
+    size_t arg_count;
+    IDxcBlob *blob;
+
+    static const WCHAR *const shader_profiles[] =
+    {
+        [SHADER_TYPE_CS] = L"cs_6_0",
+        [SHADER_TYPE_PS] = L"ps_6_0",
+        [SHADER_TYPE_VS] = L"vs_6_0",
+    };
+    const WCHAR *args[] =
+    {
+        L"/T",
+        shader_profiles[type],
+        L"/Qstrip_reflect",
+        L"/Qstrip_debug",
+        L"/flegacy-macro-expansion",
+        L"/flegacy-resource-reservation",
+        NULL,
+        NULL,
+        NULL,
+    };
+
+    *blob_out = NULL;
+    *errors_out = NULL;
+
+    arg_count = ARRAY_SIZE(args) - 3;
+    if (compile_options & D3DCOMPILE_PACK_MATRIX_ROW_MAJOR)
+        args[arg_count++] = L"/Zpr";
+    if (compile_options & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
+        args[arg_count++] = L"/Zpc";
+    if (compile_options & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
+        args[arg_count++] = L"/Gec";
+
+    if (FAILED(hr = IDxcCompiler3_Compile(compiler, &src_buf, args, arg_count, NULL, &IID_IDxcResult, (void **)&result)))
+    {
+        trace("Failed to compile shader, hr %#x.\n", hr);
+        return hr;
+    }
+
+    if (IDxcResult_HasOutput(result, DXC_OUT_ERRORS)
+            && SUCCEEDED(hr = IDxcResult_GetOutput(result, DXC_OUT_ERRORS, &IID_IDxcBlobUtf8, (void **)&errors, NULL)))
+    {
+        if (IDxcBlobUtf8_GetStringLength(errors))
+            d3d10_blob_from_dxc_blob_utf8(errors, errors_out);
+        IDxcBlobUtf8_Release(errors);
+    }
+
+    if (FAILED(hr = IDxcResult_GetStatus(result, &compile_hr)) || FAILED((hr = compile_hr)))
+    {
+        if (hr == DXC_E_LLVM_CAST_ERROR)
+            hr = E_FAIL;
+        goto result_release;
+    }
+
+    if (FAILED(hr = IDxcResult_GetOutput(result, DXC_OUT_OBJECT, &IID_IDxcBlob, (void **)&blob, NULL)))
+        goto result_release;
+
+    IDxcResult_Release(result);
+
+    hr = d3d10_blob_from_dxc_blob(blob, blob_out);
+    IDxcBlob_Release(blob);
+    return hr;
+
+result_release:
+    IDxcResult_Release(result);
+    return hr;
+}
+
+static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_compiler, const char *source, size_t len,
+        enum shader_type type, HRESULT expect)
+{
+    bool use_dxcompiler = runner->minimum_shader_model >= SHADER_MODEL_6_0;
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
     HRESULT hr;
@@ -817,10 +950,19 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",
         [SHADER_MODEL_5_1] = "5_1",
+        [SHADER_MODEL_6_0] = "6_0",
     };
 
-    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
-    hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
+    if (use_dxcompiler)
+    {
+        assert(dxc_compiler);
+        hr = dxc_compiler_compile_shader(dxc_compiler, type, runner->compile_options, source, &blob, &errors);
+    }
+    else
+    {
+        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
+        hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
+    }
     hr = map_unidentified_hrs(hr);
     ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
@@ -845,8 +987,11 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
 {
     while (*src && *src != ']')
     {
+        /* 'todo' is not meaningful when dxcompiler is in use, so it has no '(sm<6) qualifier. */
         if (match_directive_substring(src, "todo", &src))
         {
+            if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
+                continue;
             if (state == STATE_SHADER_COMPUTE)
                 state = STATE_SHADER_COMPUTE_TODO;
             else if (state == STATE_SHADER_PIXEL)
@@ -858,9 +1003,20 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
         {
             *expect_hr = E_FAIL;
         }
-        else if (match_directive_substring(src, "notimpl", &src))
+        else if (match_directive_substring(src, "fail(sm<6)", &src))
         {
-            *expect_hr = E_NOTIMPL;
+            if (runner->minimum_shader_model < SHADER_MODEL_6_0)
+                *expect_hr = E_FAIL;
+        }
+        else if (match_directive_substring(src, "fail(sm>=6)", &src))
+        {
+            if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
+                *expect_hr = E_FAIL;
+        }
+        else if (match_directive_substring(src, "notimpl(sm<6)", &src))
+        {
+            if (runner->minimum_shader_model < SHADER_MODEL_6_0)
+                *expect_hr = E_NOTIMPL;
         }
         else
         {
@@ -874,7 +1030,8 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
     return state;
 }
 
-void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops)
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops, void *dxc_compiler,
+        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct resource_params current_resource;
@@ -895,7 +1052,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
-    runner->minimum_shader_model = SHADER_MODEL_2_0;
+    runner->minimum_shader_model = minimum_shader_model;
+    runner->maximum_shader_model = maximum_shader_model;
 
     for (;;)
     {
@@ -915,7 +1073,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_REQUIRE:
-                    if (runner->ops->check_requirements && !runner->ops->check_requirements(runner))
+                    if (runner->maximum_shader_model < runner->minimum_shader_model
+                            || (runner->ops->check_requirements && !runner->ops->check_requirements(runner)))
                     {
                         skip_tests = true;
                     }
@@ -931,7 +1090,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_CS, expect_hr);
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_CS,
+                                expect_hr);
                     }
                     free(runner->cs_source);
                     runner->cs_source = shader_source;
@@ -945,7 +1105,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_PIXEL_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_PS, expect_hr);
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_PS,
+                                expect_hr);
                     }
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
@@ -959,7 +1120,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_VERTEX_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_VS, expect_hr);
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_VS,
+                                expect_hr);
                     }
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
@@ -1047,7 +1209,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             else if (!strcmp(line, "[require]\n"))
             {
                 state = STATE_REQUIRE;
-                runner->minimum_shader_model = SHADER_MODEL_2_0;
+                runner->minimum_shader_model = minimum_shader_model;
+                runner->maximum_shader_model = maximum_shader_model;
                 runner->compile_options = 0;
                 skip_tests = false;
             }
@@ -1208,7 +1371,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_TEST:
-                    if (!skip_tests)
+                    /* Compilation which fails with dxcompiler is not 'todo', therefore the tests are
+                     * not 'todo' either. They cannot run, so skip them entirely. */
+                    if (!skip_tests && SUCCEEDED(expect_hr))
                         parse_test_directive(runner, line);
                     break;
             }
@@ -1284,8 +1449,47 @@ out:
 }
 #endif
 
+#if defined(SONAME_LIBDXCOMPILER) && !defined(VKD3D_CROSSTEST)
+static IDxcCompiler3 *dxcompiler_create()
+{
+    DxcCreateInstanceProc create_instance;
+    IDxcCompiler3 *compiler;
+    HRESULT hr;
+    void *dll;
+
+    if (!(dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER)))
+    {
+        trace("Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
+        return NULL;
+    }
+
+    if (!(create_instance = (DxcCreateInstanceProc)vkd3d_dlsym(dll, "DxcCreateInstance")))
+    {
+        trace("Failed to get DxcCreateInstance() pointer.\n");
+        return NULL;
+    }
+
+    if (FAILED(hr = create_instance(&CLSID_DxcCompiler, &IID_IDxcCompiler3, (void **)&compiler)))
+    {
+        trace("Failed to create instance, hr %#x.\n", hr);
+        return NULL;
+    }
+
+    return compiler;
+}
+#elif !defined(VKD3D_CROSSTEST)
+static IDxcCompiler3 *dxcompiler_create()
+{
+    return NULL;
+}
+#endif
+
 START_TEST(shader_runner)
 {
+#ifndef VKD3D_CROSSTEST
+    IDxcCompiler3 *dxc_compiler;
+#endif
+
     parse_args(argc, argv);
 
 #if defined(VKD3D_CROSSTEST)
@@ -1298,7 +1502,7 @@ START_TEST(shader_runner)
     run_shader_tests_d3d11();
 
     trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
-    run_shader_tests_d3d12();
+    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
 
     print_dll_version("d3dcompiler_47.dll");
     print_dll_version("dxgi.dll");
@@ -1315,7 +1519,15 @@ START_TEST(shader_runner)
     run_shader_tests_d3d11();
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12();
+    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+
+    if ((dxc_compiler = dxcompiler_create()))
+    {
+        trace("Compiling shaders with dxcompiler and executing with vkd3d\n");
+        run_shader_tests_d3d12(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+        IDxcCompiler3_Release(dxc_compiler);
+        print_dll_version(SONAME_LIBDXCOMPILER);
+    }
 
     print_dll_version("d3d9.dll");
     print_dll_version("d3d11.dll");
@@ -1326,6 +1538,13 @@ START_TEST(shader_runner)
     run_shader_tests_vulkan();
 
     trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12();
+    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+
+    if ((dxc_compiler = dxcompiler_create()))
+    {
+        trace("Compiling shaders with dxcompiler and executing with vkd3d\n");
+        run_shader_tests_d3d12(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+        IDxcCompiler3_Release(dxc_compiler);
+    }
 #endif
 }

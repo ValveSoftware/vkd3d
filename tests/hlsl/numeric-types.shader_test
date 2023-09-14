@@ -38,7 +38,7 @@ vector main() : sv_target
     return ret;
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 vector main() : sv_target
 {
     vector<float> ret = vector(1.0, 2.0, 3.0, 4.0);
@@ -71,7 +71,7 @@ float4 main() : sv_target
 draw quad
 probe all rgba (5.0, 6.0, 7.0, 0.0)
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     matrix m = matrix<float>(1.0, 2.0, 3.0, 4.0,
@@ -81,7 +81,7 @@ float4 main() : sv_target
     return m[1];
 }
 
-[pixel shader fail]
+[pixel shader fail(sm<6)]
 float4 main() : sv_target
 {
     matrix m = matrix<float, 4>(1.0, 2.0, 3.0, 4.0,

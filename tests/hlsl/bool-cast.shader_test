@@ -30,7 +30,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 0.0 0.0 2.0 4.0
 uniform 4 int4 0 1 0 10
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.0, 10.0, 1.0, 11.0)
 
 
@@ -44,5 +44,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 0x00000001 0x00000002 0x80000000 0x00000000
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (2.0, 2.0, 2.0, 0.0)

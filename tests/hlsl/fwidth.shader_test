@@ -18,7 +18,7 @@ float4 main(float4 pos : sv_position) : sv_target
 }
 
 [test]
-draw quad
+todo(sm>=6) draw quad
 probe (10, 10) rgba (8.0, 8.0, 8.0, 8.0)
 probe (11, 10) rgba (8.0, 8.0, 8.0, 8.0)
 probe (12, 10) rgba (10.0, 10.0, 10.0, 10.0)

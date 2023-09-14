@@ -83,6 +83,16 @@ commas or semicolons.
 
  * VKD3D_TEST_BUG - set to 0 to disable bug_if() conditions in tests.
 
+If the configuration defines 'DXCOMPILER_LIBS=-L/path/to/dxcompiler', Shader
+Runner attempts to load libdxcompiler.so or dxcompiler.dll to compile test
+shaders in Shader Model 6. LD_LIBRARY_PATH (linux), WINEPATH (wine) or PATH
+(native windows) should include the location of dxcompiler if SM 6 shader
+tests are desired. If dxcompiler is not found, Shader Runner will compile the
+test shaders only in earlier shader models. The DXC source does not contain
+code for adding DXBC checksums, so the official release should be installed
+from:
+https://github.com/microsoft/DirectXShaderCompiler/releases
+
 ================
 Developing vkd3d
 ================

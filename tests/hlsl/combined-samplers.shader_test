@@ -1,5 +1,6 @@
 [require]
 shader model >= 4.0
+shader model < 6.0
 
 
 [sampler 0]
@@ -35,6 +36,7 @@ size (1, 1)
 4.0 4.0 4.0 1.0
 
 [require]
+shader model < 6.0
 options: backcompat
 
 [pixel shader]
@@ -136,6 +138,7 @@ probe all rgba (1, 1, 1, 11)
 
 [require]
 shader model >= 5.0
+shader model < 6.0
 
 
 [pixel shader todo]

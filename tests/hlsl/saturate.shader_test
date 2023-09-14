@@ -1,16 +1,20 @@
 [pixel shader]
-float4 main(uniform float2 u) : sv_target
+uniform float2 u;
+
+float4 main() : sv_target
 {
     return float4(saturate(u), saturate(u.x + 0.5), saturate(-1.2));
 }
 
 [test]
 uniform 0 float4 0.7 -0.1 0.0 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.7, 0.0, 1.0, 0.0)
 
 [pixel shader]
-float4 main(uniform float4 u) : sv_target
+uniform float4 u;
+
+float4 main() : sv_target
 {
     int4 i = u;
     return saturate(i);
@@ -18,5 +22,5 @@ float4 main(uniform float4 u) : sv_target
 
 [test]
 uniform 0 float4 -2 0 2 -1
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (0.0, 0.0, 1.0, 0.0)

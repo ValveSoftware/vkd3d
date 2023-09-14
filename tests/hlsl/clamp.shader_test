@@ -1,12 +1,14 @@
 [pixel shader]
-float4 main(uniform float3 u) : sv_target
+uniform float3 u;
+
+float4 main() : sv_target
 {
     return float4(clamp(u.x, u.y, u.z), clamp(0.9, u.y, u.z), clamp(u.x, -0.5, u.z), clamp(0.6, -0.4, 0.3));
 }
 
 [test]
 uniform 0 float4 -0.3 -0.1 0.7 0.0
-draw quad
+todo(sm>=6) draw quad
 probe all rgba (-0.1, 0.7, -0.3, 0.3)
 
 

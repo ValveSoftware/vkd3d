@@ -7,6 +7,11 @@ float4 main(out Texture2D tex : TEXTURE) : sv_target
 }
 
 
+% dxcompiler crashes.
+[require]
+shader model < 6.0
+
+
 [pixel shader fail todo]
 struct params
 {
@@ -23,7 +28,7 @@ float4 main(inout params x) : sv_target
 shader model >= 5.0
 
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 uniform float global;
 
 struct apple
@@ -32,7 +37,12 @@ struct apple
     float4 pos : sv_position;
 };
 
+#ifdef __hlsl_dx_compiler
+uniform float param;
+float4 main(struct apple input) : sv_target
+#else
 float4 main(struct apple input, uniform float param) : sv_target
+#endif
 {
     return input.tex.Load(int3(0, 0, 0)) + global + param + input.pos;
 }
@@ -89,7 +99,7 @@ filter linear linear linear
 address clamp clamp clamp
 
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 struct apple
 {
     Texture2D unused;   // must reserve t1
@@ -113,7 +123,7 @@ todo draw quad
 todo probe all rgba (416.0, 416.0, 416.0, 111.0)
 
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 Texture2D tex;
 
 struct apple
@@ -157,7 +167,7 @@ filter point point point
 address clamp clamp clamp
 
 
-[pixel shader todo]
+[pixel shader todo fail(sm>=6)]
 Texture2D tex;
 sampler sam0; // must reserve s3
 
