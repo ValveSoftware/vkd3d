@@ -6702,27 +6702,18 @@ static void test_draw_depth_only(void)
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    D3D12_SHADER_BYTECODE ps;
+    ID3D10Blob *ps_bytecode;
     unsigned int i, j;
     HRESULT hr;
 
-    static const DWORD ps_code[] =
-    {
-#if 0
-        float depth;
-
-        float main() : SV_Depth
-        {
-            return depth;
-        }
-#endif
-        0x43425844, 0x91af6cd0, 0x7e884502, 0xcede4f54, 0x6f2c9326, 0x00000001, 0x000000b0, 0x00000003,
-        0x0000002c, 0x0000003c, 0x00000070, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
-        0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003, 0xffffffff,
-        0x00000e01, 0x445f5653, 0x68747065, 0xababab00, 0x52444853, 0x00000038, 0x00000040, 0x0000000e,
-        0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x02000065, 0x0000c001, 0x05000036, 0x0000c001,
-        0x0020800a, 0x00000000, 0x00000000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char ps_code[] =
+            "float depth;\n"
+            "\n"
+            "float main() : SV_Depth\n"
+            "{\n"
+            "    return depth;\n"
+            "}\n";
     static const struct
     {
         float clear_depth;
@@ -6742,10 +6733,16 @@ static void test_draw_depth_only(void)
         {1.0f, 0.5f, 0.5f},
     };
 
+    ps_bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(ps_bytecode);
+
     memset(&desc, 0, sizeof(desc));
     desc.no_render_target = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(ps_bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -6833,6 +6830,8 @@ static void test_draw_depth_only(void)
 
     destroy_depth_stencil(&ds);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(ps_bytecode);
 }
 
 static void test_draw_uav_only(void)
