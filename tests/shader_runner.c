@@ -109,6 +109,24 @@ static bool match_string(const char *line, const char *token, const char **const
     return true;
 }
 
+static bool match_directive_substring(const char *line, const char *token, const char **const rest)
+{
+    size_t len = strlen(token);
+
+    while (isspace(*line) || *line == ']')
+        ++line;
+
+    if (strncmp(line, token, len) || !(isspace(line[len]) || line[len] == ']'))
+        return false;
+    if (rest)
+    {
+        *rest = line + len;
+        while (isspace(**rest))
+            ++*rest;
+    }
+    return true;
+}
+
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
     unsigned int i;
@@ -809,6 +827,40 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
     }
 }
 
+static enum parse_state read_shader_directive(struct shader_runner *runner, enum parse_state state, const char *line,
+        const char *src, HRESULT *expect_hr)
+{
+    while (*src && *src != ']')
+    {
+        if (match_directive_substring(src, "todo", &src))
+        {
+            if (state == STATE_SHADER_COMPUTE)
+                state = STATE_SHADER_COMPUTE_TODO;
+            else if (state == STATE_SHADER_PIXEL)
+                state = STATE_SHADER_PIXEL_TODO;
+            else
+                state = STATE_SHADER_VERTEX_TODO;
+        }
+        else if (match_directive_substring(src, "fail", &src))
+        {
+            *expect_hr = E_FAIL;
+        }
+        else if (match_directive_substring(src, "notimpl", &src))
+        {
+            *expect_hr = E_NOTIMPL;
+        }
+        else
+        {
+            fatal_error("Malformed line '%s'.\n", line);
+        }
+    }
+
+    if (strcmp(src, "]\n"))
+        fatal_error("Malformed line '%s'.\n", line);
+
+    return state;
+}
+
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
@@ -818,7 +870,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
     unsigned int i, line_number = 0;
     char *shader_source = NULL;
     HRESULT expect_hr = S_OK;
-    char line[256];
+    char line_buffer[256];
     FILE *f;
 
     if (!test_options.filename)
@@ -833,7 +885,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
     for (;;)
     {
-        char *ret = fgets(line, sizeof(line), f);
+        char *ret = fgets(line_buffer, sizeof(line_buffer), f);
+        const char *line = line_buffer;
 
         ++line_number;
 
@@ -957,59 +1010,21 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
         {
             unsigned int index;
 
-            if (!strcmp(line, "[compute shader]\n"))
+            if (match_directive_substring(line, "[compute shader", &line))
             {
                 state = STATE_SHADER_COMPUTE;
                 expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[compute shader todo]\n"))
-            {
-                state = STATE_SHADER_COMPUTE_TODO;
-                expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[compute shader fail]\n"))
-            {
-                state = STATE_SHADER_COMPUTE;
-                expect_hr = E_FAIL;
-            }
-            else if (!strcmp(line, "[compute shader fail todo]\n"))
-            {
-                state = STATE_SHADER_COMPUTE_TODO;
-                expect_hr = E_FAIL;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
             else if (!strcmp(line, "[require]\n"))
             {
                 state = STATE_REQUIRE;
             }
-            else if (!strcmp(line, "[pixel shader]\n"))
+            else if (match_directive_substring(line, "[pixel shader", &line))
             {
                 state = STATE_SHADER_PIXEL;
                 expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[pixel shader todo]\n"))
-            {
-                state = STATE_SHADER_PIXEL_TODO;
-                expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[pixel shader fail]\n"))
-            {
-                state = STATE_SHADER_PIXEL;
-                expect_hr = E_FAIL;
-            }
-            else if (!strcmp(line, "[pixel shader fail todo]\n"))
-            {
-                state = STATE_SHADER_PIXEL_TODO;
-                expect_hr = E_FAIL;
-            }
-            else if (!strcmp(line, "[pixel shader notimpl]\n"))
-            {
-                state = STATE_SHADER_PIXEL;
-                expect_hr = E_NOTIMPL;
-            }
-            else if (!strcmp(line, "[pixel shader notimpl todo]\n"))
-            {
-                state = STATE_SHADER_PIXEL_TODO;
-                expect_hr = E_NOTIMPL;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
             else if (sscanf(line, "[sampler %u]\n", &index))
             {
@@ -1103,25 +1118,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             {
                 state = STATE_PREPROC_INVALID;
             }
-            else if (!strcmp(line, "[vertex shader]\n"))
+            else if (match_directive_substring(line, "[vertex shader", &line))
             {
                 state = STATE_SHADER_VERTEX;
                 expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[vertex shader todo]\n"))
-            {
-                state = STATE_SHADER_VERTEX_TODO;
-                expect_hr = S_OK;
-            }
-            else if (!strcmp(line, "[vertex shader fail]\n"))
-            {
-                state = STATE_SHADER_VERTEX;
-                expect_hr = E_FAIL;
-            }
-            else if (!strcmp(line, "[vertex shader fail todo]\n"))
-            {
-                state = STATE_SHADER_VERTEX_TODO;
-                expect_hr = E_FAIL;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
             else if (!strcmp(line, "[input layout]\n"))
             {
@@ -1132,7 +1133,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 runner->input_element_count = 0;
             }
 
-            vkd3d_test_push_context("Section %.*s, line %u", strlen(line) - 1, line, line_number);
+            vkd3d_test_push_context("Section %.*s, line %u", strlen(line_buffer) - 1, line_buffer, line_number);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
