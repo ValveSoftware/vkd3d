@@ -6606,6 +6606,8 @@ static void test_draw_depth_no_ps(void)
     D3D12_VERTEX_BUFFER_VIEW vbv;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    D3D12_SHADER_BYTECODE vs;
+    ID3D10Blob *vs_bytecode;
     ID3D12Resource *vb;
     HRESULT hr;
 
@@ -6624,28 +6626,22 @@ static void test_draw_depth_no_ps(void)
         {{ 1.0f, -1.0f, 0.5f, 1.0f}},
         {{ 1.0f,  1.0f, 0.5f, 1.0f}},
     };
-    static const DWORD vs_code[] =
-    {
-#if 0
-        void main(float4 in_position : POSITION, out float4 out_position : SV_POSITION)
-        {
-            out_position = in_position;
-        }
-#endif
-        0x43425844, 0xa7a2f22d, 0x83ff2560, 0xe61638bd, 0x87e3ce90, 0x00000001, 0x000000d8, 0x00000003,
-        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
-        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x49534f50, 0x4e4f4954, 0xababab00,
-        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000001, 0x00000003,
-        0x00000000, 0x0000000f, 0x505f5653, 0x5449534f, 0x004e4f49, 0x52444853, 0x0000003c, 0x00010040,
-        0x0000000f, 0x0300005f, 0x001010f2, 0x00000000, 0x04000067, 0x001020f2, 0x00000000, 0x00000001,
-        0x05000036, 0x001020f2, 0x00000000, 0x00101e46, 0x00000000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE vs = {vs_code, sizeof(vs_code)};
+    static const char vs_code[] =
+            "void main(float4 in_position : POSITION, out float4 out_position : SV_POSITION)\n"
+            "{\n"
+            "    out_position = in_position;\n"
+            "}\n";
+
+    vs_bytecode = compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0");
+    vs = shader_bytecode_from_blob(vs_bytecode);
 
     memset(&desc, 0, sizeof(desc));
     desc.no_render_target = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(vs_bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -6693,6 +6689,8 @@ static void test_draw_depth_no_ps(void)
     destroy_depth_stencil(&ds);
     ID3D12Resource_Release(vb);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(vs_bytecode);
 }
 
 static void test_draw_depth_only(void)
