@@ -2522,11 +2522,11 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         struct sm6_function *function)
 {
     struct vkd3d_shader_instruction *ins;
+    size_t i, block_idx, block_count;
     const struct dxil_record *record;
     bool ret_found, is_terminator;
     struct sm6_block *code_block;
     struct sm6_value *dst;
-    size_t i, block_idx;
 
     if (sm6->function_count)
     {
@@ -2552,12 +2552,12 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    if (!(function->block_count = block->records[0]->operands[0]))
+    if (!(block_count = block->records[0]->operands[0]))
     {
         WARN("Function contains no blocks.\n");
         return VKD3D_ERROR_INVALID_SHADER;
     }
-    if (function->block_count > 1)
+    if (block_count > 1)
     {
         FIXME("Branched shaders are not supported yet.\n");
         return VKD3D_ERROR_INVALID_SHADER;
@@ -2568,6 +2568,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         ERR("Failed to allocate code block.\n");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
+    function->block_count = block_count;
     code_block = function->blocks[0];
 
     sm6->cur_max_value = function->value_count;
