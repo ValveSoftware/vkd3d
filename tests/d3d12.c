@@ -6536,34 +6536,30 @@ static void test_scissor(void)
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    D3D12_SHADER_BYTECODE ps;
+    ID3D10Blob *ps_bytecode;
     unsigned int color;
     RECT scissor_rect;
 
-    static const DWORD ps_code[] =
-    {
-#if 0
-        float4 main(float4 position : SV_POSITION) : SV_Target
-        {
-            return float4(0.0, 1.0, 0.0, 1.0);
-        }
-#endif
-        0x43425844, 0x30240e72, 0x012f250c, 0x8673c6ea, 0x392e4cec, 0x00000001, 0x000000d4, 0x00000003,
-        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
-        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x505f5653, 0x5449534f, 0x004e4f49,
-        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
-        0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x52444853, 0x00000038, 0x00000040,
-        0x0000000e, 0x03000065, 0x001020f2, 0x00000000, 0x08000036, 0x001020f2, 0x00000000, 0x00004002,
-        0x00000000, 0x3f800000, 0x00000000, 0x3f800000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char ps_code[] =
+            "float4 main(float4 position : SV_POSITION) : SV_Target\n"
+            "{\n"
+            "    return float4(0.0, 1.0, 0.0, 1.0);\n"
+            "}\n";
     static const float red[] = {1.0f, 0.0f, 0.0f, 1.0f};
+
+    ps_bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(ps_bytecode);
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_width = 640;
     desc.rt_height = 480;
     desc.ps = &ps;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(ps_bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -6596,6 +6592,8 @@ static void test_scissor(void)
     release_resource_readback(&rb);
 
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(ps_bytecode);
 }
 
 static void test_draw_depth_no_ps(void)
