@@ -6395,9 +6395,11 @@ static void test_fractional_viewports(void)
 {
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     ID3D12GraphicsCommandList *command_list;
+    ID3D10Blob *vs_bytecode, *ps_bytecode;
     D3D12_INPUT_LAYOUT_DESC input_layout;
     struct d3d12_resource_readback rb;
     struct test_context_desc desc;
+    D3D12_SHADER_BYTECODE vs, ps;
     D3D12_VERTEX_BUFFER_VIEW vbv;
     struct test_context context;
     ID3D12CommandQueue *queue;
@@ -6405,51 +6407,21 @@ static void test_fractional_viewports(void)
     unsigned int i, x, y;
     ID3D12Resource *vb;
 
-    static const DWORD vs_code[] =
-    {
-#if 0
-        void main(in float4 in_position : POSITION,
-                in float2 in_texcoord : TEXCOORD,
-                out float4 position : SV_Position,
-                out float2 texcoord : TEXCOORD)
-        {
-            position = in_position;
-            texcoord = in_texcoord;
-        }
-#endif
-        0x43425844, 0x4df282ca, 0x85c8bbfc, 0xd44ad19f, 0x1158be97, 0x00000001, 0x00000148, 0x00000003,
-        0x0000002c, 0x00000080, 0x000000d8, 0x4e475349, 0x0000004c, 0x00000002, 0x00000008, 0x00000038,
-        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000041, 0x00000000, 0x00000000,
-        0x00000003, 0x00000001, 0x00000303, 0x49534f50, 0x4e4f4954, 0x58455400, 0x524f4f43, 0xabab0044,
-        0x4e47534f, 0x00000050, 0x00000002, 0x00000008, 0x00000038, 0x00000000, 0x00000001, 0x00000003,
-        0x00000000, 0x0000000f, 0x00000044, 0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x00000c03,
-        0x505f5653, 0x7469736f, 0x006e6f69, 0x43584554, 0x44524f4f, 0xababab00, 0x52444853, 0x00000068,
-        0x00010040, 0x0000001a, 0x0300005f, 0x001010f2, 0x00000000, 0x0300005f, 0x00101032, 0x00000001,
-        0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x03000065, 0x00102032, 0x00000001, 0x05000036,
-        0x001020f2, 0x00000000, 0x00101e46, 0x00000000, 0x05000036, 0x00102032, 0x00000001, 0x00101046,
-        0x00000001, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE vs = {vs_code, sizeof(vs_code)};
-    static const DWORD ps_code[] =
-    {
-#if 0
-        float4 main(float4 position : SV_Position,
-                float2 texcoord : TEXCOORD) : SV_Target
-        {
-            return float4(position.xy, texcoord);
-        }
-#endif
-        0x43425844, 0xa15616bc, 0x6862ab1c, 0x28b915c0, 0xdb0df67c, 0x00000001, 0x0000011c, 0x00000003,
-        0x0000002c, 0x00000084, 0x000000b8, 0x4e475349, 0x00000050, 0x00000002, 0x00000008, 0x00000038,
-        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000030f, 0x00000044, 0x00000000, 0x00000000,
-        0x00000003, 0x00000001, 0x00000303, 0x505f5653, 0x7469736f, 0x006e6f69, 0x43584554, 0x44524f4f,
-        0xababab00, 0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000,
-        0x00000003, 0x00000000, 0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x52444853, 0x0000005c,
-        0x00000040, 0x00000017, 0x04002064, 0x00101032, 0x00000000, 0x00000001, 0x03001062, 0x00101032,
-        0x00000001, 0x03000065, 0x001020f2, 0x00000000, 0x05000036, 0x00102032, 0x00000000, 0x00101046,
-        0x00000000, 0x05000036, 0x001020c2, 0x00000000, 0x00101406, 0x00000001, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char vs_code[] =
+            "void main(in float4 in_position : POSITION,\n"
+            "        in float2 in_texcoord : TEXCOORD,\n"
+            "        out float4 position : SV_Position,\n"
+            "        out float2 texcoord : TEXCOORD)\n"
+            "{\n"
+            "    position = in_position;\n"
+            "    texcoord = in_texcoord;\n"
+            "}\n";
+    static const char ps_code[] =
+            "float4 main(float4 position : SV_Position,\n"
+            "        float2 texcoord : TEXCOORD) : SV_Target\n"
+            "{\n"
+            "    return float4(position.xy, texcoord);\n"
+            "}\n";
     static const D3D12_INPUT_ELEMENT_DESC layout_desc[] =
     {
         {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
@@ -6473,11 +6445,21 @@ static void test_fractional_viewports(void)
         1.0f / 64.0f, 1.0f / 128.0f, 1.0f / 256.0f, 63.0f / 128.0f,
     };
 
+    vs_bytecode = compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0");
+    vs = shader_bytecode_from_blob(vs_bytecode);
+
+    ps_bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(ps_bytecode);
+
     memset(&desc, 0, sizeof(desc));
     desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     desc.no_root_signature = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(vs_bytecode);
+        ID3D10Blob_Release(ps_bytecode);
         return;
+    }
     command_list = context.list;
     queue = context.queue;
 
@@ -6542,6 +6524,9 @@ static void test_fractional_viewports(void)
 
     ID3D12Resource_Release(vb);
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(vs_bytecode);
+    ID3D10Blob_Release(ps_bytecode);
 }
 
 static void test_scissor(void)
