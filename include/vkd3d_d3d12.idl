@@ -4999,6 +4999,90 @@ interface ID3D12SDKConfiguration : IUnknown
     HRESULT SetSDKVersion(UINT version, const char *path);
 }
 
+typedef enum D3D12_AXIS_SHADING_RATE
+{
+    D3D12_AXIS_SHADING_RATE_1X = 0x0,
+    D3D12_AXIS_SHADING_RATE_2X = 0x1,
+    D3D12_AXIS_SHADING_RATE_4X = 0x2,
+} D3D12_AXIS_SHADING_RATE;
+
+typedef enum D3D12_SHADING_RATE
+{
+    D3D12_SHADING_RATE_1X1 = 0x0,
+    D3D12_SHADING_RATE_1X2 = 0x1,
+    D3D12_SHADING_RATE_2X1 = 0x4,
+    D3D12_SHADING_RATE_2X2 = 0x5,
+    D3D12_SHADING_RATE_2X4 = 0x6,
+    D3D12_SHADING_RATE_4X2 = 0x9,
+    D3D12_SHADING_RATE_4X4 = 0xa,
+} D3D12_SHADING_RATE;
+
+typedef enum D3D12_SHADING_RATE_COMBINER
+{
+    D3D12_SHADING_RATE_COMBINER_PASSTHROUGH = 0x0,
+    D3D12_SHADING_RATE_COMBINER_OVERRIDE = 0x1,
+    D3D12_SHADING_RATE_COMBINER_MIN = 0x2,
+    D3D12_SHADING_RATE_COMBINER_MAX = 0x3,
+    D3D12_SHADING_RATE_COMBINER_SUM = 0x4,
+} D3D12_SHADING_RATE_COMBINER;
+
+[
+    uuid(55050859-4024-474c-87f5-6472eaee44ea),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12GraphicsCommandList5 : ID3D12GraphicsCommandList4
+{
+    void RSSetShadingRate(
+            D3D12_SHADING_RATE base_shading_rate,
+            const D3D12_SHADING_RATE_COMBINER *combiners);
+
+    void RSSetShadingRateImage(
+            ID3D12Resource *shading_rate_image);
+}
+
+const UINT D3D12_SHADING_RATE_X_AXIS_SHIFT = 2;
+const UINT D3D12_SHADING_RATE_VALID_MASK = 3;
+
+cpp_quote("#define D3D12_MAKE_COARSE_SHADING_RATE(x, y) ((x) << D3D12_SHADING_RATE_X_AXIS_SHIFT | (y))")
+cpp_quote("#define D3D12_GET_COARSE_SHADING_RATE_X_AXIS(val) (((val) >> D3D12_SHADING_RATE_X_AXIS_SHIFT) & D3D12_SHADING_RATE_VALID_MASK)")
+cpp_quote("#define D3D12_GET_COARSE_SHADING_RATE_Y_AXIS(val) ((val) & D3D12_SHADING_RATE_VALID_MASK)")
+
+typedef struct D3D12_DISPATCH_MESH_ARGUMENTS
+{
+    UINT ThreadGroupCountX;
+    UINT ThreadGroupCountY;
+    UINT ThreadGroupCountZ;
+} D3D12_DISPATCH_MESH_ARGUMENTS;
+
+[
+    uuid(c3827890-e548-4cfa-96cf-5689a9370f80),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12GraphicsCommandList6 : ID3D12GraphicsCommandList5
+{
+    void DispatchMesh(
+            UINT thread_group_count_x,
+            UINT thread_group_count_y,
+            UINT thread_group_count_z);
+}
+
+[
+    uuid(dd171223-8b61-4769-90e3-160ccde4e2c1),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12GraphicsCommandList7 : ID3D12GraphicsCommandList6
+{
+    void Barrier(
+            UINT32 barrier_groups_count,
+            const D3D12_BARRIER_GROUP *barrier_groups);
+};
+
 typedef HRESULT (__stdcall *PFN_D3D12_CREATE_ROOT_SIGNATURE_DESERIALIZER)(
         const void *data, SIZE_T data_size, REFIID iid, void **deserializer);
 
