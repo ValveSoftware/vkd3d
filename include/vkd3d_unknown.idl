@@ -23,6 +23,8 @@ cpp_quote("#define __VKD3D_UNKNOWN_H")
 cpp_quote("#if 0")
 typedef IID *REFIID;
 typedef IID *REFGUID;
+typedef GUID CLSID,*LPCLSID;
+typedef CLSID *REFCLSID;
 cpp_quote("#endif")
 
 cpp_quote("#if !defined(_WIN32)")

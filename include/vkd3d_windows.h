@@ -125,6 +125,7 @@ typedef struct _GUID
 # endif
 
 typedef GUID IID;
+typedef GUID CLSID;
 
 # ifdef INITGUID
 #  ifndef __cplusplus
@@ -223,9 +224,11 @@ typedef struct SECURITY_ATTRIBUTES SECURITY_ATTRIBUTES;
 # if defined(__cplusplus) && !defined(CINTERFACE)
 #  define REFIID const IID &
 #  define REFGUID const GUID &
+#  define REFCLSID const CLSID &
 # else
 #  define REFIID const IID * const
 #  define REFGUID const GUID * const
+#  define REFCLSID const CLSID * const
 # endif
 
 #if defined(__cplusplus) && !defined(CINTERFACE)
