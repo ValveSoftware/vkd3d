@@ -126,6 +126,7 @@ typedef struct _GUID
 
 typedef GUID IID;
 typedef GUID CLSID;
+typedef GUID UUID;
 
 # ifdef INITGUID
 #  ifndef __cplusplus
