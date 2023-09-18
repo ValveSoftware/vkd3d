@@ -2920,6 +2920,8 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
     struct sm6_parser *sm6;
     int ret;
 
+    ERR("Creating a DXIL parser. This is unsupported; you get to keep all the pieces if it breaks.\n");
+
     if (!(sm6 = vkd3d_calloc(1, sizeof(*sm6))))
     {
         ERR("Failed to allocate parser.\n");
