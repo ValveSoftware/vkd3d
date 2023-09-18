@@ -23740,9 +23740,11 @@ static void test_create_query_heap(void)
         heap_desc.NodeMask = 0;
 
         hr = ID3D12Device_CreateQueryHeap(device, &heap_desc, &IID_ID3D12QueryHeap, (void **)&query_heap);
+        bug_if(types[i] == D3D12_QUERY_HEAP_TYPE_PIPELINE_STATISTICS && is_mvk_device(device))
         ok(hr == S_OK, "Failed to create query heap, type %u, hr %#x.\n", types[i], hr);
 
-        ID3D12QueryHeap_Release(query_heap);
+        if (hr == S_OK)
+            ID3D12QueryHeap_Release(query_heap);
     }
 
     heap_desc.Type = D3D12_QUERY_HEAP_TYPE_SO_STATISTICS;
@@ -23881,7 +23883,14 @@ static void test_query_pipeline_statistics(void)
     heap_desc.Count = 2;
     heap_desc.NodeMask = 0;
     hr = ID3D12Device_CreateQueryHeap(device, &heap_desc, &IID_ID3D12QueryHeap, (void **)&query_heap);
+    bug_if(is_mvk_device(device))
     ok(SUCCEEDED(hr), "Failed to create query heap, type %u, hr %#x.\n", heap_desc.Type, hr);
+    if (FAILED(hr))
+    {
+        ID3D12PipelineState_Release(pso);
+        destroy_test_context(&context);
+        return;
+    }
 
     resource = create_readback_buffer(device, 2 * sizeof(struct D3D12_QUERY_DATA_PIPELINE_STATISTICS));
 
