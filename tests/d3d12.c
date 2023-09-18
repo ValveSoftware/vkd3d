@@ -32402,6 +32402,7 @@ static void test_shader_get_render_target_sample_count(void)
     struct test_context_desc desc;
     struct test_context context;
     ID3D12CommandQueue *queue;
+    struct vec4 sample_count;
     HRESULT hr;
 
     static const float black[4];
@@ -32422,20 +32423,28 @@ static void test_shader_get_render_target_sample_count(void)
         0x0100003e,
     };
     static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
-    static const struct vec4 sample_count = {8.0f, 8.0f, 8.0f, 8.0f};
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     desc.sample_desc.Count = 8;
     desc.no_pipeline = true;
+    desc.check_multisampling = true;
     if (!init_test_context(&context, &desc))
         return;
     command_list = context.list;
     queue = context.queue;
+    bug_if(is_mvk_device(context.device))
+    ok(context.render_target_desc.SampleDesc.Count == 8, "Failed to create render target with MSAA 8, got %u.\n",
+            context.render_target_desc.SampleDesc.Count);
+
+    sample_count.x = context.render_target_desc.SampleDesc.Count;
+    sample_count.y = context.render_target_desc.SampleDesc.Count;
+    sample_count.z = context.render_target_desc.SampleDesc.Count;
+    sample_count.w = context.render_target_desc.SampleDesc.Count;
 
     init_pipeline_state_desc(&pso_desc, context.root_signature,
             context.render_target_desc.Format, NULL, &ps, NULL);
-    pso_desc.SampleDesc.Count = desc.sample_desc.Count;
+    pso_desc.SampleDesc.Count = context.render_target_desc.SampleDesc.Count;
     hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
     ok(hr == S_OK, "Failed to create pipeline, hr %#x.\n", hr);

@@ -934,6 +934,7 @@ struct test_context_desc
     unsigned int rt_width, rt_height, rt_array_size;
     DXGI_FORMAT rt_format;
     DXGI_SAMPLE_DESC sample_desc;
+    bool check_multisampling;
     unsigned int rt_descriptor_count;
     unsigned int root_signature_flags;
     bool no_render_target;
@@ -965,6 +966,24 @@ struct test_context
     RECT scissor_rect;
 };
 
+#define check_multisample_support(a, b, c) check_multisample_support_(__LINE__, a, b, c)
+static unsigned int check_multisample_support_(unsigned int line, ID3D12Device *device,
+        DXGI_FORMAT format, unsigned int sample_count)
+{
+    D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS format_support =
+    {
+        .Format = format,
+        .SampleCount = sample_count,
+    };
+    HRESULT hr;
+
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS,
+            &format_support, sizeof(format_support));
+    ok_(line)(hr == S_OK, "Cannot check feature support, hr %#x.\n", hr);
+
+    return format_support.NumQualityLevels;
+}
+
 #define create_render_target(context, a, b, c) create_render_target_(__LINE__, context, a, b, c)
 static void create_render_target_(unsigned int line, struct test_context *context,
         const struct test_context_desc *desc, ID3D12Resource **render_target,
@@ -994,6 +1013,22 @@ static void create_render_target_(unsigned int line, struct test_context *contex
     clear_value.Color[1] = 1.0f;
     clear_value.Color[2] = 1.0f;
     clear_value.Color[3] = 1.0f;
+
+    if (desc && desc->check_multisampling)
+    {
+        for (; resource_desc.SampleDesc.Count != 1; resource_desc.SampleDesc.Count /= 2)
+        {
+            unsigned int quality_level_count = check_multisample_support_(line, context->device,
+                    resource_desc.Format, resource_desc.SampleDesc.Count);
+
+            if (quality_level_count != 0)
+            {
+                resource_desc.SampleDesc.Quality = min(resource_desc.SampleDesc.Quality, quality_level_count - 1);
+                break;
+            }
+        }
+    }
+
     hr = ID3D12Device_CreateCommittedResource(context->device,
             &heap_properties, D3D12_HEAP_FLAG_NONE, &resource_desc,
             D3D12_RESOURCE_STATE_RENDER_TARGET, &clear_value,
