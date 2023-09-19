@@ -823,6 +823,36 @@ static void test_scan_descriptors(void)
     }
 }
 
+static void test_build_varying_map(void)
+{
+    struct vkd3d_shader_signature_element output_elements[] =
+    {
+        {"position", 0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"texcoord", 2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0xf, 0xf},
+        {"colour",   0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf, 0xf},
+    };
+    struct vkd3d_shader_signature_element input_elements[] =
+    {
+        {"colour",   0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 3, 0xf, 0xf},
+        {"texcoord", 2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 4, 0x3, 0x3},
+    };
+    struct vkd3d_shader_signature output = {output_elements, ARRAY_SIZE(output_elements)};
+    struct vkd3d_shader_signature input = {input_elements, ARRAY_SIZE(input_elements)};
+    PFN_vkd3d_shader_build_varying_map pfn_vkd3d_shader_build_varying_map;
+    struct vkd3d_shader_varying_map map[ARRAY_SIZE(input_elements)];
+    unsigned int count;
+
+    pfn_vkd3d_shader_build_varying_map = vkd3d_shader_build_varying_map;
+    pfn_vkd3d_shader_build_varying_map(&output, &input, &count, map);
+    ok(count == ARRAY_SIZE(input_elements), "Got count %u.\n", count);
+    ok(map[0].output_signature_index == 2, "Got map[0].output_signature_index %u.\n", map[0].output_signature_index);
+    ok(map[0].input_register_index == 3, "Got map[0].input_register_index %u.\n", map[0].input_register_index);
+    ok(map[0].input_mask == 0xf, "Got map[0].input_mask %#x.\n", map[0].input_mask);
+    ok(map[1].output_signature_index == 1, "Got map[1].output_signature_index %u.\n", map[1].output_signature_index);
+    ok(map[1].input_register_index == 4, "Got map[1].input_register_index %u.\n", map[1].input_register_index);
+    ok(map[1].input_mask == 0x3, "Got map[1].input_mask %#x.\n", map[1].input_mask);
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -834,4 +864,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_dxbc);
     run_test(test_scan_signatures);
     run_test(test_scan_descriptors);
+    run_test(test_build_varying_map);
 }
