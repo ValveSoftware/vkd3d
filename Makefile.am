@@ -310,8 +310,9 @@ libvkd3d_la_SOURCES = \
 	include/private/vkd3d_common.h \
 	include/private/vkd3d_debug.h \
 	include/private/vkd3d_memory.h \
-	include/private/vkd3d_utf8.h \
+	include/private/vkd3d_shader_utils.h \
 	include/private/vkd3d_test.h \
+	include/private/vkd3d_utf8.h \
 	include/vkd3d_d3d12.idl \
 	include/vkd3d_d3dcommon.idl \
 	include/vkd3d_unknown.idl \
