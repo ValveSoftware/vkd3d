@@ -2362,6 +2362,10 @@ typedef int (*PFN_vkd3d_shader_parse_dxbc)(const struct vkd3d_shader_code *dxbc,
 typedef int (*PFN_vkd3d_shader_serialize_dxbc)(size_t section_count,
         const struct vkd3d_shader_dxbc_section_desc *sections, struct vkd3d_shader_code *dxbc, char **messages);
 
+/** Type of vkd3d_shader_build_varying_map(). \since 1.9 */
+typedef void (*PFN_vkd3d_shader_build_varying_map)(const struct vkd3d_shader_signature *output_signature,
+        const struct vkd3d_shader_signature *input_signature,
+        unsigned int *count, struct vkd3d_shader_varying_map *varyings);
 /** Type of vkd3d_shader_free_scan_signature_info(). \since 1.9 */
 typedef void (*PFN_vkd3d_shader_free_scan_signature_info)(struct vkd3d_shader_scan_signature_info *info);
 
