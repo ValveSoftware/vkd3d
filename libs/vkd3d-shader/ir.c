@@ -86,14 +86,14 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
 }
 
 static const struct vkd3d_shader_varying_map *find_varying_map(
-        const struct vkd3d_shader_next_stage_info *next_stage, unsigned int signature_idx)
+        const struct vkd3d_shader_varying_map_info *varying_map, unsigned int signature_idx)
 {
     unsigned int i;
 
-    for (i = 0; i < next_stage->varying_count; ++i)
+    for (i = 0; i < varying_map->varying_count; ++i)
     {
-        if (next_stage->varying_map[i].output_signature_index == signature_idx)
-            return &next_stage->varying_map[i];
+        if (varying_map->varying_map[i].output_signature_index == signature_idx)
+            return &varying_map->varying_map[i];
     }
 
     return NULL;
@@ -103,15 +103,15 @@ static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *pars
         const struct vkd3d_shader_compile_info *compile_info)
 {
     struct shader_signature *signature = &parser->shader_desc.output_signature;
-    const struct vkd3d_shader_next_stage_info *next_stage;
+    const struct vkd3d_shader_varying_map_info *varying_map;
     unsigned int i;
 
-    if (!(next_stage = vkd3d_find_struct(compile_info->next, NEXT_STAGE_INFO)))
+    if (!(varying_map = vkd3d_find_struct(compile_info->next, VARYING_MAP_INFO)))
         return VKD3D_OK;
 
     for (i = 0; i < signature->element_count; ++i)
     {
-        const struct vkd3d_shader_varying_map *map = find_varying_map(next_stage, i);
+        const struct vkd3d_shader_varying_map *map = find_varying_map(varying_map, i);
         struct signature_element *e = &signature->elements[i];
 
         if (map)
@@ -137,9 +137,9 @@ static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *pars
         }
     }
 
-    for (i = 0; i < next_stage->varying_count; ++i)
+    for (i = 0; i < varying_map->varying_count; ++i)
     {
-        if (next_stage->varying_map[i].output_signature_index >= signature->element_count)
+        if (varying_map->varying_map[i].output_signature_index >= signature->element_count)
         {
             vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                     "Aborting due to not yet implemented feature: "

@@ -91,10 +91,10 @@ enum vkd3d_shader_structure_type
      */
     VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO,
     /**
-     * The structure is a vkd3d_shader_next_stage_info structure.
+     * The structure is a vkd3d_shader_varying_map_info structure.
      * \since 1.9
      */
-    VKD3D_SHADER_STRUCTURE_TYPE_NEXT_STAGE_INFO,
+    VKD3D_SHADER_STRUCTURE_TYPE_VARYING_MAP_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -1690,7 +1690,7 @@ struct vkd3d_shader_scan_signature_info
  * Describes the mapping of a output varying register in a shader stage,
  * to an input varying register in the following shader stage.
  *
- * This structure is used in struct vkd3d_shader_next_stage_info.
+ * This structure is used in struct vkd3d_shader_varying_map_info.
  */
 struct vkd3d_shader_varying_map
 {
@@ -1708,15 +1708,21 @@ struct vkd3d_shader_varying_map
 };
 
 /**
- * A chained structure which describes the next shader in the pipeline.
+ * A chained structure which describes how output varyings in this shader stage
+ * should be mapped to input varyings in the next stage.
  *
- * This structure is optional, and should only be provided if there is in fact
- * another shader in the pipeline.
+ * This structure is optional. It should not be provided if there is no shader
+ * stage.
  * However, depending on the input and output formats, this structure may be
  * necessary in order to generate shaders which correctly match each other.
- * If the structure or its individual fields are not provided, vkd3d-shader
- * will generate shaders which may be correct in isolation, but are not
- * guaranteed to correctly match each other.
+ *
+ * If this structure is absent, vkd3d-shader will map varyings from one stage
+ * to another based on their register index.
+ * For Direct3D shader model 3.0, such a default mapping will be incorrect
+ * unless the registers are allocated in the same order, and hence this
+ * field is necessary to correctly match inter-stage varyings.
+ * This mapping may also be necessary under other circumstances where the
+ * varying interface does not match exactly.
  *
  * This structure is passed to vkd3d_shader_compile() and extends
  * vkd3d_shader_compile_info.
@@ -1725,9 +1731,9 @@ struct vkd3d_shader_varying_map
  *
  * \since 1.9
  */
-struct vkd3d_shader_next_stage_info
+struct vkd3d_shader_varying_map_info
 {
-    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_NEXT_STAGE_INFO. */
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_VARYING_MAP_INFO. */
     enum vkd3d_shader_structure_type type;
     /** Optional pointer to a structure containing further parameters. */
     const void *next;
@@ -1740,14 +1746,6 @@ struct vkd3d_shader_next_stage_info
      * consumed by the next shader stage.
      * If this shader stage outputs a varying that is not consumed by the next
      * shader stage, that varying should be absent from this array.
-     *
-     * If this field is absent, vkd3d-shader will map varyings from one stage
-     * to another based on their register index.
-     * For Direct3D shader model 3.0, such a default mapping will be incorrect
-     * unless the registers are allocated in the same order, and hence this
-     * field is necessary to correctly match inter-stage varyings.
-     * This mapping may also be necessary under other circumstances where the
-     * varying interface does not match exactly.
      *
      * This mapping may be constructed by vkd3d_shader_build_varying_map().
      */
@@ -1830,7 +1828,7 @@ VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported
  * following chained structures:
  * - vkd3d_shader_hlsl_source_info
  * - vkd3d_shader_interface_info
- * - vkd3d_shader_next_stage_info
+ * - vkd3d_shader_varying_map_info
  * - vkd3d_shader_scan_descriptor_info
  * - vkd3d_shader_scan_signature_info
  * - vkd3d_shader_spirv_domain_shader_target_info
@@ -2273,7 +2271,7 @@ VKD3D_SHADER_API void vkd3d_shader_free_scan_signature_info(struct vkd3d_shader_
  * Build a mapping of output varyings in a shader stage to input varyings in
  * the following shader stage.
  *
- * This mapping should be used in struct vkd3d_shader_next_stage_info to
+ * This mapping should be used in struct vkd3d_shader_varying_map_info to
  * compile the first shader.
  *
  * \param output_signature The output signature of the first shader.
