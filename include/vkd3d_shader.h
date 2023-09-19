@@ -1463,7 +1463,7 @@ enum vkd3d_shader_sysval_semantic
     VKD3D_SHADER_SV_TESS_FACTOR_TRIINT        = 0x0e,
     VKD3D_SHADER_SV_TESS_FACTOR_LINEDET       = 0x0f,
     VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN       = 0x10,
-    /** Render target; SV_Target in Direct3D shader model 6 shaders. */
+    /** Render target; SV_Target in Direct3D shader model 6 shaders. \since 1.9 */
     VKD3D_SHADER_SV_TARGET                    = 0x40,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SYSVAL_SEMANTIC),
