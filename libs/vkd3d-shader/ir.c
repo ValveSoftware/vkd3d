@@ -1260,6 +1260,96 @@ static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d
     return VKD3D_OK;
 }
 
+static void remove_dead_code(struct vkd3d_shader_parser *parser)
+{
+    size_t i, depth = 0;
+    bool dead = false;
+
+    for (i = 0; i < parser->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_IF:
+            case VKD3DSIH_LOOP:
+            case VKD3DSIH_SWITCH:
+                if (dead)
+                {
+                    vkd3d_shader_instruction_make_nop(ins);
+                    ++depth;
+                }
+                break;
+
+            case VKD3DSIH_ENDIF:
+            case VKD3DSIH_ENDLOOP:
+            case VKD3DSIH_ENDSWITCH:
+            case VKD3DSIH_ELSE:
+                if (dead)
+                {
+                    if (depth > 0)
+                    {
+                        vkd3d_shader_instruction_make_nop(ins);
+                        if (ins->handler_idx != VKD3DSIH_ELSE)
+                            --depth;
+                    }
+                    else
+                    {
+                        dead = false;
+                    }
+                }
+                break;
+
+            /* `depth' is counted with respect to where the dead code
+             * segment began. So it starts at zero and it signals the
+             * termination of the dead code segment when it would
+             * become negative. */
+            case VKD3DSIH_BREAK:
+            case VKD3DSIH_RET:
+            case VKD3DSIH_CONTINUE:
+                if (dead)
+                {
+                    vkd3d_shader_instruction_make_nop(ins);
+                }
+                else
+                {
+                    dead = true;
+                    depth = 0;
+                }
+                break;
+
+            /* If `case' or `default' appears at zero depth, it means
+             * that they are a possible target for the corresponding
+             * switch, so the code is live again. */
+            case VKD3DSIH_CASE:
+            case VKD3DSIH_DEFAULT:
+                if (dead)
+                {
+                    if (depth == 0)
+                        dead = false;
+                    else
+                        vkd3d_shader_instruction_make_nop(ins);
+                }
+                break;
+
+            /* Phase instructions can only appear in hull shaders and
+             * outside of any block. When a phase returns, control is
+             * moved to the following phase, so they make code live
+             * again. */
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                dead = false;
+                break;
+
+            default:
+                if (dead)
+                    vkd3d_shader_instruction_make_nop(ins);
+                break;
+        }
+    }
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -1286,6 +1376,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
     if (result >= 0)
         result = instruction_array_normalise_flat_constants(parser);
+
+    if (result >= 0)
+        remove_dead_code(parser);
 
     if (result >= 0 && TRACE_ON())
         vkd3d_shader_trace(instructions, &parser->shader_version);
