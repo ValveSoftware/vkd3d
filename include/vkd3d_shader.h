@@ -1464,8 +1464,24 @@ enum vkd3d_shader_sysval_semantic
     VKD3D_SHADER_SV_TESS_FACTOR_TRIINT        = 0x0e,
     VKD3D_SHADER_SV_TESS_FACTOR_LINEDET       = 0x0f,
     VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN       = 0x10,
-    /** Render target; SV_Target in Direct3D shader model 6 shaders. \since 1.9 */
+    /** Render target; SV_Target in Direct3D. \since 1.9 */
     VKD3D_SHADER_SV_TARGET                    = 0x40,
+    /** Depth; SV_Depth in Direct3D. \since 1.9 */
+    VKD3D_SHADER_SV_DEPTH                     = 0x41,
+    /** Sample mask; SV_Coverage in Direct3D. \since 1.9 */
+    VKD3D_SHADER_SV_COVERAGE                  = 0x42,
+    /**
+     * Depth, which is guaranteed to be greater than or equal to the current
+     * depth; SV_DepthGreaterEqual in Direct3D. \since 1.9
+     */
+    VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL       = 0x43,
+    /**
+     * Depth, which is guaranteed to be less than or equal to the current
+     * depth; SV_DepthLessEqual in Direct3D. \since 1.9
+     */
+    VKD3D_SHADER_SV_DEPTH_LESS_EQUAL          = 0x44,
+    /** Stencil reference; SV_StencilRef in Direct3D. \since 1.9 */
+    VKD3D_SHADER_SV_STENCIL_REF               = 0x45,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SYSVAL_SEMANTIC),
 };
