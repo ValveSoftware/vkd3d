@@ -587,7 +587,7 @@ static void test_scan_signatures(void)
 
     static const struct vkd3d_shader_signature_element ps2_outputs[] =
     {
-        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_TARGET,   VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
     };
 
     static const char ps3_source[] =
@@ -609,8 +609,8 @@ static void test_scan_signatures(void)
 
     static const struct vkd3d_shader_signature_element ps3_outputs[] =
     {
-        {"COLOR",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
-        {"DEPTH",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x1, 0x1},
+        {"COLOR",       0, 0, VKD3D_SHADER_SV_TARGET,   VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"DEPTH",       0, 0, VKD3D_SHADER_SV_DEPTH,    VKD3D_SHADER_COMPONENT_FLOAT, 0, 0x1, 0x1},
     };
 
     static const char ps4_source[] =

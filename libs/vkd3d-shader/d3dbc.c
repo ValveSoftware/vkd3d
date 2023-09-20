@@ -597,7 +597,7 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
         case VKD3DSPR_TEMP:
             if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL
                     && sm1->p.shader_version.major == 1 && !register_index)
-                return add_signature_element(sm1, true, "COLOR", 0, VKD3D_SHADER_SV_NONE, 0, is_dcl, mask);
+                return add_signature_element(sm1, true, "COLOR", 0, VKD3D_SHADER_SV_TARGET, 0, is_dcl, mask);
             return true;
 
         case VKD3DSPR_INPUT:
@@ -641,11 +641,11 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
 
         case VKD3DSPR_COLOROUT:
             return add_signature_element(sm1, true, "COLOR", register_index,
-                    VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
+                    VKD3D_SHADER_SV_TARGET, register_index, is_dcl, mask);
 
         case VKD3DSPR_DEPTHOUT:
             return add_signature_element(sm1, true, "DEPTH", 0,
-                    VKD3D_SHADER_SV_NONE, register_index, is_dcl, 0x1);
+                    VKD3D_SHADER_SV_DEPTH, register_index, is_dcl, 0x1);
 
         case VKD3DSPR_RASTOUT:
             switch (register_index)
