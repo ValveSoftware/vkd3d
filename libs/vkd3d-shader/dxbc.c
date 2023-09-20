@@ -321,6 +321,26 @@ int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
     return ret;
 }
 
+/* Shader Model 6 shaders use these special values in the output signature,
+ * but Shader Model 4/5 just use VKD3D_SHADER_SV_NONE. Normalize to SM6. */
+static enum vkd3d_shader_sysval_semantic map_fragment_output_sysval(const char *name)
+{
+    if (!ascii_strcasecmp(name, "sv_target"))
+        return VKD3D_SHADER_SV_TARGET;
+    if (!ascii_strcasecmp(name, "sv_depth"))
+        return VKD3D_SHADER_SV_DEPTH;
+    if (!ascii_strcasecmp(name, "sv_coverage"))
+        return VKD3D_SHADER_SV_COVERAGE;
+    if (!ascii_strcasecmp(name, "sv_depthgreaterequal"))
+        return VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL;
+    if (!ascii_strcasecmp(name, "sv_depthlessequal"))
+        return VKD3D_SHADER_SV_DEPTH_LESS_EQUAL;
+    if (!ascii_strcasecmp(name, "sv_stencilref"))
+        return VKD3D_SHADER_SV_STENCIL_REF;
+
+    return VKD3D_SHADER_SV_NONE;
+}
+
 static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *section,
         struct vkd3d_shader_message_context *message_context, struct shader_signature *s)
 {
@@ -401,6 +421,9 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
             case TAG_OSGN:
             case TAG_OSG1:
             case TAG_OSG5:
+                if (e[i].sysval_semantic == VKD3D_SHADER_SV_NONE)
+                    e[i].sysval_semantic = map_fragment_output_sysval(e[i].semantic_name);
+                /* Fall through. */
             case TAG_PCSG:
             case TAG_PSG1:
                 e[i].used_mask = e[i].mask & ~e[i].used_mask;

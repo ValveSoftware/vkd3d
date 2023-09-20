@@ -566,8 +566,8 @@ static void test_scan_signatures(void)
 
     static const struct vkd3d_shader_signature_element ps1_outputs[] =
     {
-        {"sv_target",   2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 2,   0xf, 0xf},
-        {"sv_depth",    0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, ~0u, 0x1, 0x1},
+        {"sv_target",   2, 0, VKD3D_SHADER_SV_TARGET,   VKD3D_SHADER_COMPONENT_FLOAT, 2,   0xf, 0xf},
+        {"sv_depth",    0, 0, VKD3D_SHADER_SV_DEPTH,    VKD3D_SHADER_COMPONENT_FLOAT, ~0u, 0x1, 0x1},
     };
 
     static const char ps2_source[] =
