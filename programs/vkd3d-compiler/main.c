@@ -782,7 +782,7 @@ int main(int argc, char **argv)
     if (!options.explicit_colour && !getenv("NO_COLOUR") && !getenv("NO_COLOR") && has_colour(output))
         options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
-    add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_8);
+    add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_9);
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = &hlsl_source_info;

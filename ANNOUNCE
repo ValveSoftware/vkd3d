@@ -1,16 +1,16 @@
-The Wine team is proud to announce that release 1.8 of vkd3d, the Direct3D to
+The Wine team is proud to announce that release 1.9 of vkd3d, the Direct3D to
 Vulkan translation library, is now available.
 
 This release contains improvements that are listed in the release notes below.
 The main highlights are:
 
-  - Support for still many more HLSL features and intrinsics.
-  - Performance improvements to vkd3d descriptor updates.
+  - Yet more improvements to the HLSL compiler.
+  - A new utility to inspect the contents of DXBC blobs.
   - Miscellaneous bug fixes.
 
 The source is available from the following location:
 
-  https://dl.winehq.org/vkd3d/source/vkd3d-1.8.tar.xz
+  https://dl.winehq.org/vkd3d/source/vkd3d-1.9.tar.xz
 
 The current source can also be pulled directly from the git repository:
 
@@ -21,73 +21,83 @@ for the complete list.
 
 ----------------------------------------------------------------
 
-What's new in vkd3d 1.8
+What's new in vkd3d 1.9
 =======================
 
 
 *** libvkd3d
 
-- Performance improvements have been made to the code that handles descriptor
-  updates. In some applications the improvement can be quite significant.
-
-- Host-visible descriptor heaps are persistently mapped on creation. Some
-  applications access resource data from the CPU after calling Unmap(), and
-  that's supposed to work in practice.
-
-- 1-dimensional texture unordered-access views and shader resource views are
-  implemented.
-
-- Shader resource view, unordered access view, and constant buffer view root
-  descriptors with NULL GPU addresses are supported.
-
-- Direct3D 12 descriptor heap destruction is delayed until all contained
-  resources are destroyed.
+- Copying between depth/stencil and colour formats in
+  ID3D12GraphicsCommandList::CopyResource() is supported.
+- The ID3D12Fence1 interface is supported.
 
 
 *** libvkd3d-shader
 
+- vkd3d_shader_scan() supports retrieving descriptor information for `d3dbc'
+  shaders. This is one of the requirements for eventual SPIR-V generation from
+  `d3dbc' sources.
+
 - New features for the HLSL source type:
-  - Support for the ternary conditional operator "?:".
-  - Support for "discard" statements.
-  - Support for the "packoffset" keyword.
-  - Support for semantics on array types.
-  - Support for RWBuffer loads and stores.
-  - Register allocation for arrays and structures of resources and samplers
-    is implemented.
-  - Support for the SV_IsFrontFace pixel shader system-value semantics.
-  - Support for using constant expressions as array sizes and indices.
-  - Support for dynamic selection of vector components.
   - Support for the following intrinsic functions:
-    - D3DCOLORtoUBYTE4()
-    - any()
-    - asfloat()
-    - ddx() and ddy()
-    - fmod()
-    - log(), log2(), and log10()
-    - sign()
-    - trunc()
-  - The SampleBias(), SampleCmp(), SampleCmpLevelZero(), and SampleGrad()
-    texture object methods are implemented.
-  - Support for the case-insensitive variants of the "vector" and "matrix"
-    data types.
-  - Parser support for the "unroll" loop attribute. A warning is output for
-    "unroll" without iteration count, and an error is output when an iteration
-    count is specified. Actual unrolling is not implemented yet.
-  - Parser support for RWStructuredBuffer resources.
-  - Parser support for SamplerComparisonState objects. Note that outputting
-    compiled effects is not supported yet, but parsing these allows shaders
-    containing SamplerComparisonState state objects to be compiled.
+    - clip()
+    - ddx_coarse() and ddy_coarse()
+    - ddx_fine() and ddy_fine()
+    - tex1D(), tex2D(), texCUBE(), and tex3D()
+  - Constant folding support for more expression types. In particular:
+    - comparison operators
+    - floating-point min() and max()
+    - logical `and' and `or'
+    - dot products
+    - square roots
+    - logarithms
+  - Support for multi-sample texture object declarations without explicit
+    sample counts in shader model 4.1 and later shaders.
+  - Support for using constant expressions as sample counts in multi-sample
+    texture object declarations.
+  - Support for variable initialisers using variables declared earlier in the
+    same declaration list. E.g., `float a = 1, b = a, c = b + 1;'.
+  - The GetDimensions() texture object method is implemented.
+  - Matrix swizzles are implemented.
+  - Parser support for if-statement attributes like `[branch]' and
+    `[flatten]'.
+  - Support for the `inline' function modifier.
 
-- More improvements to HLSL support for the Direct3D shader model 1/2/3
-  profiles.
+- Previously, vkd3d_shader_compile() would in some cases return VKD3D_OK
+  despite compilation failing when targeting legacy Direct3D bytecode. These
+  cases have been fixed.
 
-- The section alignment of DXBC blobs produced by
-  vkd3d_shader_serialize_dxbc() matches those produced by d3dcompiler more
-  closely.
+- Various HLSL preprocessor fixes for edge cases related to stringification.
 
-- The "main" function for shaders produced by the SPIR-V target is always
-  terminated, even when the source was a TPF shader without explicit "ret"
-  instruction.
+- SPIR-V target support for the `linear noperspective centroid' input
+  interpolation mode.
 
-- Relative addressing of shader input registers is supported by SPIR-V
-  targets.
+- New interfaces:
+  - The vkd3d_shader_scan_signature_info structure extends the
+    vkd3d_shader_compile_info structure, and can be used to retrieve
+    descriptions of `dxbc-tpf' and `d3dbc' shader inputs and outputs.
+  - vkd3d_shader_free_scan_signature_info() is used to free
+    vkd3d_shader_scan_signature_info structures.
+  - The VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ORDER compile option can be
+    used to specify the default matrix packing order for HLSL sources.
+  - The vkd3d_shader_varying_map_info structure extends the
+    vkd3d_shader_compile_info structure, and can be used to specify a mapping
+    between the outputs of a shader stage and the inputs of the next shader
+    stage.
+  - vkd3d_shader_build_varying_map() is used to build a mapping between the
+    outputs of a shader stage and the inputs of the next shader stage.
+  - The VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_RAW_BUFFER flag returned as part of
+    the vkd3d_shader_descriptor_info structure indicates the descriptor refers
+    to a byte-addressed (`raw') buffer resource.
+
+
+*** vkd3d-compiler
+
+- The `--matrix-storage-order' option can used to specify the default matrix
+  storage order for HLSL sources.
+
+
+*** vkd3d-dxbc
+
+- vkd3d-dxbc is a new utility that can be used to inspect the contents of DXBC
+  blobs.
