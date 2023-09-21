@@ -20,6 +20,10 @@
 #include "d3d12_crosstest.h"
 #include "vkd3d_common.h"
 
+#ifndef D3DERR_INVALIDCALL
+#define D3DERR_INVALIDCALL 0x8876086c
+#endif
+
 struct test_options test_options = {0};
 
 #define check_preprocess(a, b, c, d, e) check_preprocess_(__LINE__, a, b, c, d, e)
@@ -602,6 +606,25 @@ static void test_thread_id(void)
     destroy_test_context(&context);
 }
 
+static void test_create_blob(void)
+{
+    unsigned int refcount;
+    ID3D10Blob *blob;
+    HRESULT hr;
+
+    hr = D3DCreateBlob(1, NULL);
+    ok(hr == D3DERR_INVALIDCALL, "Got hr %#x.\n", hr);
+
+    hr = D3DCreateBlob(0, NULL);
+    ok(hr == D3DERR_INVALIDCALL, "Got hr %#x.\n", hr);
+
+    hr = D3DCreateBlob(0, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
+    refcount = ID3D10Blob_Release(blob);
+    ok(!refcount, "Got refcount %u.\n", refcount);
+}
+
 START_TEST(hlsl_d3d12)
 {
     parse_args(argc, argv);
@@ -610,4 +633,5 @@ START_TEST(hlsl_d3d12)
 
     run_test(test_preprocess);
     run_test(test_thread_id);
+    run_test(test_create_blob);
 }

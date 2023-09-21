@@ -31,4 +31,8 @@
 #include "vkd3d_memory.h"
 #include <vkd3d_utils.h>
 
+#ifndef D3DERR_INVALIDCALL
+#define D3DERR_INVALIDCALL _HRESULT_TYPEDEF_(0x8876086c)
+#endif
+
 #endif  /* __VKD3D_UTILS_PRIVATE_H */

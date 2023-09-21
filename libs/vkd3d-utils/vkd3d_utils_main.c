@@ -537,6 +537,12 @@ HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
 
     TRACE("data_size %lu, blob %p.\n", data_size, blob);
 
+    if (!blob)
+    {
+        WARN("Invalid 'blob' pointer specified.\n");
+        return D3DERR_INVALIDCALL;
+    }
+
     if (!(data = vkd3d_calloc(data_size, 1)))
         return E_OUTOFMEMORY;
 
