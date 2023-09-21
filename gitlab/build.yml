@@ -56,6 +56,32 @@ build-llvmpipe-32:
     CC: 'gcc -m32'
     VKD3D_SHADER_CONFIG: 'force_validation'
 
+build-crosstest:
+  stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
+  interruptible: true
+  needs:
+    - job: build-image
+      optional: true
+  dependencies: []
+  script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR
+    - git clean -fdx
+    - git reset --hard
+    - rm -fr .git/rebase-merge
+    - mkdir artifacts
+    - cat /proc/cpuinfo > artifacts/cpuinfo.txt
+    - cat /proc/meminfo > artifacts/meminfo.txt
+    - vulkaninfo > artifacts/vulkaninfo.txt
+    - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-crosstest
+    - if [ -f pipeline_failed ] ; then exit 1 ; fi
+  artifacts:
+    when: always
+    paths:
+      - artifacts
+
 build-mac:
   stage: build
   rules:

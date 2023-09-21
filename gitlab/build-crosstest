@@ -11,9 +11,9 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-../configure && make -j$(sysctl -n hw.ncpu) && make -j$(sysctl -n hw.ncpu) check || touch ../pipeline_failed
+../configure && make -j$(nproc) crosstest || touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
-rsync -Rr test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT
+rsync -Rr tests/*.exe ../artifacts/$COMMIT
 
 git reset --hard
