@@ -5461,6 +5461,7 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
             view_desc.miplevel_count = 1;
             view_desc.layer_idx = view->info.texture.layer_idx;
             view_desc.layer_count = view->info.texture.layer_count;
+            view_desc.vk_image_aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 
             if (!vkd3d_create_texture_view(device, VKD3D_DESCRIPTOR_MAGIC_UAV, resource_impl->u.vk_image, &view_desc,
                     &uint_view))
