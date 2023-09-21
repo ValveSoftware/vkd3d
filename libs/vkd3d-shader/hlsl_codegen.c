@@ -377,6 +377,8 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
 
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
+            unsigned int element_modifiers = modifiers;
+
             if (type->class == HLSL_CLASS_ARRAY)
             {
                 elem_semantic_index = semantic_index
@@ -391,6 +393,17 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
                 semantic = &field->semantic;
                 elem_semantic_index = semantic->index;
                 loc = &field->loc;
+                element_modifiers |= field->storage_modifiers;
+
+                /* TODO: 'sample' modifier is not supported yet */
+
+                /* 'nointerpolation' always takes precedence, next the same is done for 'sample',
+                   remaining modifiers are combined. */
+                if (element_modifiers & HLSL_STORAGE_NOINTERPOLATION)
+                {
+                    element_modifiers &= ~HLSL_INTERPOLATION_MODIFIERS_MASK;
+                    element_modifiers |= HLSL_STORAGE_NOINTERPOLATION;
+                }
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, i, &var->loc)))
@@ -402,7 +415,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
                 return;
             list_add_after(&c->entry, &element_load->node.entry);
 
-            prepend_input_copy_recurse(ctx, block, element_load, modifiers, semantic, elem_semantic_index);
+            prepend_input_copy_recurse(ctx, block, element_load, element_modifiers, semantic, elem_semantic_index);
         }
     }
     else
