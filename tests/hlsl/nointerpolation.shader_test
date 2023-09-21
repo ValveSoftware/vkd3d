@@ -92,7 +92,7 @@ void main(uint id : sv_vertexid, inout ps_input input, out float4 pos : sv_posit
     pos = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
 }
 
-[pixel shader todo]
+[pixel shader]
 struct ps_input
 {
     nointerpolation float4 t : texcoord;
@@ -104,7 +104,7 @@ float4 main(centroid ps_input input) : sv_target
 }
 
 [test]
-todo draw triangle list 3
+draw triangle list 3
 todo probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -146,7 +146,7 @@ void main(uint id : sv_vertexid, inout ps_input input, out float4 pos : sv_posit
     pos = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
 }
 
-[vertex shader todo]
+[vertex shader]
 struct ps_input
 {
     nointerpolation float4 t : texcoord;

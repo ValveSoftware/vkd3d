@@ -4685,6 +4685,7 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %token KW_BREAK
 %token KW_BUFFER
 %token KW_CBUFFER
+%token KW_CENTROID
 %token KW_COLUMN_MAJOR
 %token KW_COMPILE
 %token KW_CONST
@@ -4707,6 +4708,7 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %token KW_MATRIX
 %token KW_NAMESPACE
 %token KW_NOINTERPOLATION
+%token KW_NOPERSPECTIVE
 %token KW_OUT
 %token KW_PACKOFFSET
 %token KW_PASS
@@ -6004,6 +6006,14 @@ var_modifiers:
     | KW_NOINTERPOLATION var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_STORAGE_NOINTERPOLATION, &@1);
+        }
+    | KW_CENTROID var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_CENTROID, &@1);
+        }
+    | KW_NOPERSPECTIVE var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_NOPERSPECTIVE, &@1);
         }
     | KW_PRECISE var_modifiers
         {

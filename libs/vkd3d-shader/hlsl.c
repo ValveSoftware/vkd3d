@@ -2211,6 +2211,10 @@ struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsig
         vkd3d_string_buffer_printf(string, "extern ");
     if (modifiers & HLSL_STORAGE_NOINTERPOLATION)
         vkd3d_string_buffer_printf(string, "nointerpolation ");
+    if (modifiers & HLSL_STORAGE_CENTROID)
+        vkd3d_string_buffer_printf(string, "centroid ");
+    if (modifiers & HLSL_STORAGE_NOPERSPECTIVE)
+        vkd3d_string_buffer_printf(string, "noperspective ");
     if (modifiers & HLSL_MODIFIER_PRECISE)
         vkd3d_string_buffer_printf(string, "precise ");
     if (modifiers & HLSL_STORAGE_SHARED)

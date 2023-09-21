@@ -74,6 +74,7 @@ BlendState              {return KW_BLENDSTATE;          }
 break                   {return KW_BREAK;               }
 Buffer                  {return KW_BUFFER;              }
 cbuffer                 {return KW_CBUFFER;             }
+centroid                {return KW_CENTROID;            }
 compile                 {return KW_COMPILE;             }
 const                   {return KW_CONST;               }
 continue                {return KW_CONTINUE;            }
@@ -95,6 +96,7 @@ inout                   {return KW_INOUT;               }
 matrix                  {return KW_MATRIX;              }
 namespace               {return KW_NAMESPACE;           }
 nointerpolation         {return KW_NOINTERPOLATION;     }
+noperspective           {return KW_NOPERSPECTIVE;       }
 out                     {return KW_OUT;                 }
 packoffset              {return KW_PACKOFFSET;          }
 pass                    {return KW_PASS;                }
