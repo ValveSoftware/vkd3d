@@ -5051,7 +5051,7 @@ field:
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
-            if (modifiers & ~HLSL_STORAGE_NOINTERPOLATION)
+            if (modifiers & ~HLSL_INTERPOLATION_MODIFIERS_MASK)
             {
                 struct vkd3d_string_buffer *string;
 

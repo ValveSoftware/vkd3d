@@ -119,7 +119,7 @@ void main(uint id : sv_vertexid, inout ps_input input, out float4 pos : sv_posit
     pos = float4(coords * float2(2, -2) + float2(-1, 1), 0, 1);
 }
 
-[pixel shader todo]
+[pixel shader]
 struct ps_input
 {
     centroid float4 t : texcoord;
@@ -131,10 +131,10 @@ float4 main(nointerpolation ps_input input) : sv_target
 }
 
 [test]
-todo draw triangle list 3
-todo probe all rgba (0.0, 1.0, 0.0, 1.0)
+draw triangle list 3
+probe all rgba (0.0, 1.0, 0.0, 1.0)
 
-[vertex shader fail]
+[vertex shader fail todo]
 struct ps_input
 {
     nointerpolation centroid float4 t : texcoord;
