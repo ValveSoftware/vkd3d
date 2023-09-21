@@ -2998,6 +2998,7 @@ static bool init_default_texture_view_desc(struct vkd3d_texture_view_desc *desc,
     desc->components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
     desc->components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
     desc->allowed_swizzle = false;
+    desc->usage = 0;
     return true;
 }
 
@@ -3039,6 +3040,7 @@ bool vkd3d_create_texture_view(struct d3d12_device *device, uint32_t magic, VkIm
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     const struct vkd3d_format *format = desc->format;
+    VkImageViewUsageCreateInfoKHR usage_desc;
     struct VkImageViewCreateInfo view_desc;
     VkImageView vk_view = VK_NULL_HANDLE;
     struct vkd3d_view *object;
@@ -3060,6 +3062,13 @@ bool vkd3d_create_texture_view(struct d3d12_device *device, uint32_t magic, VkIm
         view_desc.subresourceRange.levelCount = desc->miplevel_count;
         view_desc.subresourceRange.baseArrayLayer = desc->layer_idx;
         view_desc.subresourceRange.layerCount = desc->layer_count;
+        if (device->vk_info.KHR_maintenance2)
+        {
+            usage_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO;
+            usage_desc.pNext = NULL;
+            usage_desc.usage = desc->usage;
+            view_desc.pNext = &usage_desc;
+        }
         if ((vr = VK_CALL(vkCreateImageView(device->vk_device, &view_desc, NULL, &vk_view))) < 0)
         {
             WARN("Failed to create Vulkan image view, vr %d.\n", vr);
@@ -3196,6 +3205,7 @@ static void vkd3d_create_null_srv(struct d3d12_desc *descriptor,
     vkd3d_desc.components.b = VK_COMPONENT_SWIZZLE_ZERO;
     vkd3d_desc.components.a = VK_COMPONENT_SWIZZLE_ZERO;
     vkd3d_desc.allowed_swizzle = true;
+    vkd3d_desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     vkd3d_create_texture_view(device, VKD3D_DESCRIPTOR_MAGIC_SRV, vk_image, &vkd3d_desc, &descriptor->s.u.view);
 }
@@ -3268,6 +3278,7 @@ void d3d12_desc_create_srv(struct d3d12_desc *descriptor,
 
     vkd3d_desc.miplevel_count = VK_REMAINING_MIP_LEVELS;
     vkd3d_desc.allowed_swizzle = true;
+    vkd3d_desc.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
 
     if (desc)
     {
@@ -3421,6 +3432,7 @@ static void vkd3d_create_null_uav(struct d3d12_desc *descriptor,
     vkd3d_desc.components.b = VK_COMPONENT_SWIZZLE_B;
     vkd3d_desc.components.a = VK_COMPONENT_SWIZZLE_A;
     vkd3d_desc.allowed_swizzle = false;
+    vkd3d_desc.usage = VK_IMAGE_USAGE_STORAGE_BIT;
 
     vkd3d_create_texture_view(device, VKD3D_DESCRIPTOR_MAGIC_UAV, vk_image, &vkd3d_desc, &descriptor->s.u.view);
 }
@@ -3479,6 +3491,8 @@ static void vkd3d_create_texture_uav(struct d3d12_desc *descriptor,
 
     if (!init_default_texture_view_desc(&vkd3d_desc, resource, desc ? desc->Format : 0))
         return;
+
+    vkd3d_desc.usage = VK_IMAGE_USAGE_STORAGE_BIT;
 
     if (vkd3d_format_is_compressed(vkd3d_desc.format))
     {
@@ -3747,6 +3761,8 @@ void d3d12_rtv_desc_create_rtv(struct d3d12_rtv_desc *rtv_desc, struct d3d12_dev
     if (!init_default_texture_view_desc(&vkd3d_desc, resource, desc ? desc->Format : 0))
         return;
 
+    vkd3d_desc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
     if (vkd3d_desc.format->vk_aspect_mask != VK_IMAGE_ASPECT_COLOR_BIT)
     {
         WARN("Trying to create RTV for depth/stencil format %#x.\n", vkd3d_desc.format->dxgi_format);
@@ -3846,6 +3862,8 @@ void d3d12_dsv_desc_create_dsv(struct d3d12_dsv_desc *dsv_desc, struct d3d12_dev
 
     if (!init_default_texture_view_desc(&vkd3d_desc, resource, desc ? desc->Format : 0))
         return;
+
+    vkd3d_desc.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
     if (!(vkd3d_desc.format->vk_aspect_mask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)))
     {

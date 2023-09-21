@@ -121,6 +121,7 @@ struct vkd3d_vulkan_info
     bool KHR_draw_indirect_count;
     bool KHR_get_memory_requirements2;
     bool KHR_image_format_list;
+    bool KHR_maintenance2;
     bool KHR_maintenance3;
     bool KHR_push_descriptor;
     bool KHR_sampler_mirror_clamp_to_edge;
@@ -835,6 +836,7 @@ struct vkd3d_texture_view_desc
     VkImageAspectFlags vk_image_aspect;
     VkComponentMapping components;
     bool allowed_swizzle;
+    VkImageUsageFlags usage;
 };
 
 struct vkd3d_desc_header
