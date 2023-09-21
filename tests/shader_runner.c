@@ -870,6 +870,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
     unsigned int i, line_number = 0;
     char *shader_source = NULL;
     HRESULT expect_hr = S_OK;
+    bool skip_tests = false;
     char line_buffer[256];
     FILE *f;
 
@@ -903,8 +904,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 case STATE_REQUIRE:
                     if (runner->ops->check_requirements && !runner->ops->check_requirements(runner))
                     {
-                        vkd3d_test_pop_context();
-                        goto out;
+                        skip_tests = true;
                     }
                     break;
 
@@ -915,8 +915,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 case STATE_SHADER_COMPUTE:
                 case STATE_SHADER_COMPUTE_TODO:
-                    todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "cs", expect_hr);
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_COMPUTE_TODO)
+                            compile_shader(runner, shader_source, shader_source_len, "cs", expect_hr);
+                    }
                     free(runner->cs_source);
                     runner->cs_source = shader_source;
                     shader_source = NULL;
@@ -926,8 +929,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 case STATE_SHADER_PIXEL:
                 case STATE_SHADER_PIXEL_TODO:
-                    todo_if (state == STATE_SHADER_PIXEL_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "ps", expect_hr);
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_PIXEL_TODO)
+                            compile_shader(runner, shader_source, shader_source_len, "ps", expect_hr);
+                    }
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
                     shader_source = NULL;
@@ -937,8 +943,11 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 case STATE_SHADER_VERTEX:
                 case STATE_SHADER_VERTEX_TODO:
-                    todo_if (state == STATE_SHADER_VERTEX_TODO)
-                        compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_VERTEX_TODO)
+                            compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
+                    }
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
                     shader_source = NULL;
@@ -950,6 +959,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 {
                     ID3D10Blob *blob = NULL, *errors = NULL;
                     HRESULT hr;
+
+                    if (skip_tests)
+                        break;
 
                     hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
                     ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
@@ -973,6 +985,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     SIZE_T size;
                     HRESULT hr;
                     char *text;
+
+                    if (skip_tests)
+                        break;
 
                     hr = D3DPreprocess(shader_source, strlen(shader_source), NULL, NULL, NULL, &blob, &errors);
                     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
@@ -1019,6 +1034,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             else if (!strcmp(line, "[require]\n"))
             {
                 state = STATE_REQUIRE;
+                runner->minimum_shader_model = SHADER_MODEL_2_0;
+                runner->compile_options = 0;
+                skip_tests = false;
             }
             else if (match_directive_substring(line, "[pixel shader", &line))
             {
@@ -1177,13 +1195,13 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_TEST:
-                    parse_test_directive(runner, line);
+                    if (!skip_tests)
+                        parse_test_directive(runner, line);
                     break;
             }
         }
     }
 
-out:
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
     free(runner->input_elements);
