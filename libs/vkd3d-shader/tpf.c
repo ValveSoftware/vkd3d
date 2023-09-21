@@ -4174,7 +4174,33 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
             enum vkd3d_shader_interpolation_mode mode = VKD3DSIM_LINEAR;
 
             if ((var->storage_modifiers & HLSL_STORAGE_NOINTERPOLATION) || type_is_integer(var->data_type))
+            {
                 mode = VKD3DSIM_CONSTANT;
+            }
+            else
+            {
+                static const struct
+                {
+                    unsigned int modifiers;
+                    enum vkd3d_shader_interpolation_mode mode;
+                }
+                modes[] =
+                {
+                    { HLSL_STORAGE_CENTROID | HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE_CENTROID },
+                    { HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE },
+                    { HLSL_STORAGE_CENTROID, VKD3DSIM_LINEAR_CENTROID },
+                };
+                unsigned int i;
+
+                for (i = 0; i < ARRAY_SIZE(modes); ++i)
+                {
+                    if ((var->storage_modifiers & modes[i].modifiers) == modes[i].modifiers)
+                    {
+                        mode = modes[i].mode;
+                        break;
+                    }
+                }
+            }
 
             instr.extra_bits |= mode << VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
         }
