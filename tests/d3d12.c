@@ -9658,7 +9658,7 @@ static void test_shader_instructions(void)
         {&ps_if, {{0.0f}}, {{1.0f, 0.0f, 0.0f, 1.0f}}},
         {&ps_if, {{1.0f}}, {{0.0f, 1.0f, 0.0f, 1.0f}}},
 
-        /* FIXME: Ordered/unordered comparisons are broken on Mesa. */
+        /* Ordered/unordered comparisons were broken on Mesa. They are fixed at least from 23.1.7. */
         {&ps_if_return, {{0.0f, 0.0f, 0.0f, 0.0f}}, {{0.0f, 0.0f, 0.0f, 0.0f}}},
         {&ps_if_return, {{ NAN, 0.0f, 0.0f, 0.0f}}, {{1.0f, 0.0f, 0.0f, 0.0f}}, false, true},
         {&ps_if_return, {{3.0f, 0.0f, 0.0f, 0.0f}}, {{0.0f, 0.0f, 0.0f, 0.0f}}},
