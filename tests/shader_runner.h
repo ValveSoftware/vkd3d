@@ -38,6 +38,15 @@ enum shader_model
     SHADER_MODEL_5_1,
 };
 
+enum shader_type
+{
+    SHADER_TYPE_CS,
+    SHADER_TYPE_PS,
+    SHADER_TYPE_VS,
+};
+
+const char *shader_type_string(enum shader_type type);
+
 enum texture_data_type
 {
     TEXTURE_DATA_FLOAT,

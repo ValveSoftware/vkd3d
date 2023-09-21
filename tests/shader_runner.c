@@ -790,7 +790,20 @@ static HRESULT map_unidentified_hrs(HRESULT hr)
     return hr;
 }
 
-static void compile_shader(struct shader_runner *runner, const char *source, size_t len, const char *type, HRESULT expect)
+const char *shader_type_string(enum shader_type type)
+{
+    static const char *const shader_types[] =
+    {
+        [SHADER_TYPE_CS] = "cs",
+        [SHADER_TYPE_PS] = "ps",
+        [SHADER_TYPE_VS] = "vs",
+    };
+    assert(type < ARRAY_SIZE(shader_types));
+    return shader_types[type];
+}
+
+static void compile_shader(struct shader_runner *runner, const char *source, size_t len, enum shader_type type,
+        HRESULT expect)
 {
     ID3D10Blob *blob = NULL, *errors = NULL;
     char profile[7];
@@ -806,7 +819,7 @@ static void compile_shader(struct shader_runner *runner, const char *source, siz
         [SHADER_MODEL_5_1] = "5_1",
     };
 
-    sprintf(profile, "%s_%s", type, shader_models[runner->minimum_shader_model]);
+    sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
     hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     hr = map_unidentified_hrs(hr);
     ok(hr == expect, "Got unexpected hr %#x.\n", hr);
@@ -918,7 +931,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_COMPUTE_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, "cs", expect_hr);
+                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_CS, expect_hr);
                     }
                     free(runner->cs_source);
                     runner->cs_source = shader_source;
@@ -932,7 +945,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_PIXEL_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, "ps", expect_hr);
+                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_PS, expect_hr);
                     }
                     free(runner->ps_source);
                     runner->ps_source = shader_source;
@@ -946,7 +959,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     if (!skip_tests)
                     {
                         todo_if (state == STATE_SHADER_VERTEX_TODO)
-                            compile_shader(runner, shader_source, shader_source_len, "vs", expect_hr);
+                            compile_shader(runner, shader_source, shader_source_len, SHADER_TYPE_VS, expect_hr);
                     }
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
