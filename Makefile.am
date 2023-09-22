@@ -392,13 +392,14 @@ TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @DL_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @DL_LIBS@
 tests_hlsl_d3d12_LDADD = $(LDADD) @DL_LIBS@
-tests_shader_runner_LDADD = $(LDADD) @DL_LIBS@
-tests_shader_runner_CFLAGS = $(AM_CFLAGS) -I$(builddir)/tests
+tests_shader_runner_CFLAGS = $(AM_CFLAGS) -I$(builddir)/tests @OPENGL_CFLAGS@
+tests_shader_runner_LDADD = $(LDADD) @OPENGL_LIBS@ @DL_LIBS@
 tests_shader_runner_SOURCES = \
 	tests/shader_runner.c \
 	tests/shader_runner_d3d9.c \
 	tests/shader_runner_d3d11.c \
 	tests/shader_runner_d3d12.c \
+	tests/shader_runner_gl.c \
 	tests/shader_runner_vulkan.c
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la

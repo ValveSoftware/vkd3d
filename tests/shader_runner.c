@@ -395,7 +395,7 @@ void init_resource(struct resource *resource, const struct resource_params *para
     resource->height = params->height;
 }
 
-static struct resource *get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
+struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot)
 {
     struct resource *resource;
     size_t i;
@@ -575,7 +575,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             "{\n"
             "}";
 
-        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
         {
             memset(&params, 0, sizeof(params));
             params.slot = 0;
@@ -620,7 +620,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int vertex_count;
         char *rest;
 
-        if (!get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
+        if (!shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0))
         {
             memset(&params, 0, sizeof(params));
             params.slot = 0;
@@ -667,7 +667,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed UAV index '%s'.\n", line);
             line = rest;
 
-            resource = get_resource(runner, RESOURCE_TYPE_UAV, slot);
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_UAV, slot);
         }
         else if (match_string(line, "buffer uav", &line))
         {
@@ -677,7 +677,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed buffer UAV index '%s'.\n", line);
             line = rest;
 
-            resource = get_resource(runner, RESOURCE_TYPE_BUFFER_UAV, slot);
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_BUFFER_UAV, slot);
         }
         else if (match_string(line, "render target", &line))
         {
@@ -687,11 +687,11 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed render target index '%s'.\n", line);
             line = rest;
 
-            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot);
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, slot);
         }
         else
         {
-            resource = get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_RENDER_TARGET, 0);
         }
 
         rb = runner->ops->get_resource_readback(runner, resource);
@@ -829,7 +829,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     }
 }
 
-static struct sampler *get_sampler(struct shader_runner *runner, unsigned int slot)
+struct sampler *shader_runner_get_sampler(struct shader_runner *runner, unsigned int slot)
 {
     struct sampler *sampler;
     size_t i;
@@ -1325,7 +1325,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             {
                 state = STATE_SAMPLER;
 
-                if (!(current_sampler = get_sampler(runner, index)))
+                if (!(current_sampler = shader_runner_get_sampler(runner, index)))
                 {
                     if (runner->sampler_count == MAX_SAMPLERS)
                         fatal_error("Too many samplers declared.\n");
@@ -1639,6 +1639,11 @@ START_TEST(shader_runner)
     print_dll_version("d3d11.dll");
 #else
     trace("Running tests from a Unix build\n");
+
+# ifdef HAVE_OPENGL
+    trace("Compiling shaders with vkd3d-shader and executing with OpenGL\n");
+    run_shader_tests_gl();
+# endif
 
     trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
     run_shader_tests_vulkan();

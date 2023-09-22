@@ -164,6 +164,8 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
 void init_resource(struct resource *resource, const struct resource_params *params);
 HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, unsigned int compile_options,
         const char *hlsl, ID3D10Blob **blob_out, ID3D10Blob **errors_out);
+struct sampler *shader_runner_get_sampler(struct shader_runner *runner, unsigned int slot);
+struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot);
 
 void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops, void *dxc_compiler,
         enum shader_model minimum_shader_model, enum shader_model maximum_shader_model);
@@ -172,6 +174,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 void run_shader_tests_d3d9(void);
 void run_shader_tests_d3d11(void);
 #else
+void run_shader_tests_gl(void);
 void run_shader_tests_vulkan(void);
 #endif
 void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader_model,

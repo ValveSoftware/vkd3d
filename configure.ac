@@ -9,6 +9,7 @@ AC_ARG_VAR([WIDL], [widl IDL compiler])
 AC_ARG_VAR([CROSSCC32], [32-bit Windows cross compiler])
 AC_ARG_VAR([CROSSCC64], [64-bit Windows cross compiler])
 AC_ARG_WITH([ncurses], AS_HELP_STRING([--with-ncurses], [Build with the ncurses library (default: test)]))
+AC_ARG_WITH([opengl], AS_HELP_STRING([--with-opengl], [Build with the OpenGL library (default: test)]))
 AC_ARG_WITH([spirv-tools], AS_HELP_STRING([--with-spirv-tools],
                                           [Build with SPIRV-Tools library (default: disabled)]))
 AC_ARG_WITH([xcb], AS_HELP_STRING([--with-xcb], [Build with XCB library (default: test)]))
@@ -130,6 +131,10 @@ AS_IF([test "x$with_ncurses" != "xno"],
       [PKG_CHECK_MODULES([NCURSES], [ncurses],
                          [AC_DEFINE([HAVE_NCURSES], [1], [Define to 1 if you have ncurses.]) with_ncurses=yes],
                          [with_ncurses=no])])
+AS_IF([test "x$with_opengl" != "xno"],
+      [PKG_CHECK_MODULES([OPENGL], [egl opengl],
+                         [AC_DEFINE([HAVE_OPENGL], [1], [Define to 1 if you have OpenGL.]) with_opengl=yes],
+                         [with_opengl=no])])
 AS_IF([test "x$with_spirv_tools" = "xyes"],
       [PKG_CHECK_MODULES([SPIRV_TOOLS], [SPIRV-Tools-shared],
       [AC_DEFINE([HAVE_SPIRV_TOOLS], [1], [Define to 1 if you have SPIRV-Tools.])])],
@@ -187,6 +192,7 @@ AS_ECHO(["
   widl: ${WIDL}
 
   Have ncurses: ${with_ncurses}
+  Have OpenGL: ${with_opengl}
   Have SPIRV-Tools: ${with_spirv_tools}
   Have xcb: ${HAVE_XCB}
   Have dxcompiler: ${HAVE_DXCOMPILER}
