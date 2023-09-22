@@ -82,6 +82,41 @@ build-crosstest:
     paths:
       - artifacts
 
+.build-mingw:
+  stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+  image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
+  interruptible: true
+  needs:
+    - job: build-image
+      optional: true
+  dependencies: []
+  script:
+    - git config --global --add safe.directory $CI_PROJECT_DIR
+    - git clean -fdx
+    - git reset --hard
+    - rm -fr .git/rebase-merge
+    - mkdir artifacts
+    - cat /proc/cpuinfo > artifacts/cpuinfo.txt
+    - cat /proc/meminfo > artifacts/meminfo.txt
+    - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-mingw
+    - if [ -f pipeline_failed ] ; then exit 1 ; fi
+  artifacts:
+    when: always
+    paths:
+      - artifacts
+
+build-mingw-64:
+  extends: .build-mingw
+  variables:
+    HOST: "x86_64-w64-mingw32"
+
+build-mingw-32:
+  extends: .build-mingw
+  variables:
+    HOST: "i686-w64-mingw32"
+
 build-mac:
   stage: build
   rules:

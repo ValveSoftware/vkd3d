@@ -1,0 +1,24 @@
+#!/bin/bash
+
+echo "Building $(git log -1)"
+echo "---"
+
+COMMIT=$(printf '%03d-%s' $(git cherry $CI_MERGE_REQUEST_DIFF_BASE_SHA HEAD^ | wc -l) $(git rev-parse --short HEAD))
+
+set -Eeuxo pipefail
+
+./autogen.sh
+rm -fr build
+mkdir build
+cd build
+mkdir vulkan-headers
+cp -r /usr/include/vulkan /usr/include/vk_video /usr/include/spirv vulkan-headers
+../configure --enable-demos --disable-doxygen-doc --without-ncurses --host=$HOST SONAME_LIBVULKAN="vulkan-1.dll" CPPFLAGS="-I$PWD/vulkan-headers" CFLAGS="-g -O2 -Wno-format -Wno-array-bounds" LDFLAGS="-static-libgcc" && \
+    make -j$(nproc) && \
+    make -j$(nproc) install DESTDIR="$PWD/destdir" || \
+        touch ../pipeline_failed
+
+mkdir -p ../artifacts/$COMMIT
+cp destdir/usr/local/bin/* ../artifacts/$COMMIT
+
+git reset --hard
