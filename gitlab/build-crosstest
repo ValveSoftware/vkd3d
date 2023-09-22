@@ -7,11 +7,14 @@ COMMIT=$(git rev-parse --short HEAD)
 
 set -Eeuxo pipefail
 
+# Building with -Wno-array-bounds because MinGW headers currently emit
+# a lot of those
+
 ./autogen.sh
 rm -fr build
 mkdir build
 cd build
-../configure && make -j$(nproc) crosstest || touch ../pipeline_failed
+../configure CROSSCC32="i686-w64-mingw32-gcc -Wno-array-bounds" CROSSCC64="x86_64-w64-mingw32-gcc -Wno-array-bounds" && make -j$(nproc) crosstest || touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
 rsync -Rr tests/*.exe ../artifacts/$COMMIT
