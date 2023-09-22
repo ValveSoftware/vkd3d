@@ -1,0 +1,17 @@
+# CI script for creating releases
+
+create-release:
+  stage: deploy
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_PATH == "wine/vkd3d"
+  script:
+    - VERSION=$(expr "$CI_COMMIT_TAG" ":" 'vkd3d-\(.*\)')
+    - test -n "$VERSION" || exit 1
+    - URL=$(grep -o "https://dl.winehq.org/[^>]*" ANNOUNCE)
+    - FILEPATH=$(expr "$URL" ":" '.*\(/.*\)')
+    - release-cli create
+        --name "vkd3d $VERSION"
+        --tag-name "$CI_COMMIT_TAG"
+        --description ANNOUNCE
+        --assets-link "{\"name\":\"Source code\",\"url\":\"$URL\",\"link_type\":\"other\",\"filepath\":\"$FILEPATH\"}"

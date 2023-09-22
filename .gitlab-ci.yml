@@ -2,8 +2,10 @@ stages:
   - image
   - build
   - test
+  - deploy
 
 include:
   - local: "/gitlab/image.yml"
   - local: "/gitlab/build.yml"
   - local: "/gitlab/test.yml"
+  - local: "/gitlab/release.yml"
