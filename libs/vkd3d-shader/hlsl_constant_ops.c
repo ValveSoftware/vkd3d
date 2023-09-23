@@ -113,6 +113,32 @@ static int32_t double_to_int(double x)
     return x;
 }
 
+static bool fold_bit_not(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
+        const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
+{
+    enum hlsl_base_type type = dst_type->base_type;
+    unsigned int k;
+
+    assert(type == src->node.data_type->base_type);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        switch (type)
+        {
+            case HLSL_TYPE_INT:
+            case HLSL_TYPE_UINT:
+            case HLSL_TYPE_BOOL:
+                dst->u[k].u = ~src->value.u[k].u;
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+
+    return true;
+}
+
 static bool fold_cast(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst,
         const struct hlsl_type *dst_type, const struct hlsl_ir_constant *src)
 {
@@ -1153,6 +1179,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
     {
         case HLSL_OP1_ABS:
             success = fold_abs(ctx, &res, instr->data_type, arg1);
+            break;
+
+        case HLSL_OP1_BIT_NOT:
+            success = fold_bit_not(ctx, &res, instr->data_type, arg1);
             break;
 
         case HLSL_OP1_CAST:
