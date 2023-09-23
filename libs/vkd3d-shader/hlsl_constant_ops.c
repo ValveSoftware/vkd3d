@@ -1086,6 +1086,36 @@ static bool fold_ternary(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
     return true;
 }
 
+static bool fold_rshift(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, const struct hlsl_type *dst_type,
+        const struct hlsl_ir_constant *src1, const struct hlsl_ir_constant *src2)
+{
+    unsigned int k;
+
+    assert(dst_type->base_type == src1->node.data_type->base_type);
+    assert(src2->node.data_type->base_type == HLSL_TYPE_INT);
+
+    for (k = 0; k < dst_type->dimx; ++k)
+    {
+        unsigned int shift = src2->value.u[k].u % 32;
+
+        switch (src1->node.data_type->base_type)
+        {
+            case HLSL_TYPE_INT:
+                dst->u[k].i = src1->value.u[k].i >> shift;
+                break;
+
+            case HLSL_TYPE_UINT:
+                dst->u[k].u = src1->value.u[k].u >> shift;
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+
+    return true;
+}
+
 bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_constant *arg1, *arg2 = NULL, *arg3 = NULL;
@@ -1221,6 +1251,10 @@ bool hlsl_fold_constant_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
 
         case HLSL_OP2_NEQUAL:
             success = fold_nequal(ctx, &res, instr->data_type, arg1, arg2);
+            break;
+
+        case HLSL_OP2_RSHIFT:
+            success = fold_rshift(ctx, &res, instr->data_type, arg1, arg2);
             break;
 
         case HLSL_OP3_DP2ADD:

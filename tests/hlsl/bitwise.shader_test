@@ -30,6 +30,21 @@ draw quad
 probe all rgba (-2147483648.0, 4.0, 2147483650.0, 4.0)
 
 [pixel shader]
+float4 main() : sv_target
+{
+    int x = 2147483647;
+    int y = -1;
+    int z = 34;
+    uint x2 = 4294967295;
+
+    return float4(x >> y, x >> z, x2 >> y, x2 >> z);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 536870912.0, 1.0, 1073741824.0)
+
+[pixel shader]
 float4 main() : SV_TARGET
 {
     int x = 5;
