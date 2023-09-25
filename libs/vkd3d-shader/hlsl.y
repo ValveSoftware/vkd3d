@@ -4587,6 +4587,14 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
     }
 }
 
+static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
+{
+    if (scope->loop)
+        return scope;
+
+    return scope->upper ? get_loop_scope(scope->upper) : NULL;
+}
+
 }
 
 %locations
@@ -5290,6 +5298,13 @@ scope_start:
       %empty
         {
             hlsl_push_scope(ctx);
+        }
+
+loop_scope_start:
+      %empty
+        {
+            hlsl_push_scope(ctx);
+            ctx->cur_scope->loop = true;
         }
 
 var_identifier:
@@ -6104,7 +6119,25 @@ statement:
     | loop_statement
 
 jump_statement:
-      KW_RETURN expr ';'
+      KW_BREAK ';'
+        {
+            struct hlsl_ir_node *jump;
+
+            /* TODO: allow 'break' in the 'switch' statements. */
+
+            if (!get_loop_scope(ctx->cur_scope))
+            {
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "The 'break' statement must be used inside of a loop.");
+            }
+
+            if (!($$ = make_empty_block(ctx)))
+                YYABORT;
+            if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &@1)))
+                YYABORT;
+            hlsl_block_add_instr($$, jump);
+        }
+    | KW_RETURN expr ';'
         {
             $$ = $2;
             if (!add_return(ctx, $$, node_from_block($$), &@1))
@@ -6193,22 +6226,24 @@ if_body:
         }
 
 loop_statement:
-      attribute_list_optional KW_WHILE '(' expr ')' statement
+      attribute_list_optional loop_scope_start KW_WHILE '(' expr ')' statement
         {
-            $$ = create_loop(ctx, LOOP_WHILE, &$1, NULL, $4, NULL, $6, &@2);
-        }
-    | attribute_list_optional KW_DO statement KW_WHILE '(' expr ')' ';'
-        {
-            $$ = create_loop(ctx, LOOP_DO_WHILE, &$1, NULL, $6, NULL, $3, &@2);
-        }
-    | attribute_list_optional KW_FOR '(' scope_start expr_statement expr_statement expr_optional ')' statement
-        {
-            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
+            $$ = create_loop(ctx, LOOP_WHILE, &$1, NULL, $5, NULL, $7, &@3);
             hlsl_pop_scope(ctx);
         }
-    | attribute_list_optional KW_FOR '(' scope_start declaration expr_statement expr_optional ')' statement
+    | attribute_list_optional loop_scope_start KW_DO statement KW_WHILE '(' expr ')' ';'
         {
-            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@2);
+            $$ = create_loop(ctx, LOOP_DO_WHILE, &$1, NULL, $7, NULL, $4, &@3);
+            hlsl_pop_scope(ctx);
+        }
+    | attribute_list_optional loop_scope_start KW_FOR '(' expr_statement expr_statement expr_optional ')' statement
+        {
+            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@3);
+            hlsl_pop_scope(ctx);
+        }
+    | attribute_list_optional loop_scope_start KW_FOR '(' declaration expr_statement expr_optional ')' statement
+        {
+            $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@3);
             hlsl_pop_scope(ctx);
         }
 

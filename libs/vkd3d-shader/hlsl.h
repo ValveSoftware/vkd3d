@@ -699,6 +699,8 @@ struct hlsl_scope
     struct rb_tree types;
     /* Scope containing this scope. This value is NULL for the global scope. */
     struct hlsl_scope *upper;
+    /* The scope was created for the loop statement. */
+    bool loop;
 };
 
 struct hlsl_profile_info
