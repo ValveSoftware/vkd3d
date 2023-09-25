@@ -141,6 +141,7 @@ enum bitcode_value_symtab_code
 
 enum dx_intrinsic_opcode
 {
+    DX_LOAD_INPUT                   =   4,
     DX_STORE_OUTPUT                 =   5,
 };
 
@@ -305,6 +306,7 @@ struct sm6_parser
     size_t value_count;
     size_t value_capacity;
     size_t cur_max_value;
+    unsigned int ssa_next_id;
 
     struct vkd3d_shader_parser p;
 };
@@ -1548,6 +1550,11 @@ static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *v
     return register_get_uint_value(&value->u.reg);
 }
 
+static unsigned int sm6_parser_alloc_ssa_id(struct sm6_parser *sm6)
+{
+    return sm6->ssa_next_id++;
+}
+
 static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_shader_instruction *ins,
         unsigned int count, struct sm6_parser *sm6)
 {
@@ -1578,6 +1585,13 @@ static struct vkd3d_shader_dst_param *instruction_dst_params_alloc(struct vkd3d_
     ins->dst = params;
     ins->dst_count = count;
     return params;
+}
+
+static void register_init_with_id(struct vkd3d_shader_register *reg,
+        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int id)
+{
+    shader_register_init(reg, reg_type, data_type, 1);
+    reg->idx[0].offset = id;
 }
 
 static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type *type)
@@ -1613,6 +1627,24 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     return VKD3D_DATA_UINT;
 }
 
+static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const struct sm6_type *type,
+        struct sm6_parser *sm6)
+{
+    enum vkd3d_data_type data_type;
+    unsigned int id;
+
+    id = sm6_parser_alloc_ssa_id(sm6);
+    data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(type, 0));
+    register_init_with_id(reg, VKD3DSPR_SSA, data_type, id);
+}
+
+static void dst_param_init(struct vkd3d_shader_dst_param *param)
+{
+    param->write_mask = VKD3DSP_WRITEMASK_0;
+    param->modifiers = 0;
+    param->shift = 0;
+}
+
 static inline void dst_param_init_scalar(struct vkd3d_shader_dst_param *param, unsigned int component_idx)
 {
     param->write_mask = 1u << component_idx;
@@ -1620,9 +1652,22 @@ static inline void dst_param_init_scalar(struct vkd3d_shader_dst_param *param, u
     param->shift = 0;
 }
 
+static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *param, const struct sm6_type *type,
+        struct sm6_parser *sm6)
+{
+    dst_param_init(param);
+    register_init_ssa_scalar(&param->reg, type, sm6);
+}
+
 static inline void src_param_init(struct vkd3d_shader_src_param *param)
 {
     param->swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+    param->modifiers = VKD3DSPSM_NONE;
+}
+
+static void src_param_init_scalar(struct vkd3d_shader_src_param *param, unsigned int component_idx)
+{
+    param->swizzle = vkd3d_shader_create_swizzle(component_idx, component_idx, component_idx, component_idx);
     param->modifiers = VKD3DSPSM_NONE;
 }
 
@@ -1652,6 +1697,16 @@ static void register_address_init(struct vkd3d_shader_register *reg, const struc
         reg->idx[idx].offset = 0;
         reg->idx[idx].rel_addr = rel_addr;
     }
+}
+
+static void instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
+{
+    struct vkd3d_shader_dst_param *param = instruction_dst_params_alloc(ins, 1, sm6);
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+
+    dst_param_init_ssa_scalar(param, dst->type, sm6);
+    param->write_mask = VKD3DSP_WRITEMASK_0;
+    dst->u.reg = param->reg;
 }
 
 /* Recurse through the block tree while maintaining a current value count. The current
@@ -2166,6 +2221,38 @@ static struct sm6_block *sm6_block_create()
     return block;
 }
 
+static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, struct sm6_block *code_block,
+        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_src_param *src_param;
+    const struct shader_signature *signature;
+    unsigned int row_index, column_index;
+    const struct signature_element *e;
+
+    row_index = sm6_value_get_constant_uint(operands[0]);
+    column_index = sm6_value_get_constant_uint(operands[2]);
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    signature = &sm6->p.shader_desc.input_signature;
+    if (row_index >= signature->element_count)
+    {
+        WARN("Invalid row index %u.\n", row_index);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Invalid input row index %u.", row_index);
+        return;
+    }
+    e = &signature->elements[row_index];
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param->reg = sm6->input_params[row_index].reg;
+    src_param_init_scalar(src_param, column_index);
+    if (e->register_count > 1)
+        register_address_init(&src_param->reg, operands[1], 0, sm6);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, struct sm6_block *code_block,
         enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
 {
@@ -2235,6 +2322,7 @@ struct sm6_dx_opcode_info
  */
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
+    [DX_LOAD_INPUT                    ] = {'o', "ii8i", sm6_parser_emit_dx_load_input},
     [DX_STORE_OUTPUT                  ] = {'v', "ii8o", sm6_parser_emit_dx_store_output},
 };
 
@@ -2887,6 +2975,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
                 "Out of memory allocating DXIL value array.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
+    sm6->ssa_next_id = 1;
 
     if ((ret = sm6_parser_globals_init(sm6)) < 0)
     {
@@ -2916,6 +3005,8 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
     sm6_parser_emit_output_signature(sm6, output_signature);
     sm6_parser_emit_input_signature(sm6, input_signature);
+
+    sm6->p.shader_desc.ssa_count = sm6->ssa_next_id;
 
     for (i = 0; i < sm6->function_count; ++i)
     {
