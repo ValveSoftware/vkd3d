@@ -2558,6 +2558,10 @@ static void dump_ir_jump(struct vkd3d_string_buffer *buffer, const struct hlsl_i
         case HLSL_IR_JUMP_RETURN:
             vkd3d_string_buffer_printf(buffer, "return");
             break;
+
+        case HLSL_IR_JUMP_UNRESOLVED_CONTINUE:
+            vkd3d_string_buffer_printf(buffer, "unresolved_continue");
+            break;
     }
 }
 

@@ -574,6 +574,10 @@ enum hlsl_ir_jump_type
     HLSL_IR_JUMP_DISCARD_NEG,
     HLSL_IR_JUMP_DISCARD_NZ,
     HLSL_IR_JUMP_RETURN,
+    /* UNRESOLVED_CONTINUE type is used by the parser when 'continue' statement is found,
+       it never reaches code generation, and is resolved to CONTINUE type once iteration
+       and loop exit logic was properly applied. */
+    HLSL_IR_JUMP_UNRESOLVED_CONTINUE,
 };
 
 struct hlsl_ir_jump

@@ -464,6 +464,50 @@ static bool attribute_list_has_duplicates(const struct parse_attribute_list *att
     return false;
 }
 
+static void resolve_loop_continue(struct hlsl_ctx *ctx, struct hlsl_block *block, enum loop_type type,
+        struct hlsl_block *cond, struct hlsl_block *iter)
+{
+    struct hlsl_ir_node *instr, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            resolve_loop_continue(ctx, &iff->then_block, type, cond, iter);
+            resolve_loop_continue(ctx, &iff->else_block, type, cond, iter);
+        }
+        else if (instr->type == HLSL_IR_JUMP)
+        {
+            struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
+            struct hlsl_block block;
+
+            if (jump->type != HLSL_IR_JUMP_UNRESOLVED_CONTINUE)
+                continue;
+
+            if (type == LOOP_DO_WHILE)
+            {
+                if (!hlsl_clone_block(ctx, &block, cond))
+                    return;
+                if (!append_conditional_break(ctx, &block))
+                {
+                    hlsl_block_cleanup(&block);
+                    return;
+                }
+                list_move_before(&instr->entry, &block.instrs);
+            }
+            else if (type == LOOP_FOR)
+            {
+                if (!hlsl_clone_block(ctx, &block, iter))
+                    return;
+                list_move_before(&instr->entry, &block.instrs);
+            }
+            jump->type = HLSL_IR_JUMP_CONTINUE;
+        }
+    }
+}
+
 static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
         const struct parse_attribute_list *attributes, struct hlsl_block *init, struct hlsl_block *cond,
         struct hlsl_block *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
@@ -500,6 +544,8 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
             hlsl_warning(ctx, loc, VKD3D_SHADER_WARNING_HLSL_UNKNOWN_ATTRIBUTE, "Unrecognized attribute '%s'.", attr->name);
         }
     }
+
+    resolve_loop_continue(ctx, body, type, cond, iter);
 
     if (!init && !(init = make_empty_block(ctx)))
         goto oom;
@@ -6134,6 +6180,24 @@ jump_statement:
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
             if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_BREAK, NULL, &@1)))
+                YYABORT;
+            hlsl_block_add_instr($$, jump);
+        }
+    | KW_CONTINUE ';'
+        {
+            struct hlsl_ir_node *jump;
+            struct hlsl_scope *scope;
+
+            if (!(scope = get_loop_scope(ctx->cur_scope)))
+            {
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "The 'continue' statement must be used inside of a loop.");
+            }
+
+            if (!($$ = make_empty_block(ctx)))
+                YYABORT;
+
+            if (!(jump = hlsl_new_jump(ctx, HLSL_IR_JUMP_UNRESOLVED_CONTINUE, NULL, &@1)))
                 YYABORT;
             hlsl_block_add_instr($$, jump);
         }
