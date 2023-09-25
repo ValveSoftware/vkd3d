@@ -973,14 +973,18 @@ static const struct dxil_block *sm6_parser_get_level_one_block(const struct sm6_
     return found;
 }
 
-static char *dxil_record_to_string(const struct dxil_record *record, unsigned int offset)
+static char *dxil_record_to_string(const struct dxil_record *record, unsigned int offset, struct sm6_parser *sm6)
 {
     unsigned int i;
     char *str;
 
     assert(offset <= record->operand_count);
     if (!(str = vkd3d_calloc(record->operand_count - offset + 1, 1)))
+    {
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating a string of length %u.", record->operand_count - offset);
         return NULL;
+    }
 
     for (i = offset; i < record->operand_count; ++i)
         str[i - offset] = record->operands[i];
@@ -1235,7 +1239,7 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
                 break;
 
             case TYPE_CODE_STRUCT_NAME:
-                if (!(struct_name = dxil_record_to_string(record, 0)))
+                if (!(struct_name = dxil_record_to_string(record, 0, sm6)))
                 {
                     ERR("Failed to allocate struct name.\n");
                     return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1459,7 +1463,7 @@ static enum vkd3d_result sm6_parser_symtab_init(struct sm6_parser *sm6)
 
         symbol = &sm6->global_symbols[sm6->global_symbol_count];
         symbol->id = record->operands[0];
-        if (!(symbol->name = dxil_record_to_string(record, 1)))
+        if (!(symbol->name = dxil_record_to_string(record, 1, sm6)))
         {
             ERR("Failed to allocate symbol name.\n");
             return VKD3D_ERROR_OUT_OF_MEMORY;
