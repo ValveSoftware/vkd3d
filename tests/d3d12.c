@@ -21638,6 +21638,7 @@ static void test_tgsm(void)
     /* cs_structured_tgsm */
     reset_command_list(command_list, context.allocator);
 
+    bug_if(is_mvk_device(context.device))
     context.pipeline_state = create_compute_pipeline_state(device, context.root_signature, cs_structured_tgsm);
 
     buffer2 = create_default_buffer(device, 1024,
@@ -21690,7 +21691,8 @@ static void test_tgsm(void)
     }
     release_resource_readback(&rb);
 
-    ID3D12PipelineState_Release(context.pipeline_state);
+    if (context.pipeline_state)
+        ID3D12PipelineState_Release(context.pipeline_state);
 
     /* cs_structured_tgsm_float */
     reset_command_list(command_list, context.allocator);
