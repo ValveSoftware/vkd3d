@@ -133,7 +133,7 @@ static void vkd3d_spirv_dump(const struct vkd3d_shader_code *spirv,
     }
 }
 
-static void vkd3d_spirv_validate(const struct vkd3d_shader_code *spirv,
+static bool vkd3d_spirv_validate(struct vkd3d_string_buffer *buffer, const struct vkd3d_shader_code *spirv,
         enum vkd3d_shader_spirv_environment environment)
 {
     spv_diagnostic diagnostic = NULL;
@@ -145,12 +145,13 @@ static void vkd3d_spirv_validate(const struct vkd3d_shader_code *spirv,
     if ((ret = spvValidateBinary(context, spirv->code, spirv->size / sizeof(uint32_t),
             &diagnostic)))
     {
-        FIXME("Failed to validate SPIR-V binary, ret %d.\n", ret);
-        FIXME("Diagnostic message: %s.\n", debugstr_a(diagnostic->error));
+        vkd3d_string_buffer_printf(buffer, "%s", diagnostic->error);
     }
 
     spvDiagnosticDestroy(diagnostic);
     spvContextDestroy(context);
+
+    return !ret;
 }
 
 #else
@@ -163,8 +164,11 @@ static enum vkd3d_result vkd3d_spirv_binary_to_text(const struct vkd3d_shader_co
 }
 static void vkd3d_spirv_dump(const struct vkd3d_shader_code *spirv,
         enum vkd3d_shader_spirv_environment environment) {}
-static void vkd3d_spirv_validate(const struct vkd3d_shader_code *spirv,
-        enum vkd3d_shader_spirv_environment environment) {}
+static bool vkd3d_spirv_validate(struct vkd3d_string_buffer *buffer, const struct vkd3d_shader_code *spirv,
+        enum vkd3d_shader_spirv_environment environment)
+{
+    return true;
+}
 
 #endif  /* HAVE_SPIRV_TOOLS */
 
@@ -2403,6 +2407,8 @@ struct spirv_compiler
 
     struct ssa_register_info *ssa_register_info;
     unsigned int ssa_register_count;
+
+    uint64_t config_flags;
 };
 
 static bool is_in_default_phase(const struct spirv_compiler *compiler)
@@ -2458,7 +2464,8 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
         struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
-        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
+        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location,
+        uint64_t config_flags)
 {
     const struct shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
     const struct shader_signature *output_signature = &shader_desc->output_signature;
@@ -2475,6 +2482,7 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
     memset(compiler, 0, sizeof(*compiler));
     compiler->message_context = message_context;
     compiler->location = *location;
+    compiler->config_flags = config_flags;
 
     if ((target_info = vkd3d_find_struct(compile_info->next, SPIRV_TARGET_INFO)))
     {
@@ -9977,11 +9985,28 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (!vkd3d_spirv_compile_module(builder, spirv, spirv_compiler_get_entry_point_name(compiler)))
         return VKD3D_ERROR;
 
-    if (TRACE_ON())
+    if (TRACE_ON() || parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION)
     {
         enum vkd3d_shader_spirv_environment environment = spirv_compiler_get_target_environment(compiler);
-        vkd3d_spirv_dump(spirv, environment);
-        vkd3d_spirv_validate(spirv, environment);
+        struct vkd3d_string_buffer buffer;
+
+        if (TRACE_ON())
+            vkd3d_spirv_dump(spirv, environment);
+
+        vkd3d_string_buffer_init(&buffer);
+        if (!vkd3d_spirv_validate(&buffer, spirv, environment))
+        {
+            FIXME("Failed to validate SPIR-V binary.\n");
+            vkd3d_shader_trace_text(buffer.buffer, buffer.content_size);
+
+            if (compiler->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION)
+            {
+                spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                        "Execution generated an invalid shader, failing compilation:\n%s",
+                        buffer.buffer);
+            }
+        }
+        vkd3d_string_buffer_cleanup(&buffer);
     }
 
     if (compiler->failed)
@@ -10008,7 +10033,7 @@ int spirv_compile(struct vkd3d_shader_parser *parser,
     int ret;
 
     if (!(spirv_compiler = spirv_compiler_create(&parser->shader_version, &parser->shader_desc,
-            compile_info, scan_descriptor_info, message_context, &parser->location)))
+            compile_info, scan_descriptor_info, message_context, &parser->location, parser->config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;
