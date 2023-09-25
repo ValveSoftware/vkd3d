@@ -4,7 +4,7 @@ void main(out float tex : texcoord, inout float4 pos : sv_position)
     tex = pos.x;
 }
 
-[pixel shader todo]
+[pixel shader]
 float4 main(float tex : texcoord) : sv_target
 {
     int i;
@@ -22,7 +22,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
 probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
 probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
