@@ -2407,7 +2407,7 @@ static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, struct sm6_block *co
     if (op >= ARRAY_SIZE(sm6_dx_op_table) || !sm6_dx_op_table[op].operand_info)
     {
         FIXME("Unhandled dx intrinsic function id %u, '%s'.\n", op, name);
-        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_UNHANDLED_INTRINSIC,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
                 "Call to intrinsic function %s is unhandled.", name);
         sm6_parser_emit_unhandled(sm6, ins, dst);
         return;
