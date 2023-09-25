@@ -2,6 +2,12 @@
 
 WORKDIR /tmp
 
+# Package spirv-tools from Debian has two problems for us: first, it
+# doesn't have shared libraries; second, it's not multiarch. So we
+# have to rebuild it with some tweaks. In order to make it multiarch
+# we also have to drop the executables, but we don't care about those
+# anyway.
+
 RUN export DEBIAN_FRONTEND=noninteractive; \
     echo 'path-exclude=/usr/share/doc/*' > /etc/dpkg/dpkg.cfg.d/99-exclude-cruft && \
     echo 'path-exclude=/usr/share/locale/*' >> /etc/dpkg/dpkg.cfg.d/99-exclude-cruft && \
@@ -11,9 +17,10 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     echo 'exit 101' >> /usr/sbin/policy-rc.d && \
     chmod +x /usr/sbin/policy-rc.d && \
     dpkg --add-architecture i386 && \
+    sed -i -e 's|Types: deb|Types: deb deb-src|g' /etc/apt/sources.list.d/* && \
     apt-get update && \
     apt-get dist-upgrade -y && \
-    apt-get install -y build-essential pkg-config gcc-multilib gcc-mingw-w64 \
+    apt-get install -y build-essential pkg-config gcc-mingw-w64 crossbuild-essential-i386 \
                        autoconf automake libtool flex bison curl \
                        git ca-certificates rsync \
                        doxygen doxygen-latex graphviz \
@@ -27,6 +34,8 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
                        libxcb-util-dev libxcb-util-dev:i386 \
                        libxcb-icccm4-dev libxcb-icccm4-dev:i386 \
                        libxcb-keysyms1-dev libxcb-keysyms1-dev:i386 && \
+    apt-get build-dep -y spirv-tools && \
+    apt-get build-dep -y -ai386 spirv-tools && \
     git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git && \
     cd wine && \
     mkdir build && \
@@ -36,6 +45,26 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     cp tools/widl/widl /usr/local/bin && \
     cd ../.. && \
     rm -rf wine && \
+    apt-get source spirv-tools && \
+    cd spirv-tools-* && \
+    sed -i -e 's|-DBUILD_SHARED_LIBS=OFF|-DBUILD_SHARED_LIBS=ON|g' debian/rules && \
+    sed -i -e 's|dh_install$|dh_install \&\& rm debian/spirv-tools/usr/bin/*|g' debian/rules && \
+    sed -i '/Architecture: any/a Multi-Arch: same' debian/control && \
+    dpkg-buildpackage -uc -us && \
+    cd .. && \
+    rm -f spirv-tools-dbgsym_*.deb && \
+    dpkg -i spirv-tools_*.deb && \
+    rm -fr * && \
+    apt-get source spirv-tools && \
+    cd spirv-tools-* && \
+    sed -i -e 's|-DBUILD_SHARED_LIBS=OFF|-DBUILD_SHARED_LIBS=ON|g' debian/rules && \
+    sed -i -e 's|dh_install$|dh_install \&\& rm debian/spirv-tools/usr/bin/*|g' debian/rules && \
+    sed -i '/Architecture: any/a Multi-Arch: same' debian/control && \
+    CONFIG_SITE=/etc/dpkg-cross/cross-config.amd64 DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -ai386 -Pcross,nocheck -uc -us && \
+    cd .. && \
+    rm -f spirv-tools-dbgsym_*.deb && \
+    dpkg -i spirv-tools_*.deb && \
+    rm -fr * && \
     apt-get clean && \
     curl -L -s https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2308/linux_dxc_2023_08_14.x86_64.tar.gz | tar zx -C /usr/local ./lib/libdxcompiler.so ./lib/libdxil.so && \
     groupadd host-render -g 800 && \

@@ -48,7 +48,7 @@ build-radv-32:
     - amd-gpu
   variables:
     VK_LOADER_DRIVERS_SELECT: 'radeon_*'
-    CC: 'gcc -m32'
+    CC: 'i686-linux-gnu-gcc'
     VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-llvmpipe-32:
@@ -58,7 +58,7 @@ build-llvmpipe-32:
       - 2
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
-    CC: 'gcc -m32'
+    CC: 'i686-linux-gnu-gcc'
     VKD3D_SHADER_CONFIG: 'force_validation'
 
 build-crosstest:
