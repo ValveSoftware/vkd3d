@@ -3547,7 +3547,7 @@ static bool intrinsic_tan(struct hlsl_ctx *ctx,
 static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *params,
         const struct vkd3d_shader_location *loc, const char *name, enum hlsl_sampler_dim dim)
 {
-    struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
+    struct hlsl_resource_load_params load_params = { 0 };
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *coords, *load;
 
@@ -3576,10 +3576,41 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
         hlsl_release_string_buffer(ctx, string);
     }
 
-    if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
-            hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, hlsl_sampler_dim_count(dim)), loc)))
+    if (!strcmp(name, "tex2Dlod"))
     {
-        return false;
+        struct hlsl_ir_node *lod, *c;
+
+        load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
+
+        if (!(c = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), hlsl_sampler_dim_count(dim), params->args[1], loc)))
+            return false;
+        hlsl_block_add_instr(params->instrs, c);
+
+        if (!(coords = add_implicit_conversion(ctx, params->instrs, c, hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT,
+                hlsl_sampler_dim_count(dim)), loc)))
+        {
+            return false;
+        }
+
+        if (!(lod = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(W, W, W, W), 1, params->args[1], loc)))
+            return false;
+        hlsl_block_add_instr(params->instrs, lod);
+
+        if (!(load_params.lod = add_implicit_conversion(ctx, params->instrs, lod,
+                hlsl_get_scalar_type(ctx, HLSL_TYPE_FLOAT), loc)))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        load_params.type = HLSL_RESOURCE_SAMPLE;
+
+        if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, hlsl_sampler_dim_count(dim)), loc)))
+        {
+            return false;
+        }
     }
 
     /* tex1D() functions never produce 1D resource declarations. For newer profiles half offset
@@ -3636,6 +3667,12 @@ static bool intrinsic_tex2D(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     return intrinsic_tex(ctx, params, loc, "tex2D", HLSL_SAMPLER_DIM_2D);
+}
+
+static bool intrinsic_tex2Dlod(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex2Dlod", HLSL_SAMPLER_DIM_2D);
 }
 
 static bool intrinsic_tex3D(struct hlsl_ctx *ctx,
@@ -3822,6 +3859,7 @@ intrinsic_functions[] =
     {"tan",                                 1, true,  intrinsic_tan},
     {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
+    {"tex2Dlod",                            2, false, intrinsic_tex2Dlod},
     {"tex3D",                              -1, false, intrinsic_tex3D},
     {"texCUBE",                            -1, false, intrinsic_texCUBE},
     {"transpose",                           1, true,  intrinsic_transpose},

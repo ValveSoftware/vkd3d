@@ -34,3 +34,27 @@ probe all rgba (0.5, 0.0, 1.0, 0.0)
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(sm>=6) draw quad
 probe all rgba (0.0, 0.0, 1.0, 0.0)
+
+[require]
+shader model >= 3.0
+options: backcompat
+
+[pixel shader fail(sm>=6)]
+sampler s;
+float level;
+
+float4 main() : sv_target
+{
+    return tex2Dlod(s, float4(0.5, 0.5, 0, level));
+}
+
+[test]
+uniform 0 float4 0.0 0.0 0.0 0.0
+draw quad
+probe all rgba (1.0, 0.0, 1.0, 0.0)
+uniform 0 float4 0.5 0.0 0.0 0.0
+draw quad
+probe all rgba (0.5, 0.0, 1.0, 0.0)
+uniform 0 float4 1.0 0.0 0.0 0.0
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 0.0)
