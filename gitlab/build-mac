@@ -3,7 +3,7 @@
 echo "Building $(git log -1)"
 echo "---"
 
-COMMIT=$(git rev-parse --short HEAD)
+COMMIT=$(printf '%03d-%s' $(git cherry $CI_MERGE_REQUEST_DIFF_BASE_SHA HEAD^ | wc -l) $(git rev-parse --short HEAD))
 
 set -Eeuxo pipefail
 
