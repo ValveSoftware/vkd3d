@@ -1,7 +1,9 @@
 stages:
   - image
   - build
+  - test
 
 include:
   - local: "/gitlab/image.yml"
   - local: "/gitlab/build.yml"
+  - local: "/gitlab/test.yml"

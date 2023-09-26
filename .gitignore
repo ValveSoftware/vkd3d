@@ -23,6 +23,7 @@ vkd3d-*.tar.xz
 *.tab.c
 *.tab.h
 *.trs
+*.txt
 *.yy.c
 *~
 

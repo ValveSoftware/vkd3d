@@ -480,6 +480,9 @@ shader_runner_cross_sources = \
 	$(srcdir)/tests/shader_runner_d3d11.c \
 	$(srcdir)/tests/shader_runner_d3d12.c
 
+driver_cross_sources = \
+	$(srcdir)/tests/driver.c
+
 if HAVE_CROSSTARGET32
 CROSS32_CC = @CROSSCC32@
 CROSS32_DLLTOOL = @CROSSTARGET32@-dlltool
@@ -495,6 +498,7 @@ endif
 CROSS32_FILES = $(CROSS32_EXEFILES)
 if BUILD_TESTS
 CROSS32_FILES += tests/shader_runner.cross32.exe
+CROSS32_FILES += tests/driver.cross32.exe
 endif
 
 CLEANFILES += $(CROSS32_IMPLIBS) $(CROSS32_FILES)
@@ -517,6 +521,11 @@ tests/shader_runner.cross32.exe: $(shader_runner_cross_sources) $(CROSS32_IMPLIB
 	$(CROSS32_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(shader_runner_cross_sources) $(CROSS32_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
 	$(am__mv) $$depbase.Tpo $$depbase.Po
 
+tests/driver.cross32.exe: $(driver_cross_sources)
+	$(AM_V_CCLD)depbase=`echo $@ | sed 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
+	$(CROSS32_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(driver_cross_sources) && \
+	$(am__mv) $$depbase.Tpo $$depbase.Po
+
 else
 crosstest32:
 endif
@@ -536,6 +545,7 @@ endif
 CROSS64_FILES = $(CROSS64_EXEFILES)
 if BUILD_TESTS
 CROSS64_FILES += tests/shader_runner.cross64.exe
+CROSS64_FILES += tests/driver.cross64.exe
 endif
 
 CLEANFILES += $(CROSS64_IMPLIBS) $(CROSS64_FILES)
@@ -558,12 +568,25 @@ tests/shader_runner.cross64.exe: $(shader_runner_cross_sources) $(CROSS64_IMPLIB
 	$(CROSS64_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(shader_runner_cross_sources) $(CROSS64_IMPLIBS) -ldxgi -lgdi32 -ld3dcompiler_47 && \
 	$(am__mv) $$depbase.Tpo $$depbase.Po
 
+tests/driver.cross64.exe: $(driver_cross_sources)
+	$(AM_V_CCLD)depbase=`echo $@ | sed 's![^/]*$$!$(DEPDIR)/&!;s!\.exe$$!!'`; \
+	$(CROSS64_CC) $(CROSS_CFLAGS) -MT $@ -MD -MP -MF $$depbase.Tpo -o $@ $(driver_cross_sources) && \
+	$(am__mv) $$depbase.Tpo $$depbase.Po
+
 else
 crosstest64:
 endif
 
-.PHONY: crosstest crosstest32 crosstest64
-crosstest: crosstest32 crosstest64
+tests/crosstests.txt: FORCE
+	$(AM_V_GEN) for i in $(vkd3d_cross_tests) ; do echo $$i ; done > $@
+
+crosstest-lists: tests/crosstests.txt
+CLEANFILES += tests/crosstests.txt
+
+FORCE:
+
+.PHONY: crosstest crosstest32 crosstest64 crosstest-lists FORCE
+crosstest: crosstest32 crosstest64 crosstest-lists
 
 if BUILD_DOC
 @DX_RULES@

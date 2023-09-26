@@ -19,9 +19,10 @@ MoltenVK as the Vulkan driver. The llvmpipe and macOS jobs are
 currently allowed to fail.
 
 Additionally, MinGW is used to build PE binaries for both vkd3d and
-its crosstests, for both 32 and 64 bit. These builds are not currently
-tested (but the pipeline still fails if the compilation is not
-successful).
+its crosstests, for both 32 and 64 bit. The PE crosstests are executed
+on Windows 10 to check that behavior imposed by the tests corresponds
+to Microsoft's D3D12 implementation. The rendering backend is
+currently Window's WARP software implementation.
 
 The testing logs are available as CI artifacts, as well as the PE
 modules built by the crosstest and MinGW jobs.
@@ -58,3 +59,6 @@ environment for running the tests. All the software required to
 compile and run the tests will therefore have to be installed directly
 on the host system. Complete instructions to setup the macOS are
 currently not available.
+
+Finally, a runner tagged with `win10-21h2' must be available and
+submit jobs to a Windows 10 virtual machine.
