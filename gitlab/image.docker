@@ -29,7 +29,7 @@ RUN export DEBIAN_FRONTEND=noninteractive; \
     cd wine && \
     mkdir build && \
     cd build && \
-    ../configure --without-x --without-freetype && \
+    ../configure --enable-win64 --without-x --without-freetype && \
     make tools/widl/widl && \
     cp tools/widl/widl /usr/local/bin && \
     cd ../.. && \
