@@ -578,7 +578,10 @@ enum hlsl_ir_expr_op
     /* MOVC(a, b, c) returns c if a is bitwise zero and b otherwise.
      * TERNARY(a, b, c) returns c if a == 0 and b otherwise.
      * They differ for floating point numbers, because
-     * -0.0 == 0.0, but it is not bitwise zero. */
+     * -0.0 == 0.0, but it is not bitwise zero. CMP(a, b, c) returns b
+       if a >= 0, and c otherwise. It's used only for SM1-SM3 targets, while
+       SM4+ is using MOVC in such cases. */
+    HLSL_OP3_CMP,
     HLSL_OP3_MOVC,
     HLSL_OP3_TERNARY,
 };

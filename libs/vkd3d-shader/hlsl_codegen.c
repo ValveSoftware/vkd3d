@@ -2688,7 +2688,7 @@ static bool lower_round(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct
 /* Use 'movc' for the ternary operator. */
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS], *replacement;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 }, *replacement;
     struct hlsl_ir_node *zero, *cond, *first, *second;
     struct hlsl_constant_value zero_value = { 0 };
     struct hlsl_ir_expr *expr;
@@ -2705,28 +2705,54 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     first = expr->operands[1].node;
     second = expr->operands[2].node;
 
-    if (cond->data_type->base_type == HLSL_TYPE_FLOAT)
+    if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
     {
-        if (!(zero = hlsl_new_constant(ctx, cond->data_type, &zero_value, &instr->loc)))
+        struct hlsl_ir_node *abs, *neg;
+
+        if (!(abs = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, cond, &instr->loc)))
             return false;
-        hlsl_block_add_instr(block, zero);
+        hlsl_block_add_instr(block, abs);
+
+        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, abs, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg);
+
+        operands[0] = neg;
+        operands[1] = second;
+        operands[2] = first;
+        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_CMP, operands, first->data_type, &instr->loc)))
+            return false;
+    }
+    else if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Ternary operator is not implemented for %s profile.", ctx->profile->name);
+        return false;
+    }
+    else
+    {
+        if (cond->data_type->base_type == HLSL_TYPE_FLOAT)
+        {
+            if (!(zero = hlsl_new_constant(ctx, cond->data_type, &zero_value, &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, zero);
+
+            operands[0] = zero;
+            operands[1] = cond;
+            type = cond->data_type;
+            type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_BOOL, type->dimx, type->dimy);
+            if (!(cond = hlsl_new_expr(ctx, HLSL_OP2_NEQUAL, operands, type, &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, cond);
+        }
 
         memset(operands, 0, sizeof(operands));
-        operands[0] = zero;
-        operands[1] = cond;
-        type = cond->data_type;
-        type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_BOOL, type->dimx, type->dimy);
-        if (!(cond = hlsl_new_expr(ctx, HLSL_OP2_NEQUAL, operands, type, &instr->loc)))
+        operands[0] = cond;
+        operands[1] = first;
+        operands[2] = second;
+        if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_MOVC, operands, first->data_type, &instr->loc)))
             return false;
-        hlsl_block_add_instr(block, cond);
     }
 
-    memset(operands, 0, sizeof(operands));
-    operands[0] = cond;
-    operands[1] = first;
-    operands[2] = second;
-    if (!(replacement = hlsl_new_expr(ctx, HLSL_OP3_MOVC, operands, first->data_type, &instr->loc)))
-        return false;
     hlsl_block_add_instr(block, replacement);
     return true;
 }
@@ -4818,8 +4844,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, track_object_components_usage, body, NULL);
     sort_synthetic_separated_samplers_first(ctx);
 
-    if (profile->major_version >= 4)
-        lower_ir(ctx, lower_ternary, body);
+    lower_ir(ctx, lower_ternary, body);
     if (profile->major_version < 4)
     {
         lower_ir(ctx, lower_division, body);

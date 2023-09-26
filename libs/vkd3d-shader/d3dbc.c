@@ -1824,6 +1824,37 @@ static void write_sm1_dp2add(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer 
     write_sm1_instruction(ctx, buffer, &instr);
 }
 
+static void write_sm1_ternary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
+        D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst, const struct hlsl_reg *src1,
+        const struct hlsl_reg *src2, const struct hlsl_reg *src3)
+{
+    struct sm1_instruction instr =
+    {
+        .opcode = opcode,
+
+        .dst.type = D3DSPR_TEMP,
+        .dst.writemask = dst->writemask,
+        .dst.reg = dst->id,
+        .has_dst = 1,
+
+        .srcs[0].type = D3DSPR_TEMP,
+        .srcs[0].swizzle = hlsl_swizzle_from_writemask(src1->writemask),
+        .srcs[0].reg = src1->id,
+        .srcs[1].type = D3DSPR_TEMP,
+        .srcs[1].swizzle = hlsl_swizzle_from_writemask(src2->writemask),
+        .srcs[1].reg = src2->id,
+        .srcs[2].type = D3DSPR_TEMP,
+        .srcs[2].swizzle = hlsl_swizzle_from_writemask(src3->writemask),
+        .srcs[2].reg = src3->id,
+        .src_count = 3,
+    };
+
+    sm1_map_src_swizzle(&instr.srcs[0], instr.dst.writemask);
+    sm1_map_src_swizzle(&instr.srcs[1], instr.dst.writemask);
+    sm1_map_src_swizzle(&instr.srcs[2], instr.dst.writemask);
+    write_sm1_instruction(ctx, buffer, &instr);
+}
+
 static void write_sm1_binary_op(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *buffer,
         D3DSHADER_INSTRUCTION_OPCODE_TYPE opcode, const struct hlsl_reg *dst,
         const struct hlsl_reg *src1, const struct hlsl_reg *src2)
@@ -2188,6 +2219,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
                 default:
                     vkd3d_unreachable();
             }
+            break;
+
+        case HLSL_OP3_CMP:
+            write_sm1_ternary_op(ctx, buffer, D3DSIO_CMP, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
 
         case HLSL_OP3_DP2ADD:
