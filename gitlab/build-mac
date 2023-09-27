@@ -11,7 +11,7 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-../configure && \
+../configure CFLAGS="-g -O2 -Wno-implicit-fallthrough -Wno-enum-conversion -Werror" && \
     make -j$(sysctl -n hw.ncpu) && \
     make -j$(sysctl -n hw.ncpu) check || \
         touch ../pipeline_failed
