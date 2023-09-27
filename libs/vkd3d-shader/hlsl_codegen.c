@@ -2062,6 +2062,25 @@ static bool remove_trivial_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *i
     return true;
 }
 
+static bool remove_trivial_conditional_branches(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
+{
+    struct hlsl_ir_constant *condition;
+    struct hlsl_ir_if *iff;
+
+    if (instr->type != HLSL_IR_IF)
+        return false;
+    iff = hlsl_ir_if(instr);
+    if (iff->condition.node->type != HLSL_IR_CONSTANT)
+        return false;
+    condition = hlsl_ir_constant(iff->condition.node);
+
+    list_move_before(&instr->entry, condition->value.u[0].u ? &iff->then_block.instrs : &iff->else_block.instrs);
+    list_remove(&instr->entry);
+    hlsl_free_instr(instr);
+
+    return true;
+}
+
 static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *idx;
@@ -4417,6 +4436,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress |= hlsl_copy_propagation_execute(ctx, body);
         progress |= hlsl_transform_ir(ctx, fold_swizzle_chains, body, NULL);
         progress |= hlsl_transform_ir(ctx, remove_trivial_swizzles, body, NULL);
+        progress |= hlsl_transform_ir(ctx, remove_trivial_conditional_branches, body, NULL);
     }
     while (progress);
 

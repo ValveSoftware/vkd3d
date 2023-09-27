@@ -82,3 +82,20 @@ float4 main(uniform float4 u) : sv_target
 uniform 0 float4 0.0 0.0 0.0 0.0
 draw quad
 probe all rgba (0.9, 0.8, 0.7, 0.6)
+
+[pixel shader]
+float4 main() : sv_target
+{
+    bool c = false;
+    float a = -1.0f;
+    if (c)
+        return float4(1.0, 2.0, 3.0, 4.0);
+    else if (a > 0)
+        return float4(5.0, 6.0, 7.0, 8.0);
+    else
+        return float4(9.0, 10.0, 11.0, 12.0);
+}
+
+[test]
+draw quad
+probe all rgba (9.0, 10.0, 11.0, 12.0)

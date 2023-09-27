@@ -85,7 +85,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 // This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
 static Texture2D tex;
 sampler sam;
@@ -177,7 +177,7 @@ size (1, 1)
 0.5
 
 
-[pixel shader todo]
+[pixel shader]
 // This is allowed in 10.0.10011.16384 but not in 9.29.952.3111
 static RWTexture2D<float> tex;
 
