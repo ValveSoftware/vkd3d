@@ -10483,12 +10483,14 @@ static void test_shader_instructions(void)
         if (uint_tests[i].skip_on_warp && test_options.use_warp_device)
         {
             skip("Skipping shader '%s' test on WARP.\n", uint_tests[i].ps->name);
+            vkd3d_test_pop_context();
             continue;
         }
 
         if (uint_tests[i].is_float64 && !test_shader_float64)
         {
             skip("Skipping shader '%s' float64 test.\n", uint_tests[i].ps->name);
+            vkd3d_test_pop_context();
             continue;
         }
 
