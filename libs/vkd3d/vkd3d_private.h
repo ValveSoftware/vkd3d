@@ -22,6 +22,7 @@
 #define COBJMACROS
 #define NONAMELESSUNION
 #define VK_NO_PROTOTYPES
+#define CONST_VTABLE
 
 #ifdef _WIN32
 # define _WIN32_WINNT 0x0600  /* for condition variables */
