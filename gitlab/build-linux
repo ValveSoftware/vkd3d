@@ -17,6 +17,6 @@ cd build
         touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
-rsync -Rr doc/* test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT
+rsync -Rr config.log doc/* test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT
 
 git reset --hard
