@@ -401,6 +401,9 @@ static int cxt_main(void)
 }
 
 #ifdef _WIN32
+/* Do not trigger -Wmissing-prototypes. */
+int wmain(void);
+
 int wmain(void)
 #else
 int main(void)
