@@ -323,7 +323,8 @@ static void dump_data(const struct colours *colours, const char *prefix, const s
     printf("%s%s%08zx%s\n", prefix, colours->offset, data->size, colours->reset);
 }
 
-static void dump_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const struct options *options)
+static void dump_dxbc(const struct vkd3d_shader_code *dxbc, const struct vkd3d_shader_dxbc_desc *dxbc_desc,
+        const struct options *options)
 {
     const struct colours *colours = &options->colours;
     struct vkd3d_shader_dxbc_section_desc *section;
@@ -341,17 +342,24 @@ static void dump_dxbc(const struct vkd3d_shader_dxbc_desc *dxbc_desc, const stru
     printf("        %ssize%s: %#zx (%zu) bytes\n", colours->label, colours->reset, dxbc_desc->size, dxbc_desc->size);
     printf("    %ssections%s: %zu\n\n", colours->label, colours->reset, dxbc_desc->section_count);
 
-    printf(" %s#%s  %stag%s              %ssize%s\n",
+    printf(" %s#%s  %stag%s              %ssize (bytes)%s             %soffset (bytes)%s\n",
+            colours->label, colours->reset,
             colours->label, colours->reset,
             colours->label, colours->reset,
             colours->label, colours->reset);
     for (i = 0; i < dxbc_desc->section_count; ++i)
     {
+        char dec_size[32];
+        size_t offset;
+
         section = &dxbc_desc->sections[i];
-        printf("%s%2zu%s  %08x (%.4s)  0x%08zx (%zu) bytes\n",
+        sprintf(dec_size, "(%zu)", section->data.size);
+        offset = (char *)section->data.code - (char *)dxbc->code;
+        printf("%s%2zu%s  %08x (%.4s)  0x%08zx %-13s 0x%08zx (%zu)\n",
                 colours->index, i, colours->reset,
                 section->tag, dump_tag(tag, section->tag),
-                section->data.size, section->data.size);
+                section->data.size, dec_size,
+                offset, offset);
 
         if (!options->list_data)
             continue;
@@ -409,7 +417,7 @@ int main(int argc, char **argv)
         goto done;
 
     if (options.list || options.list_data)
-        dump_dxbc(&dxbc_desc, &options);
+        dump_dxbc(&dxbc, &dxbc_desc, &options);
 
     vkd3d_shader_free_dxbc(&dxbc_desc);
     vkd3d_shader_free_shader_code(&dxbc);
