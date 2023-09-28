@@ -358,6 +358,8 @@ struct sm6_parser
     struct sm6_symbol *global_symbols;
     size_t global_symbol_count;
 
+    const char *entry_point;
+
     struct vkd3d_shader_dst_param *output_params;
     struct vkd3d_shader_dst_param *input_params;
 
@@ -2710,6 +2712,11 @@ static bool sm6_metadata_value_is_node(const struct sm6_metadata_value *m)
     return m && m->type == VKD3D_METADATA_NODE;
 }
 
+static bool sm6_metadata_value_is_string(const struct sm6_metadata_value *m)
+{
+    return m && m->type == VKD3D_METADATA_STRING;
+}
+
 static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_function *function)
 {
@@ -3135,6 +3142,77 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
     return VKD3D_OK;
 }
 
+static const struct sm6_metadata_value *sm6_parser_find_named_metadata(struct sm6_parser *sm6, const char *name)
+{
+    const struct sm6_metadata_node *node;
+    unsigned int i;
+
+    for (i = 0; i < sm6->named_metadata_count; ++i)
+    {
+        if (strcmp(sm6->named_metadata[i].name, name))
+            continue;
+
+        node = sm6->named_metadata[i].value.u.node;
+        if (!node->operand_count)
+            return NULL;
+        if (node->operand_count > 1)
+        {
+            FIXME("Ignoring %u extra operands for %s.\n", node->operand_count - 1, name);
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Ignoring %u extra operands for metadata node %s.", node->operand_count - 1, name);
+        }
+        return node->operands[0];
+    }
+
+    return NULL;
+}
+
+static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
+{
+    const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.entryPoints");
+    const struct sm6_metadata_node *entry_node = m ? m->u.node : NULL;
+    const struct sm6_value *value;
+
+    if (!entry_node || entry_node->operand_count < 2 || !(m = entry_node->operands[0]))
+    {
+        WARN("No entry point definition found.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_ENTRY_POINT,
+                "No entry point definition found in the metadata.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (m->type != VKD3D_METADATA_VALUE)
+    {
+        WARN("Entry point definition is not a value.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_ENTRY_POINT,
+                "Entry point definition is not a metadata value.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    value = m->u.value;
+    if (!sm6_value_is_function_dcl(value))
+    {
+        WARN("Entry point value is not a function definition.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_ENTRY_POINT,
+                "Entry point metadata value does not contain a function definition.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    sm6->entry_point = value->u.function.name;
+    if (!sm6_metadata_value_is_string(entry_node->operands[1])
+            || ascii_strcasecmp(sm6->entry_point, entry_node->operands[1]->u.string_value))
+    {
+        WARN("Entry point function name %s mismatch.\n", sm6->entry_point);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_ENTRY_POINT_MISMATCH,
+                "Entry point function name %s does not match the name in metadata.", sm6->entry_point);
+    }
+
+    sm6_parser_init_input_signature(sm6, &sm6->p.shader_desc.input_signature);
+    sm6_parser_init_output_signature(sm6, &sm6->p.shader_desc.output_signature);
+
+    return VKD3D_OK;
+}
+
 static void sm6_metadata_value_destroy(struct sm6_metadata_value *m)
 {
     switch (m->type)
@@ -3245,6 +3323,15 @@ static const struct vkd3d_shader_parser_ops sm6_parser_ops =
     .parser_destroy = sm6_parser_destroy,
 };
 
+static struct sm6_function *sm6_parser_get_function(const struct sm6_parser *sm6, const char *name)
+{
+    size_t i;
+    for (i = 0; i < sm6->function_count; ++i)
+        if (!ascii_strcasecmp(sm6->functions[i].declaration->u.function.name, name))
+            return &sm6->functions[i];
+    return NULL;
+}
+
 static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t *byte_code, size_t byte_code_size,
         const char *source_name, struct vkd3d_shader_message_context *message_context)
 {
@@ -3257,6 +3344,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     enum bitcode_block_abbreviation abbr;
     struct vkd3d_shader_version version;
     struct dxil_block *block;
+    struct sm6_function *fn;
     enum vkd3d_result ret;
     unsigned int i, j;
 
@@ -3469,8 +3557,8 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
             return ret;
     }
 
-    sm6_parser_init_output_signature(sm6, output_signature);
-    sm6_parser_init_input_signature(sm6, input_signature);
+    if ((ret = sm6_parser_entry_point_init(sm6)) < 0)
+        return ret;
 
     if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
     {
@@ -3494,14 +3582,20 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
 
     sm6->p.shader_desc.ssa_count = sm6->ssa_next_id;
 
-    for (i = 0; i < sm6->function_count; ++i)
+    if (!(fn = sm6_parser_get_function(sm6, sm6->entry_point)))
     {
-        if (!sm6_block_emit_instructions(sm6->functions[i].blocks[0], sm6))
-        {
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
-                    "Out of memory emitting shader instructions.");
-            return VKD3D_ERROR_OUT_OF_MEMORY;
-        }
+        WARN("Failed to find entry point %s.\n", sm6->entry_point);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_ENTRY_POINT,
+                "The definition of the entry point function '%s' was not found.", sm6->entry_point);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    assert(sm6->function_count == 1);
+    if (!sm6_block_emit_instructions(fn->blocks[0], sm6))
+    {
+        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory emitting shader instructions.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
     dxil_block_destroy(&sm6->root_block);
