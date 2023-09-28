@@ -178,6 +178,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC         = 8013,
     VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA            = 8014,
     VKD3D_SHADER_ERROR_DXIL_INVALID_ENTRY_POINT         = 8015,
+    VKD3D_SHADER_ERROR_DXIL_INVALID_SIGNATURE           = 8016,
 
     VKD3D_SHADER_WARNING_DXIL_UNKNOWN_MAGIC_NUMBER      = 8300,
     VKD3D_SHADER_WARNING_DXIL_UNKNOWN_SHADER_TYPE       = 8301,
@@ -627,6 +628,8 @@ enum vkd3d_shader_interpolation_mode
     VKD3DSIM_LINEAR_NOPERSPECTIVE_CENTROID = 5,
     VKD3DSIM_LINEAR_SAMPLE = 6,
     VKD3DSIM_LINEAR_NOPERSPECTIVE_SAMPLE = 7,
+
+    VKD3DSIM_COUNT = 8,
 };
 
 enum vkd3d_shader_global_flags
@@ -867,6 +870,7 @@ struct signature_element
     unsigned int mask;
     unsigned int used_mask;
     enum vkd3d_shader_minimum_precision min_precision;
+    enum vkd3d_shader_interpolation_mode interpolation_mode;
     /* Register index / location in the target shader.
      * If SIGNATURE_TARGET_LOCATION_UNUSED, this element should not be written. */
     unsigned int target_location;
