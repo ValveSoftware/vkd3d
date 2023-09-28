@@ -2762,20 +2762,21 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semant
         {"position",                    true,  VKD3D_SHADER_TYPE_VERTEX,    D3D_NAME_POSITION},
         {"sv_position",                 true,  VKD3D_SHADER_TYPE_VERTEX,    D3D_NAME_POSITION},
     };
+    bool needs_compat_mapping = ascii_strncasecmp(semantic->name, "sv_", 3);
 
     for (i = 0; i < ARRAY_SIZE(semantics); ++i)
     {
         if (!ascii_strcasecmp(semantic->name, semantics[i].name)
                 && output == semantics[i].output
-                && ctx->profile->type == semantics[i].shader_type
-                && !ascii_strncasecmp(semantic->name, "sv_", 3))
+                && (ctx->semantic_compat_mapping == needs_compat_mapping || !needs_compat_mapping)
+                && ctx->profile->type == semantics[i].shader_type)
         {
             *usage = semantics[i].usage;
             return true;
         }
     }
 
-    if (!ascii_strncasecmp(semantic->name, "sv_", 3))
+    if (!needs_compat_mapping)
         return false;
 
     *usage = D3D_NAME_UNDEFINED;

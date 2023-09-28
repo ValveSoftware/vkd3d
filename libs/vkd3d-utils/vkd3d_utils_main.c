@@ -187,7 +187,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
 {
     struct vkd3d_shader_preprocess_info preprocess_info;
     struct vkd3d_shader_hlsl_source_info hlsl_info;
-    struct vkd3d_shader_compile_option options[3];
+    struct vkd3d_shader_compile_option options[4];
     struct vkd3d_shader_compile_info compile_info;
     struct vkd3d_shader_compile_option *option;
     struct vkd3d_shader_code byte_code;
@@ -300,6 +300,13 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
             option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_ROW_MAJOR;
         if (flags & D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR)
             option->value |= VKD3D_SHADER_COMPILE_OPTION_PACK_MATRIX_COLUMN_MAJOR;
+    }
+
+    if (flags & D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY)
+    {
+        option = &options[compile_info.option_count++];
+        option->name = VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY;
+        option->value = VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
     }
 
     ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);

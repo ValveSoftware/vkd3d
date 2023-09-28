@@ -35,7 +35,7 @@
 #include <term.h>
 #endif
 
-#define MAX_COMPILE_OPTIONS 5
+#define MAX_COMPILE_OPTIONS 6
 
 enum
 {
@@ -47,6 +47,7 @@ enum
     OPTION_PRINT_SOURCE_TYPES,
     OPTION_PRINT_TARGET_TYPES,
     OPTION_PROFILE,
+    OPTION_SEMANTIC_COMPAT_MAP,
     OPTION_STRIP_DEBUG,
     OPTION_VERSION,
     OPTION_TEXT_FORMATTING,
@@ -186,6 +187,8 @@ static void print_usage(const char *program_name)
         "  --matrix-storage-order=<order>\n"
         "                        Specify default matrix storage order. Valid values are\n"
         "                        'column' (default) and 'row'.\n"
+        "  --semantic-compat-map Enable semantic mapping compatibility mode to use SM4+ system values\n"
+        "                        instead of SM1-3 style semantic names when compiling from HLSL sources.\n"
         "  -e, --entry=<name>    Use <name> as the entry point (default is \"main\").\n"
         "  -E                    Preprocess the source code instead of compiling it.\n"
         "  -o, --output=<file>   Write the output to <file>. If <file> is '-' or no\n"
@@ -439,6 +442,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 {
     enum vkd3d_shader_compile_option_pack_matrix_order pack_matrix_order;
     enum vkd3d_shader_compile_option_buffer_uav buffer_uav;
+    unsigned int compat_options = 0;
     int option;
 
     static struct option long_options[] =
@@ -454,6 +458,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         {"profile",              required_argument, NULL, OPTION_PROFILE},
         {"strip-debug",          no_argument,       NULL, OPTION_STRIP_DEBUG},
         {"version",              no_argument,       NULL, OPTION_VERSION},
+        {"semantic-compat-map",  no_argument,       NULL, OPTION_SEMANTIC_COMPAT_MAP},
         {NULL,                   0,                 NULL, 0},
     };
 
@@ -533,6 +538,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 options->print_target_types = true;
                 break;
 
+            case OPTION_SEMANTIC_COMPAT_MAP:
+                compat_options |= VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
+                break;
+
             case OPTION_STRIP_DEBUG:
                 add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_STRIP_DEBUG, 1);
                 break;
@@ -554,6 +563,9 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 return false;
         }
     }
+
+    if (compat_options)
+        add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY, compat_options);
 
     if (optind < argc)
         options->filename = argv[argc - 1];
