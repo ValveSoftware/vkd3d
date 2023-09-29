@@ -295,6 +295,7 @@ struct dxil_block
 
 enum sm6_metadata_type
 {
+    VKD3D_METADATA_KIND,
     VKD3D_METADATA_NODE,
     VKD3D_METADATA_STRING,
     VKD3D_METADATA_VALUE,
@@ -307,6 +308,12 @@ struct sm6_metadata_node
     struct sm6_metadata_value *operands[];
 };
 
+struct sm6_metadata_kind
+{
+    uint64_t id;
+    char *name;
+};
+
 struct sm6_metadata_value
 {
     enum sm6_metadata_type type;
@@ -316,6 +323,7 @@ struct sm6_metadata_value
         char *string_value;
         const struct sm6_value *value;
         struct sm6_metadata_node *node;
+        struct sm6_metadata_kind kind;
     } u;
 };
 
@@ -2977,6 +2985,19 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
                     return ret;
                 break;
 
+            case METADATA_KIND:
+                if (!dxil_record_validate_operand_min_count(record, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                m->type = VKD3D_METADATA_KIND;
+                m->u.kind.id = record->operands[0];
+                if (!(m->u.kind.name = dxil_record_to_string(record, 1, sm6)))
+                {
+                    ERR("Failed to allocate name of a kind.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                break;
+
             case METADATA_STRING:
                 /* LLVM allows an empty string here. */
                 m->type = VKD3D_METADATA_STRING;
@@ -3038,6 +3059,9 @@ static void sm6_metadata_value_destroy(struct sm6_metadata_value *m)
     {
         case VKD3D_METADATA_NODE:
             vkd3d_free(m->u.node);
+            break;
+        case VKD3D_METADATA_KIND:
+            vkd3d_free(m->u.kind.name);
             break;
         case VKD3D_METADATA_STRING:
             vkd3d_free(m->u.string_value);
