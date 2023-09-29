@@ -3645,7 +3645,7 @@ struct sm4_instruction
 };
 
 static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
-        unsigned int *writemask, const struct hlsl_deref *deref)
+        uint32_t *writemask, const struct hlsl_deref *deref)
 {
     const struct hlsl_type *data_type = hlsl_deref_get_type(ctx, deref);
     const struct hlsl_ir_var *var = deref->var;
@@ -3774,7 +3774,8 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
 static void sm4_src_from_deref(const struct tpf_writer *tpf, struct vkd3d_shader_src_param *src,
         const struct hlsl_deref *deref, unsigned int map_writemask)
 {
-    unsigned int writemask, hlsl_swizzle;
+    unsigned int hlsl_swizzle;
+    uint32_t writemask;
 
     sm4_register_from_deref(tpf->ctx, &src->reg, &writemask, deref);
     if (vkd3d_sm4_get_default_swizzle_type(&tpf->lookup, src->reg.type) == VKD3D_SM4_SWIZZLE_VEC4)
@@ -3784,7 +3785,7 @@ static void sm4_src_from_deref(const struct tpf_writer *tpf, struct vkd3d_shader
     }
 }
 
-static void sm4_register_from_node(struct vkd3d_shader_register *reg, unsigned int *writemask,
+static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
         const struct hlsl_ir_node *instr)
 {
     assert(instr->reg.allocated);
@@ -3826,9 +3827,10 @@ static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
 }
 
 static void sm4_src_from_node(const struct tpf_writer *tpf, struct vkd3d_shader_src_param *src,
-        const struct hlsl_ir_node *instr, unsigned int map_writemask)
+        const struct hlsl_ir_node *instr, uint32_t map_writemask)
 {
-    unsigned int writemask, hlsl_swizzle;
+    unsigned int hlsl_swizzle;
+    uint32_t writemask;
 
     if (instr->type == HLSL_IR_CONSTANT)
     {
@@ -5470,7 +5472,7 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
 {
     const struct hlsl_ir_node *rhs = store->rhs.node;
     struct sm4_instruction instr;
-    unsigned int writemask;
+    uint32_t writemask;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
@@ -5487,8 +5489,9 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
 
 static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir_swizzle *swizzle)
 {
-    unsigned int writemask, hlsl_swizzle;
+    unsigned int hlsl_swizzle;
     struct sm4_instruction instr;
+    uint32_t writemask;
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;

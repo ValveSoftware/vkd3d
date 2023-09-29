@@ -758,7 +758,7 @@ void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_reg
 struct vkd3d_shader_dst_param
 {
     struct vkd3d_shader_register reg;
-    DWORD write_mask;
+    uint32_t write_mask;
     DWORD modifiers;
     DWORD shift;
 };

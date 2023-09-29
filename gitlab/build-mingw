@@ -13,7 +13,7 @@ mkdir build
 cd build
 mkdir vulkan-headers
 cp -r /usr/include/vulkan /usr/include/vk_video /usr/include/spirv vulkan-headers
-../configure --enable-demos --disable-doxygen-doc --without-ncurses --host=$HOST SONAME_LIBVULKAN="vulkan-1.dll" CPPFLAGS="-I$PWD/vulkan-headers" CFLAGS="-g -O2 -Wno-format -Wno-array-bounds -Wno-incompatible-pointer-types -Werror" LDFLAGS="-static-libgcc" && \
+../configure --enable-demos --disable-doxygen-doc --without-ncurses --host=$HOST SONAME_LIBVULKAN="vulkan-1.dll" CPPFLAGS="-I$PWD/vulkan-headers" CFLAGS="-g -O2 -Wno-format -Wno-array-bounds -Werror" LDFLAGS="-static-libgcc" && \
     make -j$(nproc) && \
     make -j$(nproc) install DESTDIR="$PWD/destdir" || \
         touch ../pipeline_failed
