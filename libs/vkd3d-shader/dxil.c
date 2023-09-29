@@ -20,6 +20,8 @@
 
 #define VKD3D_SM6_VERSION_MAJOR(version) (((version) >> 4) & 0xf)
 #define VKD3D_SM6_VERSION_MINOR(version) (((version) >> 0) & 0xf)
+/* Two seems to be the maximum but leave some extra room. */
+#define VKD3D_SM6_MAX_METADATA_TABLES 4
 
 #define BITCODE_MAGIC VKD3D_MAKE_TAG('B', 'C', 0xc0, 0xde)
 #define DXIL_OP_MAX_OPERANDS 17
@@ -112,6 +114,19 @@ enum bitcode_function_code
     FUNC_CODE_INST_STORE       = 44,
     FUNC_CODE_INST_STOREATOMIC = 45,
     FUNC_CODE_INST_CMPXCHG     = 46,
+};
+
+enum bitcode_metadata_code
+{
+    METADATA_STRING             =  1,
+    METADATA_VALUE              =  2,
+    METADATA_NODE               =  3,
+    METADATA_NAME               =  4,
+    METADATA_DISTINCT_NODE      =  5,
+    METADATA_KIND               =  6,
+    METADATA_LOCATION           =  7,
+    METADATA_NAMED_NODE         = 10,
+    METADATA_ATTACHMENT         = 11,
 };
 
 enum bitcode_type_code
@@ -278,6 +293,26 @@ struct dxil_block
     size_t record_count;
 };
 
+enum sm6_metadata_type
+{
+    VKD3D_METADATA_STRING,
+};
+
+struct sm6_metadata_value
+{
+    enum sm6_metadata_type type;
+    union
+    {
+        char *string_value;
+    } u;
+};
+
+struct sm6_metadata_table
+{
+    struct sm6_metadata_value *values;
+    unsigned int count;
+};
+
 struct sm6_parser
 {
     const uint32_t *ptr, *start, *end;
@@ -292,6 +327,7 @@ struct sm6_parser
 
     struct sm6_type *types;
     size_t type_count;
+    struct sm6_type *metadata_type;
 
     struct sm6_symbol *global_symbols;
     size_t global_symbol_count;
@@ -301,6 +337,8 @@ struct sm6_parser
 
     struct sm6_function *functions;
     size_t function_count;
+
+    struct sm6_metadata_table metadata_tables[VKD3D_SM6_MAX_METADATA_TABLES];
 
     struct sm6_value *values;
     size_t value_count;
@@ -1173,6 +1211,7 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
 
             case TYPE_CODE_METADATA:
                 type->class = TYPE_CLASS_METADATA;
+                sm6->metadata_type = type;
                 break;
 
             case TYPE_CODE_NUMENTRY:
@@ -2818,6 +2857,80 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     return VKD3D_OK;
 }
 
+static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const struct dxil_block *block,
+        struct sm6_metadata_table *table)
+{
+    struct sm6_metadata_value *values, *m;
+    unsigned int i, count, table_idx;
+    const struct dxil_record *record;
+
+    for (i = 0, count = 0; i < block->record_count; ++i)
+        count += block->records[i]->code != METADATA_NAME;
+
+    if (!(values = vkd3d_calloc(count, sizeof(*values))))
+    {
+        ERR("Failed to allocate metadata tables.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating metadata tables.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    table->values = values;
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        record = block->records[i];
+
+        table_idx = table->count;
+        m = &values[table_idx];
+
+        switch (record->code)
+        {
+            case METADATA_STRING:
+                /* LLVM allows an empty string here. */
+                m->type = VKD3D_METADATA_STRING;
+                if (!(m->u.string_value = dxil_record_to_string(record, 0, sm6)))
+                {
+                    ERR("Failed to allocate string.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                break;
+
+            default:
+                FIXME("Unhandled metadata type %u.\n", record->code);
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                        "Metadata type %u is unhandled.", record->code);
+                return VKD3D_ERROR_INVALID_SHADER;
+        }
+        ++table->count;
+    }
+
+    return VKD3D_OK;
+}
+
+static void sm6_metadata_value_destroy(struct sm6_metadata_value *m)
+{
+    switch (m->type)
+    {
+        case VKD3D_METADATA_STRING:
+            vkd3d_free(m->u.string_value);
+            break;
+        default:
+            break;
+    }
+}
+
+static void sm6_parser_metadata_cleanup(struct sm6_parser *sm6)
+{
+    unsigned int i, j;
+
+    for (i = 0; i < ARRAY_SIZE(sm6->metadata_tables); ++i)
+    {
+        for (j = 0; j < sm6->metadata_tables[i].count; ++j)
+            sm6_metadata_value_destroy(&sm6->metadata_tables[i].values[j]);
+        vkd3d_free(sm6->metadata_tables[i].values);
+    }
+}
+
 static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
 {
     size_t i;
@@ -2881,6 +2994,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     sm6_type_table_cleanup(sm6->types, sm6->type_count);
     sm6_symtab_cleanup(sm6->global_symbols, sm6->global_symbol_count);
     sm6_functions_cleanup(sm6->functions, sm6->function_count);
+    sm6_parser_metadata_cleanup(sm6);
     vkd3d_free(sm6->values);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
@@ -2904,7 +3018,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     struct vkd3d_shader_version version;
     struct dxil_block *block;
     enum vkd3d_result ret;
-    unsigned int i;
+    unsigned int i, j;
 
     count = byte_code_size / sizeof(*byte_code);
     if (count < 6)
@@ -3089,6 +3203,24 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     {
         WARN("Failed to load global declarations.\n");
         return ret;
+    }
+
+    for (i = 0, j = 0; i < sm6->root_block.child_block_count; ++i)
+    {
+        block = sm6->root_block.child_blocks[i];
+        if (block->id != METADATA_BLOCK)
+            continue;
+
+        if (j == ARRAY_SIZE(sm6->metadata_tables))
+        {
+            FIXME("Too many metadata tables.\n");
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                    "A metadata table count greater than %zu is unsupported.", ARRAY_SIZE(sm6->metadata_tables));
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if ((ret = sm6_parser_metadata_init(sm6, block, &sm6->metadata_tables[j++])) < 0)
+            return ret;
     }
 
     sm6_parser_init_output_signature(sm6, output_signature);
