@@ -297,6 +297,7 @@ enum sm6_metadata_type
 {
     VKD3D_METADATA_NODE,
     VKD3D_METADATA_STRING,
+    VKD3D_METADATA_VALUE,
 };
 
 struct sm6_metadata_node
@@ -313,6 +314,7 @@ struct sm6_metadata_value
     union
     {
         char *string_value;
+        const struct sm6_value *value;
         struct sm6_metadata_node *node;
     } u;
 };
@@ -1601,6 +1603,11 @@ static inline bool sm6_value_is_undef(const struct sm6_value *value)
     return sm6_value_is_register(value) && value->u.reg.type == VKD3DSPR_UNDEF;
 }
 
+static bool sm6_value_is_icb(const struct sm6_value *value)
+{
+    return sm6_value_is_register(value) && value->u.reg.type == VKD3DSPR_IMMCONSTBUFFER;
+}
+
 static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *value)
 {
     if (!sm6_value_is_constant(value))
@@ -1829,6 +1836,17 @@ static size_t sm6_parser_get_value_index(struct sm6_parser *sm6, uint64_t idx)
     }
 
     return i;
+}
+
+static const struct sm6_value *sm6_parser_get_value_safe(struct sm6_parser *sm6, unsigned int idx)
+{
+    if (idx < sm6->value_count)
+        return &sm6->values[idx];
+
+    WARN("Invalid value index %u.\n", idx);
+    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+            "Invalid value index %u.", idx);
+    return NULL;
 }
 
 static size_t sm6_parser_get_value_idx_by_ref(struct sm6_parser *sm6, const struct dxil_record *record,
@@ -2926,9 +2944,10 @@ static enum vkd3d_result metadata_value_create_node(struct sm6_metadata_value *m
 static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_metadata_table *table)
 {
+    unsigned int i, count, table_idx, value_idx;
     struct sm6_metadata_value *values, *m;
-    unsigned int i, count, table_idx;
     const struct dxil_record *record;
+    const struct sm6_value *value;
     enum vkd3d_result ret;
 
     for (i = 0, count = 0; i < block->record_count; ++i)
@@ -2966,6 +2985,39 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
                     ERR("Failed to allocate string.\n");
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 }
+                break;
+
+            case METADATA_VALUE:
+                if (!dxil_record_validate_operand_count(record, 2, 2, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                m->type = VKD3D_METADATA_VALUE;
+                if (!(m->value_type = sm6_parser_get_type(sm6, record->operands[0])))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if (record->operands[1] > UINT_MAX)
+                    WARN("Truncating value index %"PRIu64".\n", record->operands[1]);
+                value_idx = record->operands[1];
+                if (!(value = sm6_parser_get_value_safe(sm6, value_idx)))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if (!sm6_value_is_constant(value) && !sm6_value_is_undef(value) && !sm6_value_is_icb(value)
+                        && !sm6_value_is_function_dcl(value))
+                {
+                    WARN("Value at index %u is not a constant or a function declaration.\n", value_idx);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                            "Metadata value at index %u is not a constant or a function declaration.", value_idx);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                m->u.value = value;
+
+                if (value->type != m->value_type)
+                {
+                    WARN("Type mismatch.\n");
+                    vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                            "The type of a metadata value does not match its referenced value at index %u.", value_idx);
+                }
+
                 break;
 
             default:
