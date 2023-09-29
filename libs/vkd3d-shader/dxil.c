@@ -295,15 +295,25 @@ struct dxil_block
 
 enum sm6_metadata_type
 {
+    VKD3D_METADATA_NODE,
     VKD3D_METADATA_STRING,
+};
+
+struct sm6_metadata_node
+{
+    bool is_distinct;
+    unsigned int operand_count;
+    struct sm6_metadata_value *operands[];
 };
 
 struct sm6_metadata_value
 {
     enum sm6_metadata_type type;
+    const struct sm6_type *value_type;
     union
     {
         char *string_value;
+        struct sm6_metadata_node *node;
     } u;
 };
 
@@ -2857,12 +2867,69 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     return VKD3D_OK;
 }
 
+static enum vkd3d_result metadata_value_create_node(struct sm6_metadata_value *m, struct sm6_metadata_table *table,
+        unsigned int dst_idx, unsigned int end_count, const struct dxil_record *record, struct sm6_parser *sm6)
+{
+    struct sm6_metadata_node *node;
+    unsigned int i;
+
+    m->type = VKD3D_METADATA_NODE;
+    if (!(m->value_type = sm6->metadata_type))
+    {
+        WARN("Metadata type not found.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                "The type for metadata values was not found.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (!(node = vkd3d_malloc(offsetof(struct sm6_metadata_node, operands[record->operand_count]))))
+    {
+        ERR("Failed to allocate metadata node with %u operands.\n", record->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating a metadata node with %u operands.", record->operand_count);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    m->u.node = node;
+
+    node->is_distinct = record->code == METADATA_DISTINCT_NODE;
+
+    for (i = 0; i < record->operand_count; ++i)
+    {
+        uint64_t ref;
+
+        ref = record->operands[i] - 1;
+        if (record->operands[i] >= 1 && ref >= end_count)
+        {
+            WARN("Invalid metadata index %"PRIu64".\n", ref);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                    "Metadata index %"PRIu64" is invalid.", ref);
+            vkd3d_free(node);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if (!node->is_distinct && ref == dst_idx)
+        {
+            WARN("Metadata self-reference at index %u.\n", dst_idx);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                    "Metadata index %u is self-referencing.", dst_idx);
+            vkd3d_free(node);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        node->operands[i] = (record->operands[i] >= 1) ? &table->values[ref] : NULL;
+    }
+
+    node->operand_count = record->operand_count;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_metadata_table *table)
 {
     struct sm6_metadata_value *values, *m;
     unsigned int i, count, table_idx;
     const struct dxil_record *record;
+    enum vkd3d_result ret;
 
     for (i = 0, count = 0; i < block->record_count; ++i)
         count += block->records[i]->code != METADATA_NAME;
@@ -2885,6 +2952,12 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
 
         switch (record->code)
         {
+            case METADATA_DISTINCT_NODE:
+            case METADATA_NODE:
+                if ((ret = metadata_value_create_node(m, table, table_idx, count, record, sm6)) < 0)
+                    return ret;
+                break;
+
             case METADATA_STRING:
                 /* LLVM allows an empty string here. */
                 m->type = VKD3D_METADATA_STRING;
@@ -2911,6 +2984,9 @@ static void sm6_metadata_value_destroy(struct sm6_metadata_value *m)
 {
     switch (m->type)
     {
+        case VKD3D_METADATA_NODE:
+            vkd3d_free(m->u.node);
+            break;
         case VKD3D_METADATA_STRING:
             vkd3d_free(m->u.string_value);
             break;
