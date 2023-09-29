@@ -333,6 +333,12 @@ struct sm6_metadata_table
     unsigned int count;
 };
 
+struct sm6_named_metadata
+{
+    char *name;
+    struct sm6_metadata_value value;
+};
+
 struct sm6_parser
 {
     const uint32_t *ptr, *start, *end;
@@ -359,6 +365,8 @@ struct sm6_parser
     size_t function_count;
 
     struct sm6_metadata_table metadata_tables[VKD3D_SM6_MAX_METADATA_TABLES];
+    struct sm6_named_metadata *named_metadata;
+    unsigned int named_metadata_count;
 
     struct sm6_value *values;
     size_t value_count;
@@ -2697,6 +2705,11 @@ static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static bool sm6_metadata_value_is_node(const struct sm6_metadata_value *m)
+{
+    return m && m->type == VKD3D_METADATA_NODE;
+}
+
 static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_function *function)
 {
@@ -2893,11 +2906,31 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     return VKD3D_OK;
 }
 
+static bool sm6_parser_allocate_named_metadata(struct sm6_parser *sm6)
+{
+    struct dxil_block *block;
+    unsigned int i, j, count;
+
+    for (i = 0, count = 0; i < sm6->root_block.child_block_count; ++i)
+    {
+        block = sm6->root_block.child_blocks[i];
+        if (block->id != METADATA_BLOCK)
+            continue;
+        for (j = 0; j < block->record_count; ++j)
+            count += block->records[j]->code == METADATA_NAMED_NODE;
+    }
+
+    if (!count)
+        return true;
+
+    return !!(sm6->named_metadata = vkd3d_calloc(count, sizeof(*sm6->named_metadata)));
+}
+
 static enum vkd3d_result metadata_value_create_node(struct sm6_metadata_value *m, struct sm6_metadata_table *table,
         unsigned int dst_idx, unsigned int end_count, const struct dxil_record *record, struct sm6_parser *sm6)
 {
     struct sm6_metadata_node *node;
-    unsigned int i;
+    unsigned int i, offset;
 
     m->type = VKD3D_METADATA_NODE;
     if (!(m->value_type = sm6->metadata_type))
@@ -2918,12 +2951,14 @@ static enum vkd3d_result metadata_value_create_node(struct sm6_metadata_value *m
 
     node->is_distinct = record->code == METADATA_DISTINCT_NODE;
 
+    offset = record->code != METADATA_NAMED_NODE;
+
     for (i = 0; i < record->operand_count; ++i)
     {
         uint64_t ref;
 
-        ref = record->operands[i] - 1;
-        if (record->operands[i] >= 1 && ref >= end_count)
+        ref = record->operands[i] - offset;
+        if (record->operands[i] >= offset && ref >= end_count)
         {
             WARN("Invalid metadata index %"PRIu64".\n", ref);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
@@ -2941,7 +2976,15 @@ static enum vkd3d_result metadata_value_create_node(struct sm6_metadata_value *m
             return VKD3D_ERROR_INVALID_SHADER;
         }
 
-        node->operands[i] = (record->operands[i] >= 1) ? &table->values[ref] : NULL;
+        node->operands[i] = (record->operands[i] >= offset) ? &table->values[ref] : NULL;
+        if (record->code == METADATA_NAMED_NODE && !sm6_metadata_value_is_node(node->operands[i]))
+        {
+            WARN("Named node operand is not a node.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                    "The operand of a metadata named node is not a node.");
+            vkd3d_free(node);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
     }
 
     node->operand_count = record->operand_count;
@@ -2957,6 +3000,7 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
     const struct dxil_record *record;
     const struct sm6_value *value;
     enum vkd3d_result ret;
+    char *name;
 
     for (i = 0, count = 0; i < block->record_count; ++i)
         count += block->records[i]->code != METADATA_NAME;
@@ -2970,7 +3014,7 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
     }
     table->values = values;
 
-    for (i = 0; i < block->record_count; ++i)
+    for (i = 0, name = NULL; i < block->record_count; ++i)
     {
         record = block->records[i];
 
@@ -2979,6 +3023,27 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
 
         switch (record->code)
         {
+            case METADATA_NAMED_NODE:
+                if (!name)
+                {
+                    WARN("Named node has no name.\n");
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                            "A metadata named node has no name.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                /* When DXC emits metadata value array reference indices it assumes named nodes
+                 * are not included in the array. Store named nodes separately. */
+                m = &sm6->named_metadata[sm6->named_metadata_count].value;
+                sm6->named_metadata[sm6->named_metadata_count].name = name;
+                name = NULL;
+
+                if ((ret = metadata_value_create_node(m, table, UINT_MAX, count, record, sm6)) < 0)
+                    return ret;
+                ++sm6->named_metadata_count;
+                /* Skip incrementing the table count. */
+                continue;
+
             case METADATA_DISTINCT_NODE:
             case METADATA_NODE:
                 if ((ret = metadata_value_create_node(m, table, table_idx, count, record, sm6)) < 0)
@@ -2997,6 +3062,23 @@ static enum vkd3d_result sm6_parser_metadata_init(struct sm6_parser *sm6, const 
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 }
                 break;
+
+            case METADATA_NAME:
+                /* Check the next record to avoid freeing 'name' in all exit paths. */
+                if (i + 1 == block->record_count || block->records[i + 1]->code != METADATA_NAMED_NODE)
+                {
+                    WARN("Name is not followed by a named node.\n");
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+                            "A metadata node name is not followed by a named node.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                /* LLVM allows an empty string here. */
+                if (!(name = dxil_record_to_string(record, 0, sm6)))
+                {
+                    ERR("Failed to allocate name.\n");
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                continue;
 
             case METADATA_STRING:
                 /* LLVM allows an empty string here. */
@@ -3081,6 +3163,12 @@ static void sm6_parser_metadata_cleanup(struct sm6_parser *sm6)
             sm6_metadata_value_destroy(&sm6->metadata_tables[i].values[j]);
         vkd3d_free(sm6->metadata_tables[i].values);
     }
+    for (i = 0; i < sm6->named_metadata_count; ++i)
+    {
+        sm6_metadata_value_destroy(&sm6->named_metadata[i].value);
+        vkd3d_free(sm6->named_metadata[i].name);
+    }
+    vkd3d_free(sm6->named_metadata);
 }
 
 static void sm6_type_table_cleanup(struct sm6_type *types, size_t count)
@@ -3355,6 +3443,12 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     {
         WARN("Failed to load global declarations.\n");
         return ret;
+    }
+
+    if (!sm6_parser_allocate_named_metadata(sm6))
+    {
+        ERR("Failed to allocate named metadata array.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
     for (i = 0, j = 0; i < sm6->root_block.child_block_count; ++i)
