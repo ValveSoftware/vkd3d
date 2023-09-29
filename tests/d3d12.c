@@ -36343,6 +36343,8 @@ static void test_readback_map_stability(void)
     ID3D12Resource_Unmap(buffer, 0, NULL);
 
     ID3D12Resource_Release(buffer);
+
+    destroy_test_context(&context);
 }
 
 static void test_vs_ps_relative_addressing(void)
