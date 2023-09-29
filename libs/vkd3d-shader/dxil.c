@@ -1324,6 +1324,11 @@ static bool sm6_type_is_numeric_aggregate(const struct sm6_type *type)
     }
 }
 
+static bool sm6_type_is_array(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_ARRAY;
+}
+
 static inline bool sm6_type_is_struct(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_STRUCT;
@@ -1916,12 +1921,80 @@ static inline double bitcast_uint64_to_double(uint64_t value)
     return u.double_value;
 }
 
+static enum vkd3d_result register_allocate_constant_array(struct vkd3d_shader_register *reg, const struct sm6_type *type,
+        const uint64_t *operands, struct sm6_parser *sm6)
+{
+    struct vkd3d_shader_immediate_constant_buffer *icb;
+    const struct sm6_type *elem_type;
+    unsigned int i, size, count;
+
+    elem_type = type->u.array.elem_type;
+    /* Multidimensional arrays are emitted in flattened form. */
+    if (elem_type->class != TYPE_CLASS_INTEGER && elem_type->class != TYPE_CLASS_FLOAT)
+    {
+        FIXME("Unhandled element type %u for data array.\n", elem_type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "The element data type for an immediate constant buffer is not scalar integer or floating point.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    /* Arrays of bool are not used in DXIL. dxc will emit an array of int32 instead if necessary. */
+    if (!(size = elem_type->u.width / CHAR_BIT))
+    {
+        WARN("Invalid data type width %u.\n", elem_type->u.width);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "An immediate constant buffer is declared with boolean elements.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    size = max(size, sizeof(icb->data[0]));
+    count = type->u.array.count * size / sizeof(icb->data[0]);
+
+    if (!(icb = vkd3d_malloc(offsetof(struct vkd3d_shader_immediate_constant_buffer, data[count]))))
+    {
+        ERR("Failed to allocate buffer, count %u.\n", count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating an immediate constant buffer of count %u.", count);
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+    if ((reg->idx[0].offset = shader_instruction_array_add_icb(&sm6->p.instructions, icb)) == UINT_MAX)
+    {
+        ERR("Failed to store icb object.\n");
+        vkd3d_free(icb);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory storing an immediate constant buffer object.");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    reg->type = VKD3DSPR_IMMCONSTBUFFER;
+    reg->idx_count = 1;
+
+    icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    icb->element_count = type->u.array.count;
+    icb->component_count = 1;
+
+    count = type->u.array.count;
+    if (size > sizeof(icb->data[0]))
+    {
+        uint64_t *data = (uint64_t *)icb->data;
+        for (i = 0; i < count; ++i)
+            data[i] = operands[i];
+    }
+    else
+    {
+        for (i = 0; i < count; ++i)
+            icb->data[i] = operands[i];
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const struct dxil_block *block)
 {
     enum vkd3d_shader_register_type reg_type = VKD3DSPR_INVALID;
     const struct sm6_type *type, *elem_type;
     enum vkd3d_data_type reg_data_type;
     const struct dxil_record *record;
+    enum vkd3d_result ret;
     struct sm6_value *dst;
     size_t i, value_idx;
     uint64_t value;
@@ -1974,7 +2047,14 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         switch (record->code)
         {
             case CST_CODE_NULL:
-                /* Register constant data is already zero-filled. */
+                if (sm6_type_is_array(type))
+                {
+                    FIXME("Constant null arrays are not supported.\n");
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Constant null arrays are not supported.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                /* For non-aggregates, register constant data is already zero-filled. */
                 break;
 
             case CST_CODE_INTEGER:
@@ -2017,7 +2097,19 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 break;
 
             case CST_CODE_DATA:
-                WARN("Unhandled constant array.\n");
+                if (!sm6_type_is_array(type))
+                {
+                    WARN("Invalid type %u for data constant idx %zu.\n", type->class, value_idx);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "The type of a constant array is not an array type.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                if (!dxil_record_validate_operand_count(record, type->u.array.count, type->u.array.count, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if ((ret = register_allocate_constant_array(&dst->u.reg, type, record->operands, sm6)) < 0)
+                    return ret;
+
                 break;
 
             case CST_CODE_UNDEF:

@@ -1646,7 +1646,8 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
             vkd3d_string_buffer_printf(buffer, " {\n");
-            for (i = 0; i < ins->declaration.icb->vec4_count; ++i)
+            assert(ins->declaration.icb->component_count == VKD3D_VEC4_SIZE);
+            for (i = 0; i < ins->declaration.icb->element_count; ++i)
             {
                 shader_print_hex_literal(compiler, "    {", ins->declaration.icb->data[4 * i + 0], "");
                 shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 1], "");
