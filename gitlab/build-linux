@@ -11,7 +11,8 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-../configure --enable-demos CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL" && \
+export LD_LIBRARY_PATH=/usr/local/lib
+../configure --enable-demos DXCOMPILER_LIBS="-L/usr/local/lib" CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL" && \
     make -j$(nproc) && \
     make -j$(nproc) check || \
         touch ../pipeline_failed
