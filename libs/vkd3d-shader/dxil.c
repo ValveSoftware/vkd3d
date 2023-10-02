@@ -214,6 +214,14 @@ enum dxil_semantic_kind
     SEMANTIC_KIND_INVALID              = SEMANTIC_KIND_COUNT,
 };
 
+enum dxil_element_additional_tag
+{
+    ADDITIONAL_TAG_STREAM_INDEX  = 0,
+    ADDITIONAL_TAG_GLOBAL_SYMBOL = 1, /* not used */
+    ADDITIONAL_TAG_RELADDR_MASK  = 2,
+    ADDITIONAL_TAG_USED_MASK     = 3,
+};
+
 enum dx_intrinsic_opcode
 {
     DX_LOAD_INPUT                   =   4,
@@ -3306,6 +3314,76 @@ static const struct sm6_metadata_value *sm6_parser_find_named_metadata(struct sm
     return NULL;
 }
 
+static void signature_element_read_additional_element_values(struct signature_element *e,
+        const struct sm6_metadata_node *node, struct sm6_parser *sm6)
+{
+    unsigned int i, operand_count, value;
+    enum dxil_element_additional_tag tag;
+
+    if (node->operand_count < 11 || !node->operands[10])
+        return;
+
+    if (!sm6_metadata_value_is_node(node->operands[10]))
+    {
+        WARN("Additional values list is not a node.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_SIGNATURE,
+                "Signature element additional values list is not a metadata node.");
+        return;
+    }
+
+    node = node->operands[10]->u.node;
+    if (node->operand_count & 1)
+    {
+        WARN("Operand count is not even.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Operand count for signature element additional tag/value pairs is not even.");
+    }
+    operand_count = node->operand_count & ~1u;
+
+    for (i = 0; i < operand_count; i += 2)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &tag)
+                || !sm6_metadata_get_uint_value(sm6, node->operands[i + 1], &value))
+        {
+            WARN("Failed to extract tag/value pair.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_SIGNATURE,
+                    "Signature element tag/value pair at index %u is not an integer pair.", i);
+            continue;
+        }
+
+        switch (tag)
+        {
+            case ADDITIONAL_TAG_STREAM_INDEX:
+                e->stream_index = value;
+                break;
+            case ADDITIONAL_TAG_RELADDR_MASK:
+                /* A mask of components accessed via relative addressing. Seems to replace TPF 'dcl_index_range'. */
+                if (value > VKD3DSP_WRITEMASK_ALL)
+                {
+                    WARN("Invalid relative addressed mask %#x.\n", value);
+                    vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_MASK,
+                            "Mask %#x of relative-addressed components is invalid.", value);
+                }
+                break;
+            case ADDITIONAL_TAG_USED_MASK:
+                if (value > VKD3DSP_WRITEMASK_ALL)
+                {
+                    WARN("Invalid used mask %#x.\n", value);
+                    vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_MASK,
+                            "Mask %#x of used components is invalid.", value);
+                    value &= VKD3DSP_WRITEMASK_ALL;
+                }
+                e->used_mask = value;
+                break;
+            default:
+                FIXME("Unhandled tag %u, value %u.\n", tag, value);
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                        "Tag %#x for signature element additional value %#x is unhandled.", tag, value);
+                break;
+        }
+    }
+}
+
 static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const struct sm6_metadata_value *m,
         struct shader_signature *s)
 {
@@ -3396,9 +3474,6 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
         }
         e->semantic_name = element_node->operands[1]->u.string_value;
 
-        /* TODO: load from additional tag/value pairs. */
-        e->stream_index = 0;
-
         e->component_type = vkd3d_component_type_from_dxil_component_type(values[2]);
         e->min_precision = minimum_precision_from_dxil_component_type(values[2]);
 
@@ -3442,8 +3517,9 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
         }
 
         e->mask = vkd3d_write_mask_from_component_count(column_count) << index;
-        /* TODO: load from additional tag/value pairs. */
         e->used_mask = e->mask;
+
+        signature_element_read_additional_element_values(e, element_node, sm6);
 
         m = element_node->operands[4];
         if (!sm6_metadata_value_is_node(m))
