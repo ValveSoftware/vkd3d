@@ -1457,23 +1457,20 @@ static IDxcCompiler3 *dxcompiler_create()
     HRESULT hr;
     void *dll;
 
-    if (!(dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER)))
-    {
-        trace("Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
+    dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER);
+    ok(dll, "Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
+    if (!dll)
         return NULL;
-    }
 
-    if (!(create_instance = (DxcCreateInstanceProc)vkd3d_dlsym(dll, "DxcCreateInstance")))
-    {
-        trace("Failed to get DxcCreateInstance() pointer.\n");
+    create_instance = (DxcCreateInstanceProc)vkd3d_dlsym(dll, "DxcCreateInstance");
+    ok(create_instance, "Failed to get DxcCreateInstance() pointer.\n");
+    if (!create_instance)
         return NULL;
-    }
 
-    if (FAILED(hr = create_instance(&CLSID_DxcCompiler, &IID_IDxcCompiler3, (void **)&compiler)))
-    {
-        trace("Failed to create instance, hr %#x.\n", hr);
+    hr = create_instance(&CLSID_DxcCompiler, &IID_IDxcCompiler3, (void **)&compiler);
+    ok(SUCCEEDED(hr), "Failed to create instance, hr %#x.\n", hr);
+    if (FAILED(hr))
         return NULL;
-    }
 
     return compiler;
 }
