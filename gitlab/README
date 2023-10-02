@@ -14,8 +14,17 @@ The file build.yml contains the actual testing targets. Currently
 vkd3d is tested on Linux, on x86-64 and i386, each architecture with
 two different Vulkan drivers (both from Mesa): llvmpipe (a software
 implementation) and RADV (a hardware implementation backed by an AMD
-GPU); and on macOS, on Intel, using MoltenVK as Vulkan driver. The
-testing logs are available as CI artifacts.
+GPU). vkd3d is also tested on macOS, with an Intel processor, using
+MoltenVK as the Vulkan driver. The llvmpipe and macOS jobs are
+currently allowed to fail.
+
+Additionally, MinGW is used to build PE binaries for both vkd3d and
+its crosstests, for both 32 and 64 bit. These builds are not currently
+tested (but the pipeline still fails if the compilation is not
+successful).
+
+The testing logs are available as CI artifacts, as well as the PE
+modules built by the crosstest and MinGW jobs.
 
 Some custom runner configuration is required in order to run the tests
 on an AMD GPU. Specifically, a runner tagged with `amd-gpu' must be
