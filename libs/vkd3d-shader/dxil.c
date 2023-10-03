@@ -222,6 +222,23 @@ enum dxil_element_additional_tag
     ADDITIONAL_TAG_USED_MASK     = 3,
 };
 
+enum dxil_shader_properties_tag
+{
+    SHADER_PROPERTIES_FLAGS              =  0,
+    SHADER_PROPERTIES_GEOMETRY           =  1,
+    SHADER_PROPERTIES_DOMAIN             =  2,
+    SHADER_PROPERTIES_HULL               =  3,
+    SHADER_PROPERTIES_COMPUTE            =  4,
+    SHADER_PROPERTIES_AUTO_BINDING_SPACE =  5,
+    SHADER_PROPERTIES_RAY_PAYLOAD_SIZE   =  6,
+    SHADER_PROPERTIES_RAY_ATTRIB_SIZE    =  7,
+    SHADER_PROPERTIES_SHADER_KIND        =  8,
+    SHADER_PROPERTIES_MESH               =  9,
+    SHADER_PROPERTIES_AMPLIFICATION      = 10,
+    SHADER_PROPERTIES_WAVE_SIZE          = 11,
+    SHADER_PROPERTIES_ENTRY_ROOT_SIG     = 12,
+};
+
 enum dx_intrinsic_opcode
 {
     DX_LOAD_INPUT                   =   4,
@@ -1657,6 +1674,17 @@ static unsigned int register_get_uint_value(const struct vkd3d_shader_register *
     return reg->u.immconst_uint[0];
 }
 
+static uint64_t register_get_uint64_value(const struct vkd3d_shader_register *reg)
+{
+    if (!register_is_constant(reg) || !data_type_is_integer(reg->data_type))
+        return UINT64_MAX;
+
+    if (reg->dimension == VSIR_DIMENSION_VEC4)
+        WARN("Returning vec4.x.\n");
+
+    return (reg->type == VKD3DSPR_IMMCONST64) ? reg->u.immconst_uint64[0] : reg->u.immconst_uint[0];
+}
+
 static inline bool sm6_value_is_function_dcl(const struct sm6_value *value)
 {
     return value->value_type == VALUE_TYPE_FUNCTION;
@@ -1755,6 +1783,8 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
                 return VKD3D_DATA_UINT8;
             case 32:
                 return VKD3D_DATA_UINT;
+            case 64:
+                return VKD3D_DATA_UINT64;
             default:
                 FIXME("Unhandled width %u.\n", type->u.width);
                 return VKD3D_DATA_UINT;
@@ -2812,6 +2842,25 @@ static bool sm6_metadata_get_uint_value(const struct sm6_parser *sm6,
     return true;
 }
 
+static bool sm6_metadata_get_uint64_value(const struct sm6_parser *sm6,
+        const struct sm6_metadata_value *m, uint64_t *u)
+{
+    const struct sm6_value *value;
+
+    if (!m || m->type != VKD3D_METADATA_VALUE)
+        return false;
+
+    value = m->u.value;
+    if (!sm6_value_is_constant(value))
+        return false;
+    if (!sm6_type_is_integer(value->type))
+        return false;
+
+    *u = register_get_uint64_value(&value->u.reg);
+
+    return true;
+}
+
 static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_function *function)
 {
@@ -3598,10 +3647,34 @@ static enum vkd3d_result sm6_parser_signatures_init(struct sm6_parser *sm6, cons
     return VKD3D_OK;
 }
 
+static void sm6_parser_emit_global_flags(struct sm6_parser *sm6, const struct sm6_metadata_value *m)
+{
+    enum vkd3d_shader_global_flags global_flags, mask, rotated_flags;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!sm6_metadata_get_uint64_value(sm6, m, &global_flags))
+    {
+        WARN("Failed to load global flags.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Global flags metadata value is not an integer.");
+        return;
+    }
+    /* Rotate SKIP_OPTIMIZATION from bit 0 to bit 4 to match vkd3d_shader_global_flags. */
+    mask = (VKD3DSGF_SKIP_OPTIMIZATION << 1) - 1;
+    rotated_flags = global_flags & mask;
+    rotated_flags = (rotated_flags >> 1) | ((rotated_flags & 1) << 4);
+    global_flags = (global_flags & ~mask) | rotated_flags;
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_GLOBAL_FLAGS);
+    ins->declaration.global_flags = global_flags;
+}
+
 static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
 {
     const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.entryPoints");
-    const struct sm6_metadata_node *entry_node = m ? m->u.node : NULL;
+    const struct sm6_metadata_node *node, *entry_node = m ? m->u.node : NULL;
+    enum dxil_shader_properties_tag tag;
+    unsigned int i, operand_count;
     const struct sm6_value *value;
     enum vkd3d_result ret;
 
@@ -3643,6 +3716,49 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
             && (ret = sm6_parser_signatures_init(sm6, m)) < 0)
     {
         return ret;
+    }
+
+    if (entry_node->operand_count >= 5 && (m = entry_node->operands[4]))
+    {
+        if (!sm6_metadata_value_is_node(m))
+        {
+            WARN("Shader properties list is not a node.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Shader properties tag/value list is not a metadata node.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        node = m->u.node;
+        if (node->operand_count & 1)
+        {
+            WARN("Operand count is not even.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Operand count for shader properties tag/value pairs is not even.");
+        }
+        operand_count = node->operand_count & ~1u;
+
+        for (i = 0; i < operand_count; i += 2)
+        {
+            if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &tag))
+            {
+                WARN("Tag is not an integer value.\n");
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                        "Shader properties tag at index %u is not an integer.", i);
+                return VKD3D_ERROR_INVALID_SHADER;
+            }
+
+            switch (tag)
+            {
+                case SHADER_PROPERTIES_FLAGS:
+                    sm6_parser_emit_global_flags(sm6, node->operands[i + 1]);
+                    break;
+                default:
+                    FIXME("Unhandled tag %#x.\n", tag);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                            "Shader properties tag %#x is unhandled.", tag);
+                    break;
+            }
+        }
     }
 
     return VKD3D_OK;
