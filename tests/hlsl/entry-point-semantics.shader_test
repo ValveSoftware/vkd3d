@@ -84,7 +84,7 @@ float4 main(in apple a) : sv_target
 
 [test]
 draw quad
-todo(sm>=6) probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
+probe (0, 0) rgba (10.0, 20.0, 30.0, 40.0)
 
 
 % Arrays of matrices get successive indexes.
@@ -101,7 +101,12 @@ float4 main(in apple a) : sv_target
 
 [test]
 draw quad
-todo(sm>=6) probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
+probe (0, 0) rgba (10.0, 11.0, 30.0, 31.0)
+
+
+% dxcompiler emits correct array addressing.
+[require]
+shader model < 6.0
 
 
 % Arrays (even multi-dimensional) of struct elements are allowed. The fields in the different struct
@@ -143,6 +148,10 @@ float4 main(in banana bans[2]) : sv_target
 [test]
 draw quad
 todo(sm>=6) probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+
+
+[require]
+% reset requirements
 
 
 [pixel shader fail]
@@ -201,7 +210,7 @@ float4 main(in float4 tex0 : TEXCOORD0, in float4 tex1 : TEXCOORD1) : sv_target
 
 [test]
 draw quad
-todo(sm>=6) probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
+probe (0, 0) rgba (1.0, 2.0, 10.0, 20.0)
 
 
 % Output semantics cannot be mapped to more than one value.
@@ -272,7 +281,7 @@ float4 main(in float4 a : TEXCOORD0, in float3 b : TEXCOORD1) : sv_target
 
 [test]
 draw quad
-todo(sm>=6) probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
+probe (0, 0) rgba (10.0, 11.0, 20.0, 21.0)
 
 
 % In SM4, duplicated input semantics can only have different types if they have the same layout and

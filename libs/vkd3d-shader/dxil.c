@@ -2384,7 +2384,7 @@ static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shade
 {
     struct vkd3d_shader_dst_param *param;
     const struct signature_element *e;
-    unsigned int i;
+    unsigned int i, count;
 
     for (i = 0; i < s->element_count; ++i)
     {
@@ -2392,8 +2392,11 @@ static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shade
 
         param = &params[i];
         dst_param_io_init(param, e, reg_type);
-        param->reg.idx[0].offset = i;
-        param->reg.idx_count = 1;
+        count = 0;
+        if (e->register_count > 1)
+            param->reg.idx[count++].offset = 0;
+        param->reg.idx[count++].offset = i;
+        param->reg.idx_count = count;
     }
 }
 
@@ -2427,6 +2430,12 @@ static void sm6_parser_emit_signature(struct sm6_parser *sm6, const struct shade
 
         ins->flags = e->interpolation_mode;
         *param = params[i];
+
+        if (e->register_count > 1)
+        {
+            param->reg.idx[0].rel_addr = NULL;
+            param->reg.idx[0].offset = e->register_count;
+        }
     }
 }
 
