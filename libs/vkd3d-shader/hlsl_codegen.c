@@ -23,8 +23,8 @@
 
 /* TODO: remove when no longer needed, only used for new_offset_instr_from_deref() */
 static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, struct hlsl_block *block,
-        struct hlsl_type *type, struct hlsl_ir_node *offset, struct hlsl_ir_node *idx,
-        enum hlsl_regset regset, const struct vkd3d_shader_location *loc)
+        struct hlsl_type *type, struct hlsl_ir_node *base_offset, struct hlsl_ir_node *idx,
+        enum hlsl_regset regset, unsigned int *offset_component, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *idx_offset = NULL;
     struct hlsl_ir_node *c;
@@ -32,7 +32,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
     switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
-            idx_offset = idx;
+            *offset_component += hlsl_ir_constant(idx)->value.u[0].u;
             break;
 
         case HLSL_CLASS_MATRIX:
@@ -67,8 +67,16 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
         {
             unsigned int field_idx = hlsl_ir_constant(idx)->value.u[0].u;
             struct hlsl_struct_field *field = &type->e.record.fields[field_idx];
+            unsigned int field_offset = field->reg_offset[regset];
 
-            if (!(c = hlsl_new_uint_constant(ctx, field->reg_offset[regset], loc)))
+            if (regset == HLSL_REGSET_NUMERIC)
+            {
+                assert(*offset_component == 0);
+                *offset_component = field_offset % 4;
+                field_offset -= *offset_component;
+            }
+
+            if (!(c = hlsl_new_uint_constant(ctx, field_offset, loc)))
                 return NULL;
             hlsl_block_add_instr(block, c);
 
@@ -81,26 +89,32 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
             vkd3d_unreachable();
     }
 
-    if (offset)
+    if (idx_offset)
     {
-        if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, offset, idx_offset)))
+        if (!(base_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, base_offset, idx_offset)))
             return NULL;
-        hlsl_block_add_instr(block, idx_offset);
+        hlsl_block_add_instr(block, base_offset);
     }
 
-    return idx_offset;
+    return base_offset;
 }
 
 /* TODO: remove when no longer needed, only used for replace_deref_path_with_offset() */
 static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, struct hlsl_block *block,
-        const struct hlsl_deref *deref, const struct vkd3d_shader_location *loc)
+        const struct hlsl_deref *deref, unsigned int *offset_component, const struct vkd3d_shader_location *loc)
 {
     enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
-    struct hlsl_ir_node *offset = NULL;
+    struct hlsl_ir_node *offset;
     struct hlsl_type *type;
     unsigned int i;
 
+    *offset_component = 0;
+
     hlsl_block_init(block);
+
+    if (!(offset = hlsl_new_uint_constant(ctx, 0, loc)))
+        return NULL;
+    hlsl_block_add_instr(block, offset);
 
     assert(deref->var);
     type = deref->var->data_type;
@@ -112,7 +126,7 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
         hlsl_block_init(&idx_block);
 
         if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node,
-                regset, loc)))
+                regset, offset_component, loc)))
         {
             hlsl_block_cleanup(&idx_block);
             return NULL;
@@ -130,9 +144,10 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
 static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
-    struct hlsl_type *type;
+    unsigned int offset_component;
     struct hlsl_ir_node *offset;
     struct hlsl_block block;
+    struct hlsl_type *type;
 
     assert(deref->var);
     assert(!hlsl_deref_is_lowered(deref));
@@ -149,12 +164,13 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
 
     deref->data_type = type;
 
-    if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &instr->loc)))
+    if (!(offset = new_offset_instr_from_deref(ctx, &block, deref, &offset_component, &instr->loc)))
         return false;
     list_move_before(&instr->entry, &block.instrs);
 
     hlsl_cleanup_deref(deref);
     hlsl_src_from_node(&deref->offset, offset);
+    deref->const_offset = offset_component;
 
     return true;
 }
@@ -4439,30 +4455,28 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
 
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
+    enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
     struct hlsl_ir_node *offset_node = deref->offset.node;
-    enum hlsl_regset regset;
     unsigned int size;
 
-    if (!offset_node)
+    *offset = deref->const_offset;
+
+    if (offset_node)
     {
-        *offset = 0;
-        return true;
+        /* We should always have generated a cast to UINT. */
+        assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
+                && offset_node->data_type->base_type == HLSL_TYPE_UINT);
+
+        if (offset_node->type != HLSL_IR_CONSTANT)
+            return false;
+
+        *offset += hlsl_ir_constant(offset_node)->value.u[0].u;
     }
-
-    /* We should always have generated a cast to UINT. */
-    assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
-            && offset_node->data_type->base_type == HLSL_TYPE_UINT);
-
-    if (offset_node->type != HLSL_IR_CONSTANT)
-        return false;
-
-    *offset = hlsl_ir_constant(offset_node)->value.u[0].u;
-    regset = hlsl_deref_get_regset(ctx, deref);
 
     size = deref->var->data_type->reg_size[regset];
     if (*offset >= size)
     {
-        hlsl_error(ctx, &deref->offset.node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
+        hlsl_error(ctx, &offset_node->loc, VKD3D_SHADER_ERROR_HLSL_OFFSET_OUT_OF_BOUNDS,
                 "Dereference is out of bounds. %u/%u", *offset, size);
         return false;
     }

@@ -638,14 +638,16 @@ struct hlsl_deref
     unsigned int path_len;
     struct hlsl_src *path;
 
-    /* Single instruction node of data type uint used to represent the register offset (in register
-     *   components, within the pertaining regset), from the start of the variable, of the part
-     *   referenced.
-     * The path is lowered to this single offset -- whose value may vary between SM1 and SM4 --
-     *   before writing the bytecode.
+    /* Before writing the bytecode, deref paths are lowered into an offset (within the pertaining
+     *   regset) from the start of the variable, to the part of the variable that is referenced.
+     * This offset is stored using two fields, one for a variable part and other for a constant
+     *   part, which are added together:
+     *   - offset: An offset given by an instruction node, in number of register components.
+     *   - const_offset: A constant number of register components.
      * Since the type information cannot longer be retrieved from the offset alone, the type is
      *   stored in the data_type field, which remains NULL if the deref hasn't been lowered yet. */
     struct hlsl_src offset;
+    unsigned int const_offset;
     struct hlsl_type *data_type;
 };
 

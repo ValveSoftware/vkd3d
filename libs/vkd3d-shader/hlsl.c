@@ -513,6 +513,7 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
     deref->var = var;
     deref->path_len = path_len;
     deref->offset.node = NULL;
+    deref->const_offset = 0;
     deref->data_type = NULL;
 
     if (path_len == 0)
@@ -541,6 +542,7 @@ bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *d
     deref->path = NULL;
     deref->path_len = 0;
     deref->offset.node = NULL;
+    deref->const_offset = 0;
 
     assert(chain);
     if (chain->type == HLSL_IR_INDEX)
@@ -1137,6 +1139,7 @@ void hlsl_cleanup_deref(struct hlsl_deref *deref)
     deref->path_len = 0;
 
     hlsl_src_remove(&deref->offset);
+    deref->const_offset = 0;
 }
 
 /* Initializes a simple variable dereference, so that it can be passed to load/store functions. */
@@ -2411,21 +2414,37 @@ static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_der
     if (deref->var)
     {
         vkd3d_string_buffer_printf(buffer, "%s", deref->var->name);
-        if (deref->path_len)
+        if (!hlsl_deref_is_lowered(deref))
         {
-            vkd3d_string_buffer_printf(buffer, "[");
-            for (i = 0; i < deref->path_len; ++i)
+            if (deref->path_len)
             {
                 vkd3d_string_buffer_printf(buffer, "[");
-                dump_src(buffer, &deref->path[i]);
+                for (i = 0; i < deref->path_len; ++i)
+                {
+                    vkd3d_string_buffer_printf(buffer, "[");
+                    dump_src(buffer, &deref->path[i]);
+                    vkd3d_string_buffer_printf(buffer, "]");
+                }
                 vkd3d_string_buffer_printf(buffer, "]");
             }
-            vkd3d_string_buffer_printf(buffer, "]");
         }
-        else if (deref->offset.node)
+        else
         {
+            bool show_rel, show_const;
+
+            show_rel = deref->offset.node;
+            show_const = deref->const_offset != 0 || !show_rel;
+
             vkd3d_string_buffer_printf(buffer, "[");
-            dump_src(buffer, &deref->offset);
+            if (show_rel)
+            {
+                dump_src(buffer, &deref->offset);
+                vkd3d_string_buffer_printf(buffer, "c");
+            }
+            if (show_rel && show_const)
+                vkd3d_string_buffer_printf(buffer, " + ");
+            if (show_const)
+                vkd3d_string_buffer_printf(buffer, "%uc", deref->const_offset);
             vkd3d_string_buffer_printf(buffer, "]");
         }
     }
