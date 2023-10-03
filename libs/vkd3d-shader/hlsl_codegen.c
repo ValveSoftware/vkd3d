@@ -37,20 +37,19 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
 
         case HLSL_CLASS_MATRIX:
         {
-            if (!(c = hlsl_new_uint_constant(ctx, 4, loc)))
-                return NULL;
-            hlsl_block_add_instr(block, c);
-
-            if (!(idx_offset = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, c, idx)))
-                return NULL;
-            hlsl_block_add_instr(block, idx_offset);
-
+            idx_offset = idx;
             break;
         }
 
         case HLSL_CLASS_ARRAY:
         {
             unsigned int size = hlsl_type_get_array_element_reg_size(type->e.array.type, regset);
+
+            if (regset == HLSL_REGSET_NUMERIC)
+            {
+                assert(size % 4 == 0);
+                size /= 4;
+            }
 
             if (!(c = hlsl_new_uint_constant(ctx, size, loc)))
                 return NULL;
@@ -73,7 +72,7 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
             {
                 assert(*offset_component == 0);
                 *offset_component = field_offset % 4;
-                field_offset -= *offset_component;
+                field_offset /= 4;
             }
 
             if (!(c = hlsl_new_uint_constant(ctx, field_offset, loc)))
@@ -4470,7 +4469,10 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
         if (offset_node->type != HLSL_IR_CONSTANT)
             return false;
 
-        *offset += hlsl_ir_constant(offset_node)->value.u[0].u;
+        if (regset == HLSL_REGSET_NUMERIC)
+            *offset += 4 * hlsl_ir_constant(offset_node)->value.u[0].u;
+        else
+            *offset += hlsl_ir_constant(offset_node)->value.u[0].u;
     }
 
     size = deref->var->data_type->reg_size[regset];

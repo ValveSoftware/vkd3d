@@ -642,7 +642,7 @@ struct hlsl_deref
      *   regset) from the start of the variable, to the part of the variable that is referenced.
      * This offset is stored using two fields, one for a variable part and other for a constant
      *   part, which are added together:
-     *   - offset: An offset given by an instruction node, in number of register components.
+     *   - offset: An offset given by an instruction node, in whole registers.
      *   - const_offset: A constant number of register components.
      * Since the type information cannot longer be retrieved from the offset alone, the type is
      *   stored in the data_type field, which remains NULL if the deref hasn't been lowered yet. */

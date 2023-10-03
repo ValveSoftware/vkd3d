@@ -2437,10 +2437,7 @@ static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_der
 
             vkd3d_string_buffer_printf(buffer, "[");
             if (show_rel)
-            {
                 dump_src(buffer, &deref->offset);
-                vkd3d_string_buffer_printf(buffer, "c");
-            }
             if (show_rel && show_const)
                 vkd3d_string_buffer_printf(buffer, " + ");
             if (show_const)
