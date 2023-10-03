@@ -26,6 +26,8 @@
 #define BITCODE_MAGIC VKD3D_MAKE_TAG('B', 'C', 0xc0, 0xde)
 #define DXIL_OP_MAX_OPERANDS 17
 
+static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
+
 enum bitcode_block_id
 {
     BLOCKINFO_BLOCK           =  0,
@@ -3669,6 +3671,65 @@ static void sm6_parser_emit_global_flags(struct sm6_parser *sm6, const struct sm
     ins->declaration.global_flags = global_flags;
 }
 
+static enum vkd3d_result sm6_parser_emit_thread_group(struct sm6_parser *sm6, const struct sm6_metadata_value *m)
+{
+    const struct sm6_metadata_node *node;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int group_sizes[3];
+    unsigned int i;
+
+    if (sm6->p.shader_version.type != VKD3D_SHADER_TYPE_COMPUTE)
+    {
+        WARN("Shader of type %#x has thread group dimensions.\n", sm6->p.shader_version.type);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Shader has thread group dimensions but is not a compute shader.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    if (!m || !sm6_metadata_value_is_node(m))
+    {
+        WARN("Thread group dimension value is not a node.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Thread group dimension metadata value is not a node.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    node = m->u.node;
+    if (node->operand_count != 3)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Thread group dimension operand count %u is invalid.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    for (i = 0; i < 3; ++i)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &group_sizes[i]))
+        {
+            WARN("Thread group dimension is not an integer value.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Thread group dimension metadata value is not an integer.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+        if (!group_sizes[i] || group_sizes[i] > dx_max_thread_group_size[i])
+        {
+            char dim = "XYZ"[i];
+            WARN("Invalid thread group %c dimension %u.\n", dim, group_sizes[i]);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Thread group %c dimension %u is invalid.", dim, group_sizes[i]);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+    }
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_THREAD_GROUP);
+    ins->declaration.thread_group_size.x = group_sizes[0];
+    ins->declaration.thread_group_size.y = group_sizes[1];
+    ins->declaration.thread_group_size.z = group_sizes[2];
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
 {
     const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.entryPoints");
@@ -3751,6 +3812,10 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
             {
                 case SHADER_PROPERTIES_FLAGS:
                     sm6_parser_emit_global_flags(sm6, node->operands[i + 1]);
+                    break;
+               case SHADER_PROPERTIES_COMPUTE:
+                    if ((ret = sm6_parser_emit_thread_group(sm6, node->operands[i + 1])) < 0)
+                        return ret;
                     break;
                 default:
                     FIXME("Unhandled tag %#x.\n", tag);
