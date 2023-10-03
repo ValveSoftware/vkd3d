@@ -391,13 +391,14 @@ static unsigned int shader_get_float_offset(enum vkd3d_shader_register_type regi
     }
 }
 
-static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler, uint32_t global_flags)
+static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler,
+        enum vkd3d_shader_global_flags global_flags)
 {
     unsigned int i;
 
     static const struct
     {
-        unsigned int flag;
+        enum vkd3d_shader_global_flags flag;
         const char *name;
     }
     global_flag_info[] =
@@ -423,7 +424,7 @@ static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler, ui
     }
 
     if (global_flags)
-        vkd3d_string_buffer_printf(&compiler->buffer, "unknown_flags(%#x)", global_flags);
+        vkd3d_string_buffer_printf(&compiler->buffer, "unknown_flags(%#"PRIx64")", global_flags);
 }
 
 static void shader_dump_sync_flags(struct vkd3d_d3d_asm_compiler *compiler, uint32_t sync_flags)
@@ -1637,7 +1638,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
         case VKD3DSIH_DCL_GLOBAL_FLAGS:
             vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_global_flags(compiler, ins->flags);
+            shader_dump_global_flags(compiler, ins->declaration.global_flags);
             break;
 
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:

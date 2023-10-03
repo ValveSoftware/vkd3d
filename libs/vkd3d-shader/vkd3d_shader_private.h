@@ -642,6 +642,32 @@ enum vkd3d_shader_global_flags
     VKD3DSGF_SKIP_OPTIMIZATION                 = 0x10,
     VKD3DSGF_ENABLE_MINIMUM_PRECISION          = 0x20,
     VKD3DSGF_ENABLE_11_1_DOUBLE_EXTENSIONS     = 0x40,
+    VKD3DSGF_ENABLE_SHADER_EXTENSIONS          = 0x80, /* never emitted? */
+    VKD3DSGF_BIND_FOR_DURATION                 =     0x100,
+    VKD3DSGF_ENABLE_VP_AND_RT_ARRAY_INDEX      =     0x200,
+    VKD3DSGF_ENABLE_INNER_COVERAGE             =     0x400,
+    VKD3DSGF_ENABLE_STENCIL_REF                =     0x800,
+    VKD3DSGF_ENABLE_TILED_RESOURCE_INTRINSICS  =    0x1000,
+    VKD3DSGF_ENABLE_RELAXED_TYPED_UAV_FORMATS  =    0x2000,
+    VKD3DSGF_ENABLE_LVL_9_COMPARISON_FILTERING =    0x4000,
+    VKD3DSGF_ENABLE_UP_TO_64_UAVS              =    0x8000,
+    VKD3DSGF_ENABLE_UAVS_AT_EVERY_STAGE        =   0x10000,
+    VKD3DSGF_ENABLE_CS4_RAW_STRUCTURED_BUFFERS =   0x20000,
+    VKD3DSGF_ENABLE_RASTERIZER_ORDERED_VIEWS   =   0x40000,
+    VKD3DSGF_ENABLE_WAVE_INTRINSICS            =   0x80000,
+    VKD3DSGF_ENABLE_INT64                      =  0x100000,
+    VKD3DSGF_ENABLE_VIEWID                     =  0x200000,
+    VKD3DSGF_ENABLE_BARYCENTRICS               =  0x400000,
+    VKD3DSGF_FORCE_NATIVE_LOW_PRECISION        =  0x800000,
+    VKD3DSGF_ENABLE_SHADINGRATE                = 0x1000000,
+    VKD3DSGF_ENABLE_RAYTRACING_TIER_1_1        = 0x2000000,
+    VKD3DSGF_ENABLE_SAMPLER_FEEDBACK           = 0x4000000,
+    VKD3DSGF_ENABLE_ATOMIC_INT64_ON_TYPED_RESOURCE                =   0x8000000,
+    VKD3DSGF_ENABLE_ATOMIC_INT64_ON_GROUP_SHARED                  =  0x10000000,
+    VKD3DSGF_ENABLE_DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS =  0x20000000,
+    VKD3DSGF_ENABLE_RESOURCE_DESCRIPTOR_HEAP_INDEXING             =  0x40000000,
+    VKD3DSGF_ENABLE_SAMPLER_DESCRIPTOR_HEAP_INDEXING              =  0x80000000,
+    VKD3DSGF_ENABLE_ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE      = 0x100000000ull,
 };
 
 enum vkd3d_shader_sync_flags
@@ -1016,6 +1042,7 @@ struct vkd3d_shader_instruction
     const struct vkd3d_shader_src_param *predicate;
     union
     {
+        enum vkd3d_shader_global_flags global_flags;
         struct vkd3d_shader_semantic semantic;
         struct vkd3d_shader_register_semantic register_semantic;
         struct vkd3d_shader_primitive_type primitive_type;

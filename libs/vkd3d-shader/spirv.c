@@ -5378,7 +5378,7 @@ static size_t spirv_compiler_get_current_function_location(struct spirv_compiler
 static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    unsigned int flags = instruction->flags;
+    enum vkd3d_shader_global_flags flags = instruction->declaration.global_flags;
 
     if (flags & VKD3DSGF_FORCE_EARLY_DEPTH_STENCIL)
     {
@@ -5393,9 +5393,9 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
     }
 
     if (flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS))
-        FIXME("Unhandled global flags %#x.\n", flags);
+        FIXME("Unhandled global flags %#"PRIx64".\n", flags);
     else
-        WARN("Unhandled global flags %#x.\n", flags);
+        WARN("Unhandled global flags %#"PRIx64".\n", flags);
 }
 
 static void spirv_compiler_emit_temps(struct spirv_compiler *compiler, uint32_t count)
