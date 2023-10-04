@@ -2667,8 +2667,8 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommandList(ID3D12Device5 *i
             initial_pipeline_state, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12GraphicsCommandList4_iface,
-            &IID_ID3D12GraphicsCommandList4, riid, command_list);
+    return return_interface(&object->ID3D12GraphicsCommandList5_iface,
+            &IID_ID3D12GraphicsCommandList5, riid, command_list);
 }
 
 /* Direct3D feature levels restrict which formats can be optionally supported. */

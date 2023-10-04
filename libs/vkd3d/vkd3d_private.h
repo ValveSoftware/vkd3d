@@ -1429,7 +1429,7 @@ enum vkd3d_pipeline_bind_point
 /* ID3D12CommandList */
 struct d3d12_command_list
 {
-    ID3D12GraphicsCommandList4 ID3D12GraphicsCommandList4_iface;
+    ID3D12GraphicsCommandList5 ID3D12GraphicsCommandList5_iface;
     LONG refcount;
 
     D3D12_COMMAND_LIST_TYPE type;
