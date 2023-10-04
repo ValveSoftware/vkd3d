@@ -3210,6 +3210,19 @@ static void dump_function(struct rb_entry *entry, void *context)
     rb_for_each_entry(&func->overloads, dump_function_decl, ctx);
 }
 
+static bool mark_indexable_vars(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
+        struct hlsl_ir_node *instr)
+{
+    if (!deref->rel_offset.node)
+        return false;
+
+    assert(deref->var);
+    assert(deref->rel_offset.node->type != HLSL_IR_CONSTANT);
+    deref->var->indexable = true;
+
+    return true;
+}
+
 static char get_regset_name(enum hlsl_regset regset)
 {
     switch (regset)
@@ -4811,6 +4824,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
 
     if (TRACE_ON())
         rb_for_each_entry(&ctx->functions, dump_function, ctx);
+
+    transform_derefs(ctx, mark_indexable_vars, body);
 
     calculate_resource_register_counts(ctx);
 

@@ -425,6 +425,9 @@ struct hlsl_ir_var
      * It may be less than the allocation size, e.g. for texture arrays. */
     unsigned int bind_count[HLSL_REGSET_LAST_OBJECT + 1];
 
+    /* Whether the shader performs dereferences with non-constant offsets in the variable. */
+    bool indexable;
+
     uint32_t is_input_semantic : 1;
     uint32_t is_output_semantic : 1;
     uint32_t is_uniform : 1;
