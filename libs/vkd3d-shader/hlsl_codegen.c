@@ -135,9 +135,7 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     struct hlsl_block block;
 
     assert(deref->var);
-
-    /* register offsets shouldn't be used before this point is reached. */
-    assert(!deref->offset.node);
+    assert(!hlsl_deref_is_lowered(deref));
 
     type = hlsl_deref_get_type(ctx, deref);
 

@@ -644,10 +644,16 @@ struct hlsl_deref
      * The path is lowered to this single offset -- whose value may vary between SM1 and SM4 --
      *   before writing the bytecode.
      * Since the type information cannot longer be retrieved from the offset alone, the type is
-     *   stored in the data_type field. */
+     *   stored in the data_type field, which remains NULL if the deref hasn't been lowered yet. */
     struct hlsl_src offset;
     struct hlsl_type *data_type;
 };
+
+/* Whether the path has been lowered to an offset or not. */
+static inline bool hlsl_deref_is_lowered(const struct hlsl_deref *deref)
+{
+    return !!deref->data_type;
+}
 
 struct hlsl_ir_load
 {

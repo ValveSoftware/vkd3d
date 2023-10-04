@@ -249,14 +249,7 @@ static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
 
 enum hlsl_regset hlsl_deref_get_regset(struct hlsl_ctx *ctx, const struct hlsl_deref *deref)
 {
-    struct hlsl_type *type;
-
-    if (deref->data_type)
-        type = deref->data_type;
-    else
-        type = hlsl_deref_get_type(ctx, deref);
-
-    return type_get_regset(type);
+    return type_get_regset(hlsl_deref_get_type(ctx, deref));
 }
 
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset)
@@ -520,6 +513,7 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
     deref->var = var;
     deref->path_len = path_len;
     deref->offset.node = NULL;
+    deref->data_type = NULL;
 
     if (path_len == 0)
     {
@@ -609,7 +603,7 @@ struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_de
 
     assert(deref);
 
-    if (deref->offset.node)
+    if (hlsl_deref_is_lowered(deref))
         return deref->data_type;
 
     type = deref->var->data_type;
@@ -1120,7 +1114,7 @@ bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struc
     if (!other)
         return true;
 
-    assert(!other->offset.node);
+    assert(!hlsl_deref_is_lowered(other));
 
     if (!init_deref(ctx, deref, other->var, other->path_len))
         return false;
@@ -1177,7 +1171,7 @@ struct hlsl_ir_node *hlsl_new_store_index(struct hlsl_ctx *ctx, const struct hls
     unsigned int i;
 
     assert(lhs);
-    assert(!lhs->offset.node);
+    assert(!hlsl_deref_is_lowered(lhs));
 
     if (!(store = hlsl_alloc(ctx, sizeof(*store))))
         return NULL;
@@ -1384,7 +1378,7 @@ struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl
     struct hlsl_type *type;
     unsigned int i;
 
-    assert(!deref->offset.node);
+    assert(!hlsl_deref_is_lowered(deref));
 
     type = hlsl_deref_get_type(ctx, deref);
     if (idx)
@@ -1657,7 +1651,7 @@ static bool clone_deref(struct hlsl_ctx *ctx, struct clone_instr_map *map,
 {
     unsigned int i;
 
-    assert(!src->offset.node);
+    assert(!hlsl_deref_is_lowered(src));
 
     if (!init_deref(ctx, dst, src->var, src->path_len))
         return false;
