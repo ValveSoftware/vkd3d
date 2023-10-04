@@ -3473,6 +3473,10 @@ struct register_allocator
         unsigned int writemask;
         unsigned int first_write, last_read;
     } *allocations;
+
+    /* Indexable temps are allocated separately and always keep their index regardless of their
+     * lifetime. */
+    size_t indexable_count;
 };
 
 static unsigned int get_available_writemask(const struct register_allocator *allocator,
@@ -3719,11 +3723,23 @@ static void allocate_variable_temp_register(struct hlsl_ctx *ctx,
 
     if (!var->regs[HLSL_REGSET_NUMERIC].allocated && var->last_read)
     {
-        var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, allocator,
-                var->first_write, var->last_read, var->data_type);
+        if (var->indexable)
+        {
+            var->regs[HLSL_REGSET_NUMERIC].id = allocator->indexable_count++;
+            var->regs[HLSL_REGSET_NUMERIC].allocation_size = 1;
+            var->regs[HLSL_REGSET_NUMERIC].writemask = 0;
+            var->regs[HLSL_REGSET_NUMERIC].allocated = true;
 
-        TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name, debug_register('r',
-                var->regs[HLSL_REGSET_NUMERIC], var->data_type), var->first_write, var->last_read);
+            TRACE("Allocated %s to x%u[].\n", var->name, var->regs[HLSL_REGSET_NUMERIC].id);
+        }
+        else
+        {
+            var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, allocator,
+                    var->first_write, var->last_read, var->data_type);
+
+            TRACE("Allocated %s to %s (liveness %u-%u).\n", var->name, debug_register('r',
+                    var->regs[HLSL_REGSET_NUMERIC], var->data_type), var->first_write, var->last_read);
+        }
     }
 }
 

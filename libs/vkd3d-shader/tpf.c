@@ -3732,7 +3732,7 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
         struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
 
         assert(hlsl_reg.allocated);
-        reg->type = VKD3DSPR_TEMP;
+        reg->type =  deref->var->indexable ? VKD3DSPR_IDXTEMP : VKD3DSPR_TEMP;
         reg->dimension = VSIR_DIMENSION_VEC4;
         reg->idx[0].offset = hlsl_reg.id;
         reg->idx_count = 1;
@@ -4246,6 +4246,20 @@ static void write_sm4_dcl_temps(const struct tpf_writer *tpf, uint32_t temp_coun
 
         .idx = {temp_count},
         .idx_count = 1,
+    };
+
+    write_sm4_instruction(tpf, &instr);
+}
+
+static void write_sm4_dcl_indexable_temp(const struct tpf_writer *tpf, uint32_t idx,
+        uint32_t size, uint32_t comp_count)
+{
+    struct sm4_instruction instr =
+    {
+        .opcode = VKD3D_SM4_OP_DCL_INDEXABLE_TEMP,
+
+        .idx = {idx, size, comp_count},
+        .idx_count = 3,
     };
 
     write_sm4_instruction(tpf, &instr);
@@ -5616,6 +5630,7 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     struct extern_resource *extern_resources;
     unsigned int extern_resources_count, i;
     const struct hlsl_buffer *cbuffer;
+    const struct hlsl_scope *scope;
     const struct hlsl_ir_var *var;
     size_t token_count_position;
     struct tpf_writer tpf;
@@ -5669,6 +5684,25 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
 
     if (ctx->temp_count)
         write_sm4_dcl_temps(&tpf, ctx->temp_count);
+
+    LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (var->is_uniform || var->is_input_semantic || var->is_output_semantic)
+                continue;
+            if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
+                continue;
+
+            if (var->indexable)
+            {
+                unsigned int id = var->regs[HLSL_REGSET_NUMERIC].id;
+                unsigned int size = align(var->data_type->reg_size[HLSL_REGSET_NUMERIC], 4) / 4;
+
+                write_sm4_dcl_indexable_temp(&tpf, id, size, 4);
+            }
+        }
+    }
 
     write_sm4_block(&tpf, &entry_func->body);
 
