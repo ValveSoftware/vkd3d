@@ -247,6 +247,7 @@ enum dx_intrinsic_opcode
     DX_LOAD_INPUT                   =   4,
     DX_STORE_OUTPUT                 =   5,
     DX_CREATE_HANDLE                =  57,
+    DX_CBUFFER_LOAD_LEGACY          =  59,
 };
 
 struct sm6_pointer_info
@@ -1586,6 +1587,11 @@ static const struct sm6_type *sm6_type_get_scalar_type(const struct sm6_type *ty
     }
 }
 
+static unsigned int sm6_type_max_vector_size(const struct sm6_type *type)
+{
+    return min((VKD3D_VEC4_SIZE * sizeof(uint32_t) * CHAR_BIT) / type->u.width, VKD3D_VEC4_SIZE);
+}
+
 static const struct sm6_type *sm6_parser_get_type(struct sm6_parser *sm6, uint64_t type_id)
 {
     if (type_id >= sm6->type_count)
@@ -1690,7 +1696,7 @@ static const char *sm6_parser_get_global_symbol_name(const struct sm6_parser *sm
 
 static unsigned int register_get_uint_value(const struct vkd3d_shader_register *reg)
 {
-    if (!register_is_constant(reg) || !data_type_is_integer(reg->data_type))
+    if (!register_is_constant(reg) || (!data_type_is_integer(reg->data_type) && !data_type_is_bool(reg->data_type)))
         return UINT_MAX;
 
     if (reg->dimension == VSIR_DIMENSION_VEC4)
@@ -1847,8 +1853,8 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
     return VKD3D_DATA_UINT;
 }
 
-static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const struct sm6_type *type,
-        struct sm6_parser *sm6)
+static void register_init_ssa_vector(struct vkd3d_shader_register *reg, const struct sm6_type *type,
+        unsigned int component_count, struct sm6_parser *sm6)
 {
     enum vkd3d_data_type data_type;
     unsigned int id;
@@ -1856,6 +1862,13 @@ static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const st
     id = sm6_parser_alloc_ssa_id(sm6);
     data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(type, 0));
     register_init_with_id(reg, VKD3DSPR_SSA, data_type, id);
+    reg->dimension = component_count > 1 ? VSIR_DIMENSION_VEC4 : VSIR_DIMENSION_SCALAR;
+}
+
+static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const struct sm6_type *type,
+        struct sm6_parser *sm6)
+{
+    register_init_ssa_vector(reg, type, 1, sm6);
 }
 
 static void dst_param_init(struct vkd3d_shader_dst_param *param)
@@ -1868,6 +1881,13 @@ static void dst_param_init(struct vkd3d_shader_dst_param *param)
 static inline void dst_param_init_scalar(struct vkd3d_shader_dst_param *param, unsigned int component_idx)
 {
     param->write_mask = 1u << component_idx;
+    param->modifiers = 0;
+    param->shift = 0;
+}
+
+static void dst_param_init_vector(struct vkd3d_shader_dst_param *param, unsigned int component_count)
+{
+    param->write_mask = (1u << component_count) - 1;
     param->modifiers = 0;
     param->shift = 0;
 }
@@ -1895,6 +1915,14 @@ static void src_param_init_from_value(struct vkd3d_shader_src_param *param, cons
 {
     src_param_init(param);
     param->reg = src->u.reg;
+}
+
+static void src_param_init_vector_from_reg(struct vkd3d_shader_src_param *param,
+        const struct vkd3d_shader_register *reg)
+{
+    param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    param->modifiers = VKD3DSPSM_NONE;
+    param->reg = *reg;
 }
 
 static void register_index_address_init(struct vkd3d_shader_register_index *idx, const struct sm6_value *address,
@@ -1925,6 +1953,17 @@ static void instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instructio
 
     dst_param_init_ssa_scalar(param, dst->type, sm6);
     param->write_mask = VKD3DSP_WRITEMASK_0;
+    dst->u.reg = param->reg;
+}
+
+static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instruction *ins,
+        unsigned int component_count, struct sm6_parser *sm6)
+{
+    struct vkd3d_shader_dst_param *param = instruction_dst_params_alloc(ins, 1, sm6);
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+
+    dst_param_init_vector(param, component_count);
+    register_init_ssa_vector(&param->reg, sm6_type_get_scalar_type(dst->type, 0), component_count, sm6);
     dst->u.reg = param->reg;
 }
 
@@ -1990,6 +2029,18 @@ static size_t sm6_parser_get_value_index(struct sm6_parser *sm6, uint64_t idx)
     }
 
     return i;
+}
+
+static bool sm6_value_validate_is_handle(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_value_is_handle(value))
+    {
+        WARN("Handle parameter of type %u is not a handle.\n", value->value_type);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE,
+                "A handle parameter passed to a DX intrinsic function is not a handle.");
+        return false;
+    }
+    return true;
 }
 
 static const struct sm6_value *sm6_parser_get_value_safe(struct sm6_parser *sm6, unsigned int idx)
@@ -2554,6 +2605,32 @@ static struct sm6_block *sm6_block_create()
     return block;
 }
 
+static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, struct sm6_block *code_block,
+        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+{
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    struct vkd3d_shader_src_param *src_param;
+    const struct sm6_value *buffer;
+    const struct sm6_type *type;
+
+    buffer = operands[0];
+    if (!sm6_value_validate_is_handle(buffer, sm6))
+        return;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_vector_from_reg(src_param, &buffer->u.handle.reg);
+    register_index_address_init(&src_param->reg.idx[2], operands[1], sm6);
+    assert(src_param->reg.idx_count == 3);
+
+    type = sm6_type_get_scalar_type(dst->type, 0);
+    assert(type);
+    src_param->reg.data_type = vkd3d_data_type_from_sm6_type(type);
+
+    instruction_dst_param_init_ssa_vector(ins, sm6_type_max_vector_size(type), sm6);
+}
+
 static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_parser *sm6,
         enum vkd3d_shader_descriptor_type type, unsigned int id, const struct sm6_value *address)
 {
@@ -2718,6 +2795,7 @@ struct sm6_dx_opcode_info
  */
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
+    [DX_CBUFFER_LOAD_LEGACY           ] = {'o', "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_CREATE_HANDLE                 ] = {'H', "ccib", sm6_parser_emit_dx_create_handle},
     [DX_LOAD_INPUT                    ] = {'o', "ii8i", sm6_parser_emit_dx_load_input},
     [DX_STORE_OUTPUT                  ] = {'v', "ii8o", sm6_parser_emit_dx_store_output},

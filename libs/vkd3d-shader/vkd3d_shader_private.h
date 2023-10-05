@@ -182,6 +182,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_DXIL_INVALID_SIGNATURE           = 8016,
     VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES          = 8017,
     VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES           = 8018,
+    VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE     = 8019,
 
     VKD3D_SHADER_WARNING_DXIL_UNKNOWN_MAGIC_NUMBER      = 8300,
     VKD3D_SHADER_WARNING_DXIL_UNKNOWN_SHADER_TYPE       = 8301,
@@ -582,6 +583,11 @@ static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
 {
     return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT
             || data_type == VKD3D_DATA_UINT64;
+}
+
+static inline bool data_type_is_bool(enum vkd3d_data_type data_type)
+{
+    return data_type == VKD3D_DATA_BOOL;
 }
 
 enum vsir_dimension
