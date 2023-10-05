@@ -3841,6 +3841,20 @@ static void sm4_src_from_node(const struct tpf_writer *tpf, struct vkd3d_shader_
     }
 }
 
+static unsigned int sm4_get_index_addressing_from_reg(const struct vkd3d_shader_register *reg,
+        unsigned int i)
+{
+    if (reg->idx[i].rel_addr)
+    {
+        if (reg->idx[i].offset == 0)
+            return VKD3D_SM4_ADDRESSING_RELATIVE;
+        else
+            return VKD3D_SM4_ADDRESSING_RELATIVE | VKD3D_SM4_ADDRESSING_OFFSET;
+    }
+
+    return 0;
+}
+
 static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct vkd3d_shader_register *reg,
         enum vkd3d_sm4_swizzle_type sm4_swizzle_type, uint32_t sm4_swizzle)
 {
@@ -3867,6 +3881,12 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct v
     token |= sm4_reg_type << VKD3D_SM4_REGISTER_TYPE_SHIFT;
     token |= reg->idx_count << VKD3D_SM4_REGISTER_ORDER_SHIFT;
     token |= sm4_reg_dim << VKD3D_SM4_DIMENSION_SHIFT;
+    if (reg->idx_count > 0)
+        token |= sm4_get_index_addressing_from_reg(reg, 0) << VKD3D_SM4_ADDRESSING_SHIFT0;
+    if (reg->idx_count > 1)
+        token |= sm4_get_index_addressing_from_reg(reg, 1) << VKD3D_SM4_ADDRESSING_SHIFT1;
+    if (reg->idx_count > 2)
+        token |= sm4_get_index_addressing_from_reg(reg, 2) << VKD3D_SM4_ADDRESSING_SHIFT2;
 
     if (sm4_reg_dim == VKD3D_SM4_DIMENSION_VEC4)
     {
