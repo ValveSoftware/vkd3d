@@ -3605,6 +3605,36 @@ VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_sta
     return vk_pipeline;
 }
 
+static int compile_hlsl_cs(const struct vkd3d_shader_code *hlsl, struct vkd3d_shader_code *dxbc)
+{
+    struct vkd3d_shader_hlsl_source_info hlsl_info;
+    struct vkd3d_shader_compile_info info;
+
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_9},
+    };
+
+    info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
+    info.next = &hlsl_info;
+    info.source = *hlsl;
+    info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+    info.options = options;
+    info.option_count = ARRAY_SIZE(options);
+    info.log_level = VKD3D_SHADER_LOG_NONE;
+    info.source_name = NULL;
+
+    hlsl_info.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO;
+    hlsl_info.next = NULL;
+    hlsl_info.entry_point = "main";
+    hlsl_info.secondary_code.code = NULL;
+    hlsl_info.secondary_code.size = 0;
+    hlsl_info.profile = "cs_5_0";
+
+    return vkd3d_shader_compile(&info, dxbc, NULL);
+}
+
 static void vkd3d_uav_clear_pipelines_cleanup(struct vkd3d_uav_clear_pipelines *pipelines,
         struct d3d12_device *device)
 {
@@ -3658,7 +3688,7 @@ HRESULT vkd3d_uav_clear_state_init(struct vkd3d_uav_clear_state *state, struct d
     {
         VkPipeline *pipeline;
         VkPipelineLayout *pipeline_layout;
-        D3D12_SHADER_BYTECODE code;
+        struct vkd3d_shader_code code;
     }
     pipelines[] =
     {
@@ -3748,13 +3778,25 @@ HRESULT vkd3d_uav_clear_state_init(struct vkd3d_uav_clear_state *state, struct d
 
     for (i = 0; i < ARRAY_SIZE(pipelines); ++i)
     {
+        struct vkd3d_shader_code dxbc;
+        int ret;
+
+        if ((ret = compile_hlsl_cs(&pipelines[i].code, &dxbc)))
+        {
+            ERR("Failed to compile HLSL compute shader %u, ret %d.\n", i, ret);
+            hr = hresult_from_vk_result(ret);
+            goto fail;
+        }
+
         if (pipelines[i].pipeline_layout == &state->vk_pipeline_layout_buffer)
             binding.flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
         else
             binding.flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
 
-        if (FAILED(hr = vkd3d_create_compute_pipeline(device, &pipelines[i].code, &shader_interface,
-                *pipelines[i].pipeline_layout, pipelines[i].pipeline)))
+        hr = vkd3d_create_compute_pipeline(device, &(D3D12_SHADER_BYTECODE){dxbc.code, dxbc.size},
+                &shader_interface, *pipelines[i].pipeline_layout, pipelines[i].pipeline);
+        vkd3d_shader_free_shader_code(&dxbc);
+        if (FAILED(hr))
         {
             ERR("Failed to create compute pipeline %u, hr %#x.\n", i, hr);
             goto fail;
