@@ -5639,7 +5639,8 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     reg.idx[1].offset = range->first;
     reg.idx[2].offset = range->last;
 
-    size = size_in_bytes / (VKD3D_VEC4_SIZE * sizeof(uint32_t));
+    size = align(size_in_bytes, VKD3D_VEC4_SIZE * sizeof(uint32_t));
+    size /= VKD3D_VEC4_SIZE * sizeof(uint32_t);
 
     if ((push_cb = spirv_compiler_find_push_constant_buffer(compiler, range)))
     {
