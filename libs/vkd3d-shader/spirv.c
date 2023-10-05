@@ -3543,6 +3543,14 @@ static bool vkd3d_swizzle_is_equal(unsigned int dst_write_mask,
     return vkd3d_compact_swizzle(VKD3D_SHADER_NO_SWIZZLE, dst_write_mask) == vkd3d_compact_swizzle(swizzle, write_mask);
 }
 
+static bool vkd3d_swizzle_is_scalar(unsigned int swizzle)
+{
+    unsigned int component_idx = vkd3d_swizzle_get_component(swizzle, 0);
+    return vkd3d_swizzle_get_component(swizzle, 1) == component_idx
+            && vkd3d_swizzle_get_component(swizzle, 2) == component_idx
+            && vkd3d_swizzle_get_component(swizzle, 3) == component_idx;
+}
+
 static uint32_t spirv_compiler_emit_swizzle(struct spirv_compiler *compiler,
         uint32_t val_id, unsigned int val_write_mask, enum vkd3d_shader_component_type component_type,
         unsigned int swizzle, unsigned int write_mask)
@@ -3745,6 +3753,26 @@ static void spirv_compiler_set_ssa_register_id(const struct spirv_compiler *comp
     compiler->ssa_register_ids[i] = val_id;
 }
 
+static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_register *reg, enum vkd3d_shader_component_type component_type,
+        unsigned int swizzle)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    unsigned int component_idx;
+    uint32_t type_id, val_id;
+
+    val_id = spirv_compiler_get_ssa_register_id(compiler, reg);
+    assert(val_id);
+    assert(vkd3d_swizzle_is_scalar(swizzle));
+
+    if (reg->dimension == VSIR_DIMENSION_SCALAR)
+        return val_id;
+
+    type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
+    component_idx = vkd3d_swizzle_get_component(swizzle, 0);
+    return vkd3d_spirv_build_op_composite_extract1(builder, type_id, val_id, component_idx);
+}
+
 static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, DWORD swizzle, DWORD write_mask)
 {
@@ -3766,7 +3794,7 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
 
     if (reg->type == VKD3DSPR_SSA)
-        return spirv_compiler_get_ssa_register_id(compiler, reg);
+        return spirv_compiler_emit_load_ssa_reg(compiler, reg, component_type, swizzle);
 
     if (!spirv_compiler_get_register_info(compiler, reg, &reg_info))
     {
