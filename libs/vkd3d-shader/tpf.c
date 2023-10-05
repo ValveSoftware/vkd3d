@@ -618,8 +618,6 @@ struct vkd3d_shader_sm4_parser
 {
     const uint32_t *start, *end, *ptr;
 
-    unsigned int output_map[MAX_REG_OUTPUT];
-
     enum vkd3d_shader_opcode phase;
     bool has_control_point_phase;
     unsigned int input_register_masks[MAX_REG_OUTPUT];
@@ -1656,31 +1654,6 @@ static enum vkd3d_sm4_swizzle_type vkd3d_sm4_get_default_swizzle_type(
     return register_type_info->default_src_swizzle_type;
 }
 
-static void map_register(const struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_register *reg)
-{
-    switch (sm4->p.shader_version.type)
-    {
-        case VKD3D_SHADER_TYPE_PIXEL:
-            if (reg->type == VKD3DSPR_OUTPUT)
-            {
-                unsigned int reg_idx = reg->idx[0].offset;
-
-                if (reg_idx >= ARRAY_SIZE(sm4->output_map))
-                {
-                    /* Validated later */
-                    break;
-                }
-
-                reg->type = VKD3DSPR_COLOROUT;
-                reg->idx[0].offset = sm4->output_map[reg_idx];
-            }
-            break;
-
-        default:
-            break;
-    }
-}
-
 static enum vkd3d_data_type map_data_type(char t)
 {
     switch (t)
@@ -1943,8 +1916,6 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
         param->idx[1] = param->idx[0];
         ++param->idx_count;
     }
-
-    map_register(priv, param);
 
     return true;
 }
@@ -2476,7 +2447,6 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
 {
     struct vkd3d_shader_version version;
     uint32_t version_token, token_count;
-    unsigned int i;
 
     if (byte_code_size / sizeof(*byte_code) < 2)
     {
@@ -2535,23 +2505,6 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
             token_count / 7u + 20))
         return false;
     sm4->ptr = sm4->start;
-
-    memset(sm4->output_map, 0xff, sizeof(sm4->output_map));
-    for (i = 0; i < output_signature->element_count; ++i)
-    {
-        struct signature_element *e = &output_signature->elements[i];
-
-        if (version.type == VKD3D_SHADER_TYPE_PIXEL
-                && ascii_strcasecmp(e->semantic_name, "SV_Target"))
-            continue;
-        if (e->register_index >= ARRAY_SIZE(sm4->output_map))
-        {
-            WARN("Invalid output index %u.\n", e->register_index);
-            continue;
-        }
-
-        sm4->output_map[e->register_index] = e->semantic_index;
-    }
 
     init_sm4_lookup_tables(&sm4->lookup);
 

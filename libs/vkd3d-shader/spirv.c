@@ -3003,8 +3003,10 @@ static bool spirv_compiler_get_register_name(char *buffer, unsigned int buffer_s
             snprintf(buffer, buffer_size, "vicp%u", idx);
             break;
         case VKD3DSPR_OUTPUT:
-        case VKD3DSPR_COLOROUT:
             snprintf(buffer, buffer_size, "o%u", idx);
+            break;
+        case VKD3DSPR_COLOROUT:
+            snprintf(buffer, buffer_size, "oC%u", idx);
             break;
         case VKD3DSPR_DEPTHOUT:
         case VKD3DSPR_DEPTHOUTGE:
@@ -5061,6 +5063,9 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
         if (is_patch_constant)
             location += shader_signature_next_location(&compiler->output_signature);
+        else if (compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL
+                && signature_element->sysval_semantic == VKD3D_SHADER_SV_TARGET)
+            location = signature_element->semantic_index;
 
         id = spirv_compiler_emit_array_variable(compiler, &builder->global_stream,
                 storage_class, component_type, output_component_count, array_sizes, 2);
