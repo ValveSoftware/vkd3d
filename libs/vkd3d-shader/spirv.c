@@ -5633,8 +5633,10 @@ static void spirv_compiler_emit_cbv_declaration(struct spirv_compiler *compiler,
     struct vkd3d_symbol reg_symbol;
     unsigned int size;
 
-    vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 1);
+    vsir_register_init(&reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
     reg.idx[0].offset = register_id;
+    reg.idx[1].offset = range->first;
+    reg.idx[2].offset = range->last;
 
     size = size_in_bytes / (VKD3D_VEC4_SIZE * sizeof(uint32_t));
 
