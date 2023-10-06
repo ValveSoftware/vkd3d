@@ -3915,6 +3915,36 @@ static uint32_t sm4_encode_register(const struct tpf_writer *tpf, const struct v
     return token;
 }
 
+static void sm4_write_register_index(const struct tpf_writer *tpf, const struct vkd3d_shader_register *reg,
+        unsigned int j)
+{
+    unsigned int addressing = sm4_get_index_addressing_from_reg(reg, j);
+    struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
+    unsigned int k;
+
+    if (addressing & VKD3D_SM4_ADDRESSING_RELATIVE)
+    {
+        const struct vkd3d_shader_src_param *idx_src = reg->idx[j].rel_addr;
+        uint32_t idx_src_token;
+
+        assert(idx_src);
+        assert(!idx_src->modifiers);
+        assert(idx_src->reg.type != VKD3DSPR_IMMCONST);
+        idx_src_token = sm4_encode_register(tpf, &idx_src->reg, VKD3D_SM4_SWIZZLE_SCALAR, idx_src->swizzle);
+
+        put_u32(buffer, idx_src_token);
+        for (k = 0; k < idx_src->reg.idx_count; ++k)
+        {
+            put_u32(buffer, idx_src->reg.idx[k].offset);
+            assert(!idx_src->reg.idx[k].rel_addr);
+        }
+    }
+    else
+    {
+        put_u32(tpf->buffer, reg->idx[j].offset);
+    }
+}
+
 static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vkd3d_shader_dst_param *dst)
 {
     struct vkd3d_bytecode_buffer *buffer = tpf->buffer;
@@ -3925,10 +3955,7 @@ static void sm4_write_dst_register(const struct tpf_writer *tpf, const struct vk
     put_u32(buffer, token);
 
     for (j = 0; j < dst->reg.idx_count; ++j)
-    {
-        put_u32(buffer, dst->reg.idx[j].offset);
-        assert(!dst->reg.idx[j].rel_addr);
-    }
+        sm4_write_register_index(tpf, &dst->reg, j);
 }
 
 static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vkd3d_shader_src_param *src)
@@ -3978,10 +4005,7 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
     }
 
     for (j = 0; j < src->reg.idx_count; ++j)
-    {
-        put_u32(buffer, src->reg.idx[j].offset);
-        assert(!src->reg.idx[j].rel_addr);
-    }
+        sm4_write_register_index(tpf, &src->reg, j);
 
     if (src->reg.type == VKD3DSPR_IMMCONST)
     {
