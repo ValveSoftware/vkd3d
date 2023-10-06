@@ -14,7 +14,7 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-../configure CROSSCC32="i686-w64-mingw32-gcc" CROSSCC64="x86_64-w64-mingw32-gcc" CFLAGS="-g -O2 -Wno-array-bounds -Werror" && \
+../configure CROSSCC64="x86_64-w64-mingw32-gcc -Wno-array-bounds -Werror" CROSSCC32="i686-w64-mingw32-gcc -Wno-array-bounds -Werror" && \
     make -j$(nproc) crosstest || \
         touch ../pipeline_failed
 
