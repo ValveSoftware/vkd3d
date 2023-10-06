@@ -599,7 +599,8 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     VkPipelineVertexInputStateCreateInfo input_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkPipelineColorBlendStateCreateInfo blend_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
     VkPipelineMultisampleStateCreateInfo ms_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-    static const VkViewport viewport = {.width = RENDER_TARGET_WIDTH, .height = RENDER_TARGET_HEIGHT, .maxDepth = 1};
+    static const VkViewport viewport = {.y = RENDER_TARGET_HEIGHT,
+            .width = RENDER_TARGET_WIDTH, .height = -RENDER_TARGET_HEIGHT, .maxDepth = 1};
     VkPipelineViewportStateCreateInfo vp_desc = {.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     static const VkRect2D rt_rect = {.extent.width = RENDER_TARGET_WIDTH, .extent.height = RENDER_TARGET_HEIGHT};
     VkGraphicsPipelineCreateInfo pipeline_desc = {.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
@@ -699,6 +700,7 @@ static VkPipeline create_graphics_pipeline(const struct vulkan_shader_runner *ru
     vp_desc.pScissors = &rt_rect;
 
     rs_desc.cullMode = VK_CULL_MODE_NONE;
+    rs_desc.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rs_desc.lineWidth = 1.0f;
 
     ms_desc.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1190,6 +1192,7 @@ static bool get_graphics_queue_index(const struct vulkan_shader_runner *runner, 
 static const char *const required_device_extensions[] =
 {
     VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
+    VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 };
 
 static bool has_extension(const VkExtensionProperties *extensions, uint32_t count, const char *extension_name)
