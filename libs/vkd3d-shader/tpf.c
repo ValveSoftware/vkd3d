@@ -3635,6 +3635,9 @@ struct sm4_instruction
 
     uint32_t idx[3];
     unsigned int idx_count;
+
+    struct vkd3d_shader_src_param idx_srcs[7];
+    unsigned int idx_src_count;
 };
 
 static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
@@ -3648,8 +3651,54 @@ static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *
     *writemask = instr->reg.writemask;
 }
 
+static void sm4_numeric_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
+        enum vkd3d_shader_register_type type, uint32_t *writemask, const struct hlsl_deref *deref,
+        struct sm4_instruction *sm4_instr)
+{
+    const struct hlsl_ir_var *var = deref->var;
+    unsigned int offset_const_deref;
+
+    reg->type = type;
+    reg->idx[0].offset = var->regs[HLSL_REGSET_NUMERIC].id;
+    reg->dimension = VSIR_DIMENSION_VEC4;
+
+    assert(var->regs[HLSL_REGSET_NUMERIC].allocated);
+
+    if (!var->indexable)
+    {
+        offset_const_deref = hlsl_offset_from_deref_safe(ctx, deref);
+        reg->idx[0].offset += offset_const_deref / 4;
+        reg->idx_count = 1;
+    }
+    else
+    {
+        offset_const_deref = deref->const_offset;
+        reg->idx[1].offset = offset_const_deref / 4;
+        reg->idx_count = 2;
+
+        if (deref->rel_offset.node)
+        {
+            struct vkd3d_shader_src_param *idx_src;
+            unsigned int idx_writemask;
+
+            assert(sm4_instr->idx_src_count < ARRAY_SIZE(sm4_instr->idx_srcs));
+            idx_src = &sm4_instr->idx_srcs[sm4_instr->idx_src_count++];
+            memset(idx_src, 0, sizeof(*idx_src));
+
+            reg->idx[1].rel_addr = idx_src;
+            sm4_register_from_node(&idx_src->reg, &idx_writemask, deref->rel_offset.node);
+            assert(idx_writemask != 0);
+            idx_src->swizzle = swizzle_from_sm4(hlsl_swizzle_from_writemask(idx_writemask));
+        }
+    }
+
+    *writemask = 0xf & (0xf << (offset_const_deref % 4));
+    if (var->regs[HLSL_REGSET_NUMERIC].writemask)
+        *writemask = hlsl_combine_writemasks(var->regs[HLSL_REGSET_NUMERIC].writemask, *writemask);
+}
+
 static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
-        uint32_t *writemask, const struct hlsl_deref *deref)
+        uint32_t *writemask, const struct hlsl_deref *deref, struct sm4_instruction *sm4_instr)
 {
     const struct hlsl_type *data_type = hlsl_deref_get_type(ctx, deref);
     const struct hlsl_ir_var *var = deref->var;
@@ -3764,24 +3813,19 @@ static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_re
     }
     else
     {
-        struct hlsl_reg hlsl_reg = hlsl_reg_from_deref(ctx, deref);
+        enum vkd3d_shader_register_type type = deref->var->indexable ? VKD3DSPR_IDXTEMP : VKD3DSPR_TEMP;
 
-        assert(hlsl_reg.allocated);
-        reg->type =  deref->var->indexable ? VKD3DSPR_IDXTEMP : VKD3DSPR_TEMP;
-        reg->dimension = VSIR_DIMENSION_VEC4;
-        reg->idx[0].offset = hlsl_reg.id;
-        reg->idx_count = 1;
-        *writemask = hlsl_reg.writemask;
+        sm4_numeric_register_from_deref(ctx, reg, type, writemask, deref, sm4_instr);
     }
 }
 
 static void sm4_src_from_deref(const struct tpf_writer *tpf, struct vkd3d_shader_src_param *src,
-        const struct hlsl_deref *deref, unsigned int map_writemask)
+        const struct hlsl_deref *deref, unsigned int map_writemask, struct sm4_instruction *sm4_instr)
 {
     unsigned int hlsl_swizzle;
     uint32_t writemask;
 
-    sm4_register_from_deref(tpf->ctx, &src->reg, &writemask, deref);
+    sm4_register_from_deref(tpf->ctx, &src->reg, &writemask, deref, sm4_instr);
     if (vkd3d_sm4_get_default_swizzle_type(&tpf->lookup, src->reg.type) == VKD3D_SM4_SWIZZLE_VEC4)
     {
         hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
@@ -4532,7 +4576,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
 
     sm4_src_from_node(tpf, &instr.srcs[0], coords, coords_writemask);
 
-    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask, &instr);
 
     instr.src_count = 2;
 
@@ -4619,8 +4663,8 @@ static void write_sm4_sample(const struct tpf_writer *tpf, const struct hlsl_ir_
     instr.dst_count = 1;
 
     sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
-    sm4_src_from_deref(tpf, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask, &instr);
+    sm4_src_from_deref(tpf, &instr.srcs[2], sampler, VKD3DSP_WRITEMASK_ALL, &instr);
     instr.src_count = 3;
 
     if (load->load_type == HLSL_RESOURCE_SAMPLE_LOD
@@ -4661,7 +4705,7 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     sm4_dst_from_node(&instr.dsts[0], dst);
     instr.dst_count = 1;
 
-    sm4_src_from_deref(tpf, &instr.srcs[0], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[0], resource, instr.dsts[0].write_mask, &instr);
     instr.src_count = 1;
 
     write_sm4_instruction(tpf, &instr);
@@ -4684,7 +4728,7 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
     instr.dst_count = 1;
 
     sm4_src_from_node(tpf, &instr.srcs[0], load->lod.node, VKD3DSP_WRITEMASK_ALL);
-    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[1], resource, instr.dsts[0].write_mask, &instr);
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);
@@ -4832,7 +4876,7 @@ static void write_sm4_store_uav_typed(const struct tpf_writer *tpf, const struct
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM5_OP_STORE_UAV_TYPED;
 
-    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].write_mask, dst);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &instr.dsts[0].write_mask, dst, &instr);
     instr.dst_count = 1;
 
     sm4_src_from_node(tpf, &instr.srcs[0], coords, VKD3DSP_WRITEMASK_ALL);
@@ -5378,7 +5422,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
 
         instr.opcode = VKD3D_SM4_OP_MOVC;
 
-        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
+        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask, &instr);
 
         memset(&value, 0xff, sizeof(value));
         sm4_src_from_constant_value(&instr.srcs[1], &value, type->dimx, instr.dsts[0].write_mask);
@@ -5390,7 +5434,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     {
         instr.opcode = VKD3D_SM4_OP_MOV;
 
-        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask);
+        sm4_src_from_deref(tpf, &instr.srcs[0], &load->src, instr.dsts[0].write_mask, &instr);
         instr.src_count = 1;
     }
 
@@ -5443,10 +5487,10 @@ static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_
         }
     }
 
-    sm4_src_from_deref(tpf, &instr.srcs[instr.src_count++], resource, instr.dsts[0].write_mask);
+    sm4_src_from_deref(tpf, &instr.srcs[instr.src_count++], resource, instr.dsts[0].write_mask, &instr);
 
     src = &instr.srcs[instr.src_count++];
-    sm4_src_from_deref(tpf, src, sampler, VKD3DSP_WRITEMASK_ALL);
+    sm4_src_from_deref(tpf, src, sampler, VKD3DSP_WRITEMASK_ALL, &instr);
     src->reg.dimension = VSIR_DIMENSION_VEC4;
     src->swizzle = swizzle;
 
@@ -5547,7 +5591,7 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_MOV;
 
-    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, &store->lhs);
+    sm4_register_from_deref(tpf->ctx, &instr.dsts[0].reg, &writemask, &store->lhs, &instr);
     instr.dsts[0].write_mask = hlsl_combine_writemasks(writemask, store->writemask);
     instr.dst_count = 1;
 
