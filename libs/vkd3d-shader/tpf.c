@@ -3637,6 +3637,17 @@ struct sm4_instruction
     unsigned int idx_count;
 };
 
+static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
+        const struct hlsl_ir_node *instr)
+{
+    assert(instr->reg.allocated);
+    reg->type = VKD3DSPR_TEMP;
+    reg->dimension = VSIR_DIMENSION_VEC4;
+    reg->idx[0].offset = instr->reg.id;
+    reg->idx_count = 1;
+    *writemask = instr->reg.writemask;
+}
+
 static void sm4_register_from_deref(struct hlsl_ctx *ctx, struct vkd3d_shader_register *reg,
         uint32_t *writemask, const struct hlsl_deref *deref)
 {
@@ -3776,17 +3787,6 @@ static void sm4_src_from_deref(const struct tpf_writer *tpf, struct vkd3d_shader
         hlsl_swizzle = hlsl_map_swizzle(hlsl_swizzle_from_writemask(writemask), map_writemask);
         src->swizzle = swizzle_from_sm4(hlsl_swizzle);
     }
-}
-
-static void sm4_register_from_node(struct vkd3d_shader_register *reg, uint32_t *writemask,
-        const struct hlsl_ir_node *instr)
-{
-    assert(instr->reg.allocated);
-    reg->type = VKD3DSPR_TEMP;
-    reg->dimension = VSIR_DIMENSION_VEC4;
-    reg->idx[0].offset = instr->reg.id;
-    reg->idx_count = 1;
-    *writemask = instr->reg.writemask;
 }
 
 static void sm4_dst_from_node(struct vkd3d_shader_dst_param *dst, const struct hlsl_ir_node *instr)
