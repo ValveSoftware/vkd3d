@@ -512,7 +512,7 @@ static bool init_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hl
 {
     deref->var = var;
     deref->path_len = path_len;
-    deref->offset.node = NULL;
+    deref->rel_offset.node = NULL;
     deref->const_offset = 0;
     deref->data_type = NULL;
 
@@ -541,7 +541,7 @@ bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *d
 
     deref->path = NULL;
     deref->path_len = 0;
-    deref->offset.node = NULL;
+    deref->rel_offset.node = NULL;
     deref->const_offset = 0;
 
     assert(chain);
@@ -1138,7 +1138,7 @@ void hlsl_cleanup_deref(struct hlsl_deref *deref)
     deref->path = NULL;
     deref->path_len = 0;
 
-    hlsl_src_remove(&deref->offset);
+    hlsl_src_remove(&deref->rel_offset);
     deref->const_offset = 0;
 }
 
@@ -2432,12 +2432,12 @@ static void dump_deref(struct vkd3d_string_buffer *buffer, const struct hlsl_der
         {
             bool show_rel, show_const;
 
-            show_rel = deref->offset.node;
+            show_rel = deref->rel_offset.node;
             show_const = deref->const_offset != 0 || !show_rel;
 
             vkd3d_string_buffer_printf(buffer, "[");
             if (show_rel)
-                dump_src(buffer, &deref->offset);
+                dump_src(buffer, &deref->rel_offset);
             if (show_rel && show_const)
                 vkd3d_string_buffer_printf(buffer, " + ");
             if (show_const)
@@ -3011,7 +3011,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 
 static void free_ir_resource_store(struct hlsl_ir_resource_store *store)
 {
-    hlsl_src_remove(&store->resource.offset);
+    hlsl_src_remove(&store->resource.rel_offset);
     hlsl_src_remove(&store->coords);
     hlsl_src_remove(&store->value);
     vkd3d_free(store);

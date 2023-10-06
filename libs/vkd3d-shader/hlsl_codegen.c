@@ -168,7 +168,7 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
     list_move_before(&instr->entry, &block.instrs);
 
     hlsl_cleanup_deref(deref);
-    hlsl_src_from_node(&deref->offset, offset);
+    hlsl_src_from_node(&deref->rel_offset, offset);
     deref->const_offset = offset_component;
 
     return true;
@@ -177,15 +177,15 @@ static bool replace_deref_path_with_offset(struct hlsl_ctx *ctx, struct hlsl_der
 static bool clean_constant_deref_offset_srcs(struct hlsl_ctx *ctx, struct hlsl_deref *deref,
         struct hlsl_ir_node *instr)
 {
-    if (deref->offset.node && deref->offset.node->type == HLSL_IR_CONSTANT)
+    if (deref->rel_offset.node && deref->rel_offset.node->type == HLSL_IR_CONSTANT)
     {
         enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
 
         if (regset == HLSL_REGSET_NUMERIC)
-            deref->const_offset += 4 * hlsl_ir_constant(deref->offset.node)->value.u[0].u;
+            deref->const_offset += 4 * hlsl_ir_constant(deref->rel_offset.node)->value.u[0].u;
         else
-            deref->const_offset += hlsl_ir_constant(deref->offset.node)->value.u[0].u;
-        hlsl_src_remove(&deref->offset);
+            deref->const_offset += hlsl_ir_constant(deref->rel_offset.node)->value.u[0].u;
+        hlsl_src_remove(&deref->rel_offset);
         return true;
     }
     return false;
@@ -3298,8 +3298,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
             if (!var->first_write)
                 var->first_write = loop_first ? min(instr->index, loop_first) : instr->index;
             store->rhs.node->last_read = last_read;
-            if (store->lhs.offset.node)
-                store->lhs.offset.node->last_read = last_read;
+            if (store->lhs.rel_offset.node)
+                store->lhs.rel_offset.node->last_read = last_read;
             break;
         }
         case HLSL_IR_EXPR:
@@ -3326,8 +3326,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = load->src.var;
             var->last_read = max(var->last_read, last_read);
-            if (load->src.offset.node)
-                load->src.offset.node->last_read = last_read;
+            if (load->src.rel_offset.node)
+                load->src.rel_offset.node->last_read = last_read;
             break;
         }
         case HLSL_IR_LOOP:
@@ -3344,14 +3344,14 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = load->resource.var;
             var->last_read = max(var->last_read, last_read);
-            if (load->resource.offset.node)
-                load->resource.offset.node->last_read = last_read;
+            if (load->resource.rel_offset.node)
+                load->resource.rel_offset.node->last_read = last_read;
 
             if ((var = load->sampler.var))
             {
                 var->last_read = max(var->last_read, last_read);
-                if (load->sampler.offset.node)
-                    load->sampler.offset.node->last_read = last_read;
+                if (load->sampler.rel_offset.node)
+                    load->sampler.rel_offset.node->last_read = last_read;
             }
 
             if (load->coords.node)
@@ -3376,8 +3376,8 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             var = store->resource.var;
             var->last_read = max(var->last_read, last_read);
-            if (store->resource.offset.node)
-                store->resource.offset.node->last_read = last_read;
+            if (store->resource.rel_offset.node)
+                store->resource.rel_offset.node->last_read = last_read;
             store->coords.node->last_read = last_read;
             store->value.node->last_read = last_read;
             break;
@@ -4473,7 +4473,7 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
 bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref, unsigned int *offset)
 {
     enum hlsl_regset regset = hlsl_deref_get_regset(ctx, deref);
-    struct hlsl_ir_node *offset_node = deref->offset.node;
+    struct hlsl_ir_node *offset_node = deref->rel_offset.node;
     unsigned int size;
 
     *offset = deref->const_offset;
@@ -4505,8 +4505,8 @@ unsigned int hlsl_offset_from_deref_safe(struct hlsl_ctx *ctx, const struct hlsl
     if (hlsl_offset_from_deref(ctx, deref, &offset))
         return offset;
 
-    hlsl_fixme(ctx, &deref->offset.node->loc, "Dereference with non-constant offset of type %s.",
-            hlsl_node_type_to_string(deref->offset.node->type));
+    hlsl_fixme(ctx, &deref->rel_offset.node->loc, "Dereference with non-constant offset of type %s.",
+            hlsl_node_type_to_string(deref->rel_offset.node->type));
 
     return 0;
 }
