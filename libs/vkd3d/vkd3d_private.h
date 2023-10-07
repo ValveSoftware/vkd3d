@@ -682,7 +682,7 @@ struct d3d12_heap
 };
 
 HRESULT d3d12_heap_create(struct d3d12_device *device, const D3D12_HEAP_DESC *desc,
-        const struct d3d12_resource *resource, struct d3d12_heap **heap);
+        const struct d3d12_resource *resource, ID3D12ProtectedResourceSession *protected_session, struct d3d12_heap **heap);
 struct d3d12_heap *unsafe_impl_from_ID3D12Heap(ID3D12Heap *iface);
 
 #define VKD3D_RESOURCE_PUBLIC_FLAGS \

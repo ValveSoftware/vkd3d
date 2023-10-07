@@ -574,10 +574,14 @@ static HRESULT d3d12_heap_init(struct d3d12_heap *heap,
 }
 
 HRESULT d3d12_heap_create(struct d3d12_device *device, const D3D12_HEAP_DESC *desc,
-        const struct d3d12_resource *resource, struct d3d12_heap **heap)
+        const struct d3d12_resource *resource, ID3D12ProtectedResourceSession *protected_session,
+        struct d3d12_heap **heap)
 {
     struct d3d12_heap *object;
     HRESULT hr;
+
+    if (protected_session)
+        FIXME("Protected session is not supported.\n");
 
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
@@ -2064,7 +2068,7 @@ static HRESULT vkd3d_allocate_resource_memory(
     heap_desc.Properties = *heap_properties;
     heap_desc.Alignment = 0;
     heap_desc.Flags = heap_flags;
-    if (SUCCEEDED(hr = d3d12_heap_create(device, &heap_desc, resource, &resource->heap)))
+    if (SUCCEEDED(hr = d3d12_heap_create(device, &heap_desc, resource, NULL, &resource->heap)))
         resource->flags |= VKD3D_RESOURCE_DEDICATED_HEAP;
     return hr;
 }

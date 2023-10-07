@@ -3645,7 +3645,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap(ID3D12Device5 *iface,
     TRACE("iface %p, desc %p, iid %s, heap %p.\n",
             iface, desc, debugstr_guid(iid), heap);
 
-    if (FAILED(hr = d3d12_heap_create(device, desc, NULL, &object)))
+    if (FAILED(hr = d3d12_heap_create(device, desc, NULL, NULL, &object)))
     {
         *heap = NULL;
         return hr;
@@ -4024,10 +4024,20 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap1(ID3D12Device5 *iface,
         const D3D12_HEAP_DESC *desc, ID3D12ProtectedResourceSession *protected_session,
         REFIID iid, void **heap)
 {
-    FIXME("iface %p, desc %p, protected_session %p, iid %s, heap %p stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device5(iface);
+    struct d3d12_heap *object;
+    HRESULT hr;
+
+    TRACE("iface %p, desc %p, protected_session %p, iid %s, heap %p.\n",
             iface, desc, protected_session, debugstr_guid(iid), heap);
 
-    return E_NOTIMPL;
+    if (FAILED(hr = d3d12_heap_create(device, desc, NULL, protected_session, &object)))
+    {
+        *heap = NULL;
+        return hr;
+    }
+
+    return return_interface(&object->ID3D12Heap_iface, &IID_ID3D12Heap, iid, heap);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateReservedResource1(ID3D12Device5 *iface,

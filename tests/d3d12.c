@@ -1849,6 +1849,7 @@ static void test_create_heap(void)
     ID3D12Device *device, *tmp_device;
     bool is_pool_L1_supported;
     HRESULT hr, expected_hr;
+    ID3D12Device4 *device4;
     unsigned int i, j;
     ID3D12Heap *heap;
     ULONG refcount;
@@ -2061,6 +2062,21 @@ static void test_create_heap(void)
         }
 
         vkd3d_test_pop_context();
+    }
+
+    if (SUCCEEDED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device4, (void **)&device4)))
+    {
+        desc.SizeInBytes = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        memset(&desc.Properties, 0, sizeof(desc.Properties));
+        desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+        desc.Alignment = 0;
+        desc.Flags = D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        hr = ID3D12Device4_CreateHeap1(device4, &desc, NULL, &IID_ID3D12Heap, (void **)&heap);
+        ok(hr == S_OK, "Failed to create heap, hr %#x.\n", hr);
+
+        ID3D12Heap_Release(heap);
+
+        ID3D12Device4_Release(device4);
     }
 
 done:
