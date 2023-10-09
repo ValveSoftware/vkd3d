@@ -2076,7 +2076,8 @@ static HRESULT vkd3d_allocate_resource_memory(
 HRESULT d3d12_committed_resource_create(struct d3d12_device *device,
         const D3D12_HEAP_PROPERTIES *heap_properties, D3D12_HEAP_FLAGS heap_flags,
         const D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_STATES initial_state,
-        const D3D12_CLEAR_VALUE *optimized_clear_value, struct d3d12_resource **resource)
+        const D3D12_CLEAR_VALUE *optimized_clear_value, ID3D12ProtectedResourceSession *protected_session,
+        struct d3d12_resource **resource)
 {
     struct d3d12_resource *object;
     HRESULT hr;
@@ -2086,6 +2087,9 @@ HRESULT d3d12_committed_resource_create(struct d3d12_device *device,
         WARN("Heap properties are NULL.\n");
         return E_INVALIDARG;
     }
+
+    if (protected_session)
+        FIXME("Protected session is not supported.\n");
 
     if (FAILED(hr = d3d12_resource_create(device, heap_properties, heap_flags,
             desc, initial_state, optimized_clear_value, &object)))
