@@ -1387,7 +1387,10 @@ struct vkd3d_shader_descriptor_info
  * as follows:
  *
  * - Each constant register set used by the shader is scanned as a single
- *   constant buffer descriptor, as follows:
+ *   constant buffer descriptor.
+ *   There may therefore be up to three such descriptors, one for each register
+ *   set used by the shader: float, integer, and boolean.
+ *   The fields are set as follows:
  *   * The \ref vkd3d_shader_descriptor_info.type field is set to
  *     VKD3D_SHADER_DESCRIPTOR_TYPE_CBV.
  *   * The \ref vkd3d_shader_descriptor_info.register_space field is set to zero.
@@ -1407,9 +1410,6 @@ struct vkd3d_shader_descriptor_info
  *   * The \ref vkd3d_shader_descriptor_info.register_index field is set to the
  *     binding index of the original sampler, for both descriptors.
  *   * The \ref vkd3d_shader_descriptor_info.count field is set to one.
- *
- * In summary, there may be up to three such descriptors, one for each register
- * set used by the shader: float, integer, and boolean.
  */
 struct vkd3d_shader_scan_descriptor_info
 {
