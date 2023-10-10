@@ -2523,6 +2523,199 @@ static void vkd3d_desc_object_cache_cleanup(struct vkd3d_desc_object_cache *cach
     }
 }
 
+/* ID3D12ShaderCacheSession */
+struct d3d12_cache_session
+{
+    ID3D12ShaderCacheSession ID3D12ShaderCacheSession_iface;
+    unsigned int refcount;
+
+    struct d3d12_device *device;
+    struct vkd3d_private_store private_store;
+};
+
+static inline struct d3d12_cache_session *impl_from_ID3D12ShaderCacheSession(ID3D12ShaderCacheSession *iface)
+{
+    return CONTAINING_RECORD(iface, struct d3d12_cache_session, ID3D12ShaderCacheSession_iface);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_QueryInterface(ID3D12ShaderCacheSession *iface,
+        REFIID iid, void **object)
+{
+    TRACE("iface %p, iid %s, object %p.\n", iface, debugstr_guid(iid), object);
+
+    if (!object)
+    {
+        WARN("Output pointer is NULL, returning E_POINTER.\n");
+        return E_POINTER;
+    }
+
+    if (IsEqualGUID(iid, &IID_ID3D12ShaderCacheSession)
+            || IsEqualGUID(iid, &IID_ID3D12DeviceChild)
+            || IsEqualGUID(iid, &IID_ID3D12Object)
+            || IsEqualGUID(iid, &IID_IUnknown))
+    {
+        ID3D12ShaderCacheSession_AddRef(iface);
+        *object = iface;
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+
+    *object = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE d3d12_cache_session_AddRef(ID3D12ShaderCacheSession *iface)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&session->refcount);
+
+    TRACE("%p increasing refcount to %u.\n", session, refcount);
+
+    return refcount;
+}
+
+static void d3d12_cache_session_destroy(struct d3d12_cache_session *session)
+{
+    struct d3d12_device *device = session->device;
+
+    TRACE("Destroying cache session %p.\n", session);
+
+    vkd3d_private_store_destroy(&session->private_store);
+    vkd3d_free(session);
+
+    d3d12_device_release(device);
+}
+
+static ULONG STDMETHODCALLTYPE d3d12_cache_session_Release(ID3D12ShaderCacheSession *iface)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&session->refcount);
+
+    TRACE("%p decreasing refcount to %u.\n", session, refcount);
+
+    if (!refcount)
+        d3d12_cache_session_destroy(session);
+
+    return refcount;
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_GetPrivateData(ID3D12ShaderCacheSession *iface,
+        REFGUID guid, UINT *data_size, void *data)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p, guid %s, data_size %p, data %p.\n", iface, debugstr_guid(guid), data_size, data);
+
+    return vkd3d_get_private_data(&session->private_store, guid, data_size, data);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_SetPrivateData(ID3D12ShaderCacheSession *iface,
+        REFGUID guid, UINT data_size, const void *data)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p, guid %s, data_size %u, data %p.\n", iface, debugstr_guid(guid), data_size, data);
+
+    return vkd3d_set_private_data(&session->private_store, guid, data_size, data);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_SetPrivateDataInterface(
+        ID3D12ShaderCacheSession *iface, REFGUID guid, const IUnknown *data)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p, guid %s, data %p.\n", iface, debugstr_guid(guid), data);
+
+    return vkd3d_set_private_data_interface(&session->private_store, guid, data);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_SetName(ID3D12ShaderCacheSession *iface,
+        const WCHAR *name)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p, name %s.\n", iface, debugstr_w(name, session->device->wchar_size));
+
+    return name ? S_OK : E_INVALIDARG;
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_GetDevice(ID3D12ShaderCacheSession *iface,
+        REFIID iid, void **device)
+{
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+
+    TRACE("iface %p, iid %s, device %p.\n", iface, debugstr_guid(iid), device);
+
+    return d3d12_device_query_interface(session->device, iid, device);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_FindValue(ID3D12ShaderCacheSession *iface,
+        const void *key, UINT key_size, void *value, UINT *value_size)
+{
+    FIXME("iface %p, key %p, key_size %#x, value %p, value_size %p stub!\n",
+            iface, key, key_size, value, value_size);
+
+    return DXGI_ERROR_NOT_FOUND;
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_cache_session_StoreValue(ID3D12ShaderCacheSession *iface,
+        const void *key, UINT key_size, const void *value, UINT value_size)
+{
+    FIXME("iface %p, key %p, key_size %#x, value %p, value_size %u stub!\n", iface, key, key_size,
+            value, value_size);
+
+    return E_NOTIMPL;
+}
+
+static void STDMETHODCALLTYPE d3d12_cache_session_SetDeleteOnDestroy(ID3D12ShaderCacheSession *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+}
+
+static D3D12_SHADER_CACHE_SESSION_DESC * STDMETHODCALLTYPE d3d12_cache_session_GetDesc(
+        ID3D12ShaderCacheSession *iface, D3D12_SHADER_CACHE_SESSION_DESC *desc)
+{
+    FIXME("stub %p!\n", iface);
+    return desc;
+}
+
+static const struct ID3D12ShaderCacheSessionVtbl d3d12_cache_session_vtbl =
+{
+    /* IUnknown methods */
+    d3d12_cache_session_QueryInterface,
+    d3d12_cache_session_AddRef,
+    d3d12_cache_session_Release,
+    /* ID3D12Object methods */
+    d3d12_cache_session_GetPrivateData,
+    d3d12_cache_session_SetPrivateData,
+    d3d12_cache_session_SetPrivateDataInterface,
+    d3d12_cache_session_SetName,
+    /* ID3D12DeviceChild methods */
+    d3d12_cache_session_GetDevice,
+    /* ID3D12ShaderCacheSession methods */
+    d3d12_cache_session_FindValue,
+    d3d12_cache_session_StoreValue,
+    d3d12_cache_session_SetDeleteOnDestroy,
+    d3d12_cache_session_GetDesc,
+};
+
+static HRESULT d3d12_cache_session_init(struct d3d12_cache_session *session,
+        struct d3d12_device *device, const D3D12_SHADER_CACHE_SESSION_DESC *desc)
+{
+    HRESULT hr;
+
+    session->ID3D12ShaderCacheSession_iface.lpVtbl = &d3d12_cache_session_vtbl;
+    session->refcount = 1;
+
+    if (FAILED(hr = vkd3d_private_store_init(&session->private_store)))
+        return hr;
+
+    d3d12_device_add_ref(session->device = device);
+
+    return S_OK;
+}
+
 /* ID3D12Device */
 static inline struct d3d12_device *impl_from_ID3D12Device9(ID3D12Device9 *iface)
 {
@@ -4634,10 +4827,25 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints1(ID3D12Device9 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateShaderCacheSession(ID3D12Device9 *iface,
         const D3D12_SHADER_CACHE_SESSION_DESC *desc, REFIID iid, void **session)
 {
-    FIXME("iface %p, desc %p, iid %s, session %p stub!\n", iface, desc, debugstr_guid(iid),
-            session);
+    struct d3d12_device *device = impl_from_ID3D12Device9(iface);
+    struct d3d12_cache_session *object;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    TRACE("iface %p, desc %p, iid %s, session %p.\n", iface, desc, debugstr_guid(iid), session);
+
+    if (!(object = vkd3d_malloc(sizeof(*object))))
+        return E_OUTOFMEMORY;
+
+    if (FAILED(hr = d3d12_cache_session_init(object, device, desc)))
+    {
+        vkd3d_free(object);
+        return hr;
+    }
+
+    hr = ID3D12ShaderCacheSession_QueryInterface(&object->ID3D12ShaderCacheSession_iface, iid,
+            session);
+    ID3D12ShaderCacheSession_Release(&object->ID3D12ShaderCacheSession_iface);
+    return hr;
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_ShaderCacheControl(ID3D12Device9 *iface,
