@@ -864,13 +864,6 @@ struct hlsl_ctx
     uint32_t found_numthreads : 1;
 };
 
-enum hlsl_error_level
-{
-    HLSL_LEVEL_ERROR = 0,
-    HLSL_LEVEL_WARNING,
-    HLSL_LEVEL_NOTE,
-};
-
 struct hlsl_resource_load_params
 {
     struct hlsl_type *format;

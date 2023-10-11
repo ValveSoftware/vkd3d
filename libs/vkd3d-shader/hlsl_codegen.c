@@ -249,7 +249,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
                 {
                     hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                             "Output semantic \"%s%u\" is used multiple times.", semantic->name, index);
-                    hlsl_note(ctx, &ext_var->loc, HLSL_LEVEL_ERROR,
+                    hlsl_note(ctx, &ext_var->loc, VKD3D_SHADER_LOG_ERROR,
                             "First use of \"%s%u\" is here.", semantic->name, index);
                     semantic->reported_duplicated_output_next_index = index + 1;
                 }
@@ -262,7 +262,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
                     hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
                             "Input semantic \"%s%u\" is used multiple times with incompatible types.",
                             semantic->name, index);
-                    hlsl_note(ctx, &ext_var->loc, HLSL_LEVEL_ERROR,
+                    hlsl_note(ctx, &ext_var->loc, VKD3D_SHADER_LOG_ERROR,
                             "First declaration of \"%s%u\" is here.", semantic->name, index);
                     semantic->reported_duplicated_input_incompatible_next_index = index + 1;
                 }
