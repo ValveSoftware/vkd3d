@@ -29,8 +29,6 @@ static struct hlsl_ir_node *new_offset_from_path_index(struct hlsl_ctx *ctx, str
     struct hlsl_ir_node *idx_offset = NULL;
     struct hlsl_ir_node *c;
 
-    hlsl_block_init(block);
-
     switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
@@ -111,9 +109,14 @@ static struct hlsl_ir_node *new_offset_instr_from_deref(struct hlsl_ctx *ctx, st
     {
         struct hlsl_block idx_block;
 
+        hlsl_block_init(&idx_block);
+
         if (!(offset = new_offset_from_path_index(ctx, &idx_block, type, offset, deref->path[i].node,
                 regset, loc)))
+        {
+            hlsl_block_cleanup(&idx_block);
             return NULL;
+        }
 
         hlsl_block_add_block(block, &idx_block);
 
