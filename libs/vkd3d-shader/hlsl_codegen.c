@@ -4455,6 +4455,62 @@ static bool type_has_object_components(struct hlsl_type *type)
     return false;
 }
 
+static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *body)
+{
+    struct hlsl_ir_node *instr, *next;
+    struct hlsl_block block;
+    struct list *start;
+
+    LIST_FOR_EACH_ENTRY_SAFE(instr, next, &body->instrs, struct hlsl_ir_node, entry)
+    {
+        if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+
+            remove_unreachable_code(ctx, &iff->then_block);
+            remove_unreachable_code(ctx, &iff->else_block);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
+
+            remove_unreachable_code(ctx, &loop->body);
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+            {
+                remove_unreachable_code(ctx, &c->body);
+            }
+        }
+    }
+
+    /* Remove instructions past unconditional jumps. */
+    LIST_FOR_EACH_ENTRY(instr, &body->instrs, struct hlsl_ir_node, entry)
+    {
+        struct hlsl_ir_jump *jump;
+
+        if (instr->type != HLSL_IR_JUMP)
+            continue;
+
+        jump = hlsl_ir_jump(instr);
+        if (jump->type != HLSL_IR_JUMP_BREAK && jump->type != HLSL_IR_JUMP_CONTINUE)
+            continue;
+
+        if (!(start = list_next(&body->instrs, &instr->entry)))
+            break;
+
+        hlsl_block_init(&block);
+        list_move_slice_tail(&block.instrs, start, list_tail(&body->instrs));
+        hlsl_block_cleanup(&block);
+
+        break;
+    }
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -4572,6 +4628,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         progress |= hlsl_transform_ir(ctx, remove_trivial_conditional_branches, body, NULL);
     }
     while (progress);
+    remove_unreachable_code(ctx, body);
 
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
