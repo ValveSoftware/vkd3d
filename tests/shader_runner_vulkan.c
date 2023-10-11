@@ -73,9 +73,22 @@ struct vulkan_shader_runner
     } samplers[MAX_SAMPLERS];
 
     DECLARE_VK_PFN(vkCreateInstance);
+    DECLARE_VK_PFN(vkEnumerateInstanceExtensionProperties);
 #define VK_INSTANCE_PFN   DECLARE_VK_PFN
 #define VK_DEVICE_PFN     DECLARE_VK_PFN
 #include "vulkan_procs.h"
+};
+
+struct extension_list
+{
+    const char **names;
+    size_t count;
+};
+
+struct physical_device_info
+{
+    VkPhysicalDeviceFeatures2 features2;
+    VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock_features;
 };
 
 static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r)
@@ -504,6 +517,16 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     spirv_info.next = &interface_info;
     spirv_info.environment = VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_0;
+    if (runner->caps.rov)
+    {
+        static const enum vkd3d_shader_spirv_extension extensions[] =
+        {
+            VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK,
+        };
+
+        spirv_info.extensions = extensions;
+        spirv_info.extension_count = ARRAY_SIZE(extensions);
+    }
 
     push_constants.register_space = 0;
     push_constants.register_index = 0;
@@ -1253,12 +1276,6 @@ static bool get_graphics_queue_index(const struct vulkan_shader_runner *runner, 
     return false;
 }
 
-static const char *const required_device_extensions[] =
-{
-    VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
-    VK_KHR_MAINTENANCE1_EXTENSION_NAME,
-};
-
 static bool has_extension(const VkExtensionProperties *extensions, uint32_t count, const char *extension_name)
 {
     uint32_t i;
@@ -1271,21 +1288,75 @@ static bool has_extension(const VkExtensionProperties *extensions, uint32_t coun
     return false;
 }
 
-static bool check_device_extensions(struct vulkan_shader_runner *runner)
+static void check_instance_extensions(struct vulkan_shader_runner *runner, struct extension_list *enabled_extensions)
+{
+    VkExtensionProperties *extensions;
+    uint32_t count, i;
+
+    static const char *instance_extensions[] =
+    {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+    };
+
+    enabled_extensions->names = calloc(ARRAY_SIZE(instance_extensions), sizeof(*enabled_extensions->names));
+    enabled_extensions->count = 0;
+
+    VK_CALL(vkEnumerateInstanceExtensionProperties(NULL, &count, NULL));
+    extensions = calloc(count, sizeof(*extensions));
+    VK_CALL(vkEnumerateInstanceExtensionProperties(NULL, &count, extensions));
+
+    for (i = 0; i < ARRAY_SIZE(instance_extensions); ++i)
+    {
+        const char *name = instance_extensions[i];
+
+        if (has_extension(extensions, count, name))
+            enabled_extensions->names[enabled_extensions->count++] = name;
+    }
+
+    free(extensions);
+}
+
+static bool check_device_extensions(struct vulkan_shader_runner *runner, struct extension_list *enabled_extensions)
 {
     VkPhysicalDevice phys_device = runner->phys_device;
     VkExtensionProperties *extensions;
     uint32_t i, count;
 
+    static const struct
+    {
+        const char *name;
+        bool required;
+    }
+    device_extensions[] =
+    {
+        {VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME},
+        {VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME, true},
+        {VK_KHR_MAINTENANCE1_EXTENSION_NAME, true},
+    };
+
+    enabled_extensions->names = calloc(ARRAY_SIZE(device_extensions), sizeof(*enabled_extensions->names));
+    enabled_extensions->count = 0;
+
     VK_CALL(vkEnumerateDeviceExtensionProperties(phys_device, NULL, &count, NULL));
     extensions = calloc(count, sizeof(*extensions));
     VK_CALL(vkEnumerateDeviceExtensionProperties(phys_device, NULL, &count, extensions));
 
-    for (i = 0; i < ARRAY_SIZE(required_device_extensions); ++i)
+    for (i = 0; i < ARRAY_SIZE(device_extensions); ++i)
     {
-        if (!has_extension(extensions, count, required_device_extensions[i]))
+        const char *name = device_extensions[i].name;
+
+        if (has_extension(extensions, count, name))
         {
-            skip("The selected Vulkan device does not support %s.\n", required_device_extensions[i]);
+            enabled_extensions->names[enabled_extensions->count++] = name;
+            if (!strcmp(name, VK_EXT_FRAGMENT_SHADER_INTERLOCK_EXTENSION_NAME))
+                runner->caps.rov = true;
+            continue;
+        }
+
+        if (device_extensions[i].required)
+        {
+            skip("The selected Vulkan device does not support %s.\n", name);
+            free(enabled_extensions->names);
             free(extensions);
             return false;
         }
@@ -1293,6 +1364,23 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner)
 
     free(extensions);
     return true;
+}
+
+static void get_physical_device_info(struct vulkan_shader_runner *runner, struct physical_device_info *info)
+{
+    memset(info, 0, sizeof(*info));
+
+    info->features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    if (runner->caps.rov)
+    {
+        info->features2.pNext = &info->interlock_features;
+        info->interlock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
+    }
+
+    if (runner->vkGetPhysicalDeviceFeatures2KHR)
+        VK_CALL(vkGetPhysicalDeviceFeatures2KHR(runner->phys_device, &info->features2));
+    else
+        VK_CALL(vkGetPhysicalDeviceFeatures(runner->phys_device, &info->features2.features));
 }
 
 static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
@@ -1303,9 +1391,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkDeviceQueueCreateInfo queue_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-    VkPhysicalDeviceFeatures ret_features, features;
+    VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT interlock_features;
     VkDescriptorPoolSize descriptor_pool_sizes[5];
+    const VkPhysicalDeviceFeatures *ret_features;
+    struct extension_list enabled_extensions;
     static const float queue_priority = 1.0f;
+    struct physical_device_info device_info;
+    VkPhysicalDeviceFeatures features;
     VkFormatProperties format_props;
     uint32_t count, graphics_index;
     VkDevice device;
@@ -1320,8 +1412,15 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     vkGetInstanceProcAddr = vkd3d_dlsym(libvulkan, "vkGetInstanceProcAddr");
 
     runner->vkCreateInstance = (void *)vkGetInstanceProcAddr(NULL, "vkCreateInstance");
+    runner->vkEnumerateInstanceExtensionProperties = (void *)vkGetInstanceProcAddr(NULL,
+            "vkEnumerateInstanceExtensionProperties");
 
-    if ((vr = VK_CALL(vkCreateInstance(&instance_desc, NULL, &runner->instance))) < 0)
+    check_instance_extensions(runner, &enabled_extensions);
+    instance_desc.ppEnabledExtensionNames = enabled_extensions.names;
+    instance_desc.enabledExtensionCount = enabled_extensions.count;
+    vr = VK_CALL(vkCreateInstance(&instance_desc, NULL, &runner->instance));
+    free(enabled_extensions.names);
+    if (vr < 0)
     {
         skip("Failed to create a Vulkan instance, vr %d.\n", vr);
         return false;
@@ -1351,15 +1450,15 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
 
     device_desc.pQueueCreateInfos = &queue_desc;
     device_desc.queueCreateInfoCount = 1;
-    device_desc.enabledExtensionCount = ARRAY_SIZE(required_device_extensions);
-    device_desc.ppEnabledExtensionNames = required_device_extensions;
 
     queue_desc.queueFamilyIndex = graphics_index;
     queue_desc.queueCount = 1;
     queue_desc.pQueuePriorities = &queue_priority;
 
-    if (!check_device_extensions(runner))
+    if (!check_device_extensions(runner, &enabled_extensions))
         goto out_destroy_instance;
+    device_desc.ppEnabledExtensionNames = enabled_extensions.names;
+    device_desc.enabledExtensionCount = enabled_extensions.count;
 
     VK_CALL(vkGetPhysicalDeviceFormatProperties(runner->phys_device, VK_FORMAT_R32G32B32A32_SFLOAT, &format_props));
     if (!(format_props.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
@@ -1369,7 +1468,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     }
 
     runner->caps.runner = "Vulkan";
-    VK_CALL(vkGetPhysicalDeviceFeatures(runner->phys_device, &ret_features));
+    get_physical_device_info(runner, &device_info);
+    ret_features = &device_info.features2.features;
 
     device_desc.pEnabledFeatures = &features;
     memset(&features, 0, sizeof(features));
@@ -1377,7 +1477,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     /* FIXME: Probably make these optional. */
 
 #define ENABLE_FEATURE(x) \
-    if (!ret_features.x) \
+    if (!ret_features->x) \
     { \
         skip("The selected Vulkan device does not support " #x ".\n"); \
         goto out_destroy_instance; \
@@ -1385,21 +1485,41 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     features.x = VK_TRUE
 
     ENABLE_FEATURE(fragmentStoresAndAtomics);
+    /* For SV_PrimitiveID/SpvBuiltInPrimitiveId in fragment shaders. */
+    ENABLE_FEATURE(geometryShader);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
 
-    if (ret_features.shaderFloat64)
+    if (ret_features->shaderFloat64)
     {
         features.shaderFloat64 = VK_TRUE;
         runner->caps.float64 = true;
     }
-    if (ret_features.shaderInt64)
+
+    if (ret_features->shaderInt64)
     {
         features.shaderInt64 = VK_TRUE;
         runner->caps.int64 = true;
     }
 
-    if ((vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device))))
+    if (device_info.interlock_features.fragmentShaderSampleInterlock
+            && device_info.interlock_features.fragmentShaderPixelInterlock)
+    {
+        memset(&interlock_features, 0, sizeof(interlock_features));
+        interlock_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
+        interlock_features.pNext = (void *)device_desc.pNext;
+        interlock_features.fragmentShaderSampleInterlock = VK_TRUE;
+        interlock_features.fragmentShaderPixelInterlock = VK_TRUE;
+        device_desc.pNext = &interlock_features;
+    }
+    else
+    {
+        runner->caps.rov = false;
+    }
+
+    vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device));
+    free(enabled_extensions.names);
+    if (vr)
     {
         skip("Failed to create device, vr %d.\n", vr);
         goto out_destroy_instance;

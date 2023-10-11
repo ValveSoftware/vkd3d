@@ -64,6 +64,6 @@ shader model >= 5.0
 rov
 
 [test]
-todo draw triangle list 93
+draw triangle list 93
 probe all rui(0x6aaaaaaa)
 probe uav 1 all rui(0x2aaaaaaa)

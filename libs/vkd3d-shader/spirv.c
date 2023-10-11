@@ -1953,6 +1953,9 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStorageImageArrayDynamicIndexing)
             || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityShaderNonUniformEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_descriptor_indexing");
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityFragmentShaderPixelInterlockEXT)
+            || vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityFragmentShaderSampleInterlockEXT))
+        vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_fragment_shader_interlock");
     if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStencilExportEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_shader_stencil_export");
     if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityShaderViewportIndexLayerEXT))
@@ -2359,6 +2362,7 @@ struct spirv_compiler
     unsigned int output_control_point_count;
 
     bool use_vocp;
+    bool use_invocation_interlock;
     bool emit_point_size;
 
     enum vkd3d_shader_opcode phase;
@@ -6285,8 +6289,23 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
         if (!(d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_READ))
             vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationNonReadable, NULL, 0);
 
-        if (d->uav_flags & VKD3DSUF_GLOBALLY_COHERENT)
+        /* ROVs are implicitly globally coherent. */
+        if (d->uav_flags & (VKD3DSUF_GLOBALLY_COHERENT | VKD3DSUF_RASTERISER_ORDERED_VIEW))
             vkd3d_spirv_build_op_decorate(builder, var_id, SpvDecorationCoherent, NULL, 0);
+
+        if (d->uav_flags & VKD3DSUF_RASTERISER_ORDERED_VIEW)
+        {
+            if (compiler->shader_type != VKD3D_SHADER_TYPE_PIXEL)
+                spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                        "Rasteriser-ordered views are only supported in fragment shaders.");
+            else if (!spirv_compiler_is_target_extension_supported(compiler,
+                    VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK))
+                spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                        "Cannot enable fragment shader interlock. "
+                        "The target environment does not support fragment shader interlock.");
+            else
+                compiler->use_invocation_interlock = true;
+        }
 
         if (d->flags & VKD3D_SHADER_DESCRIPTOR_INFO_FLAG_UAV_COUNTER)
         {
@@ -7737,10 +7756,30 @@ static uint32_t spirv_compiler_emit_conditional_branch(struct spirv_compiler *co
     return merge_block_id;
 }
 
+static void spirv_compiler_end_invocation_interlock(struct spirv_compiler *compiler)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilitySampleRateShading))
+    {
+        spirv_compiler_emit_execution_mode(compiler, SpvExecutionModeSampleInterlockOrderedEXT, NULL, 0);
+        vkd3d_spirv_enable_capability(builder, SpvCapabilityFragmentShaderSampleInterlockEXT);
+    }
+    else
+    {
+        spirv_compiler_emit_execution_mode(compiler, SpvExecutionModePixelInterlockOrderedEXT, NULL, 0);
+        vkd3d_spirv_enable_capability(builder, SpvCapabilityFragmentShaderPixelInterlockEXT);
+    }
+    vkd3d_spirv_build_op(&builder->function_stream, SpvOpEndInvocationInterlockEXT);
+}
+
 static void spirv_compiler_emit_return(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    if (compiler->use_invocation_interlock)
+        spirv_compiler_end_invocation_interlock(compiler);
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY && (is_in_default_phase(compiler)
             || is_in_control_point_phase(compiler)))
@@ -9510,6 +9549,11 @@ static void spirv_compiler_emit_main_prolog(struct spirv_compiler *compiler)
 
     if (compiler->emit_point_size)
         spirv_compiler_emit_point_size(compiler);
+
+    /* Maybe in the future we can try to shrink the size of the interlocked
+     * section. */
+    if (compiler->use_invocation_interlock)
+        vkd3d_spirv_build_op(&compiler->spirv_builder.function_stream, SpvOpBeginInvocationInterlockEXT);
 }
 
 static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
