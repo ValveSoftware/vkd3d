@@ -2731,7 +2731,7 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semant
         const char *name;
         bool output;
         enum vkd3d_shader_type shader_type;
-        D3DDECLUSAGE usage;
+        D3D_NAME usage;
     }
     semantics[] =
     {
