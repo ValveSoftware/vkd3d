@@ -1675,6 +1675,19 @@ static void copy_propagation_invalidate_from_block(struct hlsl_ctx *ctx, struct 
                 break;
             }
 
+            case HLSL_IR_SWITCH:
+            {
+                struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+                struct hlsl_ir_switch_case *c;
+
+                LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                {
+                    copy_propagation_invalidate_from_block(ctx, state, &c->body);
+                }
+
+                break;
+            }
+
             default:
                 break;
         }
@@ -1723,6 +1736,28 @@ static bool copy_propagation_process_loop(struct hlsl_ctx *ctx, struct hlsl_ir_l
     return progress;
 }
 
+static bool copy_propagation_process_switch(struct hlsl_ctx *ctx, struct hlsl_ir_switch *s,
+        struct copy_propagation_state *state)
+{
+    struct copy_propagation_state inner_state;
+    struct hlsl_ir_switch_case *c;
+    bool progress = false;
+
+    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+    {
+        copy_propagation_state_init(ctx, &inner_state, state);
+        progress |= copy_propagation_transform_block(ctx, &c->body, &inner_state);
+        copy_propagation_state_destroy(&inner_state);
+    }
+
+    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+    {
+        copy_propagation_invalidate_from_block(ctx, state, &c->body);
+    }
+
+    return progress;
+}
+
 static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct copy_propagation_state *state)
 {
@@ -1759,6 +1794,10 @@ static bool copy_propagation_transform_block(struct hlsl_ctx *ctx, struct hlsl_b
 
             case HLSL_IR_LOOP:
                 progress |= copy_propagation_process_loop(ctx, hlsl_ir_loop(instr), state);
+                break;
+
+            case HLSL_IR_SWITCH:
+                progress |= copy_propagation_process_switch(ctx, hlsl_ir_switch(instr), state);
                 break;
 
             default:
