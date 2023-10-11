@@ -1805,10 +1805,11 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                     *modifier = VKD3DSPSM_ABSNEG;
                     break;
 
+                case VKD3D_SM4_REGISTER_MODIFIER_NONE:
+                    break;
+
                 default:
                     FIXME("Unhandled register modifier %#x.\n", m);
-                    /* fall-through */
-                case VKD3D_SM4_REGISTER_MODIFIER_NONE:
                     break;
             }
 

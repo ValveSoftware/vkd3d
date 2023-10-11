@@ -2464,9 +2464,6 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
                 compiler->formatting = option->value;
                 break;
 
-            default:
-                WARN("Ignoring unrecognised option %#x with value %#x.\n", option->name, option->value);
-
             case VKD3D_SHADER_COMPILE_OPTION_API_VERSION:
                 break;
 
@@ -2481,6 +2478,10 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
 
             case VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE:
                 compiler->write_tess_geom_point_size = option->value;
+                break;
+
+            default:
+                WARN("Ignoring unrecognised option %#x with value %#x.\n", option->name, option->value);
                 break;
         }
     }
