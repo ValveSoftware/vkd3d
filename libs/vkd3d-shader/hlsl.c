@@ -1343,6 +1343,40 @@ struct hlsl_ir_node *hlsl_new_if(struct hlsl_ctx *ctx, struct hlsl_ir_node *cond
     return &iff->node;
 }
 
+struct hlsl_ir_switch_case *hlsl_new_switch_case(struct hlsl_ctx *ctx, unsigned int value,
+        bool is_default, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_switch_case *c;
+
+    if (!(c = hlsl_alloc(ctx, sizeof(*c))))
+        return NULL;
+
+    c->value = value;
+    c->is_default = is_default;
+    hlsl_block_init(&c->body);
+    if (body)
+        hlsl_block_add_block(&c->body, body);
+    c->loc = *loc;
+
+    return c;
+}
+
+struct hlsl_ir_node *hlsl_new_switch(struct hlsl_ctx *ctx, struct hlsl_ir_node *selector,
+        struct list *cases, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_switch *s;
+
+    if (!(s = hlsl_alloc(ctx, sizeof(*s))))
+        return NULL;
+    init_node(&s->node, HLSL_IR_SWITCH, NULL, loc);
+    hlsl_src_from_node(&s->selector, selector);
+    list_init(&s->cases);
+    if (cases)
+        list_move_head(&s->cases, cases);
+
+    return &s->node;
+}
+
 struct hlsl_ir_load *hlsl_new_load_index(struct hlsl_ctx *ctx, const struct hlsl_deref *deref,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
 {
@@ -1805,6 +1839,58 @@ static struct hlsl_ir_node *clone_index(struct hlsl_ctx *ctx, struct clone_instr
     return dst;
 }
 
+void hlsl_free_ir_switch_case(struct hlsl_ir_switch_case *c)
+{
+    hlsl_block_cleanup(&c->body);
+    list_remove(&c->entry);
+    vkd3d_free(c);
+}
+
+void hlsl_cleanup_ir_switch_cases(struct list *cases)
+{
+    struct hlsl_ir_switch_case *c, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE(c, next, cases, struct hlsl_ir_switch_case, entry)
+    {
+        hlsl_free_ir_switch_case(c);
+    }
+}
+
+static struct hlsl_ir_node *clone_switch(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_switch *s)
+{
+    struct hlsl_ir_switch_case *c, *d;
+    struct hlsl_ir_node *ret;
+    struct hlsl_block body;
+    struct list cases;
+
+    list_init(&cases);
+
+    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+    {
+        if (!(clone_block(ctx, &body, &c->body, map)))
+        {
+            hlsl_cleanup_ir_switch_cases(&cases);
+            return NULL;
+        }
+
+        d = hlsl_new_switch_case(ctx, c->value, c->is_default, &body, &c->loc);
+        hlsl_block_cleanup(&body);
+        if (!d)
+        {
+            hlsl_cleanup_ir_switch_cases(&cases);
+            return NULL;
+        }
+
+        list_add_tail(&cases, &d->entry);
+    }
+
+    ret = hlsl_new_switch(ctx, map_instr(map, s->selector.node), &cases, &s->node.loc);
+    hlsl_cleanup_ir_switch_cases(&cases);
+
+    return ret;
+}
+
 static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
         struct clone_instr_map *map, const struct hlsl_ir_node *instr)
 {
@@ -1842,6 +1928,9 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_STORE:
             return clone_store(ctx, map, hlsl_ir_store(instr));
+
+        case HLSL_IR_SWITCH:
+            return clone_switch(ctx, map, hlsl_ir_switch(instr));
 
         case HLSL_IR_SWIZZLE:
             return clone_swizzle(ctx, map, hlsl_ir_swizzle(instr));
@@ -2261,6 +2350,7 @@ const char *hlsl_node_type_to_string(enum hlsl_ir_node_type type)
         [HLSL_IR_RESOURCE_LOAD ] = "HLSL_IR_RESOURCE_LOAD",
         [HLSL_IR_RESOURCE_STORE] = "HLSL_IR_RESOURCE_STORE",
         [HLSL_IR_STORE         ] = "HLSL_IR_STORE",
+        [HLSL_IR_SWITCH        ] = "HLSL_IR_SWITCH",
         [HLSL_IR_SWIZZLE       ] = "HLSL_IR_SWIZZLE",
     };
 
@@ -2685,6 +2775,32 @@ static void dump_ir_index(struct vkd3d_string_buffer *buffer, const struct hlsl_
     vkd3d_string_buffer_printf(buffer, "]");
 }
 
+static void dump_ir_switch(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_switch *s)
+{
+    struct hlsl_ir_switch_case *c;
+
+    vkd3d_string_buffer_printf(buffer, "switch (");
+    dump_src(buffer, &s->selector);
+    vkd3d_string_buffer_printf(buffer, ") {\n");
+
+    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+    {
+        if (c->is_default)
+        {
+            vkd3d_string_buffer_printf(buffer, "      %10s   default: {\n", "");
+        }
+        else
+        {
+            vkd3d_string_buffer_printf(buffer, "      %10s   case %u : {\n", "", c->value);
+        }
+
+        dump_block(ctx, buffer, &c->body);
+        vkd3d_string_buffer_printf(buffer, "      %10s   }\n", "");
+    }
+
+    vkd3d_string_buffer_printf(buffer, "      %10s   }", "");
+}
+
 static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_node *instr)
 {
     if (instr->index)
@@ -2738,6 +2854,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_STORE:
             dump_ir_store(buffer, hlsl_ir_store(instr));
+            break;
+
+        case HLSL_IR_SWITCH:
+            dump_ir_switch(ctx, buffer, hlsl_ir_switch(instr));
             break;
 
         case HLSL_IR_SWIZZLE:
@@ -2900,6 +3020,14 @@ static void free_ir_swizzle(struct hlsl_ir_swizzle *swizzle)
     vkd3d_free(swizzle);
 }
 
+static void free_ir_switch(struct hlsl_ir_switch *s)
+{
+    hlsl_src_remove(&s->selector);
+    hlsl_cleanup_ir_switch_cases(&s->cases);
+
+    vkd3d_free(s);
+}
+
 static void free_ir_index(struct hlsl_ir_index *index)
 {
     hlsl_src_remove(&index->val);
@@ -2959,6 +3087,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_SWIZZLE:
             free_ir_swizzle(hlsl_ir_swizzle(node));
+            break;
+
+        case HLSL_IR_SWITCH:
+            free_ir_switch(hlsl_ir_switch(node));
             break;
     }
 }

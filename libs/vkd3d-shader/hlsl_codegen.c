@@ -575,7 +575,19 @@ bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, 
             progress |= hlsl_transform_ir(ctx, func, &iff->else_block, context);
         }
         else if (instr->type == HLSL_IR_LOOP)
+        {
             progress |= hlsl_transform_ir(ctx, func, &hlsl_ir_loop(instr)->body, context);
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+            {
+                progress |= hlsl_transform_ir(ctx, func, &c->body, context);
+            }
+        }
 
         progress |= func(ctx, instr, context);
     }
@@ -831,6 +843,30 @@ static bool lower_return(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *fun
                 else
                 {
                     return_instr = instr;
+                    break;
+                }
+            }
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+            {
+                has_early_return |= lower_return(ctx, func, &c->body, true);
+            }
+
+            if (has_early_return)
+            {
+                if (in_loop)
+                {
+                    /* For a 'switch' nested in a loop append a break after the 'switch'. */
+                    insert_early_return_break(ctx, func, instr);
+                }
+                else
+                {
+                    cf_instr = instr;
                     break;
                 }
             }
@@ -2929,6 +2965,7 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_JUMP:
         case HLSL_IR_LOOP:
         case HLSL_IR_RESOURCE_STORE:
+        case HLSL_IR_SWITCH:
             break;
     }
 
@@ -2955,6 +2992,16 @@ static unsigned int index_instructions(struct hlsl_block *block, unsigned int in
         {
             index = index_instructions(&hlsl_ir_loop(instr)->body, index);
             hlsl_ir_loop(instr)->next_index = index;
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+            {
+                index = index_instructions(&c->body, index);
+            }
         }
     }
 
@@ -3171,6 +3218,16 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
 
             if (jump->condition.node)
                 jump->condition.node->last_read = last_read;
+            break;
+        }
+        case HLSL_IR_SWITCH:
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                compute_liveness_recurse(&c->body, loop_first, loop_last);
+            s->selector.node->last_read = last_read;
             break;
         }
         case HLSL_IR_CONSTANT:
@@ -3524,6 +3581,18 @@ static void allocate_temp_registers_recurse(struct hlsl_ctx *ctx,
                 break;
             }
 
+            case HLSL_IR_SWITCH:
+            {
+                struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+                struct hlsl_ir_switch_case *c;
+
+                LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                {
+                    allocate_temp_registers_recurse(ctx, &c->body, allocator);
+                }
+                break;
+            }
+
             default:
                 break;
         }
@@ -3630,6 +3699,18 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
             {
                 struct hlsl_ir_loop *loop = hlsl_ir_loop(instr);
                 allocate_const_registers_recurse(ctx, &loop->body, allocator);
+                break;
+            }
+
+            case HLSL_IR_SWITCH:
+            {
+                struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+                struct hlsl_ir_switch_case *c;
+
+                LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+                {
+                    allocate_const_registers_recurse(ctx, &c->body, allocator);
+                }
                 break;
             }
 

@@ -281,6 +281,7 @@ enum hlsl_ir_node_type
     HLSL_IR_RESOURCE_STORE,
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
+    HLSL_IR_SWITCH,
 };
 
 /* Common data for every type of IR instruction node. */
@@ -497,6 +498,22 @@ struct hlsl_ir_loop
     /* loop condition is stored in the body (as "if (!condition) break;") */
     struct hlsl_block body;
     unsigned int next_index; /* liveness index of the end of the loop */
+};
+
+struct hlsl_ir_switch_case
+{
+    unsigned int value;
+    bool is_default;
+    struct hlsl_block body;
+    struct list entry;
+    struct vkd3d_shader_location loc;
+};
+
+struct hlsl_ir_switch
+{
+    struct hlsl_ir_node node;
+    struct hlsl_src selector;
+    struct list cases;
 };
 
 enum hlsl_ir_expr_op
@@ -947,6 +964,12 @@ static inline struct hlsl_ir_index *hlsl_ir_index(const struct hlsl_ir_node *nod
     return CONTAINING_RECORD(node, struct hlsl_ir_index, node);
 }
 
+static inline struct hlsl_ir_switch *hlsl_ir_switch(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_SWITCH);
+    return CONTAINING_RECORD(node, struct hlsl_ir_switch, node);
+}
+
 static inline void hlsl_block_init(struct hlsl_block *block)
 {
     list_init(&block->instrs);
@@ -1120,6 +1143,9 @@ bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struc
 void hlsl_cleanup_deref(struct hlsl_deref *deref);
 void hlsl_cleanup_semantic(struct hlsl_semantic *semantic);
 
+void hlsl_cleanup_ir_switch_cases(struct list *cases);
+void hlsl_free_ir_switch_case(struct hlsl_ir_switch_case *c);
+
 void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
 
 void hlsl_free_attribute(struct hlsl_attribute *attr);
@@ -1213,6 +1239,10 @@ struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr
 struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
         const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
         const struct hlsl_reg_reservation *reg_reservation);
+struct hlsl_ir_switch_case *hlsl_new_switch_case(struct hlsl_ctx *ctx, unsigned int value, bool is_default,
+        struct hlsl_block *body, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_switch(struct hlsl_ctx *ctx, struct hlsl_ir_node *selector,
+        struct list *cases, const struct vkd3d_shader_location *loc);
 
 void hlsl_error(struct hlsl_ctx *ctx, const struct vkd3d_shader_location *loc,
         enum vkd3d_shader_error error, const char *fmt, ...) VKD3D_PRINTF_FUNC(4, 5);

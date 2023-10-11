@@ -162,6 +162,12 @@ static void destroy_block(struct hlsl_block *block)
     vkd3d_free(block);
 }
 
+static void destroy_switch_cases(struct list *cases)
+{
+    hlsl_cleanup_ir_switch_cases(cases);
+    vkd3d_free(cases);
+}
+
 static bool hlsl_types_are_componentwise_compatible(struct hlsl_ctx *ctx, struct hlsl_type *src,
         struct hlsl_type *dst)
 {
@@ -1180,6 +1186,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
             case HLSL_IR_RESOURCE_LOAD:
             case HLSL_IR_RESOURCE_STORE:
             case HLSL_IR_STORE:
+            case HLSL_IR_SWITCH:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
         }
@@ -4679,17 +4686,20 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
     enum hlsl_sampler_dim sampler_dim;
     struct hlsl_attribute *attr;
     struct parse_attribute_list attr_list;
+    struct hlsl_ir_switch_case *switch_case;
 }
 
 %token KW_BLENDSTATE
 %token KW_BREAK
 %token KW_BUFFER
+%token KW_CASE
 %token KW_CBUFFER
 %token KW_CENTROID
 %token KW_COLUMN_MAJOR
 %token KW_COMPILE
 %token KW_CONST
 %token KW_CONTINUE
+%token KW_DEFAULT
 %token KW_DEPTHSTENCILSTATE
 %token KW_DEPTHSTENCILVIEW
 %token KW_DISCARD
@@ -4796,6 +4806,7 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %type <list> type_specs
 %type <list> variables_def
 %type <list> variables_def_typed
+%type <list> switch_cases
 
 %token <name> VAR_IDENTIFIER
 %token <name> NEW_IDENTIFIER
@@ -4838,6 +4849,7 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %type <block> statement
 %type <block> statement_list
 %type <block> struct_declaration_without_vars
+%type <block> switch_statement
 %type <block> unary_expr
 
 %type <boolval> boolean
@@ -4875,6 +4887,8 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %type <sampler_dim> texture_type texture_ms_type uav_type
 
 %type <semantic> semantic
+
+%type <switch_case> switch_case
 
 %type <type> field_type
 %type <type> named_struct_spec
@@ -5355,6 +5369,11 @@ loop_scope_start:
         {
             hlsl_push_scope(ctx);
             ctx->cur_scope->loop = true;
+        }
+
+switch_scope_start:
+      %empty
+        {
         }
 
 var_identifier:
@@ -6185,6 +6204,7 @@ statement:
     | jump_statement
     | selection_statement
     | loop_statement
+    | switch_statement
 
 jump_statement:
       KW_BREAK ';'
@@ -6331,6 +6351,103 @@ loop_statement:
         {
             $$ = create_loop(ctx, LOOP_FOR, &$1, $5, $6, $7, $9, &@3);
             hlsl_pop_scope(ctx);
+        }
+
+switch_statement:
+      attribute_list_optional switch_scope_start KW_SWITCH '(' expr ')' '{' switch_cases '}'
+        {
+            struct hlsl_ir_node *selector = node_from_block($5);
+            struct hlsl_ir_node *s;
+
+            if (!(selector = add_implicit_conversion(ctx, $5, selector, hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT), &@5)))
+            {
+                destroy_switch_cases($8);
+                destroy_block($5);
+                YYABORT;
+            }
+
+            s = hlsl_new_switch(ctx, selector, $8, &@3);
+
+            destroy_switch_cases($8);
+
+            if (!s)
+            {
+                destroy_block($5);
+                YYABORT;
+            }
+
+            $$ = $5;
+            hlsl_block_add_instr($$, s);
+        }
+
+switch_case:
+      KW_CASE expr ':' statement_list
+        {
+            struct hlsl_ir_switch_case *c;
+            unsigned int value;
+
+            value = evaluate_static_expression_as_uint(ctx, $2, &@2);
+
+            c = hlsl_new_switch_case(ctx, value, false, $4, &@2);
+
+            destroy_block($2);
+            destroy_block($4);
+
+            if (!c)
+                YYABORT;
+            $$ = c;
+        }
+    | KW_CASE expr ':'
+        {
+            struct hlsl_ir_switch_case *c;
+            unsigned int value;
+
+            value = evaluate_static_expression_as_uint(ctx, $2, &@2);
+
+            c = hlsl_new_switch_case(ctx, value, false, NULL, &@2);
+
+            destroy_block($2);
+
+            if (!c)
+                YYABORT;
+            $$ = c;
+        }
+    | KW_DEFAULT ':' statement_list
+        {
+            struct hlsl_ir_switch_case *c;
+
+            c = hlsl_new_switch_case(ctx, 0, true, $3, &@1);
+
+            destroy_block($3);
+
+            if (!c)
+                YYABORT;
+            $$ = c;
+        }
+    | KW_DEFAULT ':'
+        {
+            struct hlsl_ir_switch_case *c;
+
+            if (!(c = hlsl_new_switch_case(ctx, 0, true, NULL, &@1)))
+                YYABORT;
+            $$ = c;
+        }
+
+switch_cases:
+      switch_case
+        {
+            struct hlsl_ir_switch_case *c = LIST_ENTRY($1, struct hlsl_ir_switch_case, entry);
+            if (!($$ = make_empty_list(ctx)))
+            {
+                hlsl_free_ir_switch_case(c);
+                YYABORT;
+            }
+            list_add_head($$, &$1->entry);
+        }
+    | switch_cases switch_case
+        {
+            $$ = $1;
+            list_add_tail($$, &$2->entry);
         }
 
 expr_optional:

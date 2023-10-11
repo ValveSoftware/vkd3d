@@ -46,7 +46,7 @@ static void update_location(struct hlsl_ctx *ctx, YYLTYPE *loc);
 
 %x pp pp_line pp_pragma pp_ignore
 
-RESERVED1               auto|case|catch|char|class|const_cast|default|delete|dynamic_cast|enum
+RESERVED1               auto|catch|char|class|const_cast|delete|dynamic_cast|enum
 RESERVED2               explicit|friend|goto|long|mutable|new|operator|private|protected|public
 RESERVED3               reinterpret_cast|short|signed|sizeof|static_cast|template|this|throw|try
 RESERVED4               typename|union|unsigned|using|virtual
@@ -73,6 +73,7 @@ ANY                     (.)
 BlendState              {return KW_BLENDSTATE;          }
 break                   {return KW_BREAK;               }
 Buffer                  {return KW_BUFFER;              }
+case                    {return KW_CASE;                }
 cbuffer                 {return KW_CBUFFER;             }
 centroid                {return KW_CENTROID;            }
 compile                 {return KW_COMPILE;             }
@@ -80,6 +81,7 @@ const                   {return KW_CONST;               }
 continue                {return KW_CONTINUE;            }
 DepthStencilState       {return KW_DEPTHSTENCILSTATE;   }
 DepthStencilView        {return KW_DEPTHSTENCILVIEW;    }
+default                 {return KW_DEFAULT;             }
 discard                 {return KW_DISCARD;             }
 do                      {return KW_DO;                  }
 double                  {return KW_DOUBLE;              }
