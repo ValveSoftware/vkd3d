@@ -49,6 +49,22 @@ todo(sm>=6) draw quad
 probe all rgba (14.0, 14.0, 14.0, 14.0)
 
 
+[pixel shader todo]
+float i;
+
+float4 main() : sv_target
+{
+    float a[4] = {1, 2, 3, 4};
+
+    return a[i];
+}
+
+[test]
+uniform 0 float 2.3
+todo draw quad
+todo probe all rgba (3, 3, 3, 3)
+
+
 [pixel shader]
 uniform float i;
 
@@ -116,3 +132,65 @@ float4 main() : sv_target
 uniform 0 float4 0 0 2.4 0
 todo draw quad
 probe all rgba (1.0, 120.0, 90.0, 4.0)
+
+
+% SM1 doesn't support relative addressing if it is used in a l-value.
+[require]
+shader model >= 4.0
+
+[pixel shader todo]
+int i, j;
+
+float4 main() : sv_target
+{
+    float mut1[4] = {1, 2, 3, 4};
+    float mut2[4] = {5, 6, 7, 8};
+
+    mut1[i] = 100;
+    mut2[j] = mut1[j];
+
+    return float4(mut2[0], mut2[1], mut2[2], mut2[3]);
+}
+
+[test]
+uniform 0 int 0
+uniform 1 int 0
+todo draw quad
+todo probe all rgba (100, 6, 7, 8)
+uniform 0 int 2
+uniform 1 int 2
+todo draw quad
+todo probe all rgba (5, 6, 100, 8)
+uniform 0 int 1
+uniform 1 int 3
+todo draw quad
+todo probe all rgba (5, 6, 7, 4)
+
+
+[pixel shader todo]
+float a, b, c, d;
+float e, f, g, h;
+int i, j;
+
+float4 main() : sv_target
+{
+
+   float arr1[8] = {a, a, b, b, c, c, d, d};
+   float arr2[8] = {e, e, f, f, g, g, h, h};
+
+   arr1[i] = arr2[i];
+   arr2[j] = arr1[j];
+
+   return 1000 * float4(arr1[0], arr1[4], arr2[0], arr2[4])
+         + 100 * float4(arr1[1], arr1[5], arr2[1], arr2[5])
+          + 10 * float4(arr1[2], arr1[6], arr2[2], arr2[6])
+           + 1 * float4(arr1[3], arr1[7], arr2[3], arr2[7]);
+}
+
+[test]
+uniform 0 float4 1 2 3 4
+uniform 4 float4 5 6 7 8
+uniform 8 int 3
+uniform 9 int 4
+todo draw quad
+todo probe all rgba (1126, 3344, 5566, 3788)
