@@ -2221,7 +2221,7 @@ static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
             struct sm1_instruction instr =
             {
-                .opcode = VKD3D_SM1_OP_TEXKILL,
+                .opcode = D3DSIO_TEXKILL,
 
                 .dst.type = D3DSPR_TEMP,
                 .dst.reg = reg->id,
