@@ -36,7 +36,7 @@ float4 main() : sv_target
 uniform 0 float4 11 12 0 0
 uniform 4 float4 13 14 0 0
 uniform 8 float4 20 21 22 23
-todo(sm>=6) draw quad
+draw quad
 probe (320,240) rgba (13.0, 21.0, 0.0, 0.0)
 
 [pixel shader fail]

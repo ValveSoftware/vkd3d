@@ -1483,6 +1483,11 @@ static inline bool sm6_type_is_floating_point(const struct sm6_type *type)
     return type->class == TYPE_CLASS_FLOAT;
 }
 
+static bool sm6_type_is_scalar(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_INTEGER || type->class == TYPE_CLASS_FLOAT || type->class == TYPE_CLASS_POINTER;
+}
+
 static inline bool sm6_type_is_numeric(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_INTEGER || type->class == TYPE_CLASS_FLOAT;
@@ -1491,6 +1496,11 @@ static inline bool sm6_type_is_numeric(const struct sm6_type *type)
 static inline bool sm6_type_is_pointer(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_POINTER;
+}
+
+static bool sm6_type_is_aggregate(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_STRUCT || type->class == TYPE_CLASS_VECTOR || type->class == TYPE_CLASS_ARRAY;
 }
 
 static bool sm6_type_is_numeric_aggregate(const struct sm6_type *type)
@@ -1561,6 +1571,27 @@ static const struct sm6_type *sm6_type_get_pointer_to_type(const struct sm6_type
     }
 
     return NULL;
+}
+
+/* Call for aggregate types only. */
+static const struct sm6_type *sm6_type_get_element_type_at_index(const struct sm6_type *type, uint64_t elem_idx)
+{
+    switch (type->class)
+    {
+        case TYPE_CLASS_ARRAY:
+        case TYPE_CLASS_VECTOR:
+            if (elem_idx >= type->u.array.count)
+                return NULL;
+            return type->u.array.elem_type;
+
+        case TYPE_CLASS_STRUCT:
+            if (elem_idx >= type->u.struc->elem_count)
+                return NULL;
+            return type->u.struc->elem_types[elem_idx];
+
+        default:
+            vkd3d_unreachable();
+    }
 }
 
 /* Never returns null for elem_idx 0. */
@@ -2994,6 +3025,64 @@ static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_recor
             fn_value->u.function.name, &operands[1], operand_count - 1, ins, dst);
 }
 
+static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    struct vkd3d_shader_src_param *src_param;
+    const struct sm6_type *type;
+    const struct sm6_value *src;
+    unsigned int i = 0;
+    uint64_t elem_idx;
+
+    if (!(src = sm6_parser_get_value_by_ref(sm6, record, NULL, &i)))
+        return;
+
+    if (!dxil_record_validate_operand_min_count(record, i + 1, sm6))
+        return;
+
+    if (record->operand_count > i + 1)
+    {
+        FIXME("Unhandled multiple indices.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Multiple extractval indices are not supported.");
+        return;
+    }
+
+    type = src->type;
+    if (!sm6_type_is_aggregate(type))
+    {
+        WARN("Invalid extraction from non-aggregate.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Source type of an extractval instruction is not an aggregate.");
+        return;
+    }
+
+    elem_idx = record->operands[i];
+    if (!(type = sm6_type_get_element_type_at_index(type, elem_idx)))
+    {
+        WARN("Invalid element index %"PRIu64".\n", elem_idx);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Element index %"PRIu64" for an extractval instruction is out of bounds.", elem_idx);
+        return;
+    }
+    if (!sm6_type_is_scalar(type))
+    {
+        FIXME("Nested extraction is not supported.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Extraction from nested aggregates is not supported.");
+        return;
+    }
+    dst->type = type;
+
+    ins->handler_idx = VKD3DSIH_MOV;
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(src_param, src);
+    src_param->swizzle = vkd3d_shader_create_swizzle(elem_idx, elem_idx, elem_idx, elem_idx);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record *record,
         struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
 {
@@ -3148,6 +3237,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         {
             case FUNC_CODE_INST_CALL:
                 sm6_parser_emit_call(sm6, record, code_block, ins, dst);
+                break;
+            case FUNC_CODE_INST_EXTRACTVAL:
+                sm6_parser_emit_extractval(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_RET:
                 sm6_parser_emit_ret(sm6, record, code_block, ins);

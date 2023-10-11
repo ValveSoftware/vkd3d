@@ -13,7 +13,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 [pixel shader]
@@ -31,7 +31,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 % SM1 buffer offset allocation follows different rules than SM4.
@@ -72,7 +72,7 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.0, 2.0, 4.0, 8.0)
 
 
@@ -93,7 +93,7 @@ float4 main() : sv_target
 uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.0, 4.0, 8.0, 9.0)
 
 
@@ -119,7 +119,7 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.0, 4.0, 5.0, 6.0)
 
 
@@ -142,7 +142,7 @@ uniform 0 float4 1.0 0.0 0.0 0.0
 uniform 4 float4 2.0 0.0 0.0 0.0
 uniform 8 float4 3.0 0.0 0.0 0.0
 uniform 12 float4 4.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.0, 3.0, 3.0, 4.0)
 
 
@@ -221,7 +221,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (2.0, 3.0, 2.0, 3.0)
 
 
@@ -357,7 +357,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1.0 2.0 3.0 4.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (3.0, 4.0, 3.0, 4.0)
 
 
