@@ -4648,6 +4648,39 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
     return scope->upper ? get_loop_scope(scope->upper) : NULL;
 }
 
+static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hlsl_ir_switch_case *check, struct list *cases)
+{
+    struct hlsl_ir_switch_case *c;
+    bool found_duplicate = false;
+
+    LIST_FOR_EACH_ENTRY(c, cases, struct hlsl_ir_switch_case, entry)
+    {
+        if (check->is_default)
+        {
+            if ((found_duplicate = c->is_default))
+            {
+                hlsl_error(ctx, &check->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_SWITCH_CASE,
+                        "Found multiple 'default' statements.");
+                hlsl_note(ctx, &c->loc, VKD3D_SHADER_LOG_ERROR, "The 'default' statement was previously found here.");
+            }
+        }
+        else
+        {
+            if (c->is_default) continue;
+            if ((found_duplicate = (c->value == check->value)))
+            {
+                hlsl_error(ctx, &check->loc, VKD3D_SHADER_ERROR_HLSL_DUPLICATE_SWITCH_CASE,
+                        "Found duplicate 'case' statement.");
+                hlsl_note(ctx, &c->loc, VKD3D_SHADER_LOG_ERROR, "The same 'case %d' statement was previously found here.",
+                        c->value);
+            }
+        }
+
+        if (found_duplicate)
+            break;
+    }
+}
+
 }
 
 %locations
@@ -6447,6 +6480,7 @@ switch_cases:
     | switch_cases switch_case
         {
             $$ = $1;
+            check_duplicated_switch_cases(ctx, $2, $$);
             list_add_tail($$, &$2->entry);
         }
 
