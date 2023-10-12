@@ -1,0 +1,104 @@
+[require]
+shader model < 3.0
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float4 teChnique = {0, 0, 0, 0};
+    return teChnique;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float4 technique10 = {0, 0, 0, 0};
+    return technique10;
+}
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float4 technique11 = {0, 0, 0, 0};
+    return technique11;
+}
+
+[pixel shader fail]
+typedef float4 technique10;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader fail todo]
+typedef float4 Technique;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader]
+typedef float4 Technique10;
+typedef float4 Technique11;
+
+float4 main() : sv_target
+{
+    return float4(0, 0, 0, 0);
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 teChnique10 = {0, 0, 0, 0};
+    float4 teChnique11 = {0, 0, 0, 0};
+    return teChnique10 + teChnique11;
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 teChnique11 = {0, 0, 0, 0};
+    return teChnique11;
+}
+
+[effect todo]
+technique
+{
+}
+
+technique10
+{
+}
+
+% Effects without techniques are not allowed for fx_2_0
+[effect fail]
+float4 f;
+
+% fx_5_0 keyword fails with fx_2_0 profile
+[effect fail]
+technique
+{
+}
+
+technique11
+{
+}
+
+[effect fail]
+technique
+{
+}
+
+tEchnique10
+{
+}
+
+[effect fail]
+technique
+{
+}
+
+tEchnique11
+{
+}
