@@ -2179,21 +2179,29 @@ static enum vkd3d_data_type vkd3d_data_type_from_sm6_type(const struct sm6_type 
 }
 
 static void register_init_ssa_vector(struct vkd3d_shader_register *reg, const struct sm6_type *type,
-        unsigned int component_count, struct sm6_parser *sm6)
+        unsigned int component_count, struct sm6_value *value, struct sm6_parser *sm6)
 {
     enum vkd3d_data_type data_type;
     unsigned int id;
 
-    id = sm6_parser_alloc_ssa_id(sm6);
+    if (value && register_is_ssa(&value->u.reg) && value->u.reg.idx[0].offset)
+    {
+        id = value->u.reg.idx[0].offset;
+        TRACE("Using forward-allocated id %u.\n", id);
+    }
+    else
+    {
+        id = sm6_parser_alloc_ssa_id(sm6);
+    }
     data_type = vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(type, 0));
     register_init_with_id(reg, VKD3DSPR_SSA, data_type, id);
     reg->dimension = component_count > 1 ? VSIR_DIMENSION_VEC4 : VSIR_DIMENSION_SCALAR;
 }
 
 static void register_init_ssa_scalar(struct vkd3d_shader_register *reg, const struct sm6_type *type,
-        struct sm6_parser *sm6)
+        struct sm6_value *value, struct sm6_parser *sm6)
 {
-    register_init_ssa_vector(reg, type, 1, sm6);
+    register_init_ssa_vector(reg, sm6_type_get_scalar_type(type, 0), 1, value, sm6);
 }
 
 static void dst_param_init(struct vkd3d_shader_dst_param *param)
@@ -2218,10 +2226,10 @@ static void dst_param_init_vector(struct vkd3d_shader_dst_param *param, unsigned
 }
 
 static void dst_param_init_ssa_scalar(struct vkd3d_shader_dst_param *param, const struct sm6_type *type,
-        struct sm6_parser *sm6)
+        struct sm6_value *value, struct sm6_parser *sm6)
 {
     dst_param_init(param);
-    register_init_ssa_scalar(&param->reg, type, sm6);
+    register_init_ssa_scalar(&param->reg, type, value, sm6);
 }
 
 static inline void src_param_init(struct vkd3d_shader_src_param *param)
@@ -2278,7 +2286,7 @@ static void instruction_dst_param_init_ssa_scalar(struct vkd3d_shader_instructio
     struct vkd3d_shader_dst_param *param = instruction_dst_params_alloc(ins, 1, sm6);
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
 
-    dst_param_init_ssa_scalar(param, dst->type, sm6);
+    dst_param_init_ssa_scalar(param, dst->type, dst, sm6);
     param->write_mask = VKD3DSP_WRITEMASK_0;
     dst->u.reg = param->reg;
 }
@@ -2290,7 +2298,7 @@ static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instructio
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
 
     dst_param_init_vector(param, component_count);
-    register_init_ssa_vector(&param->reg, sm6_type_get_scalar_type(dst->type, 0), component_count, sm6);
+    register_init_ssa_vector(&param->reg, sm6_type_get_scalar_type(dst->type, 0), component_count, dst, sm6);
     dst->u.reg = param->reg;
 }
 
@@ -2453,6 +2461,7 @@ static const struct sm6_value *sm6_parser_get_value_safe(struct sm6_parser *sm6,
 static size_t sm6_parser_get_value_idx_by_ref(struct sm6_parser *sm6, const struct dxil_record *record,
         const struct sm6_type *fwd_type, unsigned int *rec_idx)
 {
+    struct sm6_value *value;
     unsigned int idx;
     uint64_t val_ref;
     size_t operand;
@@ -2466,23 +2475,39 @@ static size_t sm6_parser_get_value_idx_by_ref(struct sm6_parser *sm6, const stru
     if (operand == SIZE_MAX)
         return SIZE_MAX;
 
-    if (operand >= sm6->value_count)
+    if (operand >= sm6->value_count && !fwd_type)
     {
-        if (!fwd_type)
-        {
-            /* Forward references are followed by a type id unless an earlier operand set the type,
-             * or it is contained in a function declaration. */
-            if (!dxil_record_validate_operand_min_count(record, idx + 1, sm6))
-                return SIZE_MAX;
-            if (!(fwd_type = sm6_parser_get_type(sm6, record->operands[idx++])))
-                return SIZE_MAX;
-        }
-        FIXME("Forward value references are not supported yet.\n");
-        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                "Unsupported value forward reference.");
-        return SIZE_MAX;
+        /* Forward references are followed by a type id unless an earlier operand set the type,
+         * or it is contained in a function declaration. */
+        if (!dxil_record_validate_operand_min_count(record, idx + 1, sm6))
+            return SIZE_MAX;
+        if (!(fwd_type = sm6_parser_get_type(sm6, record->operands[idx++])))
+            return SIZE_MAX;
     }
     *rec_idx = idx;
+
+    if (fwd_type)
+    {
+        value = &sm6->values[operand];
+        if (value->type)
+        {
+            if (value->type != fwd_type)
+            {
+                WARN("Value already has a mismatching type.\n");
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                        "The type of a source value does not match the predefined type.");
+            }
+        }
+        else
+        {
+            value->type = fwd_type;
+            value->value_type = VALUE_TYPE_REG;
+            register_init_with_id(&value->u.reg, VKD3DSPR_SSA, vkd3d_data_type_from_sm6_type(
+                    sm6_type_get_scalar_type(fwd_type, 0)), sm6_parser_alloc_ssa_id(sm6));
+            value->u.reg.dimension = sm6_type_is_scalar(fwd_type) ? VSIR_DIMENSION_SCALAR
+                    : VSIR_DIMENSION_VEC4;
+        }
+    }
 
     return operand;
 }
@@ -3479,7 +3504,7 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
         dst_param_init(&dst_params[0]);
         dst_param_init(&dst_params[1]);
-        register_init_ssa_scalar(&dst_params[index].reg, a->type, sm6);
+        register_init_ssa_scalar(&dst_params[index].reg, a->type, dst, sm6);
         vsir_register_init(&dst_params[index ^ 1].reg, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
         dst->u.reg = dst_params[index].reg;
     }
@@ -3992,7 +4017,7 @@ static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_
     dst_params = instruction_dst_params_alloc(ins, 2, sm6);
     dst_param_init(&dst_params[0]);
     dst_param_init(&dst_params[1]);
-    register_init_ssa_scalar(&dst_params[index].reg, dst->type, sm6);
+    register_init_ssa_scalar(&dst_params[index].reg, dst->type, dst, sm6);
     vsir_register_init(&dst_params[index ^ 1].reg, VKD3DSPR_NULL, VKD3D_DATA_UNUSED, 0);
     dst->u.reg = dst_params[index].reg;
 }
@@ -4931,7 +4956,7 @@ static void sm6_parser_emit_phi(struct sm6_parser *sm6, const struct dxil_record
     }
 
     dst->type = type;
-    register_init_ssa_scalar(&dst->u.reg, type, sm6);
+    register_init_ssa_scalar(&dst->u.reg, type, dst, sm6);
 
     if (!(phi = sm6_block_phi_require_space(code_block, sm6)))
         return;
@@ -5504,6 +5529,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
     struct vkd3d_shader_instruction *ins;
     size_t i, block_idx, block_count;
     const struct dxil_record *record;
+    const struct sm6_type *fwd_type;
     bool ret_found, is_terminator;
     struct sm6_block *code_block;
     struct sm6_value *dst;
@@ -5580,6 +5606,7 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         ins->handler_idx = VKD3DSIH_INVALID;
 
         dst = sm6_parser_get_current_value(sm6);
+        fwd_type = dst->type;
         dst->type = NULL;
         dst->value_type = VALUE_TYPE_REG;
         is_terminator = false;
@@ -5658,6 +5685,13 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             code_block->instruction_count += ins->handler_idx != VKD3DSIH_NOP;
         else
             assert(ins->handler_idx == VKD3DSIH_NOP);
+
+        if (dst->type && fwd_type && dst->type != fwd_type)
+        {
+            WARN("Type mismatch.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                    "The type of a result value does not match the type defined by a forward reference.");
+        }
 
         sm6->value_count += !!dst->type;
     }
