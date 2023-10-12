@@ -44,6 +44,7 @@ enum shader_type
     SHADER_TYPE_CS,
     SHADER_TYPE_PS,
     SHADER_TYPE_VS,
+    SHADER_TYPE_FX,
 };
 
 const char *shader_type_string(enum shader_type type);
@@ -118,6 +119,7 @@ struct shader_runner
     char *vs_source;
     char *ps_source;
     char *cs_source;
+    char *fx_source;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
 

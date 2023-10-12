@@ -89,6 +89,8 @@ enum parse_state
     STATE_SHADER_PIXEL_TODO,
     STATE_SHADER_VERTEX,
     STATE_SHADER_VERTEX_TODO,
+    STATE_SHADER_EFFECT,
+    STATE_SHADER_EFFECT_TODO,
     STATE_TEST,
 };
 
@@ -814,6 +816,7 @@ const char *shader_type_string(enum shader_type type)
         [SHADER_TYPE_CS] = "cs",
         [SHADER_TYPE_PS] = "ps",
         [SHADER_TYPE_VS] = "vs",
+        [SHADER_TYPE_FX] = "fx",
     };
     assert(type < ARRAY_SIZE(shader_types));
     return shader_types[type];
@@ -953,6 +956,14 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
         [SHADER_MODEL_6_0] = "6_0",
     };
 
+    static const char *const effect_models[] =
+    {
+        [SHADER_MODEL_2_0] = "2_0",
+        [SHADER_MODEL_4_0] = "4_0",
+        [SHADER_MODEL_4_1] = "4_1",
+        [SHADER_MODEL_5_0] = "5_0",
+    };
+
     if (use_dxcompiler)
     {
         assert(dxc_compiler);
@@ -960,7 +971,10 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
     }
     else
     {
-        sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
+        if (type == SHADER_TYPE_FX)
+            sprintf(profile, "%s_%s", shader_type_string(type), effect_models[runner->minimum_shader_model]);
+        else
+            sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     }
     hr = map_unidentified_hrs(hr);
@@ -996,8 +1010,10 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
                 state = STATE_SHADER_COMPUTE_TODO;
             else if (state == STATE_SHADER_PIXEL)
                 state = STATE_SHADER_PIXEL_TODO;
-            else
+            else if (state == STATE_SHADER_VERTEX)
                 state = STATE_SHADER_VERTEX_TODO;
+            else
+                state = STATE_SHADER_EFFECT_TODO;
         }
         else if (match_directive_substring(src, "fail", &src))
         {
@@ -1131,6 +1147,21 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     }
                     free(runner->vs_source);
                     runner->vs_source = shader_source;
+                    shader_source = NULL;
+                    shader_source_len = 0;
+                    shader_source_size = 0;
+                    break;
+
+                case STATE_SHADER_EFFECT:
+                case STATE_SHADER_EFFECT_TODO:
+                    if (!skip_tests)
+                    {
+                        todo_if (state == STATE_SHADER_EFFECT_TODO)
+                        compile_shader(runner, dxc_compiler, shader_source, shader_source_len, SHADER_TYPE_FX,
+                                expect_hr);
+                    }
+                    free(runner->fx_source);
+                    runner->fx_source = shader_source;
                     shader_source = NULL;
                     shader_source_len = 0;
                     shader_source_size = 0;
@@ -1324,6 +1355,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 expect_hr = S_OK;
                 state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
             }
+            else if (match_directive_substring(line, "[effect", &line))
+            {
+                state = STATE_SHADER_EFFECT;
+                expect_hr = S_OK;
+                state = read_shader_directive(runner, state, line_buffer, line, &expect_hr);
+            }
             else if (!strcmp(line, "[input layout]\n"))
             {
                 state = STATE_INPUT_LAYOUT;
@@ -1355,6 +1392,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 case STATE_SHADER_PIXEL_TODO:
                 case STATE_SHADER_VERTEX:
                 case STATE_SHADER_VERTEX_TODO:
+                case STATE_SHADER_EFFECT:
+                case STATE_SHADER_EFFECT_TODO:
                 {
                     size_t len = strlen(line);
 
