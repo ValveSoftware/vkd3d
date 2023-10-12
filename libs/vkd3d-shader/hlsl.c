@@ -758,7 +758,8 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     return type;
 }
 
-struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format)
+struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx,
+        enum hlsl_sampler_dim dim, struct hlsl_type *format, uint32_t modifiers)
 {
     struct hlsl_type *type;
 
@@ -769,6 +770,7 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim 
     type->dimx = format->dimx;
     type->dimy = 1;
     type->sampler_dim = dim;
+    type->modifiers = modifiers;
     type->e.resource_format = format;
     hlsl_type_calculate_reg_size(ctx, type);
     list_add_tail(&ctx->types, &type->entry);

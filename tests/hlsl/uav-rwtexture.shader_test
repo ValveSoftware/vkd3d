@@ -182,7 +182,7 @@ float4 main() : sv_target1
 }
 
 % RasterizerOrderedTexture1D types
-[pixel shader todo]
+[pixel shader]
 struct s
 {
     float3 a;
@@ -218,7 +218,7 @@ float4 main() : sv_target1
 }
 
 % RasterizerOrderedTexture1DArray types
-[pixel shader todo]
+[pixel shader]
 struct s
 {
     float3 a;
@@ -254,7 +254,7 @@ float4 main() : sv_target1
 }
 
 % RasterizerOrderedTexture2D types
-[pixel shader todo]
+[pixel shader]
 struct s
 {
     float3 a;
@@ -290,7 +290,7 @@ float4 main() : sv_target1
 }
 
 % RasterizerOrderedTexture2DArray types
-[pixel shader todo]
+[pixel shader]
 struct s
 {
     float3 a;
@@ -326,7 +326,7 @@ float4 main() : sv_target1
 }
 
 % RasterizerOrderedTexture3D types
-[pixel shader todo]
+[pixel shader]
 struct s
 {
     float3 a;

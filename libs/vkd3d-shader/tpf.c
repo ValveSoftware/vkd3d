@@ -4271,6 +4271,9 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             instr.extra_bits |= component_type->sample_count << VKD3D_SM4_RESOURCE_SAMPLE_COUNT_SHIFT;
         }
 
+        if (resource->data_type->modifiers & HLSL_MODIFIER_RASTERIZER_ORDERED)
+            instr.opcode |= VKD3DSUF_RASTERISER_ORDERED_VIEW << VKD3D_SM5_UAV_FLAGS_SHIFT;
+
         write_sm4_instruction(tpf, &instr);
     }
 }

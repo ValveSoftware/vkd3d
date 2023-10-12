@@ -5005,6 +5005,48 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
     }
 }
 
+static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
+        struct hlsl_type *format, const struct vkd3d_shader_location* loc)
+{
+    struct vkd3d_string_buffer *string = hlsl_type_to_string(ctx, format);
+
+    if (!type_contains_only_numerics(format))
+    {
+        if (string)
+            hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "UAV type %s is not numeric.", string->buffer);
+    }
+
+    switch (dim)
+    {
+        case HLSL_SAMPLER_DIM_BUFFER:
+        case HLSL_SAMPLER_DIM_1D:
+        case HLSL_SAMPLER_DIM_1DARRAY:
+        case HLSL_SAMPLER_DIM_2D:
+        case HLSL_SAMPLER_DIM_2DARRAY:
+        case HLSL_SAMPLER_DIM_3D:
+            if (format->class == HLSL_CLASS_ARRAY)
+            {
+                if (string)
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "This type of UAV does not support array type.");
+            }
+            else if (hlsl_type_component_count(format) > 4)
+            {
+                if (string)
+                    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                            "UAV data type %s size exceeds maximum size.", string->buffer);
+            }
+            break;
+        case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    hlsl_release_string_buffer(ctx, string);
+}
+
 }
 
 %locations
@@ -5084,6 +5126,13 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token KW_PASS
 %token KW_PIXELSHADER
 %token KW_PRECISE
+%token KW_RASTERIZERORDEREDBUFFER
+%token KW_RASTERIZERORDEREDSTRUCTUREDBUFFER
+%token KW_RASTERIZERORDEREDTEXTURE1D
+%token KW_RASTERIZERORDEREDTEXTURE1DARRAY
+%token KW_RASTERIZERORDEREDTEXTURE2D
+%token KW_RASTERIZERORDEREDTEXTURE2DARRAY
+%token KW_RASTERIZERORDEREDTEXTURE3D
 %token KW_RASTERIZERSTATE
 %token KW_RENDERTARGETVIEW
 %token KW_RETURN
@@ -5244,7 +5293,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %type <reg_reservation> register_opt
 %type <reg_reservation> packoffset_opt
 
-%type <sampler_dim> texture_type texture_ms_type uav_type
+%type <sampler_dim> texture_type texture_ms_type uav_type rov_type
 
 %type <semantic> semantic
 
@@ -6057,6 +6106,36 @@ uav_type:
             $$ = HLSL_SAMPLER_DIM_3D;
         }
 
+rov_type:
+      KW_RASTERIZERORDEREDBUFFER
+        {
+            $$ = HLSL_SAMPLER_DIM_BUFFER;
+        }
+    | KW_RASTERIZERORDEREDSTRUCTUREDBUFFER
+        {
+            $$ = HLSL_SAMPLER_DIM_STRUCTURED_BUFFER;
+        }
+    | KW_RASTERIZERORDEREDTEXTURE1D
+        {
+            $$ = HLSL_SAMPLER_DIM_1D;
+        }
+    | KW_RASTERIZERORDEREDTEXTURE1DARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_1DARRAY;
+        }
+    | KW_RASTERIZERORDEREDTEXTURE2D
+        {
+            $$ = HLSL_SAMPLER_DIM_2D;
+        }
+    | KW_RASTERIZERORDEREDTEXTURE2DARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_2DARRAY;
+        }
+    | KW_RASTERIZERORDEREDTEXTURE3D
+        {
+            $$ = HLSL_SAMPLER_DIM_3D;
+        }
+
 type_no_void:
       KW_VECTOR '<' type ',' C_INTEGER '>'
         {
@@ -6185,45 +6264,13 @@ type_no_void:
         }
     | uav_type '<' type '>'
         {
-            struct vkd3d_string_buffer *string = hlsl_type_to_string(ctx, $3);
-
-            if (!type_contains_only_numerics($3))
-            {
-                if (string)
-                    hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                            "UAV type %s is not numeric.", string->buffer);
-            }
-
-            switch ($1)
-            {
-                case HLSL_SAMPLER_DIM_BUFFER:
-                case HLSL_SAMPLER_DIM_1D:
-                case HLSL_SAMPLER_DIM_1DARRAY:
-                case HLSL_SAMPLER_DIM_2D:
-                case HLSL_SAMPLER_DIM_2DARRAY:
-                case HLSL_SAMPLER_DIM_3D:
-                    if ($3->class == HLSL_CLASS_ARRAY)
-                    {
-                        if (string)
-                            hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                    "This type of UAV does not support array type.");
-                    }
-                    else if (hlsl_type_component_count($3) > 4)
-                    {
-                        if (string)
-                            hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                                    "UAV data type %s size exceeds maximum size.", string->buffer);
-                    }
-                    break;
-                case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
-                    break;
-                default:
-                    vkd3d_unreachable();
-            }
-
-            hlsl_release_string_buffer(ctx, string);
-
-            $$ = hlsl_new_uav_type(ctx, $1, $3);
+            validate_uav_type(ctx, $1, $3, &@3);
+            $$ = hlsl_new_uav_type(ctx, $1, $3, 0);
+        }
+    | rov_type '<' type '>'
+        {
+            validate_uav_type(ctx, $1, $3, &@3);
+            $$ = hlsl_new_uav_type(ctx, $1, $3, HLSL_MODIFIER_RASTERIZER_ORDERED);
         }
     | TYPE_IDENTIFIER
         {
