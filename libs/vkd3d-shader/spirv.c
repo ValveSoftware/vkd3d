@@ -2277,6 +2277,12 @@ struct vkd3d_hull_shader_variables
     uint32_t patch_constants_id;
 };
 
+struct ssa_register_info
+{
+    enum vkd3d_data_type data_type;
+    uint32_t id;
+};
+
 struct spirv_compiler
 {
     struct vkd3d_spirv_builder spirv_builder;
@@ -2351,7 +2357,7 @@ struct spirv_compiler
 
     struct vkd3d_string_buffer_cache string_buffers;
 
-    uint32_t *ssa_register_ids;
+    struct ssa_register_info *ssa_register_info;
     unsigned int ssa_register_count;
 };
 
@@ -2400,7 +2406,7 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     shader_signature_cleanup(&compiler->output_signature);
     shader_signature_cleanup(&compiler->patch_constant_signature);
 
-    vkd3d_free(compiler->ssa_register_ids);
+    vkd3d_free(compiler->ssa_register_info);
 
     vkd3d_free(compiler);
 }
@@ -3741,20 +3747,21 @@ static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
     return val_id;
 }
 
-static uint32_t spirv_compiler_get_ssa_register_id(const struct spirv_compiler *compiler,
+static const struct ssa_register_info *spirv_compiler_get_ssa_register_info(const struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg)
 {
     assert(reg->idx[0].offset < compiler->ssa_register_count);
     assert(reg->idx_count == 1);
-    return compiler->ssa_register_ids[reg->idx[0].offset];
+    return &compiler->ssa_register_info[reg->idx[0].offset];
 }
 
-static void spirv_compiler_set_ssa_register_id(const struct spirv_compiler *compiler,
+static void spirv_compiler_set_ssa_register_info(const struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, uint32_t val_id)
 {
     unsigned int i = reg->idx[0].offset;
     assert(i < compiler->ssa_register_count);
-    compiler->ssa_register_ids[i] = val_id;
+    compiler->ssa_register_info[i].data_type = reg->data_type;
+    compiler->ssa_register_info[i].id = val_id;
 }
 
 static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler,
@@ -3762,15 +3769,27 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
         unsigned int swizzle)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    enum vkd3d_shader_component_type reg_component_type;
+    const struct ssa_register_info *ssa;
     unsigned int component_idx;
     uint32_t type_id, val_id;
 
-    val_id = spirv_compiler_get_ssa_register_id(compiler, reg);
+    ssa = spirv_compiler_get_ssa_register_info(compiler, reg);
+    val_id = ssa->id;
     assert(val_id);
     assert(vkd3d_swizzle_is_scalar(swizzle));
 
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
+    {
+        reg_component_type = vkd3d_component_type_from_data_type(ssa->data_type);
+        if (component_type != reg_component_type)
+        {
+            type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
+            val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        }
+
         return val_id;
+    }
 
     type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
     component_idx = vkd3d_swizzle_get_component(swizzle, 0);
@@ -4013,7 +4032,7 @@ static void spirv_compiler_emit_store_reg(struct spirv_compiler *compiler,
 
     if (reg->type == VKD3DSPR_SSA)
     {
-        spirv_compiler_set_ssa_register_id(compiler, reg, val_id);
+        spirv_compiler_set_ssa_register_info(compiler, reg, val_id);
         return;
     }
 
@@ -5453,8 +5472,8 @@ static void spirv_compiler_emit_temps(struct spirv_compiler *compiler, uint32_t 
 
 static void spirv_compiler_allocate_ssa_register_ids(struct spirv_compiler *compiler, unsigned int count)
 {
-    assert(!compiler->ssa_register_ids);
-    if (!(compiler->ssa_register_ids = vkd3d_calloc(count, sizeof(*compiler->ssa_register_ids))))
+    assert(!compiler->ssa_register_info);
+    if (!(compiler->ssa_register_info = vkd3d_calloc(count, sizeof(*compiler->ssa_register_info))))
     {
         ERR("Failed to allocate SSA register value id array, count %u.\n", count);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY,
