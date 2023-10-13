@@ -36,7 +36,7 @@ draw triangle list 3
 probe all rui(0xaaaaaaaa)
 probe uav 1 all rui(0x55555555)
 
-[pixel shader todo]
+[pixel shader]
 RasterizerOrderedTexture2D<uint4> tex : register(u1);
 Texture2D<uint4> spin : register(t0);
 

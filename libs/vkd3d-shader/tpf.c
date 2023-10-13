@@ -2810,6 +2810,7 @@ bool hlsl_sm4_usage_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semant
 
         {"position",                    false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_POSITION},
         {"sv_position",                 false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_POSITION},
+        {"sv_primitiveid",              false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_PRIMITIVE_ID},
         {"sv_isfrontface",              false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_IS_FRONT_FACE},
         {"sv_rendertargetarrayindex",   false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_RENDER_TARGET_ARRAY_INDEX},
         {"sv_viewportarrayindex",       false, VKD3D_SHADER_TYPE_PIXEL,     D3D_NAME_VIEWPORT_ARRAY_INDEX},
