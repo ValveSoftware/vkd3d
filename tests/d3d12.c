@@ -36063,6 +36063,12 @@ static void test_unbounded_resource_arrays(void)
         0x00100556, 0x00000000, 0x01000015, 0x0100003e,
     };
 
+    if (test_options.use_warp_device)
+    {
+        skip("Broken on WARP.\n");
+        return;
+    }
+
     if (!init_compute_test_context(&context))
         return;
     device = context.device;
