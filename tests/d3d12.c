@@ -19533,6 +19533,12 @@ static void test_get_copyable_footprints(void)
         },
     };
 
+    if (test_options.use_warp_device)
+    {
+        skip("Broken on WARP.\n");
+        return;
+    }
+
     if (!(device = create_device()))
     {
         skip("Failed to create device.\n");
