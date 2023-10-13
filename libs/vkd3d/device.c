@@ -94,6 +94,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(EXT_DEBUG_MARKER, EXT_debug_marker),
     VK_EXTENSION(EXT_DEPTH_CLIP_ENABLE, EXT_depth_clip_enable),
     VK_EXTENSION(EXT_DESCRIPTOR_INDEXING, EXT_descriptor_indexing),
+    VK_EXTENSION(EXT_FRAGMENT_SHADER_INTERLOCK, EXT_fragment_shader_interlock),
     VK_EXTENSION(EXT_MUTABLE_DESCRIPTOR_TYPE, EXT_mutable_descriptor_type),
     VK_EXTENSION(EXT_ROBUSTNESS_2, EXT_robustness2),
     VK_EXTENSION(EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION, EXT_shader_demote_to_helper_invocation),
@@ -789,6 +790,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceConditionalRenderingFeaturesEXT conditional_rendering_features;
     VkPhysicalDeviceDepthClipEnableFeaturesEXT depth_clip_features;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptor_indexing_features;
+    VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT fragment_shader_interlock_features;
     VkPhysicalDeviceRobustness2FeaturesEXT robustness2_features;
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT demote_features;
     VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT texel_buffer_alignment_features;
@@ -808,6 +810,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDeviceVertexAttributeDivisorPropertiesEXT *vertex_divisor_properties;
     VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT *buffer_alignment_properties;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing_features;
+    VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *fragment_shader_interlock_features;
     VkPhysicalDeviceRobustness2FeaturesEXT *robustness2_features;
     VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT *vertex_divisor_features;
     VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *buffer_alignment_features;
@@ -825,6 +828,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     conditional_rendering_features = &info->conditional_rendering_features;
     depth_clip_features = &info->depth_clip_features;
     descriptor_indexing_features = &info->descriptor_indexing_features;
+    fragment_shader_interlock_features = &info->fragment_shader_interlock_features;
     robustness2_features = &info->robustness2_features;
     descriptor_indexing_properties = &info->descriptor_indexing_properties;
     maintenance3_properties = &info->maintenance3_properties;
@@ -846,6 +850,8 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->features2, depth_clip_features);
     descriptor_indexing_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
     vk_prepend_struct(&info->features2, descriptor_indexing_features);
+    fragment_shader_interlock_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
+    vk_prepend_struct(&info->features2, fragment_shader_interlock_features);
     robustness2_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ROBUSTNESS_2_FEATURES_EXT;
     vk_prepend_struct(&info->features2, robustness2_features);
     demote_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
@@ -1158,6 +1164,7 @@ static void vkd3d_trace_physical_device_limits(const struct vkd3d_physical_devic
 
 static void vkd3d_trace_physical_device_features(const struct vkd3d_physical_device_info *info)
 {
+    const VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *fragment_shader_interlock_features;
     const VkPhysicalDeviceConditionalRenderingFeaturesEXT *conditional_rendering_features;
     const VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT *demote_features;
     const VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *buffer_alignment_features;
@@ -1278,6 +1285,15 @@ static void vkd3d_trace_physical_device_features(const struct vkd3d_physical_dev
     depth_clip_features = &info->depth_clip_features;
     TRACE("  VkPhysicalDeviceDepthClipEnableFeaturesEXT:\n");
     TRACE("    depthClipEnable: %#x.\n", depth_clip_features->depthClipEnable);
+
+    fragment_shader_interlock_features = &info->fragment_shader_interlock_features;
+    TRACE("  VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT:\n");
+    TRACE("    fragmentShaderSampleInterlock: %#x.\n.",
+            fragment_shader_interlock_features->fragmentShaderSampleInterlock);
+    TRACE("    fragmentShaderPixelInterlock: %#x\n.",
+            fragment_shader_interlock_features->fragmentShaderPixelInterlock);
+    TRACE("    fragmentShaderShadingRateInterlock: %#x\n.",
+            fragment_shader_interlock_features->fragmentShaderShadingRateInterlock);
 
     demote_features = &info->demote_features;
     TRACE("  VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT:\n");
@@ -1476,6 +1492,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         uint32_t *device_extension_count, bool **user_extension_supported)
 {
     const struct vkd3d_vk_instance_procs *vk_procs = &device->vkd3d_instance->vk_procs;
+    VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT *fragment_shader_interlock;
     const struct vkd3d_optional_device_extensions_info *optional_extensions;
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT *descriptor_indexing;
     VkPhysicalDevice physical_device = device->vk_physical_device;
@@ -1539,8 +1556,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
 
     device->feature_options.TypedUAVLoadAdditionalFormats = features->shaderStorageImageReadWithoutFormat
             && d3d12_device_supports_typed_uav_load_additional_formats(device);
-    /* GL_INTEL_fragment_shader_ordering, no Vulkan equivalent. */
-    device->feature_options.ROVsSupported = FALSE;
     /* GL_INTEL_conservative_rasterization, no Vulkan equivalent. */
     device->feature_options.ConservativeRasterizationTier = D3D12_CONSERVATIVE_RASTERIZATION_TIER_NOT_SUPPORTED;
     device->feature_options.MaxGPUVirtualAddressBitsPerResource = 40; /* FIXME */
@@ -1619,6 +1634,12 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
             *user_extension_supported, vulkan_info, "device",
             device->vkd3d_instance->config_flags & VKD3D_CONFIG_FLAG_VULKAN_DEBUG);
 
+    fragment_shader_interlock = &physical_device_info->fragment_shader_interlock_features;
+    if (!fragment_shader_interlock->fragmentShaderSampleInterlock
+            || !fragment_shader_interlock->fragmentShaderPixelInterlock)
+        vulkan_info->EXT_fragment_shader_interlock = false;
+    device->feature_options.ROVsSupported = vulkan_info->EXT_fragment_shader_interlock;
+
     if (!physical_device_info->conditional_rendering_features.conditionalRendering)
         vulkan_info->EXT_conditional_rendering = false;
     if (!physical_device_info->depth_clip_features.depthClipEnable)
@@ -1674,6 +1695,10 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     if (vulkan_info->EXT_descriptor_indexing)
         vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
                 = VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING;
+
+    if (vulkan_info->EXT_fragment_shader_interlock)
+        vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
+                = VKD3D_SHADER_SPIRV_EXTENSION_EXT_FRAGMENT_SHADER_INTERLOCK;
 
     if (vulkan_info->EXT_shader_stencil_export)
         vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
