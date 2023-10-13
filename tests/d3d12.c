@@ -24530,6 +24530,12 @@ static void test_execute_indirect(void)
     static const uint32_t count_data[] = {2, 1};
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
+    if (test_options.use_warp_device)
+    {
+        skip("Broken on WARP.\n");
+        return;
+    }
+
     memset(&desc, 0, sizeof(desc));
     desc.root_signature_flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
     desc.no_pipeline = true;
