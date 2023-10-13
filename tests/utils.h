@@ -104,6 +104,14 @@ static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
     return diff <= max_diff;
 }
 
+static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
+{
+    return compare_uint(c1 & 0xff, c2 & 0xff, max_diff)
+           && compare_uint((c1 >> 8) & 0xff, (c2 >> 8) & 0xff, max_diff)
+           && compare_uint((c1 >> 16) & 0xff, (c2 >> 16) & 0xff, max_diff)
+           && compare_uint((c1 >> 24) & 0xff, (c2 >> 24) & 0xff, max_diff);
+}
+
 static bool compare_float(float f, float g, unsigned int ulps)
 {
     int x, y;
@@ -159,9 +167,19 @@ static float get_readback_float(const struct resource_readback *rb, unsigned int
     return *(float *)get_readback_data(rb, x, y, 0, sizeof(float));
 }
 
+static unsigned int get_readback_uint(const struct resource_readback *rb, unsigned int x, unsigned int y, unsigned int z)
+{
+    return *(unsigned int*)get_readback_data(rb, x, y, z, sizeof(unsigned int));
+}
+
 static const struct vec4 *get_readback_vec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
 {
     return get_readback_data(rb, x, y, 0, sizeof(struct vec4));
+}
+
+static const struct uvec4 *get_readback_uvec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return get_readback_data(rb, x, y, 0, sizeof(struct uvec4));
 }
 
 #define check_readback_data_float(a, b, c, d) check_readback_data_float_(__LINE__, a, b, c, d)
@@ -193,6 +211,40 @@ static inline void check_readback_data_float_(unsigned int line, const struct re
     ok_(line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
 }
 
+#define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__LINE__, a, b, c, d)
+static inline void check_readback_data_uint_(unsigned int line, struct resource_readback *rb,
+        const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
+{
+    D3D12_BOX b = {0, 0, 0, rb->width, rb->height, rb->depth};
+    unsigned int x = 0, y = 0, z;
+    bool all_match = true;
+    unsigned int got = 0;
+
+    if (box)
+        b = *box;
+
+    for (z = b.front; z < b.back; ++z)
+    {
+        for (y = b.top; y < b.bottom; ++y)
+        {
+            for (x = b.left; x < b.right; ++x)
+            {
+                got = get_readback_uint(rb, x, y, z);
+                if (!compare_color(got, expected, max_diff))
+                {
+                    all_match = false;
+                    break;
+                }
+            }
+            if (!all_match)
+                break;
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
+}
+
 #define check_readback_data_vec4(a, b, c, d) check_readback_data_vec4_(__LINE__, a, b, c, d)
 static inline void check_readback_data_vec4_(unsigned int line, const struct resource_readback *rb,
         const RECT *rect, const struct vec4 *expected, unsigned int max_diff)
@@ -220,6 +272,36 @@ static inline void check_readback_data_vec4_(unsigned int line, const struct res
             break;
     }
     ok_(line)(all_match, "Got {%.8e, %.8e, %.8e, %.8e}, expected {%.8e, %.8e, %.8e, %.8e} at (%u, %u).\n",
+            got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
+}
+
+#define check_readback_data_uvec4(a, b, c) check_readback_data_uvec4_(__LINE__, a, b, c)
+static inline void check_readback_data_uvec4_(unsigned int line, const struct resource_readback *rb,
+        const RECT *rect, const struct uvec4 *expected)
+{
+    RECT r = {0, 0, rb->width, rb->height};
+    unsigned int x = 0, y = 0;
+    struct uvec4 got = {0};
+    bool all_match = true;
+
+    if (rect)
+        r = *rect;
+
+    for (y = r.top; y < r.bottom; ++y)
+    {
+        for (x = r.left; x < r.right; ++x)
+        {
+            got = *get_readback_uvec4(rb, x, y);
+            if (!compare_uvec4(&got, expected))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got {0x%08x, 0x%08x, 0x%08x, 0x%08x}, expected {0x%08x, 0x%08x, 0x%08x, 0x%08x} at (%u, %u).\n",
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 

@@ -249,11 +249,6 @@ static uint64_t get_readback_uint64(struct resource_readback *rb, unsigned int x
     return *(uint64_t *)get_readback_data(rb, x, y, 0, sizeof(uint64_t));
 }
 
-static const struct uvec4 *get_readback_uvec4(struct resource_readback *rb, unsigned int x, unsigned int y)
-{
-    return get_readback_data(rb, x, y, 0, sizeof(struct uvec4));
-}
-
 #define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__LINE__, a, b, c, d, e, f)
 static void check_sub_resource_float_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,

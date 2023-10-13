@@ -229,6 +229,17 @@ static bool match_directive_substring(const char *line, const char *token, const
     return match_string_generic(line, token, rest, true, false, 0);
 }
 
+static const char *close_parentheses(const char *line)
+{
+    while (isspace(*line))
+        ++line;
+
+    if (*line != ')')
+        fatal_error("Malformed probe arguments '%s'.\n", line);
+
+    return line;
+}
+
 static void parse_require_directive(struct shader_runner *runner, const char *line)
 {
     bool less_than = false;
@@ -564,7 +575,7 @@ static void read_int(const char **line, int *i)
     *line = rest;
 }
 
-static void read_uint(const char **line, unsigned int *u)
+static void read_uint(const char **line, unsigned int *u, bool is_uniform)
 {
     char *rest;
     unsigned long val;
@@ -572,14 +583,14 @@ static void read_uint(const char **line, unsigned int *u)
     errno = 0;
     val = strtoul(*line, &rest, 0);
 
-    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+    if (errno != 0 || (is_uniform && *rest != '\0' && !isspace((unsigned char)*rest)))
         fatal_error("Malformed uint constant '%s'.\n", *line);
 
     *u = val;
     if (*u != val)
         fatal_error("Out of range uint constant '%.*s'.\n", (int)(rest - *line), *line);
 
-    *line = rest;
+    *line = rest + (!is_uniform && *rest == ',');
 }
 
 static void read_int4(const char **line, struct ivec4 *v)
@@ -590,12 +601,12 @@ static void read_int4(const char **line, struct ivec4 *v)
     read_int(line, &v->w);
 }
 
-static void read_uint4(const char **line, struct uvec4 *v)
+static void read_uint4(const char **line, struct uvec4 *v, bool is_uniform)
 {
-    read_uint(line, &v->x);
-    read_uint(line, &v->y);
-    read_uint(line, &v->z);
-    read_uint(line, &v->w);
+    read_uint(line, &v->x, is_uniform);
+    read_uint(line, &v->y, is_uniform);
+    read_uint(line, &v->z, is_uniform);
+    read_uint(line, &v->w, is_uniform);
 }
 
 static void read_int64(const char **line, int64_t *i)
@@ -825,7 +836,18 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             fatal_error("Malformed probe arguments '%s'.\n", line);
         }
 
-        if (match_string(line, "rgba", &line))
+        if (match_string(line, "rgbaui", &line))
+        {
+            struct uvec4 v;
+
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+            read_uint4(&line, &v, false);
+            line = close_parentheses(line);
+            todo_if(runner->is_todo) check_readback_data_uvec4(rb, &rect, &v);
+        }
+        else if (match_string(line, "rgba", &line))
         {
             struct vec4 v;
 
@@ -835,6 +857,24 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             if (ret < 5)
                 ulps = 0;
             todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
+        }
+        else if (match_string(line, "rui", &line))
+        {
+            unsigned int expect;
+            D3D12_BOX box;
+
+            box.left = rect.left;
+            box.right = rect.right;
+            box.top = rect.top;
+            box.bottom = rect.bottom;
+            box.front = 0;
+            box.back = 1;
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+            read_uint(&line, &expect, false);
+            line = close_parentheses(line);
+            todo_if(runner->is_todo) check_readback_data_uint(rb, &box, expect, 0);
         }
         else if (match_string(line, "r", &line))
         {
@@ -897,7 +937,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             struct uvec4 v;
 
-            read_uint4(&line, &v);
+            read_uint4(&line, &v, true);
             set_uniforms(runner, offset, 4, &v);
         }
         else if (match_string(line, "int", &line))
@@ -911,7 +951,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             unsigned int u;
 
-            read_uint(&line, &u);
+            read_uint(&line, &u, true);
             set_uniforms(runner, offset, 1, &u);
         }
         else if (match_string(line, "int64_t2", &line))

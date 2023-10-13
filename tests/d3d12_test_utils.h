@@ -74,14 +74,6 @@ static void set_viewport(D3D12_VIEWPORT *vp, float x, float y,
     vp->MaxDepth = max_depth;
 }
 
-static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
-{
-    return compare_uint(c1 & 0xff, c2 & 0xff, max_diff)
-            && compare_uint((c1 >> 8) & 0xff, (c2 >> 8) & 0xff, max_diff)
-            && compare_uint((c1 >> 16) & 0xff, (c2 >> 16) & 0xff, max_diff)
-            && compare_uint((c1 >> 24) & 0xff, (c2 >> 24) & 0xff, max_diff);
-}
-
 static D3D12_SHADER_BYTECODE shader_bytecode(const DWORD *code, size_t size)
 {
     D3D12_SHADER_BYTECODE shader_bytecode = { code, size };
@@ -526,51 +518,11 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
             RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
-static unsigned int get_readback_uint(struct resource_readback *rb,
-        unsigned int x, unsigned int y, unsigned int z)
-{
-    return *(unsigned int *)get_readback_data(rb, x, y, z, sizeof(unsigned int));
-}
-
 static void release_resource_readback(struct d3d12_resource_readback *rb)
 {
     D3D12_RANGE range = {0, 0};
     ID3D12Resource_Unmap(rb->resource, 0, &range);
     ID3D12Resource_Release(rb->resource);
-}
-
-#define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__LINE__, a, b, c, d)
-static void check_readback_data_uint_(unsigned int line, struct resource_readback *rb,
-        const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
-{
-    D3D12_BOX b = {0, 0, 0, rb->width, rb->height, rb->depth};
-    unsigned int x = 0, y = 0, z;
-    bool all_match = true;
-    unsigned int got = 0;
-
-    if (box)
-        b = *box;
-
-    for (z = b.front; z < b.back; ++z)
-    {
-        for (y = b.top; y < b.bottom; ++y)
-        {
-            for (x = b.left; x < b.right; ++x)
-            {
-                got = get_readback_uint(rb, x, y, z);
-                if (!compare_color(got, expected, max_diff))
-                {
-                    all_match = false;
-                    break;
-                }
-            }
-            if (!all_match)
-                break;
-        }
-        if (!all_match)
-            break;
-    }
-    ok_(line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
 }
 
 #define check_sub_resource_uint(a, b, c, d, e, f) check_sub_resource_uint_(__LINE__, a, b, c, d, e, f)
