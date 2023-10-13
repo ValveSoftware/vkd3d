@@ -23325,6 +23325,12 @@ static void test_atomic_instructions(void)
         {{~0u, ~0u}, { 0}, {0xffff,  ~0u, 0}, {0xffff,    0,  ~0u}},
     };
 
+    if (test_options.use_warp_device)
+    {
+        skip("Broken on WARP.\n");
+        return;
+    }
+
     memset(&desc, 0, sizeof(desc));
     desc.rt_width = 1;
     desc.rt_height = 1;
