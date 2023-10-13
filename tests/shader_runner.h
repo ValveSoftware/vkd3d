@@ -124,6 +124,7 @@ struct shader_runner
     enum shader_model maximum_shader_model;
     bool require_float64;
     bool require_int64;
+    bool require_rov;
 
     bool last_render_failed;
 

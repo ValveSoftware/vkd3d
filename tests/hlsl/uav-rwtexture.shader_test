@@ -181,6 +181,24 @@ float4 main() : sv_target1
     return 0;
 }
 
+% RasterizerOrderedTexture1D types
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+RasterizerOrderedTexture1D<float4> u : register(u2);
+RasterizerOrderedTexture1D<float> u1;
+RasterizerOrderedTexture1D<float2x2> u2;
+RasterizerOrderedTexture1D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
 % RWTexture1DArray types
 [pixel shader]
 struct s
@@ -192,6 +210,24 @@ RWTexture1DArray<float4> u : register(u2);
 RWTexture1DArray<float> u1;
 RWTexture1DArray<float2x2> u2;
 RWTexture1DArray<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RasterizerOrderedTexture1DArray types
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+RasterizerOrderedTexture1DArray<float4> u : register(u2);
+RasterizerOrderedTexture1DArray<float> u1;
+RasterizerOrderedTexture1DArray<float2x2> u2;
+RasterizerOrderedTexture1DArray<struct s> u3;
 
 float4 main() : sv_target1
 {
@@ -217,6 +253,24 @@ float4 main() : sv_target1
     return 0;
 }
 
+% RasterizerOrderedTexture2D types
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+RasterizerOrderedTexture2D<float4> u : register(u2);
+RasterizerOrderedTexture2D<float> u1;
+RasterizerOrderedTexture2D<float2x2> u2;
+RasterizerOrderedTexture2D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
 % RWTexture2DArray types
 [pixel shader]
 struct s
@@ -235,6 +289,24 @@ float4 main() : sv_target1
     return 0;
 }
 
+% RasterizerOrderedTexture2DArray types
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+RasterizerOrderedTexture2DArray<float4> u : register(u2);
+RasterizerOrderedTexture2DArray<float> u1;
+RasterizerOrderedTexture2DArray<float2x2> u2;
+RasterizerOrderedTexture2DArray<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
 % RWTexture3D types
 [pixel shader]
 struct s
@@ -246,6 +318,24 @@ RWTexture3D<float4> u : register(u2);
 RWTexture3D<float> u1;
 RWTexture3D<float2x2> u2;
 RWTexture3D<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RasterizerOrderedTexture3D types
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+RasterizerOrderedTexture3D<float4> u : register(u2);
+RasterizerOrderedTexture3D<float> u1;
+RasterizerOrderedTexture3D<float2x2> u2;
+RasterizerOrderedTexture3D<struct s> u3;
 
 float4 main() : sv_target1
 {
@@ -317,7 +407,23 @@ float4 main() : sv_target1
 }
 
 [pixel shader fail]
+RasterizerOrderedTexture1D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
 RWTexture1DArray<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+RasterizerOrderedTexture1DArray<Texture2D> u;
 
 float4 main() : sv_target1
 {
@@ -333,6 +439,14 @@ float4 main() : sv_target1
 }
 
 [pixel shader fail]
+RasterizerOrderedTexture2D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
 RWTexture2DArray<Texture2D> u;
 
 float4 main() : sv_target1
@@ -341,7 +455,23 @@ float4 main() : sv_target1
 }
 
 [pixel shader fail]
+RasterizerOrderedTexture2DArray<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
 RWTexture3D<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+RasterizerOrderedTexture3D<Texture2D> u;
 
 float4 main() : sv_target1
 {
@@ -367,7 +497,33 @@ struct s
     Texture2D t;
 };
 
+RasterizerOrderedTexture1D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
 RWTexture1DArray<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RasterizerOrderedTexture1DArray<struct s> u;
 
 float4 main() : sv_target1
 {
@@ -393,6 +549,19 @@ struct s
     Texture2D t;
 };
 
+RasterizerOrderedTexture2D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
 RWTexture2DArray<struct s> u;
 
 float4 main() : sv_target1
@@ -406,7 +575,33 @@ struct s
     Texture2D t;
 };
 
+RasterizerOrderedTexture2DArray<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
 RWTexture3D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RasterizerOrderedTexture3D<struct s> u;
 
 float4 main() : sv_target1
 {

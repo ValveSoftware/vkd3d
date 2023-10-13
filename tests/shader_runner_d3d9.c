@@ -196,6 +196,9 @@ static bool d3d9_runner_check_requirements(struct shader_runner *r)
     if (runner->r.minimum_shader_model >= SHADER_MODEL_4_0)
         return false;
 
+    if (runner->r.require_rov)
+        return false;
+
     return true;
 }
 

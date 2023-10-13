@@ -117,6 +117,9 @@ static bool d3d12_runner_check_requirements(struct shader_runner *r)
     if (runner->r.require_int64 && !runner->options1.Int64ShaderOps)
         return false;
 
+    if (runner->r.require_rov && !runner->options.ROVsSupported)
+        return false;
+
     return true;
 }
 
@@ -652,6 +655,7 @@ void run_shader_tests_d3d12(void *dxc_compiler)
             &runner.options, sizeof(runner.options));
     ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
     trace("DoublePrecisionFloatShaderOps: %u.\n", runner.options.DoublePrecisionFloatShaderOps);
+    trace("ROVsSupported: %u.\n", runner.options.ROVsSupported);
 
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1,
             &runner.options1, sizeof(runner.options1));

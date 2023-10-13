@@ -297,6 +297,8 @@ static bool gl_runner_check_requirements(struct shader_runner *r)
         return false;
     if (r->require_int64 && !runner->caps.int64)
         return false;
+    if (r->require_rov)
+        return false;
 
     return true;
 }

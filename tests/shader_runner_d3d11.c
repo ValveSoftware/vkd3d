@@ -73,6 +73,7 @@ struct d3d11_shader_runner
     ID3D11RasterizerState *rasterizer_state;
 
     bool supports_float64;
+    bool supports_rov;
 };
 
 static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
@@ -260,6 +261,7 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
 
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
+    D3D11_FEATURE_DATA_D3D11_OPTIONS2 options2 = {0};
     D3D11_FEATURE_DATA_DOUBLES doubles = {0};
     unsigned int rt_width, rt_height;
     D3D11_RASTERIZER_DESC rs_desc;
@@ -280,6 +282,12 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
     trace("DoublePrecisionFloatShaderOps: %u.\n", doubles.DoublePrecisionFloatShaderOps);
     runner->supports_float64 = doubles.DoublePrecisionFloatShaderOps;
+
+    hr = ID3D11Device_CheckFeatureSupport(runner->device,
+            D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
+    ok(hr == S_OK, "Got hr %#lx.\n", hr);
+    trace("ROVsSupported: %u.\n", options2.ROVsSupported);
+    runner->supports_rov = options2.ROVsSupported;
 
     rt_width = RENDER_TARGET_WIDTH;
     rt_height = RENDER_TARGET_HEIGHT;
@@ -333,6 +341,8 @@ static bool d3d11_runner_check_requirements(struct shader_runner *r)
     struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
 
     if (runner->r.require_float64 && !runner->supports_float64)
+        return false;
+    if (runner->r.require_rov && !runner->supports_rov)
         return false;
 
     return true;

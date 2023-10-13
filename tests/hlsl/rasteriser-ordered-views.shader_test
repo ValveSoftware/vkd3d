@@ -1,0 +1,69 @@
+[require]
+shader model >= 5.0
+
+[render target 0]
+format r32 uint
+size (640, 480)
+
+[uav 1]
+format r32 uint
+size (640, 480)
+
+[texture 0]
+format r32g32b32a32 uint
+size (1, 1)
+0 0 0 0
+
+[vertex shader]
+float4 main(uint vid : SV_VertexID) : SV_Position
+{
+    uint pos = vid % 3;
+    return float4(pos == 1 ? 3 : -1, pos == 2 ? 3 : -1, 0, 1);
+}
+
+[pixel shader]
+RWTexture2D<uint4> uav : register(u1);
+
+uint4 main(float4 pos : sv_position) : sv_target
+{
+    uav[pos.xy] = 0x55555555;
+    return 0xaaaaaaaa;
+}
+
+% Initialise the UAV and RTV.
+[test]
+draw triangle list 3
+probe all rui(0xaaaaaaaa)
+probe uav 1 all rui(0x55555555)
+
+[pixel shader todo]
+RasterizerOrderedTexture2D<uint4> tex : register(u1);
+Texture2D<uint4> spin : register(t0);
+
+uint4 main(float4 pos : SV_Position, uint id : SV_PrimitiveID) : SV_Target
+{
+    int2 idx = int2(pos.xy);
+    uint val = tex[idx].x;
+    uint flag = 1 << (id & 31);
+    uint expected = 0x55555555 ^ (flag - 1);
+    /* Slow down the shader to increase the likelihood of overlap. */
+    int2 bufidx = int2(0, 0);
+    for (uint i = 0; i < 64; ++i)
+    {
+        uint4 extra = spin[bufidx];
+        val |= extra;
+        bufidx = extra.xy;
+    }
+    bool ok = val == expected;
+    tex[idx] = ok ? val ^ flag : 0;
+    return val;
+}
+
+[require]
+shader model >= 5.0
+rov
+
+[test]
+todo draw triangle list 93
+probe all rui(0x6aaaaaaa)
+probe uav 1 all rui(0x2aaaaaaa)

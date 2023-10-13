@@ -25,10 +25,43 @@ float4 main() : sv_target1
     return 0;
 }
 
+[pixel shader todo]
+struct s
+{
+    float3 a;
+};
+
+struct s2
+{
+    float4x4 f1, f2, f3;
+};
+
+RasterizerOrderedStructuredBuffer<float4> u : register(u2);
+RasterizerOrderedStructuredBuffer<float> u1;
+RasterizerOrderedStructuredBuffer<float2x2> u2;
+RasterizerOrderedStructuredBuffer<struct s> u3;
+RasterizerOrderedStructuredBuffer<float4x4> u4;
+RasterizerOrderedStructuredBuffer<struct s2> u5;
+
+float4 main() : sv_target1
+{
+    u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
 % Array type
 [pixel shader]
 typedef float arr[2];
 RWStructuredBuffer<arr> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader todo]
+typedef float arr[2];
+RasterizerOrderedStructuredBuffer<arr> u;
 
 float4 main() : sv_target1
 {
@@ -50,6 +83,26 @@ struct s
     Texture2D t;
 };
 RWStructuredBuffer<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail(sm<6)]
+RasterizerOrderedStructuredBuffer<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+RasterizerOrderedStructuredBuffer<struct s> u;
 
 float4 main() : sv_target1
 {

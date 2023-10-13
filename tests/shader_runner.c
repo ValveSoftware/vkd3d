@@ -309,6 +309,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     {
         runner->require_int64 = true;
     }
+    else if (match_string(line, "rov", &line))
+    {
+        runner->require_rov = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -1505,6 +1509,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 runner->maximum_shader_model = maximum_shader_model;
                 runner->require_float64 = false;
                 runner->require_int64 = false;
+                runner->require_rov = false;
                 runner->compile_options = 0;
                 skip_tests = false;
             }

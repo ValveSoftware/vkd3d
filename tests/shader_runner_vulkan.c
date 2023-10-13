@@ -94,6 +94,8 @@ static bool vulkan_runner_check_requirements(struct shader_runner *r)
         return false;
     if (runner->r.require_int64 && !runner->supports_int64)
         return false;
+    if (runner->r.require_rov)
+        return false;
 
     return true;
 }
