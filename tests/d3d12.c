@@ -2451,7 +2451,7 @@ static void test_create_descriptor_heap(void)
     ok(hr == S_OK, "Failed to create descriptor heap, hr %#x.\n", hr);
 
     gpu_handle = ID3D12DescriptorHeap_GetGPUDescriptorHandleForHeapStart(heap);
-    ok(!gpu_handle.ptr, "Got unexpected ptr %"PRIx64".\n", gpu_handle.ptr);
+    ok(!gpu_handle.ptr || broken(test_options.use_warp_device), "Got unexpected ptr %"PRIx64".\n", gpu_handle.ptr);
 
     refcount = get_refcount(device);
     ok(refcount == 2, "Got unexpected refcount %u.\n", (unsigned int)refcount);
