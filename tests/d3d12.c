@@ -19308,6 +19308,12 @@ static void test_null_vbv(void)
     };
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
+    if (test_options.use_warp_device)
+    {
+        skip("Broken on WARP.\n");
+        return;
+    }
+
     memset(&desc, 0, sizeof(desc));
     desc.no_root_signature = true;
     if (!init_test_context(&context, &desc))
