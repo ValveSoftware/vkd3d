@@ -5,11 +5,11 @@ shader model >= 4.0
 uniform int i;
 uniform uint u;
 uniform bool b;
-uniform half h;
+uniform float h;
 
 float4 main() : sv_target
 {
-    return float4(((float)i) + 1.5, ((float)u) - 2.5, ((float)b) / 2, h);
+    return float4(((float)i) + 1.5, ((float)u) - 2.5, ((float)b) / 2, (half)h);
 }
 
 [test]

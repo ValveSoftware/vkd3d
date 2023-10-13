@@ -5,7 +5,7 @@ shader model >= 4.0
 uniform float f;
 uniform int i;
 uniform uint u;
-uniform half h;
+uniform float h;
 
 float4 main() : sv_target
 {
@@ -14,7 +14,7 @@ float4 main() : sv_target
     ret.x = asuint(f);
     ret.y = asuint(i);
     ret.z = asuint(u);
-    ret.w = asuint(h);
+    ret.w = asuint((half)h);
     return ret;
 }
 

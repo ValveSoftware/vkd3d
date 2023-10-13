@@ -1,0 +1,23 @@
+[pixel shader fail(sm<6) todo]
+uniform half h;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[require]
+options: backcompat
+
+[pixel shader]
+uniform half h;
+
+float4 main() : sv_target
+{
+    return h;
+}
+
+[test]
+uniform 0 float 10.0
+todo(sm>=6) draw quad
+probe all rgba (10.0, 10.0, 10.0, 10.0)
