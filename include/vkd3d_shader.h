@@ -96,6 +96,11 @@ enum vkd3d_shader_structure_type
      * \since 1.9
      */
     VKD3D_SHADER_STRUCTURE_TYPE_VARYING_MAP_INFO,
+    /**
+     * The structure is a vkd3d_shader_scan_combined_resource_sampler_info structure.
+     * \since 1.10
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_SCAN_COMBINED_RESOURCE_SAMPLER_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -1479,6 +1484,49 @@ struct vkd3d_shader_scan_descriptor_info
 };
 
 /**
+ * This structure describes a single resource-sampler pair. It is returned as
+ * part of struct vkd3d_shader_scan_combined_resource_sampler_info.
+ *
+ * \since 1.10
+ */
+struct vkd3d_shader_combined_resource_sampler_info
+{
+    unsigned int resource_space;
+    unsigned int resource_index;
+    unsigned int sampler_space;
+    unsigned int sampler_index;
+};
+
+/**
+ * A chained structure describing the resource-sampler pairs used by a shader.
+ *
+ * This structure extends vkd3d_shader_compile_info.
+ *
+ * The information returned in this structure can be used to populate the
+ * \ref vkd3d_shader_interface_info.combined_samplers field. This is
+ * particularly useful when targeting environments without separate binding
+ * points for samplers and resources, like OpenGL.
+ *
+ * Members of this structure are allocated by vkd3d-shader and should be freed
+ * with vkd3d_shader_free_scan_combined_resource_sampler_info() when no longer
+ * needed.
+ *
+ * \since 1.10
+ */
+struct vkd3d_shader_scan_combined_resource_sampler_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_SCAN_COMBINED_RESOURCE_SAMPLER_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /** Pointer to an array of resource-sampler pairs. */
+    struct vkd3d_shader_combined_resource_sampler_info *combined_samplers;
+    /** The number of resource-sampler pairs in \ref combined_samplers. */
+    unsigned int combined_sampler_count;
+};
+
+/**
  * Data type of a shader varying, returned as part of struct
  * vkd3d_shader_signature_element.
  */
@@ -2379,6 +2427,21 @@ VKD3D_SHADER_API void vkd3d_shader_build_varying_map(const struct vkd3d_shader_s
         const struct vkd3d_shader_signature *input_signature,
         unsigned int *count, struct vkd3d_shader_varying_map *varyings);
 
+/**
+ * Free members of struct vkd3d_shader_scan_combined_resource_sampler_info
+ * allocated by vkd3d_shader_scan().
+ *
+ * This function may free members of
+ * vkd3d_shader_scan_combined_resource_sampler_info, but does not free the
+ * structure itself.
+ *
+ * \param info Combined resource-sampler information to free.
+ *
+ * \since 1.10
+ */
+VKD3D_SHADER_API void vkd3d_shader_free_scan_combined_resource_sampler_info(
+        struct vkd3d_shader_scan_combined_resource_sampler_info *info);
+
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
 /** Type of vkd3d_shader_get_version(). */
@@ -2450,6 +2513,10 @@ typedef void (*PFN_vkd3d_shader_build_varying_map)(const struct vkd3d_shader_sig
         unsigned int *count, struct vkd3d_shader_varying_map *varyings);
 /** Type of vkd3d_shader_free_scan_signature_info(). \since 1.9 */
 typedef void (*PFN_vkd3d_shader_free_scan_signature_info)(struct vkd3d_shader_scan_signature_info *info);
+
+/** Type of vkd3d_shader_free_scan_combined_resource_sampler_info(). \since 1.10 */
+typedef void (*PFN_vkd3d_shader_free_scan_combined_resource_sampler_info)(
+        struct vkd3d_shader_scan_combined_resource_sampler_info *info);
 
 #ifdef __cplusplus
 }

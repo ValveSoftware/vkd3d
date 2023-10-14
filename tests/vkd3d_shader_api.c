@@ -853,6 +853,132 @@ static void test_build_varying_map(void)
     ok(map[1].input_mask == 0x3, "Got map[1].input_mask %#x.\n", map[1].input_mask);
 }
 
+static void test_scan_combined_resource_samplers(void)
+{
+    struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
+    struct vkd3d_shader_compile_info info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    PFN_vkd3d_shader_free_scan_combined_resource_sampler_info pfn_free_combined_sampler_info;
+    struct vkd3d_shader_scan_combined_resource_sampler_info combined_sampler_info;
+    struct vkd3d_shader_combined_resource_sampler_info *s;
+    struct vkd3d_shader_code d3dbc;
+    int rc;
+
+    static const char ps_3_0_source[] =
+        "sampler s[3];\n"
+        "\n"
+        "float4 main(float4 coord : TEXCOORD) : COLOR\n"
+        "{\n"
+        "    float4 r;\n"
+        "\n"
+        "    r = tex2D(s[0], coord.xy);\n"
+        "    r += tex2D(s[2], coord.xy);\n"
+        "\n"
+        "    return r;\n"
+        "}\n";
+
+    static const uint32_t ps_5_1[] =
+    {
+#if 0
+        Texture2D<float4> t0[8] : register(t8, space4);
+        Texture2D<float4> t1[4] : register(t9, space5);
+        SamplerState s2[4] : register(s10, space6);
+        SamplerState s3[8] : register(s11, space7);
+
+        float4 main(float4 coord : TEXCOORD) : SV_TARGET
+        {
+            float4 r;
+
+            r = t0[7].Sample(s2[3], coord.xy);
+            r += t1[2].Sample(s3[6], coord.xy);
+            r += t0[4].Load(coord.xyz);
+
+            return r;
+        }
+#endif
+        0x43425844, 0x743f5994, 0x0c6d43cf, 0xde114c10, 0xc1adc69a, 0x00000001, 0x000001f8, 0x00000003,
+        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x0000070f, 0x43584554, 0x44524f4f, 0xababab00,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x0000000f, 0x545f5653, 0x45475241, 0xabab0054, 0x58454853, 0x0000015c, 0x00000051,
+        0x00000057, 0x0100086a, 0x0600005a, 0x00306e46, 0x00000000, 0x0000000a, 0x0000000d, 0x00000006,
+        0x0600005a, 0x00306e46, 0x00000001, 0x0000000b, 0x00000012, 0x00000007, 0x07001858, 0x00307e46,
+        0x00000000, 0x00000008, 0x0000000f, 0x00005555, 0x00000004, 0x07001858, 0x00307e46, 0x00000001,
+        0x00000009, 0x0000000c, 0x00005555, 0x00000005, 0x03001062, 0x00101072, 0x00000000, 0x03000065,
+        0x001020f2, 0x00000000, 0x02000068, 0x00000002, 0x0b000045, 0x001000f2, 0x00000000, 0x00101046,
+        0x00000000, 0x00207e46, 0x00000000, 0x0000000f, 0x00206000, 0x00000000, 0x0000000d, 0x0b000045,
+        0x001000f2, 0x00000001, 0x00101046, 0x00000000, 0x00207e46, 0x00000001, 0x0000000b, 0x00206000,
+        0x00000001, 0x00000011, 0x07000000, 0x001000f2, 0x00000000, 0x00100e46, 0x00000000, 0x00100e46,
+        0x00000001, 0x0500001b, 0x001000f2, 0x00000001, 0x00101a46, 0x00000000, 0x0800002d, 0x001000f2,
+        0x00000001, 0x00100e46, 0x00000001, 0x00207e46, 0x00000000, 0x0000000c, 0x07000000, 0x001020f2,
+        0x00000000, 0x00100e46, 0x00000000, 0x00100e46, 0x00000001, 0x0100003e,
+    };
+
+    pfn_free_combined_sampler_info = vkd3d_shader_free_scan_combined_resource_sampler_info;
+
+    hlsl_info.profile = "ps_3_0";
+
+    info.next = &hlsl_info;
+    info.source.code = ps_3_0_source;
+    info.source.size = ARRAY_SIZE(ps_3_0_source);
+    info.source_type = VKD3D_SHADER_SOURCE_HLSL;
+    info.target_type = VKD3D_SHADER_TARGET_D3D_BYTECODE;
+    info.log_level = VKD3D_SHADER_LOG_INFO;
+
+    rc = vkd3d_shader_compile(&info, &d3dbc, NULL);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+
+    combined_sampler_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_COMBINED_RESOURCE_SAMPLER_INFO;
+    combined_sampler_info.next = NULL;
+
+    info.next = &combined_sampler_info;
+    info.source = d3dbc;
+    info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+    info.target_type = VKD3D_SHADER_TARGET_NONE;
+
+    rc = vkd3d_shader_scan(&info, NULL);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+    ok(combined_sampler_info.combined_sampler_count == 2, "Got combined_sampler_count %u.\n",
+            combined_sampler_info.combined_sampler_count);
+    s = &combined_sampler_info.combined_samplers[0];
+    ok(s->resource_space == 0, "Got resource space %u.\n", s->resource_space);
+    ok(s->resource_index == 0, "Got resource index %u.\n", s->resource_index);
+    ok(s->sampler_space == 0, "Got sampler space %u.\n", s->sampler_space);
+    ok(s->sampler_index == 0, "Got sampler index %u.\n", s->sampler_index);
+    s = &combined_sampler_info.combined_samplers[1];
+    ok(s->resource_space == 0, "Got resource space %u.\n", s->resource_space);
+    ok(s->resource_index == 2, "Got resource index %u.\n", s->resource_index);
+    ok(s->sampler_space == 0, "Got sampler space %u.\n", s->sampler_space);
+    ok(s->sampler_index == 2, "Got sampler index %u.\n", s->sampler_index);
+    pfn_free_combined_sampler_info(&combined_sampler_info);
+
+    vkd3d_shader_free_shader_code(&d3dbc);
+
+    info.source.code = ps_5_1;
+    info.source.size = sizeof(ps_5_1);
+    info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+
+    rc = vkd3d_shader_scan(&info, NULL);
+    ok(rc == VKD3D_OK, "Got rc %d.\n", rc);
+    ok(combined_sampler_info.combined_sampler_count == 3, "Got combined_sampler_count %u.\n",
+            combined_sampler_info.combined_sampler_count);
+    s = &combined_sampler_info.combined_samplers[0];
+    ok(s->resource_space == 4, "Got resource space %u.\n", s->resource_space);
+    ok(s->resource_index == 15, "Got resource index %u.\n", s->resource_index);
+    ok(s->sampler_space == 6, "Got sampler space %u.\n", s->sampler_space);
+    ok(s->sampler_index == 13, "Got sampler index %u.\n", s->sampler_index);
+    s = &combined_sampler_info.combined_samplers[1];
+    ok(s->resource_space == 5, "Got resource space %u.\n", s->resource_space);
+    ok(s->resource_index == 11, "Got resource index %u.\n", s->resource_index);
+    ok(s->sampler_space == 7, "Got sampler space %u.\n", s->sampler_space);
+    ok(s->sampler_index == 17, "Got sampler index %u.\n", s->sampler_index);
+    s = &combined_sampler_info.combined_samplers[2];
+    ok(s->resource_space == 4, "Got resource space %u.\n", s->resource_space);
+    ok(s->resource_index == 12, "Got resource index %u.\n", s->resource_index);
+    ok(s->sampler_space == 0, "Got sampler space %u.\n", s->sampler_space);
+    ok(s->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX, "Got sampler index %u.\n", s->sampler_index);
+    pfn_free_combined_sampler_info(&combined_sampler_info);
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -865,4 +991,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_scan_signatures);
     run_test(test_scan_descriptors);
     run_test(test_build_varying_map);
+    run_test(test_scan_combined_resource_samplers);
 }

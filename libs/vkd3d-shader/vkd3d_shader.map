@@ -8,6 +8,7 @@ global:
     vkd3d_shader_free_dxbc;
     vkd3d_shader_free_messages;
     vkd3d_shader_free_root_signature;
+    vkd3d_shader_free_scan_combined_resource_sampler_info;
     vkd3d_shader_free_scan_descriptor_info;
     vkd3d_shader_free_scan_signature_info;
     vkd3d_shader_free_shader_code;
