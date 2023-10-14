@@ -173,6 +173,21 @@ enum vkd3d_shader_compile_option_backward_compatibility
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY),
 };
 
+/**
+ * Determines the origin of fragment coordinates.
+ *
+ * \since 1.10
+ */
+enum vkd3d_shader_compile_option_fragment_coordinate_origin
+{
+    /** Fragment coordinates originate from the upper-left. This is the
+     * default; it's also the only value supported by Vulkan environments. */
+    VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_UPPER_LEFT = 0x00000000,
+    /** Fragment coordinates originate from the lower-left. This matches the
+     * traditional behaviour of OpenGL environments. */
+    VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_LOWER_LEFT = 0x00000001,
+};
+
 enum vkd3d_shader_compile_option_name
 {
     /**
@@ -220,6 +235,16 @@ enum vkd3d_shader_compile_option_name
      * \since 1.10
      */
     VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY = 0x00000008,
+    /**
+     * This option specifies the origin of fragment coordinates for SPIR-V
+     * targets.
+     *
+     * \a value is a member of enum
+     * vkd3d_shader_compile_option_fragment_coordinate_origin.
+     *
+     * \since 1.10
+     */
+    VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN = 0x00000009,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

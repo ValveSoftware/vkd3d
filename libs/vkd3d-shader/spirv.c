@@ -2288,6 +2288,7 @@ struct spirv_compiler
     bool strip_debug;
     bool ssbo_uavs;
     bool uav_read_without_format;
+    SpvExecutionMode fragment_coordinate_origin;
 
     struct rb_tree symbol_table;
     uint32_t temp_id;
@@ -2453,6 +2454,7 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
     compiler->formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
             | VKD3D_SHADER_COMPILE_OPTION_FORMATTING_HEADER;
     compiler->write_tess_geom_point_size = true;
+    compiler->fragment_coordinate_origin = SpvExecutionModeOriginUpperLeft;
 
     for (i = 0; i < compile_info->option_count; ++i)
     {
@@ -2491,6 +2493,15 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
 
             case VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE:
                 compiler->write_tess_geom_point_size = option->value;
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN:
+                if (option->value == VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_UPPER_LEFT)
+                    compiler->fragment_coordinate_origin = SpvExecutionModeOriginUpperLeft;
+                else if (option->value == VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_LOWER_LEFT)
+                    compiler->fragment_coordinate_origin = SpvExecutionModeOriginLowerLeft;
+                else
+                    WARN("Ignoring unrecognised value %#x for option %#x.\n", option->value, option->name);
                 break;
 
             default:
@@ -5358,7 +5369,7 @@ static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *comp
             break;
         case VKD3D_SHADER_TYPE_PIXEL:
             vkd3d_spirv_set_execution_model(builder, SpvExecutionModelFragment);
-            spirv_compiler_emit_execution_mode(compiler, SpvExecutionModeOriginUpperLeft, NULL, 0);
+            spirv_compiler_emit_execution_mode(compiler, compiler->fragment_coordinate_origin, NULL, 0);
             break;
         case VKD3D_SHADER_TYPE_COMPUTE:
             vkd3d_spirv_set_execution_model(builder, SpvExecutionModelGLCompute);
