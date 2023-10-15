@@ -2821,6 +2821,11 @@ static bool sm6_metadata_value_is_node(const struct sm6_metadata_value *m)
     return m && m->type == VKD3D_METADATA_NODE;
 }
 
+static bool sm6_metadata_value_is_value(const struct sm6_metadata_value *m)
+{
+    return m && m->type == VKD3D_METADATA_VALUE;
+}
+
 static bool sm6_metadata_value_is_string(const struct sm6_metadata_value *m)
 {
     return m && m->type == VKD3D_METADATA_STRING;
@@ -3375,11 +3380,170 @@ static const struct sm6_metadata_value *sm6_parser_find_named_metadata(struct sm
     return NULL;
 }
 
+static bool sm6_parser_resources_load_register_range(struct sm6_parser *sm6,
+        const struct sm6_metadata_node *node, struct vkd3d_shader_register_range *range)
+{
+    unsigned int size;
+
+    if (!sm6_metadata_value_is_value(node->operands[1]))
+    {
+        WARN("Resource data type is not a value.\n");
+        return false;
+    }
+    if (!sm6_type_is_pointer(node->operands[1]->value_type))
+    {
+        WARN("Resource type is not a pointer.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Resource metadata value type is not a pointer.");
+    }
+
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[3], &range->space))
+    {
+        WARN("Failed to load register space.\n");
+        return false;
+    }
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[4], &range->first))
+    {
+        WARN("Failed to load register first.\n");
+        return false;
+    }
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[5], &size))
+    {
+        WARN("Failed to load register range size.\n");
+        return false;
+    }
+    if (!size || (size != UINT_MAX && !vkd3d_bound_range(range->first, size, UINT_MAX)))
+    {
+        WARN("Invalid register range, first %u, size %u.\n", range->first, size);
+        return false;
+    }
+    range->last = (size == UINT_MAX) ? UINT_MAX : range->first + size - 1;
+
+    return true;
+}
+
+static enum vkd3d_result sm6_parser_resources_load_cbv(struct sm6_parser *sm6,
+        const struct sm6_metadata_node *node, const struct vkd3d_shader_register_range *range,
+        unsigned int register_id, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_register *reg;
+    unsigned int buffer_size;
+
+    if (node->operand_count < 7)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a CBV descriptor.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (node->operand_count > 7 && node->operands[7])
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 7);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for a CBV descriptor.", node->operand_count - 7);
+    }
+
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[6], &buffer_size))
+    {
+        WARN("Failed to load buffer size.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Constant buffer size metadata value is not an integer.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_DCL_CONSTANT_BUFFER);
+    ins->resource_type = VKD3D_SHADER_RESOURCE_BUFFER;
+    ins->declaration.cb.size = buffer_size;
+    ins->declaration.cb.src.swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    ins->declaration.cb.src.modifiers = VKD3DSPSM_NONE;
+
+    reg = &ins->declaration.cb.src.reg;
+    vsir_register_init(reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
+    reg->idx[0].offset = register_id;
+    reg->idx[1].offset = range->first;
+    reg->idx[2].offset = range->last;
+
+    ins->declaration.cb.range = *range;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
+        enum vkd3d_shader_descriptor_type type, const struct sm6_metadata_node *descriptor_node)
+{
+    struct vkd3d_shader_register_range range;
+    struct vkd3d_shader_instruction *ins;
+    const struct sm6_metadata_node *node;
+    const struct sm6_metadata_value *m;
+    unsigned int i, register_id;
+    enum vkd3d_result ret;
+
+    for (i = 0; i < descriptor_node->operand_count; ++i)
+    {
+        m = descriptor_node->operands[i];
+        if (!sm6_metadata_value_is_node(m))
+        {
+            WARN("Resource descriptor is not a node.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource descriptor is not a metadata node.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        node = m->u.node;
+        if (node->operand_count < 6)
+        {
+            WARN("Invalid operand count %u.\n", node->operand_count);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                    "Invalid operand count %u for a descriptor.", node->operand_count);
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[0], &register_id))
+        {
+            WARN("Failed to load resource id.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource id metadata value is not an integer.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if (!sm6_parser_resources_load_register_range(sm6, node, &range))
+        {
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource register range is invalid.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        if (!(ins = sm6_parser_require_space(sm6, 1)))
+        {
+            ERR("Failed to allocate instruction.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        switch (type)
+        {
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
+                if ((ret = sm6_parser_resources_load_cbv(sm6, node, &range, register_id, ins)) < 0)
+                    return ret;
+                break;
+            default:
+                FIXME("Unsupported descriptor type %u.\n", type);
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                        "Resource descriptor type %u is unsupported.", type);
+                return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        ++sm6->p.instructions.count;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_resources_init(struct sm6_parser *sm6)
 {
     const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.resources");
     enum vkd3d_shader_descriptor_type type;
     const struct sm6_metadata_node *node;
+    enum vkd3d_result ret;
 
     if (!m)
         return VKD3D_OK;
@@ -3406,7 +3570,8 @@ static enum vkd3d_result sm6_parser_resources_init(struct sm6_parser *sm6)
             return VKD3D_ERROR_INVALID_SHADER;
         }
 
-        FIXME("Descriptor info is unhandled.\n");
+        if ((ret = sm6_parser_descriptor_type_init(sm6, type, m->u.node)) < 0)
+            return ret;
     }
 
     return VKD3D_OK;
