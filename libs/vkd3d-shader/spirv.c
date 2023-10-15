@@ -5904,6 +5904,7 @@ static void spirv_compiler_emit_combined_sampler_declarations(struct spirv_compi
                 current->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX ? 0 : current->sampler_space,
                 current->sampler_index);
         symbol.id = var_id;
+        symbol.descriptor_array = NULL;
         symbol.info.resource.range = *resource_range;
         symbol.info.resource.sampled_type = sampled_type;
         symbol.info.resource.type_id = image_type_id;
