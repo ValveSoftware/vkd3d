@@ -25,6 +25,7 @@
 
 #define BITCODE_MAGIC VKD3D_MAKE_TAG('B', 'C', 0xc0, 0xde)
 #define DXIL_OP_MAX_OPERANDS 17
+static const unsigned int SHADER_DESCRIPTOR_TYPE_COUNT = 4;
 
 static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
 
@@ -3374,6 +3375,43 @@ static const struct sm6_metadata_value *sm6_parser_find_named_metadata(struct sm
     return NULL;
 }
 
+static enum vkd3d_result sm6_parser_resources_init(struct sm6_parser *sm6)
+{
+    const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.resources");
+    enum vkd3d_shader_descriptor_type type;
+    const struct sm6_metadata_node *node;
+
+    if (!m)
+        return VKD3D_OK;
+
+    node = m->u.node;
+    if (node->operand_count != SHADER_DESCRIPTOR_TYPE_COUNT)
+    {
+        WARN("Unexpected descriptor type count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Descriptor type count %u is invalid.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    for (type = 0; type < SHADER_DESCRIPTOR_TYPE_COUNT; ++type)
+    {
+        if (!(m = node->operands[type]))
+            continue;
+
+        if (!sm6_metadata_value_is_node(m))
+        {
+            WARN("Resource list is not a node.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource list is not a metadata node.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        FIXME("Descriptor info is unhandled.\n");
+    }
+
+    return VKD3D_OK;
+}
+
 static void signature_element_read_additional_element_values(struct signature_element *e,
         const struct sm6_metadata_node *node, struct sm6_parser *sm6)
 {
@@ -4174,6 +4212,9 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
 
     if ((ret = sm6_parser_entry_point_init(sm6)) < 0)
+        return ret;
+
+    if ((ret = sm6_parser_resources_init(sm6)) < 0)
         return ret;
 
     if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
