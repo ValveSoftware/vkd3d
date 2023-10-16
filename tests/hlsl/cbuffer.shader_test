@@ -176,7 +176,7 @@ float4 main() : sv_target
 uniform 0 float4 1.0 2.0 3.0 4.0
 uniform 4 float4 5.0 6.0 7.0 8.0
 uniform 8 float4 9.0 10.0 11.0 12.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (509, 610, 711, 812)
 
 
@@ -204,7 +204,7 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (12468.0, 13509.0, 14010.0, 15011.0)
 
 
@@ -326,7 +326,7 @@ float4 main() : sv_target
 uniform 0 float 1.0
 uniform 1 float 2.0
 uniform 4 float4 5.0 6.0 7.0 8.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (512.0, 612.0, 712.0, 812.0)
 
 

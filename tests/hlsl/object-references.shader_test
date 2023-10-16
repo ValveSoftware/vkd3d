@@ -202,7 +202,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 10.0
-todo(sm>=6) draw quad
+draw quad
 probe (0, 0) rgba (11.0, 12.0, 13.0, 11.0)
 
 
