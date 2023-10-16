@@ -1450,7 +1450,7 @@ out:
 #endif
 
 #if defined(SONAME_LIBDXCOMPILER) && !defined(VKD3D_CROSSTEST)
-static IDxcCompiler3 *dxcompiler_create()
+static IDxcCompiler3 *dxcompiler_create(void)
 {
     DxcCreateInstanceProc create_instance;
     IDxcCompiler3 *compiler;
@@ -1475,7 +1475,7 @@ static IDxcCompiler3 *dxcompiler_create()
     return compiler;
 }
 #elif !defined(VKD3D_CROSSTEST)
-static IDxcCompiler3 *dxcompiler_create()
+static IDxcCompiler3 *dxcompiler_create(void)
 {
     return NULL;
 }
