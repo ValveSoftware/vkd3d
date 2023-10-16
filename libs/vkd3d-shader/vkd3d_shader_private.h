@@ -575,6 +575,7 @@ enum vkd3d_data_type
     VKD3D_DATA_UNUSED,
     VKD3D_DATA_UINT8,
     VKD3D_DATA_UINT64,
+    VKD3D_DATA_BOOL,
 };
 
 static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
