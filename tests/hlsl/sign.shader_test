@@ -44,6 +44,10 @@ uniform 4 float4 3.0 4.0 0.0 0.0
 todo(sm>=6) draw quad
 probe all rgba (1.0, 1.0, 1.0, 1.0)
 
+[require]
+% SM1-3 doesn't support integral types
+shader model >= 4.0
+
 [pixel shader]
 uniform int f;
 
