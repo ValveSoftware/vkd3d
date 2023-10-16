@@ -1,3 +1,6 @@
+[require]
+shader model >= 4.0
+
 [pixel shader]
 float4x1 main() : sv_target
 {
@@ -17,9 +20,6 @@ row_major float1x4 main() : sv_target
 [test]
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
-
-[require]
-shader model >= 4.0
 
 [render target 0]
 format r32 float
