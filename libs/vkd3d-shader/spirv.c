@@ -4592,8 +4592,7 @@ static unsigned int shader_register_get_io_indices(const struct vkd3d_shader_reg
 }
 
 static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_input_sysval_semantic sysval,
-        enum vkd3d_shader_interpolation_mode interpolation_mode)
+        const struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_input_sysval_semantic sysval)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &dst->reg;
@@ -4693,7 +4692,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         if (component_idx)
             vkd3d_spirv_build_op_decorate1(builder, input_id, SpvDecorationComponent, component_idx);
 
-        spirv_compiler_emit_interpolation_decorations(compiler, input_id, interpolation_mode);
+        spirv_compiler_emit_interpolation_decorations(compiler, input_id, signature_element->interpolation_mode);
     }
 
     var_id = input_id;
@@ -4806,7 +4805,7 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
         case VKD3DSPR_INPUT:
         case VKD3DSPR_INCONTROLPOINT:
         case VKD3DSPR_PATCHCONST:
-            spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE, VKD3DSIM_NONE);
+            spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE);
             return;
         case VKD3DSPR_PRIMID:
             spirv_compiler_emit_input_register(compiler, dst);
@@ -6089,7 +6088,7 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
     if (spirv_compiler_get_current_shader_phase(compiler))
         spirv_compiler_emit_shader_phase_input(compiler, dst);
     else if (vkd3d_shader_register_is_input(&dst->reg) || dst->reg.type == VKD3DSPR_PATCHCONST)
-        spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE, VKD3DSIM_NONE);
+        spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE);
     else
         spirv_compiler_emit_input_register(compiler, dst);
 
@@ -6097,25 +6096,11 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
         compiler->use_vocp = true;
 }
 
-static void spirv_compiler_emit_dcl_input_ps(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    spirv_compiler_emit_input(compiler, &instruction->declaration.dst, VKD3D_SIV_NONE, instruction->flags);
-}
-
-static void spirv_compiler_emit_dcl_input_ps_sysval(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    const struct vkd3d_shader_register_semantic *semantic = &instruction->declaration.register_semantic;
-
-    spirv_compiler_emit_input(compiler, &semantic->reg, semantic->sysval_semantic, instruction->flags);
-}
-
 static void spirv_compiler_emit_dcl_input_sysval(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     spirv_compiler_emit_input(compiler, &instruction->declaration.register_semantic.reg,
-            instruction->declaration.register_semantic.sysval_semantic, VKD3DSIM_NONE);
+            instruction->declaration.register_semantic.sysval_semantic);
 }
 
 static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
@@ -9301,16 +9286,12 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_TGSM_STRUCTURED:
             spirv_compiler_emit_dcl_tgsm_structured(compiler, instruction);
             break;
+        case VKD3DSIH_DCL_INPUT_PS:
         case VKD3DSIH_DCL_INPUT:
             spirv_compiler_emit_dcl_input(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_INPUT_PS:
-            spirv_compiler_emit_dcl_input_ps(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_INPUT_PS_SGV:
         case VKD3DSIH_DCL_INPUT_PS_SIV:
-            spirv_compiler_emit_dcl_input_ps_sysval(compiler, instruction);
-            break;
         case VKD3DSIH_DCL_INPUT_SGV:
         case VKD3DSIH_DCL_INPUT_SIV:
             spirv_compiler_emit_dcl_input_sysval(compiler, instruction);
