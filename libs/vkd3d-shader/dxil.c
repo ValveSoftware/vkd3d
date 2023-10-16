@@ -1861,25 +1861,24 @@ static void src_param_init_from_value(struct vkd3d_shader_src_param *param, cons
     param->reg = src->u.reg;
 }
 
-static void register_address_init(struct vkd3d_shader_register *reg, const struct sm6_value *address,
-        unsigned int idx, struct sm6_parser *sm6)
+static void register_index_address_init(struct vkd3d_shader_register_index *idx, const struct sm6_value *address,
+        struct sm6_parser *sm6)
 {
-    assert(idx < ARRAY_SIZE(reg->idx));
     if (sm6_value_is_constant(address))
     {
-        reg->idx[idx].offset = sm6_value_get_constant_uint(address);
+        idx->offset = sm6_value_get_constant_uint(address);
     }
     else if (sm6_value_is_undef(address))
     {
-        reg->idx[idx].offset = 0;
+        idx->offset = 0;
     }
     else
     {
         struct vkd3d_shader_src_param *rel_addr = shader_parser_get_src_params(&sm6->p, 1);
         if (rel_addr)
             src_param_init_from_value(rel_addr, address);
-        reg->idx[idx].offset = 0;
-        reg->idx[idx].rel_addr = rel_addr;
+        idx->offset = 0;
+        idx->rel_addr = rel_addr;
     }
 }
 
@@ -2546,7 +2545,7 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, struct sm6_blo
     src_param->reg = sm6->input_params[row_index].reg;
     src_param_init_scalar(src_param, column_index);
     if (e->register_count > 1)
-        register_address_init(&src_param->reg, operands[1], 0, sm6);
+        register_index_address_init(&src_param->reg.idx[0], operands[1], sm6);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -2598,7 +2597,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, struct sm6_b
     dst_param_init_scalar(dst_param, column_index);
     dst_param->reg = sm6->output_params[row_index].reg;
     if (e->register_count > 1)
-        register_address_init(&dst_param->reg, operands[1], 0, sm6);
+        register_index_address_init(&dst_param->reg.idx[0], operands[1], sm6);
 
     if ((src_param = instruction_src_params_alloc(ins, 1, sm6)))
         src_param_init_from_value(src_param, value);
