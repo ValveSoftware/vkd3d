@@ -226,7 +226,6 @@ size (1, 1)
 [pixel shader todo fail(sm>=6)]
 struct apple {
     Texture2D tex;
-    float4 fo : COLOR;
 };
 
 float4 main(struct apple input) : sv_target
