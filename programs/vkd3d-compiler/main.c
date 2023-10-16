@@ -35,8 +35,6 @@
 #include <term.h>
 #endif
 
-#define MAX_COMPILE_OPTIONS 6
-
 enum
 {
     OPTION_HELP = CHAR_MAX + 1,
@@ -233,7 +231,7 @@ struct options
     uint32_t formatting;
     bool explicit_colour;
 
-    struct vkd3d_shader_compile_option compile_options[MAX_COMPILE_OPTIONS];
+    struct vkd3d_shader_compile_option *compile_options;
     unsigned int compile_option_count;
 };
 
@@ -242,6 +240,7 @@ static void add_compile_option(struct options *options,
 {
     struct vkd3d_shader_compile_option *o;
     unsigned int i;
+    size_t size;
 
     for (i = 0; i < options->compile_option_count; ++i)
     {
@@ -254,9 +253,10 @@ static void add_compile_option(struct options *options,
         }
     }
 
-    if (options->compile_option_count >= ARRAY_SIZE(options->compile_options))
+    size = (options->compile_option_count + 1) * sizeof(*o);
+    if (!(options->compile_options = realloc(options->compile_options, size)))
     {
-        fprintf(stderr, "Ignoring option.\n");
+        fprintf(stderr, "Out of memory.\n");
         return;
     }
 
