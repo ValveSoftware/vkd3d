@@ -173,7 +173,13 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
 {
     switch (sysval)
     {
+        case VKD3D_SHADER_SV_COVERAGE:
+        case VKD3D_SHADER_SV_DEPTH:
+        case VKD3D_SHADER_SV_DEPTH_GREATER_EQUAL:
+        case VKD3D_SHADER_SV_DEPTH_LESS_EQUAL:
         case VKD3D_SHADER_SV_NONE:
+        case VKD3D_SHADER_SV_STENCIL_REF:
+        case VKD3D_SHADER_SV_TARGET:
             return VKD3D_SIV_NONE;
         case VKD3D_SHADER_SV_POSITION:
             return VKD3D_SIV_POSITION;
@@ -181,6 +187,16 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
             return VKD3D_SIV_CLIP_DISTANCE;
         case VKD3D_SHADER_SV_CULL_DISTANCE:
             return VKD3D_SIV_CULL_DISTANCE;
+        case VKD3D_SHADER_SV_INSTANCE_ID:
+            return VKD3D_SIV_INSTANCE_ID;
+        case VKD3D_SHADER_SV_IS_FRONT_FACE:
+            return VKD3D_SIV_IS_FRONT_FACE;
+        case VKD3D_SHADER_SV_PRIMITIVE_ID:
+            return VKD3D_SIV_PRIMITIVE_ID;
+        case VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX:
+            return VKD3D_SIV_RENDER_TARGET_ARRAY_INDEX;
+        case VKD3D_SHADER_SV_SAMPLE_INDEX:
+            return VKD3D_SIV_SAMPLE_INDEX;
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE:
             return VKD3D_SIV_QUAD_U0_TESS_FACTOR + index;
         case VKD3D_SHADER_SV_TESS_FACTOR_QUADINT:
@@ -193,6 +209,10 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
             return VKD3D_SIV_LINE_DETAIL_TESS_FACTOR;
         case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
             return VKD3D_SIV_LINE_DENSITY_TESS_FACTOR;
+        case VKD3D_SHADER_SV_VERTEX_ID:
+            return VKD3D_SIV_VERTEX_ID;
+        case VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX:
+            return VKD3D_SIV_VIEWPORT_ARRAY_INDEX;
         default:
             FIXME("Unhandled sysval %#x, index %u.\n", sysval, index);
             return VKD3D_SIV_NONE;
@@ -4592,7 +4612,7 @@ static unsigned int shader_register_get_io_indices(const struct vkd3d_shader_reg
 }
 
 static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_input_sysval_semantic sysval)
+        const struct vkd3d_shader_dst_param *dst)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &dst->reg;
@@ -4600,6 +4620,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     const struct signature_element *signature_element;
     const struct shader_signature *shader_signature;
     enum vkd3d_shader_component_type component_type;
+    enum vkd3d_shader_input_sysval_semantic sysval;
     uint32_t type_id, ptr_type_id, float_type_id;
     const struct vkd3d_spirv_builtin *builtin;
     unsigned int write_mask, reg_write_mask;
@@ -4621,10 +4642,12 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
     element_idx = shader_register_get_io_indices(reg, array_sizes);
     signature_element = &shader_signature->elements[element_idx];
-
-    if ((compiler->shader_type == VKD3D_SHADER_TYPE_HULL || compiler->shader_type == VKD3D_SHADER_TYPE_GEOMETRY)
-            && !sysval && signature_element->sysval_semantic)
-        sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
+    sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
+    /* The Vulkan spec does not explicitly forbid passing varyings from the
+     * TCS to the TES via builtins. However, Mesa doesn't seem to handle it
+     * well, and we don't actually need them to be in builtins. */
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_DOMAIN && reg->type != VKD3DSPR_PATCHCONST)
+        sysval = VKD3D_SIV_NONE;
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
@@ -4805,7 +4828,7 @@ static void spirv_compiler_emit_shader_phase_input(struct spirv_compiler *compil
         case VKD3DSPR_INPUT:
         case VKD3DSPR_INCONTROLPOINT:
         case VKD3DSPR_PATCHCONST:
-            spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE);
+            spirv_compiler_emit_input(compiler, dst);
             return;
         case VKD3DSPR_PRIMID:
             spirv_compiler_emit_input_register(compiler, dst);
@@ -4976,8 +4999,7 @@ static uint32_t spirv_compiler_emit_shader_phase_builtin_variable(struct spirv_c
     return id;
 }
 
-static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_dst_param *dst, enum vkd3d_shader_input_sysval_semantic sysval)
+static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const struct vkd3d_shader_dst_param *dst)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_register *reg = &dst->reg;
@@ -4985,6 +5007,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     const struct signature_element *signature_element;
     enum vkd3d_shader_component_type component_type;
     const struct shader_signature *shader_signature;
+    enum vkd3d_shader_input_sysval_semantic sysval;
     const struct vkd3d_spirv_builtin *builtin;
     unsigned int write_mask, reg_write_mask;
     bool use_private_variable = false;
@@ -5001,6 +5024,10 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
     element_idx = shader_register_get_io_indices(reg, array_sizes);
     signature_element = &shader_signature->elements[element_idx];
+    sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
+    /* Don't use builtins for TCS -> TES varyings. See spirv_compiler_emit_input(). */
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant)
+        sysval = VKD3D_SIV_NONE;
 
     builtin = vkd3d_get_spirv_builtin(compiler, dst->reg.type, sysval);
 
@@ -6088,7 +6115,7 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
     if (spirv_compiler_get_current_shader_phase(compiler))
         spirv_compiler_emit_shader_phase_input(compiler, dst);
     else if (vkd3d_shader_register_is_input(&dst->reg) || dst->reg.type == VKD3DSPR_PATCHCONST)
-        spirv_compiler_emit_input(compiler, dst, VKD3D_SIV_NONE);
+        spirv_compiler_emit_input(compiler, dst);
     else
         spirv_compiler_emit_input_register(compiler, dst);
 
@@ -6099,8 +6126,7 @@ static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,
 static void spirv_compiler_emit_dcl_input_sysval(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    spirv_compiler_emit_input(compiler, &instruction->declaration.register_semantic.reg,
-            instruction->declaration.register_semantic.sysval_semantic);
+    spirv_compiler_emit_input(compiler, &instruction->declaration.register_semantic.reg);
 }
 
 static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
@@ -6110,7 +6136,7 @@ static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
 
     if (vkd3d_shader_register_is_output(&dst->reg)
             || (is_in_fork_or_join_phase(compiler) && vkd3d_shader_register_is_patch_constant(&dst->reg)))
-        spirv_compiler_emit_output(compiler, dst, VKD3D_SIV_NONE);
+        spirv_compiler_emit_output(compiler, dst);
     else
         spirv_compiler_emit_output_register(compiler, dst);
 }
@@ -6118,13 +6144,7 @@ static void spirv_compiler_emit_dcl_output(struct spirv_compiler *compiler,
 static void spirv_compiler_emit_dcl_output_siv(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    enum vkd3d_shader_input_sysval_semantic sysval;
-    const struct vkd3d_shader_dst_param *dst;
-
-    dst = &instruction->declaration.register_semantic.reg;
-    sysval = instruction->declaration.register_semantic.sysval_semantic;
-
-    spirv_compiler_emit_output(compiler, dst, sysval);
+    spirv_compiler_emit_output(compiler, &instruction->declaration.register_semantic.reg);
 }
 
 static void spirv_compiler_emit_dcl_stream(struct spirv_compiler *compiler,
