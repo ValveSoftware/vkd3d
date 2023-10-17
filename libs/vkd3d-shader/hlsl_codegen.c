@@ -2714,6 +2714,35 @@ static bool lower_ceil(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct 
     return true;
 }
 
+/* Lower FLOOR to FRC */
+static bool lower_floor(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *arg, *neg, *sum, *frc;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+
+    expr = hlsl_ir_expr(instr);
+    arg = expr->operands[0].node;
+    if (expr->op != HLSL_OP1_FLOOR)
+        return false;
+
+    if (!(frc = hlsl_new_unary_expr(ctx, HLSL_OP1_FRACT, arg, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, frc);
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, frc, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, neg);
+
+    if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, neg, arg)))
+        return false;
+    hlsl_block_add_instr(block, sum);
+
+    return true;
+}
+
 /* Use 'movc' for the ternary operator. */
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
@@ -4881,6 +4910,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         lower_ir(ctx, lower_dot, body);
         lower_ir(ctx, lower_round, body);
         lower_ir(ctx, lower_ceil, body);
+        lower_ir(ctx, lower_floor, body);
     }
 
     if (profile->major_version < 2)
