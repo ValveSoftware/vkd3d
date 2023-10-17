@@ -526,6 +526,7 @@ enum hlsl_ir_expr_op
     HLSL_OP1_ABS,
     HLSL_OP1_BIT_NOT,
     HLSL_OP1_CAST,
+    HLSL_OP1_CEIL,
     HLSL_OP1_COS,
     HLSL_OP1_COS_REDUCED,    /* Reduced range [-pi, pi] */
     HLSL_OP1_DSX,
