@@ -4974,7 +4974,7 @@ static void spirv_compiler_emit_output_register(struct spirv_compiler *compiler,
 }
 
 static uint32_t spirv_compiler_emit_shader_phase_builtin_variable(struct spirv_compiler *compiler,
-        const struct vkd3d_spirv_builtin *builtin)
+        const struct vkd3d_spirv_builtin *builtin, const unsigned int *array_sizes, unsigned int size_count)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t *variable_id, id;
@@ -4989,7 +4989,7 @@ static uint32_t spirv_compiler_emit_shader_phase_builtin_variable(struct spirv_c
     if (variable_id && *variable_id)
         return *variable_id;
 
-    id = spirv_compiler_emit_builtin_variable(compiler, builtin, SpvStorageClassOutput, 0);
+    id = spirv_compiler_emit_builtin_variable_v(compiler, builtin, SpvStorageClassOutput, array_sizes, size_count);
     if (is_in_fork_or_join_phase(compiler))
         vkd3d_spirv_build_op_decorate(builder, id, SpvDecorationPatch, NULL, 0);
 
@@ -5071,7 +5071,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
     else if (builtin)
     {
         if (spirv_compiler_get_current_shader_phase(compiler))
-            id = spirv_compiler_emit_shader_phase_builtin_variable(compiler, builtin);
+            id = spirv_compiler_emit_shader_phase_builtin_variable(compiler, builtin, array_sizes, 2);
         else
             id = spirv_compiler_emit_builtin_variable_v(compiler, builtin, storage_class, array_sizes, 2);
 
