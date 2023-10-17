@@ -4931,6 +4931,11 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             write_sm4_cast(tpf, expr);
             break;
 
+        case HLSL_OP1_CEIL:
+            assert(type_is_float(dst_type));
+            write_sm4_unary_op(tpf, VKD3D_SM4_OP_ROUND_PI, &expr->node, arg1, 0);
+            break;
+
         case HLSL_OP1_COS:
             assert(type_is_float(dst_type));
             write_sm4_unary_op_with_two_destinations(tpf, VKD3D_SM4_OP_SINCOS, &expr->node, 1, arg1);
