@@ -69,6 +69,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/cast-to-int.shader_test \
 	tests/hlsl/cast-to-uint.shader_test \
 	tests/hlsl/cbuffer.shader_test \
+	tests/hlsl/ceil.shader_test \
 	tests/hlsl/clamp.shader_test \
 	tests/hlsl/clip.shader_test \
 	tests/hlsl/combined-samplers.shader_test \
