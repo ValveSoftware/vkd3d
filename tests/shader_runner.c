@@ -1081,7 +1081,13 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_RESOURCE:
-                    set_resource(runner, runner->ops->create_resource(runner, &current_resource));
+                    /* Not every backend supports every resource type
+                     * (specifically, D3D9 doesn't support UAVs and
+                     * textures with data type other than float). */
+                    if (!skip_tests)
+                    {
+                        set_resource(runner, runner->ops->create_resource(runner, &current_resource));
+                    }
                     free(current_resource.data);
                     break;
 
