@@ -217,7 +217,7 @@ float4 main() : sv_target1
 }
 
 % RWTexture2DArray types
-[pixel shader fail(sm>=6) todo]
+[pixel shader fail(sm>=6)]
 struct s
 {
     float3 a;
