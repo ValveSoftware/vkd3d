@@ -216,6 +216,24 @@ float4 main() : sv_target1
     return 0;
 }
 
+% RWTexture2DArray types
+[pixel shader fail(sm>=6) todo]
+struct s
+{
+    float3 a;
+};
+
+RWTexture2DArray<float4> u : register(u2);
+RWTexture2DArray<float> u1;
+RWTexture2DArray<float2x2> u2;
+RWTexture2DArray<struct s> u3;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
 % RWTexture3D types
 [pixel shader fail(sm>=6)]
 struct s
@@ -310,6 +328,14 @@ float4 main() : sv_target1
 }
 
 [pixel shader fail]
+RWTexture2DArray<Texture2D> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
 RWTexture3D<Texture2D> u;
 
 float4 main() : sv_target1
@@ -350,6 +376,19 @@ struct s
 };
 
 RWTexture2D<struct s> u;
+
+float4 main() : sv_target1
+{
+    return 0;
+}
+
+[pixel shader fail]
+struct s
+{
+    Texture2D t;
+};
+
+RWTexture2DArray<struct s> u;
 
 float4 main() : sv_target1
 {
