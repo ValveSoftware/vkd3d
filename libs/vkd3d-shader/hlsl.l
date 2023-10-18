@@ -109,6 +109,7 @@ register                {return KW_REGISTER;            }
 RWBuffer                {return KW_RWBUFFER;            }
 RWStructuredBuffer      {return KW_RWSTRUCTUREDBUFFER;  }
 RWTexture1D             {return KW_RWTEXTURE1D;         }
+RWTexture1DArray        {return KW_RWTEXTURE1DARRAY;    }
 RWTexture2D             {return KW_RWTEXTURE2D;         }
 RWTexture3D             {return KW_RWTEXTURE3D;         }
 sampler                 {return KW_SAMPLER;             }

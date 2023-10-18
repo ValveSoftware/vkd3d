@@ -4722,6 +4722,7 @@ static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
 %token KW_RWBUFFER
 %token KW_RWSTRUCTUREDBUFFER
 %token KW_RWTEXTURE1D
+%token KW_RWTEXTURE1DARRAY
 %token KW_RWTEXTURE2D
 %token KW_RWTEXTURE3D
 %token KW_SAMPLER
@@ -5547,6 +5548,10 @@ uav_type:
         {
             $$ = HLSL_SAMPLER_DIM_1D;
         }
+    | KW_RWTEXTURE1DARRAY
+        {
+            $$ = HLSL_SAMPLER_DIM_1DARRAY;
+        }
     | KW_RWTEXTURE2D
         {
             $$ = HLSL_SAMPLER_DIM_2D;
@@ -5697,6 +5702,7 @@ type_no_void:
             {
                 case HLSL_SAMPLER_DIM_BUFFER:
                 case HLSL_SAMPLER_DIM_1D:
+                case HLSL_SAMPLER_DIM_1DARRAY:
                 case HLSL_SAMPLER_DIM_2D:
                 case HLSL_SAMPLER_DIM_3D:
                     if ($3->class == HLSL_CLASS_ARRAY)
