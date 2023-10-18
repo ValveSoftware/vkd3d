@@ -580,8 +580,11 @@ endif
 tests/crosstests.txt: FORCE
 	$(AM_V_GEN) for i in $(vkd3d_cross_tests) ; do echo $$i ; done > $@
 
-crosstest-lists: tests/crosstests.txt
-CLEANFILES += tests/crosstests.txt
+tests/shader_tests.txt: FORCE
+	$(AM_V_GEN) for i in $(vkd3d_shader_tests) ; do echo $$i ; done > $@
+
+crosstest-lists: tests/crosstests.txt tests/shader_tests.txt
+CLEANFILES += tests/crosstests.txt tests/shader_tests.txt
 
 FORCE:
 

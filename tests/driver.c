@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <windows.h>
+#include <shlobj.h>
 
 #define TIMEOUT_MS (10 * 1000)
 #define MAX_TIMEOUT_COUNT 3
@@ -32,15 +33,32 @@ enum program_result
 
 static enum program_result run_program(const char *cmdline, const char *log_filename)
 {
+    char cmdline2[1024], log_dirname[1024], *file_part;
     enum program_result ret = PROGRAM_RESULT_SUCCESS;
     HANDLE log = INVALID_HANDLE_VALUE;
     SECURITY_ATTRIBUTES attrs = {0};
     PROCESS_INFORMATION info = {0};
     DWORD exit_code, wait_result;
     STARTUPINFOA startup = {0};
-    char cmdline2[1024];
+    int res;
 
     strcpy(cmdline2, cmdline);
+
+    if (GetFullPathNameA(log_filename, sizeof(log_dirname), log_dirname, &file_part) == 0)
+    {
+        fprintf(stderr, "Cannot extract the directory name for path %s, last error %ld.\n", log_filename, GetLastError());
+        ret = PROGRAM_RESULT_FAILURE;
+        goto out;
+    }
+    *file_part = '\0';
+
+    res = SHCreateDirectoryExA(NULL, log_dirname, NULL);
+    if (res != ERROR_SUCCESS && res != ERROR_ALREADY_EXISTS)
+    {
+        fprintf(stderr, "Cannot create log directory %s, error %d.\n", log_dirname, res);
+        ret = PROGRAM_RESULT_FAILURE;
+        goto out;
+    }
 
     attrs.nLength = sizeof(attrs);
     attrs.bInheritHandle = TRUE;
@@ -124,6 +142,38 @@ static bool run_tests_for_directory(const char *commit_dir)
 
     printf("Building %s\n", commit_dir);
     printf("---\n");
+
+    sprintf(list_filename, "artifacts/%s/tests/shader_tests.txt", commit_dir);
+    list_file = fopen(list_filename, "r");
+
+    if (!list_file)
+    {
+        fprintf(stderr, "Cannot open list file %s, errno %d.\n", list_filename, errno);
+        ret = false;
+    }
+    else
+    {
+        while (fgets(line, sizeof(line), list_file) && timeout_count < MAX_TIMEOUT_COUNT)
+        {
+            size_t len = strlen(line);
+
+            if (line[len - 1] == '\n')
+                line[--len] = '\0';
+
+            sprintf(cmdline, "artifacts/%s/tests/shader_runner.cross%s.exe %s", commit_dir, test_arch, line);
+
+            /* Remove the .shader_test suffix. */
+            line[len - 12] = '\0';
+            sprintf(log_filename, "artifacts/%s/%s.log", commit_dir, line);
+
+            ++test_count;
+            result = run_program(cmdline, log_filename);
+            success_count += result == PROGRAM_RESULT_SUCCESS;
+            timeout_count += result == PROGRAM_RESULT_TIMEOUT;
+         }
+
+        fclose(list_file);
+    }
 
     sprintf(list_filename, "artifacts/%s/tests/crosstests.txt", commit_dir);
     list_file = fopen(list_filename, "r");
