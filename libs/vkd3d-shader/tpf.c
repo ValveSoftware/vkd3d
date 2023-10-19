@@ -884,6 +884,8 @@ static void shader_sm4_read_dcl_constant_buffer(struct vkd3d_shader_instruction 
         ins->declaration.cb.size = *tokens++;
         shader_sm4_read_register_space(priv, &tokens, end, &ins->declaration.cb.range.space);
     }
+
+    ins->declaration.cb.size *= VKD3D_VEC4_SIZE * sizeof(float);
 }
 
 static void shader_sm4_read_dcl_sampler(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,

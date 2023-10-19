@@ -1626,8 +1626,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_register(compiler, &ins->declaration.cb.src.reg, true);
-            if (shader_ver_ge(&compiler->shader_version, 5, 1))
+            if (shader_ver_ge(&compiler->shader_version, 6, 0))
                 shader_print_subscript(compiler, ins->declaration.cb.size, NULL);
+            else if (shader_ver_ge(&compiler->shader_version, 5, 1))
+                shader_print_subscript(compiler, ins->declaration.cb.size / VKD3D_VEC4_SIZE / sizeof(float), NULL);
             shader_addline(buffer, ", %s",
                     ins->flags & VKD3DSI_INDEXED_DYNAMIC ? "dynamicIndexed" : "immediateIndexed");
             shader_dump_register_space(compiler, ins->declaration.cb.range.space);
