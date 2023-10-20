@@ -4150,7 +4150,7 @@ static void sm6_parser_emit_global_flags(struct sm6_parser *sm6, const struct sm
     enum vkd3d_shader_global_flags global_flags, mask, rotated_flags;
     struct vkd3d_shader_instruction *ins;
 
-    if (!sm6_metadata_get_uint64_value(sm6, m, &global_flags))
+    if (!sm6_metadata_get_uint64_value(sm6, m, (uint64_t*)&global_flags))
     {
         WARN("Failed to load global flags.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,

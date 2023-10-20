@@ -419,7 +419,7 @@ static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler,
     }
 
     if (global_flags)
-        vkd3d_string_buffer_printf(&compiler->buffer, "unknown_flags(%#"PRIx64")", global_flags);
+        vkd3d_string_buffer_printf(&compiler->buffer, "unknown_flags(%#"PRIx64")", (uint64_t)global_flags);
 }
 
 static void shader_dump_sync_flags(struct vkd3d_d3d_asm_compiler *compiler, uint32_t sync_flags)
