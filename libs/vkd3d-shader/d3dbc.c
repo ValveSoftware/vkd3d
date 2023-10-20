@@ -555,9 +555,9 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
         return false;
     element = &signature->elements[signature->element_count++];
 
+    memset(element, 0, sizeof(*element));
     element->semantic_name = name;
     element->semantic_index = index;
-    element->stream_index = 0;
     element->sysval_semantic = sysval;
     element->component_type = VKD3D_SHADER_COMPONENT_FLOAT;
     element->register_index = register_index;
@@ -565,7 +565,8 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     element->register_count = 1;
     element->mask = mask;
     element->used_mask = is_dcl ? 0 : mask;
-    element->min_precision = VKD3D_SHADER_MINIMUM_PRECISION_NONE;
+    if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
+        element->interpolation_mode = VKD3DSIM_LINEAR;
 
     return true;
 }
