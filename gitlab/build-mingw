@@ -19,7 +19,7 @@ cp -r /usr/include/vulkan /usr/include/vk_video /usr/include/spirv vulkan-header
         touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
-cp config.log ../artifacts/$COMMIT
-cp destdir/usr/local/bin/* ../artifacts/$COMMIT
+cp config.log ../artifacts/$COMMIT || true
+cp destdir/usr/local/bin/* ../artifacts/$COMMIT || true
 
 git reset --hard

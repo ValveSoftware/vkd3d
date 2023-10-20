@@ -19,7 +19,7 @@ cd build
         touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
-rsync -Rr config.log tests/*.txt tests/*.exe ../artifacts/$COMMIT
+rsync -Rr config.log tests/*.txt tests/*.exe ../artifacts/$COMMIT || true
 
 # Make the driver easily available to the Windows CI job
 cp tests/driver.cross64.exe ../artifacts

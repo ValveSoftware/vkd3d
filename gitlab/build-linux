@@ -18,6 +18,6 @@ export LD_LIBRARY_PATH=/usr/local/lib
         touch ../pipeline_failed
 
 mkdir -p ../artifacts/$COMMIT
-rsync -Rr config.log doc/* test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT
+rsync -Rr config.log doc/* test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT || true
 
 git reset --hard
