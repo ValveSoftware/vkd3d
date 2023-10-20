@@ -16,7 +16,7 @@ draw quad
 probe all rgba (2.0, -10.0, -2.0, 76.25)
 
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 uniform int4 x;
 uniform int4 y;
 uniform int4 s;
@@ -33,8 +33,8 @@ if(sm<4) uniform 8 float4 0 1 -1 1000000
 if(sm>=4) uniform 0 int4 2 3 4 0
 if(sm>=4) uniform 4 int4 0 -10 10 1000000
 if(sm>=4) uniform 8 int4 0 1 -1 1000000
-todo(sm<4) draw quad
-probe all rgba (2.0, -10.0, -2.0, 1e12)
+draw quad
+probe all rgba (2.0, -10.0, -2.0, 1e12) 4
 
 
 [pixel shader]
