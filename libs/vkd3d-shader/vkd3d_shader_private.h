@@ -916,6 +916,8 @@ struct shader_signature
     unsigned int element_count;
 };
 
+struct signature_element *vsir_signature_find_element_for_reg(const struct shader_signature *signature,
+        unsigned int reg_idx, unsigned int write_mask);
 void shader_signature_cleanup(struct shader_signature *signature);
 
 struct vkd3d_shader_desc

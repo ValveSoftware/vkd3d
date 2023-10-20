@@ -581,6 +581,12 @@ static unsigned int shader_signature_find_element_for_reg(const struct shader_si
     vkd3d_unreachable();
 }
 
+struct signature_element *vsir_signature_find_element_for_reg(const struct shader_signature *signature,
+        unsigned int reg_idx, unsigned int write_mask)
+{
+    return &signature->elements[shader_signature_find_element_for_reg(signature, reg_idx, write_mask)];
+}
+
 static unsigned int range_map_get_register_count(uint8_t range_map[][VKD3D_VEC4_SIZE],
         unsigned int register_idx, unsigned int write_mask)
 {

@@ -1070,16 +1070,31 @@ static void shader_sm4_read_declaration_register_semantic(struct vkd3d_shader_in
 static void shader_sm4_read_dcl_input_ps(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
+    struct vkd3d_shader_dst_param *dst = &ins->declaration.dst;
+
     ins->flags = (opcode_token & VKD3D_SM4_INTERPOLATION_MODE_MASK) >> VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
-    shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT, &ins->declaration.dst);
+    if (shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT, dst))
+    {
+        struct signature_element *e = vsir_signature_find_element_for_reg(
+                &priv->p.shader_desc.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+
+        e->interpolation_mode = ins->flags;
+    }
 }
 
 static void shader_sm4_read_dcl_input_ps_siv(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
+    struct vkd3d_shader_dst_param *dst = &ins->declaration.register_semantic.reg;
+
     ins->flags = (opcode_token & VKD3D_SM4_INTERPOLATION_MODE_MASK) >> VKD3D_SM4_INTERPOLATION_MODE_SHIFT;
-    shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT,
-            &ins->declaration.register_semantic.reg);
+    if (shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT, dst))
+    {
+        struct signature_element *e = vsir_signature_find_element_for_reg(
+                &priv->p.shader_desc.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+
+        e->interpolation_mode = ins->flags;
+    }
     ins->declaration.register_semantic.sysval_semantic = *tokens;
 }
 
