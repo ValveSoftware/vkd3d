@@ -4365,47 +4365,41 @@ struct vkd3d_spirv_builtin
  */
 static const struct
 {
-    enum vkd3d_shader_input_sysval_semantic sysval;
+    enum vkd3d_shader_sysval_semantic sysval;
     struct vkd3d_spirv_builtin builtin;
     enum vkd3d_shader_spirv_environment environment;
 }
 vkd3d_system_value_builtins[] =
 {
-    {VKD3D_SIV_VERTEX_ID,   {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInVertexId},
+    {VKD3D_SHADER_SV_VERTEX_ID,             {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInVertexId},
             VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5},
-    {VKD3D_SIV_INSTANCE_ID, {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInInstanceId},
+    {VKD3D_SHADER_SV_INSTANCE_ID,           {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInInstanceId},
             VKD3D_SHADER_SPIRV_ENVIRONMENT_OPENGL_4_5},
 
-    {VKD3D_SIV_POSITION,    {VKD3D_SHADER_COMPONENT_FLOAT, 4, SpvBuiltInPosition}},
-    {VKD3D_SIV_VERTEX_ID,   {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInVertexIndex, sv_vertex_id_fixup}},
-    {VKD3D_SIV_INSTANCE_ID, {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInInstanceIndex, sv_instance_id_fixup}},
+    {VKD3D_SHADER_SV_POSITION,              {VKD3D_SHADER_COMPONENT_FLOAT, 4, SpvBuiltInPosition}},
+    {VKD3D_SHADER_SV_VERTEX_ID,             {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInVertexIndex, sv_vertex_id_fixup}},
+    {VKD3D_SHADER_SV_INSTANCE_ID,           {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInInstanceIndex, sv_instance_id_fixup}},
 
-    {VKD3D_SIV_PRIMITIVE_ID, {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInPrimitiveId}},
+    {VKD3D_SHADER_SV_PRIMITIVE_ID,          {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInPrimitiveId}},
 
-    {VKD3D_SIV_RENDER_TARGET_ARRAY_INDEX, {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInLayer}},
-    {VKD3D_SIV_VIEWPORT_ARRAY_INDEX,      {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInViewportIndex}},
+    {VKD3D_SHADER_SV_RENDER_TARGET_ARRAY_INDEX, {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInLayer}},
+    {VKD3D_SHADER_SV_VIEWPORT_ARRAY_INDEX,      {VKD3D_SHADER_COMPONENT_INT, 1, SpvBuiltInViewportIndex}},
 
-    {VKD3D_SIV_IS_FRONT_FACE, {VKD3D_SHADER_COMPONENT_BOOL, 1, SpvBuiltInFrontFacing, sv_front_face_fixup}},
+    {VKD3D_SHADER_SV_IS_FRONT_FACE,         {VKD3D_SHADER_COMPONENT_BOOL, 1, SpvBuiltInFrontFacing, sv_front_face_fixup}},
 
-    {VKD3D_SIV_SAMPLE_INDEX, {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSampleId}},
+    {VKD3D_SHADER_SV_SAMPLE_INDEX,          {VKD3D_SHADER_COMPONENT_UINT, 1, SpvBuiltInSampleId}},
 
-    {VKD3D_SIV_CLIP_DISTANCE, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInClipDistance, NULL, 1}},
-    {VKD3D_SIV_CULL_DISTANCE, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInCullDistance, NULL, 1}},
+    {VKD3D_SHADER_SV_CLIP_DISTANCE,         {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInClipDistance, NULL, 1}},
+    {VKD3D_SHADER_SV_CULL_DISTANCE,         {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInCullDistance, NULL, 1}},
 
-    {VKD3D_SIV_QUAD_U0_TESS_FACTOR,      {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 0}},
-    {VKD3D_SIV_QUAD_V0_TESS_FACTOR,      {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 1}},
-    {VKD3D_SIV_QUAD_U1_TESS_FACTOR,      {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 2}},
-    {VKD3D_SIV_QUAD_V1_TESS_FACTOR,      {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 3}},
-    {VKD3D_SIV_QUAD_U_INNER_TESS_FACTOR, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelInner, NULL, 2, 0}},
-    {VKD3D_SIV_QUAD_V_INNER_TESS_FACTOR, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelInner, NULL, 2, 1}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE,  {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_QUADINT,   {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelInner, NULL, 2}},
 
-    {VKD3D_SIV_TRIANGLE_U_TESS_FACTOR,     {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 0}},
-    {VKD3D_SIV_TRIANGLE_V_TESS_FACTOR,     {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 1}},
-    {VKD3D_SIV_TRIANGLE_W_TESS_FACTOR,     {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 2}},
-    {VKD3D_SIV_TRIANGLE_INNER_TESS_FACTOR, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelInner, NULL, 2, 0}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_TRIEDGE,   {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_TRIINT,    {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelInner, NULL, 2}},
 
-    {VKD3D_SIV_LINE_DENSITY_TESS_FACTOR, {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 0}},
-    {VKD3D_SIV_LINE_DETAIL_TESS_FACTOR,  {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 1}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN,   {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 0}},
+    {VKD3D_SHADER_SV_TESS_FACTOR_LINEDET,   {VKD3D_SHADER_COMPONENT_FLOAT, 1, SpvBuiltInTessLevelOuter, NULL, 4, 1}},
 };
 static const struct vkd3d_spirv_builtin vkd3d_pixel_shader_position_builtin =
 {
@@ -4469,7 +4463,7 @@ static void spirv_compiler_emit_register_execution_mode(struct spirv_compiler *c
 }
 
 static const struct vkd3d_spirv_builtin *get_spirv_builtin_for_sysval(
-        const struct spirv_compiler *compiler, enum vkd3d_shader_input_sysval_semantic sysval)
+        const struct spirv_compiler *compiler, enum vkd3d_shader_sysval_semantic sysval)
 {
     enum vkd3d_shader_spirv_environment environment;
     unsigned int i;
@@ -4478,7 +4472,7 @@ static const struct vkd3d_spirv_builtin *get_spirv_builtin_for_sysval(
         return NULL;
 
     /* In pixel shaders, SV_Position is mapped to SpvBuiltInFragCoord. */
-    if (sysval == VKD3D_SIV_POSITION && compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL)
+    if (sysval == VKD3D_SHADER_SV_POSITION && compiler->shader_type == VKD3D_SHADER_TYPE_PIXEL)
         return &vkd3d_pixel_shader_position_builtin;
 
     environment = spirv_compiler_get_target_environment(compiler);
@@ -4510,7 +4504,7 @@ static const struct vkd3d_spirv_builtin *get_spirv_builtin_for_register(
 }
 
 static const struct vkd3d_spirv_builtin *vkd3d_get_spirv_builtin(const struct spirv_compiler *compiler,
-        enum vkd3d_shader_register_type reg_type, enum vkd3d_shader_input_sysval_semantic sysval)
+        enum vkd3d_shader_register_type reg_type, enum vkd3d_shader_sysval_semantic sysval)
 {
     const struct vkd3d_spirv_builtin *builtin;
 
@@ -4519,7 +4513,7 @@ static const struct vkd3d_spirv_builtin *vkd3d_get_spirv_builtin(const struct sp
     if ((builtin = get_spirv_builtin_for_register(reg_type)))
         return builtin;
 
-    if (sysval != VKD3D_SIV_NONE || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_PATCHCONST))
+    if (sysval != VKD3D_SHADER_SV_NONE || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_PATCHCONST))
         FIXME("Unhandled builtin (register type %#x, sysval %#x).\n", reg_type, sysval);
     return NULL;
 }
@@ -4698,8 +4692,8 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     const struct signature_element *signature_element;
     const struct shader_signature *shader_signature;
     enum vkd3d_shader_component_type component_type;
-    enum vkd3d_shader_input_sysval_semantic sysval;
     const struct vkd3d_spirv_builtin *builtin;
+    enum vkd3d_shader_sysval_semantic sysval;
     unsigned int write_mask, reg_write_mask;
     struct vkd3d_symbol *symbol = NULL;
     uint32_t val_id, input_id, var_id;
@@ -4719,12 +4713,12 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
     element_idx = reg->idx[reg->idx_count - 1].offset;
     signature_element = &shader_signature->elements[element_idx];
-    sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
+    sysval = signature_element->sysval_semantic;
     /* The Vulkan spec does not explicitly forbid passing varyings from the
      * TCS to the TES via builtins. However, Mesa doesn't seem to handle it
      * well, and we don't actually need them to be in builtins. */
     if (compiler->shader_type == VKD3D_SHADER_TYPE_DOMAIN && reg->type != VKD3DSPR_PATCHCONST)
-        sysval = VKD3D_SIV_NONE;
+        sysval = VKD3D_SHADER_SV_NONE;
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
@@ -4944,7 +4938,7 @@ static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *
     if (clip_distance_mask)
     {
         count = vkd3d_popcount(clip_distance_mask);
-        builtin = get_spirv_builtin_for_sysval(compiler, VKD3D_SIV_CLIP_DISTANCE);
+        builtin = get_spirv_builtin_for_sysval(compiler, VKD3D_SHADER_SV_CLIP_DISTANCE);
         clip_distance_id = spirv_compiler_emit_builtin_variable(compiler,
                 builtin, SpvStorageClassOutput, count);
     }
@@ -4952,7 +4946,7 @@ static void spirv_compiler_emit_shader_signature_outputs(struct spirv_compiler *
     if (cull_distance_mask)
     {
         count = vkd3d_popcount(cull_distance_mask);
-        builtin = get_spirv_builtin_for_sysval(compiler, VKD3D_SIV_CULL_DISTANCE);
+        builtin = get_spirv_builtin_for_sysval(compiler, VKD3D_SHADER_SV_CULL_DISTANCE);
         cull_distance_id = spirv_compiler_emit_builtin_variable(compiler,
                 builtin, SpvStorageClassOutput, count);
     }
@@ -5045,8 +5039,8 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
     const struct signature_element *signature_element;
     enum vkd3d_shader_component_type component_type;
     const struct shader_signature *shader_signature;
-    enum vkd3d_shader_input_sysval_semantic sysval;
     const struct vkd3d_spirv_builtin *builtin;
+    enum vkd3d_shader_sysval_semantic sysval;
     unsigned int write_mask, reg_write_mask;
     bool use_private_variable = false;
     struct vkd3d_symbol reg_symbol;
@@ -5062,10 +5056,10 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
 
     element_idx = reg->idx[reg->idx_count - 1].offset;
     signature_element = &shader_signature->elements[element_idx];
-    sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
+    sysval = signature_element->sysval_semantic;
     /* Don't use builtins for TCS -> TES varyings. See spirv_compiler_emit_input(). */
     if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant)
-        sysval = VKD3D_SIV_NONE;
+        sysval = VKD3D_SHADER_SV_NONE;
     array_sizes[0] = (reg->type == VKD3DSPR_PATCHCONST ? 0 : compiler->output_control_point_count);
     array_sizes[1] = signature_element->register_count;
     if (array_sizes[1] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic))
@@ -5193,16 +5187,15 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
 static uint32_t spirv_compiler_get_output_array_index(struct spirv_compiler *compiler,
         const struct signature_element *e)
 {
-    enum vkd3d_shader_input_sysval_semantic sysval;
+    enum vkd3d_shader_sysval_semantic sysval = e->sysval_semantic;
     const struct vkd3d_spirv_builtin *builtin;
 
-    sysval = vkd3d_siv_from_sysval_indexed(e->sysval_semantic, e->semantic_index);
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
     switch (sysval)
     {
-        case VKD3D_SIV_LINE_DETAIL_TESS_FACTOR:
-        case VKD3D_SIV_LINE_DENSITY_TESS_FACTOR:
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN:
+        case VKD3D_SHADER_SV_TESS_FACTOR_LINEDET:
             return builtin->member_idx;
         default:
             return e->semantic_index;
