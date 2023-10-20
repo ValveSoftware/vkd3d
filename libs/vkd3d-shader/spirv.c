@@ -4649,18 +4649,17 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     const struct shader_signature *shader_signature;
     enum vkd3d_shader_component_type component_type;
     enum vkd3d_shader_input_sysval_semantic sysval;
-    uint32_t type_id, ptr_type_id, float_type_id;
     const struct vkd3d_spirv_builtin *builtin;
     unsigned int write_mask, reg_write_mask;
     struct vkd3d_symbol *symbol = NULL;
     uint32_t val_id, input_id, var_id;
+    uint32_t type_id, float_type_id;
     struct vkd3d_symbol reg_symbol;
     SpvStorageClass storage_class;
     struct rb_entry *entry = NULL;
     bool use_private_var = false;
     unsigned int array_sizes[2];
     unsigned int element_idx;
-    uint32_t i, index;
 
     assert(!reg->idx_count || !reg->idx[0].rel_addr);
     assert(reg->idx_count < 2 || !reg->idx[1].rel_addr);
@@ -4765,47 +4764,27 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
     if (use_private_var)
     {
+        struct vkd3d_shader_register dst_reg = *reg;
+        dst_reg.data_type = VKD3D_DATA_FLOAT;
+
         type_id = vkd3d_spirv_get_type_id(builder, component_type, input_component_count);
-        for (i = 0; i < max(array_sizes[0], 1); ++i)
+
+        val_id = vkd3d_spirv_build_op_load(builder, type_id, input_id, SpvMemoryAccessMaskNone);
+
+        if (builtin && builtin->fixup_pfn)
+            val_id = builtin->fixup_pfn(compiler, val_id);
+
+        if (component_type != VKD3D_SHADER_COMPONENT_FLOAT)
         {
-            struct vkd3d_shader_register dst_reg = *reg;
-            dst_reg.data_type = VKD3D_DATA_FLOAT;
-
-            val_id = input_id;
-            if (array_sizes[0])
-            {
-                ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassInput, type_id);
-                index = spirv_compiler_get_constant_uint(compiler, i);
-                val_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, ptr_type_id, input_id, index);
-                dst_reg.idx[0].offset = i;
-            }
-            else if (builtin && builtin->spirv_array_size)
-            {
-                /* The D3D builtin is not an array, but the SPIR-V builtin is,
-                 * so we'll need to index into the SPIR-V builtin when loading
-                 * it. This happens when reading TessLevel in domain shaders. */
-                ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassInput, type_id);
-                index = spirv_compiler_get_constant_uint(compiler, builtin->member_idx);
-                val_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, ptr_type_id, input_id, index);
-                dst_reg.idx[0].offset = element_idx + i;
-            }
-            val_id = vkd3d_spirv_build_op_load(builder, type_id, val_id, SpvMemoryAccessMaskNone);
-
-            if (builtin && builtin->fixup_pfn)
-                val_id = builtin->fixup_pfn(compiler, val_id);
-
-            if (component_type != VKD3D_SHADER_COMPONENT_FLOAT)
-            {
-                float_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, input_component_count);
-                val_id = vkd3d_spirv_build_op_bitcast(builder, float_type_id, val_id);
-            }
-
-            val_id = spirv_compiler_emit_swizzle(compiler, val_id,
-                    vkd3d_write_mask_from_component_count(input_component_count),
-                    VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_SHADER_NO_SWIZZLE, dst->write_mask >> component_idx);
-
-            spirv_compiler_emit_store_reg(compiler, &dst_reg, dst->write_mask, val_id);
+            float_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, input_component_count);
+            val_id = vkd3d_spirv_build_op_bitcast(builder, float_type_id, val_id);
         }
+
+        val_id = spirv_compiler_emit_swizzle(compiler, val_id,
+                vkd3d_write_mask_from_component_count(input_component_count),
+                VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_SHADER_NO_SWIZZLE, dst->write_mask >> component_idx);
+
+        spirv_compiler_emit_store_reg(compiler, &dst_reg, dst->write_mask, val_id);
     }
 
     return input_id;
