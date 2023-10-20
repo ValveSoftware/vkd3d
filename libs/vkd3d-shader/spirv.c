@@ -4576,7 +4576,7 @@ static uint32_t spirv_compiler_emit_builtin_variable_v(struct spirv_compiler *co
     assert(size_count <= ARRAY_SIZE(sizes));
     memcpy(sizes, array_sizes, size_count * sizeof(sizes[0]));
     array_sizes = sizes;
-    sizes[0] = max(sizes[0], builtin->spirv_array_size);
+    sizes[size_count - 1] = max(sizes[size_count - 1], builtin->spirv_array_size);
 
     id = spirv_compiler_emit_array_variable(compiler, &builder->global_stream, storage_class,
             builtin->component_type, builtin->component_count, array_sizes, size_count);
@@ -4614,24 +4614,6 @@ static unsigned int shader_signature_next_location(const struct shader_signature
     return max_row;
 }
 
-static unsigned int shader_register_get_io_indices(const struct vkd3d_shader_register *reg,
-        unsigned int *array_sizes)
-{
-    unsigned int i, element_idx;
-
-    array_sizes[0] = 0;
-    array_sizes[1] = 0;
-    element_idx = reg->idx[0].offset;
-    for (i = 1; i < reg->idx_count; ++i)
-    {
-        array_sizes[1] = array_sizes[0];
-        array_sizes[0] = element_idx;
-        element_idx = reg->idx[i].offset;
-    }
-
-    return element_idx;
-}
-
 static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         const struct vkd3d_shader_dst_param *dst)
 {
@@ -4660,7 +4642,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     shader_signature = reg->type == VKD3DSPR_PATCHCONST
             ? &compiler->patch_constant_signature : &compiler->input_signature;
 
-    element_idx = shader_register_get_io_indices(reg, array_sizes);
+    element_idx = reg->idx[reg->idx_count - 1].offset;
     signature_element = &shader_signature->elements[element_idx];
     sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
     /* The Vulkan spec does not explicitly forbid passing varyings from the
@@ -4670,6 +4652,11 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         sysval = VKD3D_SIV_NONE;
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
+
+    array_sizes[0] = (reg->type == VKD3DSPR_PATCHCONST ? 0 : compiler->input_control_point_count);
+    array_sizes[1] = signature_element->register_count;
+    if (array_sizes[1] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic))
+        array_sizes[1] = 0;
 
     write_mask = signature_element->mask;
 
@@ -5021,12 +5008,16 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
 
     shader_signature = is_patch_constant ? &compiler->patch_constant_signature : &compiler->output_signature;
 
-    element_idx = shader_register_get_io_indices(reg, array_sizes);
+    element_idx = reg->idx[reg->idx_count - 1].offset;
     signature_element = &shader_signature->elements[element_idx];
     sysval = vkd3d_siv_from_sysval(signature_element->sysval_semantic);
     /* Don't use builtins for TCS -> TES varyings. See spirv_compiler_emit_input(). */
     if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant)
         sysval = VKD3D_SIV_NONE;
+    array_sizes[0] = (reg->type == VKD3DSPR_PATCHCONST ? 0 : compiler->output_control_point_count);
+    array_sizes[1] = signature_element->register_count;
+    if (array_sizes[1] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic))
+        array_sizes[1] = 0;
 
     builtin = vkd3d_get_spirv_builtin(compiler, dst->reg.type, sysval);
 

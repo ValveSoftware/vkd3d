@@ -827,12 +827,6 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
     return true;
 }
 
-static bool sysval_semantic_is_tess_factor(enum vkd3d_shader_sysval_semantic sysval_semantic)
-{
-    return sysval_semantic >= VKD3D_SHADER_SV_TESS_FACTOR_QUADEDGE
-        && sysval_semantic <= VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN;
-}
-
 static unsigned int shader_register_normalise_arrayed_addressing(struct vkd3d_shader_register *reg,
         unsigned int id_idx, unsigned int register_index)
 {
@@ -933,7 +927,7 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
         id_idx = 1;
     }
 
-    if ((e->register_count > 1 || sysval_semantic_is_tess_factor(e->sysval_semantic)))
+    if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
     {
         if (is_io_dcl)
         {
@@ -1008,7 +1002,7 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
     element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
 
     e = &signature->elements[element_idx];
-    if ((e->register_count > 1 || sysval_semantic_is_tess_factor(e->sysval_semantic)))
+    if ((e->register_count > 1 || vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)))
         id_idx = shader_register_normalise_arrayed_addressing(reg, id_idx, e->register_index);
     reg->idx[id_idx].offset = element_idx;
     reg->idx_count = id_idx + 1;
