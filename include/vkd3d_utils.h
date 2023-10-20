@@ -20,6 +20,7 @@
 #define __VKD3D_UTILS_H
 
 #include <vkd3d.h>
+#include <vkd3d_d3dcompiler_types.h>
 
 #ifndef VKD3D_UTILS_API_VERSION
 #define VKD3D_UTILS_API_VERSION VKD3D_API_VERSION_1_0
@@ -50,9 +51,6 @@ extern "C" {
 #else
 # define VKD3D_UTILS_API VKD3D_IMPORT
 #endif
-
-/** \since 1.10 */
-typedef enum D3D_BLOB_PART D3D_BLOB_PART;
 
 /* 1.0 */
 VKD3D_UTILS_API HANDLE vkd3d_create_event(void);

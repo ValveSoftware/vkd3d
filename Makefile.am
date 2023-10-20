@@ -24,6 +24,7 @@ vkd3d_public_headers = \
 	include/vkd3d_d3d9types.h \
 	include/vkd3d_d3dcommon.h \
 	include/vkd3d_d3dcompiler.h \
+	include/vkd3d_d3dcompiler_types.h \
 	include/vkd3d_d3dx9shader.h \
 	include/vkd3d_dxgibase.h \
 	include/vkd3d_dxgiformat.h \
