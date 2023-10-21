@@ -3633,7 +3633,7 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
-    vkd3d_shader_dump_shader(compile_info->source_type, profile->type, &compile_info->source);
+    vkd3d_shader_dump_shader(compile_info->source_type, profile->name, &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE && profile->major_version > 3)
     {

@@ -391,7 +391,10 @@ static void vkd3d_shader_dump_blob(const char *path, const char *prefix,
 
     id = InterlockedIncrement(&shader_id) - 1;
 
-    snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%u.%s", path, prefix, id, suffix);
+    if (prefix)
+        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%u.%s", path, prefix, id, suffix);
+    else
+        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u.%s", path, id, suffix);
     if ((f = fopen(filename, "wb")))
     {
         if (fwrite(data, 1, size, f) != size)
@@ -424,7 +427,7 @@ static const char *shader_get_source_type_suffix(enum vkd3d_shader_source_type t
 }
 
 void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
-        enum vkd3d_shader_type shader_type, const struct vkd3d_shader_code *shader)
+        const char *prefix, const struct vkd3d_shader_code *shader)
 {
     static bool enabled = true;
     const char *path;
@@ -438,8 +441,8 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
         return;
     }
 
-    vkd3d_shader_dump_blob(path, shader_get_type_prefix(shader_type),
-            shader_get_source_type_suffix(source_type), shader->code, shader->size);
+    vkd3d_shader_dump_blob(path, prefix, shader_get_source_type_suffix(source_type),
+            shader->code, shader->size);
 }
 
 static void init_scan_signature_info(const struct vkd3d_shader_compile_info *info)
@@ -1348,7 +1351,8 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     struct vkd3d_shader_compile_info scan_info;
     int ret;
 
-    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
+    vkd3d_shader_dump_shader(compile_info->source_type, shader_get_type_prefix(parser->shader_version.type),
+            &compile_info->source);
 
     scan_info = *compile_info;
 
@@ -1433,7 +1437,8 @@ static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_
         return ret;
     }
 
-    vkd3d_shader_dump_shader(compile_info->source_type, parser->shader_version.type, &compile_info->source);
+    vkd3d_shader_dump_shader(compile_info->source_type, shader_get_type_prefix(parser->shader_version.type),
+            &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
