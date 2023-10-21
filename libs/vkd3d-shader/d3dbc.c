@@ -2000,14 +2000,12 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         case HLSL_TYPE_UINT:
             switch(src_type->base_type)
             {
+                case HLSL_TYPE_HALF:
+                case HLSL_TYPE_FLOAT:
+                    /* A compilation pass applies a FLOOR operation to casts to int, so no change is necessary. */
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                     write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, 0, 0);
-                    break;
-
-                case HLSL_TYPE_HALF:
-                case HLSL_TYPE_FLOAT:
-                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from float to integer.");
                     break;
 
                 case HLSL_TYPE_BOOL:
@@ -2244,6 +2242,12 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     assert(instr->reg.allocated);
 
+    if (expr->op == HLSL_OP1_CAST)
+    {
+        write_sm1_cast(ctx, buffer, instr);
+        return;
+    }
+
     if (instr->data_type->base_type != HLSL_TYPE_FLOAT)
     {
         /* These need to be lowered. */
@@ -2255,10 +2259,6 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     {
         case HLSL_OP1_ABS:
             write_sm1_unary_op(ctx, buffer, D3DSIO_ABS, &instr->reg, &arg1->reg, 0, 0);
-            break;
-
-        case HLSL_OP1_CAST:
-            write_sm1_cast(ctx, buffer, instr);
             break;
 
         case HLSL_OP1_DSX:
