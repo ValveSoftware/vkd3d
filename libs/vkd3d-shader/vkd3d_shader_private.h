@@ -1324,8 +1324,7 @@ void vkd3d_shader_vnote(struct vkd3d_shader_message_context *context, const stru
 void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args);
 
-void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
-        const char *prefix, const struct vkd3d_shader_code *shader);
+void vkd3d_shader_dump_shader(const struct vkd3d_shader_compile_info *compile_info);
 void vkd3d_shader_trace_text_(const char *text, size_t size, const char *function);
 #define vkd3d_shader_trace_text(text, size) \
         vkd3d_shader_trace_text_(text, size, __FUNCTION__)

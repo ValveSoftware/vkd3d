@@ -1169,6 +1169,7 @@ void hlsl_free_var(struct hlsl_ir_var *decl);
 
 struct hlsl_ir_function *hlsl_get_function(struct hlsl_ctx *ctx, const char *name);
 struct hlsl_ir_function_decl *hlsl_get_func_decl(struct hlsl_ctx *ctx, const char *name);
+const struct hlsl_profile_info *hlsl_get_target_info(const char *target);
 struct hlsl_type *hlsl_get_type(struct hlsl_scope *scope, const char *name, bool recursive, bool case_insensitive);
 struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name);
 

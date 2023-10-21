@@ -3260,7 +3260,7 @@ unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsi
     return ret;
 }
 
-static const struct hlsl_profile_info *get_target_info(const char *target)
+const struct hlsl_profile_info *hlsl_get_target_info(const char *target)
 {
     unsigned int i;
 
@@ -3627,13 +3627,11 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
     }
     entry_point = hlsl_source_info->entry_point ? hlsl_source_info->entry_point : "main";
 
-    if (!(profile = get_target_info(hlsl_source_info->profile)))
+    if (!(profile = hlsl_get_target_info(hlsl_source_info->profile)))
     {
         FIXME("Unknown compilation target %s.\n", debugstr_a(hlsl_source_info->profile));
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
-
-    vkd3d_shader_dump_shader(compile_info->source_type, profile->name, &compile_info->source);
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_BYTECODE && profile->major_version > 3)
     {

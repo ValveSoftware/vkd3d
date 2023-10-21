@@ -18,6 +18,7 @@
 
 #include "vkd3d_shader_private.h"
 #include "vkd3d_version.h"
+#include "hlsl.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -381,7 +382,7 @@ void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value
     memcpy(buffer->data + offset, &value, sizeof(value));
 }
 
-static void vkd3d_shader_dump_blob(const char *path, const char *prefix,
+static void vkd3d_shader_dump_blob(const char *path, const char *profile,
         const char *suffix, const void *data, size_t size)
 {
     static LONG shader_id = 0;
@@ -391,8 +392,8 @@ static void vkd3d_shader_dump_blob(const char *path, const char *prefix,
 
     id = InterlockedIncrement(&shader_id) - 1;
 
-    if (prefix)
-        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%s-%u.%s", path, prefix, id, suffix);
+    if (profile)
+        snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u-%s.%s", path, id, profile, suffix);
     else
         snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u.%s", path, id, suffix);
     if ((f = fopen(filename, "wb")))
@@ -426,9 +427,12 @@ static const char *shader_get_source_type_suffix(enum vkd3d_shader_source_type t
     }
 }
 
-void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
-        const char *prefix, const struct vkd3d_shader_code *shader)
+void vkd3d_shader_dump_shader(const struct vkd3d_shader_compile_info *compile_info)
 {
+    const struct vkd3d_shader_code *shader = &compile_info->source;
+    const struct vkd3d_shader_hlsl_source_info *hlsl_source_info;
+    const struct hlsl_profile_info *profile;
+    const char *profile_name = NULL;
     static bool enabled = true;
     const char *path;
 
@@ -441,7 +445,18 @@ void vkd3d_shader_dump_shader(enum vkd3d_shader_source_type source_type,
         return;
     }
 
-    vkd3d_shader_dump_blob(path, prefix, shader_get_source_type_suffix(source_type),
+    if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
+    {
+        if (!(hlsl_source_info = vkd3d_find_struct(compile_info->next, HLSL_SOURCE_INFO)))
+            return;
+
+        if (!(profile = hlsl_get_target_info(hlsl_source_info->profile)))
+            return;
+
+        profile_name = profile->name;
+    }
+
+    vkd3d_shader_dump_blob(path, profile_name, shader_get_source_type_suffix(compile_info->source_type),
             shader->code, shader->size);
 }
 
@@ -1310,6 +1325,8 @@ int vkd3d_shader_scan(const struct vkd3d_shader_compile_info *compile_info, char
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
 
+    vkd3d_shader_dump_shader(compile_info);
+
     switch (compile_info->source_type)
     {
         case VKD3D_SHADER_SOURCE_DXBC_TPF:
@@ -1350,9 +1367,6 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     struct vkd3d_glsl_generator *glsl_generator;
     struct vkd3d_shader_compile_info scan_info;
     int ret;
-
-    vkd3d_shader_dump_shader(compile_info->source_type, shader_get_type_prefix(parser->shader_version.type),
-            &compile_info->source);
 
     scan_info = *compile_info;
 
@@ -1437,9 +1451,6 @@ static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_
         return ret;
     }
 
-    vkd3d_shader_dump_shader(compile_info->source_type, shader_get_type_prefix(parser->shader_version.type),
-            &compile_info->source);
-
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
         ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
@@ -1485,6 +1496,8 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
     init_scan_signature_info(compile_info);
 
     vkd3d_shader_message_context_init(&message_context, compile_info->log_level);
+
+    vkd3d_shader_dump_shader(compile_info);
 
     switch (compile_info->source_type)
     {
