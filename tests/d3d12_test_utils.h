@@ -415,8 +415,11 @@ struct d3d12_resource_readback
     ID3D12Resource *resource;
 };
 
-static void get_resource_readback_with_command_list(ID3D12Resource *resource, unsigned int sub_resource,
-        struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+#define RESOURCE_STATE_DO_NOT_CHANGE (~0u)
+
+static void get_resource_readback_with_command_list_and_states(ID3D12Resource *resource, unsigned int sub_resource,
+        struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+        D3D12_RESOURCE_STATES initial_state, D3D12_RESOURCE_STATES final_state)
 {
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
@@ -443,6 +446,9 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
     if (resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER)
         rb->rb.row_pitch = align(rb->rb.row_pitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     rb->rb.data = NULL;
+
+    if (initial_state != RESOURCE_STATE_DO_NOT_CHANGE)
+        transition_sub_resource_state(command_list, resource, sub_resource, initial_state, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     src_resource = resource;
     if (resource_desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER && resource_desc.SampleDesc.Count > 1)
@@ -493,6 +499,10 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
 
         ID3D12GraphicsCommandList_CopyTextureRegion(command_list, &dst_location, 0, 0, 0, &src_location, NULL);
     }
+
+    if (final_state != RESOURCE_STATE_DO_NOT_CHANGE)
+        transition_sub_resource_state(command_list, resource, sub_resource, D3D12_RESOURCE_STATE_COPY_SOURCE, final_state);
+
     hr = ID3D12GraphicsCommandList_Close(command_list);
     assert_that(hr == S_OK, "Failed to close command list, hr %#x.\n", hr);
 
@@ -507,6 +517,13 @@ static void get_resource_readback_with_command_list(ID3D12Resource *resource, un
     read_range.End = buffer_size;
     hr = ID3D12Resource_Map(rb->resource, 0, &read_range, &rb->rb.data);
     assert_that(hr == S_OK, "Failed to map readback buffer, hr %#x.\n", hr);
+}
+
+static void get_resource_readback_with_command_list(ID3D12Resource *resource, unsigned int sub_resource,
+        struct d3d12_resource_readback *rb, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+{
+    return get_resource_readback_with_command_list_and_states(resource, sub_resource, rb, queue, command_list,
+            RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
 static unsigned int get_readback_uint(struct resource_readback *rb,

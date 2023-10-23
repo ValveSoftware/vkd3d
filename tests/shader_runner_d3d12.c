@@ -546,13 +546,9 @@ static struct resource_readback *d3d12_runner_get_resource_readback(struct shade
     else
         state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-    transition_resource_state(test_context->list, resource->resource,
-            state, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    get_resource_readback_with_command_list(resource->resource, 0, rb,
-            test_context->queue, test_context->list);
+    get_resource_readback_with_command_list_and_states(resource->resource, 0, rb,
+            test_context->queue, test_context->list, state, state);
     reset_command_list(test_context->list, test_context->allocator);
-    transition_resource_state(test_context->list, resource->resource,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, state);
 
     return &rb->rb;
 }
