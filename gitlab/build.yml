@@ -153,6 +153,7 @@ build-mac:
   variables:
     VKD3D_DISABLE_EXTENSIONS: "VK_EXT_descriptor_indexing"
     VKD3D_SHADER_CONFIG: 'force_validation'
+    MVK_CONFIG_LOG_LEVEL: 1
   artifacts:
     when: always
     paths:
