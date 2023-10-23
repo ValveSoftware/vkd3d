@@ -5151,9 +5151,12 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
 
     storage_class = SpvStorageClassOutput;
 
-    if (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
-            || (compiler->output_info[element_idx].id && compiler->output_info[element_idx].array_element_mask)
-            || needs_private_io_variable(builtin))
+    if (needs_private_io_variable(builtin))
+        use_private_variable = true;
+
+    if (!is_patch_constant
+            && (get_shader_output_swizzle(compiler, signature_element->register_index) != VKD3D_SHADER_NO_SWIZZLE
+            || (compiler->output_info[element_idx].id && compiler->output_info[element_idx].array_element_mask)))
     {
         use_private_variable = true;
     }
@@ -5168,7 +5171,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
         return;
     }
 
-    if (compiler->output_info[element_idx].id)
+    if (!is_patch_constant && compiler->output_info[element_idx].id)
     {
         id = compiler->output_info[element_idx].id;
     }
@@ -5220,8 +5223,11 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler, const st
 
     spirv_compiler_decorate_xfb_output(compiler, id, output_component_count, signature_element);
 
-    compiler->output_info[element_idx].id = id;
-    compiler->output_info[element_idx].component_type = component_type;
+    if (!is_patch_constant)
+    {
+        compiler->output_info[element_idx].id = id;
+        compiler->output_info[element_idx].component_type = component_type;
+    }
 
     var_id = id;
     if (use_private_variable)
@@ -6442,7 +6448,6 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
 
 static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 {
-    const struct shader_signature *signature = &compiler->output_signature;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
 
     if (is_in_control_point_phase(compiler) && compiler->emit_default_control_point_phase)
@@ -6460,7 +6465,6 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
 
         /* Fork and join phases share output registers (patch constants).
          * Control point phase has separate output registers. */
-        memset(compiler->output_info, 0, signature->element_count * sizeof(*compiler->output_info));
         memset(compiler->private_output_variable, 0, sizeof(compiler->private_output_variable));
         memset(compiler->private_output_variable_write_mask, 0, sizeof(compiler->private_output_variable_write_mask));
     }
