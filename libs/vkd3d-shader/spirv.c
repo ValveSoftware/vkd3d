@@ -2356,7 +2356,6 @@ struct spirv_compiler
         uint32_t array_element_mask;
     } *output_info;
     uint32_t private_output_variable[MAX_REG_OUTPUT + 1]; /* 1 entry for oDepth */
-    uint32_t private_output_variable_array_idx[MAX_REG_OUTPUT + 1]; /* 1 entry for oDepth */
     uint32_t private_output_variable_write_mask[MAX_REG_OUTPUT + 1]; /* 1 entry for oDepth */
     uint32_t epilogue_function_id;
 
@@ -5309,7 +5308,6 @@ static void spirv_compiler_emit_shader_epilogue_function(struct spirv_compiler *
 
     STATIC_ASSERT(ARRAY_SIZE(compiler->private_output_variable) == ARRAY_SIZE(param_id));
     STATIC_ASSERT(ARRAY_SIZE(compiler->private_output_variable) == ARRAY_SIZE(param_type_id));
-    STATIC_ASSERT(ARRAY_SIZE(compiler->private_output_variable) == ARRAY_SIZE(compiler->private_output_variable_array_idx));
     STATIC_ASSERT(ARRAY_SIZE(compiler->private_output_variable) == ARRAY_SIZE(compiler->private_output_variable_write_mask));
 
     is_patch_constant = is_in_fork_or_join_phase(compiler);
@@ -5365,7 +5363,6 @@ static void spirv_compiler_emit_shader_epilogue_function(struct spirv_compiler *
     vkd3d_spirv_build_op_function_end(builder);
 
     memset(compiler->private_output_variable, 0, sizeof(compiler->private_output_variable));
-    memset(compiler->private_output_variable_array_idx, 0, sizeof(compiler->private_output_variable_array_idx));
     memset(compiler->private_output_variable_write_mask, 0, sizeof(compiler->private_output_variable_write_mask));
     compiler->epilogue_function_id = 0;
 }
@@ -6397,7 +6394,6 @@ static void spirv_compiler_leave_shader_phase(struct spirv_compiler *compiler)
          * Control point phase has separate output registers. */
         memset(compiler->output_info, 0, signature->element_count * sizeof(*compiler->output_info));
         memset(compiler->private_output_variable, 0, sizeof(compiler->private_output_variable));
-        memset(compiler->private_output_variable_array_idx, 0, sizeof(compiler->private_output_variable_array_idx));
         memset(compiler->private_output_variable_write_mask, 0, sizeof(compiler->private_output_variable_write_mask));
     }
 }
@@ -6526,36 +6522,17 @@ static void spirv_compiler_emit_hull_shader_barrier(struct spirv_compiler *compi
 static void spirv_compiler_emit_shader_epilogue_invocation(struct spirv_compiler *compiler)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t void_id, type_id, ptr_type_id, function_id;
     uint32_t arguments[MAX_REG_OUTPUT];
+    uint32_t void_id, function_id;
     unsigned int i, count;
 
     if ((function_id = compiler->epilogue_function_id))
     {
         void_id = vkd3d_spirv_get_op_type_void(builder);
-        type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, 4);
-        ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, SpvStorageClassPrivate, type_id);
         for (i = 0, count = 0; i < ARRAY_SIZE(compiler->private_output_variable); ++i)
         {
             if (compiler->private_output_variable[i])
-            {
-                uint32_t argument_id = compiler->private_output_variable[i];
-                unsigned int argument_idx = count++;
-
-                if (compiler->private_output_variable_array_idx[i])
-                {
-                    uint32_t tmp_id;
-
-                    tmp_id = vkd3d_spirv_build_op_access_chain1(builder, ptr_type_id,
-                            argument_id, compiler->private_output_variable_array_idx[i]);
-                    tmp_id = vkd3d_spirv_build_op_load(builder, type_id, tmp_id, SpvMemoryAccessMaskNone);
-                    argument_id = vkd3d_spirv_build_op_variable(builder,
-                            &builder->global_stream, ptr_type_id, SpvStorageClassPrivate, 0);
-                    vkd3d_spirv_build_op_store(builder, argument_id, tmp_id, SpvMemoryAccessMaskNone);
-                }
-
-                arguments[argument_idx] = argument_id;
-            }
+                arguments[count++] = compiler->private_output_variable[i];
         }
 
         vkd3d_spirv_build_op_function_call(builder, void_id, function_id, arguments, count);
