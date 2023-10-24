@@ -449,7 +449,8 @@ static enum vkd3d_result control_point_normaliser_emit_hs_input(struct control_p
 
         shader_dst_param_io_init(param, e, VKD3DSPR_INPUT, 2);
         param->reg.idx[0].offset = input_control_point_count;
-        param->reg.idx[1].offset = i;
+        param->reg.idx[1].offset = e->register_index;
+        param->write_mask = e->mask;
 
         ++ins;
     }
