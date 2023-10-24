@@ -2544,6 +2544,16 @@ static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t 
     return true;
 }
 
+static void uninvert_used_masks(struct shader_signature *signature)
+{
+    for (unsigned int i = 0; i < signature->element_count; ++i)
+    {
+        struct signature_element *e = &signature->elements[i];
+
+        e->used_mask = e->mask & ~e->used_mask;
+    }
+}
+
 static bool shader_sm4_parser_validate_signature(struct vkd3d_shader_sm4_parser *sm4,
         const struct shader_signature *signature, unsigned int *masks, const char *name)
 {
@@ -2638,6 +2648,12 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         vkd3d_free(sm4);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
+
+    /* DXBC stores used masks inverted for output signatures, for some reason.
+     * We return them un-inverted. */
+    uninvert_used_masks(&shader_desc->output_signature);
+    if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL)
+        uninvert_used_masks(&shader_desc->patch_constant_signature);
 
     if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature,
             sm4->input_register_masks, "Input")

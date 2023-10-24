@@ -431,10 +431,6 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
             case TAG_OSG5:
                 if (e[i].sysval_semantic == VKD3D_SHADER_SV_NONE)
                     e[i].sysval_semantic = map_fragment_output_sysval(e[i].semantic_name);
-                /* Fall through. */
-            case TAG_PCSG:
-            case TAG_PSG1:
-                e[i].used_mask = e[i].mask & ~e[i].used_mask;
                 break;
         }
 
