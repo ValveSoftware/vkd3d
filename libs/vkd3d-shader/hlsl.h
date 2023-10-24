@@ -727,6 +727,8 @@ struct hlsl_scope
     struct hlsl_scope *upper;
     /* The scope was created for the loop statement. */
     bool loop;
+    /* The scope was created for the switch statement. */
+    bool _switch;
 };
 
 struct hlsl_profile_info

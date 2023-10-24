@@ -4640,12 +4640,31 @@ static void validate_texture_format_type(struct hlsl_ctx *ctx, struct hlsl_type 
     }
 }
 
-static struct hlsl_scope *get_loop_scope(struct hlsl_scope *scope)
+static bool check_continue(struct hlsl_ctx *ctx, const struct hlsl_scope *scope, const struct vkd3d_shader_location *loc)
 {
-    if (scope->loop)
-        return scope;
+    if (scope->_switch)
+    {
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                "The 'continue' statement is not allowed in 'switch' statements.");
+        return false;
+    }
 
-    return scope->upper ? get_loop_scope(scope->upper) : NULL;
+    if (scope->loop)
+        return true;
+
+    if (scope->upper)
+        return check_continue(ctx, scope->upper, loc);
+
+    hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "The 'continue' statement is only allowed in loops.");
+    return false;
+}
+
+static bool is_break_allowed(const struct hlsl_scope *scope)
+{
+    if (scope->loop || scope->_switch)
+        return true;
+
+    return scope->upper ? is_break_allowed(scope->upper) : false;
 }
 
 static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hlsl_ir_switch_case *check, struct list *cases)
@@ -5407,6 +5426,8 @@ loop_scope_start:
 switch_scope_start:
       %empty
         {
+            hlsl_push_scope(ctx);
+            ctx->cur_scope->_switch = true;
         }
 
 var_identifier:
@@ -6244,12 +6265,10 @@ jump_statement:
         {
             struct hlsl_ir_node *jump;
 
-            /* TODO: allow 'break' in the 'switch' statements. */
-
-            if (!get_loop_scope(ctx->cur_scope))
+            if (!is_break_allowed(ctx->cur_scope))
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
-                        "The 'break' statement must be used inside of a loop.");
+                        "The 'break' statement must be used inside of a loop or a switch.");
             }
 
             if (!($$ = make_empty_block(ctx)))
@@ -6261,13 +6280,8 @@ jump_statement:
     | KW_CONTINUE ';'
         {
             struct hlsl_ir_node *jump;
-            struct hlsl_scope *scope;
 
-            if (!(scope = get_loop_scope(ctx->cur_scope)))
-            {
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
-                        "The 'continue' statement must be used inside of a loop.");
-            }
+            check_continue(ctx, ctx->cur_scope, &@1);
 
             if (!($$ = make_empty_block(ctx)))
                 YYABORT;
@@ -6411,6 +6425,8 @@ switch_statement:
 
             $$ = $5;
             hlsl_block_add_instr($$, s);
+
+            hlsl_pop_scope(ctx);
         }
 
 switch_case:
