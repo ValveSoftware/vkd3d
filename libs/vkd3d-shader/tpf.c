@@ -659,16 +659,18 @@ static const enum vkd3d_primitive_type output_primitive_type_table[] =
     /* VKD3D_SM4_OUTPUT_PT_TRIANGLESTRIP */   VKD3D_PT_TRIANGLESTRIP,
 };
 
-static const enum vkd3d_primitive_type input_primitive_type_table[] =
+static const struct
 {
-    /* UNKNOWN */                             VKD3D_PT_UNDEFINED,
-    /* VKD3D_SM4_INPUT_PT_POINT */            VKD3D_PT_POINTLIST,
-    /* VKD3D_SM4_INPUT_PT_LINE */             VKD3D_PT_LINELIST,
-    /* VKD3D_SM4_INPUT_PT_TRIANGLE */         VKD3D_PT_TRIANGLELIST,
-    /* UNKNOWN */                             VKD3D_PT_UNDEFINED,
-    /* UNKNOWN */                             VKD3D_PT_UNDEFINED,
-    /* VKD3D_SM4_INPUT_PT_LINEADJ */          VKD3D_PT_LINELIST_ADJ,
-    /* VKD3D_SM4_INPUT_PT_TRIANGLEADJ */      VKD3D_PT_TRIANGLELIST_ADJ,
+    unsigned int control_point_count;
+    enum vkd3d_primitive_type vkd3d_type;
+}
+input_primitive_type_table[] =
+{
+    [VKD3D_SM4_INPUT_PT_POINT]          = {1, VKD3D_PT_POINTLIST},
+    [VKD3D_SM4_INPUT_PT_LINE]           = {2, VKD3D_PT_LINELIST},
+    [VKD3D_SM4_INPUT_PT_TRIANGLE]       = {3, VKD3D_PT_TRIANGLELIST},
+    [VKD3D_SM4_INPUT_PT_LINEADJ]        = {4, VKD3D_PT_LINELIST_ADJ},
+    [VKD3D_SM4_INPUT_PT_TRIANGLEADJ]    = {6, VKD3D_PT_TRIANGLELIST_ADJ},
 };
 
 static const enum vkd3d_shader_resource_type resource_type_table[] =
@@ -1037,6 +1039,7 @@ static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction 
     {
         ins->declaration.primitive_type.type = VKD3D_PT_PATCH;
         ins->declaration.primitive_type.patch_vertex_count = primitive_type - VKD3D_SM5_INPUT_PT_PATCH1 + 1;
+        priv->p.shader_desc.input_control_point_count = ins->declaration.primitive_type.patch_vertex_count;
     }
     else if (primitive_type >= ARRAY_SIZE(input_primitive_type_table))
     {
@@ -1044,7 +1047,8 @@ static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction 
     }
     else
     {
-        ins->declaration.primitive_type.type = input_primitive_type_table[primitive_type];
+        ins->declaration.primitive_type.type = input_primitive_type_table[primitive_type].vkd3d_type;
+        priv->p.shader_desc.input_control_point_count = input_primitive_type_table[primitive_type].control_point_count;
     }
 
     if (ins->declaration.primitive_type.type == VKD3D_PT_UNDEFINED)
@@ -1154,6 +1158,11 @@ static void shader_sm5_read_control_point_count(struct vkd3d_shader_instruction 
 {
     ins->declaration.count = (opcode_token & VKD3D_SM5_CONTROL_POINT_COUNT_MASK)
             >> VKD3D_SM5_CONTROL_POINT_COUNT_SHIFT;
+
+    if (opcode == VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT)
+        priv->p.shader_desc.input_control_point_count = ins->declaration.count;
+    else
+        priv->p.shader_desc.output_control_point_count = ins->declaration.count;
 }
 
 static void shader_sm5_read_dcl_tessellator_domain(struct vkd3d_shader_instruction *ins, uint32_t opcode,

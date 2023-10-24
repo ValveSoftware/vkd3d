@@ -9338,11 +9338,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL_GS_INSTANCES:
             spirv_compiler_emit_dcl_gs_instances(compiler, instruction);
             break;
-        case VKD3DSIH_DCL_INPUT_CONTROL_POINT_COUNT:
-            compiler->input_control_point_count = instruction->declaration.count;
-            break;
         case VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT:
-            compiler->output_control_point_count = instruction->declaration.count;
             spirv_compiler_emit_output_vertex_count(compiler, instruction);
             break;
         case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
@@ -9602,6 +9598,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DCL:
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
         case VKD3DSIH_DCL_HS_MAX_TESSFACTOR:
+        case VKD3DSIH_DCL_INPUT_CONTROL_POINT_COUNT:
         case VKD3DSIH_DCL_RESOURCE_RAW:
         case VKD3DSIH_DCL_RESOURCE_STRUCTURED:
         case VKD3DSIH_DCL_SAMPLER:
@@ -9699,6 +9696,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
     memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
     compiler->use_vocp = parser->shader_desc.use_vocp;
+
+    compiler->input_control_point_count = shader_desc->input_control_point_count;
+    compiler->output_control_point_count = shader_desc->output_control_point_count;
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);

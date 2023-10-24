@@ -955,6 +955,8 @@ struct vkd3d_shader_desc
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
 
+    unsigned int input_control_point_count, output_control_point_count;
+
     uint32_t temp_count;
     unsigned int ssa_count;
 
