@@ -1510,6 +1510,10 @@ static void vsir_validate_register(struct validation_context *ctx,
     if (reg->dimension >= VSIR_DIMENSION_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid register dimension %#x.",
                 reg->dimension);
+
+    if (reg->idx_count > ARRAY_SIZE(reg->idx))
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid register index count %u.",
+                reg->idx_count);
 }
 
 static void vsir_validate_dst_param(struct validation_context *ctx,
