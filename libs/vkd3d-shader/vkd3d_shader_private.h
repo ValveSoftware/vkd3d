@@ -202,6 +202,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE             = 9006,
     VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION           = 9007,
     VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE           = 9008,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION           = 9009,
 };
 
 enum vkd3d_shader_opcode
@@ -601,6 +602,8 @@ enum vsir_dimension
     VSIR_DIMENSION_NONE,
     VSIR_DIMENSION_SCALAR,
     VSIR_DIMENSION_VEC4,
+
+    VSIR_DIMENSION_COUNT,
 };
 
 enum vkd3d_shader_src_modifier

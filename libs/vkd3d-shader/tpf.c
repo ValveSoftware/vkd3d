@@ -549,6 +549,8 @@ static enum vkd3d_sm4_dimension sm4_dimension_from_vsir_dimension(enum vsir_dime
             return VKD3D_SM4_DIMENSION_SCALAR;
         case VSIR_DIMENSION_VEC4:
             return VKD3D_SM4_DIMENSION_VEC4;
+        case VSIR_DIMENSION_COUNT:
+            vkd3d_unreachable();
     }
     vkd3d_unreachable();
 }
