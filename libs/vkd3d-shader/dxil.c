@@ -2650,9 +2650,7 @@ static void sm6_parser_emit_signature(struct sm6_parser *sm6, const struct shade
 
 static void sm6_parser_init_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
 {
-    sm6_parser_init_signature(sm6, output_signature,
-            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSPR_COLOROUT : VKD3DSPR_OUTPUT,
-            sm6->output_params);
+    sm6_parser_init_signature(sm6, output_signature, VKD3DSPR_OUTPUT, sm6->output_params);
 }
 
 static void sm6_parser_init_input_signature(struct sm6_parser *sm6, const struct shader_signature *input_signature)
