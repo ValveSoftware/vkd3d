@@ -1502,6 +1502,10 @@ static void vsir_validate_register(struct validation_context *ctx,
     if (reg->precision >= VKD3D_SHADER_REGISTER_PRECISION_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION, "Invalid register precision %#x.",
                 reg->precision);
+
+    if (reg->data_type >= VKD3D_DATA_COUNT)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE, "Invalid register data type %#x.",
+                reg->data_type);
 }
 
 static void vsir_validate_dst_param(struct validation_context *ctx,

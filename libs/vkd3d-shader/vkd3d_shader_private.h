@@ -201,6 +201,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT               = 9005,
     VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE             = 9006,
     VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION           = 9007,
+    VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE           = 9008,
 };
 
 enum vkd3d_shader_opcode
@@ -580,6 +581,8 @@ enum vkd3d_data_type
     VKD3D_DATA_UINT8,
     VKD3D_DATA_UINT64,
     VKD3D_DATA_BOOL,
+
+    VKD3D_DATA_COUNT,
 };
 
 static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
