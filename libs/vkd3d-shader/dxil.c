@@ -2987,45 +2987,6 @@ static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shade
     }
 }
 
-static void sm6_parser_emit_signature(struct sm6_parser *sm6, const struct shader_signature *s,
-        enum vkd3d_shader_opcode handler_idx, enum vkd3d_shader_opcode siv_handler_idx,
-        struct vkd3d_shader_dst_param *params)
-{
-    struct vkd3d_shader_instruction *ins;
-    struct vkd3d_shader_dst_param *param;
-    const struct signature_element *e;
-    unsigned int i;
-
-    for (i = 0; i < s->element_count; ++i)
-    {
-        e = &s->elements[i];
-
-        /* Do not check e->used_mask because in some cases it is zero for used elements.
-         * TODO: scan ahead for used I/O elements. */
-
-        if (e->sysval_semantic != VKD3D_SHADER_SV_NONE && e->sysval_semantic != VKD3D_SHADER_SV_TARGET)
-        {
-            ins = sm6_parser_add_instruction(sm6, siv_handler_idx);
-            param = &ins->declaration.register_semantic.reg;
-            ins->declaration.register_semantic.sysval_semantic = vkd3d_siv_from_sysval(e->sysval_semantic);
-        }
-        else
-        {
-            ins = sm6_parser_add_instruction(sm6, handler_idx);
-            param = &ins->declaration.dst;
-        }
-
-        ins->flags = e->interpolation_mode;
-        *param = params[i];
-
-        if (e->register_count > 1)
-        {
-            param->reg.idx[0].rel_addr = NULL;
-            param->reg.idx[0].offset = e->register_count;
-        }
-    }
-}
-
 static void sm6_parser_init_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
 {
     sm6_parser_init_signature(sm6, output_signature, VKD3DSPR_OUTPUT, sm6->output_params);
@@ -3034,19 +2995,6 @@ static void sm6_parser_init_output_signature(struct sm6_parser *sm6, const struc
 static void sm6_parser_init_input_signature(struct sm6_parser *sm6, const struct shader_signature *input_signature)
 {
     sm6_parser_init_signature(sm6, input_signature, VKD3DSPR_INPUT, sm6->input_params);
-}
-
-static void sm6_parser_emit_output_signature(struct sm6_parser *sm6, const struct shader_signature *output_signature)
-{
-    sm6_parser_emit_signature(sm6, output_signature, VKD3DSIH_DCL_OUTPUT, VKD3DSIH_DCL_OUTPUT_SIV, sm6->output_params);
-}
-
-static void sm6_parser_emit_input_signature(struct sm6_parser *sm6, const struct shader_signature *input_signature)
-{
-    sm6_parser_emit_signature(sm6, input_signature,
-            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSIH_DCL_INPUT_PS : VKD3DSIH_DCL_INPUT,
-            (sm6->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL) ? VKD3DSIH_DCL_INPUT_PS_SIV : VKD3DSIH_DCL_INPUT_SIV,
-            sm6->input_params);
 }
 
 static const struct sm6_value *sm6_parser_next_function_definition(struct sm6_parser *sm6)
@@ -6111,8 +6059,6 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
                 "Out of memory emitting shader signature declarations.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
-    sm6_parser_emit_output_signature(sm6, output_signature);
-    sm6_parser_emit_input_signature(sm6, input_signature);
 
     sm6->p.shader_desc.ssa_count = sm6->ssa_next_id;
 
