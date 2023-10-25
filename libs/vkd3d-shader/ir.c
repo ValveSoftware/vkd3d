@@ -1473,6 +1473,7 @@ struct validation_context
 {
     struct vkd3d_shader_parser *parser;
     size_t instruction_idx;
+    bool dcl_temps_found;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *ctx,
@@ -1514,6 +1515,25 @@ static void vsir_validate_register(struct validation_context *ctx,
     if (reg->idx_count > ARRAY_SIZE(reg->idx))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid register index count %u.",
                 reg->idx_count);
+
+    switch (reg->type)
+    {
+        case VKD3DSPR_TEMP:
+            if (reg->idx_count != 1)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a TEMP register.",
+                        reg->idx_count);
+
+            if (reg->idx_count >= 1 && reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
+
+            if (reg->idx_count >= 1 && reg->idx[0].offset >= ctx->parser->shader_desc.temp_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the declared count %u.",
+                        reg->idx[0].offset, ctx->parser->shader_desc.temp_count);
+            break;
+
+        default:
+            break;
+    }
 }
 
 static void vsir_validate_dst_param(struct validation_context *ctx,
@@ -1602,6 +1622,14 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         case VKD3DSIH_DCL_TEMPS:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
+            /* TODO Check that each phase in a hull shader has at most
+             * one occurrence. */
+            if (ctx->dcl_temps_found && ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS, "Duplicate DCL_TEMPS instruction.");
+            ctx->dcl_temps_found = true;
+            if (instruction->declaration.count != ctx->parser->shader_desc.temp_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS, "Invalid DCL_TEMPS count %u, expected %u.",
+                        instruction->declaration.count, ctx->parser->shader_desc.temp_count);
             break;
 
         default:
