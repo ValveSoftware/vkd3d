@@ -1073,6 +1073,9 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
             vkd3d_shader_scan_sampler_declaration(context, instruction);
             break;
         case VKD3DSIH_DCL:
+            if (instruction->declaration.semantic.resource_type == VKD3D_SHADER_RESOURCE_NONE)
+                break;
+
             if (instruction->declaration.semantic.resource.reg.reg.type == VKD3DSPR_COMBINED_SAMPLER)
             {
                 vkd3d_shader_scan_combined_sampler_declaration(context, &instruction->declaration.semantic);
