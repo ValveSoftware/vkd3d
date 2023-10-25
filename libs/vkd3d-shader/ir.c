@@ -1560,6 +1560,24 @@ static void vsir_validate_src_param(struct validation_context *ctx,
                 src->modifiers);
 }
 
+static void vsir_validate_dst_count(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, unsigned int count)
+{
+    if (instruction->dst_count != count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DEST_COUNT,
+                "Invalid destination count %u for an instruction of type %#x, expected %u.",
+                        instruction->dst_count, instruction->handler_idx, count);
+}
+
+static void vsir_validate_src_count(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, unsigned int count)
+{
+    if (instruction->src_count != count)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
+                "Invalid source count %u for an instruction of type %#x, expected %u.",
+                instruction->src_count, instruction->handler_idx, count);
+}
+
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
     const struct vkd3d_shader_instruction *instruction = &ctx->parser->instructions.elements[ctx->instruction_idx];
@@ -1577,6 +1595,17 @@ static void vsir_validate_instruction(struct validation_context *ctx)
     {
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Invalid instruction handler %#x.",
                 instruction->handler_idx);
+    }
+
+    switch (instruction->handler_idx)
+    {
+        case VKD3DSIH_DCL_TEMPS:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 0);
+            break;
+
+        default:
+            break;
     }
 }
 
