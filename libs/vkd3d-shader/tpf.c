@@ -5467,6 +5467,46 @@ static void write_sm4_store(const struct tpf_writer *tpf, const struct hlsl_ir_s
     write_sm4_instruction(tpf, &instr);
 }
 
+static void write_sm4_switch(const struct tpf_writer *tpf, const struct hlsl_ir_switch *s)
+{
+    const struct hlsl_ir_node *selector = s->selector.node;
+    struct hlsl_ir_switch_case *c;
+    struct sm4_instruction instr;
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_SWITCH;
+
+    sm4_src_from_node(tpf, &instr.srcs[0], selector, VKD3DSP_WRITEMASK_ALL);
+    instr.src_count = 1;
+
+    write_sm4_instruction(tpf, &instr);
+
+    LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+    {
+        memset(&instr, 0, sizeof(instr));
+        if (c->is_default)
+        {
+            instr.opcode = VKD3D_SM4_OP_DEFAULT;
+        }
+        else
+        {
+            struct hlsl_constant_value value = { .u[0].u = c->value };
+
+            instr.opcode = VKD3D_SM4_OP_CASE;
+            sm4_src_from_constant_value(&instr.srcs[0], &value, 1, VKD3DSP_WRITEMASK_ALL);
+            instr.src_count = 1;
+        }
+
+        write_sm4_instruction(tpf, &instr);
+        write_sm4_block(tpf, &c->body);
+    }
+
+    memset(&instr, 0, sizeof(instr));
+    instr.opcode = VKD3D_SM4_OP_ENDSWITCH;
+
+    write_sm4_instruction(tpf, &instr);
+}
+
 static void write_sm4_swizzle(const struct tpf_writer *tpf, const struct hlsl_ir_swizzle *swizzle)
 {
     unsigned int hlsl_swizzle;
@@ -5552,6 +5592,10 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
 
             case HLSL_IR_STORE:
                 write_sm4_store(tpf, hlsl_ir_store(instr));
+                break;
+
+            case HLSL_IR_SWITCH:
+                write_sm4_switch(tpf, hlsl_ir_switch(instr));
                 break;
 
             case HLSL_IR_SWIZZLE:

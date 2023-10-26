@@ -1,7 +1,7 @@
 [require]
 shader model >= 4.0
 
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -19,17 +19,17 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 3 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (5.0, 5.0, 5.0, 5.0)
 uniform 0 uint4 1 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (4.0, 4.0, 4.0, 4.0)
 uniform 0 uint4 0 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (3.0, 3.0, 3.0, 3.0)
 
 % falling through is only supported for empty case statements
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -49,17 +49,17 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 uniform 0 uint4 1 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.0, 3.0, 4.0)
 uniform 0 uint4 0 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.0, 3.0, 4.0)
 
 % case value evaluation
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -81,14 +81,14 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.1, 3.1, 4.1)
 uniform 0 uint4 1 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 % floats are accepted
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 uint4 v;
 
 float4 main() : sv_target
@@ -110,13 +110,13 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.1, 3.1, 4.1)
 uniform 0 uint4 1 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
-[pixel shader todo fail(sm>=6)]
+[pixel shader fail(sm>=6)]
 float4 v;
 
 float4 main() : sv_target
@@ -138,10 +138,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 2.0 0.0 0.0 0.0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.1, 3.1, 4.1)
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 [pixel shader fail]
@@ -312,7 +312,7 @@ float4 main() : sv_target
 }
 
 % more complicated breaks
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -339,17 +339,17 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.1, 2.1, 3.1, 4.1)
 uniform 0 uint4 1 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.2, 2.2, 3.2, 4.2)
 uniform 0 uint4 0 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 % switch breaks within a loop
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -377,11 +377,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (5.0, 6.0, 7.0, 8.0)
 
 % default case placement
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -408,16 +408,16 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 0 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (4.0, 5.0, 6.0, 7.0)
 uniform 0 uint4 2 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (2.0, 3.0, 4.0, 5.0)
 uniform 0 uint4 3 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (4.0, 5.0, 6.0, 7.0)
 
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -445,13 +445,13 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 3 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 uniform 0 uint4 0 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (4.0, 5.0, 6.0, 7.0)
 uniform 0 uint4 5 0 0 0
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 % 'continue' is not supported in switches
@@ -480,7 +480,7 @@ float4 main() : sv_target
     return c;
 }
 
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -511,14 +511,14 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 0 0 3 1
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (10.0, 11.0, 12.0, 13.0)
 uniform 0 uint4 1 0 3 1
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (7.0, 8.0, 9.0, 10.0)
 
 % return from a switch nested in a loop
-[pixel shader todo]
+[pixel shader]
 uint4 v;
 
 float4 main() : sv_target
@@ -545,8 +545,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 uint4 0 0 3 1
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (304.0, 305.0, 306.0, 307.0)
 uniform 0 uint4 1 0 3 1
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (3.0, 4.0, 5.0, 6.0)
