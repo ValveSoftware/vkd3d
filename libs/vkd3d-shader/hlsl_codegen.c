@@ -3556,13 +3556,19 @@ static struct hlsl_reg allocate_register(struct hlsl_ctx *ctx, struct register_a
 static bool is_range_available(const struct register_allocator *allocator,
         unsigned int first_write, unsigned int last_read, uint32_t reg_idx, unsigned int reg_size)
 {
+    unsigned int last_reg_mask = (1u << (reg_size % 4)) - 1;
+    unsigned int writemask;
     uint32_t i;
 
     for (i = 0; i < (reg_size / 4); ++i)
     {
-        if (get_available_writemask(allocator, first_write, last_read, reg_idx + i) != VKD3DSP_WRITEMASK_ALL)
+        writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + i);
+        if (writemask != VKD3DSP_WRITEMASK_ALL)
             return false;
     }
+    writemask = get_available_writemask(allocator, first_write, last_read, reg_idx + (reg_size / 4));
+    if ((writemask & last_reg_mask) != last_reg_mask)
+        return false;
     return true;
 }
 
