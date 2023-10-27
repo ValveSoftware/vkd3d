@@ -35376,7 +35376,7 @@ static void test_bufinfo_instruction(void)
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_width = desc.rt_height = 64;
-    desc.rt_format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+    desc.rt_format = DXGI_FORMAT_R32G32B32A32_UINT;
     desc.no_root_signature = true;
     desc.no_pipeline = true;
     if (!init_test_context(&context, &desc))
