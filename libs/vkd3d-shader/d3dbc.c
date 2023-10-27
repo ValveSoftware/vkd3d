@@ -645,15 +645,15 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
             {
                 case 0:
                     return add_signature_element(sm1, true, "POSITION", 0,
-                            VKD3D_SHADER_SV_POSITION, register_index, is_dcl, mask);
+                            VKD3D_SHADER_SV_POSITION, SM1_RASTOUT_REGISTER_OFFSET + register_index, is_dcl, mask);
 
                 case 1:
                     return add_signature_element(sm1, true, "FOG", 0,
-                            VKD3D_SHADER_SV_NONE, register_index, is_dcl, 0x1);
+                            VKD3D_SHADER_SV_NONE, SM1_RASTOUT_REGISTER_OFFSET + register_index, is_dcl, 0x1);
 
                 case 2:
                     return add_signature_element(sm1, true, "PSIZE", 0,
-                            VKD3D_SHADER_SV_NONE, register_index, is_dcl, 0x1);
+                            VKD3D_SHADER_SV_NONE, SM1_RASTOUT_REGISTER_OFFSET + register_index, is_dcl, 0x1);
 
                 default:
                     vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_INVALID_REGISTER_INDEX,

@@ -916,7 +916,7 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
             break;
 
         case VKD3DSPR_RASTOUT:
-            reg_idx = reg->idx[0].offset;
+            reg_idx = SM1_RASTOUT_REGISTER_OFFSET + reg->idx[0].offset;
             signature = normaliser->output_signature;
             reg->type = VKD3DSPR_OUTPUT;
             dcl_params = normaliser->output_dcl_params;

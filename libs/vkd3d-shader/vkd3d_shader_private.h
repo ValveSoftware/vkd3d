@@ -956,6 +956,7 @@ enum vkd3d_shader_input_sysval_semantic
 };
 
 #define SM1_COLOR_REGISTER_OFFSET 8
+#define SM1_RASTOUT_REGISTER_OFFSET 10
 
 #define SIGNATURE_TARGET_LOCATION_UNUSED (~0u)
 
