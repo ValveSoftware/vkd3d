@@ -3587,6 +3587,8 @@ static struct hlsl_reg allocate_range(struct hlsl_ctx *ctx, struct register_allo
 
     for (i = 0; i < reg_size / 4; ++i)
         record_allocation(ctx, allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, first_write, last_read);
+    if (reg_size % 4)
+        record_allocation(ctx, allocator, reg_idx + (reg_size / 4), (1u << (reg_size % 4)) - 1, first_write, last_read);
 
     ret.id = reg_idx;
     ret.allocation_size = align(reg_size, 4) / 4;
