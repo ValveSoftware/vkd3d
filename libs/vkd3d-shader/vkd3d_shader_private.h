@@ -955,6 +955,8 @@ enum vkd3d_shader_input_sysval_semantic
     VKD3D_SIV_LINE_DENSITY_TESS_FACTOR     = 22,
 };
 
+#define SM1_COLOR_REGISTER_OFFSET 8
+
 #define SIGNATURE_TARGET_LOCATION_UNUSED (~0u)
 
 struct signature_element

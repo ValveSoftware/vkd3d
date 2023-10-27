@@ -518,8 +518,6 @@ static struct signature_element *find_signature_element_by_register_index(
     return NULL;
 }
 
-#define SM1_COLOR_REGISTER_OFFSET 8
-
 static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool output,
         const char *name, unsigned int index, enum vkd3d_shader_sysval_semantic sysval,
         unsigned int register_index, bool is_dcl, unsigned int mask)
