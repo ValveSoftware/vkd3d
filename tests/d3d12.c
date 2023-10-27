@@ -3632,12 +3632,13 @@ static void test_create_pipeline_state(void)
     {
         D3D12_PIPELINE_STATE_STREAM_DESC stream_desc;
         HRESULT expected_result;
+        bool is_mvk_bug;
     }
     tests[] =
     {
         { { sizeof(pipeline_desc_1), &pipeline_desc_1 }, S_OK },
         { { sizeof(pipeline_desc_2), &pipeline_desc_2 }, S_OK },
-        { { sizeof(pipeline_desc_3), &pipeline_desc_3 }, S_OK },
+        { { sizeof(pipeline_desc_3), &pipeline_desc_3 }, S_OK, true },
         { { sizeof(pipeline_desc_4), &pipeline_desc_4 }, E_INVALIDARG },
         { { sizeof(pipeline_desc_5), &pipeline_desc_5 }, E_INVALIDARG },
         { { sizeof(pipeline_desc_6), &pipeline_desc_6 }, S_OK },
@@ -3681,6 +3682,7 @@ static void test_create_pipeline_state(void)
             rs_subobject->root_signature = root_signature;
 
         hr = ID3D12Device2_CreatePipelineState(device2, &tests[i].stream_desc, &IID_ID3D12PipelineState, (void **)&pipeline_state);
+        bug_if(tests[i].is_mvk_bug && is_mvk_device(device))
         ok(hr == tests[i].expected_result, "Got unexpected return value %#x.\n", hr);
 
         if (hr == S_OK)
@@ -30297,7 +30299,9 @@ static void test_domain_shader_inputs(void)
     struct test_context context;
     ID3D12Resource *so_buffer;
     ID3D12CommandQueue *queue;
+    const float *elems = NULL;
     unsigned int x, y;
+    bool fail = false;
     HRESULT hr;
 
 #if 0
@@ -30457,6 +30461,7 @@ static void test_domain_shader_inputs(void)
     pso_desc.StreamOutput.RasterizedStream = D3D12_SO_NO_RASTERIZED_STREAM;
     hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     so_buffer = create_default_buffer(context.device, 1024,
@@ -30478,13 +30483,21 @@ static void test_domain_shader_inputs(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (y = 0; y < ARRAY_SIZE(reference); ++y)
     {
-        const float *elems = get_readback_data(&rb.rb, y, 0, 0, stride);
+        elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
-            ok(compare_float(reference[y][x], elems[x], 0),
-                    "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
+            if (!compare_float(reference[y][x], elems[x], 0))
+            {
+                fail = true;
+                break;
+            }
         }
+
+        if (fail)
+            break;
     }
+    bug_if(is_mvk_device(context.device))
+    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -30502,7 +30515,9 @@ static void test_domain_shader_one_patch_constant_input(void)
     struct test_context context;
     ID3D12Resource *so_buffer;
     ID3D12CommandQueue *queue;
+    const float *elems = NULL;
     unsigned int x, y;
+    bool fail = false;
     HRESULT hr;
 
 #if 0
@@ -30631,6 +30646,7 @@ static void test_domain_shader_one_patch_constant_input(void)
     pso_desc.StreamOutput.RasterizedStream = D3D12_SO_NO_RASTERIZED_STREAM;
     hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     so_buffer = create_default_buffer(context.device, 1024,
@@ -30652,13 +30668,21 @@ static void test_domain_shader_one_patch_constant_input(void)
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
     for (y = 0; y < ARRAY_SIZE(reference); ++y)
     {
-        const float *elems = get_readback_data(&rb.rb, y, 0, 0, stride);
+        elems = get_readback_data(&rb.rb, y, 0, 0, stride);
         for (x = 0; x < ARRAY_SIZE(*reference); ++x)
         {
-            ok(compare_float(reference[y][x], elems[x], 0),
-                    "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
+            if (!compare_float(reference[y][x], elems[x], 0))
+            {
+                fail = true;
+                break;
+            }
         }
+
+        if (fail)
+            break;
     }
+    bug_if(is_mvk_device(context.device))
+    ok(!fail, "Got unexpected value %.8e for [%u][%u], expected %.8e.\n", elems[x], y, x, reference[y][x]);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -36156,6 +36180,7 @@ static void test_hull_shader_relative_addressing(void)
     pso_desc.StreamOutput.RasterizedStream = D3D12_SO_NO_RASTERIZED_STREAM;
     hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     vb = create_upload_buffer(context.device, sizeof(vertices), vertices);
@@ -36182,7 +36207,8 @@ static void test_hull_shader_relative_addressing(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
-    bug_if(is_radv_device(context.device)) check_triangles(&rb.rb, &expected_triangle, 1);
+    bug_if(is_radv_device(context.device) || is_mvk_device(context.device))
+    check_triangles(&rb.rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
     ID3D12Resource_Release(so_buffer);
@@ -36389,6 +36415,7 @@ static void test_hull_shader_patch_constant_inputs(void)
     pso_desc.StreamOutput.RasterizedStream = D3D12_SO_NO_RASTERIZED_STREAM;
     hr = ID3D12Device_CreateGraphicsPipelineState(context.device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
+    bug_if(is_mvk_device(context.device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     vb = create_upload_buffer(context.device, sizeof(vertices), vertices);
@@ -36414,6 +36441,7 @@ static void test_hull_shader_patch_constant_inputs(void)
     transition_resource_state(command_list, so_buffer,
             D3D12_RESOURCE_STATE_STREAM_OUT, D3D12_RESOURCE_STATE_COPY_SOURCE);
     get_buffer_readback_with_command_list(so_buffer, DXGI_FORMAT_UNKNOWN, &rb, queue, command_list);
+    bug_if(is_mvk_device(context.device))
     check_triangles(&rb.rb, &expected_triangle, 1);
     release_resource_readback(&rb);
 
