@@ -3461,22 +3461,20 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
 
 struct register_allocator
 {
-    size_t count, capacity;
-
-    /* Highest register index that has been allocated.
-     * Used to declare sm4 temp count. */
-    uint32_t max_reg;
-
     struct allocation
     {
         uint32_t reg;
         unsigned int writemask;
         unsigned int first_write, last_read;
     } *allocations;
+    size_t count, capacity;
 
     /* Indexable temps are allocated separately and always keep their index regardless of their
      * lifetime. */
     size_t indexable_count;
+
+    /* Total number of registers allocated so far. Used to declare sm4 temp count. */
+    uint32_t reg_count;
 };
 
 static unsigned int get_available_writemask(const struct register_allocator *allocator,
@@ -3519,7 +3517,7 @@ static void record_allocation(struct hlsl_ctx *ctx, struct register_allocator *a
     allocation->first_write = first_write;
     allocation->last_read = last_read;
 
-    allocator->max_reg = max(allocator->max_reg, reg_idx);
+    allocator->reg_count = max(allocator->reg_count, reg_idx + 1);
 }
 
 /* reg_size is the number of register components to be reserved, while component_count is the number
@@ -3986,7 +3984,7 @@ static void allocate_temp_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functio
     }
 
     allocate_temp_registers_recurse(ctx, &entry_func->body, &allocator);
-    ctx->temp_count = allocator.max_reg + 1;
+    ctx->temp_count = allocator.reg_count;
     vkd3d_free(allocator.allocations);
 }
 
