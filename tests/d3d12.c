@@ -13685,7 +13685,7 @@ static void test_sample_instructions(void)
     unsigned int x_step, y_step;
     ID3D12CommandQueue *queue;
     ID3D12Resource *texture;
-    unsigned int i, x, y;
+    unsigned int i, x = 0, y;
     ID3D12Device *device;
     HRESULT hr;
 
@@ -13908,6 +13908,7 @@ static void test_sample_instructions(void)
         float max_lod;
         float ps_constants[4];
         const unsigned int *expected_data;
+        bool bug_on_mvk;
     }
     tests[] =
     {
@@ -13919,7 +13920,7 @@ static void test_sample_instructions(void)
         {&ps_sample_b, &r8g8b8a8_texture,    POINT, 0.0f, 0.0f, MIP_MAX, {0.0f},                   r8g8b8a8_data},
         {&ps_sample_b, &a8_texture,          POINT, 0.0f, 0.0f, MIP_MAX, {0.0f},                   a8_expected_data},
         {&ps_sample_b, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.0f},                   rgba_level_0},
-        {&ps_sample_b, &rgba_texture,        POINT, 8.0f, 0.0f, MIP_MAX, {0.0f},                   level_1_colors},
+        {&ps_sample_b, &rgba_texture,        POINT, 8.0f, 0.0f, MIP_MAX, {0.0f},                   level_1_colors, true},
         {&ps_sample_b, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {8.0f},                   level_1_colors},
         {&ps_sample_b, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {8.4f},                   level_1_colors},
         {&ps_sample_b, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {8.5f},                   level_2_colors},
@@ -13937,19 +13938,21 @@ static void test_sample_instructions(void)
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {-1.0f},                  rgba_level_0},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.0f},                   rgba_level_0},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.4f},                   rgba_level_0},
-        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.5f},                   level_1_colors},
+        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.5f},                   level_1_colors, true},
+        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {0.6f},                   level_1_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.0f},                   level_1_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.4f},                   level_1_colors},
-        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.5f},                   level_2_colors},
+        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.5f},                   level_2_colors, true},
+        {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {1.6f},                   level_2_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {2.0f},                   level_2_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {3.0f},                   level_2_colors},
         {&ps_sample_l, &rgba_texture,        POINT, 0.0f, 0.0f, MIP_MAX, {4.0f},                   level_2_colors},
         {&ps_sample_l, &rgba_texture, POINT_LINEAR, 0.0f, 0.0f, MIP_MAX, {1.5f},                   lerp_1_2_colors},
         {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {-2.0f},                  rgba_level_0},
-        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {-1.0f},                  level_1_colors},
-        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {0.0f},                   level_2_colors},
-        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {1.0f},                   level_2_colors},
-        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {1.5f},                   level_2_colors},
+        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {-1.0f},                  level_1_colors, true},
+        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {0.0f},                   level_2_colors, true},
+        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {1.0f},                   level_2_colors, true},
+        {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 0.0f, MIP_MAX, {1.5f},                   level_2_colors, true},
         {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 2.0f, 2.0f,    {-9.0f},                  level_2_colors},
         {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 2.0f, 2.0f,    {-1.0f},                  level_2_colors},
         {&ps_sample_l, &rgba_texture, POINT_LINEAR, 2.0f, 2.0f, 2.0f,    {0.0f},                   level_2_colors},
@@ -14015,6 +14018,9 @@ static void test_sample_instructions(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
+        unsigned int color = 0;
+        bool fail = false;
+
         vkd3d_test_push_context("Test %u", i);
 
         memset(&sampler_desc, 0, sizeof(sampler_desc));
@@ -14070,12 +14076,20 @@ static void test_sample_instructions(void)
         {
             for (x = 0; x < tests[i].texture->width; ++x)
             {
-                unsigned int color = get_readback_uint(&rb.rb, x * x_step + x_step / 2, y * y_step + y_step / 2, 0);
-                ok(compare_color(color, tests[i].expected_data[tests[i].texture->width * y + x], 1),
-                        "Got color 0x%08x, expected 0x%08x at (%u, %u).\n",
-                        color, tests[i].expected_data[tests[i].texture->width * y + x], x, y);
+                color = get_readback_uint(&rb.rb, x * x_step + x_step / 2, y * y_step + y_step / 2, 0);
+                if (!compare_color(color, tests[i].expected_data[tests[i].texture->width * y + x], 1))
+                {
+                    fail = true;
+                    break;
+                }
             }
+
+            if (fail)
+                break;
         }
+        bug_if(tests[i].bug_on_mvk && is_mvk_device(device))
+        ok(!fail, "Got color 0x%08x, expected 0x%08x at (%u, %u).\n",
+                color, tests[i].expected_data[tests[i].texture->width * y + x], x, y);
         release_resource_readback(&rb);
 
         ID3D12Resource_Release(texture);
