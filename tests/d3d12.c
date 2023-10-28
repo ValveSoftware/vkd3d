@@ -34035,11 +34035,11 @@ static void test_read_write_subresource(void)
 
     /* NULL box */
     hr = ID3D12Resource_WriteToSubresource(src_texture, 0, NULL, dst_buffer, row_pitch, slice_pitch);
-    todo_if(is_nvidia_device(device))
+    todo_if(is_nvidia_device(device) || is_mvk_device(device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     hr = ID3D12Resource_ReadFromSubresource(src_texture, dst_buffer, row_pitch, slice_pitch, 0, NULL);
-    todo_if(is_nvidia_device(device))
+    todo_if(is_nvidia_device(device) || is_mvk_device(device))
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
     /* Empty box */
@@ -34078,20 +34078,20 @@ static void test_read_write_subresource(void)
         if (i)
         {
             hr = ID3D12Resource_WriteToSubresource(src_texture, 0, NULL, zero_buffer, row_pitch, slice_pitch);
-            todo_if(is_nvidia_device(device))
+            todo_if(is_nvidia_device(device) || is_mvk_device(device))
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
             /* Write region 1 */
             set_box(&box, 0, 0, 0, 2, 2, 2);
             hr = ID3D12Resource_WriteToSubresource(src_texture, 0, &box, dst_buffer, row_pitch, slice_pitch);
-            todo_if(is_nvidia_device(device))
+            todo_if(is_nvidia_device(device) || is_mvk_device(device))
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
             /* Write region 2 */
             set_box(&box, 2, 2, 2, 11, 13, 17);
             hr = ID3D12Resource_WriteToSubresource(src_texture, 0, &box, &dst_buffer[2 * 128 * 100 + 2 * 128 + 2],
                     row_pitch, slice_pitch);
-            todo_if(is_nvidia_device(device))
+            todo_if(is_nvidia_device(device) || is_mvk_device(device))
             ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
         }
         else
@@ -34113,14 +34113,14 @@ static void test_read_write_subresource(void)
         /* Read region 1 */
         set_box(&box, 0, 0, 0, 2, 2, 2);
         hr = ID3D12Resource_ReadFromSubresource(src_texture, dst_buffer, row_pitch, slice_pitch, 0, &box);
-        todo_if(is_nvidia_device(device))
+        todo_if(is_nvidia_device(device) || is_mvk_device(device))
         ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
         /* Read region 2 */
         set_box(&box, 2, 2, 2, 11, 13, 17);
         hr = ID3D12Resource_ReadFromSubresource(src_texture, &dst_buffer[2 * 128 * 100 + 2 * 128 + 2], row_pitch,
                 slice_pitch, 0, &box);
-        todo_if(is_nvidia_device(device))
+        todo_if(is_nvidia_device(device) || is_mvk_device(device))
         ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
 
         for (z = 0; z < 64; ++z)
@@ -34146,7 +34146,7 @@ static void test_read_write_subresource(void)
             if (got != expected)
                 break;
         }
-        todo_if(is_nvidia_device(device))
+        todo_if(is_nvidia_device(device) || is_mvk_device(device))
         ok(got == expected, "Got unexpected value 0x%08x at (%u, %u, %u), expected 0x%08x.\n", got, x, y, z, expected);
         vkd3d_test_pop_context();
     }
@@ -34196,7 +34196,7 @@ static void test_read_write_subresource(void)
         if (got != expected)
             break;
     }
-    todo_if(is_nvidia_device(device))
+    todo_if(is_nvidia_device(device) || is_mvk_device(device))
     ok(got == expected, "Got unexpected value 0x%08x at (%u, %u, %u), expected 0x%08x.\n", got, x, y, z, expected);
     release_resource_readback(&rb);
 
