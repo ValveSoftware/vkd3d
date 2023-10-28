@@ -34813,6 +34813,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffffff, 0);
 
     reset_command_list(command_list, context.allocator);
@@ -34831,6 +34832,7 @@ static void test_conditional_rendering(void)
 
     ID3D12GraphicsCommandList_SetPredication(command_list, conditions,
             sizeof(uint64_t), D3D12_PREDICATION_OP_EQUAL_ZERO);
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffffff, 0);
 
     reset_command_list(command_list, context.allocator);
@@ -34953,6 +34955,7 @@ static void test_conditional_rendering(void)
             0, D3D12_PREDICATION_OP_NOT_EQUAL_ZERO);
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffffff, 0);
 
     reset_command_list(command_list, context.allocator);
@@ -34974,6 +34977,7 @@ static void test_conditional_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xffffffff, 0);
 
     reset_command_list(command_list, context.allocator);
@@ -35148,7 +35152,8 @@ static void test_conditional_rendering(void)
 
         get_buffer_readback_with_command_list(buffer, DXGI_FORMAT_R32_UINT, &rb, queue, command_list);
         value = get_readback_uint(&rb.rb, 0, 0, 0);
-        ok(value == (!i ? init_value : input.value), "Got %#x, expected %#x.\n", value, input.value);
+        bug_if(is_mvk_device(context.device))
+        ok(value == (!i ? init_value : input.value), "Got %#x, expected %#x.\n", value, !i ? init_value : input.value);
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
 
