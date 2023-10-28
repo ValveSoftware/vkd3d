@@ -487,27 +487,27 @@ static void resolve_loop_continue(struct hlsl_ctx *ctx, struct hlsl_block *block
         else if (instr->type == HLSL_IR_JUMP)
         {
             struct hlsl_ir_jump *jump = hlsl_ir_jump(instr);
-            struct hlsl_block block;
+            struct hlsl_block cond_block;
 
             if (jump->type != HLSL_IR_JUMP_UNRESOLVED_CONTINUE)
                 continue;
 
             if (type == LOOP_DO_WHILE)
             {
-                if (!hlsl_clone_block(ctx, &block, cond))
+                if (!hlsl_clone_block(ctx, &cond_block, cond))
                     return;
-                if (!append_conditional_break(ctx, &block))
+                if (!append_conditional_break(ctx, &cond_block))
                 {
-                    hlsl_block_cleanup(&block);
+                    hlsl_block_cleanup(&cond_block);
                     return;
                 }
-                list_move_before(&instr->entry, &block.instrs);
+                list_move_before(&instr->entry, &cond_block.instrs);
             }
             else if (type == LOOP_FOR)
             {
-                if (!hlsl_clone_block(ctx, &block, iter))
+                if (!hlsl_clone_block(ctx, &cond_block, iter))
                     return;
-                list_move_before(&instr->entry, &block.instrs);
+                list_move_before(&instr->entry, &cond_block.instrs);
             }
             jump->type = HLSL_IR_JUMP_CONTINUE;
         }
