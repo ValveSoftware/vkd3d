@@ -3553,7 +3553,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
 {
     struct hlsl_resource_load_params load_params = { 0 };
     const struct hlsl_type *sampler_type;
-    struct hlsl_ir_node *coords, *load;
+    struct hlsl_ir_node *coords, *sample;
 
     if (params->args_count != 2 && params->args_count != 4)
     {
@@ -3688,9 +3688,9 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     load_params.format = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4);
     load_params.sampling_dim = dim;
 
-    if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
+    if (!(sample = hlsl_new_resource_load(ctx, &load_params, loc)))
         return false;
-    hlsl_block_add_instr(params->instrs, load);
+    hlsl_block_add_instr(params->instrs, sample);
     return true;
 }
 
