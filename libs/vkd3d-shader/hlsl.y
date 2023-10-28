@@ -563,8 +563,11 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
                 hlsl_warning(ctx, loc, VKD3D_SHADER_ERROR_HLSL_NOT_IMPLEMENTED, "Loop unrolling is not implemented.");
             }
         }
-        else if (!strcmp(attr->name, "loop")
-                || !strcmp(attr->name, "fastopt")
+        else if (!strcmp(attr->name, "loop"))
+        {
+            /* TODO: this attribute will be used to disable unrolling, once it's implememented. */
+        }
+        else if (!strcmp(attr->name, "fastopt")
                 || !strcmp(attr->name, "allow_uav_condition"))
         {
             hlsl_fixme(ctx, loc, "Unhandled attribute '%s'.", attr->name);

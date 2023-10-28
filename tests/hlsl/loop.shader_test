@@ -102,7 +102,7 @@ todo(sm>=6) draw quad
 probe all rgba (410.1, 410.1, 410.1, 410.1)
 
 % loop attribute by itself
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -116,10 +116,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -135,10 +135,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -154,7 +154,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 % unroll can't be used with fastopt or loop
