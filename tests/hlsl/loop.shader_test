@@ -158,7 +158,7 @@ todo draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 % unroll can't be used with fastopt or loop
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -171,7 +171,7 @@ float4 main() : sv_target
     return ret;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -184,7 +184,7 @@ float4 main() : sv_target
     return ret;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -199,7 +199,7 @@ float4 main() : sv_target
     return ret;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float ret = 0.0;

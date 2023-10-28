@@ -514,6 +514,28 @@ static void resolve_loop_continue(struct hlsl_ctx *ctx, struct hlsl_block *block
     }
 }
 
+static void check_loop_attributes(struct hlsl_ctx *ctx, const struct parse_attribute_list *attributes,
+        const struct vkd3d_shader_location *loc)
+{
+    bool has_unroll = false, has_loop = false, has_fastopt = false;
+    unsigned int i;
+
+    for (i = 0; i < attributes->count; ++i)
+    {
+        const char *name = attributes->attrs[i]->name;
+
+        has_loop |= !strcmp(name, "loop");
+        has_unroll |= !strcmp(name, "unroll");
+        has_fastopt |= !strcmp(name, "fastopt");
+    }
+
+    if (has_unroll && has_loop)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Unroll attribute can't be used with 'loop' attribute.");
+
+    if (has_unroll && has_fastopt)
+        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Unroll attribute can't be used with 'fastopt' attribute.");
+}
+
 static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
         const struct parse_attribute_list *attributes, struct hlsl_block *init, struct hlsl_block *cond,
         struct hlsl_block *iter, struct hlsl_block *body, const struct vkd3d_shader_location *loc)
@@ -523,6 +545,8 @@ static struct hlsl_block *create_loop(struct hlsl_ctx *ctx, enum loop_type type,
 
     if (attribute_list_has_duplicates(attributes))
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Found duplicate attribute.");
+
+    check_loop_attributes(ctx, attributes, loc);
 
     /* Ignore unroll(0) attribute, and any invalid attribute. */
     for (i = 0; i < attributes->count; ++i)
