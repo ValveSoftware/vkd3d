@@ -100,3 +100,146 @@ float4 main() : sv_target
 uniform 0 float 4.0
 todo(sm>=6) draw quad
 probe all rgba (410.1, 410.1, 410.1, 410.1)
+
+% loop attribute by itself
+[pixel shader todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+
+    [loop] for (int i = 0; i < 10; ++i)
+    {
+        ret += 1.0;
+    }
+
+    return ret;
+}
+
+[test]
+todo draw quad
+probe all rgba (10.0, 10.0, 10.0, 10.0)
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [loop] while (i < 10)
+    {
+        ret += 1.0;
+        i++;
+    }
+
+    return ret;
+}
+
+[test]
+todo draw quad
+probe all rgba (10.0, 10.0, 10.0, 10.0)
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [loop] do
+    {
+        i++;
+        ret += 1.0;
+    } while (i < 10);
+
+    return ret;
+}
+
+[test]
+todo draw quad
+probe all rgba (10.0, 10.0, 10.0, 10.0)
+
+% unroll can't be used with fastopt or loop
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+
+    [loop] [unroll(1)] for (int i = 0; i < 10; ++i)
+    {
+        ret += 1.0;
+    }
+
+    return ret;
+}
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+
+    [fastopt] [unroll(1)] for (int i = 0; i < 10; ++i)
+    {
+        ret += 1.0;
+    }
+
+    return ret;
+}
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [loop] [unroll(1)] while (i < 10)
+    {
+        ret += 1.0;
+        i++;
+    }
+
+    return ret;
+}
+
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [fastopt] [unroll(1)] while (i < 10)
+    {
+        ret += 1.0;
+        i++;
+    }
+
+    return ret;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [loop] [unroll(1)] do
+    {
+        ret += 1.0;
+        i++;
+    } while (i < 10)
+
+    return ret;
+}
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float ret = 0.0;
+    int i = 0;
+
+    [fastopt] [unroll(1)] do
+    {
+        ret += 1.0;
+        i++;
+    } while (i < 10)
+
+    return ret;
+}
