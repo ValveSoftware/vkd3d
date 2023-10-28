@@ -2253,7 +2253,7 @@ static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         {
             struct hlsl_reg *reg = &jump->condition.node->reg;
 
-            struct sm1_instruction instr =
+            struct sm1_instruction sm1_instr =
             {
                 .opcode = D3DSIO_TEXKILL,
 
@@ -2263,7 +2263,7 @@ static void write_sm1_jump(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
                 .has_dst = 1,
             };
 
-            write_sm1_instruction(ctx, buffer, &instr);
+            write_sm1_instruction(ctx, buffer, &sm1_instr);
             break;
         }
 
