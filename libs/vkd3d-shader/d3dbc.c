@@ -402,16 +402,6 @@ static uint32_t read_u32(const uint32_t **ptr)
     return *(*ptr)++;
 }
 
-static bool shader_ver_ge(const struct vkd3d_shader_version *v, unsigned int major, unsigned int minor)
-{
-    return v->major > major || (v->major == major && v->minor >= minor);
-}
-
-static bool shader_ver_le(const struct vkd3d_shader_version *v, unsigned int major, unsigned int minor)
-{
-    return v->major < major || (v->major == major && v->minor <= minor);
-}
-
 static bool has_relative_address(uint32_t param)
 {
     enum vkd3d_sm1_address_mode_type address_mode;
@@ -434,8 +424,8 @@ static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info(
             return NULL;
 
         if (opcode == info->sm1_opcode
-                && shader_ver_ge(&sm1->p.shader_version, info->min_version.major, info->min_version.minor)
-                && (shader_ver_le(&sm1->p.shader_version, info->max_version.major, info->max_version.minor)
+                && vkd3d_shader_ver_ge(&sm1->p.shader_version, info->min_version.major, info->min_version.minor)
+                && (vkd3d_shader_ver_le(&sm1->p.shader_version, info->max_version.major, info->max_version.minor)
                         || !info->max_version.major))
             return info;
     }
@@ -1263,7 +1253,7 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
             return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    if (!shader_ver_le(&version, 3, 0))
+    if (!vkd3d_shader_ver_le(&version, 3, 0))
     {
         vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_D3DBC_INVALID_VERSION_TOKEN,
                 "Invalid shader version %u.%u (token 0x%08x).", version.major, version.minor, code[0]);

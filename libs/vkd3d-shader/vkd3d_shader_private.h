@@ -1082,6 +1082,16 @@ struct vkd3d_shader_instruction
     } declaration;
 };
 
+static inline bool vkd3d_shader_ver_ge(const struct vkd3d_shader_version *v, unsigned int major, unsigned int minor)
+{
+    return v->major > major || (v->major == major && v->minor >= minor);
+}
+
+static inline bool vkd3d_shader_ver_le(const struct vkd3d_shader_version *v, unsigned int major, unsigned int minor)
+{
+    return v->major < major || (v->major == major && v->minor <= minor);
+}
+
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode handler_idx);
 
