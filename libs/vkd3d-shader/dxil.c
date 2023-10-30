@@ -2347,9 +2347,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         dst = sm6_parser_get_current_value(sm6);
         dst->type = type;
         dst->value_type = VALUE_TYPE_REG;
-        dst->u.reg.type = reg_type;
-        dst->u.reg.dimension = VSIR_DIMENSION_SCALAR;
-        dst->u.reg.data_type = reg_data_type;
+        vsir_register_init(&dst->u.reg, reg_type, reg_data_type, 0);
 
         switch (record->code)
         {
