@@ -4070,10 +4070,12 @@ static enum vkd3d_result sm6_parser_read_signature(struct sm6_parser *sm6, const
             return VKD3D_ERROR_INVALID_SHADER;
         }
 
-        e->mask = vkd3d_write_mask_from_component_count(column_count) << index;
+        e->mask = vkd3d_write_mask_from_component_count(column_count);
         e->used_mask = e->mask;
+        e->mask <<= index;
 
         signature_element_read_additional_element_values(e, element_node, sm6);
+        e->used_mask <<= index;
 
         m = element_node->operands[4];
         if (!sm6_metadata_value_is_node(m))
