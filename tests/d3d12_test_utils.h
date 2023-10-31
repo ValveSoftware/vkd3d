@@ -773,9 +773,10 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
             RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
-#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
-static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer, size_t offset,
-        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+#define upload_buffer_data_with_states(a, b, c, d, e, f, g, h) upload_buffer_data_with_states_(__LINE__, a, b, c, d, e, f, g, h)
+static inline void upload_buffer_data_with_states_(unsigned int line, ID3D12Resource *buffer, size_t offset,
+        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+        D3D12_RESOURCE_STATES initial_state, D3D12_RESOURCE_STATES final_state)
 {
     ID3D12Resource *upload_buffer;
     ID3D12Device *device;
@@ -786,8 +787,14 @@ static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer
 
     upload_buffer = create_upload_buffer_(line, device, size, data);
 
+    if (initial_state != RESOURCE_STATE_DO_NOT_CHANGE)
+        transition_resource_state(command_list, buffer, initial_state, D3D12_RESOURCE_STATE_COPY_DEST);
+
     ID3D12GraphicsCommandList_CopyBufferRegion(command_list, buffer, offset,
             upload_buffer, 0, size);
+
+    if (final_state != RESOURCE_STATE_DO_NOT_CHANGE)
+        transition_resource_state(command_list, buffer, D3D12_RESOURCE_STATE_COPY_DEST, final_state);
 
     hr = ID3D12GraphicsCommandList_Close(command_list);
     ok_(line)(SUCCEEDED(hr), "Failed to close command list, hr %#x.\n", hr);
@@ -796,6 +803,14 @@ static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer
 
     ID3D12Resource_Release(upload_buffer);
     ID3D12Device_Release(device);
+}
+
+#define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
+static inline void upload_buffer_data_(unsigned int line, ID3D12Resource *buffer, size_t offset,
+        size_t size, const void *data, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+{
+    return upload_buffer_data_with_states_(line, buffer, offset, size, data, queue, command_list,
+            RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
 static HRESULT create_root_signature(ID3D12Device *device, const D3D12_ROOT_SIGNATURE_DESC *desc,

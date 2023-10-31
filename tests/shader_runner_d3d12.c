@@ -181,11 +181,10 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
             resource->resource = create_default_buffer(device, params->data_size,
                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_buffer_data(resource->resource, 0, params->data_size, resource_data,
-                    test_context->queue, test_context->list);
+            upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data,
+                    test_context->queue, test_context->list,
+                    RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             reset_command_list(test_context->list, test_context->allocator);
-            transition_resource_state(test_context->list, resource->resource,
-                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
             uav_desc.Format = params->format;
             uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
