@@ -147,11 +147,11 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
             resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
                     params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_texture_data(resource->resource, resource_data,
-                    params->level_count, test_context->queue, test_context->list);
-            reset_command_list(test_context->list, test_context->allocator);
-            transition_resource_state(test_context->list, resource->resource, D3D12_RESOURCE_STATE_COPY_DEST,
+            upload_texture_data_with_states(resource->resource, resource_data,
+                    params->level_count, test_context->queue, test_context->list,
+                    RESOURCE_STATE_DO_NOT_CHANGE,
                     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            reset_command_list(test_context->list, test_context->allocator);
             ID3D12Device_CreateShaderResourceView(device, resource->resource,
                     NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
             break;
@@ -163,11 +163,10 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
 
             resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
                     params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_texture_data(resource->resource, resource_data,
-                    params->level_count, test_context->queue, test_context->list);
+            upload_texture_data_with_states(resource->resource, resource_data,
+                    params->level_count, test_context->queue, test_context->list,
+                    RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             reset_command_list(test_context->list, test_context->allocator);
-            transition_resource_state(test_context->list, resource->resource,
-                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
                     NULL, NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             break;

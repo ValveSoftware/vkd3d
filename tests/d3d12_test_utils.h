@@ -671,10 +671,11 @@ static void copy_sub_resource_data(const D3D12_MEMCPY_DEST *dst, const D3D12_SUB
     }
 }
 
-#define upload_texture_data(a, b, c, d, e) upload_texture_data_(__LINE__, a, b, c, d, e)
-static inline void upload_texture_data_(unsigned int line, ID3D12Resource *texture,
+#define upload_texture_data_with_states(a, b, c, d, e, f, g) upload_texture_data_with_states_(__LINE__, a, b, c, d, e, f, g)
+static inline void upload_texture_data_with_states_(unsigned int line, ID3D12Resource *texture,
         const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
-        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+        D3D12_RESOURCE_STATES initial_state, D3D12_RESOURCE_STATES final_state)
 {
     D3D12_TEXTURE_COPY_LOCATION dst_location, src_location;
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts;
@@ -718,7 +719,13 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
 
     if (resource_desc.Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
     {
+        if (initial_state != RESOURCE_STATE_DO_NOT_CHANGE)
+            transition_resource_state(command_list, texture, initial_state, D3D12_RESOURCE_STATE_COPY_DEST);
+
         ID3D12GraphicsCommandList_CopyResource(command_list, texture, upload_buffer);
+
+        if (final_state != RESOURCE_STATE_DO_NOT_CHANGE)
+            transition_resource_state(command_list, texture, D3D12_RESOURCE_STATE_COPY_DEST, final_state);
     }
     else
     {
@@ -732,8 +739,14 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
             src_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src_location.PlacedFootprint = layouts[i];
 
+            if (initial_state != RESOURCE_STATE_DO_NOT_CHANGE)
+                transition_sub_resource_state(command_list, texture, i, initial_state, D3D12_RESOURCE_STATE_COPY_DEST);
+
             ID3D12GraphicsCommandList_CopyTextureRegion(command_list,
                     &dst_location, 0, 0, 0, &src_location, NULL);
+
+            if (final_state != RESOURCE_STATE_DO_NOT_CHANGE)
+                transition_sub_resource_state(command_list, texture, i, D3D12_RESOURCE_STATE_COPY_DEST, final_state);
         }
     }
 
@@ -749,6 +762,15 @@ static inline void upload_texture_data_(unsigned int line, ID3D12Resource *textu
     free(layouts);
     free(row_counts);
     free(row_sizes);
+}
+
+#define upload_texture_data(a, b, c, d, e) upload_texture_data_(__LINE__, a, b, c, d, e)
+static inline void upload_texture_data_(unsigned int line, ID3D12Resource *texture,
+        const D3D12_SUBRESOURCE_DATA *data, unsigned int sub_resource_count,
+        ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list)
+{
+    return upload_texture_data_with_states_(line, texture, data, sub_resource_count, queue, command_list,
+            RESOURCE_STATE_DO_NOT_CHANGE, RESOURCE_STATE_DO_NOT_CHANGE);
 }
 
 #define upload_buffer_data(a, b, c, d, e, f) upload_buffer_data_(__LINE__, a, b, c, d, e, f)
