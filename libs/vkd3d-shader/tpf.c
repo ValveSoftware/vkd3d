@@ -3790,7 +3790,7 @@ static void sm4_dst_from_node(struct vkd3d_shader_dst_param *dst, const struct h
 static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
         const struct hlsl_constant_value *value, unsigned int width, unsigned int map_writemask)
 {
-    src->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    src->swizzle = 0;
     src->reg.type = VKD3DSPR_IMMCONST;
     if (width == 1)
     {
