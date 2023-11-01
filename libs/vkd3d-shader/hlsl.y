@@ -4955,6 +4955,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 
 %type <name> any_identifier
 %type <name> var_identifier
+%type <name> technique_name
 
 %type <parameter> parameter
 
@@ -4996,7 +4997,49 @@ hlsl_prog:
             destroy_block($2);
         }
     | hlsl_prog preproc_directive
+    | hlsl_prog technique
     | hlsl_prog ';'
+
+technique_name:
+      %empty
+        {
+            $$ = NULL;
+        }
+    | any_identifier
+
+pass_list:
+      %empty
+
+technique9:
+      KW_TECHNIQUE technique_name '{' pass_list '}'
+        {
+            hlsl_fixme(ctx, &@$, "Unsupported \'technique\' declaration.");
+        }
+
+technique10:
+      KW_TECHNIQUE10 technique_name '{' pass_list '}'
+        {
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "The 'technique10' keyword is invalid for this profile.");
+
+            hlsl_fixme(ctx, &@$, "Unsupported \'technique10\' declaration.");
+        }
+
+technique11:
+      KW_TECHNIQUE11 technique_name '{' pass_list '}'
+        {
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
+                        "The 'technique11' keyword is invalid for this profile.");
+
+            hlsl_fixme(ctx, &@$, "Unsupported \'technique11\' declaration.");
+        }
+
+technique:
+      technique9
+    | technique10
+    | technique11
 
 buffer_declaration:
       buffer_type any_identifier colon_attribute

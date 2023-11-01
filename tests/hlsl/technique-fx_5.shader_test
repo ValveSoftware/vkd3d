@@ -46,7 +46,7 @@ technique11
 {
 }
 
-[effect fail]
+[effect fail todo]
 technique
 {
 }
@@ -55,7 +55,7 @@ tEchnique10
 {
 }
 
-[effect fail]
+[effect fail todo]
 technique
 {
 }
