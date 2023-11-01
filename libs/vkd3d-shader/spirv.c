@@ -2986,12 +2986,6 @@ static uint32_t spirv_compiler_get_constant_vector(struct spirv_compiler *compil
     return spirv_compiler_get_constant(compiler, component_type, component_count, values);
 }
 
-static uint32_t spirv_compiler_get_constant_int_vector(struct spirv_compiler *compiler,
-        uint32_t value, unsigned int component_count)
-{
-    return spirv_compiler_get_constant_vector(compiler, VKD3D_SHADER_COMPONENT_INT, component_count, value);
-}
-
 static uint32_t spirv_compiler_get_constant_uint_vector(struct spirv_compiler *compiler,
         uint32_t value, unsigned int component_count)
 {
@@ -7188,6 +7182,7 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t src_type_id, dst_type_id, condition_type_id;
+    enum vkd3d_shader_component_type component_type;
     unsigned int component_count;
 
     assert(instruction->dst_count == 1);
@@ -7205,8 +7200,11 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
     int_min_id = spirv_compiler_get_constant_float_vector(compiler, -2147483648.0f, component_count);
     val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, int_min_id);
 
+    /* VSIR allows the destination of a signed conversion to be unsigned. */
+    component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
+
     float_max_id = spirv_compiler_get_constant_float_vector(compiler, 2147483648.0f, component_count);
-    int_max_id = spirv_compiler_get_constant_int_vector(compiler, INT_MAX, component_count);
+    int_max_id = spirv_compiler_get_constant_vector(compiler, component_type, component_count, INT_MAX);
     condition_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
     condition_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
             SpvOpFOrdGreaterThanEqual, condition_type_id, val_id, float_max_id);
@@ -7214,7 +7212,7 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
     val_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpConvertFToS, dst_type_id, val_id);
     val_id = vkd3d_spirv_build_op_select(builder, dst_type_id, condition_id, int_max_id, val_id);
 
-    zero_id = spirv_compiler_get_constant_int_vector(compiler, 0, component_count);
+    zero_id = spirv_compiler_get_constant_vector(compiler, component_type, component_count, 0);
     condition_id = vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpIsNan, condition_type_id, src_id);
     val_id = vkd3d_spirv_build_op_select(builder, dst_type_id, condition_id, zero_id, val_id);
 
