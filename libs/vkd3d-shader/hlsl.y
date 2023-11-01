@@ -4832,6 +4832,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token KW_TBUFFER
 %token KW_TECHNIQUE
 %token KW_TECHNIQUE10
+%token KW_TECHNIQUE11
 %token KW_TEXTURE
 %token KW_TEXTURE1D
 %token KW_TEXTURE1DARRAY

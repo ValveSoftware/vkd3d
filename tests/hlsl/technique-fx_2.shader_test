@@ -15,7 +15,7 @@ float4 main() : sv_target
     return technique10;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float4 technique11 = {0, 0, 0, 0};

@@ -133,6 +133,7 @@ switch                  {return KW_SWITCH;              }
 tbuffer                 {return KW_TBUFFER;             }
 technique               {return KW_TECHNIQUE;           }
 technique10             {return KW_TECHNIQUE10;         }
+technique11             {return KW_TECHNIQUE11;         }
 texture                 {return KW_TEXTURE;             }
 texture1D               {return KW_TEXTURE1D;           }
 Texture1D               {return KW_TEXTURE1D;           }
