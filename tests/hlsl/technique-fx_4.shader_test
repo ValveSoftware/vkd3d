@@ -81,3 +81,40 @@ float4 technIque10;
 
 [effect todo]
 float4 technIque11;
+
+% Regular shaders with technique blocks
+[vertex shader todo]
+float4 main() : sv_position
+{
+    return 0;
+}
+
+technique
+{
+}
+
+technique10
+{
+}
+
+technique11
+{
+}
+
+[pixel shader todo]
+float4 main() : sv_target
+{
+    return 0;
+}
+
+tEchnique
+{
+}
+
+technique10
+{
+}
+
+technique11
+{
+}
