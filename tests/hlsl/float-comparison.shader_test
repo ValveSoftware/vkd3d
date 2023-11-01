@@ -1,5 +1,5 @@
 % Check that -0.0f is not less than 0.0f
-[pixel shader todo(sm<4)]
+[pixel shader]
 float a;
 
 float4 main() : sv_target
@@ -9,7 +9,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 0.0
-todo(sm<4) draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 
@@ -77,7 +77,7 @@ if(sm>=6) probe all rgba (1010101.0, 11110000.0, 1101001.0, 1.0)
 shader model >= 2.0
 shader model < 3.0
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float4 a, b;
 
 float4 main() : sv_target
@@ -88,7 +88,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 1e-37  1e-37 1e+38  1e+38
 uniform 4 float4     0 -1e-37 1e+38 -1e+38
-todo(sm<4) draw quad
+draw quad
 probe all rgba (1.0, 1.0, 1.0, 0.0)
 
 
@@ -96,7 +96,7 @@ probe all rgba (1.0, 1.0, 1.0, 0.0)
 shader model >= 3.0
 shader model < 4.0
 
-[pixel shader todo(sm<4)]
+[pixel shader]
 float4 a, b;
 
 float4 main() : sv_target

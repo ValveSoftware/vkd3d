@@ -3141,6 +3141,67 @@ static bool lower_comparison_operators(struct hlsl_ctx *ctx, struct hlsl_ir_node
     return true;
 }
 
+/* Intended to be used for SM1-SM3, lowers SLT instructions (only available in vertex shaders) to
+ * CMP instructions (only available in pixel shaders).
+ * Based on the following equivalence:
+ *     SLT(x, y)
+ *     = (x < y) ? 1.0 : 0.0
+ *     = ((x - y) >= 0) ? 0.0 : 1.0
+ *     = CMP(x - y, 0.0, 1.0)
+ */
+static bool lower_slt(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_node *arg1, *arg2, *arg1_cast, *arg2_cast, *neg, *sub, *zero, *one, *cmp;
+    struct hlsl_constant_value zero_value, one_value;
+    struct hlsl_type *float_type;
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op != HLSL_OP2_SLT)
+        return false;
+
+    arg1 = expr->operands[0].node;
+    arg2 = expr->operands[1].node;
+    float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, instr->data_type->dimx);
+
+    if (!(arg1_cast = hlsl_new_cast(ctx, arg1, float_type, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, arg1_cast);
+
+    if (!(arg2_cast = hlsl_new_cast(ctx, arg2, float_type, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, arg2_cast);
+
+    if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, arg2_cast, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, neg);
+
+    if (!(sub = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, arg1_cast, neg)))
+        return false;
+    hlsl_block_add_instr(block, sub);
+
+    memset(&zero_value, 0, sizeof(zero_value));
+    if (!(zero = hlsl_new_constant(ctx, float_type, &zero_value, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, zero);
+
+    one_value.u[0].f = 1.0;
+    one_value.u[1].f = 1.0;
+    one_value.u[2].f = 1.0;
+    one_value.u[3].f = 1.0;
+    if (!(one = hlsl_new_constant(ctx, float_type, &one_value, &instr->loc)))
+        return false;
+    hlsl_block_add_instr(block, one);
+
+    if (!(cmp = hlsl_new_ternary_expr(ctx, HLSL_OP3_CMP, sub, zero, one)))
+        return false;
+    hlsl_block_add_instr(block, cmp);
+
+    return true;
+}
+
 static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_type *type = instr->data_type, *arg_type;
@@ -5331,6 +5392,8 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
         lower_ir(ctx, lower_ceil, body);
         lower_ir(ctx, lower_floor, body);
         lower_ir(ctx, lower_comparison_operators, body);
+        if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+            lower_ir(ctx, lower_slt, body);
     }
 
     if (profile->major_version < 2)
