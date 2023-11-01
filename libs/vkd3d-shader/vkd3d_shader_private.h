@@ -387,6 +387,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_ISHR,
     VKD3DSIH_ITOD,
     VKD3DSIH_ITOF,
+    VKD3DSIH_ITOI,
     VKD3DSIH_LABEL,
     VKD3DSIH_LD,
     VKD3DSIH_LD2DMS,
@@ -494,6 +495,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_USHR,
     VKD3DSIH_UTOD,
     VKD3DSIH_UTOF,
+    VKD3DSIH_UTOU,
     VKD3DSIH_XOR,
 
     VKD3DSIH_INVALID,

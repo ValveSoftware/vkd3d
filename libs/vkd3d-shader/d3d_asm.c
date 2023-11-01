@@ -199,6 +199,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_ISHR                            ] = "ishr",
     [VKD3DSIH_ITOD                            ] = "itod",
     [VKD3DSIH_ITOF                            ] = "itof",
+    [VKD3DSIH_ITOI                            ] = "itoi",
     [VKD3DSIH_LABEL                           ] = "label",
     [VKD3DSIH_LD                              ] = "ld",
     [VKD3DSIH_LD2DMS                          ] = "ld2dms",
@@ -306,6 +307,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_USHR                            ] = "ushr",
     [VKD3DSIH_UTOD                            ] = "utod",
     [VKD3DSIH_UTOF                            ] = "utof",
+    [VKD3DSIH_UTOU                            ] = "utou",
     [VKD3DSIH_XOR                             ] = "xor",
 };
 

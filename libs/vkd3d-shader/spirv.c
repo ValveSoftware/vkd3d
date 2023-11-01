@@ -4255,12 +4255,12 @@ static uint32_t spirv_compiler_emit_int_to_bool(struct spirv_compiler *compiler,
 }
 
 static uint32_t spirv_compiler_emit_bool_to_int(struct spirv_compiler *compiler,
-        unsigned int component_count, uint32_t val_id)
+        unsigned int component_count, uint32_t val_id, bool signedness)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, true_id, false_id;
 
-    true_id = spirv_compiler_get_constant_uint_vector(compiler, 0xffffffff, component_count);
+    true_id = spirv_compiler_get_constant_uint_vector(compiler, signedness ? 0xffffffff : 1, component_count);
     false_id = spirv_compiler_get_constant_uint_vector(compiler, 0, component_count);
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, component_count);
     return vkd3d_spirv_build_op_select(builder, type_id, val_id, true_id, false_id);
@@ -4332,7 +4332,7 @@ static uint32_t sv_instance_id_fixup(struct spirv_compiler *compiler,
 static uint32_t sv_front_face_fixup(struct spirv_compiler *compiler,
         uint32_t front_facing_id)
 {
-    return spirv_compiler_emit_bool_to_int(compiler, 1, front_facing_id);
+    return spirv_compiler_emit_bool_to_int(compiler, 1, front_facing_id, true);
 }
 
 /* frag_coord.w = 1.0f / frag_coord.w */
@@ -6699,6 +6699,10 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
         /* ITOD is not supported. Frontends which emit bool casts must use ITOF for double. */
         val_id = spirv_compiler_emit_bool_to_double(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOF);
     }
+    else if (dst->reg.data_type == VKD3D_DATA_UINT)
+    {
+        val_id = spirv_compiler_emit_bool_to_int(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOI);
+    }
     else
     {
         WARN("Unhandled data type %u.\n", dst->reg.data_type);
@@ -6727,7 +6731,8 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
             /* VSIR supports logic ops AND/OR/XOR on bool values. */
             op = spirv_compiler_map_logical_instruction(instruction);
         }
-        else if (instruction->handler_idx == VKD3DSIH_ITOF || instruction->handler_idx == VKD3DSIH_UTOF)
+        else if (instruction->handler_idx == VKD3DSIH_ITOF || instruction->handler_idx == VKD3DSIH_UTOF
+                || instruction->handler_idx == VKD3DSIH_ITOI || instruction->handler_idx == VKD3DSIH_UTOU)
         {
             /* VSIR supports cast from bool to signed/unsigned integer types and floating point types,
              * where bool is treated as a 1-bit integer and a signed 'true' value converts to -1. */
@@ -7416,7 +7421,7 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
     result_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
             op, type_id, src0_id, src1_id);
 
-    result_id = spirv_compiler_emit_bool_to_int(compiler, component_count, result_id);
+    result_id = spirv_compiler_emit_bool_to_int(compiler, component_count, result_id, true);
     spirv_compiler_emit_store_reg(compiler, &dst->reg, dst->write_mask, result_id);
 }
 
@@ -9523,12 +9528,14 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ISHR:
         case VKD3DSIH_ITOD:
         case VKD3DSIH_ITOF:
+        case VKD3DSIH_ITOI:
         case VKD3DSIH_MUL:
         case VKD3DSIH_NOT:
         case VKD3DSIH_OR:
         case VKD3DSIH_USHR:
         case VKD3DSIH_UTOD:
         case VKD3DSIH_UTOF:
+        case VKD3DSIH_UTOU:
         case VKD3DSIH_XOR:
             spirv_compiler_emit_alu_instruction(compiler, instruction);
             break;
