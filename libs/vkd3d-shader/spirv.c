@@ -7387,7 +7387,8 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
     result_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
             op, type_id, src0_id, src1_id);
 
-    result_id = spirv_compiler_emit_bool_to_int(compiler, component_count, result_id, true);
+    if (dst->reg.data_type != VKD3D_DATA_BOOL)
+        result_id = spirv_compiler_emit_bool_to_int(compiler, component_count, result_id, true);
     spirv_compiler_emit_store_reg(compiler, &dst->reg, dst->write_mask, result_id);
 }
 
