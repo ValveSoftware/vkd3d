@@ -1,7 +1,7 @@
 [require]
 shader model < 3.0
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float4 teChnique = {0, 0, 0, 0};
@@ -30,7 +30,7 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 typedef float4 Technique;
 
 float4 main() : sv_target

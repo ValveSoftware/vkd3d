@@ -2,7 +2,7 @@
 shader model >= 5.0
 shader model < 6.0
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float4 teChnique = {0, 0, 0, 0};
