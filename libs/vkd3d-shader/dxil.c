@@ -1374,7 +1374,7 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
 
             case TYPE_CODE_STRUCT_ANON:
             case TYPE_CODE_STRUCT_NAMED:
-                if (!dxil_record_validate_operand_min_count(record, 2, sm6))
+                if (!dxil_record_validate_operand_min_count(record, 1, sm6))
                     return VKD3D_ERROR_INVALID_SHADER;
                 if (record->code == TYPE_CODE_STRUCT_NAMED && !struct_name)
                 {
