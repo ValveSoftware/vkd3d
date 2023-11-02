@@ -89,6 +89,7 @@ else                    {return KW_ELSE;                }
 extern                  {return KW_EXTERN;              }
 false                   {return KW_FALSE;               }
 for                     {return KW_FOR;                 }
+fxgroup                 {return KW_FXGROUP;             }
 GeometryShader          {return KW_GEOMETRYSHADER;      }
 groupshared             {return KW_GROUPSHARED;         }
 if                      {return KW_IF;                  }

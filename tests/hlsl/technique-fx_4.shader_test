@@ -9,7 +9,7 @@ float4 main() : sv_target
     return teChnique;
 }
 
-[pixel shader fail todo]
+[pixel shader fail]
 float4 main() : sv_target
 {
     float4 fxgroup = {0, 0, 0, 0};
