@@ -9,6 +9,13 @@ float4 main() : sv_target
     return teChnique;
 }
 
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float4 fxgroup = {0, 0, 0, 0};
+    return fxgroup;
+}
+
 [pixel shader]
 float4 main() : sv_target
 {
@@ -21,6 +28,13 @@ float4 main() : sv_target
 {
     float4 teChnique11 = {0, 0, 0, 0};
     return teChnique11;
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 fxGroup = {0, 0, 0, 0};
+    return fxGroup;
 }
 
 [effect todo]
@@ -101,6 +115,11 @@ technique11
 {
 }
 
+fxgroup group
+{
+    technique10 {}
+}
+
 [pixel shader todo]
 float4 main() : sv_target
 {
@@ -117,4 +136,51 @@ technique10
 
 technique11
 {
+}
+
+fxgroup group
+{
+    technique10 {}
+}
+
+% Groups syntax
+
+% Name has to be specified, it belongs to global scope
+[effect fail]
+fxgroup
+{
+}
+
+% Group can't be empty
+[effect fail]
+fxgroup group
+{
+}
+
+[effect fail]
+float4 group;
+
+fxgroup group
+{
+}
+
+% Groups can only contain a list of techniques
+[effect fail]
+fxgroup group
+{
+    float4 v;
+
+    technique11 {}
+}
+
+% Group provides scope for techniques
+[effect todo]
+fxgroup group1
+{
+    technique11 tech0 {}
+}
+
+fxgroup group2
+{
+    technique11 tech0 {}
 }

@@ -38,6 +38,13 @@ float4 main() : sv_target
     return float4(0, 0, 0, 0);
 }
 
+[pixel shader fail todo]
+float4 main() : sv_target
+{
+    float4 fxgroup = {0, 0, 0, 0};
+    return fxgroup;
+}
+
 [pixel shader]
 typedef float4 Technique10;
 typedef float4 Technique11;
@@ -60,6 +67,13 @@ float4 main() : sv_target
 {
     float4 teChnique11 = {0, 0, 0, 0};
     return teChnique11;
+}
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float4 fxGroup = {0, 0, 0, 0};
+    return fxGroup;
 }
 
 [effect todo]
@@ -103,6 +117,12 @@ tEchnique11
 {
 }
 
+[effect fail]
+// Empty groups are not allowed
+fxgroup group
+{
+}
+
 % Regular shaders with technique blocks
 [vertex shader todo]
 float4 main() : sv_position
@@ -122,6 +142,11 @@ technique11
 {
 }
 
+fxgroup group
+{
+    technique10 {}
+}
+
 [pixel shader todo]
 float4 main() : sv_target
 {
@@ -138,4 +163,9 @@ technique10
 
 technique11
 {
+}
+
+fxgroup group
+{
+    technique10 {}
 }
