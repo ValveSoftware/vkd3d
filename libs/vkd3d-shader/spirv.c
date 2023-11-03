@@ -4266,6 +4266,30 @@ static uint32_t spirv_compiler_emit_bool_to_int(struct spirv_compiler *compiler,
     return vkd3d_spirv_build_op_select(builder, type_id, val_id, true_id, false_id);
 }
 
+static uint32_t spirv_compiler_emit_bool_to_float(struct spirv_compiler *compiler,
+        unsigned int component_count, uint32_t val_id, bool signedness)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    uint32_t type_id, true_id, false_id;
+
+    true_id = spirv_compiler_get_constant_float_vector(compiler, signedness ? -1.0f : 1.0f, component_count);
+    false_id = spirv_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
+    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, component_count);
+    return vkd3d_spirv_build_op_select(builder, type_id, val_id, true_id, false_id);
+}
+
+static uint32_t spirv_compiler_emit_bool_to_double(struct spirv_compiler *compiler,
+        unsigned int component_count, uint32_t val_id, bool signedness)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    uint32_t type_id, true_id, false_id;
+
+    true_id = spirv_compiler_get_constant_double_vector(compiler, signedness ? -1.0 : 1.0, component_count);
+    false_id = spirv_compiler_get_constant_double_vector(compiler, 0.0, component_count);
+    type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_DOUBLE, component_count);
+    return vkd3d_spirv_build_op_select(builder, type_id, val_id, true_id, false_id);
+}
+
 typedef uint32_t (*vkd3d_spirv_builtin_fixup_pfn)(struct spirv_compiler *compiler,
         uint32_t val_id);
 
@@ -6656,6 +6680,35 @@ static SpvOp spirv_compiler_map_logical_instruction(const struct vkd3d_shader_in
     }
 }
 
+static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t val_id;
+
+    assert(src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type != VKD3D_DATA_BOOL);
+
+    val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    if (dst->reg.data_type == VKD3D_DATA_FLOAT)
+    {
+        val_id = spirv_compiler_emit_bool_to_float(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOF);
+    }
+    else if (dst->reg.data_type == VKD3D_DATA_DOUBLE)
+    {
+        /* ITOD is not supported. Frontends which emit bool casts must use ITOF for double. */
+        val_id = spirv_compiler_emit_bool_to_double(compiler, 1, val_id, instruction->handler_idx == VKD3DSIH_ITOF);
+    }
+    else
+    {
+        WARN("Unhandled data type %u.\n", dst->reg.data_type);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_TYPE,
+                "Register data type %u is unhandled.", dst->reg.data_type);
+    }
+
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
 static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6664,13 +6717,23 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t src_ids[SPIRV_MAX_SRC_COUNT];
     uint32_t type_id, val_id;
+    SpvOp op = SpvOpMax;
     unsigned int i;
-    SpvOp op;
 
-    if (src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type == VKD3D_DATA_BOOL)
+    if (src->reg.data_type == VKD3D_DATA_BOOL)
     {
-        /* VSIR supports logic ops AND/OR/XOR on bool values. */
-        op = spirv_compiler_map_logical_instruction(instruction);
+        if (dst->reg.data_type == VKD3D_DATA_BOOL)
+        {
+            /* VSIR supports logic ops AND/OR/XOR on bool values. */
+            op = spirv_compiler_map_logical_instruction(instruction);
+        }
+        else if (instruction->handler_idx == VKD3DSIH_ITOF || instruction->handler_idx == VKD3DSIH_UTOF)
+        {
+            /* VSIR supports cast from bool to signed/unsigned integer types and floating point types,
+             * where bool is treated as a 1-bit integer and a signed 'true' value converts to -1. */
+            spirv_compiler_emit_bool_cast(compiler, instruction);
+            return;
+        }
     }
     else
     {
@@ -6680,6 +6743,8 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
     if (op == SpvOpMax)
     {
         ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
+                "Encountered invalid/unhandled instruction handler %#x.", instruction->handler_idx);
         return;
     }
 
