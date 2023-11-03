@@ -53,7 +53,6 @@ vkd3d_shader_tests = \
 	tests/hlsl/arithmetic-int.shader_test \
 	tests/hlsl/arithmetic-uint.shader_test \
 	tests/hlsl/array-dimension.shader_test \
-	tests/hlsl/array-index-expr.shader_test \
 	tests/hlsl/array-parameters.shader_test \
 	tests/hlsl/array-size-expr.shader_test \
 	tests/hlsl/asfloat.shader_test \
@@ -134,6 +133,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/multiple-rt.shader_test \
 	tests/hlsl/nested-arrays.shader_test \
 	tests/hlsl/nointerpolation.shader_test \
+	tests/hlsl/non-const-indexing.shader_test \
 	tests/hlsl/normalize.shader_test \
 	tests/hlsl/numeric-constructor-truncation.shader_test \
 	tests/hlsl/numeric-types.shader_test \
