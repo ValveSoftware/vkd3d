@@ -1150,6 +1150,20 @@ static uint32_t vkd3d_spirv_get_op_type_pointer(struct vkd3d_spirv_builder *buil
             vkd3d_spirv_build_op_type_pointer);
 }
 
+static uint32_t vkd3d_spirv_build_op_constant_bool(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t value)
+{
+    return vkd3d_spirv_build_op_tr(builder, &builder->global_stream,
+            value ? SpvOpConstantTrue : SpvOpConstantFalse, result_type);
+}
+
+static uint32_t vkd3d_spirv_get_op_constant_bool(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t value)
+{
+    return vkd3d_spirv_build_once2(builder, value ? SpvOpConstantTrue : SpvOpConstantFalse, result_type, value,
+            vkd3d_spirv_build_op_constant_bool);
+}
+
 /* Types larger than 32-bits are not supported. */
 static uint32_t vkd3d_spirv_build_op_constant(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t value)
@@ -1802,6 +1816,8 @@ static uint32_t vkd3d_spirv_get_type_id_for_data_type(struct vkd3d_spirv_builder
                 break;
             case VKD3D_DATA_DOUBLE:
                 return vkd3d_spirv_get_op_type_float(builder, 64);
+            case VKD3D_DATA_BOOL:
+                return vkd3d_spirv_get_op_type_bool(builder);
             default:
                 FIXME("Unhandled data type %#x.\n", data_type);
                 return 0;
@@ -2897,6 +2913,13 @@ static uint32_t spirv_compiler_get_constant(struct spirv_compiler *compiler,
         case VKD3D_SHADER_COMPONENT_INT:
         case VKD3D_SHADER_COMPONENT_FLOAT:
             break;
+        case VKD3D_SHADER_COMPONENT_BOOL:
+            if (component_count == 1)
+                return vkd3d_spirv_get_op_constant_bool(builder, type_id, *values);
+            FIXME("Unsupported vector of bool.\n");
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_TYPE,
+                    "Vectors of bool type are not supported.");
+            return vkd3d_spirv_get_op_undef(builder, type_id);
         default:
             FIXME("Unhandled component_type %#x.\n", component_type);
             return vkd3d_spirv_get_op_undef(builder, type_id);
@@ -6618,6 +6641,21 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
     return SpvOpMax;
 }
 
+static SpvOp spirv_compiler_map_logical_instruction(const struct vkd3d_shader_instruction *instruction)
+{
+    switch (instruction->handler_idx)
+    {
+        case VKD3DSIH_AND:
+            return SpvOpLogicalAnd;
+        case VKD3DSIH_OR:
+            return SpvOpLogicalOr;
+        case VKD3DSIH_XOR:
+            return SpvOpLogicalNotEqual;
+        default:
+            return SpvOpMax;
+    }
+}
+
 static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -6629,7 +6667,16 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
     unsigned int i;
     SpvOp op;
 
-    op = spirv_compiler_map_alu_instruction(instruction);
+    if (src->reg.data_type == VKD3D_DATA_BOOL && dst->reg.data_type == VKD3D_DATA_BOOL)
+    {
+        /* VSIR supports logic ops AND/OR/XOR on bool values. */
+        op = spirv_compiler_map_logical_instruction(instruction);
+    }
+    else
+    {
+        op = spirv_compiler_map_alu_instruction(instruction);
+    }
+
     if (op == SpvOpMax)
     {
         ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
