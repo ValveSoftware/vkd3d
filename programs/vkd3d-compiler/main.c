@@ -40,6 +40,7 @@ enum
     OPTION_HELP = CHAR_MAX + 1,
     OPTION_BUFFER_UAV,
     OPTION_ENTRY,
+    OPTION_FRAGMENT_COORDINATE_ORIGIN,
     OPTION_MATRIX_STORAGE_ORDER,
     OPTION_OUTPUT,
     OPTION_PRINT_SOURCE_TYPES,
@@ -189,6 +190,11 @@ static void print_usage(const char *program_name)
         "                        optionally prefixed by '+' or '-'. Valid flags are\n"
         "                        'colour', 'indent', 'offsets', 'header', and 'raw-ids'.\n"
         "                        The 'indent' and 'header' flags are enabled by default.\n"
+        "  --fragment-coordinate-origin=<origin>\n"
+        "                        Specify the origin of fragment coordinates for SPIR-V\n"
+        "                        targets. Valid values are 'upper-left' (default) and\n"
+        "                        'lower-left'. The only value supported by Vulkan\n"
+        "                        environments is 'upper-left'.\n"
         "  --matrix-storage-order=<order>\n"
         "                        Specify the default matrix storage order. Valid values\n"
         "                        are 'column' (default) and 'row'.\n"
@@ -337,6 +343,24 @@ static bool parse_formatting(uint32_t *formatting, bool *colour, char *arg)
     return true;
 }
 
+static bool parse_fragment_coordinate_origin(enum vkd3d_shader_compile_option_fragment_coordinate_origin *origin,
+        const char *arg)
+{
+    if (!strcmp(arg, "upper-left"))
+    {
+        *origin = VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_UPPER_LEFT;
+        return true;
+    }
+
+    if (!strcmp(arg, "lower-left"))
+    {
+        *origin = VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_LOWER_LEFT;
+        return true;
+    }
+
+    return false;
+}
+
 static bool parse_matrix_storage_order(enum vkd3d_shader_compile_option_pack_matrix_order *order, const char *arg)
 {
     if (!strcmp(arg, "column"))
@@ -441,25 +465,27 @@ static bool validate_target_type(
 static bool parse_command_line(int argc, char **argv, struct options *options)
 {
     enum vkd3d_shader_compile_option_pack_matrix_order pack_matrix_order;
+    enum vkd3d_shader_compile_option_fragment_coordinate_origin origin;
     enum vkd3d_shader_compile_option_buffer_uav buffer_uav;
     unsigned int compat_options = 0;
     int option;
 
     static struct option long_options[] =
     {
-        {"help",                 no_argument,       NULL, OPTION_HELP},
-        {"buffer-uav",           required_argument, NULL, OPTION_BUFFER_UAV},
-        {"entry",                required_argument, NULL, OPTION_ENTRY},
-        {"matrix-storage-order", required_argument, NULL, OPTION_MATRIX_STORAGE_ORDER},
-        {"output",               required_argument, NULL, OPTION_OUTPUT},
-        {"formatting",           required_argument, NULL, OPTION_TEXT_FORMATTING},
-        {"print-source-types",   no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
-        {"print-target-types",   no_argument,       NULL, OPTION_PRINT_TARGET_TYPES},
-        {"profile",              required_argument, NULL, OPTION_PROFILE},
-        {"strip-debug",          no_argument,       NULL, OPTION_STRIP_DEBUG},
-        {"version",              no_argument,       NULL, OPTION_VERSION},
-        {"semantic-compat-map",  no_argument,       NULL, OPTION_SEMANTIC_COMPAT_MAP},
-        {NULL,                   0,                 NULL, 0},
+        {"help",                       no_argument,       NULL, OPTION_HELP},
+        {"buffer-uav",                 required_argument, NULL, OPTION_BUFFER_UAV},
+        {"entry",                      required_argument, NULL, OPTION_ENTRY},
+        {"fragment-coordinate-origin", required_argument, NULL, OPTION_FRAGMENT_COORDINATE_ORIGIN},
+        {"matrix-storage-order",       required_argument, NULL, OPTION_MATRIX_STORAGE_ORDER},
+        {"output",                     required_argument, NULL, OPTION_OUTPUT},
+        {"formatting",                 required_argument, NULL, OPTION_TEXT_FORMATTING},
+        {"print-source-types",         no_argument,       NULL, OPTION_PRINT_SOURCE_TYPES},
+        {"print-target-types",         no_argument,       NULL, OPTION_PRINT_TARGET_TYPES},
+        {"profile",                    required_argument, NULL, OPTION_PROFILE},
+        {"strip-debug",                no_argument,       NULL, OPTION_STRIP_DEBUG},
+        {"version",                    no_argument,       NULL, OPTION_VERSION},
+        {"semantic-compat-map",        no_argument,       NULL, OPTION_SEMANTIC_COMPAT_MAP},
+        {NULL,                         0,                 NULL, 0},
     };
 
     memset(options, 0, sizeof(*options));
@@ -499,6 +525,15 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
             case 'E':
                 options->preprocess_only = true;
+                break;
+
+            case OPTION_FRAGMENT_COORDINATE_ORIGIN:
+                if (!parse_fragment_coordinate_origin(&origin, optarg))
+                {
+                    fprintf(stderr, "Invalid fragment coordinate origin '%s' specified.\n", optarg);
+                    return false;
+                }
+                add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN, origin);
                 break;
 
             case 'h':
