@@ -96,6 +96,7 @@ enum hlsl_base_type
     HLSL_TYPE_PIXELSHADER,
     HLSL_TYPE_VERTEXSHADER,
     HLSL_TYPE_TECHNIQUE,
+    HLSL_TYPE_EFFECT_GROUP,
     HLSL_TYPE_STRING,
     HLSL_TYPE_VOID,
 };
@@ -405,6 +406,8 @@ struct hlsl_ir_var
     struct list scope_entry;
     /* Item entry in hlsl_ctx.extern_vars, if the variable is extern. */
     struct list extern_entry;
+    /* Scope that variable itself defines, used to provide a container for techniques and passes. */
+    struct hlsl_scope *scope;
 
     /* Indexes of the IR instructions where the variable is first written and last read (liveness
      *   range). The IR instructions are numerated starting from 2, because 0 means unused, and 1

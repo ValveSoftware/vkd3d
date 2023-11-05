@@ -124,7 +124,7 @@ fxgroup group
 }
 
 % Regular shaders with technique blocks
-[vertex shader todo]
+[vertex shader]
 float4 main() : sv_position
 {
     return 0;
@@ -147,7 +147,7 @@ fxgroup group
     technique10 {}
 }
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     return 0;

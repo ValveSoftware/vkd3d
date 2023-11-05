@@ -1120,6 +1120,31 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, const char *ty
     return true;
 }
 
+static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_var *var;
+    struct hlsl_type *type;
+
+    type = hlsl_get_type(ctx->globals, "fxgroup", false, false);
+    if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
+        return false;
+    var->scope = scope;
+
+    if (!hlsl_add_var(ctx, var, false))
+    {
+        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
+
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                "Identifier \"%s\" was already declared in this scope.", var->name);
+        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
+        hlsl_free_var(var);
+        return false;
+    }
+
+    return true;
+}
+
 static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
 {
     struct hlsl_reg_reservation reservation = {0};
@@ -5120,6 +5145,7 @@ hlsl_prog:
         }
     | hlsl_prog preproc_directive
     | hlsl_prog global_technique
+    | hlsl_prog effect_group
     | hlsl_prog ';'
 
 technique_name:
@@ -5165,6 +5191,23 @@ global_technique:
       technique9
     | technique10
     | technique11
+
+group_technique:
+      technique10
+    | technique11
+
+group_techniques:
+      group_technique
+    | group_techniques group_technique
+
+effect_group:
+      KW_FXGROUP any_identifier '{' scope_start group_techniques '}'
+        {
+            struct hlsl_scope *scope = ctx->cur_scope;
+            hlsl_pop_scope(ctx);
+            if (!(add_effect_group(ctx, $2, scope, &@2)))
+                YYABORT;
+        }
 
 buffer_declaration:
       buffer_type any_identifier colon_attribute
