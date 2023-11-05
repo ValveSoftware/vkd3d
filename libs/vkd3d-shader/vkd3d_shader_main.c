@@ -383,13 +383,42 @@ size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *byte
     return offset;
 }
 
-void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value)
+size_t bytecode_reserve_bytes(struct vkd3d_bytecode_buffer *buffer, size_t size)
+{
+    size_t offset = bytecode_align(buffer);
+
+    if (buffer->status)
+        return offset;
+
+    if (!vkd3d_array_reserve((void **)&buffer->data, &buffer->capacity, offset + size, 1))
+    {
+        buffer->status = VKD3D_ERROR_OUT_OF_MEMORY;
+        return offset;
+    }
+
+    memset(buffer->data + offset, 0, size);
+    buffer->size = offset + size;
+    return offset;
+}
+
+static void bytecode_set_bytes(struct vkd3d_bytecode_buffer *buffer, size_t offset,
+        const void *value, size_t size)
 {
     if (buffer->status)
         return;
 
-    assert(vkd3d_bound_range(offset, sizeof(value), buffer->size));
-    memcpy(buffer->data + offset, &value, sizeof(value));
+    assert(vkd3d_bound_range(offset, size, buffer->size));
+    memcpy(buffer->data + offset, value, size);
+}
+
+void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value)
+{
+    bytecode_set_bytes(buffer, offset, &value, sizeof(value));
+}
+
+void set_string(struct vkd3d_bytecode_buffer *buffer, size_t offset, const char *string, size_t length)
+{
+    bytecode_set_bytes(buffer, offset, string, length);
 }
 
 static void vkd3d_shader_dump_blob(const char *path, const char *profile,

@@ -1168,6 +1168,7 @@ void hlsl_dump_function(struct hlsl_ctx *ctx, const struct hlsl_ir_function_decl
 
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out);
+int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out);
 
 bool hlsl_init_deref_from_index_chain(struct hlsl_ctx *ctx, struct hlsl_deref *deref, struct hlsl_ir_node *chain);
 bool hlsl_copy_deref(struct hlsl_ctx *ctx, struct hlsl_deref *deref, const struct hlsl_deref *other);

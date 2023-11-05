@@ -294,6 +294,7 @@ libvkd3d_shader_la_SOURCES = \
 	libs/vkd3d-shader/d3dbc.c \
 	libs/vkd3d-shader/dxbc.c \
 	libs/vkd3d-shader/dxil.c \
+	libs/vkd3d-shader/fx.c \
 	libs/vkd3d-shader/glsl.c \
 	libs/vkd3d-shader/hlsl.c \
 	libs/vkd3d-shader/hlsl.h \

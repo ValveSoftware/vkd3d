@@ -3679,6 +3679,14 @@ int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d
         return VKD3D_ERROR_NOT_IMPLEMENTED;
     }
 
+    if (ctx.profile->type == VKD3D_SHADER_TYPE_EFFECT)
+    {
+        ret = hlsl_emit_effect_binary(&ctx, out);
+
+        hlsl_ctx_cleanup(&ctx);
+        return ret;
+    }
+
     if ((func = hlsl_get_function(&ctx, entry_point)))
     {
         LIST_FOR_EACH_ENTRY(decl, &func->overloads, struct hlsl_ir_function_decl, entry)
