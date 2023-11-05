@@ -5095,7 +5095,7 @@ hlsl_prog:
             destroy_block($2);
         }
     | hlsl_prog preproc_directive
-    | hlsl_prog technique
+    | hlsl_prog global_technique
     | hlsl_prog ';'
 
 technique_name:
@@ -5134,7 +5134,7 @@ technique11:
             hlsl_fixme(ctx, &@$, "Unsupported \'technique11\' declaration.");
         }
 
-technique:
+global_technique:
       technique9
     | technique10
     | technique11
