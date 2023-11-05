@@ -1096,6 +1096,30 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     return true;
 }
 
+static bool add_technique(struct hlsl_ctx *ctx, const char *name, const char *typename,
+        const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_var *var;
+    struct hlsl_type *type;
+
+    type = hlsl_get_type(ctx->globals, typename, false, false);
+    if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
+        return false;
+
+    if (!hlsl_add_var(ctx, var, false))
+    {
+        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
+
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                "Identifier \"%s\" was already declared in this scope.", var->name);
+        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
+        hlsl_free_var(var);
+        return false;
+    }
+
+    return true;
+}
+
 static struct hlsl_reg_reservation parse_reg_reservation(const char *reg_string)
 {
     struct hlsl_reg_reservation reservation = {0};
@@ -5111,7 +5135,8 @@ pass_list:
 technique9:
       KW_TECHNIQUE technique_name '{' pass_list '}'
         {
-            hlsl_fixme(ctx, &@$, "Unsupported \'technique\' declaration.");
+            if (!add_technique(ctx, $2, "technique", &@1))
+                YYABORT;
         }
 
 technique10:
@@ -5121,7 +5146,8 @@ technique10:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique10' keyword is invalid for this profile.");
 
-            hlsl_fixme(ctx, &@$, "Unsupported \'technique10\' declaration.");
+            if (!add_technique(ctx, $2, "technique10", &@1))
+                YYABORT;
         }
 
 technique11:
@@ -5131,7 +5157,8 @@ technique11:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique11' keyword is invalid for this profile.");
 
-            hlsl_fixme(ctx, &@$, "Unsupported \'technique11\' declaration.");
+            if (!add_technique(ctx, $2, "technique11", &@1))
+                YYABORT;
         }
 
 global_technique:

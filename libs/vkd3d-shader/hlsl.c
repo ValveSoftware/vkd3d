@@ -98,18 +98,21 @@ bool hlsl_add_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *decl, bool local_var
     struct hlsl_scope *scope = ctx->cur_scope;
     struct hlsl_ir_var *var;
 
-    LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
+    if (decl->name)
     {
-        if (!strcmp(decl->name, var->name))
-            return false;
-    }
-    if (local_var && scope->upper->upper == ctx->globals)
-    {
-        /* Check whether the variable redefines a function parameter. */
-        LIST_FOR_EACH_ENTRY(var, &scope->upper->vars, struct hlsl_ir_var, scope_entry)
+        LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
         {
-            if (!strcmp(decl->name, var->name))
+            if (var->name && !strcmp(decl->name, var->name))
                 return false;
+        }
+        if (local_var && scope->upper->upper == ctx->globals)
+        {
+            /* Check whether the variable redefines a function parameter. */
+            LIST_FOR_EACH_ENTRY(var, &scope->upper->vars, struct hlsl_ir_var, scope_entry)
+            {
+                if (var->name && !strcmp(decl->name, var->name))
+                    return false;
+            }
         }
     }
 
@@ -123,7 +126,7 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
 
     LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
     {
-        if (!strcmp(name, var->name))
+        if (var->name && !strcmp(name, var->name))
             return var;
     }
     if (!scope->upper)
@@ -915,6 +918,11 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
     if (t1->class == HLSL_CLASS_ARRAY)
         return t1->e.array.elements_count == t2->e.array.elements_count
                 && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
+    if (t1->class == HLSL_CLASS_OBJECT)
+    {
+        if (t1->base_type == HLSL_TYPE_TECHNIQUE && t1->e.version != t2->e.version)
+            return false;
+    }
 
     return true;
 }
@@ -990,6 +998,13 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
                     dst_field->semantic.index = src_field->semantic.index;
                 }
             }
+            break;
+        }
+
+        case HLSL_CLASS_OBJECT:
+        {
+            if (type->base_type == HLSL_TYPE_TECHNIQUE)
+                type->e.version = old->e.version;
             break;
         }
 
@@ -3357,6 +3372,18 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"VERTEXSHADER",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
     };
 
+    static const struct
+    {
+        char *name;
+        unsigned int version;
+    }
+    technique_types[] =
+    {
+        {"technique",    9},
+        {"technique10", 10},
+        {"technique11", 11},
+    };
+
     for (bt = 0; bt <= HLSL_TYPE_LAST_SCALAR; ++bt)
     {
         for (y = 1; y <= 4; ++y)
@@ -3459,6 +3486,13 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     {
         type = hlsl_new_type(ctx, effect_types[i].name, effect_types[i].class,
                 effect_types[i].base_type, effect_types[i].dimx, effect_types[i].dimy);
+        hlsl_scope_add_type(ctx->globals, type);
+    }
+
+    for (i = 0; i < ARRAY_SIZE(technique_types); ++i)
+    {
+        type = hlsl_new_type(ctx, technique_types[i].name, HLSL_CLASS_OBJECT, HLSL_TYPE_TECHNIQUE, 1, 1);
+        type->e.version = technique_types[i].version;
         hlsl_scope_add_type(ctx->globals, type);
     }
 }

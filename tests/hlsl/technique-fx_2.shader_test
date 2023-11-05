@@ -90,7 +90,7 @@ technique10
 float4 f;
 
 % fx_5_0 keyword fails with fx_2_0 profile
-[effect fail todo]
+[effect fail]
 technique
 {
 }
@@ -99,7 +99,7 @@ technique11
 {
 }
 
-[effect fail todo]
+[effect fail]
 technique
 {
 }
@@ -108,7 +108,7 @@ tEchnique10
 {
 }
 
-[effect fail todo]
+[effect fail]
 technique
 {
 }
