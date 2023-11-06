@@ -18,7 +18,8 @@
     - cat /proc/meminfo > artifacts/meminfo.txt
     - vulkaninfo > artifacts/vulkaninfo.txt
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-linux
-    - if [ -f pipeline_failed ] ; then exit 1 ; fi
+    - if [ -f build_failed ] ; then exit 1 ; fi
+    - if [ -f tests_failed ] ; then exit 2 ; fi
   artifacts:
     when: always
     paths:
@@ -34,7 +35,9 @@ build-radv-64:
 
 build-llvmpipe-64:
   extends: .build-linux
-  allow_failure: true
+  allow_failure:
+    exit_codes:
+      - 2
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
     VKD3D_SHADER_CONFIG: 'force_validation'
@@ -50,7 +53,9 @@ build-radv-32:
 
 build-llvmpipe-32:
   extends: .build-linux
-  allow_failure: true
+  allow_failure:
+    exit_codes:
+      - 2
   variables:
     VK_LOADER_DRIVERS_SELECT: 'lvp_*'
     CC: 'gcc -m32'
@@ -121,7 +126,9 @@ build-mac:
   stage: build
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  allow_failure: true
+  allow_failure:
+    exit_codes:
+      - 2
   interruptible: true
   needs: []
   dependencies: []
@@ -149,7 +156,8 @@ build-mac:
     - cd ../..
     - export PATH="$PWD/wine/build/tools/widl:$PATH"
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-mac
-    - if [ -f pipeline_failed ] ; then exit 1 ; fi
+    - if [ -f build_failed ] ; then exit 1 ; fi
+    - if [ -f tests_failed ] ; then exit 2 ; fi
   variables:
     VKD3D_DISABLE_EXTENSIONS: "VK_EXT_descriptor_indexing"
     VKD3D_SHADER_CONFIG: 'force_validation'

@@ -11,10 +11,13 @@ set -Eeuxo pipefail
 rm -fr build
 mkdir build
 cd build
-../configure CFLAGS="-g -O2 -Wno-implicit-fallthrough -Wno-enum-conversion -Werror" && \
-    make -j$(sysctl -n hw.ncpu) && \
+if ../configure CFLAGS="-g -O2 -Wno-implicit-fallthrough -Wno-enum-conversion -Werror" && \
+        make -j$(sysctl -n hw.ncpu) ; then
     make -j$(sysctl -n hw.ncpu) check || \
-        touch ../pipeline_failed
+        touch ../tests_failed
+else
+    touch ../build_failed
+fi
 
 mkdir -p ../artifacts/$COMMIT
 rsync -Rr config.log test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT || true

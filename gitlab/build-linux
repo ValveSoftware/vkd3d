@@ -12,10 +12,13 @@ rm -fr build
 mkdir build
 cd build
 export LD_LIBRARY_PATH=/usr/local/lib
-../configure --enable-demos DXCOMPILER_LIBS="-L/usr/local/lib" CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL" && \
-    make -j$(nproc) && \
+if ../configure --enable-demos DXCOMPILER_LIBS="-L/usr/local/lib" CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL" && \
+        make -j$(nproc) ; then
     make -j$(nproc) check || \
-        touch ../pipeline_failed
+        touch ../tests_failed
+else
+    touch ../build_failed
+fi
 
 mkdir -p ../artifacts/$COMMIT
 rsync -Rr config.log doc/* test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT || true
