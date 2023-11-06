@@ -1684,6 +1684,23 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 --ctx->depth;
             break;
 
+        case VKD3DSIH_REP:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 1);
+            if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
+                return;
+            ctx->blocks[ctx->depth++] = instruction->handler_idx;
+            break;
+
+        case VKD3DSIH_ENDREP:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 0);
+            if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_REP)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDREP instruction doesn't terminate REP block.");
+            else
+                --ctx->depth;
+            break;
+
         default:
             break;
     }
