@@ -1472,6 +1472,7 @@ struct validation_context
     struct vkd3d_shader_parser *parser;
     size_t instruction_idx;
     bool dcl_temps_found;
+    enum vkd3d_shader_opcode phase;
 
     enum vkd3d_shader_opcode *blocks;
     size_t depth;
@@ -1622,6 +1623,32 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
     switch (instruction->handler_idx)
     {
+        case VKD3DSIH_HS_DECLS:
+        case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+        case VKD3DSIH_HS_FORK_PHASE:
+        case VKD3DSIH_HS_JOIN_PHASE:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 0);
+            if (ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Phase instruction %#x is only valid in a hull shader.",
+                        instruction->handler_idx);
+            if (ctx->depth != 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "Phase instruction %#x must appear to top level.",
+                        instruction->handler_idx);
+            ctx->phase = instruction->handler_idx;
+            return;
+
+        default:
+            break;
+    }
+
+    if (ctx->parser->shader_version.type == VKD3D_SHADER_TYPE_HULL &&
+            ctx->phase == VKD3DSIH_INVALID)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Instruction %#x appear before any phase instruction in a hull shader.",
+                instruction->handler_idx);
+
+    switch (instruction->handler_idx)
+    {
         case VKD3DSIH_DCL_TEMPS:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
@@ -1720,7 +1747,11 @@ static void vsir_validate_instruction(struct validation_context *ctx)
 
 void vsir_validate(struct vkd3d_shader_parser *parser)
 {
-    struct validation_context ctx = { .parser = parser };
+    struct validation_context ctx =
+    {
+        .parser = parser,
+        .phase = VKD3DSIH_INVALID,
+    };
 
     if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
         return;
