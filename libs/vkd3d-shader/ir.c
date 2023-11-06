@@ -1492,6 +1492,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
     va_end(args);
 
     vkd3d_shader_parser_error(ctx->parser, error, "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
+    ERR("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
 
     vkd3d_string_buffer_cleanup(&buf);
 }
