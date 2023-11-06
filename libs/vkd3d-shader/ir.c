@@ -1477,6 +1477,10 @@ struct validation_context
     struct vkd3d_shader_parser *parser;
     size_t instruction_idx;
     bool dcl_temps_found;
+
+    enum vkd3d_shader_opcode *blocks;
+    size_t depth;
+    size_t blocks_capacity;
 };
 
 static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *ctx,
@@ -1637,6 +1641,32 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->declaration.count, ctx->parser->shader_desc.temp_count);
             break;
 
+        case VKD3DSIH_IF:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 1);
+            if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
+                return;
+            ctx->blocks[ctx->depth++] = instruction->handler_idx;
+            break;
+
+        case VKD3DSIH_ELSE:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 0);
+            if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ELSE instruction doesn't terminate IF block.");
+            else
+                ctx->blocks[ctx->depth - 1] = instruction->handler_idx;
+            break;
+
+        case VKD3DSIH_ENDIF:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 0);
+            if (ctx->depth == 0 || (ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF && ctx->blocks[ctx->depth - 1] != VKD3DSIH_ELSE))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDIF instruction doesn't terminate IF/ELSE block.");
+            else
+                --ctx->depth;
+            break;
+
         default:
             break;
     }
@@ -1651,4 +1681,9 @@ void vsir_validate(struct vkd3d_shader_parser *parser)
 
     for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
+
+    if (ctx.depth != 0)
+        validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "%zu nested blocks were not closed.", ctx.depth);
+
+    free(ctx.blocks);
 }
