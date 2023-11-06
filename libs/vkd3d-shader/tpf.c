@@ -3460,7 +3460,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
-            if (var->is_uniform && var->buffer == cbuffer)
+            if (var->is_uniform && var->buffer == cbuffer
+                    && var->data_type->class != HLSL_CLASS_OBJECT)
                 ++var_count;
         }
 
@@ -3494,7 +3495,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
 
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
-            if (var->is_uniform && var->buffer == cbuffer)
+            if (var->is_uniform && var->buffer == cbuffer
+                    && var->data_type->class != HLSL_CLASS_OBJECT)
             {
                 uint32_t flags = 0;
 
@@ -3521,7 +3523,8 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         j = 0;
         LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
         {
-            if (var->is_uniform && var->buffer == cbuffer)
+            if (var->is_uniform && var->buffer == cbuffer
+                    && var->data_type->class != HLSL_CLASS_OBJECT)
             {
                 const unsigned int var_size = (profile->major_version >= 5 ? 10 : 6);
                 size_t var_offset = vars_start + j * var_size * sizeof(uint32_t);
