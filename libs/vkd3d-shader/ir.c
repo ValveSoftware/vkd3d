@@ -1631,7 +1631,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             if (ctx->dcl_temps_found && ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS, "Duplicate DCL_TEMPS instruction.");
             ctx->dcl_temps_found = true;
-            if (instruction->declaration.count != ctx->parser->shader_desc.temp_count)
+            if (instruction->declaration.count != ctx->parser->shader_desc.temp_count &&
+                    ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS, "Invalid DCL_TEMPS count %u, expected %u.",
                         instruction->declaration.count, ctx->parser->shader_desc.temp_count);
             break;
