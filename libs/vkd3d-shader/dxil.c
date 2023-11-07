@@ -306,6 +306,36 @@ enum dxil_cast_code
     CAST_ADDRSPACECAST = 12,
 };
 
+enum dxil_predicate
+{
+    FCMP_FALSE =  0,
+    FCMP_OEQ   =  1,
+    FCMP_OGT   =  2,
+    FCMP_OGE   =  3,
+    FCMP_OLT   =  4,
+    FCMP_OLE   =  5,
+    FCMP_ONE   =  6,
+    FCMP_ORD   =  7,
+    FCMP_UNO   =  8,
+    FCMP_UEQ   =  9,
+    FCMP_UGT   = 10,
+    FCMP_UGE   = 11,
+    FCMP_ULT   = 12,
+    FCMP_ULE   = 13,
+    FCMP_UNE   = 14,
+    FCMP_TRUE  = 15,
+    ICMP_EQ    = 32,
+    ICMP_NE    = 33,
+    ICMP_UGT   = 34,
+    ICMP_UGE   = 35,
+    ICMP_ULT   = 36,
+    ICMP_ULE   = 37,
+    ICMP_SGT   = 38,
+    ICMP_SGE   = 39,
+    ICMP_SLT   = 40,
+    ICMP_SLE   = 41,
+};
+
 struct sm6_pointer_info
 {
     const struct sm6_type *type;
@@ -514,6 +544,7 @@ struct sm6_parser
 
     struct sm6_type *types;
     size_t type_count;
+    struct sm6_type *bool_type;
     struct sm6_type *metadata_type;
     struct sm6_type *handle_type;
 
@@ -1388,6 +1419,8 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
                 switch ((width = record->operands[0]))
                 {
                     case 1:
+                        sm6->bool_type = type;
+                        break;
                     case 8:
                     case 16:
                     case 32:
@@ -3416,6 +3449,140 @@ static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_recor
         src_param->reg.data_type = dst->u.reg.data_type;
 }
 
+struct sm6_cmp_info
+{
+    enum vkd3d_shader_opcode handler_idx;
+    bool src_swap;
+};
+
+static const struct sm6_cmp_info *sm6_map_cmp2_op(uint64_t code)
+{
+    static const struct sm6_cmp_info cmp_op_table[] =
+    {
+        [FCMP_FALSE] = {VKD3DSIH_INVALID},
+        [FCMP_OEQ]   = {VKD3DSIH_EQ},
+        [FCMP_OGT]   = {VKD3DSIH_LT, true},
+        [FCMP_OGE]   = {VKD3DSIH_GE},
+        [FCMP_OLT]   = {VKD3DSIH_LT},
+        [FCMP_OLE]   = {VKD3DSIH_GE, true},
+        [FCMP_ONE]   = {VKD3DSIH_NE},
+        [FCMP_ORD]   = {VKD3DSIH_INVALID},
+        [FCMP_UNO]   = {VKD3DSIH_INVALID},
+        [FCMP_UEQ]   = {VKD3DSIH_EQ},
+        [FCMP_UGT]   = {VKD3DSIH_LT, true},
+        [FCMP_UGE]   = {VKD3DSIH_GE},
+        [FCMP_ULT]   = {VKD3DSIH_LT},
+        [FCMP_ULE]   = {VKD3DSIH_GE, true},
+        [FCMP_UNE]   = {VKD3DSIH_NE},
+        [FCMP_TRUE]  = {VKD3DSIH_INVALID},
+
+        [ICMP_EQ]    = {VKD3DSIH_IEQ},
+        [ICMP_NE]    = {VKD3DSIH_INE},
+        [ICMP_UGT]   = {VKD3DSIH_ULT, true},
+        [ICMP_UGE]   = {VKD3DSIH_UGE},
+        [ICMP_ULT]   = {VKD3DSIH_ULT},
+        [ICMP_ULE]   = {VKD3DSIH_UGE, true},
+        [ICMP_SGT]   = {VKD3DSIH_ILT, true},
+        [ICMP_SGE]   = {VKD3DSIH_IGE},
+        [ICMP_SLT]   = {VKD3DSIH_ILT},
+        [ICMP_SLE]   = {VKD3DSIH_IGE, true},
+    };
+
+    return (code < ARRAY_SIZE(cmp_op_table)) ? &cmp_op_table[code] : NULL;
+}
+
+static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_type *type_a, *type_b;
+    const struct sm6_cmp_info *cmp;
+    const struct sm6_value *a, *b;
+    unsigned int i = 0;
+    bool is_int, is_fp;
+    uint64_t code;
+
+    if (!(dst->type = sm6->bool_type))
+    {
+        WARN("Bool type not found.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                "Module does not define a boolean type for comparison results.");
+        return;
+    }
+
+    a = sm6_parser_get_value_by_ref(sm6, record, NULL, &i);
+    b = sm6_parser_get_value_by_ref(sm6, record, a->type, &i);
+    if (!a || !b)
+        return;
+
+    if (!dxil_record_validate_operand_count(record, i + 1, i + 2, sm6))
+        return;
+
+    type_a = a->type;
+    type_b = b->type;
+    is_int = sm6_type_is_bool_i16_i32_i64(type_a);
+    is_fp = sm6_type_is_floating_point(type_a);
+
+    code = record->operands[i++];
+
+    if ((!is_int && !is_fp) || is_int != (code >= ICMP_EQ))
+    {
+        FIXME("Invalid operation %"PRIu64" on type class %u.\n", code, type_a->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Comparison operation %"PRIu64" on type class %u is invalid.", code, type_a->class);
+        return;
+    }
+
+    if (type_a != type_b)
+    {
+        WARN("Type mismatch, type %u width %u vs type %u width %u.\n", type_a->class,
+                type_a->u.width, type_b->class, type_b->u.width);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Type mismatch in comparison operation arguments.");
+    }
+
+    if (!(cmp = sm6_map_cmp2_op(code)) || !cmp->handler_idx || cmp->handler_idx == VKD3DSIH_INVALID)
+    {
+        FIXME("Unhandled operation %"PRIu64".\n", code);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Comparison operation %"PRIu64" is unhandled.", code);
+        return;
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, cmp->handler_idx);
+
+    if (record->operand_count > i)
+    {
+        uint64_t flags = record->operands[i];
+        bool silence_warning = false;
+
+        if (is_fp)
+        {
+            if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
+                ins->flags |= VKD3DSI_PRECISE_X;
+            flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
+            /* SPIR-V FPFastMathMode is only available in the Kernel executon model. */
+            silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
+        }
+        if (flags && silence_warning)
+        {
+            TRACE("Ignoring fast FP modifier %#"PRIx64".\n", flags);
+        }
+        else if (flags)
+        {
+            WARN("Ignoring flags %#"PRIx64".\n", flags);
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Ignoring flags %#"PRIx64" for a comparison operation.", flags);
+        }
+    }
+
+    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    src_param_init_from_value(&src_params[0 ^ cmp->src_swap], a);
+    src_param_init_from_value(&src_params[1 ^ cmp->src_swap], b);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -3634,6 +3801,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_CAST:
                 sm6_parser_emit_cast(sm6, record, ins, dst);
+                break;
+            case FUNC_CODE_INST_CMP2:
+                sm6_parser_emit_cmp2(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_EXTRACTVAL:
                 sm6_parser_emit_extractval(sm6, record, ins, dst);

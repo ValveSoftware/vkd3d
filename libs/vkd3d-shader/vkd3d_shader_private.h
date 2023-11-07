@@ -1411,6 +1411,8 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
             return VKD3D_SHADER_COMPONENT_INT;
         case VKD3D_DATA_DOUBLE:
             return VKD3D_SHADER_COMPONENT_DOUBLE;
+        case VKD3D_DATA_BOOL:
+            return VKD3D_SHADER_COMPONENT_BOOL;
         default:
             FIXME("Unhandled data type %#x.\n", data_type);
             /* fall-through */
