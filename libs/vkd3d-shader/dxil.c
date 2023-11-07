@@ -289,6 +289,23 @@ enum dx_intrinsic_opcode
     DX_CBUFFER_LOAD_LEGACY          =  59,
 };
 
+enum dxil_cast_code
+{
+    CAST_TRUNC    =  0,
+    CAST_ZEXT     =  1,
+    CAST_SEXT     =  2,
+    CAST_FPTOUI   =  3,
+    CAST_FPTOSI   =  4,
+    CAST_UITOFP   =  5,
+    CAST_SITOFP   =  6,
+    CAST_FPTRUNC  =  7,
+    CAST_FPEXT    =  8,
+    CAST_PTRTOINT =  9,
+    CAST_INTTOPTR = 10,
+    CAST_BITCAST  = 11,
+    CAST_ADDRSPACECAST = 12,
+};
+
 struct sm6_pointer_info
 {
     const struct sm6_type *type;
@@ -3248,6 +3265,159 @@ static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_recor
             fn_value->u.function.name, &operands[1], operand_count - 1, ins, dst);
 }
 
+static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_type *from,
+        const struct sm6_type *to, struct sm6_parser *sm6)
+{
+    enum vkd3d_shader_opcode op = VKD3DSIH_INVALID;
+    bool from_int, to_int, from_fp, to_fp;
+    bool is_valid = false;
+
+    from_int = sm6_type_is_integer(from);
+    to_int = sm6_type_is_integer(to);
+    from_fp = sm6_type_is_floating_point(from);
+    to_fp = sm6_type_is_floating_point(to);
+
+    /* NOTE: DXIL currently doesn't use vectors here. */
+    if ((!from_int && !from_fp) || (!to_int && !to_fp))
+    {
+        FIXME("Unhandled cast of type class %u to type class %u.\n", from->class, to->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Cast of type class %u to type class %u is not implemented.", from->class, to->class);
+        return VKD3DSIH_INVALID;
+    }
+    if (to->u.width == 8 || from->u.width == 8)
+    {
+        FIXME("Unhandled 8-bit value.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Cast to/from an 8-bit type is not implemented.");
+        return VKD3DSIH_INVALID;
+    }
+
+    /* DXC emits minimum precision types as 16-bit. These must be emitted
+     * as 32-bit in VSIR, so all width extensions to 32 bits are no-ops. */
+    switch (code)
+    {
+        case CAST_TRUNC:
+            /* nop or min precision. TODO: native 16-bit */
+            if (to->u.width == from->u.width || (to->u.width == 16 && from->u.width == 32))
+                op = VKD3DSIH_NOP;
+            else
+                op = VKD3DSIH_UTOU;
+            is_valid = from_int && to_int && to->u.width <= from->u.width;
+            break;
+        case CAST_ZEXT:
+        case CAST_SEXT:
+            /* nop or min precision. TODO: native 16-bit */
+            if (to->u.width == from->u.width || (to->u.width == 32 && from->u.width == 16))
+            {
+                op = VKD3DSIH_NOP;
+                is_valid = from_int && to_int;
+            }
+            else if (to->u.width > from->u.width)
+            {
+                op = (code == CAST_ZEXT) ? VKD3DSIH_UTOU : VKD3DSIH_ITOI;
+                assert(from->u.width == 1 || to->u.width == 64);
+                is_valid = from_int && to_int;
+            }
+            break;
+        case CAST_FPTOUI:
+            op = VKD3DSIH_FTOU;
+            is_valid = from_fp && to_int && to->u.width > 1;
+            break;
+        case CAST_FPTOSI:
+            op = VKD3DSIH_FTOI;
+            is_valid = from_fp && to_int && to->u.width > 1;
+            break;
+        case CAST_UITOFP:
+            op = VKD3DSIH_UTOF;
+            is_valid = from_int && to_fp;
+            break;
+        case CAST_SITOFP:
+            op = VKD3DSIH_ITOF;
+            is_valid = from_int && to_fp;
+            break;
+        case CAST_FPTRUNC:
+            /* TODO: native 16-bit */
+            op = (from->u.width == 64) ? VKD3DSIH_DTOF : VKD3DSIH_NOP;
+            is_valid = from_fp && to_fp;
+            break;
+        case CAST_FPEXT:
+            /* TODO: native 16-bit */
+            op = (to->u.width == 64) ? VKD3DSIH_FTOD : VKD3DSIH_NOP;
+            is_valid = from_fp && to_fp;
+            break;
+        case CAST_BITCAST:
+            op = VKD3DSIH_MOV;
+            is_valid = to->u.width == from->u.width;
+            break;
+        default:
+            FIXME("Unhandled cast op %"PRIu64".\n", code);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Cast operation %"PRIu64" is unhandled.\n", code);
+            return VKD3DSIH_INVALID;
+    }
+
+    if (!is_valid)
+    {
+        FIXME("Invalid types %u and/or %u for op %"PRIu64".\n", from->class, to->class, code);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Cast operation %"PRIu64" from type class %u, width %u to type class %u, width %u is invalid.\n",
+                code, from->class, from->u.width, to->class, to->u.width);
+        return VKD3DSIH_INVALID;
+    }
+
+    return op;
+}
+
+static void sm6_parser_emit_cast(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    struct vkd3d_shader_src_param *src_param;
+    enum vkd3d_shader_opcode handler_idx;
+    const struct sm6_value *value;
+    const struct sm6_type *type;
+    unsigned int i = 0;
+
+    if (!(value = sm6_parser_get_value_by_ref(sm6, record, NULL, &i)))
+        return;
+
+    if (!dxil_record_validate_operand_count(record, i + 2, i + 2, sm6))
+        return;
+
+    if (!(type = sm6_parser_get_type(sm6, record->operands[i++])))
+        return;
+
+    dst->type = type;
+
+    if (sm6_type_is_pointer(type))
+    {
+        *dst = *value;
+        dst->type = type;
+        ins->handler_idx = VKD3DSIH_NOP;
+        return;
+    }
+
+    if ((handler_idx = sm6_map_cast_op(record->operands[i], value->type, type, sm6)) == VKD3DSIH_INVALID)
+        return;
+
+    vsir_instruction_init(ins, &sm6->p.location, handler_idx);
+
+    if (handler_idx == VKD3DSIH_NOP)
+    {
+        dst->u.reg = value->u.reg;
+        return;
+    }
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(src_param, value);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+
+    /* bitcast */
+    if (handler_idx == VKD3DSIH_MOV)
+        src_param->reg.data_type = dst->u.reg.data_type;
+}
+
 static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -3463,6 +3633,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_CALL:
                 sm6_parser_emit_call(sm6, record, code_block, ins, dst);
+                break;
+            case FUNC_CODE_INST_CAST:
+                sm6_parser_emit_cast(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_EXTRACTVAL:
                 sm6_parser_emit_extractval(sm6, record, ins, dst);

@@ -12,17 +12,17 @@ uniform 0 float4 1.0 2.0 3.0 4.0
 uniform 4 float4 5.0 6.0 7.0 8.0
 uniform 8 float4 9.0 10.0 11.0 12.0
 uniform 12 float4 0 0 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (1.0, 2.0, 3.0, 4.0)
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
 uniform 12 float4 1 0 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
+draw quad
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 uniform 12 float4 0 1 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
+draw quad
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 uniform 12 float4 1 1 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (9.0, 10.0, 11.0, 12.0)
+draw quad
+probe all rgba (9.0, 10.0, 11.0, 12.0)
 
 
 [pixel shader]
