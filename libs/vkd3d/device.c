@@ -2934,6 +2934,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device5 
                 data->Support1 |= D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW;
                 if (device->vk_info.uav_read_without_format)
                     data->Support2 |= D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD;
+                /* We effectively require shaderStorageImageWriteWithoutFormat,
+                 * so we can just report UAV_TYPED_STORE unconditionally. */
+                data->Support2 |= D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE;
             }
 
             if (image_features & VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT)
