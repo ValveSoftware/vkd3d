@@ -7250,10 +7250,19 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
     dst_type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
     src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
 
-    zero_id = spirv_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
+    if (src->reg.data_type == VKD3D_DATA_DOUBLE)
+    {
+        zero_id = spirv_compiler_get_constant_double_vector(compiler, 0.0, component_count);
+        float_max_id = spirv_compiler_get_constant_double_vector(compiler, 4294967296.0, component_count);
+    }
+    else
+    {
+        zero_id = spirv_compiler_get_constant_float_vector(compiler, 0.0f, component_count);
+        float_max_id = spirv_compiler_get_constant_float_vector(compiler, 4294967296.0f, component_count);
+    }
+
     val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, zero_id);
 
-    float_max_id = spirv_compiler_get_constant_float_vector(compiler, 4294967296.0f, component_count);
     uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, UINT_MAX, component_count);
     condition_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
     condition_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
@@ -9525,7 +9534,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DIV:
         case VKD3DSIH_DMUL:
         case VKD3DSIH_DTOF:
-        case VKD3DSIH_DTOU:
         case VKD3DSIH_FREM:
         case VKD3DSIH_FTOD:
         case VKD3DSIH_IADD:
@@ -9596,6 +9604,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_FTOI:
             spirv_compiler_emit_ftoi(compiler, instruction);
             break;
+        case VKD3DSIH_DTOU:
         case VKD3DSIH_FTOU:
             spirv_compiler_emit_ftou(compiler, instruction);
             break;
