@@ -106,6 +106,9 @@ target_type_info[] =
         "dxbc-tpf",     "A 'Tokenized Program Format' shader embedded in a DXBC container.\n"
         "                This is the format used for Direct3D shader model 4 and 5 shaders.\n",
         true},
+    {VKD3D_SHADER_TARGET_FX,
+        "fx",           "Binary format used by Direct3D 9/10.x/11 effects.\n",
+        true},
     {VKD3D_SHADER_TARGET_GLSL,
         "glsl", "An 'OpenGL Shading Language' shader.\n",
         false}

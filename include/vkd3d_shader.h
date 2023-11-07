@@ -785,6 +785,11 @@ enum vkd3d_shader_target_type
      * An 'OpenGL Shading Language' shader. \since 1.3
      */
     VKD3D_SHADER_TARGET_GLSL,
+    /**
+     * Binary format used by Direct3D 9/10.x/11 effects profiles.
+     * Output is a raw FX section without container. \since 1.11
+     */
+    VKD3D_SHADER_TARGET_FX,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_TARGET_TYPE),
 };
