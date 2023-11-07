@@ -1472,6 +1472,7 @@ struct validation_context
     struct vkd3d_shader_parser *parser;
     size_t instruction_idx;
     bool dcl_temps_found;
+    unsigned int temp_count;
     enum vkd3d_shader_opcode phase;
 
     enum vkd3d_shader_opcode *blocks;
@@ -1500,6 +1501,12 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
 static void vsir_validate_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
+    unsigned int temp_count = ctx->temp_count;
+
+    /* SM1-3 shaders do not include a DCL_TEMPS instruction. */
+    if (ctx->parser->shader_version.major <= 3)
+        temp_count = ctx->parser->shader_desc.temp_count;
+
     if (reg->type >= VKD3DSPR_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE, "Invalid register type %#x.",
                 reg->type);
@@ -1530,9 +1537,9 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->idx_count >= 1 && reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
 
-            if (reg->idx_count >= 1 && reg->idx[0].offset >= ctx->parser->shader_desc.temp_count)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the declared count %u.",
-                        reg->idx[0].offset, ctx->parser->shader_desc.temp_count);
+            if (reg->idx_count >= 1 && reg->idx[0].offset >= temp_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
+                        reg->idx[0].offset, temp_count);
             break;
 
         default:
@@ -1636,6 +1643,8 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "Phase instruction %#x must appear to top level.",
                         instruction->handler_idx);
             ctx->phase = instruction->handler_idx;
+            ctx->dcl_temps_found = false;
+            ctx->temp_count = 0;
             return;
 
         default:
@@ -1652,15 +1661,13 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         case VKD3DSIH_DCL_TEMPS:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
-            /* TODO Check that each phase in a hull shader has at most
-             * one occurrence. */
-            if (ctx->dcl_temps_found && ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+            if (ctx->dcl_temps_found)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS, "Duplicate DCL_TEMPS instruction.");
-            ctx->dcl_temps_found = true;
-            if (instruction->declaration.count != ctx->parser->shader_desc.temp_count &&
-                    ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS, "Invalid DCL_TEMPS count %u, expected %u.",
+            if (instruction->declaration.count > ctx->parser->shader_desc.temp_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS, "Invalid DCL_TEMPS count %u, expected at most %u.",
                         instruction->declaration.count, ctx->parser->shader_desc.temp_count);
+            ctx->dcl_temps_found = true;
+            ctx->temp_count = instruction->declaration.count;
             break;
 
         case VKD3DSIH_IF:
