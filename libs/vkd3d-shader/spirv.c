@@ -7197,13 +7197,22 @@ static void spirv_compiler_emit_ftoi(struct spirv_compiler *compiler,
     dst_type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
     src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
 
-    int_min_id = spirv_compiler_get_constant_float_vector(compiler, -2147483648.0f, component_count);
+    if (src->reg.data_type == VKD3D_DATA_DOUBLE)
+    {
+        int_min_id = spirv_compiler_get_constant_double_vector(compiler, -2147483648.0, component_count);
+        float_max_id = spirv_compiler_get_constant_double_vector(compiler, 2147483648.0, component_count);
+    }
+    else
+    {
+        int_min_id = spirv_compiler_get_constant_float_vector(compiler, -2147483648.0f, component_count);
+        float_max_id = spirv_compiler_get_constant_float_vector(compiler, 2147483648.0f, component_count);
+    }
+
     val_id = vkd3d_spirv_build_op_glsl_std450_max(builder, src_type_id, src_id, int_min_id);
 
     /* VSIR allows the destination of a signed conversion to be unsigned. */
     component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
 
-    float_max_id = spirv_compiler_get_constant_float_vector(compiler, 2147483648.0f, component_count);
     int_max_id = spirv_compiler_get_constant_vector(compiler, component_type, component_count, INT_MAX);
     condition_type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
     condition_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
@@ -9516,7 +9525,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_DIV:
         case VKD3DSIH_DMUL:
         case VKD3DSIH_DTOF:
-        case VKD3DSIH_DTOI:
         case VKD3DSIH_DTOU:
         case VKD3DSIH_FREM:
         case VKD3DSIH_FTOD:
@@ -9584,6 +9592,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_UDIV:
             spirv_compiler_emit_int_div(compiler, instruction);
             break;
+        case VKD3DSIH_DTOI:
         case VKD3DSIH_FTOI:
             spirv_compiler_emit_ftoi(compiler, instruction);
             break;
