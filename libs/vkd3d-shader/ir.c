@@ -62,17 +62,7 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
         reg = (struct vkd3d_shader_register *)&ins->src[i].reg;
         if (shader_register_is_phase_instance_id(reg))
         {
-            reg->type = VKD3DSPR_IMMCONST;
-            reg->precision = VKD3D_SHADER_REGISTER_PRECISION_DEFAULT;
-            reg->non_uniform = false;
-            reg->idx[0].offset = ~0u;
-            reg->idx[0].rel_addr = NULL;
-            reg->idx[1].offset = ~0u;
-            reg->idx[1].rel_addr = NULL;
-            reg->idx[2].offset = ~0u;
-            reg->idx[2].rel_addr = NULL;
-            reg->idx_count = 0;
-            reg->dimension = VSIR_DIMENSION_SCALAR;
+            vsir_register_init(reg, VKD3DSPR_IMMCONST, reg->data_type, 0);
             reg->u.immconst_uint[0] = instance_id;
             continue;
         }
