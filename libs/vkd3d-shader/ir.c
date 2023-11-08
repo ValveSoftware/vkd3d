@@ -1511,6 +1511,7 @@ static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser 
 struct cf_flattener_if_info
 {
     struct vkd3d_shader_src_param *false_param;
+    unsigned int id;
     uint32_t merge_block_id;
     unsigned int else_block_id;
 };
@@ -1532,6 +1533,7 @@ struct cf_flattener_switch_info
 {
     size_t ins_location;
     const struct vkd3d_shader_src_param *condition;
+    unsigned int id;
     unsigned int merge_block_id;
     unsigned int default_block_id;
     struct cf_flattener_switch_case *cases;
@@ -1569,6 +1571,13 @@ struct cf_flattener
     size_t instruction_count;
 
     unsigned int block_id;
+    const char **block_names;
+    size_t block_name_capacity;
+    size_t block_name_count;
+
+    unsigned int branch_id;
+    unsigned int loop_id;
+    unsigned int switch_id;
 
     unsigned int control_flow_depth;
     struct cf_flattener_info *control_flow_info;
@@ -1751,6 +1760,31 @@ static struct cf_flattener_info *cf_flattener_find_innermost_breakable_cf_constr
     return NULL;
 }
 
+static void VKD3D_PRINTF_FUNC(3, 4) cf_flattener_create_block_name(struct cf_flattener *flattener,
+        unsigned int block_id, const char *fmt, ...)
+{
+    struct vkd3d_string_buffer buffer;
+    size_t block_name_count;
+    va_list args;
+
+    --block_id;
+
+    block_name_count = max(flattener->block_name_count, block_id + 1);
+    if (!vkd3d_array_reserve((void **)&flattener->block_names, &flattener->block_name_capacity,
+            block_name_count, sizeof(*flattener->block_names)))
+        return;
+    memset(&flattener->block_names[flattener->block_name_count], 0,
+            (block_name_count - flattener->block_name_count) * sizeof(*flattener->block_names));
+    flattener->block_name_count = block_name_count;
+
+    vkd3d_string_buffer_init(&buffer);
+    va_start(args, fmt);
+    vkd3d_string_buffer_vprintf(&buffer, fmt, args);
+    va_end(args);
+
+    flattener->block_names[block_id] = buffer.buffer;
+}
+
 static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
 {
     struct vkd3d_shader_parser *parser = flattener->parser;
@@ -1797,10 +1831,15 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
                 cf_flattener_emit_label(flattener, true_block_id);
 
+                cf_info->u.if_.id = flattener->branch_id;
                 cf_info->u.if_.merge_block_id = merge_block_id;
                 cf_info->u.if_.else_block_id = 0;
                 cf_info->inside_block = true;
                 cf_info->current_block = VKD3D_BLOCK_IF;
+
+                cf_flattener_create_block_name(flattener, merge_block_id, "branch%u_merge", flattener->branch_id);
+                cf_flattener_create_block_name(flattener, true_block_id, "branch%u_true", flattener->branch_id);
+                ++flattener->branch_id;
                 break;
 
             case VKD3DSIH_ELSE:
@@ -1810,6 +1849,8 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 cf_info->u.if_.else_block_id = cf_flattener_alloc_block_id(flattener);
                 cf_info->u.if_.false_param->reg.idx[0].offset = cf_info->u.if_.else_block_id;
 
+                cf_flattener_create_block_name(flattener,
+                        cf_info->u.if_.else_block_id, "branch%u_false", cf_info->u.if_.id);
                 cf_flattener_emit_label(flattener, cf_info->u.if_.else_block_id);
 
                 cf_info->inside_block = true;
@@ -1845,6 +1886,12 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 cf_info->u.loop.merge_block_id = merge_block_id;
                 cf_info->current_block = VKD3D_BLOCK_LOOP;
                 cf_info->inside_block = true;
+
+                cf_flattener_create_block_name(flattener, loop_header_block_id, "loop%u_header", flattener->loop_id);
+                cf_flattener_create_block_name(flattener, loop_body_block_id, "loop%u_body", flattener->loop_id);
+                cf_flattener_create_block_name(flattener, continue_block_id, "loop%u_continue", flattener->loop_id);
+                cf_flattener_create_block_name(flattener, merge_block_id, "loop%u_merge", flattener->loop_id);
+                ++flattener->loop_id;
                 break;
 
             case VKD3DSIH_ENDLOOP:
@@ -1872,6 +1919,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 vsir_instruction_init(dst_ins, &instruction->location, VKD3DSIH_SWITCH_MONOLITHIC);
                 ++flattener->instruction_count;
 
+                cf_info->u.switch_.id = flattener->switch_id;
                 cf_info->u.switch_.merge_block_id = merge_block_id;
                 cf_info->u.switch_.cases = NULL;
                 cf_info->u.switch_.cases_size = 0;
@@ -1879,6 +1927,9 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 cf_info->u.switch_.default_block_id = 0;
                 cf_info->inside_block = false;
                 cf_info->current_block = VKD3D_BLOCK_SWITCH;
+
+                cf_flattener_create_block_name(flattener, merge_block_id, "switch%u_merge", flattener->switch_id);
+                ++flattener->switch_id;
 
                 if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.cases, &cf_info->u.switch_.cases_size,
                         10, sizeof(*cf_info->u.switch_.cases)))
@@ -1946,6 +1997,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 ++cf_info->u.switch_.cases_count;
 
                 cf_flattener_emit_label(flattener, label_id);
+                cf_flattener_create_block_name(flattener, label_id, "switch%u_case%u", cf_info->u.switch_.id, value);
                 cf_info->inside_block = true;
                 break;
             }
@@ -1956,6 +2008,9 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                     cf_flattener_emit_unconditional_branch(flattener, cf_info->u.switch_.default_block_id);
 
                 cf_flattener_emit_label(flattener, cf_info->u.switch_.default_block_id);
+
+                cf_flattener_create_block_name(flattener, cf_info->u.switch_.default_block_id,
+                        "switch%u_default", cf_info->u.switch_.id);
                 cf_info->inside_block = true;
                 break;
 
@@ -2078,6 +2133,9 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
     }
 
     vkd3d_free(flattener.control_flow_info);
+    /* Simpler to always free these in free_shader_desc(). */
+    parser->shader_desc.block_names = flattener.block_names;
+    parser->shader_desc.block_name_count = flattener.block_name_count;
 
     return result;
 }

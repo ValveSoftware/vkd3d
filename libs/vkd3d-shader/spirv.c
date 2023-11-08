@@ -2358,6 +2358,8 @@ struct spirv_compiler
 
     uint32_t *block_label_ids;
     unsigned int block_count;
+    const char **block_names;
+    size_t block_name_count;
 };
 
 static bool is_in_default_phase(const struct spirv_compiler *compiler)
@@ -7576,6 +7578,10 @@ static void spirv_compiler_emit_label(struct spirv_compiler *compiler,
 
     label_id = spirv_compiler_get_label_id(compiler, block_id);
     vkd3d_spirv_build_op_label(builder, label_id);
+
+    --block_id;
+    if (block_id < compiler->block_name_count && compiler->block_names[block_id])
+        vkd3d_spirv_build_op_name(builder, label_id, compiler->block_names[block_id]);
 }
 
 static void spirv_compiler_emit_merge(struct spirv_compiler *compiler,
@@ -9671,6 +9677,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
     memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
     compiler->use_vocp = parser->shader_desc.use_vocp;
+    compiler->block_names = parser->shader_desc.block_names;
+    compiler->block_name_count = parser->shader_desc.block_name_count;
 
     compiler->input_control_point_count = shader_desc->input_control_point_count;
     compiler->output_control_point_count = shader_desc->output_control_point_count;

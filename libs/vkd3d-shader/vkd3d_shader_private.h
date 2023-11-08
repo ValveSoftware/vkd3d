@@ -1026,6 +1026,9 @@ struct vkd3d_shader_desc
     } flat_constant_count[3];
 
     bool use_vocp;
+
+    const char **block_names;
+    size_t block_name_count;
 };
 
 struct vkd3d_shader_register_semantic
