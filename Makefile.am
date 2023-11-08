@@ -152,6 +152,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/object-references.shader_test \
 	tests/hlsl/pow.shader_test \
 	tests/hlsl/reflect.shader_test \
+	tests/hlsl/register-reservations-numeric.shader_test \
 	tests/hlsl/register-reservations-resources.shader_test \
 	tests/hlsl/return-implicit-conversion.shader_test \
 	tests/hlsl/return.shader_test \

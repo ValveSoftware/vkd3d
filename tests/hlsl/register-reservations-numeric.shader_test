@@ -1,0 +1,279 @@
+[pixel shader fail(sm<6) todo]
+// Overlapping register(cX) reservations are not allowed except on SM6, where they are aliased.
+// On SM1 this gives hr 0x88760b59.
+float a : register(c0);
+float b : register(c0);
+
+float4 main() : sv_target
+{
+    return a + b;
+}
+
+
+[pixel shader]
+// It is not required to provide a register(cX) for all elements in the $Globals buffer.
+float4 a; // will get register(c1)
+float4 b : register(c0);
+
+float4 main() : sv_target
+{
+    return float4(a.xw, b.yz);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+draw quad
+todo(sm<6) probe all rgba (1.1, 1.4, 0.2, 0.3)
+
+
+[pixel shader]
+float4 a[3]; // will get register(c3)
+float4 b[2] : register(c1);
+
+float4 main() : sv_target
+{
+    return float4(a[1].xy, b[0].zw);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+uniform 12 float4 3.1 3.2 3.3 3.4
+uniform 16 float4 4.1 4.2 4.3 4.4
+draw quad
+todo(sm<6) probe all rgba (4.1, 4.2, 1.3, 1.4)
+
+
+[require]
+shader model < 4.0
+
+[pixel shader]
+float a : register(c2);
+float b; // will get register c0 in SM1
+
+float4 main() : sv_target
+{
+    return float4(a, b, 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+uniform 12 float4 3.1 3.2 3.3 3.4
+draw quad
+todo probe all rgba (2.1, 0.1, 0.0, 0.0)
+
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+float a : register(c2);
+float b; // will get offset equivalent to c2.y in SM4 and SM6
+
+float4 main() : sv_target
+{
+    return float4(a, b, 0.0, 0.0);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+uniform 12 float4 3.1 3.2 3.3 3.4
+draw quad
+todo(sm<6) probe all rgba (2.1, 2.2, 0.0, 0.0)
+
+
+[require]
+shader model >= 6.0
+
+[pixel shader]
+// Variables with overlapping register(cX) reservations are aliased in SM6.
+float2 a : register(c2);
+float3 b : register(c2);
+
+float4 main() : sv_target
+{
+    return float4(a, b.yz);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+draw quad
+probe all rgba (2.1, 2.2, 2.2, 2.3)
+
+
+% Results differ between SM1 and SM4 because in the latter variables can share the same register,
+% using different writemasks.
+[require]
+shader model < 4.0
+
+[pixel shader]
+struct
+{
+    float2 a;
+    float b;
+} apple : register(c2);
+
+float4 main() : sv_target
+{
+    return float4(apple.a, apple.b, 0);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+uniform 12 float4 3.1 3.2 3.3 3.4
+draw quad
+todo probe all rgba (2.1, 2.2, 3.1, 0.0)
+
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+struct
+{
+    float2 a;
+    float b;
+} apple : register(c2);
+
+float4 main() : sv_target
+{
+    return float4(apple.a, apple.b, 0);
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+uniform 4 float4 1.1 1.2 1.3 1.4
+uniform 8 float4 2.1 2.2 2.3 2.4
+uniform 12 float4 3.1 3.2 3.3 3.4
+draw quad
+todo(sm<6) probe all rgba (2.1, 2.2, 2.3, 0.0)
+
+
+[pixel shader]
+// On SM4, register(cX) has no effect unless in the $Globals buffer.
+cbuffer extra
+{
+    float a : register(c1);
+};
+
+float4 main() : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 100
+uniform 4 float 101
+draw quad
+probe all rgba (100, 100, 100, 100)
+
+
+[pixel shader fail(sm>=6)]
+// On SM4 register(cX) has no effect unless in the $Globals buffer.
+float4 main(uniform float a : register(c1)) : sv_target
+{
+    return a;
+}
+
+[test]
+uniform 0 float 100
+uniform 4 float 101
+draw quad
+probe all rgba (100, 100, 100, 100)
+
+[pixel shader todo]
+cbuffer c
+{
+    float a : packoffset(c1);
+    float b : packoffset(c2) : register(c1);
+    // ^ register(c1) ignored for cbuffer that is not $Globals.
+}
+
+float4 main() : sv_target
+{
+    return float4(a, b, 0, 0);
+}
+
+[test]
+uniform 0 float 200
+uniform 4 float 201
+uniform 8 float 202
+todo(sm<6) draw quad
+todo(sm<6) probe all rgba (201.0, 202.0, 0.0, 0.0)
+
+
+[pixel shader fail(sm<4)]
+int k : register(i0); // register(cX) is also required.
+
+float4 main() : sv_target
+{
+    return k;
+}
+
+
+[require]
+% All shader models.
+
+% In SM1, most variables are needed in the "c" register group, for float operations.
+% If a variable is needed in the "c" register group, register() reservations in other groups can be
+% provided only if a register(cX) reservation is also provided.
+
+[pixel shader fail(sm<4) todo(sm<4)]
+int k : register(i0);
+// ^^ register(cX) is also required in SM1.
+
+float4 main() : sv_target
+{
+    return k;
+}
+
+[pixel shader todo]
+int k : register(i0) : register(c1);
+// Shader compiles because a "c" register reservation is provided for "k".
+
+float4 main() : sv_target
+{
+    return k;
+}
+
+
+[require]
+shader model >= 3.0
+% model 2.0 doesn't support unrollable loops.
+
+[pixel shader todo(sm<4)]
+int k : register(i0);
+// ^^ register(cX) is not required since "k" is just needed in the "i" register group.
+
+float4 main() : sv_target
+{
+    float f = 0;
+
+    for (int i = 0; i < k; ++i)
+        f += i;
+    return f;
+}
+
+
+[pixel shader todo]
+int k : register(c0) : register(b0);
+// ^^ unlike the "c" register group, a reservation is not required for the "i" group, even though "k" is needed on it.
+
+float4 main() : sv_target
+{
+    float f = 0;
+
+    for (int i = 0; i < k; ++i)
+        f += i;
+    return f;
+}
