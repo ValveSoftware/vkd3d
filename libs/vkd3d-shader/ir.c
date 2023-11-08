@@ -1554,6 +1554,12 @@ static void vsir_validate_register(struct validation_context *ctx,
                         reg->idx_count);
             break;
 
+        case VKD3DSPR_IMMCONST64:
+            if (reg->idx_count != 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a IMMCONST64 register.",
+                        reg->idx_count);
+            break;
+
         default:
             break;
     }
