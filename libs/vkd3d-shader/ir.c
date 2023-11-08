@@ -1488,10 +1488,13 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
     vkd3d_string_buffer_cleanup(&buf);
 }
 
+static void vsir_validate_src_param(struct validation_context *ctx,
+        const struct vkd3d_shader_src_param *src);
+
 static void vsir_validate_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
-    unsigned int temp_count = ctx->temp_count;
+    unsigned int i, temp_count = ctx->temp_count;
 
     /* SM1-3 shaders do not include a DCL_TEMPS instruction. */
     if (ctx->parser->shader_version.major <= 3)
@@ -1516,6 +1519,13 @@ static void vsir_validate_register(struct validation_context *ctx,
     if (reg->idx_count > ARRAY_SIZE(reg->idx))
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid register index count %u.",
                 reg->idx_count);
+
+    for (i = 0; i < min(reg->idx_count, ARRAY_SIZE(reg->idx)); ++i)
+    {
+        const struct vkd3d_shader_src_param *param = reg->idx[i].rel_addr;
+        if (reg->idx[i].rel_addr)
+            vsir_validate_src_param(ctx, param);
+    }
 
     switch (reg->type)
     {
