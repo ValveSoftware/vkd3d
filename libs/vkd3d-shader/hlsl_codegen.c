@@ -4123,13 +4123,46 @@ static void allocate_const_registers(struct hlsl_ctx *ctx, struct hlsl_ir_functi
 
     LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
-        if (var->is_uniform && var->last_read)
+        unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+
+        if (!var->is_uniform || !var->last_read || reg_size == 0)
+            continue;
+
+        if (var->reg_reservation.reg_type == 'c')
         {
-            unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+            unsigned int reg_idx = var->reg_reservation.reg_index;
+            unsigned int i;
 
-            if (reg_size == 0)
-                continue;
+            assert(reg_size % 4 == 0);
+            for (i = 0; i < reg_size / 4; ++i)
+            {
+                if (get_available_writemask(&allocator, 1, UINT_MAX, reg_idx + i) != VKD3DSP_WRITEMASK_ALL)
+                {
+                    hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_RESERVATION,
+                            "Overlapping register() reservations on 'c%u'.", reg_idx + i);
+                }
 
+                record_allocation(ctx, &allocator, reg_idx + i, VKD3DSP_WRITEMASK_ALL, 1, UINT_MAX);
+            }
+
+            var->regs[HLSL_REGSET_NUMERIC].id = reg_idx;
+            var->regs[HLSL_REGSET_NUMERIC].allocation_size = reg_size / 4;
+            var->regs[HLSL_REGSET_NUMERIC].writemask = VKD3DSP_WRITEMASK_ALL;
+            var->regs[HLSL_REGSET_NUMERIC].allocated = true;
+            TRACE("Allocated reserved %s to %s.\n", var->name,
+                    debug_register('c', var->regs[HLSL_REGSET_NUMERIC], var->data_type));
+        }
+    }
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        unsigned int reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
+
+        if (!var->is_uniform || !var->last_read || reg_size == 0)
+            continue;
+
+        if (!var->regs[HLSL_REGSET_NUMERIC].allocated)
+        {
             var->regs[HLSL_REGSET_NUMERIC] = allocate_numeric_registers_for_type(ctx, &allocator,
                     1, UINT_MAX, var->data_type);
             TRACE("Allocated %s to %s.\n", var->name,
