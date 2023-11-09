@@ -63,5 +63,5 @@ shader model >= 6.0
 
 [test]
 uniform 0 float4 0.0 1.5 1.5 0.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1010101.0, 11110000.0, 1101001.0, 0.0)

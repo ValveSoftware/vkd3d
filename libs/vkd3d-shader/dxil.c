@@ -2156,6 +2156,18 @@ static size_t sm6_parser_get_value_index(struct sm6_parser *sm6, uint64_t idx)
     return i;
 }
 
+static bool sm6_value_validate_is_register(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_value_is_register(value))
+    {
+        WARN("Operand of type %u is not a register.\n", value->value_type);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A register operand passed to a DXIL instruction is not a register.");
+        return false;
+    }
+    return true;
+}
+
 static bool sm6_value_validate_is_handle(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     if (!sm6_value_is_handle(value))
@@ -2163,6 +2175,19 @@ static bool sm6_value_validate_is_handle(const struct sm6_value *value, struct s
         WARN("Handle parameter of type %u is not a handle.\n", value->value_type);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE,
                 "A handle parameter passed to a DX intrinsic function is not a handle.");
+        return false;
+    }
+    return true;
+}
+
+static bool sm6_value_validate_is_bool(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    const struct sm6_type *type = value->type;
+    if (!sm6_type_is_bool(type))
+    {
+        WARN("Operand of type class %u is not bool.\n", type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A bool operand of type class %u passed to a DXIL instruction is not a bool.", type->class);
         return false;
     }
     return true;
@@ -3648,6 +3673,41 @@ static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_value *src[3];
+    unsigned int i = 0;
+
+    if (!(src[1] = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
+            || !(src[2] = sm6_parser_get_value_by_ref(sm6, record, src[1]->type, &i))
+            || !(src[0] = sm6_parser_get_value_by_ref(sm6, record, NULL, &i)))
+    {
+        return;
+    }
+    dxil_record_validate_operand_max_count(record, i, sm6);
+
+    for (i = 0; i < 3; ++i)
+    {
+        if (!sm6_value_validate_is_register(src[i], sm6))
+            return;
+    }
+
+    dst->type = src[1]->type;
+
+    if (!sm6_value_validate_is_bool(src[0], sm6))
+        return;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOVC);
+
+    src_params = instruction_src_params_alloc(ins, 3, sm6);
+    for (i = 0; i < 3; ++i)
+        src_param_init_from_value(&src_params[i], src[i]);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static bool sm6_metadata_value_is_node(const struct sm6_metadata_value *m)
 {
     return m && m->type == VKD3D_METADATA_NODE;
@@ -3807,6 +3867,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 sm6_parser_emit_ret(sm6, record, code_block, ins);
                 is_terminator = true;
                 ret_found = true;
+                break;
+            case FUNC_CODE_INST_VSELECT:
+                sm6_parser_emit_vselect(sm6, record, ins, dst);
                 break;
             default:
                 FIXME("Unhandled dxil instruction %u.\n", record->code);
