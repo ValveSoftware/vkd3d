@@ -1295,9 +1295,9 @@ static void remove_dead_code(struct vkd3d_shader_parser *parser)
                 {
                     if (depth > 0)
                     {
-                        vkd3d_shader_instruction_make_nop(ins);
                         if (ins->handler_idx != VKD3DSIH_ELSE)
                             --depth;
+                        vkd3d_shader_instruction_make_nop(ins);
                     }
                     else
                     {
