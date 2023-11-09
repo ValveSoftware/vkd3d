@@ -2419,6 +2419,7 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         case HLSL_RESOURCE_SAMPLE:
         case HLSL_RESOURCE_SAMPLE_LOD:
         case HLSL_RESOURCE_SAMPLE_LOD_BIAS:
+        case HLSL_RESOURCE_SAMPLE_PROJ:
             break;
     }
     if (load->sampler.var)

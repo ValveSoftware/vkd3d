@@ -2337,6 +2337,8 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
         .src_count = 2,
     };
+    if (load->load_type == HLSL_RESOURCE_SAMPLE_PROJ)
+        sm1_instr.opcode |= VKD3DSI_TEXLD_PROJECT << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
 
     assert(instr->reg.allocated);
 

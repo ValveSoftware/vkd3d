@@ -3572,6 +3572,37 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             return false;
         }
     }
+    else if (!strcmp(name, "tex2Dproj"))
+    {
+        if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
+                hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), loc)))
+        {
+            return false;
+        }
+
+        if (shader_profile_version_ge(ctx, 4, 0))
+        {
+            unsigned int count = hlsl_sampler_dim_count(dim);
+            struct hlsl_ir_node *divisor;
+
+            if (!(divisor = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(W, W, W, W), count, coords, loc)))
+                return false;
+            hlsl_block_add_instr(params->instrs, divisor);
+
+            if (!(coords = hlsl_new_swizzle(ctx, HLSL_SWIZZLE(X, Y, Z, W), count, coords, loc)))
+                return false;
+            hlsl_block_add_instr(params->instrs, coords);
+
+            if (!(coords = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, coords, divisor, loc)))
+                return false;
+
+            load_params.type = HLSL_RESOURCE_SAMPLE;
+        }
+        else
+        {
+            load_params.type = HLSL_RESOURCE_SAMPLE_PROJ;
+        }
+    }
     else
     {
         load_params.type = HLSL_RESOURCE_SAMPLE;
@@ -3643,6 +3674,12 @@ static bool intrinsic_tex2Dlod(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     return intrinsic_tex(ctx, params, loc, "tex2Dlod", HLSL_SAMPLER_DIM_2D);
+}
+
+static bool intrinsic_tex2Dproj(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex2Dproj", HLSL_SAMPLER_DIM_2D);
 }
 
 static bool intrinsic_tex3D(struct hlsl_ctx *ctx,
@@ -3831,6 +3868,7 @@ intrinsic_functions[] =
     {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
     {"tex2Dlod",                            2, false, intrinsic_tex2Dlod},
+    {"tex2Dproj",                           2, false, intrinsic_tex2Dproj},
     {"tex3D",                              -1, false, intrinsic_tex3D},
     {"texCUBE",                            -1, false, intrinsic_texCUBE},
     {"transpose",                           1, true,  intrinsic_transpose},

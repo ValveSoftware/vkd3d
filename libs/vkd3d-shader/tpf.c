@@ -5574,6 +5574,9 @@ static void write_sm4_resource_load(const struct tpf_writer *tpf, const struct h
         case HLSL_RESOURCE_RESINFO:
             write_sm4_resinfo(tpf, load);
             break;
+
+        case HLSL_RESOURCE_SAMPLE_PROJ:
+            vkd3d_unreachable();
     }
 }
 
