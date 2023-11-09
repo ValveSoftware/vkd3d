@@ -3572,7 +3572,8 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
             return false;
         }
     }
-    else if (!strcmp(name, "tex2Dproj"))
+    else if (!strcmp(name, "tex2Dproj")
+            || !strcmp(name, "tex3Dproj"))
     {
         if (!(coords = add_implicit_conversion(ctx, params->instrs, params->args[1],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, 4), loc)))
@@ -3686,6 +3687,12 @@ static bool intrinsic_tex3D(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     return intrinsic_tex(ctx, params, loc, "tex3D", HLSL_SAMPLER_DIM_3D);
+}
+
+static bool intrinsic_tex3Dproj(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return intrinsic_tex(ctx, params, loc, "tex3Dproj", HLSL_SAMPLER_DIM_3D);
 }
 
 static bool intrinsic_texCUBE(struct hlsl_ctx *ctx,
@@ -3870,6 +3877,7 @@ intrinsic_functions[] =
     {"tex2Dlod",                            2, false, intrinsic_tex2Dlod},
     {"tex2Dproj",                           2, false, intrinsic_tex2Dproj},
     {"tex3D",                              -1, false, intrinsic_tex3D},
+    {"tex3Dproj",                           2, false, intrinsic_tex3Dproj},
     {"texCUBE",                            -1, false, intrinsic_texCUBE},
     {"transpose",                           1, true,  intrinsic_transpose},
     {"trunc",                               1, true,  intrinsic_trunc},
