@@ -2890,6 +2890,12 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     first = expr->operands[1].node;
     second = expr->operands[2].node;
 
+    if (cond->data_type->class > HLSL_CLASS_VECTOR || instr->data_type->class > HLSL_CLASS_VECTOR)
+    {
+        hlsl_fixme(ctx, &instr->loc, "Lower ternary of type other than scalar or vector.\n");
+        return false;
+    }
+
     if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
     {
         struct hlsl_ir_node *abs, *neg;
