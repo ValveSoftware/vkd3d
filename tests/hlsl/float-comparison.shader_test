@@ -1,0 +1,67 @@
+[pixel shader]
+uniform float4 f;
+
+float4 main() : sv_target
+{
+    float4 result;
+    float n = f.x/f.w;
+
+    /* '!(condition)' in SM6 forces use of the unordered instruction variant. */
+
+    result.x  = (f.y > f.x)   ?        1.0 : 0.0;
+    result.x += (f.y < f.x)   ?       10.0 : 0.0;
+    result.x += (f.y >= f.x)  ?      100.0 : 0.0;
+    result.x += (f.y <= f.x)  ?     1000.0 : 0.0;
+    result.x += !(f.y <= f.x) ?    10000.0 : 0.0;
+    result.x += !(f.y >= f.x) ?   100000.0 : 0.0;
+    result.x += !(f.y < f.x)  ?  1000000.0 : 0.0;
+    result.x += !(f.y > f.x)  ? 10000000.0 : 0.0;
+    result.y  = (n > f.x)   ?        1.0 : 0.0;
+    result.y += (n < f.x)   ?       10.0 : 0.0;
+    result.y += (n >= f.x)  ?      100.0 : 0.0;
+    result.y += (n <= f.x)  ?     1000.0 : 0.0;
+    result.y += !(n <= f.x) ?    10000.0 : 0.0;
+    result.y += !(n >= f.x) ?   100000.0 : 0.0;
+    result.y += !(n < f.x)  ?  1000000.0 : 0.0;
+    result.y += !(n > f.x)  ? 10000000.0 : 0.0;
+    result.z  = (f.z == f.y)  ?        1.0 : 0.0;
+    result.z += (f.z != f.y)  ?       10.0 : 0.0;
+    result.z += !(f.z == f.y) ?      100.0 : 0.0;
+    result.z += !(f.z != f.y) ?     1000.0 : 0.0;
+    result.z += (n == f.y)    ?    10000.0 : 0.0;
+    result.z += (n != f.y)    ?   100000.0 : 0.0;
+    result.z += !(n == f.y)   ?  1000000.0 : 0.0;
+    result.z += !(n != f.y)   ? 10000000.0 : 0.0;
+    /* It doesn't seem possible to generate DXIL instructions for 'is ordered' or 'is unordered'.
+     * Expressions 'isnan(n)' and '(isnan(n) || isnan(f.x))' compile into intrinsics. */
+    result.w = 0;
+    return result;
+}
+
+% SM1-3 apparently treats '0/0' as zero.
+[require]
+shader model < 4.0
+
+[test]
+uniform 0 float4 0.0 1.5 1.5 0.0
+draw quad
+todo probe all rgba (1010101.0, 11001100.0, 1101001.0, 0.0)
+
+% SM4-5 optimises away the 'not' by inverting the condition, even though this is invalid for NaN.
+[require]
+shader model >= 4.0
+shader model < 6.0
+
+[test]
+uniform 0 float4 0.0 1.5 1.5 0.0
+draw quad
+todo probe all rgba (1010101.0, 0.0, 1101001.0, 0.0)
+
+% SM6 emits the correct ordered/unordered instructions, so comparisons are false for NaN, and are made true with 'not'.
+[require]
+shader model >= 6.0
+
+[test]
+uniform 0 float4 0.0 1.5 1.5 0.0
+todo(sm>=6) draw quad
+probe all rgba (1010101.0, 11110000.0, 1101001.0, 0.0)

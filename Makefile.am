@@ -87,6 +87,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/entry-point-semantics.shader_test \
 	tests/hlsl/exp.shader_test \
 	tests/hlsl/expr-indexing.shader_test \
+	tests/hlsl/float-comparison.shader_test \
 	tests/hlsl/floor.shader_test \
 	tests/hlsl/fmod.shader_test \
 	tests/hlsl/for.shader_test \
