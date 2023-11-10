@@ -163,6 +163,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/side-effects.shader_test \
 	tests/hlsl/sign.shader_test \
 	tests/hlsl/single-numeric-initializer.shader_test \
+	tests/hlsl/sm6-ternary.shader_test \
 	tests/hlsl/smoothstep.shader_test \
 	tests/hlsl/sqrt.shader_test \
 	tests/hlsl/state-block-syntax.shader_test \
