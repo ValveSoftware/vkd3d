@@ -5102,7 +5102,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 
 %type <name> any_identifier
 %type <name> var_identifier
-%type <name> technique_name
+%type <name> name_opt
 
 %type <parameter> parameter
 
@@ -5148,7 +5148,7 @@ hlsl_prog:
     | hlsl_prog effect_group
     | hlsl_prog ';'
 
-technique_name:
+name_opt:
       %empty
         {
             $$ = NULL;
@@ -5159,14 +5159,14 @@ pass_list:
       %empty
 
 technique9:
-      KW_TECHNIQUE technique_name '{' pass_list '}'
+      KW_TECHNIQUE name_opt '{' pass_list '}'
         {
             if (!add_technique(ctx, $2, "technique", &@1))
                 YYABORT;
         }
 
 technique10:
-      KW_TECHNIQUE10 technique_name '{' pass_list '}'
+      KW_TECHNIQUE10 name_opt '{' pass_list '}'
         {
             if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
@@ -5177,7 +5177,7 @@ technique10:
         }
 
 technique11:
-      KW_TECHNIQUE11 technique_name '{' pass_list '}'
+      KW_TECHNIQUE11 name_opt '{' pass_list '}'
         {
             if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
