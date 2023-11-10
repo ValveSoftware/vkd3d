@@ -4091,14 +4091,36 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *common_type;
 
-    if (!(common_type = get_common_numeric_type(ctx, first, second, &first->loc)))
-        return false;
+    if (first->data_type->class <= HLSL_CLASS_LAST_NUMERIC
+            && second->data_type->class <= HLSL_CLASS_LAST_NUMERIC)
+    {
+        if (!(common_type = get_common_numeric_type(ctx, first, second, &first->loc)))
+            return false;
 
-    if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
-        return false;
+        if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
+            return false;
 
-    if (!(second = add_implicit_conversion(ctx, block, second, common_type, &second->loc)))
-        return false;
+        if (!(second = add_implicit_conversion(ctx, block, second, common_type, &second->loc)))
+            return false;
+    }
+    else
+    {
+        struct vkd3d_string_buffer *first_string, *second_string;
+
+        if (!hlsl_types_are_equal(first->data_type, second->data_type))
+        {
+            first_string = hlsl_type_to_string(ctx, first->data_type);
+            second_string = hlsl_type_to_string(ctx, second->data_type);
+            if (first_string && second_string)
+                hlsl_error(ctx, &first->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Ternary argument types '%s' and '%s' do not match.",
+                        first_string->buffer, second_string->buffer);
+            hlsl_release_string_buffer(ctx, first_string);
+            hlsl_release_string_buffer(ctx, second_string);
+        }
+
+        common_type = first->data_type;
+    }
 
     args[0] = cond;
     args[1] = first;
