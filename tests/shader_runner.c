@@ -94,40 +94,139 @@ enum parse_state
     STATE_TEST,
 };
 
-static bool match_string(const char *line, const char *token, const char **const rest)
+static bool check_qualifier_args_conjunction(const char *line,
+        const char **const rest, enum shader_model sm)
+{
+    bool holds = true;
+    unsigned int i;
+
+    static const struct
+    {
+        const char *text;
+        enum shader_model sm_min, sm_max;
+    }
+    valid_args[] =
+    {
+        {"sm>=4", SHADER_MODEL_4_0, SHADER_MODEL_6_0},
+        {"sm>=6", SHADER_MODEL_6_0, SHADER_MODEL_6_0},
+        {"sm<4",  SHADER_MODEL_2_0, SHADER_MODEL_4_0 - 1},
+        {"sm<6",  SHADER_MODEL_2_0, SHADER_MODEL_6_0 - 1},
+    };
+
+    while (*line != ')' && *line != '|')
+    {
+        bool match = false;
+
+        while (isspace(*line))
+            ++line;
+
+        for (i = 0; i < ARRAY_SIZE(valid_args); ++i)
+        {
+            const char *option_text = valid_args[i].text;
+
+            if (!strncmp(line, option_text, strlen(option_text)))
+            {
+                line += strlen(option_text);
+                if (sm < valid_args[i].sm_min)
+                    holds = false;
+                if (sm > valid_args[i].sm_max)
+                    holds = false;
+
+                match = true;
+                break;
+            }
+        }
+
+        while (isspace(*line))
+            ++line;
+
+        if (match && *line == '&')
+        {
+            ++line;
+        }
+        else if (*line != ')' && *line != '|')
+        {
+            fatal_error("Invalid qualifier argument '%s'.\n", line);
+        }
+    }
+
+    assert(*line == ')' || *line == '|');
+    if (rest)
+        *rest = line;
+
+    return holds;
+}
+
+static bool check_qualifier_args(const char *line, const char **const rest, enum shader_model sm)
+{
+    bool first = true;
+    bool holds = false;
+
+    assert(*line == '(');
+    ++line;
+
+    while (*line != ')')
+    {
+        if (!first && *line == '|')
+            ++line;
+        first = false;
+
+        holds = check_qualifier_args_conjunction(line, &line, sm) || holds;
+    }
+
+    assert(*line == ')');
+    if (rest)
+        *rest = line + 1;
+
+    return holds;
+}
+
+static bool match_string_generic(const char *line, const char *token, const char **const rest,
+    bool exclude_bracket, bool allow_qualifier_args, enum shader_model sm)
 {
     size_t len = strlen(token);
+    bool holds = true;
 
-    while (isspace(*line))
+    while (isspace(*line) || (exclude_bracket && *line == ']'))
         ++line;
 
-    if (strncmp(line, token, len) || !isspace(line[len]))
+    if (strncmp(line, token, len) || !(isspace(line[len]) || line[len] == '('
+            || (exclude_bracket && line[len] == ']')))
         return false;
+    line += len;
+
+    if (allow_qualifier_args && *line == '(')
+        holds = check_qualifier_args(line, &line, sm);
+
     if (rest)
     {
-        *rest = line + len;
+        *rest = line;
         while (isspace(**rest))
             ++*rest;
     }
-    return true;
+    return holds;
+}
+
+static bool match_string_with_args(const char *line, const char *token, const char **const rest,
+    enum shader_model sm)
+{
+    return match_string_generic(line, token, rest, false, true, sm);
+}
+
+static bool match_string(const char *line, const char *token, const char **const rest)
+{
+    return match_string_generic(line, token, rest, false, false, 0);
+}
+
+static bool match_directive_substring_with_args(const char *line, const char *token,
+        const char **const rest, enum shader_model sm)
+{
+    return match_string_generic(line, token, rest, true, true, sm);
 }
 
 static bool match_directive_substring(const char *line, const char *token, const char **const rest)
 {
-    size_t len = strlen(token);
-
-    while (isspace(*line) || *line == ']')
-        ++line;
-
-    if (strncmp(line, token, len) || !(isspace(line[len]) || line[len] == ']'))
-        return false;
-    if (rest)
-    {
-        *rest = line + len;
-        while (isspace(**rest))
-            ++*rest;
-    }
-    return true;
+    return match_string_generic(line, token, rest, true, false, 0);
 }
 
 static void parse_require_directive(struct shader_runner *runner, const char *line)
@@ -548,12 +647,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
     runner->is_todo = false;
 
-    if (match_string(line, "todo", &line))
+    if (match_string_with_args(line, "todo", &line, runner->minimum_shader_model))
+    {
         runner->is_todo = true;
-    else if (match_string(line, "todo(sm<6)", &line))
-        runner->is_todo = runner->minimum_shader_model < SHADER_MODEL_6_0;
-    else if (match_string(line, "todo(sm>=6)", &line))
-        runner->is_todo = runner->minimum_shader_model >= SHADER_MODEL_6_0;
+    }
 
     if (match_string(line, "dispatch", &line))
     {
@@ -1068,45 +1165,42 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
     }
 }
 
+static enum parse_state get_parse_state_todo(enum parse_state state)
+{
+    if (state == STATE_SHADER_COMPUTE)
+        return STATE_SHADER_COMPUTE_TODO;
+    else if (state == STATE_SHADER_PIXEL)
+        return STATE_SHADER_PIXEL_TODO;
+    else if (state == STATE_SHADER_VERTEX)
+        return STATE_SHADER_VERTEX_TODO;
+    else
+        return STATE_SHADER_EFFECT_TODO;
+}
+
 static enum parse_state read_shader_directive(struct shader_runner *runner, enum parse_state state, const char *line,
         const char *src, HRESULT *expect_hr)
 {
     while (*src && *src != ']')
     {
-        /* 'todo' is not meaningful when dxcompiler is in use, so it has no '(sm<6) qualifier. */
-        if (match_directive_substring(src, "todo", &src))
+        const char *src_start = src;
+
+        if (match_directive_substring_with_args(src, "todo", &src, runner->minimum_shader_model))
         {
+            /* 'todo' is not meaningful when dxcompiler is in use. */
             if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
                 continue;
-            if (state == STATE_SHADER_COMPUTE)
-                state = STATE_SHADER_COMPUTE_TODO;
-            else if (state == STATE_SHADER_PIXEL)
-                state = STATE_SHADER_PIXEL_TODO;
-            else if (state == STATE_SHADER_VERTEX)
-                state = STATE_SHADER_VERTEX_TODO;
-            else
-                state = STATE_SHADER_EFFECT_TODO;
+            state = get_parse_state_todo(state);
         }
-        else if (match_directive_substring(src, "fail", &src))
+        else if (match_directive_substring_with_args(src, "fail", &src, runner->minimum_shader_model))
         {
             *expect_hr = E_FAIL;
         }
-        else if (match_directive_substring(src, "fail(sm<6)", &src))
+        else if (match_directive_substring_with_args(src, "notimpl", &src, runner->minimum_shader_model))
         {
-            if (runner->minimum_shader_model < SHADER_MODEL_6_0)
-                *expect_hr = E_FAIL;
+            *expect_hr = E_NOTIMPL;
         }
-        else if (match_directive_substring(src, "fail(sm>=6)", &src))
-        {
-            if (runner->minimum_shader_model >= SHADER_MODEL_6_0)
-                *expect_hr = E_FAIL;
-        }
-        else if (match_directive_substring(src, "notimpl(sm<6)", &src))
-        {
-            if (runner->minimum_shader_model < SHADER_MODEL_6_0)
-                *expect_hr = E_NOTIMPL;
-        }
-        else
+
+        if (src == src_start)
         {
             fatal_error("Malformed line '%s'.\n", line);
         }
