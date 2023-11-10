@@ -35,6 +35,11 @@ struct vec4
     float x, y, z, w;
 };
 
+struct dvec2
+{
+    double x, y;
+};
+
 struct ivec4
 {
     int x, y, z, w;
@@ -43,6 +48,16 @@ struct ivec4
 struct uvec4
 {
     unsigned int x, y, z, w;
+};
+
+struct i64vec2
+{
+    int64_t x, y;
+};
+
+struct u64vec2
+{
+    uint64_t x, y;
 };
 
 struct resource_readback

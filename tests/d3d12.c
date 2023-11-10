@@ -42,11 +42,6 @@ static ID3D10Blob *compile_shader(const char *source, size_t len, const char *pr
     return bytecode;
 }
 
-struct dvec2
-{
-    double x, y;
-};
-
 static bool compare_uint8(uint8_t a, uint8_t b, unsigned int max_diff)
 {
     return abs(a - b) <= max_diff;

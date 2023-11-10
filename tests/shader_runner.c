@@ -491,6 +491,48 @@ static void read_uint4(const char **line, struct uvec4 *v)
     read_uint(line, &v->w);
 }
 
+static void read_int64(const char **line, int64_t *i)
+{
+    char *rest;
+    int64_t val;
+
+    errno = 0;
+    val = strtoll(*line, &rest, 0);
+
+    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+        fatal_error("Malformed int64 constant '%s'.\n", *line);
+
+    *i = val;
+    *line = rest;
+}
+
+static void read_uint64(const char **line, uint64_t *u)
+{
+    char *rest;
+    uint64_t val;
+
+    errno = 0;
+    val = strtoull(*line, &rest, 0);
+
+    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+        fatal_error("Malformed uint64 constant '%s'.\n", *line);
+
+    *u = val;
+    *line = rest;
+}
+
+static void read_int64_t2(const char **line, struct i64vec2 *v)
+{
+    read_int64(line, &v->x);
+    read_int64(line, &v->y);
+}
+
+static void read_uint64_t2(const char **line, struct u64vec2 *v)
+{
+    read_uint64(line, &v->x);
+    read_uint64(line, &v->y);
+}
+
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
     char *rest;
@@ -726,6 +768,14 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed float constant '%s'.\n", line);
             set_uniforms(runner, offset, 1, &f);
         }
+        else if (match_string(line, "double2", &line))
+        {
+            struct dvec2 v;
+
+            if (sscanf(line, "%lf %lf", &v.x, &v.y) < 2)
+                fatal_error("Malformed double2 constant '%s'.\n", line);
+            set_uniforms(runner, offset, 4, &v);
+        }
         else if (match_string(line, "int4", &line))
         {
             struct ivec4 v;
@@ -753,6 +803,20 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
             read_uint(&line, &u);
             set_uniforms(runner, offset, 1, &u);
+        }
+        else if (match_string(line, "int64_t2", &line))
+        {
+            struct i64vec2 v;
+
+            read_int64_t2(&line, &v);
+            set_uniforms(runner, offset, 4, &v);
+        }
+        else if (match_string(line, "uint64_t2", &line))
+        {
+            struct u64vec2 v;
+
+            read_uint64_t2(&line, &v);
+            set_uniforms(runner, offset, 4, &v);
         }
         else
         {

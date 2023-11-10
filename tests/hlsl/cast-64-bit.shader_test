@@ -1,0 +1,57 @@
+[require]
+shader model >= 5.0
+
+[pixel shader todo]
+uniform double2 d;
+uniform float2 f;
+
+float4 main() : sv_target
+{
+    double2 n = d / f;
+    return float4(d.x, d.y, n.x, n.y);
+}
+
+[test]
+uniform 0 double2 -4.5 8.5
+uniform 4 float4 -2.25 4.25 0.0 0.0
+todo(sm<6) draw quad
+probe all rgba (-4.5, 8.5, 2.0, 2.0)
+
+
+[require]
+shader model >= 6.0
+
+[pixel shader]
+uniform uint64_t2 l;
+uniform uint2 u;
+
+float4 main() : sv_target
+{
+    uint64_t2 n = l / u;
+    uint4 result = uint4(l.x, l.y, n.x, n.y);
+    return result;
+}
+
+[test]
+uniform 0 uint64_t2 0x500000001 0x100000002
+uniform 4 uint4 10 4 0 0
+todo draw quad
+todo probe all rgba (1.0, 2.0, 2147483648.0, 1073741824.0)
+
+
+[pixel shader]
+uniform int64_t2 l;
+uniform int2 i;
+
+float4 main() : sv_target
+{
+    int64_t2 n = l / i;
+    int4 result = int4(l.x, l.y, n.x, n.y);
+    return result;
+}
+
+[test]
+uniform 0 int64_t2 -21474836481 0x100000002
+uniform 4 int4 -20 8 0 0
+todo draw quad
+todo probe all rgba (-1.0, 2.0, 1073741824.0, 536870912.0)
