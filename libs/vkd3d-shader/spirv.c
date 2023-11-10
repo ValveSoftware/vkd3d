@@ -6642,7 +6642,7 @@ static void spirv_compiler_emit_bool_cast(struct spirv_compiler *compiler,
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
-static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
+static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -6666,7 +6666,7 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
             /* VSIR supports cast from bool to signed/unsigned integer types and floating point types,
              * where bool is treated as a 1-bit integer and a signed 'true' value converts to -1. */
             spirv_compiler_emit_bool_cast(compiler, instruction);
-            return;
+            return VKD3D_OK;
         }
     }
     else
@@ -6679,7 +6679,7 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
         spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
                 "Encountered invalid/unhandled instruction handler %#x.", instruction->handler_idx);
-        return;
+        return VKD3D_ERROR_INVALID_SHADER;
     }
 
     assert(instruction->dst_count == 1);
@@ -6711,6 +6711,7 @@ static void spirv_compiler_emit_alu_instruction(struct spirv_compiler *compiler,
         vkd3d_spirv_build_op_decorate(builder, val_id, SpvDecorationNoContraction, NULL, 0);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
+    return VKD3D_OK;
 }
 
 static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
@@ -9491,7 +9492,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_UTOF:
         case VKD3DSIH_UTOU:
         case VKD3DSIH_XOR:
-            spirv_compiler_emit_alu_instruction(compiler, instruction);
+            ret = spirv_compiler_emit_alu_instruction(compiler, instruction);
             break;
         case VKD3DSIH_DFMA:
         case VKD3DSIH_DMAX:
@@ -9712,6 +9713,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         default:
             FIXME("Unhandled instruction %#x.\n", instruction->handler_idx);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER,
+                    "Encountered invalid/unhandled instruction handler %#x.", instruction->handler_idx);
+            break;
     }
 
     return ret;
