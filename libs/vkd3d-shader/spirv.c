@@ -3396,21 +3396,6 @@ static bool spirv_compiler_get_register_info(const struct spirv_compiler *compil
     return true;
 }
 
-static bool register_is_descriptor(const struct vkd3d_shader_register *reg)
-{
-    switch (reg->type)
-    {
-        case VKD3DSPR_SAMPLER:
-        case VKD3DSPR_RESOURCE:
-        case VKD3DSPR_CONSTBUFFER:
-        case VKD3DSPR_UAV:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
 static bool spirv_compiler_enable_descriptor_indexing(struct spirv_compiler *compiler,
         enum vkd3d_shader_register_type reg_type, enum vkd3d_shader_resource_type resource_type)
 {
@@ -3536,7 +3521,7 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
             FIXME("Relative addressing not implemented.\n");
 
         /* Handle arrayed registers, e.g. v[3][0]. */
-        if (reg->idx_count > 1 && !register_is_descriptor(reg))
+        if (reg->idx_count > 1 && !vsir_register_is_descriptor(reg))
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[0]);
     }
 

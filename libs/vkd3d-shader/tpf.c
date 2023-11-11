@@ -1751,21 +1751,6 @@ static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const 
     return true;
 }
 
-static bool sm4_register_is_descriptor(enum vkd3d_sm4_register_type register_type)
-{
-    switch (register_type)
-    {
-        case VKD3D_SM4_RT_SAMPLER:
-        case VKD3D_SM4_RT_RESOURCE:
-        case VKD3D_SM4_RT_CONSTBUFFER:
-        case VKD3D_SM5_RT_UAV:
-            return true;
-
-        default:
-            return false;
-    }
-}
-
 static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const uint32_t **ptr, const uint32_t *end,
         enum vkd3d_data_type data_type, struct vkd3d_shader_register *param, enum vkd3d_shader_src_modifier *modifier)
 {
@@ -1943,7 +1928,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                 break;
         }
     }
-    else if (!shader_is_sm_5_1(priv) && sm4_register_is_descriptor(register_type))
+    else if (!shader_is_sm_5_1(priv) && vsir_register_is_descriptor(param))
     {
         /* SM5.1 places a symbol identifier in idx[0] and moves
          * other values up one slot. Normalize to SM5.1. */

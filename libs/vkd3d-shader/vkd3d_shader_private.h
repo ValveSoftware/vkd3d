@@ -833,6 +833,21 @@ struct vkd3d_shader_register
 void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_register_type reg_type,
         enum vkd3d_data_type data_type, unsigned int idx_count);
 
+static inline bool vsir_register_is_descriptor(const struct vkd3d_shader_register *reg)
+{
+    switch (reg->type)
+    {
+        case VKD3DSPR_SAMPLER:
+        case VKD3DSPR_RESOURCE:
+        case VKD3DSPR_CONSTBUFFER:
+        case VKD3DSPR_UAV:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 struct vkd3d_shader_dst_param
 {
     struct vkd3d_shader_register reg;
