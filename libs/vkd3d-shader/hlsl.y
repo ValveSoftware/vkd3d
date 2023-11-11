@@ -1096,8 +1096,8 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     return true;
 }
 
-static bool add_technique(struct hlsl_ctx *ctx, const char *name, const char *typename,
-        const struct vkd3d_shader_location *loc)
+static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
+        const char *typename, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -1105,6 +1105,7 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, const char *ty
     type = hlsl_get_type(ctx->globals, typename, false, false);
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
         return false;
+    var->scope = scope;
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -5155,35 +5156,52 @@ name_opt:
         }
     | any_identifier
 
+pass:
+      KW_PASS name_opt '{' '}'
+
 pass_list:
-      %empty
+      pass
+    | pass_list pass
+
+passes:
+      scope_start
+    | scope_start pass_list
 
 technique9:
-      KW_TECHNIQUE name_opt '{' pass_list '}'
+      KW_TECHNIQUE name_opt '{' passes '}'
         {
-            if (!add_technique(ctx, $2, "technique", &@1))
+            struct hlsl_scope *scope = ctx->cur_scope;
+            hlsl_pop_scope(ctx);
+
+            if (!add_technique(ctx, $2, scope, "technique", &@1))
                 YYABORT;
         }
 
 technique10:
-      KW_TECHNIQUE10 name_opt '{' pass_list '}'
+      KW_TECHNIQUE10 name_opt '{' passes '}'
         {
+            struct hlsl_scope *scope = ctx->cur_scope;
+            hlsl_pop_scope(ctx);
+
             if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique10' keyword is invalid for this profile.");
 
-            if (!add_technique(ctx, $2, "technique10", &@1))
+            if (!add_technique(ctx, $2, scope, "technique10", &@1))
                 YYABORT;
         }
 
 technique11:
-      KW_TECHNIQUE11 name_opt '{' pass_list '}'
+      KW_TECHNIQUE11 name_opt '{' passes '}'
         {
+            struct hlsl_scope *scope = ctx->cur_scope;
+            hlsl_pop_scope(ctx);
+
             if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique11' keyword is invalid for this profile.");
 
-            if (!add_technique(ctx, $2, "technique11", &@1))
+            if (!add_technique(ctx, $2, scope, "technique11", &@1))
                 YYABORT;
         }
 
