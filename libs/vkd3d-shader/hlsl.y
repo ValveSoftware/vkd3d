@@ -1096,6 +1096,29 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     return true;
 }
 
+static bool add_pass(struct hlsl_ctx *ctx, const char *name, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_var *var;
+    struct hlsl_type *type;
+
+    type = hlsl_get_type(ctx->globals, "pass", false, false);
+    if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
+        return false;
+
+    if (!hlsl_add_var(ctx, var, false))
+    {
+        struct hlsl_ir_var *old = hlsl_get_var(ctx->cur_scope, var->name);
+
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_REDEFINED,
+                "Identifier \"%s\" was already declared in this scope.", var->name);
+        hlsl_note(ctx, &old->loc, VKD3D_SHADER_LOG_ERROR, "\"%s\" was previously declared here.", old->name);
+        hlsl_free_var(var);
+        return false;
+    }
+
+    return true;
+}
+
 static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
         const char *typename, const struct vkd3d_shader_location *loc)
 {
@@ -5245,6 +5268,10 @@ name_opt:
 
 pass:
       KW_PASS name_opt '{' '}'
+        {
+            if (!add_pass(ctx, $2, &@1))
+                YYABORT;
+        }
 
 annotations_list:
       variables_def_typed ';'

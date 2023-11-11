@@ -3366,6 +3366,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"vector",          HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT,         4, 1},
         {"matrix",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},
         {"fxgroup",         HLSL_CLASS_OBJECT, HLSL_TYPE_EFFECT_GROUP,  1, 1},
+        {"pass",            HLSL_CLASS_OBJECT, HLSL_TYPE_PASS,          1, 1},
         {"STRING",          HLSL_CLASS_OBJECT, HLSL_TYPE_STRING,        1, 1},
         {"TEXTURE",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
         {"PIXELSHADER",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
