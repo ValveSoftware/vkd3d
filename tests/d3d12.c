@@ -1058,7 +1058,7 @@ static void test_format_support(void)
     }
     unsupported_format_features[] =
     {
-        /* A recent version of WARP suppots B8G8R8A8 UAVs even on D3D_FEATURE_LEVEL_11_0. */
+        /* A recent version of WARP supports B8G8R8A8 UAVs even on D3D_FEATURE_LEVEL_11_0. */
         {{DXGI_FORMAT_B8G8R8A8_TYPELESS, D3D12_FORMAT_SUPPORT1_TYPED_UNORDERED_ACCESS_VIEW,
                 D3D12_FORMAT_SUPPORT2_UAV_TYPED_LOAD | D3D12_FORMAT_SUPPORT2_UAV_TYPED_STORE}, true},
     };

@@ -803,7 +803,7 @@ static HRESULT map_unidentified_hrs(HRESULT hr)
 {
     if (hr == 0x80010064)
     {
-        trace("Mapping unindentified hr %#x as %#x.\n", hr, E_FAIL);
+        trace("Mapping unidentified hr %#x as %#x.\n", hr, E_FAIL);
         return E_FAIL;
     }
     return hr;

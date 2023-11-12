@@ -108,7 +108,7 @@ static enum program_result run_program(const char *cmdline, const char *log_file
 
     if (!GetExitCodeProcess(info.hProcess, &exit_code))
     {
-        fprintf(stderr, "Cannot retrive the process exit code, last error %ld.\n", GetLastError());
+        fprintf(stderr, "Cannot retrieve the process exit code, last error %ld.\n", GetLastError());
         ret = PROGRAM_RESULT_FAILURE;
         goto out;
     }
