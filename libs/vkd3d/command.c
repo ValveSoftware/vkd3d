@@ -2536,7 +2536,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_list_Reset(ID3D12GraphicsCommandL
 static void STDMETHODCALLTYPE d3d12_command_list_ClearState(ID3D12GraphicsCommandList5 *iface,
         ID3D12PipelineState *pipeline_state)
 {
-    FIXME("iface %p, pipline_state %p stub!\n", iface, pipeline_state);
+    FIXME("iface %p, pipeline_state %p stub!\n", iface, pipeline_state);
 }
 
 static bool d3d12_command_list_has_depth_stencil_view(struct d3d12_command_list *list)

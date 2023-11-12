@@ -836,7 +836,7 @@ static unsigned int vk_heap_binding_count_from_descriptor_range(const struct d3d
     else
     {
         /* Prefer an unsupported binding count vs a zero count, because shader compilation will fail
-         * to match a declaration to a zero binding, resulting in failure of pipline state creation. */
+         * to match a declaration to a zero binding, resulting in failure of pipeline state creation. */
         return max_count + !max_count;
     }
 }
@@ -3236,7 +3236,7 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     graphics->ms_desc.alphaToCoverageEnable = desc->BlendState.AlphaToCoverageEnable;
     graphics->ms_desc.alphaToOneEnable = VK_FALSE;
 
-    /* We defer creating the render pass for pipelines wth DSVFormat equal to
+    /* We defer creating the render pass for pipelines with DSVFormat equal to
      * DXGI_FORMAT_UNKNOWN. We take the actual DSV format from the bound DSV. */
     if (is_dsv_format_unknown)
         graphics->render_pass = VK_NULL_HANDLE;

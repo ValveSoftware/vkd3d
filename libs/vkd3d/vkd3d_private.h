@@ -1099,7 +1099,7 @@ HRESULT d3d12_query_heap_create(struct d3d12_device *device,
 struct d3d12_query_heap *unsafe_impl_from_ID3D12QueryHeap(ID3D12QueryHeap *iface);
 
 /* A Vulkan query has to be issued at least one time before the result is
- * available. In D3D12 it is legal to get query reults for not issued queries.
+ * available. In D3D12 it is legal to get query results for not issued queries.
  */
 static inline bool d3d12_query_heap_is_result_available(const struct d3d12_query_heap *heap,
         unsigned int query_index)
