@@ -1910,7 +1910,7 @@ static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_
     {
         ERR("Failed to allocate src params.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
-                "Out of memory allocating instruction src paramaters.");
+                "Out of memory allocating instruction src parameters.");
         return NULL;
     }
     ins->src = params;
@@ -1926,7 +1926,7 @@ static struct vkd3d_shader_dst_param *instruction_dst_params_alloc(struct vkd3d_
     {
         ERR("Failed to allocate dst params.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
-                "Out of memory allocating instruction dst paramaters.");
+                "Out of memory allocating instruction dst parameters.");
         return NULL;
     }
     ins->dst = params;
@@ -2138,7 +2138,7 @@ static size_t sm6_parser_get_value_index(struct sm6_parser *sm6, uint64_t idx)
         WARN("Ignoring upper 32 bits of relative index.\n");
     i = (uint32_t)sm6->value_count - (uint32_t)idx;
 
-    /* This may underflow to produce a forward reference, but it must not exceeed the final value count. */
+    /* This may underflow to produce a forward reference, but it must not exceed the final value count. */
     if (i >= sm6->cur_max_value)
     {
         WARN("Invalid value index %"PRIx64" at %zu.\n", idx, sm6->value_count);
@@ -3561,7 +3561,7 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
             if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
                 ins->flags |= VKD3DSI_PRECISE_X;
             flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
-            /* SPIR-V FPFastMathMode is only available in the Kernel executon model. */
+            /* SPIR-V FPFastMathMode is only available in the Kernel execution model. */
             silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
         }
         if (flags && silence_warning)

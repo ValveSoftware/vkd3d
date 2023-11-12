@@ -372,7 +372,7 @@ struct hlsl_attribute
 /* Reservation of a register and/or an offset for objects inside constant buffers, to be used as a
  *   starting point of their allocation. They are available through the register(·) and the
  *   packoffset(·) syntaxes, respectivelly.
- * The costant buffer offset is measured register components. */
+ * The constant buffer offset is measured register components. */
 struct hlsl_reg_reservation
 {
     char reg_type;
