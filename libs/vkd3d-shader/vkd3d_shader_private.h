@@ -801,7 +801,6 @@ struct vkd3d_shader_immediate_constant_buffer
 
 struct vkd3d_shader_indexable_temp
 {
-    struct list entry;
     unsigned int register_idx;
     unsigned int register_size;
     unsigned int component_count;
