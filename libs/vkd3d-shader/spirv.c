@@ -5493,13 +5493,11 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
 {
     const struct vkd3d_shader_indexable_temp *temp = &instruction->declaration.indexable_temp;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    enum vkd3d_shader_component_type component_type;
     struct vkd3d_shader_register reg;
     struct vkd3d_symbol reg_symbol;
     size_t function_location;
     uint32_t id;
-
-    if (temp->component_count != 4)
-        FIXME("Unhandled component count %u.\n", temp->component_count);
 
     vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
@@ -5516,16 +5514,17 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
 
+    component_type = vkd3d_component_type_from_data_type(temp->data_type);
     id = spirv_compiler_emit_array_variable(compiler, &builder->function_stream,
-            SpvStorageClassFunction, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE, &temp->register_size, 1);
+            SpvStorageClassFunction, component_type, temp->component_count, &temp->register_size, 1);
 
     spirv_compiler_emit_register_debug_name(builder, id, &reg);
 
     vkd3d_spirv_end_function_stream_insertion(builder);
 
     vkd3d_symbol_make_register(&reg_symbol, &reg);
-    vkd3d_symbol_set_register_info(&reg_symbol, id,
-            SpvStorageClassFunction, VKD3D_SHADER_COMPONENT_FLOAT, VKD3DSP_WRITEMASK_ALL);
+    vkd3d_symbol_set_register_info(&reg_symbol, id, SpvStorageClassFunction,
+            component_type, vkd3d_write_mask_from_component_count(temp->component_count));
     spirv_compiler_put_symbol(compiler, &reg_symbol);
 }
 
