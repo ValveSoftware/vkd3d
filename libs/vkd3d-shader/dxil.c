@@ -2603,7 +2603,7 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
 }
 
 static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const struct sm6_type *elem_type,
-        unsigned int count, unsigned int alignment, struct sm6_value *dst)
+        unsigned int count, unsigned int alignment, unsigned int init, struct sm6_value *dst)
 {
     enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
     struct vkd3d_shader_instruction *ins;
@@ -2614,6 +2614,8 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
     ins->declaration.indexable_temp.alignment = alignment;
     ins->declaration.indexable_temp.data_type = data_type;
     ins->declaration.indexable_temp.component_count = 1;
+    /* The initialiser value index will be resolved later so forward references can be handled. */
+    ins->declaration.indexable_temp.initialiser = (void *)(uintptr_t)init;
 
     register_init_with_id(&dst->u.reg, VKD3DSPR_IDXTEMP, data_type, ins->declaration.indexable_temp.register_idx);
 }
@@ -2726,14 +2728,7 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
     dst->type = type;
     dst->value_type = VALUE_TYPE_REG;
 
-    if (init)
-    {
-        FIXME("Unsupported initialiser.\n");
-        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                "Global variable initialisers are not supported.");
-        return false;
-    }
-    else if (is_constant)
+    if (is_constant && !init)
     {
         WARN("Constant array has no initialiser.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
@@ -2743,7 +2738,7 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
 
     if (address_space == ADDRESS_SPACE_DEFAULT)
     {
-        sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, dst);
+        sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, init, dst);
     }
     else if (address_space == ADDRESS_SPACE_GROUPSHARED)
     {
@@ -2764,9 +2759,30 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
     return true;
 }
 
+static const struct vkd3d_shader_immediate_constant_buffer *resolve_forward_initialiser(
+        size_t index, struct sm6_parser *sm6)
+{
+    const struct sm6_value *value;
+
+    assert(index);
+    --index;
+    if (!(value = sm6_parser_get_value_safe(sm6, index)) || !sm6_value_is_icb(value))
+    {
+        WARN("Invalid initialiser index %zu.\n", index);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Global variable initialiser value index %zu is invalid.", index);
+        return NULL;
+    }
+    else
+    {
+        return value->u.icb;
+    }
+}
+
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
 {
     const struct dxil_block *block = &sm6->root_block;
+    struct vkd3d_shader_instruction *ins;
     const struct dxil_record *record;
     enum vkd3d_result ret;
     uint64_t version;
@@ -2817,6 +2833,17 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
         if (block->child_blocks[i]->id == CONSTANTS_BLOCK
                 && (ret = sm6_parser_constants_init(sm6, block->child_blocks[i])) < 0)
             return ret;
+    }
+
+    /* Resolve initialiser forward references. */
+    for (i = 0; i < sm6->p.instructions.count; ++i)
+    {
+        ins = &sm6->p.instructions.elements[i];
+        if (ins->handler_idx == VKD3DSIH_DCL_INDEXABLE_TEMP && ins->declaration.indexable_temp.initialiser)
+        {
+            ins->declaration.indexable_temp.initialiser = resolve_forward_initialiser(
+                    (uintptr_t)ins->declaration.indexable_temp.initialiser, sm6);
+        }
     }
 
     return VKD3D_OK;

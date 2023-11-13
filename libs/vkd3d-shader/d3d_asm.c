@@ -1595,6 +1595,36 @@ static void shader_print_opcode(struct vkd3d_d3d_asm_compiler *compiler, enum vk
             shader_opcode_names[opcode], compiler->colours.reset);
 }
 
+static void shader_dump_icb(struct vkd3d_d3d_asm_compiler *compiler,
+        const struct vkd3d_shader_immediate_constant_buffer *icb)
+{
+    struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    unsigned int i, j;
+
+    vkd3d_string_buffer_printf(buffer, " {\n");
+    if (icb->component_count == 1)
+    {
+        for (i = 0; i < icb->element_count; )
+        {
+            for (j = 0; i < icb->element_count && j < 4; ++i, ++j)
+                shader_print_hex_literal(compiler, !j ? "    " : ", ", icb->data[i], "");
+            vkd3d_string_buffer_printf(buffer, "\n");
+        }
+    }
+    else
+    {
+        assert(icb->component_count == VKD3D_VEC4_SIZE);
+        for (i = 0; i < icb->element_count; ++i)
+        {
+            shader_print_hex_literal(compiler, "    {", icb->data[4 * i + 0], "");
+            shader_print_hex_literal(compiler, ", ", icb->data[4 * i + 1], "");
+            shader_print_hex_literal(compiler, ", ", icb->data[4 * i + 2], "");
+            shader_print_hex_literal(compiler, ", ", icb->data[4 * i + 3], "},\n");
+        }
+    }
+    shader_addline(buffer, "}");
+}
+
 static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_instruction *ins)
 {
@@ -1656,16 +1686,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER:
-            vkd3d_string_buffer_printf(buffer, " {\n");
-            assert(ins->declaration.icb->component_count == VKD3D_VEC4_SIZE);
-            for (i = 0; i < ins->declaration.icb->element_count; ++i)
-            {
-                shader_print_hex_literal(compiler, "    {", ins->declaration.icb->data[4 * i + 0], "");
-                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 1], "");
-                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 2], "");
-                shader_print_hex_literal(compiler, ", ", ins->declaration.icb->data[4 * i + 3], "},\n");
-            }
-            shader_addline(buffer, "}");
+            shader_dump_icb(compiler, ins->declaration.icb);
             break;
 
         case VKD3DSIH_DCL_INDEX_RANGE:
@@ -1681,6 +1702,8 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             shader_print_uint_literal(compiler, ", ", ins->declaration.indexable_temp.component_count, "");
             if (ins->declaration.indexable_temp.alignment)
                 shader_print_uint_literal(compiler, ", align ", ins->declaration.indexable_temp.alignment, "");
+            if (ins->declaration.indexable_temp.initialiser)
+                shader_dump_icb(compiler, ins->declaration.indexable_temp.initialiser);
             break;
 
         case VKD3DSIH_DCL_INPUT_PS:

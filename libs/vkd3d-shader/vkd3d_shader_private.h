@@ -95,6 +95,7 @@ enum vkd3d_shader_error
     VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY                = 2005,
     VKD3D_SHADER_ERROR_SPV_INVALID_TYPE                 = 2006,
     VKD3D_SHADER_ERROR_SPV_INVALID_HANDLER              = 2007,
+    VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED              = 2008,
 
     VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE            = 2300,
 
@@ -806,6 +807,7 @@ struct vkd3d_shader_indexable_temp
     unsigned int alignment;
     enum vkd3d_data_type data_type;
     unsigned int component_count;
+    const struct vkd3d_shader_immediate_constant_buffer *initialiser;
 };
 
 struct vkd3d_shader_register_index

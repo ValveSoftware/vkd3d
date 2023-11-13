@@ -5497,6 +5497,12 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
 
     if (temp->alignment)
         WARN("Ignoring alignment %u.\n", temp->alignment);
+    if (temp->initialiser)
+    {
+        FIXME("Initialisers are not supported.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "Initialisers for indexable temps are not supported.");
+    }
 
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
