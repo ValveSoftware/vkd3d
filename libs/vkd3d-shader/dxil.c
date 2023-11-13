@@ -2821,8 +2821,9 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
     struct vkd3d_shader_src_param *src_params;
     enum vkd3d_shader_opcode handler_idx;
     const struct sm6_value *a, *b;
+    uint64_t code, flags;
+    bool silence_warning;
     unsigned int i = 0;
-    uint64_t code;
 
     a = sm6_parser_get_value_by_ref(sm6, record, NULL, &i);
     b = sm6_parser_get_value_by_ref(sm6, record, a->type, &i);
@@ -2838,48 +2839,45 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
 
     vsir_instruction_init(ins, &sm6->p.location, handler_idx);
 
-    if (record->operand_count > i && record->operands[i])
-    {
-        uint64_t flags = record->operands[i];
-        bool silence_warning = false;
+    flags = (record->operand_count > i) ? record->operands[i] : 0;
+    silence_warning = false;
 
-        switch (handler_idx)
-        {
-            case VKD3DSIH_ADD:
-            case VKD3DSIH_MUL:
-            case VKD3DSIH_DIV:
-            case VKD3DSIH_FREM:
-                if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
-                    ins->flags |= VKD3DSI_PRECISE_X;
-                flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
-                /* SPIR-V FPFastMathMode is only available in the Kernel executon model. */
-                silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
-                break;
-            case VKD3DSIH_IADD:
-            case VKD3DSIH_UMUL:
-            case VKD3DSIH_ISHL:
-                silence_warning = !(flags & ~(OB_NO_UNSIGNED_WRAP | OB_NO_SIGNED_WRAP));
-                break;
-            case VKD3DSIH_ISHR:
-            case VKD3DSIH_USHR:
-            case VKD3DSIH_IDIV:
-            case VKD3DSIH_UDIV:
-                silence_warning = !(flags & ~PEB_EXACT);
-                break;
-            default:
-                break;
-        }
-        /* The above flags are very common and cause warning spam. */
-        if (flags && silence_warning)
-        {
-            TRACE("Ignoring flags %#"PRIx64".\n", flags);
-        }
-        else if (flags)
-        {
-            WARN("Ignoring flags %#"PRIx64".\n", flags);
-            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
-                    "Ignoring flags %#"PRIx64" for a binary operation.", flags);
-        }
+    switch (handler_idx)
+    {
+        case VKD3DSIH_ADD:
+        case VKD3DSIH_MUL:
+        case VKD3DSIH_DIV:
+        case VKD3DSIH_FREM:
+            if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
+                ins->flags |= VKD3DSI_PRECISE_X;
+            flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
+            /* SPIR-V FPFastMathMode is only available in the Kernel executon model. */
+            silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
+            break;
+        case VKD3DSIH_IADD:
+        case VKD3DSIH_UMUL:
+        case VKD3DSIH_ISHL:
+            silence_warning = !(flags & ~(OB_NO_UNSIGNED_WRAP | OB_NO_SIGNED_WRAP));
+            break;
+        case VKD3DSIH_ISHR:
+        case VKD3DSIH_USHR:
+        case VKD3DSIH_IDIV:
+        case VKD3DSIH_UDIV:
+            silence_warning = !(flags & ~PEB_EXACT);
+            break;
+        default:
+            break;
+    }
+    /* The above flags are very common and cause warning spam. */
+    if (flags && silence_warning)
+    {
+        TRACE("Ignoring flags %#"PRIx64".\n", flags);
+    }
+    else if (flags)
+    {
+        WARN("Ignoring flags %#"PRIx64".\n", flags);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring flags %#"PRIx64" for a binary operation.", flags);
     }
 
     src_params = instruction_src_params_alloc(ins, 2, sm6);
