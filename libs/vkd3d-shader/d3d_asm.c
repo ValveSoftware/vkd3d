@@ -1679,6 +1679,8 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
                     ins->declaration.indexable_temp.register_idx, compiler->colours.reset);
             shader_print_subscript(compiler, ins->declaration.indexable_temp.register_size, NULL);
             shader_print_uint_literal(compiler, ", ", ins->declaration.indexable_temp.component_count, "");
+            if (ins->declaration.indexable_temp.alignment)
+                shader_print_uint_literal(compiler, ", align ", ins->declaration.indexable_temp.alignment, "");
             break;
 
         case VKD3DSIH_DCL_INPUT_PS:

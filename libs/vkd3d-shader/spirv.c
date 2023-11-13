@@ -5495,6 +5495,9 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
 
+    if (temp->alignment)
+        WARN("Ignoring alignment %u.\n", temp->alignment);
+
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
 

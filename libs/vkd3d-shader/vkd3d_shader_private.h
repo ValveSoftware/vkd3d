@@ -803,6 +803,8 @@ struct vkd3d_shader_indexable_temp
 {
     unsigned int register_idx;
     unsigned int register_size;
+    unsigned int alignment;
+    enum vkd3d_data_type data_type;
     unsigned int component_count;
 };
 

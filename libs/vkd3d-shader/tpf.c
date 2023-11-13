@@ -1113,6 +1113,8 @@ static void shader_sm4_read_dcl_indexable_temp(struct vkd3d_shader_instruction *
 {
     ins->declaration.indexable_temp.register_idx = *tokens++;
     ins->declaration.indexable_temp.register_size = *tokens++;
+    ins->declaration.indexable_temp.alignment = 0;
+    ins->declaration.indexable_temp.data_type = VKD3D_DATA_FLOAT;
     ins->declaration.indexable_temp.component_count = *tokens;
 }
 

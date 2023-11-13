@@ -25,6 +25,10 @@
 
 #define BITCODE_MAGIC VKD3D_MAKE_TAG('B', 'C', 0xc0, 0xde)
 #define DXIL_OP_MAX_OPERANDS 17
+static const uint64_t MAX_ALIGNMENT_EXPONENT = 29;
+static const uint64_t GLOBALVAR_FLAG_IS_CONSTANT = 1;
+static const uint64_t GLOBALVAR_FLAG_EXPLICIT_TYPE = 2;
+static const unsigned int GLOBALVAR_ADDRESS_SPACE_SHIFT = 2;
 static const unsigned int SHADER_DESCRIPTOR_TYPE_COUNT = 4;
 
 static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
@@ -155,6 +159,13 @@ enum bitcode_value_symtab_code
 {
     VST_CODE_ENTRY   = 1,
     VST_CODE_BBENTRY = 2,
+};
+
+enum bitcode_linkage
+{
+    LINKAGE_EXTERNAL  = 0,
+    LINKAGE_APPENDING = 2,
+    LINKAGE_INTERNAL  = 3,
 };
 
 enum dxil_component_type
@@ -566,6 +577,8 @@ struct sm6_parser
     struct sm6_descriptor_info *descriptors;
     size_t descriptor_capacity;
     size_t descriptor_count;
+
+    unsigned int indexable_temp_count;
 
     struct sm6_value *values;
     size_t value_count;
@@ -2555,6 +2568,17 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
     return VKD3D_OK;
 }
 
+static bool bitcode_parse_alignment(uint64_t encoded_alignment, unsigned int *alignment)
+{
+    if (encoded_alignment > MAX_ALIGNMENT_EXPONENT + 1)
+    {
+        *alignment = 0;
+        return false;
+    }
+    *alignment = (1u << encoded_alignment) >> 1;
+    return true;
+}
+
 static struct vkd3d_shader_instruction *sm6_parser_require_space(struct sm6_parser *sm6, size_t extra)
 {
     if (!shader_instruction_array_reserve(&sm6->p.instructions, sm6->p.instructions.count + extra))
@@ -2574,6 +2598,168 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
     vsir_instruction_init(ins, &sm6->p.location, handler_idx);
     ++sm6->p.instructions.count;
     return ins;
+}
+
+static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const struct sm6_type *elem_type,
+        unsigned int count, unsigned int alignment, struct sm6_value *dst)
+{
+    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    struct vkd3d_shader_instruction *ins;
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_INDEXABLE_TEMP);
+    ins->declaration.indexable_temp.register_idx = sm6->indexable_temp_count++;
+    ins->declaration.indexable_temp.register_size = count;
+    ins->declaration.indexable_temp.alignment = alignment;
+    ins->declaration.indexable_temp.data_type = data_type;
+    ins->declaration.indexable_temp.component_count = 1;
+
+    register_init_with_id(&dst->u.reg, VKD3DSPR_IDXTEMP, data_type, ins->declaration.indexable_temp.register_idx);
+}
+
+static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_record *record)
+{
+    const struct sm6_type *type, *scalar_type;
+    unsigned int alignment, count;
+    uint64_t address_space, init;
+    struct sm6_value *dst;
+    bool is_constant;
+
+    if (!dxil_record_validate_operand_min_count(record, 6, sm6))
+        return false;
+
+    if (!(type = sm6_parser_get_type(sm6, record->operands[0])))
+        return false;
+    if (sm6_type_is_array(type))
+    {
+        if (!sm6_type_is_scalar(type->u.array.elem_type))
+        {
+            FIXME("Unsupported nested type class %u.\n", type->u.array.elem_type->class);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Global array variables with nested type class %u are not supported.",
+                    type->u.array.elem_type->class);
+            return false;
+        }
+        count = type->u.array.count;
+        scalar_type = type->u.array.elem_type;
+    }
+    else if (sm6_type_is_scalar(type))
+    {
+        count = 1;
+        scalar_type = type;
+    }
+    else
+    {
+        FIXME("Unsupported type class %u.\n", type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Global variables of type class %u are not supported.", type->class);
+        return false;
+    }
+
+    is_constant = record->operands[1] & GLOBALVAR_FLAG_IS_CONSTANT;
+
+    if (record->operands[1] & GLOBALVAR_FLAG_EXPLICIT_TYPE)
+    {
+        address_space = record->operands[1] >> GLOBALVAR_ADDRESS_SPACE_SHIFT;
+
+        if (!(type = sm6_type_get_pointer_to_type(type, address_space, sm6)))
+        {
+            WARN("Failed to get pointer type for type class %u, address space %"PRIu64".\n",
+                    type->class, address_space);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                    "Module does not define a pointer type for a global variable.");
+            return false;
+        }
+    }
+    else
+    {
+        if (!sm6_type_is_pointer(type))
+        {
+            WARN("Type is not a pointer.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "The type of a global variable is not a pointer.");
+            return false;
+        }
+        address_space = type->u.pointer.addr_space;
+    }
+
+    if ((init = record->operands[2]))
+    {
+        if (init - 1 >= sm6->value_capacity)
+        {
+            WARN("Invalid value index %"PRIu64" for initialiser.", init - 1);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Global variable initialiser value index %"PRIu64" is invalid.", init - 1);
+            return false;
+        }
+    }
+
+    /* LINKAGE_EXTERNAL is common but not relevant here. */
+    if (record->operands[3] != LINKAGE_EXTERNAL && record->operands[3] != LINKAGE_INTERNAL)
+        WARN("Ignoring linkage %"PRIu64".\n", record->operands[3]);
+
+    if (!bitcode_parse_alignment(record->operands[4], &alignment))
+        WARN("Invalid alignment %"PRIu64".\n", record->operands[4]);
+
+    if (record->operands[5])
+        WARN("Ignoring section code %"PRIu64".\n", record->operands[5]);
+
+    if (!sm6_parser_get_global_symbol_name(sm6, sm6->value_count))
+        WARN("Missing symbol name for global variable at index %zu.\n", sm6->value_count);
+    /* TODO: store global symbol names in struct vkd3d_shader_desc? */
+
+    if (record->operand_count > 6 && record->operands[6])
+        WARN("Ignoring visibility %"PRIu64".\n", record->operands[6]);
+    if (record->operand_count > 7 && record->operands[7])
+        WARN("Ignoring thread local mode %"PRIu64".\n", record->operands[7]);
+    /* record->operands[8] contains unnamed_addr, a flag indicating the address
+     * is not important, only the content is. This info is not relevant. */
+    if (record->operand_count > 9 && record->operands[9])
+        WARN("Ignoring external_init %"PRIu64".\n", record->operands[9]);
+    if (record->operand_count > 10 && record->operands[10])
+        WARN("Ignoring dll storage class %"PRIu64".\n", record->operands[10]);
+    if (record->operand_count > 11 && record->operands[11])
+        WARN("Ignoring comdat %"PRIu64".\n", record->operands[11]);
+
+    dst = sm6_parser_get_current_value(sm6);
+    dst->type = type;
+    dst->value_type = VALUE_TYPE_REG;
+
+    if (init)
+    {
+        FIXME("Unsupported initialiser.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Global variable initialisers are not supported.");
+        return false;
+    }
+    else if (is_constant)
+    {
+        WARN("Constant array has no initialiser.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A constant global variable has no initialiser.");
+        return false;
+    }
+
+    if (address_space == ADDRESS_SPACE_DEFAULT)
+    {
+        sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, dst);
+    }
+    else if (address_space == ADDRESS_SPACE_GROUPSHARED)
+    {
+        FIXME("Unsupported TGSM.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "TGSM global variables are not supported.");
+        return false;
+    }
+    else
+    {
+        FIXME("Unhandled address space %"PRIu64".\n", address_space);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Global variables with address space %"PRIu64" are not supported.", address_space);
+        return false;
+    }
+
+    ++sm6->value_count;
+    return true;
 }
 
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
@@ -2603,7 +2789,8 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
                 break;
 
             case MODULE_CODE_GLOBALVAR:
-                FIXME("Global variables are not implemented yet.\n");
+                if (!sm6_parser_declare_global(sm6, record))
+                    return VKD3D_ERROR_INVALID_SHADER;
                 break;
 
             case MODULE_CODE_VERSION:
