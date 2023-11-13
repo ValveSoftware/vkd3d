@@ -8,6 +8,9 @@ OUTPUT_DIRECTORY       = doc
 JAVADOC_AUTOBRIEF      = YES
 OPTIMIZE_OUTPUT_FOR_C  = YES
 EXTRACT_STATIC         = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+LATEX_BATCHMODE        = YES
 
 INPUT                  = @srcdir@/include/vkd3d.h \
                          @srcdir@/include/vkd3d_shader.h \
