@@ -300,10 +300,13 @@ void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_reg
     reg->data_type = data_type;
     reg->idx[0].offset = ~0u;
     reg->idx[0].rel_addr = NULL;
+    reg->idx[0].is_in_bounds = false;
     reg->idx[1].offset = ~0u;
     reg->idx[1].rel_addr = NULL;
+    reg->idx[1].is_in_bounds = false;
     reg->idx[2].offset = ~0u;
     reg->idx[2].rel_addr = NULL;
+    reg->idx[2].is_in_bounds = false;
     reg->idx_count = idx_count;
     reg->dimension = VSIR_DIMENSION_SCALAR;
 }

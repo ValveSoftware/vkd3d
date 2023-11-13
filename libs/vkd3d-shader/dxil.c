@@ -2195,6 +2195,18 @@ static bool sm6_value_validate_is_handle(const struct sm6_value *value, struct s
     return true;
 }
 
+static bool sm6_value_validate_is_pointer(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_type_is_pointer(value->type))
+    {
+        WARN("Operand result type class %u is not a pointer.\n", value->type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A pointer operand passed to a DXIL instruction is not a pointer.");
+        return false;
+    }
+    return true;
+}
+
 static bool sm6_value_validate_is_bool(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     const struct sm6_type *type = value->type;
@@ -3877,6 +3889,106 @@ static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    const struct sm6_type *type, *pointee_type;
+    unsigned int elem_idx, operand_idx = 2;
+    enum bitcode_address_space addr_space;
+    const struct sm6_value *elem_value;
+    struct vkd3d_shader_register *reg;
+    const struct sm6_value *src;
+    bool is_in_bounds;
+
+    if (!dxil_record_validate_operand_min_count(record, 5, sm6)
+            || !(type = sm6_parser_get_type(sm6, record->operands[1]))
+            || !(src = sm6_parser_get_value_by_ref(sm6, record, NULL, &operand_idx))
+            || !sm6_value_validate_is_register(src, sm6)
+            || !sm6_value_validate_is_pointer(src, sm6)
+            || !dxil_record_validate_operand_min_count(record, operand_idx + 2, sm6))
+    {
+        return;
+    }
+
+    if (src->u.reg.idx_count > 1)
+    {
+        WARN("Unsupported stacked GEP.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A GEP instruction on the result of a previous GEP is unsupported.");
+        return;
+    }
+
+    is_in_bounds = record->operands[0];
+
+    if ((pointee_type = src->type->u.pointer.type) != type)
+    {
+        WARN("Type mismatch, type %u width %u vs type %u width %u.\n", type->class,
+                type->u.width, pointee_type->class, pointee_type->u.width);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Type mismatch in GEP operation arguments.");
+    }
+    addr_space = src->type->u.pointer.addr_space;
+
+    if (!(elem_value = sm6_parser_get_value_by_ref(sm6, record, NULL, &operand_idx)))
+        return;
+
+    /* The first index is always zero, to form a simple pointer dereference. */
+    if (sm6_value_get_constant_uint(elem_value))
+    {
+        WARN("Expected constant zero.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "The pointer dereference index for a GEP instruction is not constant zero.");
+        return;
+    }
+
+    if (!sm6_type_is_array(pointee_type))
+    {
+        WARN("Invalid GEP on type class %u.\n", pointee_type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Source type for index 1 of a GEP instruction is not an array.");
+        return;
+    }
+
+    if (!(elem_value = sm6_parser_get_value_by_ref(sm6, record, NULL, &operand_idx)))
+        return;
+
+    /* If indexing is dynamic, just get the type at offset zero. */
+    elem_idx = sm6_value_is_constant(elem_value) ? sm6_value_get_constant_uint(elem_value) : 0;
+    type = sm6_type_get_element_type_at_index(pointee_type, elem_idx);
+    if (!type)
+    {
+        WARN("Invalid element index %u.\n", elem_idx);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Element index %u for a GEP instruction is out of bounds.", elem_idx);
+        return;
+    }
+
+    if (operand_idx < record->operand_count)
+    {
+        FIXME("Multiple element indices are not implemented.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Multi-dimensional addressing in GEP instructions is not supported.");
+        return;
+    }
+
+    if (!(dst->type = sm6_type_get_pointer_to_type(type, addr_space, sm6)))
+    {
+        WARN("Failed to get pointer type for type %u.\n", type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                "Module does not define a pointer type for a GEP instruction.");
+        return;
+    }
+
+    reg = &dst->u.reg;
+    *reg = src->u.reg;
+    reg->idx[1].offset = 0;
+    register_index_address_init(&reg->idx[1], elem_value, sm6);
+    reg->idx[1].is_in_bounds = is_in_bounds;
+    reg->idx_count = 2;
+
+    ins->handler_idx = VKD3DSIH_NOP;
+}
+
 static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record *record,
         struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
 {
@@ -4078,6 +4190,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_EXTRACTVAL:
                 sm6_parser_emit_extractval(sm6, record, ins, dst);
+                break;
+            case FUNC_CODE_INST_GEP:
+                sm6_parser_emit_gep(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_RET:
                 sm6_parser_emit_ret(sm6, record, code_block, ins);
