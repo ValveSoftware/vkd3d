@@ -220,7 +220,7 @@ bool hlsl_type_is_resource(const struct hlsl_type *type)
  * resources, since for both their data types span across a single regset. */
 static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
 {
-    if (type->class <= HLSL_CLASS_LAST_NUMERIC)
+    if (hlsl_is_numeric_type(type))
         return HLSL_REGSET_NUMERIC;
 
     if (type->class == HLSL_CLASS_ARRAY)

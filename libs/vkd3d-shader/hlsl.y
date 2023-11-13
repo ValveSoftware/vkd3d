@@ -211,7 +211,7 @@ static bool hlsl_types_are_componentwise_equal(struct hlsl_ctx *ctx, struct hlsl
     return true;
 }
 
-static bool type_contains_only_numerics(struct hlsl_type *type)
+static bool type_contains_only_numerics(const struct hlsl_type *type)
 {
     unsigned int i;
 
@@ -226,12 +226,12 @@ static bool type_contains_only_numerics(struct hlsl_type *type)
         }
         return true;
     }
-    return type->class <= HLSL_CLASS_LAST_NUMERIC;
+    return hlsl_is_numeric_type(type);
 }
 
 static bool explicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
 {
-    if (src->class <= HLSL_CLASS_LAST_NUMERIC && src->dimx == 1 && src->dimy == 1 && type_contains_only_numerics(dst))
+    if (hlsl_is_numeric_type(src) && src->dimx == 1 && src->dimy == 1 && type_contains_only_numerics(dst))
         return true;
 
     if (src->class == HLSL_CLASS_MATRIX && dst->class == HLSL_CLASS_MATRIX
@@ -251,10 +251,10 @@ static bool explicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_typ
 
 static bool implicit_compatible_data_types(struct hlsl_ctx *ctx, struct hlsl_type *src, struct hlsl_type *dst)
 {
-    if ((src->class <= HLSL_CLASS_LAST_NUMERIC) != (dst->class <= HLSL_CLASS_LAST_NUMERIC))
+    if (hlsl_is_numeric_type(src) != hlsl_is_numeric_type(dst))
         return false;
 
-    if (src->class <= HLSL_CLASS_LAST_NUMERIC)
+    if (hlsl_is_numeric_type(src))
     {
         /* Scalar vars can be converted to any other numeric data type */
         if (src->dimx == 1 && src->dimy == 1)
@@ -311,7 +311,7 @@ static struct hlsl_ir_node *add_cast(struct hlsl_ctx *ctx, struct hlsl_block *bl
         struct hlsl_ir_var *var;
         unsigned int dst_idx;
 
-        broadcast = src_type->class <= HLSL_CLASS_LAST_NUMERIC && src_type->dimx == 1 && src_type->dimy == 1;
+        broadcast = hlsl_is_numeric_type(src_type) && src_type->dimx == 1 && src_type->dimy == 1;
         matrix_cast = !broadcast && dst_comp_count != src_comp_count
                 && src_type->class == HLSL_CLASS_MATRIX && dst_type->class == HLSL_CLASS_MATRIX;
         assert(src_comp_count >= dst_comp_count || broadcast);
@@ -1292,7 +1292,7 @@ static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hl
 static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct hlsl_type *t2,
         const struct vkd3d_shader_location *loc, enum hlsl_type_class *type, unsigned int *dimx, unsigned int *dimy)
 {
-    if (t1->class > HLSL_CLASS_LAST_NUMERIC)
+    if (!hlsl_is_numeric_type(t1))
     {
         struct vkd3d_string_buffer *string;
 
@@ -1303,7 +1303,7 @@ static bool expr_common_shape(struct hlsl_ctx *ctx, struct hlsl_type *t1, struct
         return false;
     }
 
-    if (t2->class > HLSL_CLASS_LAST_NUMERIC)
+    if (!hlsl_is_numeric_type(t2))
     {
         struct vkd3d_string_buffer *string;
 
@@ -1775,7 +1775,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
             return NULL;
     }
 
-    if (lhs_type->class <= HLSL_CLASS_LAST_NUMERIC)
+    if (hlsl_is_numeric_type(lhs_type))
         writemask = (1 << lhs_type->dimx) - 1;
 
     if (!(rhs = add_implicit_conversion(ctx, block, rhs, lhs_type, &rhs->loc)))
@@ -2005,7 +2005,7 @@ static bool type_has_object_components(struct hlsl_type *type, bool must_be_in_s
 
 static bool type_has_numeric_components(struct hlsl_type *type)
 {
-    if (type->class <= HLSL_CLASS_LAST_NUMERIC)
+    if (hlsl_is_numeric_type(type))
         return true;
     if (type->class == HLSL_CLASS_ARRAY)
         return type_has_numeric_components(type->e.array.type);
@@ -3926,7 +3926,7 @@ static struct hlsl_block *add_call(struct hlsl_ctx *ctx, const char *name,
 
             for (i = 0; i < args->args_count; ++i)
             {
-                if (args->args[i]->data_type->class > HLSL_CLASS_LAST_NUMERIC)
+                if (!hlsl_is_numeric_type(args->args[i]->data_type))
                 {
                     struct vkd3d_string_buffer *string;
 
@@ -6776,7 +6776,7 @@ postfix_expr:
                     YYABORT;
                 $$ = $1;
             }
-            else if (node->data_type->class <= HLSL_CLASS_LAST_NUMERIC)
+            else if (hlsl_is_numeric_type(node->data_type))
             {
                 struct hlsl_ir_node *swizzle;
 
@@ -6819,7 +6819,7 @@ postfix_expr:
                 free_parse_initializer(&$4);
                 YYABORT;
             }
-            if ($2->class > HLSL_CLASS_LAST_NUMERIC)
+            if (!hlsl_is_numeric_type($2))
             {
                 struct vkd3d_string_buffer *string;
 

@@ -1105,6 +1105,11 @@ static inline struct hlsl_type *hlsl_get_numeric_type(const struct hlsl_ctx *ctx
         return hlsl_get_matrix_type(ctx, base_type, dimx, dimy);
 }
 
+static inline bool hlsl_is_numeric_type(const struct hlsl_type *type)
+{
+    return type->class <= HLSL_CLASS_LAST_NUMERIC;
+}
+
 static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
 {
     switch (dim)

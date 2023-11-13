@@ -229,7 +229,7 @@ static void prepend_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block,
 
 static void validate_field_semantic(struct hlsl_ctx *ctx, struct hlsl_struct_field *field)
 {
-    if (!field->semantic.name && hlsl_get_multiarray_element_type(field->type)->class <= HLSL_CLASS_LAST_NUMERIC
+    if (!field->semantic.name && hlsl_is_numeric_type(hlsl_get_multiarray_element_type(field->type))
             && !field->semantic.reported_missing)
     {
         hlsl_error(ctx, &field->loc, VKD3D_SHADER_ERROR_HLSL_MISSING_SEMANTIC,
@@ -339,7 +339,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
     struct hlsl_ir_node *c;
     unsigned int i;
 
-    if (type->class > HLSL_CLASS_LAST_NUMERIC)
+    if (!hlsl_is_numeric_type(type))
     {
         struct vkd3d_string_buffer *string;
         if (!(string = hlsl_type_to_string(ctx, type)))
@@ -481,7 +481,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
     struct hlsl_ir_node *c;
     unsigned int i;
 
-    if (type->class > HLSL_CLASS_LAST_NUMERIC)
+    if (!hlsl_is_numeric_type(type))
     {
         struct vkd3d_string_buffer *string;
         if (!(string = hlsl_type_to_string(ctx, type)))
@@ -3942,7 +3942,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                 constant->reg = allocate_numeric_registers_for_type(ctx, allocator, 1, UINT_MAX, type);
                 TRACE("Allocated constant @%u to %s.\n", instr->index, debug_register('c', constant->reg, type));
 
-                assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
+                assert(hlsl_is_numeric_type(type));
                 assert(type->dimy == 1);
                 assert(constant->reg.writemask);
 
@@ -4634,7 +4634,7 @@ struct hlsl_reg hlsl_reg_from_deref(struct hlsl_ctx *ctx, const struct hlsl_dere
     unsigned int offset = hlsl_offset_from_deref_safe(ctx, deref);
 
     assert(deref->data_type);
-    assert(deref->data_type->class <= HLSL_CLASS_LAST_NUMERIC);
+    assert(hlsl_is_numeric_type(deref->data_type));
 
     ret.id += offset / 4;
 

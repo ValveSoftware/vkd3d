@@ -5411,7 +5411,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     sm4_dst_from_node(&instr.dsts[0], &load->node);
     instr.dst_count = 1;
 
-    assert(type->class <= HLSL_CLASS_LAST_NUMERIC);
+    assert(hlsl_is_numeric_type(type));
     if (type->base_type == HLSL_TYPE_BOOL && var_is_user_input(tpf->ctx, load->src.var))
     {
         struct hlsl_constant_value value;
