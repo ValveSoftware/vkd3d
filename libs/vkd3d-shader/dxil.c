@@ -3494,11 +3494,11 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
 {
     struct vkd3d_shader_src_param *src_params;
     const struct sm6_type *type_a, *type_b;
+    bool is_int, is_fp, silence_warning;
     const struct sm6_cmp_info *cmp;
     const struct sm6_value *a, *b;
+    uint64_t code, flags;
     unsigned int i = 0;
-    bool is_int, is_fp;
-    uint64_t code;
 
     if (!(dst->type = sm6->bool_type))
     {
@@ -3549,29 +3549,26 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
 
     vsir_instruction_init(ins, &sm6->p.location, cmp->handler_idx);
 
-    if (record->operand_count > i)
-    {
-        uint64_t flags = record->operands[i];
-        bool silence_warning = false;
+    flags = (record->operand_count > i) ? record->operands[i] : 0;
+    silence_warning = false;
 
-        if (is_fp)
-        {
-            if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
-                ins->flags |= VKD3DSI_PRECISE_X;
-            flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
-            /* SPIR-V FPFastMathMode is only available in the Kernel execution model. */
-            silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
-        }
-        if (flags && silence_warning)
-        {
-            TRACE("Ignoring fast FP modifier %#"PRIx64".\n", flags);
-        }
-        else if (flags)
-        {
-            WARN("Ignoring flags %#"PRIx64".\n", flags);
-            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
-                    "Ignoring flags %#"PRIx64" for a comparison operation.", flags);
-        }
+    if (is_fp)
+    {
+        if (!(flags & FP_ALLOW_UNSAFE_ALGEBRA))
+            ins->flags |= VKD3DSI_PRECISE_X;
+        flags &= ~FP_ALLOW_UNSAFE_ALGEBRA;
+        /* SPIR-V FPFastMathMode is only available in the Kernel execution model. */
+        silence_warning = !(flags & ~(FP_NO_NAN | FP_NO_INF | FP_NO_SIGNED_ZEROS | FP_ALLOW_RECIPROCAL));
+    }
+    if (flags && silence_warning)
+    {
+        TRACE("Ignoring fast FP modifier %#"PRIx64".\n", flags);
+    }
+    else if (flags)
+    {
+        WARN("Ignoring flags %#"PRIx64".\n", flags);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring flags %#"PRIx64" for a comparison operation.", flags);
     }
 
     src_params = instruction_src_params_alloc(ins, 2, sm6);
