@@ -36,16 +36,16 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float 0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (11.0, 11.0, 11.0, 11.0)
 uniform 0 float 1
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (12.0, 12.0, 12.0, 12.0)
 uniform 0 float 2
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (13.0, 13.0, 13.0, 13.0)
 uniform 0 float 3
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (14.0, 14.0, 14.0, 14.0)
 
 
@@ -61,8 +61,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 2.3
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (3, 3, 3, 3)
+draw quad
+probe all rgba (3, 3, 3, 3)
 
 
 [pixel shader]
@@ -77,16 +77,16 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float 0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (21.0, 1.0, 24.0, 0.0)
 uniform 0 float 1
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (22.0, 0.0, 23.0, 1.0)
 uniform 0 float 2
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (23.0, 1.0, 22.0, 0.0)
 uniform 0 float 3
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (24.0, 0.0, 21.0, 1.0)
 
 
@@ -102,17 +102,17 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0 0 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (1.0, 2.0, 3.0, 4.0)
+draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
 uniform 0 float4 1 0 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
+draw quad
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 uniform 0 float4 0 1 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
+draw quad
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 uniform 0 float4 1 1 0 0
-todo(sm>=6) draw quad
-todo(sm>=6) probe all rgba (9.0, 10.0, 11.0, 12.0)
+draw quad
+probe all rgba (9.0, 10.0, 11.0, 12.0)
 
 
 [pixel shader]
@@ -130,7 +130,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0 0 2.4 0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1.0, 120.0, 90.0, 4.0)
 
 

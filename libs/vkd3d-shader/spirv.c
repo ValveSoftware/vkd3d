@@ -1194,6 +1194,16 @@ static uint32_t vkd3d_spirv_get_op_constant64(struct vkd3d_spirv_builder *builde
             (const uint32_t *)&value, 2, vkd3d_spirv_build_op_constant64);
 }
 
+static uint32_t vkd3d_spirv_build_op_constant_null(struct vkd3d_spirv_builder *builder, uint32_t result_type)
+{
+    return vkd3d_spirv_build_op_tr(builder, &builder->global_stream, SpvOpConstantNull, result_type);
+}
+
+static uint32_t vkd3d_spirv_get_op_constant_null(struct vkd3d_spirv_builder *builder, uint32_t result_type)
+{
+    return vkd3d_spirv_build_once1(builder, SpvOpConstantNull, result_type, vkd3d_spirv_build_op_constant_null);
+}
+
 static uint32_t vkd3d_spirv_build_op_constant_composite(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, const uint32_t *constituents, unsigned int constituent_count)
 {
@@ -3756,6 +3766,61 @@ static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
     return val_id;
 }
 
+static uint32_t spirv_compiler_emit_constant_array(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_immediate_constant_buffer *icb)
+{
+    uint32_t *elements, elem_type_id, length_id, type_id, const_id;
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    unsigned int i, element_count;
+
+    element_count = icb->element_count;
+
+    elem_type_id = vkd3d_spirv_get_type_id_for_data_type(builder, icb->data_type, 1);
+    length_id = spirv_compiler_get_constant_uint(compiler, element_count);
+    type_id = vkd3d_spirv_get_op_type_array(builder, elem_type_id, length_id);
+
+    if (icb->is_null)
+    {
+        /* All values are null. Workgroup memory initialisers require OpConstantNull. */
+        return vkd3d_spirv_get_op_constant_null(builder, type_id);
+    }
+
+    if (!(elements = vkd3d_calloc(element_count, sizeof(*elements))))
+    {
+        ERR("Failed to allocate %u elements.", element_count);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY,
+                "Failed to allocate %u constant array elements.", element_count);
+        return 0;
+    }
+
+    switch (icb->data_type)
+    {
+        case VKD3D_DATA_FLOAT:
+        case VKD3D_DATA_INT:
+        case VKD3D_DATA_UINT:
+            for (i = 0; i < element_count; ++i)
+                elements[i] = vkd3d_spirv_get_op_constant(builder, elem_type_id, icb->data[i]);
+            break;
+        case VKD3D_DATA_DOUBLE:
+        case VKD3D_DATA_UINT64:
+        {
+            uint64_t *data = (uint64_t *)icb->data;
+            for (i = 0; i < element_count; ++i)
+                elements[i] = vkd3d_spirv_get_op_constant64(builder, elem_type_id, data[i]);
+            break;
+        }
+        default:
+            FIXME("Unhandled data type %u.\n", icb->data_type);
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_TYPE,
+                    "Immediate constant buffer data type %u is unhandled.", icb->data_type);
+            break;
+    }
+
+    const_id = vkd3d_spirv_build_op_constant_composite(builder, type_id, elements, element_count);
+    vkd3d_free(elements);
+    return const_id;
+}
+
 static const struct ssa_register_info *spirv_compiler_get_ssa_register_info(const struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg)
 {
@@ -5493,37 +5558,39 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
 {
     const struct vkd3d_shader_indexable_temp *temp = &instruction->declaration.indexable_temp;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    uint32_t id, type_id, length_id, ptr_type_id, init_id = 0;
     enum vkd3d_shader_component_type component_type;
     struct vkd3d_shader_register reg;
     struct vkd3d_symbol reg_symbol;
+    SpvStorageClass storage_class;
     size_t function_location;
-    uint32_t id;
+
+    storage_class = SpvStorageClassFunction;
 
     vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
 
     if (temp->alignment)
         WARN("Ignoring alignment %u.\n", temp->alignment);
-    if (temp->initialiser)
-    {
-        FIXME("Initialisers are not supported.\n");
-        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
-                "Initialisers for indexable temps are not supported.");
-    }
 
     function_location = spirv_compiler_get_current_function_location(compiler);
     vkd3d_spirv_begin_function_stream_insertion(builder, function_location);
 
     component_type = vkd3d_component_type_from_data_type(temp->data_type);
-    id = spirv_compiler_emit_array_variable(compiler, &builder->function_stream,
-            SpvStorageClassFunction, component_type, temp->component_count, &temp->register_size, 1);
+    type_id = vkd3d_spirv_get_type_id(builder, component_type, temp->component_count);
+    length_id = spirv_compiler_get_constant_uint(compiler, temp->register_size);
+    type_id = vkd3d_spirv_get_op_type_array(builder, type_id, length_id);
+    ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
+    if (temp->initialiser)
+        init_id = spirv_compiler_emit_constant_array(compiler, temp->initialiser);
+    id = vkd3d_spirv_build_op_variable(builder, &builder->function_stream, ptr_type_id, storage_class, init_id);
 
     spirv_compiler_emit_register_debug_name(builder, id, &reg);
 
     vkd3d_spirv_end_function_stream_insertion(builder);
 
     vkd3d_symbol_make_register(&reg_symbol, &reg);
-    vkd3d_symbol_set_register_info(&reg_symbol, id, SpvStorageClassFunction,
+    vkd3d_symbol_set_register_info(&reg_symbol, id, storage_class,
             component_type, vkd3d_write_mask_from_component_count(temp->component_count));
     spirv_compiler_put_symbol(compiler, &reg_symbol);
 }
