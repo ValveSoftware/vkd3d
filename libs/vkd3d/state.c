@@ -1736,6 +1736,37 @@ void vkd3d_render_pass_cache_cleanup(struct vkd3d_render_pass_cache *cache,
     cache->render_passes = NULL;
 }
 
+static void d3d12_init_pipeline_state_desc(struct d3d12_pipeline_state_desc *desc)
+{
+    D3D12_DEPTH_STENCIL_DESC1 *ds_state = &desc->depth_stencil_state;
+    D3D12_RASTERIZER_DESC *rs_state = &desc->rasterizer_state;
+    D3D12_BLEND_DESC *blend_state = &desc->blend_state;
+    DXGI_SAMPLE_DESC *sample_desc = &desc->sample_desc;
+
+    memset(desc, 0, sizeof(*desc));
+    ds_state->DepthEnable = TRUE;
+    ds_state->DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    ds_state->DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    ds_state->StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    ds_state->StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    ds_state->FrontFace.StencilFunc = ds_state->BackFace.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    ds_state->FrontFace.StencilDepthFailOp = ds_state->BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+    ds_state->FrontFace.StencilPassOp = ds_state->BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+    ds_state->FrontFace.StencilFailOp = ds_state->BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+
+    rs_state->FillMode = D3D12_FILL_MODE_SOLID;
+    rs_state->CullMode = D3D12_CULL_MODE_BACK;
+    rs_state->DepthClipEnable = TRUE;
+    rs_state->ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+    blend_state->RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+
+    sample_desc->Count = 1;
+    sample_desc->Quality = 0;
+
+    desc->sample_mask = D3D12_DEFAULT_SAMPLE_MASK;
+}
+
 static void pipeline_state_desc_from_d3d12_graphics_desc(struct d3d12_pipeline_state_desc *desc,
         const D3D12_GRAPHICS_PIPELINE_STATE_DESC *d3d12_desc)
 {
@@ -1772,6 +1803,120 @@ static void pipeline_state_desc_from_d3d12_compute_desc(struct d3d12_pipeline_st
     desc->node_mask = d3d12_desc->NodeMask;
     desc->cached_pso = d3d12_desc->CachedPSO;
     desc->flags = d3d12_desc->Flags;
+}
+
+static HRESULT pipeline_state_desc_from_d3d12_stream_desc(struct d3d12_pipeline_state_desc *desc,
+        const D3D12_PIPELINE_STATE_STREAM_DESC *d3d12_desc, VkPipelineBindPoint *vk_bind_point)
+{
+    D3D12_PIPELINE_STATE_SUBOBJECT_TYPE subobject_type;
+    uint64_t defined_subobjects = 0;
+    const uint8_t *stream_ptr;
+    uint64_t subobject_bit;
+    size_t start, size, i;
+    uint8_t *desc_bytes;
+
+    static const struct
+    {
+        size_t alignment;
+        size_t size;
+        size_t dst_offset;
+    }
+    subobject_info[] =
+    {
+#define DCL_SUBOBJECT_INFO(type, field) {__alignof__(type), sizeof(type), offsetof(struct d3d12_pipeline_state_desc, field)}
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE]  = DCL_SUBOBJECT_INFO(ID3D12RootSignature *, root_signature),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, vs),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, ps),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, ds),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_HS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, hs),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_GS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, gs),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CS]              = DCL_SUBOBJECT_INFO(D3D12_SHADER_BYTECODE, cs),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_STREAM_OUTPUT]   = DCL_SUBOBJECT_INFO(D3D12_STREAM_OUTPUT_DESC, stream_output),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND]           = DCL_SUBOBJECT_INFO(D3D12_BLEND_DESC, blend_state),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_MASK]     = DCL_SUBOBJECT_INFO(UINT, sample_mask),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER]      = DCL_SUBOBJECT_INFO(D3D12_RASTERIZER_DESC, rasterizer_state),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL]   = DCL_SUBOBJECT_INFO(D3D12_DEPTH_STENCIL_DESC, depth_stencil_state),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_INPUT_LAYOUT]    = DCL_SUBOBJECT_INFO(D3D12_INPUT_LAYOUT_DESC, input_layout),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_IB_STRIP_CUT_VALUE] = DCL_SUBOBJECT_INFO(D3D12_INDEX_BUFFER_STRIP_CUT_VALUE, strip_cut_value),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PRIMITIVE_TOPOLOGY] = DCL_SUBOBJECT_INFO(D3D12_PRIMITIVE_TOPOLOGY_TYPE, primitive_topology_type),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RENDER_TARGET_FORMATS] = DCL_SUBOBJECT_INFO(D3D12_RT_FORMAT_ARRAY, rtv_formats),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL_FORMAT]  = DCL_SUBOBJECT_INFO(DXGI_FORMAT, dsv_format),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_SAMPLE_DESC]     = DCL_SUBOBJECT_INFO(DXGI_SAMPLE_DESC, sample_desc),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_NODE_MASK]       = DCL_SUBOBJECT_INFO(UINT, node_mask),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_CACHED_PSO]      = DCL_SUBOBJECT_INFO(D3D12_CACHED_PIPELINE_STATE, cached_pso),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_FLAGS]           = DCL_SUBOBJECT_INFO(D3D12_PIPELINE_STATE_FLAGS, flags),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1]  = DCL_SUBOBJECT_INFO(D3D12_DEPTH_STENCIL_DESC1, depth_stencil_state),
+        [D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VIEW_INSTANCING] = DCL_SUBOBJECT_INFO(D3D12_VIEW_INSTANCING_DESC, view_instancing_desc),
+#undef DCL_SUBOBJECT_INFO
+    };
+    STATIC_ASSERT(ARRAY_SIZE(subobject_info) <= sizeof(defined_subobjects) * CHAR_BIT);
+
+    /* Initialize defaults for undefined subobjects. */
+    d3d12_init_pipeline_state_desc(desc);
+
+    stream_ptr = d3d12_desc->pPipelineStateSubobjectStream;
+    desc_bytes = (uint8_t *)desc;
+
+    for (i = 0; i < d3d12_desc->SizeInBytes; )
+    {
+        if (!vkd3d_bound_range(0, sizeof(subobject_type), d3d12_desc->SizeInBytes - i))
+        {
+            WARN("Invalid pipeline state stream.\n");
+            return E_INVALIDARG;
+        }
+
+        subobject_type = *(const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE *)&stream_ptr[i];
+        if (subobject_type >= ARRAY_SIZE(subobject_info))
+        {
+            FIXME("Unhandled pipeline subobject type %#x.\n", subobject_type);
+            return E_INVALIDARG;
+        }
+
+        subobject_bit = 1ull << subobject_type;
+        if (defined_subobjects & subobject_bit)
+        {
+            WARN("Duplicate pipeline subobject type %u.\n", subobject_type);
+            return E_INVALIDARG;
+        }
+        defined_subobjects |= subobject_bit;
+
+        start = align(sizeof(subobject_type), subobject_info[subobject_type].alignment);
+        size = subobject_info[subobject_type].size;
+
+        if (!vkd3d_bound_range(start, size, d3d12_desc->SizeInBytes - i))
+        {
+            WARN("Invalid pipeline state stream.\n");
+            return E_INVALIDARG;
+        }
+
+        memcpy(&desc_bytes[subobject_info[subobject_type].dst_offset], &stream_ptr[i + start], size);
+        /* Stream packets are aligned to the size of pointers. */
+        i += align(start + size, sizeof(void *));
+    }
+
+    /* Deduce pipeline type from specified shaders. */
+    if (desc->vs.BytecodeLength && desc->vs.pShaderBytecode)
+    {
+        *vk_bind_point = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    }
+    else if (desc->cs.BytecodeLength && desc->cs.pShaderBytecode)
+    {
+        *vk_bind_point = VK_PIPELINE_BIND_POINT_COMPUTE;
+    }
+    else
+    {
+        WARN("Cannot deduce pipeline type from shader stages.\n");
+        return E_INVALIDARG;
+    }
+
+    if (desc->vs.BytecodeLength && desc->vs.pShaderBytecode
+            && desc->cs.BytecodeLength && desc->cs.pShaderBytecode)
+    {
+        WARN("Invalid combination of shader stages VS and CS.\n");
+        return E_INVALIDARG;
+    }
+
+    return S_OK;
 }
 
 struct vkd3d_pipeline_key
@@ -3277,6 +3422,13 @@ static HRESULT d3d12_pipeline_state_init_graphics(struct d3d12_pipeline_state *s
     graphics->ms_desc.alphaToCoverageEnable = desc->blend_state.AlphaToCoverageEnable;
     graphics->ms_desc.alphaToOneEnable = VK_FALSE;
 
+    if (desc->view_instancing_desc.ViewInstanceCount)
+    {
+        FIXME("View instancing is not supported yet.\n");
+        hr = E_INVALIDARG;
+        goto fail;
+    }
+
     /* We defer creating the render pass for pipelines with DSVFormat equal to
      * DXGI_FORMAT_UNKNOWN. We take the actual DSV format from the bound DSV. */
     if (is_dsv_format_unknown)
@@ -3331,6 +3483,46 @@ HRESULT d3d12_pipeline_state_create_graphics(struct d3d12_device *device,
 
     *state = object;
 
+    return S_OK;
+}
+
+HRESULT d3d12_pipeline_state_create(struct d3d12_device *device,
+        const D3D12_PIPELINE_STATE_STREAM_DESC *desc, struct d3d12_pipeline_state **state)
+{
+    struct d3d12_pipeline_state_desc pipeline_desc;
+    struct d3d12_pipeline_state *object;
+    VkPipelineBindPoint bind_point;
+    HRESULT hr;
+
+    if (FAILED(hr = pipeline_state_desc_from_d3d12_stream_desc(&pipeline_desc, desc, &bind_point)))
+        return hr;
+
+    if (!(object = vkd3d_calloc(1, sizeof(*object))))
+        return E_OUTOFMEMORY;
+
+    switch (bind_point)
+    {
+        case VK_PIPELINE_BIND_POINT_COMPUTE:
+            hr = d3d12_pipeline_state_init_compute(object, device, &pipeline_desc);
+            break;
+
+        case VK_PIPELINE_BIND_POINT_GRAPHICS:
+            hr = d3d12_pipeline_state_init_graphics(object, device, &pipeline_desc);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (FAILED(hr))
+    {
+        vkd3d_free(object);
+        return hr;
+    }
+
+    TRACE("Created pipeline state %p.\n", object);
+
+    *state = object;
     return S_OK;
 }
 

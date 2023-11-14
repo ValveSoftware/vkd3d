@@ -1337,6 +1337,7 @@ struct d3d12_pipeline_state_desc
     D3D12_RT_FORMAT_ARRAY rtv_formats;
     DXGI_FORMAT dsv_format;
     DXGI_SAMPLE_DESC sample_desc;
+    D3D12_VIEW_INSTANCING_DESC view_instancing_desc;
     unsigned int node_mask;
     D3D12_CACHED_PIPELINE_STATE cached_pso;
     D3D12_PIPELINE_STATE_FLAGS flags;
@@ -1346,6 +1347,8 @@ HRESULT d3d12_pipeline_state_create_compute(struct d3d12_device *device,
         const D3D12_COMPUTE_PIPELINE_STATE_DESC *desc, struct d3d12_pipeline_state **state);
 HRESULT d3d12_pipeline_state_create_graphics(struct d3d12_device *device,
         const D3D12_GRAPHICS_PIPELINE_STATE_DESC *desc, struct d3d12_pipeline_state **state);
+HRESULT d3d12_pipeline_state_create(struct d3d12_device *device,
+        const D3D12_PIPELINE_STATE_STREAM_DESC *desc, struct d3d12_pipeline_state **state);
 VkPipeline d3d12_pipeline_state_get_or_create_pipeline(struct d3d12_pipeline_state *state,
         D3D12_PRIMITIVE_TOPOLOGY topology, const uint32_t *strides, VkFormat dsv_format, VkRenderPass *vk_render_pass);
 struct d3d12_pipeline_state *unsafe_impl_from_ID3D12PipelineState(ID3D12PipelineState *iface);

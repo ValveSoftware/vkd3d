@@ -3964,9 +3964,16 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_SetResidencyPriority(ID3D12Device5
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePipelineState(ID3D12Device5 *iface,
         const D3D12_PIPELINE_STATE_STREAM_DESC *desc, REFIID iid, void **pipeline_state)
 {
-    FIXME("iface %p, desc %p, iid %s, pipeline_state %p stub!\n", iface, desc, debugstr_guid(iid), pipeline_state);
+    struct d3d12_device *device = impl_from_ID3D12Device5(iface);
+    struct d3d12_pipeline_state *object;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    TRACE("iface %p, desc %p, iid %s, pipeline_state %p.\n", iface, desc, debugstr_guid(iid), pipeline_state);
+
+    if (FAILED(hr = d3d12_pipeline_state_create(device, desc, &object)))
+        return hr;
+
+    return return_interface(&object->ID3D12PipelineState_iface, &IID_ID3D12PipelineState, iid, pipeline_state);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_OpenExistingHeapFromAddress(ID3D12Device5 *iface,
