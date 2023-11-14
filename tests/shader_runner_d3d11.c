@@ -747,7 +747,7 @@ void run_shader_tests_d3d11(void)
         init_adapter_info();
         if (init_test_context(&runner))
         {
-            run_shader_tests(&runner.r, &d3d11_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_5_1);
+            run_shader_tests(&runner.r, &d3d11_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
             destroy_test_context(&runner);
         }
     }
