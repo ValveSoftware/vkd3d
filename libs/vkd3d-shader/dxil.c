@@ -2412,7 +2412,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
         return VKD3D_ERROR_INVALID_SHADER;
     }
     size = max(size, sizeof(icb->data[0]));
-    count = type->u.array.count * size / sizeof(icb->data[0]);
+    count = operands ? type->u.array.count * size / sizeof(icb->data[0]) : 0;
 
     if (!(icb = vkd3d_malloc(offsetof(struct vkd3d_shader_immediate_constant_buffer, data[count]))))
     {
@@ -2436,6 +2436,10 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
     icb->element_count = type->u.array.count;
     icb->component_count = 1;
+    icb->is_null = !operands;
+
+    if (!operands)
+        return VKD3D_OK;
 
     count = type->u.array.count;
     if (size > sizeof(icb->data[0]))
@@ -2510,12 +2514,10 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         switch (record->code)
         {
             case CST_CODE_NULL:
-                if (sm6_type_is_array(type))
+                if (sm6_type_is_array(type)
+                        && (ret = value_allocate_constant_array(dst, type, NULL, sm6)) < 0)
                 {
-                    FIXME("Constant null arrays are not supported.\n");
-                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                            "Constant null arrays are not supported.");
-                    return VKD3D_ERROR_INVALID_SHADER;
+                    return ret;
                 }
                 /* For non-aggregates, register constant data is already zero-filled. */
                 break;

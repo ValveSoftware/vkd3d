@@ -797,6 +797,7 @@ struct vkd3d_shader_immediate_constant_buffer
     /* total count is element_count * component_count */
     unsigned int element_count;
     unsigned int component_count;
+    bool is_null;
     uint32_t data[];
 };
 

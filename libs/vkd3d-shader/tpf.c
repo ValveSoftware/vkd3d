@@ -795,6 +795,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     icb->data_type = VKD3D_DATA_FLOAT;
     icb->component_count = VKD3D_VEC4_SIZE;
     icb->element_count = icb_size / VKD3D_VEC4_SIZE;
+    icb->is_null = false;
     memcpy(icb->data, tokens, sizeof(*tokens) * icb_size);
     shader_instruction_array_add_icb(&priv->p.instructions, icb);
     ins->declaration.icb = icb;
