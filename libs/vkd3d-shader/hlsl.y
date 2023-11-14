@@ -1122,7 +1122,7 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_sc
 }
 
 static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
-        const struct vkd3d_shader_location *loc)
+        struct hlsl_scope *annotations, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -1131,6 +1131,7 @@ static bool add_effect_group(struct hlsl_ctx *ctx, const char *name, struct hlsl
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
         return false;
     var->scope = scope;
+    var->annotations = annotations;
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -4999,6 +5000,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
     struct hlsl_attribute *attr;
     struct parse_attribute_list attr_list;
     struct hlsl_ir_switch_case *switch_case;
+    struct hlsl_scope *scope;
 }
 
 %token KW_BLENDSTATE
@@ -5124,6 +5126,8 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token <name> STRING
 %token <name> TYPE_IDENTIFIER
 
+%type <scope> annotations_opt
+
 %type <arrays> arrays
 
 %type <assign_op> assign_op
@@ -5242,6 +5246,28 @@ name_opt:
 pass:
       KW_PASS name_opt '{' '}'
 
+annotations_list:
+      variables_def_typed ';'
+    | annotations_list variables_def_typed ';'
+
+annotations_opt:
+      %empty
+        {
+            $$ = NULL;
+        }
+    | '<' scope_start '>'
+        {
+            hlsl_pop_scope(ctx);
+            $$ = NULL;
+        }
+    | '<' scope_start annotations_list '>'
+        {
+            struct hlsl_scope *scope = ctx->cur_scope;
+
+            hlsl_pop_scope(ctx);
+            $$ = scope;
+        }
+
 pass_list:
       pass
     | pass_list pass
@@ -5302,11 +5328,11 @@ group_techniques:
     | group_techniques group_technique
 
 effect_group:
-      KW_FXGROUP any_identifier '{' scope_start group_techniques '}'
+      KW_FXGROUP any_identifier annotations_opt '{' scope_start group_techniques '}'
         {
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
-            if (!(add_effect_group(ctx, $2, scope, &@2)))
+            if (!(add_effect_group(ctx, $2, scope, $3, &@2)))
                 YYABORT;
         }
 
