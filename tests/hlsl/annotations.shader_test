@@ -2,19 +2,19 @@
 shader model >= 4.0
 shader model < 6.0
 
-[effect todo]
+[effect]
 // Annotations on techniques
 technique10 t1 < int a = 1; > {}
 technique10 t2 < int a = 2; int t1 = 3; int t2 = 4; > {}
 
-[effect todo]
+[effect]
 // Annotations on passes
 technique10 t1 < int a = 1; >
 {
     pass < int t1 = 2; > {}
 }
 
-[effect todo]
+[effect]
 // Using names from the global scope
 float a;
 
@@ -23,32 +23,32 @@ technique10 t1 < int a = 1; >
     pass < int a = 2; > {}
 }
 
-[effect todo]
+[effect]
 // Evaluated literal constant expression for initial values
 technique10 < int a = 1+2; > {}
 
-[effect todo]
+[effect]
 // Using constant variables in the initializer
 static const int b = 123;
 technique10 < int a = b; > {}
 
-[effect todo]
+[effect]
 // Implicitly sized array
 technique10 < float a[] = {1, 2}; > {}
 
-[effect todo]
+[effect]
 // Nested braces
 technique10 < float4 a = {1, {{{2, {3}}, 4}}}; > {}
 
-[effect todo]
+[effect]
 // Flattening
 technique10 < float4 a = {1, float2(2, 3), 4}; > {}
 
-[effect todo]
+[effect]
 // Comma separated initializers
 technique10 < int a = 1, b = 2; > {}
 
-[effect todo]
+[effect]
 // Majority modifier
 technique10 < row_major float3x2 m = {1, 2, 3, 4, 5, 6}; > {}
 
@@ -66,7 +66,7 @@ technique10
     pass < int a = 0; float a = 1.0; > {}
 }
 
-[effect fail]
+[effect fail todo]
 // Without initializer
 technique10 < int a; > {}
 
@@ -74,17 +74,17 @@ technique10 < int a; > {}
 // Only numeric types and strings are allowed
 technique10 < DepthStencilState ds = { 0 }; > {}
 
-[effect fail]
+[effect fail todo]
 // Type declarations are not allowed
 technique10 < struct s { int a; } var = { 2 }; > {}
 
-[effect fail]
+[effect fail todo]
 // Static modifier is not allowed
 technique10 < static int a = 5; > {}
 
-[effect fail]
+[effect fail todo]
 // Initializer should not depend on other annotations
 technique10 < int a = 1, b = a; > {}
 
-[effect fail]
+[effect fail todo]
 technique10 < int a = 1; int b = a; > {}

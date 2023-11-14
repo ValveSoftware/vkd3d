@@ -1122,7 +1122,7 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *
 }
 
 static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *scope,
-        const char *typename, const struct vkd3d_shader_location *loc)
+        struct hlsl_scope *annotations, const char *typename, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -1131,6 +1131,7 @@ static bool add_technique(struct hlsl_ctx *ctx, const char *name, struct hlsl_sc
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
         return false;
     var->scope = scope;
+    var->annotations = annotations;
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -5306,17 +5307,17 @@ passes:
     | scope_start pass_list
 
 technique9:
-      KW_TECHNIQUE name_opt '{' passes '}'
+      KW_TECHNIQUE name_opt annotations_opt '{' passes '}'
         {
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
 
-            if (!add_technique(ctx, $2, scope, "technique", &@1))
+            if (!add_technique(ctx, $2, scope, $3, "technique", &@1))
                 YYABORT;
         }
 
 technique10:
-      KW_TECHNIQUE10 name_opt '{' passes '}'
+      KW_TECHNIQUE10 name_opt annotations_opt '{' passes '}'
         {
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
@@ -5325,12 +5326,12 @@ technique10:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique10' keyword is invalid for this profile.");
 
-            if (!add_technique(ctx, $2, scope, "technique10", &@1))
+            if (!add_technique(ctx, $2, scope, $3, "technique10", &@1))
                 YYABORT;
         }
 
 technique11:
-      KW_TECHNIQUE11 name_opt '{' passes '}'
+      KW_TECHNIQUE11 name_opt annotations_opt '{' passes '}'
         {
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
@@ -5339,7 +5340,7 @@ technique11:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "The 'technique11' keyword is invalid for this profile.");
 
-            if (!add_technique(ctx, $2, scope, "technique11", &@1))
+            if (!add_technique(ctx, $2, scope, $3, "technique11", &@1))
                 YYABORT;
         }
 
