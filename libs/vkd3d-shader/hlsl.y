@@ -1096,7 +1096,8 @@ static bool add_func_parameter(struct hlsl_ctx *ctx, struct hlsl_func_parameters
     return true;
 }
 
-static bool add_pass(struct hlsl_ctx *ctx, const char *name, const struct vkd3d_shader_location *loc)
+static bool add_pass(struct hlsl_ctx *ctx, const char *name, struct hlsl_scope *annotations,
+        const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_var *var;
     struct hlsl_type *type;
@@ -1104,6 +1105,7 @@ static bool add_pass(struct hlsl_ctx *ctx, const char *name, const struct vkd3d_
     type = hlsl_get_type(ctx->globals, "pass", false, false);
     if (!(var = hlsl_new_var(ctx, name, type, loc, NULL, 0, NULL)))
         return false;
+    var->annotations = annotations;
 
     if (!hlsl_add_var(ctx, var, false))
     {
@@ -5267,9 +5269,9 @@ name_opt:
     | any_identifier
 
 pass:
-      KW_PASS name_opt '{' '}'
+      KW_PASS name_opt annotations_opt '{' '}'
         {
-            if (!add_pass(ctx, $2, &@1))
+            if (!add_pass(ctx, $2, $3, &@1))
                 YYABORT;
         }
 
