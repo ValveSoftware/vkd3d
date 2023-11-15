@@ -64,7 +64,7 @@ draw quad
 probe all rgba (10, 10, 10, 11)
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 Texture2D tex;
 sampler sam[2];
 
@@ -111,7 +111,7 @@ probe all rgba (104, 104, 104, 111)
 
 % Sampler arrays with components that have different usage dimensions are only forbidden in SM4 upwards.
 % However, tex2D and tex1D are considered the same dimension for these purposes.
-[pixel shader fail]
+[pixel shader fail(sm>=4)]
 sampler sam[2];
 
 float4 main() : sv_target

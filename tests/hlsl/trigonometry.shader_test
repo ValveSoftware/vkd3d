@@ -5,7 +5,7 @@ void main(float4 pos : position, out float tex : texcoord, out float4 out_pos : 
     out_pos = pos;
 }
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main(float tex : texcoord) : sv_target
 {
     tex = floor(tex + 0.25);
@@ -13,7 +13,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe ( 0, 0) rgba ( 0.00000000,  1.00000000,  0.00000000, 0.0)
 probe ( 1, 0) rgba ( 0.84147098,  0.54030231,  1.55740772, 0.0) 1024
 probe ( 2, 0) rgba ( 0.90929743, -0.41614684, -2.18503986, 0.0) 1024
@@ -32,7 +32,7 @@ probe (14, 0) rgba ( 0.99060736,  0.13673722,  7.24460662, 0.0) 1024
 probe (15, 0) rgba ( 0.65028784, -0.75968791, -0.85599340, 0.0) 1024
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -42,11 +42,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.52359877 2.61799387 3.14159265
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0.0, 500.0, 500.0, 0.0)
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -56,11 +56,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 0.0 0.78539816 1.57079632 2.35619449
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (1000.0, 707.0, -0.0, -707.0)
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -72,5 +72,5 @@ float4 main() : sv_target
 % tan(pi/2) is an asymtote and therefore undefined
 % so check 0, pi/4, 3pi/4, pi
 uniform 0 float4 0.0 0.78539816 2.35619449 3.14159265
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0, 1000, -1000.0, 0)

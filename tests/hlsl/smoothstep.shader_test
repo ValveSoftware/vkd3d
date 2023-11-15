@@ -1,5 +1,3 @@
-
-
 [pixel shader]
 float4 main() : sv_target
 {
@@ -109,7 +107,7 @@ draw quad
 probe all rgba (0.028, 0.104, 0.216, 0.352) 6
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 // 4 division by zero warnings.
 // Only test compilation because result is implementation-dependent.
 float4 main() : sv_target

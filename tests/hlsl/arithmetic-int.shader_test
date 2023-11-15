@@ -77,6 +77,7 @@ draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 [pixel shader fail(sm<6)]
+// On SM1 this gives hr 0x88760b59.
 float4 main() : SV_TARGET
 {
     int x = 1;
@@ -90,6 +91,7 @@ draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 [pixel shader fail(sm<6)]
+// On SM1 this gives hr 0x88760b59.
 float4 main() : SV_TARGET
 {
     int x = 1;

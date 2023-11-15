@@ -968,8 +968,13 @@ unsigned int get_vb_stride(const struct shader_runner *runner, unsigned int slot
     return stride;
 }
 
-static HRESULT map_unidentified_hrs(HRESULT hr)
+static HRESULT map_special_hrs(HRESULT hr)
 {
+    if (hr == 0x88760b59)
+    {
+        trace("Mapping hr %#x (D3DXERR_INVALIDDATA) as %#x.\n", hr, E_FAIL);
+        return E_FAIL;
+    }
     if (hr == 0x80010064)
     {
         trace("Mapping unidentified hr %#x as %#x.\n", hr, E_FAIL);
@@ -1116,8 +1121,8 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
 
     static const char *const shader_models[] =
     {
-        [SHADER_MODEL_2_0] = "4_0",
-        [SHADER_MODEL_3_0] = "4_0",
+        [SHADER_MODEL_2_0] = "2_0",
+        [SHADER_MODEL_3_0] = "3_0",
         [SHADER_MODEL_4_0] = "4_0",
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",
@@ -1146,7 +1151,7 @@ static void compile_shader(struct shader_runner *runner, IDxcCompiler3 *dxc_comp
             sprintf(profile, "%s_%s", shader_type_string(type), shader_models[runner->minimum_shader_model]);
         hr = D3DCompile(source, len, NULL, NULL, NULL, "main", profile, runner->compile_options, 0, &blob, &errors);
     }
-    hr = map_unidentified_hrs(hr);
+    hr = map_special_hrs(hr);
     ok(hr == expect, "Got unexpected hr %#x.\n", hr);
     if (hr == S_OK)
     {

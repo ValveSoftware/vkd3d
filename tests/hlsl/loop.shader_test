@@ -1,6 +1,6 @@
 % TODO: dxcompiler emits no loops for any of these test shaders.
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float a;
 
 float4 main() : sv_target
@@ -18,11 +18,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 5.0
-draw quad
+todo(sm<4) draw quad
 probe all rgba (50.0, 50.0, 50.0, 50.0)
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float a;
 
 float4 main() : sv_target
@@ -41,10 +41,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-draw quad
+todo(sm<4) draw quad
 probe all rgba (20.0, 20.0, 20.0, 20.0)
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float a;
 
 float4 main() : sv_target
@@ -70,10 +70,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-draw quad
+todo(sm<4) draw quad
 probe all rgba (409.1, 409.1, 409.1, 409.1)
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float a;
 
 float4 main() : sv_target
@@ -100,11 +100,11 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 4.0
-draw quad
+todo(sm<4) draw quad
 probe all rgba (410.1, 410.1, 410.1, 410.1)
 
 % loop attribute by itself
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -118,10 +118,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -137,10 +137,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main() : sv_target
 {
     float ret = 0.0;
@@ -156,7 +156,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)
 
 % unroll can't be used with fastopt or loop

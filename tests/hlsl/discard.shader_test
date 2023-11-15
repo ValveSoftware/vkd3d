@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float4 x;
 
 float4 main() : sv_target
@@ -9,8 +9,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 1 2 3 4
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (1, 2, 3, 4)
 uniform 0 float4 9 8 7 6
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (1, 2, 3, 4)

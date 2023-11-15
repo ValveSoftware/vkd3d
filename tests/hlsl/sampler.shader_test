@@ -7,7 +7,7 @@ size (2, 2)
 0.0 0.0 0.0 0.0     0.0 0.0 0.0 0.0
 0.0 0.0 0.0 0.0     1.0 0.0 1.0 0.0
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 sampler s;
 Texture2D t;
 
@@ -17,10 +17,10 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0.25, 0, 0.25, 0)
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 SamplerState s;
 Texture2D t;
 
@@ -30,7 +30,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0.25, 0, 0.25, 0)
 
 [pixel shader fail]

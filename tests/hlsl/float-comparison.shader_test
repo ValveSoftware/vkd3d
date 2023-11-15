@@ -1,4 +1,4 @@
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float4 f;
 
 float4 main() : sv_target
@@ -44,7 +44,7 @@ shader model < 4.0
 
 [test]
 uniform 0 float4 0.0 1.5 1.5 0.0
-draw quad
+todo(sm<4) draw quad
 todo probe all rgba (1010101.0, 11001100.0, 1101001.0, 0.0)
 
 % SM4-5 optimises away the 'not' by inverting the condition, even though this is invalid for NaN.

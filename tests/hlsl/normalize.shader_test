@@ -34,7 +34,7 @@ float4 main() : SV_TARGET
 
 [test]
 uniform 0 float4 2.0 3.0 0.0 0.0
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0.554700196, 0.832050323, 0.0, 0.0) 1
 
 [pixel shader]

@@ -26,7 +26,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo(sm>=6) probe all rgba (5.0, 6.0, 7.0, 8.0)
+probe all rgba (5.0, 6.0, 7.0, 8.0)
 
 [require]
 % reset requirements

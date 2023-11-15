@@ -5,7 +5,7 @@ void main(float4 pos : position, out float tex : texcoord, out float4 out_pos : 
     out_pos = pos;
 }
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main(float tex : texcoord) : sv_target
 {
     int i;
@@ -23,7 +23,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-draw quad
+todo(sm<4) draw quad
 probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
 probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
 probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
@@ -59,10 +59,11 @@ probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
 probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
 probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
 
+
 [require]
 % Reset requirements
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 float4 main(float tex : texcoord) : sv_target
 {
     int i;
@@ -75,7 +76,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-draw quad
+todo(sm<4) draw quad
 probe all rgba (10.0, 45.0, 0.0, 0.0)
 
 [pixel shader fail(sm<6)]

@@ -18,7 +18,7 @@ void main(float4 pos : position, out float2 tex : texcoord, out float4 out_pos :
     out_pos = pos;
 }
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 sampler s;
 Texture2D t;
 uniform float bias;
@@ -32,13 +32,13 @@ float4 main(float2 coord : texcoord) : sv_target
 
 [test]
 uniform 0 float4 6.5 0.0 0.0 0.0
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (10.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 7.5 0.0 0.0 0.0
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (4.0, 0.0, 10.0, 0.0)
 
 uniform 0 float4 8.5 0.0 0.0 0.0
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (0.0, 0.0, 10.0, 0.0)

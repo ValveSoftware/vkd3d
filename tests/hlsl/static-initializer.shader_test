@@ -17,6 +17,7 @@ probe all rgba (0.8, 0.0, 0.0, 0.0)
 
 
 [pixel shader fail(sm<6)]
+// On SM1 this gives hr 0x88760b59.
 static uint i;
 
 float4 main() : sv_target
@@ -135,7 +136,7 @@ float4 main(Texture2D tex2) : sv_target
 }
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 Texture2D real_tex;
 static Texture2D tex = real_tex;
 sampler sam;
@@ -146,11 +147,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (1, 2, 3, 4)
 
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 Texture2D real_tex;
 static Texture2D tex;
 sampler sam;
@@ -162,7 +163,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+todo(sm<4 | sm>=6) draw quad
 probe all rgba (1, 2, 3, 4)
 
 

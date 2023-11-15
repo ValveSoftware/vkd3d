@@ -9,7 +9,7 @@ float4 main() : sv_target
 [require]
 options: backcompat
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform half h;
 
 float4 main() : sv_target
@@ -19,5 +19,5 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float 10.0
-draw quad
+todo(sm<4) draw quad
 probe all rgba (10.0, 10.0, 10.0, 10.0)

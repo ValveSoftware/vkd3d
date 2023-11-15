@@ -412,8 +412,8 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     static const char *const shader_models[] =
     {
-        [SHADER_MODEL_2_0] = "4_0",
-        [SHADER_MODEL_3_0] = "4_0",
+        [SHADER_MODEL_2_0] = "2_0",
+        [SHADER_MODEL_3_0] = "3_0",
         [SHADER_MODEL_4_0] = "4_0",
         [SHADER_MODEL_4_1] = "4_1",
         [SHADER_MODEL_5_0] = "5_0",
@@ -424,7 +424,11 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     info.source.code = source;
     info.source.size = strlen(source);
     info.source_type = VKD3D_SHADER_SOURCE_HLSL;
-    info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+    if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
+        info.target_type = VKD3D_SHADER_TARGET_D3D_BYTECODE;
+    else
+        info.target_type = VKD3D_SHADER_TARGET_DXBC_TPF;
+
     info.log_level = VKD3D_SHADER_LOG_WARNING;
 
     info.options = options;
@@ -468,7 +472,10 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     info.next = &spirv_info;
     info.source = *dxbc;
-    info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    if (runner->r.minimum_shader_model < SHADER_MODEL_4_0)
+        info.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+    else
+        info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
     info.target_type = VKD3D_SHADER_TARGET_SPIRV_BINARY;
 
     spirv_info.next = &interface_info;
@@ -1420,8 +1427,11 @@ void run_shader_tests_vulkan(void)
     if (!init_vulkan_runner(&runner))
         return;
 
-    trace("Compiling SM2-SM5 shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_5_1);
+    trace("Compiling SM2-SM3 shaders with vkd3d-shader and executing with Vulkan\n");
+    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_3_0);
+
+    trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with Vulkan\n");
+    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
 
     cleanup_vulkan_runner(&runner);
 }
