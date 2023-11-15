@@ -1,4 +1,4 @@
-test-win-64:
+.test-win:
   stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
@@ -9,27 +9,17 @@ test-win-64:
     - win10-21h2
   script:
     - ./artifacts/driver.cross64.exe
-  variables:
-    TEST_ARCH: "64"
   artifacts:
     when: always
     paths:
       - artifacts
 
+test-win-64:
+  extends: .test-win
+  variables:
+    TEST_ARCH: "64"
+
 test-win-32:
-  stage: test
-  rules:
-    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
-  interruptible: true
-  needs:
-    - job: build-crosstest
-  tags:
-    - win10-21h2
-  script:
-    - ./artifacts/driver.cross64.exe
+  extends: .test-win
   variables:
     TEST_ARCH: "32"
-  artifacts:
-    when: always
-    paths:
-      - artifacts
