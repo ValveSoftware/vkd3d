@@ -8,7 +8,8 @@
   tags:
     - win10-21h2
   script:
-    - ./artifacts/driver.cross64.exe
+    - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec './artifacts/driver.cross64.exe $(git cherry $CI_MERGE_REQUEST_DIFF_BASE_SHA HEAD^ | wc -l) $(git rev-parse --short HEAD)'
+    - if (Test-Path "pipeline_failed") { exit 1 }
   artifacts:
     when: always
     paths:

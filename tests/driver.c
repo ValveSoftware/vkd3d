@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <windows.h>
 #include <shlobj.h>
 
@@ -215,40 +216,43 @@ static bool run_tests_for_directory(const char *commit_dir)
     printf("# FAIL:  %u\n", test_count - success_count);
 
     if (test_count != success_count)
-        ret = false;
+    {
+        HANDLE handle;
+
+        handle = CreateFileA("pipeline_failed", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (handle == INVALID_HANDLE_VALUE)
+        {
+            fprintf(stderr, "Cannot create failure file, last error %ld.\n", GetLastError());
+            ret = false;
+        }
+        else
+        {
+            if (!CloseHandle(handle))
+                fprintf(stderr, "Cannot close failure file, last error %ld.\n", GetLastError());
+        }
+    }
 
     return ret;
 }
 
-int wmain(void)
+int wmain(int argc, WCHAR **wargv)
 {
-    WIN32_FIND_DATAA find_data;
-    HANDLE find_handle;
-    bool ret = true;
+    char commit_num[16], commit_hash[16], commit_dir[16];
 
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
 
-    find_handle = FindFirstFileA("artifacts/*-*", &find_data);
-    if (find_handle == INVALID_HANDLE_VALUE)
+    if (argc != 3)
     {
-        fprintf(stderr, "Cannot list commits, last error %ld.\n", GetLastError());
-        ret = false;
-    }
-    else
-    {
-        do
-        {
-            ret &= run_tests_for_directory(find_data.cFileName);
-        } while (FindNextFileA(find_handle, &find_data));
-
-        if (GetLastError() != ERROR_NO_MORE_FILES)
-        {
-            fprintf(stderr, "Cannot list tests, last error %ld.\n", GetLastError());
-            ret = false;
-        }
-
-        FindClose(find_handle);
+        fprintf(stderr, "Call with commit number and hash.\n");
+        return 1;
     }
 
-    return !ret;
+    WideCharToMultiByte(CP_ACP, 0, wargv[1], -1, commit_num, sizeof(commit_num), NULL, NULL);
+    WideCharToMultiByte(CP_ACP, 0, wargv[2], -1, commit_hash, sizeof(commit_hash), NULL, NULL);
+    commit_num[sizeof(commit_num) - 1] = '\0';
+    commit_hash[sizeof(commit_hash) - 1] = '\0';
+    snprintf(commit_dir, sizeof(commit_dir), "%03d-%s", atoi(commit_num), commit_hash);
+    commit_dir[sizeof(commit_dir) - 1] = '\0';
+
+    return !run_tests_for_directory(commit_dir);
 }
