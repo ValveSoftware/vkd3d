@@ -581,6 +581,7 @@ struct sm6_parser
     size_t descriptor_count;
 
     unsigned int indexable_temp_count;
+    unsigned int icb_count;
 
     struct sm6_value *values;
     size_t value_count;
@@ -2433,6 +2434,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
     dst->value_type = VALUE_TYPE_ICB;
     dst->u.icb = icb;
 
+    icb->register_idx = sm6->icb_count++;
     icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
     icb->element_count = type->u.array.count;
     icb->component_count = 1;
