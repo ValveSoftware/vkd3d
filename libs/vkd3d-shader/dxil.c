@@ -2630,6 +2630,18 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
     return ins;
 }
 
+static void sm6_parser_declare_icb(struct sm6_parser *sm6, const struct sm6_type *elem_type, unsigned int count,
+        unsigned int alignment, unsigned int init, struct sm6_value *dst)
+{
+    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    struct vkd3d_shader_instruction *ins;
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER);
+    /* The icb value index will be resolved later so forward references can be handled. */
+    ins->declaration.icb = (void *)(intptr_t)init;
+    register_init_with_id(&dst->u.reg, VKD3DSPR_IMMCONSTBUFFER, data_type, init);
+}
+
 static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const struct sm6_type *elem_type,
         unsigned int count, unsigned int alignment, unsigned int init, struct sm6_value *dst)
 {
@@ -2766,7 +2778,10 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
 
     if (address_space == ADDRESS_SPACE_DEFAULT)
     {
-        sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, init, dst);
+        if (is_constant)
+            sm6_parser_declare_icb(sm6, scalar_type, count, alignment, init, dst);
+        else
+            sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, init, dst);
     }
     else if (address_space == ADDRESS_SPACE_GROUPSHARED)
     {
@@ -2810,11 +2825,11 @@ static const struct vkd3d_shader_immediate_constant_buffer *resolve_forward_init
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
 {
     const struct dxil_block *block = &sm6->root_block;
+    size_t i, base_value_idx = sm6->value_count;
     struct vkd3d_shader_instruction *ins;
     const struct dxil_record *record;
     enum vkd3d_result ret;
     uint64_t version;
-    size_t i;
 
     sm6->p.location.line = block->id;
     sm6->p.location.column = 0;
@@ -2872,6 +2887,21 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
             ins->declaration.indexable_temp.initialiser = resolve_forward_initialiser(
                     (uintptr_t)ins->declaration.indexable_temp.initialiser, sm6);
         }
+        else if (ins->handler_idx == VKD3DSIH_DCL_IMMEDIATE_CONSTANT_BUFFER)
+        {
+            ins->declaration.icb = resolve_forward_initialiser((uintptr_t)ins->declaration.icb, sm6);
+        }
+    }
+    for (i = base_value_idx; i < sm6->value_count; ++i)
+    {
+        const struct vkd3d_shader_immediate_constant_buffer *icb;
+        struct sm6_value *value = &sm6->values[i];
+
+        if (!sm6_value_is_register(value) || value->u.reg.type != VKD3DSPR_IMMCONSTBUFFER)
+            continue;
+
+        if ((icb = resolve_forward_initialiser(value->u.reg.idx[0].offset, sm6)))
+            value->u.reg.idx[0].offset = icb->register_idx;
     }
 
     return VKD3D_OK;
