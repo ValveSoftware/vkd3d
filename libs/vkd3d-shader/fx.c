@@ -49,6 +49,7 @@ struct fx_write_context_ops
 {
     uint32_t (*write_string)(const char *string, struct fx_write_context *fx);
     void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
+    void (*write_pass)(struct hlsl_ir_var *var, struct fx_write_context *fx);
 };
 
 struct fx_write_context
@@ -73,6 +74,11 @@ struct fx_write_context
 static uint32_t write_string(const char *string, struct fx_write_context *fx)
 {
     return fx->ops->write_string(string, fx);
+}
+
+static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    fx->ops->write_pass(var, fx);
 }
 
 static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_context_ops *ops,
@@ -147,7 +153,21 @@ static uint32_t write_fx_4_string(const char *string, struct fx_write_context *f
     return string_entry->offset;
 }
 
-static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
+static void write_fx_4_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t name_offset;
+
+    name_offset = write_string(var->name, fx);
+    put_u32(buffer, name_offset);
+    put_u32(buffer, 0); /* Assignment count. */
+    put_u32(buffer, 0); /* Annotation count. */
+
+    /* TODO: annotations */
+    /* TODO: assignments */
+}
+
+static void write_fx_2_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t name_offset;
@@ -156,6 +176,9 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
     put_u32(buffer, name_offset);
     put_u32(buffer, 0); /* Annotation count. */
     put_u32(buffer, 0); /* Assignment count. */
+
+    /* TODO: annotations */
+    /* TODO: assignments */
 }
 
 static void write_fx_4_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -261,21 +284,30 @@ static uint32_t write_fx_2_string(const char *string, struct fx_write_context *f
 static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset;
+    uint32_t name_offset, count_offset, count = 0;
+    struct hlsl_ir_var *pass;
 
     name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     put_u32(buffer, 0); /* Annotation count. */
-    put_u32(buffer, 0); /* Pass count. */
+    count_offset = put_u32(buffer, 0); /* Pass count. */
 
     /* FIXME: annotations */
-    /* FIXME: passes */
+
+    LIST_FOR_EACH_ENTRY(pass, &var->scope->vars, struct hlsl_ir_var, scope_entry)
+    {
+        write_pass(pass, fx);
+        ++count;
+    }
+
+    set_u32(buffer, count_offset, count);
 }
 
 static const struct fx_write_context_ops fx_2_ops =
 {
     .write_string = write_fx_2_string,
     .write_technique = write_fx_2_technique,
+    .write_pass = write_fx_2_pass,
 };
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
@@ -311,7 +343,6 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     /* TODO: resources */
 
     size = align(fx.unstructured.size, 4);
-    /* Accounts for additional 4 bytes before the raw data section. */
     set_u32(&buffer, offset, size);
 
     bytecode_put_bytes(&buffer, fx.unstructured.data, fx.unstructured.size);
@@ -336,6 +367,7 @@ static const struct fx_write_context_ops fx_4_ops =
 {
     .write_string = write_fx_4_string,
     .write_technique = write_fx_4_technique,
+    .write_pass = write_fx_4_pass,
 };
 
 static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
