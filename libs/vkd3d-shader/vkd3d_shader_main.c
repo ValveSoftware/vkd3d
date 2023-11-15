@@ -2045,14 +2045,14 @@ bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *ins
     return true;
 }
 
-unsigned int shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
+bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
         struct vkd3d_shader_immediate_constant_buffer *icb)
 {
     if (!vkd3d_array_reserve((void **)&instructions->icbs, &instructions->icb_capacity, instructions->icb_count + 1,
             sizeof(*instructions->icbs)))
-        return UINT_MAX;
-    instructions->icbs[instructions->icb_count] = icb;
-    return instructions->icb_count++;
+        return false;
+    instructions->icbs[instructions->icb_count++] = icb;
+    return true;
 }
 
 static struct vkd3d_shader_src_param *shader_instruction_array_clone_src_params(

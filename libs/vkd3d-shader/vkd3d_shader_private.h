@@ -1206,7 +1206,7 @@ struct vkd3d_shader_instruction_array
 
 bool shader_instruction_array_init(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
 bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *instructions, unsigned int reserve);
-unsigned int shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
+bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
         struct vkd3d_shader_immediate_constant_buffer *icb);
 bool shader_instruction_array_clone_instruction(struct vkd3d_shader_instruction_array *instructions,
         unsigned int dst, unsigned int src);

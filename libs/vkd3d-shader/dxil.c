@@ -404,6 +404,7 @@ enum sm6_value_type
 {
     VALUE_TYPE_FUNCTION,
     VALUE_TYPE_REG,
+    VALUE_TYPE_ICB,
     VALUE_TYPE_HANDLE,
 };
 
@@ -429,6 +430,7 @@ struct sm6_value
     {
         struct sm6_function_data function;
         struct vkd3d_shader_register reg;
+        const struct vkd3d_shader_immediate_constant_buffer *icb;
         struct sm6_handle_data handle;
     } u;
 };
@@ -1900,7 +1902,7 @@ static inline bool sm6_value_is_undef(const struct sm6_value *value)
 
 static bool sm6_value_is_icb(const struct sm6_value *value)
 {
-    return sm6_value_is_register(value) && value->u.reg.type == VKD3DSPR_IMMCONSTBUFFER;
+    return value->value_type == VALUE_TYPE_ICB;
 }
 
 static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *value)
@@ -2360,7 +2362,7 @@ static inline double bitcast_uint64_to_double(uint64_t value)
     return u.double_value;
 }
 
-static enum vkd3d_result register_allocate_constant_array(struct vkd3d_shader_register *reg, const struct sm6_type *type,
+static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, const struct sm6_type *type,
         const uint64_t *operands, struct sm6_parser *sm6)
 {
     struct vkd3d_shader_immediate_constant_buffer *icb;
@@ -2395,7 +2397,7 @@ static enum vkd3d_result register_allocate_constant_array(struct vkd3d_shader_re
                 "Out of memory allocating an immediate constant buffer of count %u.", count);
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
-    if ((reg->idx[0].offset = shader_instruction_array_add_icb(&sm6->p.instructions, icb)) == UINT_MAX)
+    if (!shader_instruction_array_add_icb(&sm6->p.instructions, icb))
     {
         ERR("Failed to store icb object.\n");
         vkd3d_free(icb);
@@ -2404,8 +2406,8 @@ static enum vkd3d_result register_allocate_constant_array(struct vkd3d_shader_re
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    reg->type = VKD3DSPR_IMMCONSTBUFFER;
-    reg->idx_count = 1;
+    dst->value_type = VALUE_TYPE_ICB;
+    dst->u.icb = icb;
 
     icb->data_type = vkd3d_data_type_from_sm6_type(elem_type);
     icb->element_count = type->u.array.count;
@@ -2544,7 +2546,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 if (!dxil_record_validate_operand_count(record, type->u.array.count, type->u.array.count, sm6))
                     return VKD3D_ERROR_INVALID_SHADER;
 
-                if ((ret = register_allocate_constant_array(&dst->u.reg, type, record->operands, sm6)) < 0)
+                if ((ret = value_allocate_constant_array(dst, type, record->operands, sm6)) < 0)
                     return ret;
 
                 break;
