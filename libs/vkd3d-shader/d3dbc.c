@@ -855,6 +855,14 @@ static void shader_sm1_skip_opcode(const struct vkd3d_shader_sm1_parser *sm1, co
     {
         *ptr += 2;
     }
+    /* Somewhat similarly, DEF and DEFI have a single source, but need to read
+     * four tokens for that source. See shader_sm1_read_immconst().
+     * Technically shader model 1 doesn't have integer registers or DEFI; we
+     * handle it here anyway because it's easy. */
+    else if (opcode_info->vkd3d_opcode == VKD3DSIH_DEF || opcode_info->vkd3d_opcode == VKD3DSIH_DEFI)
+    {
+        *ptr += 3;
+    }
 
     *ptr += (opcode_info->dst_count + opcode_info->src_count);
 }

@@ -238,6 +238,13 @@ static void test_d3dbc(void)
         0xfffe0100, /* vs_1_0 */
         0x0000ffff, /* end */
     };
+    static const uint32_t vs_dcl_def[] =
+    {
+        0xfffe0101,                                                             /* vs_1_1 */
+        0x0000001f, 0x80000000, 0x900f0000,                                     /* dcl_position v0  */
+        0x00000051, 0xa00f0000, 0x3f800000, 0x00000000, 0x00000000, 0x3f800000, /* def c0, 1.0, 0.0, 0.0, 1.0   */
+        0x0000ffff,                                                             /* end */
+    };
     static const uint32_t invalid_type[] =
     {
         0x00010100, /* <invalid>_1_0 */
@@ -255,6 +262,10 @@ static void test_d3dbc(void)
         0x0000ffff,                         /* end */
     };
     static const char expected[] = "vs_1_0\n";
+    static const char expected_dcl_def[] =
+        "vs_1_1\n"
+        "dcl_position0 v0\n"
+        "def c0 = 1.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00\n";
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = NULL;
@@ -290,6 +301,15 @@ static void test_d3dbc(void)
     info.source.size = sizeof(vs_minimal) - 1;
     rc = vkd3d_shader_compile(&info, &d3d_asm, NULL);
     ok(rc == VKD3D_ERROR_INVALID_SHADER, "Got unexpected error code %d.\n", rc);
+
+    info.source.code = vs_dcl_def;
+    info.source.size = sizeof(vs_dcl_def);
+    rc = vkd3d_shader_compile(&info, &d3d_asm, NULL);
+    ok(rc == VKD3D_OK, "Got unexpected error code %d.\n", rc);
+    ok(d3d_asm.size == strlen(expected_dcl_def), "Got unexpected size %zu.\n", d3d_asm.size);
+    ok(!memcmp(d3d_asm.code, expected_dcl_def, d3d_asm.size), "Got unexpected code \"%.*s\"\n",
+            (int)d3d_asm.size, (char *)d3d_asm.code);
+    vkd3d_shader_free_shader_code(&d3d_asm);
 
     info.source.code = invalid_type;
     info.source.size = sizeof(invalid_type);
