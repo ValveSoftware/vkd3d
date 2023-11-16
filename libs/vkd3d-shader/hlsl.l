@@ -203,17 +203,29 @@ while                   {return KW_WHILE;               }
                             yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
-0x[0-9a-fA-F]+[uU]?     {
+0x[0-9a-fA-F]+[lL]?     {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }
-0[0-7]+[uU]?            {
+0[0-7]+[lL]?            {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }
-[0-9]+[uU]?             {
+[0-9]+[lL]?             {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
+                        }
+0x[0-9a-fA-F]+([uU]|[uU][lL]|[lL][uU]) {
+                            yylval->intval = vkd3d_parse_integer(yytext);
+                            return C_UNSIGNED;
+                        }
+0[0-7]+([uU]|[uU][lL]|[lL][uU]) {
+                            yylval->intval = vkd3d_parse_integer(yytext);
+                            return C_UNSIGNED;
+                        }
+[0-9]+([uU]|[uU][lL]|[lL][uU]) {
+                            yylval->intval = vkd3d_parse_integer(yytext);
+                            return C_UNSIGNED;
                         }
 
 {WS}+                   {}

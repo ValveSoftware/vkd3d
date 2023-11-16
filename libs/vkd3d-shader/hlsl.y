@@ -4975,6 +4975,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token <floatval> C_FLOAT
 
 %token <intval> C_INTEGER
+%token <intval> C_UNSIGNED
 %token <intval> PRE_LINE
 
 %type <list> type_specs
@@ -6705,6 +6706,15 @@ primary_expr:
             struct hlsl_ir_node *c;
 
             if (!(c = hlsl_new_int_constant(ctx, $1, &@1)))
+                YYABORT;
+            if (!($$ = make_block(ctx, c)))
+                YYABORT;
+        }
+    | C_UNSIGNED
+        {
+            struct hlsl_ir_node *c;
+
+            if (!(c = hlsl_new_uint_constant(ctx, $1, &@1)))
                 YYABORT;
             if (!($$ = make_block(ctx, c)))
                 YYABORT;

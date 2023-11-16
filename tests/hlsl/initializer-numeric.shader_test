@@ -57,7 +57,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo(sm<6) probe all rgba (3.0, 250.0, 16.0, 4.2949673e+009) 4
+probe all rgba (3.0, 250.0, 16.0, 4.2949673e+009) 4
 
 
 [require]
@@ -73,4 +73,4 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (-1294967296.0, 3000000000.0, 0.0, 0.0) 4
+probe all rgba (-1294967296.0, 3000000000.0, 0.0, 0.0) 4
