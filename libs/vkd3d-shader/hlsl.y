@@ -3171,6 +3171,7 @@ static bool intrinsic_log(struct hlsl_ctx *ctx,
     /* ln(2) */
     if (!(coeff = hlsl_new_float_constant(ctx, 0.69314718055f, loc)))
         return false;
+    hlsl_block_add_instr(params->instrs, coeff);
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, log, coeff, loc);
 }
@@ -3189,6 +3190,7 @@ static bool intrinsic_log10(struct hlsl_ctx *ctx,
     /* 1 / log2(10) */
     if (!(coeff = hlsl_new_float_constant(ctx, 0.301029996f, loc)))
         return false;
+    hlsl_block_add_instr(params->instrs, coeff);
 
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, log, coeff, loc);
 }
