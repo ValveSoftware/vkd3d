@@ -1696,6 +1696,14 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             ctx->blocks[ctx->depth++] = instruction->handler_idx;
             break;
 
+        case VKD3DSIH_IFC:
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 2);
+            if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
+                return;
+            ctx->blocks[ctx->depth++] = VKD3DSIH_IF;
+            break;
+
         case VKD3DSIH_ELSE:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
