@@ -2878,6 +2878,22 @@ static bool intrinsic_ddy_coarse(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_DSY_COARSE, arg, loc);
 }
 
+static bool intrinsic_degrees(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg, *deg;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    /* 1 rad = 180/pi degree = 57.2957795 degree */
+    if (!(deg = hlsl_new_float_constant(ctx, 57.2957795f, loc)))
+        return false;
+    hlsl_block_add_instr(params->instrs, deg);
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, deg, loc);
+}
+
 static bool intrinsic_ddy_fine(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3865,6 +3881,7 @@ intrinsic_functions[] =
     {"ddy",                                 1, true,  intrinsic_ddy},
     {"ddy_coarse",                          1, true,  intrinsic_ddy_coarse},
     {"ddy_fine",                            1, true,  intrinsic_ddy_fine},
+    {"degrees",                             1, true,  intrinsic_degrees},
     {"distance",                            2, true,  intrinsic_distance},
     {"dot",                                 2, true,  intrinsic_dot},
     {"exp",                                 1, true,  intrinsic_exp},
