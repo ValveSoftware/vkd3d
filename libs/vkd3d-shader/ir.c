@@ -207,10 +207,15 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
     {
         /* Leave only the first temp declaration and set it to the max count later. */
         if (!normaliser->max_temp_count)
+        {
+            normaliser->max_temp_count = ins->declaration.count;
             normaliser->temp_dcl_idx = index;
+        }
         else
+        {
+            normaliser->max_temp_count = max(normaliser->max_temp_count, ins->declaration.count);
             vkd3d_shader_instruction_make_nop(ins);
-        normaliser->max_temp_count = max(normaliser->max_temp_count, ins->declaration.count);
+        }
         return;
     }
 
