@@ -46,6 +46,7 @@ vkd3d_cross_tests = \
 vkd3d_shader_tests = \
 	tests/hlsl/abs.shader_test \
 	tests/hlsl/all.shader_test \
+	tests/hlsl/angle-unit.shader_test \
 	tests/hlsl/any.shader_test \
 	tests/hlsl/arithmetic-float-uniform.shader_test \
 	tests/hlsl/arithmetic-float.shader_test \

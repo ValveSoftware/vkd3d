@@ -3341,6 +3341,22 @@ static bool intrinsic_pow(struct hlsl_ctx *ctx,
     return !!add_pow_expr(ctx, params->instrs, params->args[0], params->args[1], loc);
 }
 
+static bool intrinsic_radians(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *arg, *rad;
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    /* 1 degree = pi/180 rad = 0.0174532925f rad */
+    if (!(rad = hlsl_new_float_constant(ctx, 0.0174532925f, loc)))
+        return false;
+    hlsl_block_add_instr(params->instrs, rad);
+
+    return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, arg, rad, loc);
+}
+
 static bool intrinsic_reflect(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3869,6 +3885,7 @@ intrinsic_functions[] =
     {"mul",                                 2, true,  intrinsic_mul},
     {"normalize",                           1, true,  intrinsic_normalize},
     {"pow",                                 2, true,  intrinsic_pow},
+    {"radians",                             1, true,  intrinsic_radians},
     {"reflect",                             2, true,  intrinsic_reflect},
     {"round",                               1, true,  intrinsic_round},
     {"rsqrt",                               1, true,  intrinsic_rsqrt},
