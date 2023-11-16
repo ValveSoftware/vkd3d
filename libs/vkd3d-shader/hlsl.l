@@ -203,15 +203,15 @@ while                   {return KW_WHILE;               }
                             yylval->floatval = atof(yytext);
                             return C_FLOAT;
                         }
-0x[0-9a-fA-F]+          {
+0x[0-9a-fA-F]+[uU]?     {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }
-0[0-7]+                 {
+0[0-7]+[uU]?            {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }
-[0-9]+                  {
+[0-9]+[uU]?             {
                             yylval->intval = vkd3d_parse_integer(yytext);
                             return C_INTEGER;
                         }

@@ -48,7 +48,7 @@ draw quad
 probe all rgba (10.1, 1.1, 1.2, 2.1) 4
 
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     float4 aa = { 3U, 0xfau, 020u, -1u};
@@ -56,14 +56,14 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 todo(sm<6) probe all rgba (3.0, 250.0, 16.0, 4.2949673e+009) 4
 
 
 [require]
 shader model < 6.0
 
-[pixel shader todo]
+[pixel shader]
 float4 main() : sv_target
 {
     // 3000000000 is -1294967296 when it doesn't have the 'u' suffix, except in SM6.
@@ -72,5 +72,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 todo probe all rgba (-1294967296.0, 3000000000.0, 0.0, 0.0) 4
