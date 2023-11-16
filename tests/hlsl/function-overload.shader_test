@@ -41,6 +41,47 @@ todo(sm<6) draw quad
 probe all rgba (0.1, 0.2, 0.1, 0.2)
 
 
+[pixel shader fail todo]
+float func(int arg)
+{
+    return 1.0;
+}
+
+float func(uint arg)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    return func(3); // whether 3 is signed or unsigned is unspecified.
+}
+
+
+[pixel shader todo]
+float func(int arg)
+{
+    return 1.0;
+}
+
+float func(uint arg)
+{
+    return 2.0;
+}
+
+float4 main() : sv_target
+{
+    int a = 3;
+    uint b = 3l;
+
+    return float4(func(a), func(b), func(3u), func(3lu));
+}
+
+[test]
+todo(sm<6) draw quad
+todo(sm<6) probe all rgba (1.0, 2.0, 2.0, 2.0)
+
+
 % float and float1 can be defined separately...
 
 [pixel shader]
