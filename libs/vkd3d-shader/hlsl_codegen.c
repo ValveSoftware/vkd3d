@@ -1203,6 +1203,43 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
     return false;
 }
 
+/* Allocate a unique, ordered index to each instruction, which will be used for
+ * computing liveness ranges.
+ * Index 0 means unused; index 1 means function entry, so start at 2. */
+static unsigned int index_instructions(struct hlsl_block *block, unsigned int index)
+{
+    struct hlsl_ir_node *instr;
+
+    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
+    {
+        instr->index = index++;
+
+        if (instr->type == HLSL_IR_IF)
+        {
+            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
+            index = index_instructions(&iff->then_block, index);
+            index = index_instructions(&iff->else_block, index);
+        }
+        else if (instr->type == HLSL_IR_LOOP)
+        {
+            index = index_instructions(&hlsl_ir_loop(instr)->body, index);
+            hlsl_ir_loop(instr)->next_index = index;
+        }
+        else if (instr->type == HLSL_IR_SWITCH)
+        {
+            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
+            struct hlsl_ir_switch_case *c;
+
+            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
+            {
+                index = index_instructions(&c->body, index);
+            }
+        }
+    }
+
+    return index;
+}
+
 /*
  * Copy propagation. The basic idea is to recognize instruction sequences of the
  * form:
@@ -3240,42 +3277,6 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
     return false;
 }
 
-/* Allocate a unique, ordered index to each instruction, which will be used for
- * computing liveness ranges. */
-static unsigned int index_instructions(struct hlsl_block *block, unsigned int index)
-{
-    struct hlsl_ir_node *instr;
-
-    LIST_FOR_EACH_ENTRY(instr, &block->instrs, struct hlsl_ir_node, entry)
-    {
-        instr->index = index++;
-
-        if (instr->type == HLSL_IR_IF)
-        {
-            struct hlsl_ir_if *iff = hlsl_ir_if(instr);
-            index = index_instructions(&iff->then_block, index);
-            index = index_instructions(&iff->else_block, index);
-        }
-        else if (instr->type == HLSL_IR_LOOP)
-        {
-            index = index_instructions(&hlsl_ir_loop(instr)->body, index);
-            hlsl_ir_loop(instr)->next_index = index;
-        }
-        else if (instr->type == HLSL_IR_SWITCH)
-        {
-            struct hlsl_ir_switch *s = hlsl_ir_switch(instr);
-            struct hlsl_ir_switch_case *c;
-
-            LIST_FOR_EACH_ENTRY(c, &s->cases, struct hlsl_ir_switch_case, entry)
-            {
-                index = index_instructions(&c->body, index);
-            }
-        }
-    }
-
-    return index;
-}
-
 static void dump_function(struct rb_entry *entry, void *context)
 {
     struct hlsl_ir_function *func = RB_ENTRY_VALUE(entry, struct hlsl_ir_function, entry);
@@ -3518,7 +3519,6 @@ static void compute_liveness(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl 
     struct hlsl_scope *scope;
     struct hlsl_ir_var *var;
 
-    /* Index 0 means unused; index 1 means function entry, so start at 2. */
     index_instructions(&entry_func->body, 2);
 
     LIST_FOR_EACH_ENTRY(scope, &ctx->scopes, struct hlsl_scope, entry)
