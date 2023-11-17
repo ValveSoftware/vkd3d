@@ -39,6 +39,13 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
     generator->failed = true;
 }
 
+static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
+{
+    vkd3d_string_buffer_printf(&gen->buffer, "/* <unhandled instruction %#x> */\n", ins->handler_idx);
+    vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
+            "Internal compiler error: Unhandled instruction %#x.", ins->handler_idx);
+}
+
 static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
         const struct vkd3d_shader_instruction *ins)
 {
@@ -69,9 +76,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
             shader_glsl_ret(generator, instruction);
             break;
         default:
-            vkd3d_glsl_compiler_error(generator,
-                    VKD3D_SHADER_ERROR_GLSL_INTERNAL,
-                    "Unhandled instruction %#x", instruction->handler_idx);
+            shader_glsl_unhandled(generator, instruction);
             break;
     }
 }
