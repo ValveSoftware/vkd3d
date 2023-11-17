@@ -75,7 +75,7 @@ static inline size_t align(size_t addr, size_t alignment)
     return (addr + (alignment - 1)) & ~(alignment - 1);
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
 # define VKD3D_NORETURN __attribute__((noreturn))
 # ifdef __MINGW_PRINTF_FORMAT
 #  define VKD3D_PRINTF_FUNC(fmt, args) __attribute__((format(__MINGW_PRINTF_FORMAT, fmt, args)))
