@@ -24,6 +24,7 @@ struct vkd3d_glsl_generator
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
+    unsigned int indent;
     bool failed;
 };
 
@@ -39,8 +40,14 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
     generator->failed = true;
 }
 
+static void shader_glsl_print_indent(struct vkd3d_string_buffer *buffer, unsigned int indent)
+{
+    vkd3d_string_buffer_printf(buffer, "%*s", 4 * indent, "");
+}
+
 static void shader_glsl_unhandled(struct vkd3d_glsl_generator *gen, const struct vkd3d_shader_instruction *ins)
 {
+    shader_glsl_print_indent(&gen->buffer, gen->indent);
     vkd3d_string_buffer_printf(&gen->buffer, "/* <unhandled instruction %#x> */\n", ins->handler_idx);
     vkd3d_glsl_compiler_error(gen, VKD3D_SHADER_ERROR_GLSL_INTERNAL,
             "Internal compiler error: Unhandled instruction %#x.", ins->handler_idx);
@@ -57,6 +64,7 @@ static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
     */
     if (version->major >= 4)
     {
+        shader_glsl_print_indent(&generator->buffer, generator->indent);
         vkd3d_string_buffer_printf(&generator->buffer, "return;\n");
     }
 }
@@ -92,6 +100,7 @@ static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
+    ++generator->indent;
     for (i = 0; i < instructions->count; ++i)
     {
         vkd3d_glsl_handle_instruction(generator, &instructions->elements[i]);
