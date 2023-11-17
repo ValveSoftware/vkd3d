@@ -28,7 +28,7 @@ struct vkd3d_glsl_generator
 };
 
 struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
-        struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location)
+        struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_glsl_generator *generator;
 
@@ -38,7 +38,6 @@ struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shad
     memset(generator, 0, sizeof(*generator));
     generator->version = *version;
     vkd3d_string_buffer_init(&generator->buffer);
-    generator->location = *location;
     generator->message_context = message_context;
     return generator;
 }
@@ -73,6 +72,8 @@ static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
 static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator,
         const struct vkd3d_shader_instruction *instruction)
 {
+    generator->location = instruction->location;
+
     switch (instruction->handler_idx)
     {
         case VKD3DSIH_DCL_INPUT:
@@ -101,10 +102,8 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
-    generator->location.column = 0;
     for (i = 0; i < program->instructions.count; ++i)
     {
-        generator->location.line = i + 1;
         vkd3d_glsl_handle_instruction(generator, &program->instructions.elements[i]);
     }
 

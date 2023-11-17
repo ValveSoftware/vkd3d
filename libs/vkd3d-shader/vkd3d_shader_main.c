@@ -1553,6 +1553,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_scan_descriptor_info1 scan_descriptor_info;
+    struct vsir_program *program = &parser->program;
     struct vkd3d_glsl_generator *glsl_generator;
     struct vkd3d_shader_compile_info scan_info;
     int ret;
@@ -1562,22 +1563,20 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
-            ret = vkd3d_dxbc_binary_to_text(&parser->program, &parser->shader_desc,
-                    compile_info, out, VSIR_ASM_FLAG_NONE);
+            ret = vkd3d_dxbc_binary_to_text(program, &parser->shader_desc, compile_info, out, VSIR_ASM_FLAG_NONE);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
             if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
                 return ret;
-            if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->program.shader_version,
-                    message_context, &parser->location)))
+            if (!(glsl_generator = vkd3d_glsl_generator_create(&program->shader_version, message_context)))
             {
                 ERR("Failed to create GLSL generator.\n");
                 vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
                 return VKD3D_ERROR;
             }
 
-            ret = vkd3d_glsl_generator_generate(glsl_generator, &parser->program, out);
+            ret = vkd3d_glsl_generator_generate(glsl_generator, program, out);
             vkd3d_glsl_generator_destroy(glsl_generator);
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
