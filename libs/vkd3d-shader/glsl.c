@@ -92,10 +92,13 @@ static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         vkd3d_glsl_handle_instruction(generator, &instructions->elements[i]);
     }
 
+    vkd3d_string_buffer_printf(&generator->buffer, "}\n");
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_trace(&generator->buffer);
+
     if (generator->failed)
         return VKD3D_ERROR_INVALID_SHADER;
-
-    vkd3d_string_buffer_printf(&generator->buffer, "}\n");
 
     if ((code = vkd3d_malloc(generator->buffer.buffer_size)))
     {
