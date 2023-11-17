@@ -20,7 +20,7 @@
 
 struct vkd3d_glsl_generator
 {
-    struct vkd3d_shader_version version;
+    struct vsir_program *program;
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_location location;
     struct vkd3d_shader_message_context *message_context;
@@ -42,7 +42,7 @@ static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
 static void shader_glsl_ret(struct vkd3d_glsl_generator *generator,
         const struct vkd3d_shader_instruction *ins)
 {
-    const struct vkd3d_shader_version *version = &generator->version;
+    const struct vkd3d_shader_version *version = &generator->program->shader_version;
 
     /*
     * TODO: Implement in_subroutine
@@ -76,9 +76,9 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
     }
 }
 
-static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
-        struct vsir_program *program, struct vkd3d_shader_code *out)
+static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator, struct vkd3d_shader_code *out)
 {
+    const struct vkd3d_shader_instruction_array *instructions = &generator->program->instructions;
     unsigned int i;
     void *code;
 
@@ -87,9 +87,9 @@ static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
-    for (i = 0; i < program->instructions.count; ++i)
+    for (i = 0; i < instructions->count; ++i)
     {
-        vkd3d_glsl_handle_instruction(generator, &program->instructions.elements[i]);
+        vkd3d_glsl_handle_instruction(generator, &instructions->elements[i]);
     }
 
     if (generator->failed)
@@ -114,10 +114,10 @@ static void vkd3d_glsl_generator_cleanup(struct vkd3d_glsl_generator *gen)
 }
 
 static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
-        const struct vkd3d_shader_version *version, struct vkd3d_shader_message_context *message_context)
+        struct vsir_program *program, struct vkd3d_shader_message_context *message_context)
 {
     memset(gen, 0, sizeof(*gen));
-    gen->version = *version;
+    gen->program = program;
     vkd3d_string_buffer_init(&gen->buffer);
     gen->message_context = message_context;
 }
@@ -128,8 +128,8 @@ int glsl_compile(struct vsir_program *program, struct vkd3d_shader_code *out,
     struct vkd3d_glsl_generator generator;
     int ret;
 
-    vkd3d_glsl_generator_init(&generator, &program->shader_version, message_context);
-    ret = vkd3d_glsl_generator_generate(&generator, program, out);
+    vkd3d_glsl_generator_init(&generator, program, message_context);
+    ret = vkd3d_glsl_generator_generate(&generator, out);
     vkd3d_glsl_generator_cleanup(&generator);
 
     return ret;
