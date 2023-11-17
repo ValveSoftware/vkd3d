@@ -27,21 +27,6 @@ struct vkd3d_glsl_generator
     bool failed;
 };
 
-struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
-        struct vkd3d_shader_message_context *message_context)
-{
-    struct vkd3d_glsl_generator *generator;
-
-    if (!(generator = vkd3d_malloc(sizeof(*generator))))
-        return NULL;
-
-    memset(generator, 0, sizeof(*generator));
-    generator->version = *version;
-    vkd3d_string_buffer_init(&generator->buffer);
-    generator->message_context = message_context;
-    return generator;
-}
-
 static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_glsl_compiler_error(
         struct vkd3d_glsl_generator *generator,
         enum vkd3d_shader_error error, const char *fmt, ...)
@@ -91,7 +76,7 @@ static void vkd3d_glsl_handle_instruction(struct vkd3d_glsl_generator *generator
     }
 }
 
-int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
+static int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
         struct vsir_program *program, struct vkd3d_shader_code *out)
 {
     unsigned int i;
@@ -123,8 +108,29 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     return VKD3D_OK;
 }
 
-void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator)
+static void vkd3d_glsl_generator_cleanup(struct vkd3d_glsl_generator *gen)
 {
-    vkd3d_string_buffer_cleanup(&generator->buffer);
-    vkd3d_free(generator);
+    vkd3d_string_buffer_cleanup(&gen->buffer);
+}
+
+static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
+        const struct vkd3d_shader_version *version, struct vkd3d_shader_message_context *message_context)
+{
+    memset(gen, 0, sizeof(*gen));
+    gen->version = *version;
+    vkd3d_string_buffer_init(&gen->buffer);
+    gen->message_context = message_context;
+}
+
+int glsl_compile(struct vsir_program *program, struct vkd3d_shader_code *out,
+        struct vkd3d_shader_message_context *message_context)
+{
+    struct vkd3d_glsl_generator generator;
+    int ret;
+
+    vkd3d_glsl_generator_init(&generator, &program->shader_version, message_context);
+    ret = vkd3d_glsl_generator_generate(&generator, program, out);
+    vkd3d_glsl_generator_cleanup(&generator);
+
+    return ret;
 }

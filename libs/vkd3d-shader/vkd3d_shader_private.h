@@ -1504,13 +1504,8 @@ int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, struct shader_signature *signature);
 
-struct vkd3d_glsl_generator;
-
-struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
+int glsl_compile(struct vsir_program *program, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context);
-int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
-        struct vsir_program *program, struct vkd3d_shader_code *out);
-void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
 
 #define SPIRV_MAX_SRC_COUNT 6
 
