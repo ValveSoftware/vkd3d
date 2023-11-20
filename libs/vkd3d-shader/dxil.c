@@ -5040,7 +5040,7 @@ static const enum vkd3d_shader_sysval_semantic sysval_semantic_table[] =
 {
     [SEMANTIC_KIND_ARBITRARY]            = VKD3D_SHADER_SV_NONE,
     [SEMANTIC_KIND_POSITION]             = VKD3D_SHADER_SV_POSITION,
-    [SEMANTIC_KIND_TARGET]               = VKD3D_SHADER_SV_NONE,
+    [SEMANTIC_KIND_TARGET]               = VKD3D_SHADER_SV_TARGET,
 };
 
 static enum vkd3d_shader_sysval_semantic sysval_semantic_from_dxil_semantic_kind(enum dxil_semantic_kind kind)
