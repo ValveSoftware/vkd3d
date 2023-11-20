@@ -655,6 +655,16 @@ static VKD3D_PRINTF_FUNC(3, 4) void vkd3d_shader_scan_error(struct vkd3d_shader_
     va_end(args);
 }
 
+static void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_scan_warning(struct vkd3d_shader_scan_context *context,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(context->message_context, &context->location, error, format, args);
+    va_end(args);
+}
+
 static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_version *version,
         const struct vkd3d_shader_compile_info *compile_info,
@@ -907,6 +917,18 @@ static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_co
     {
         const struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
         const struct vkd3d_shader_descriptor_info1 *d;
+        bool dynamic_resource, dynamic_sampler;
+
+        if ((dynamic_resource = resource->idx[1].rel_addr))
+            vkd3d_shader_scan_warning(context, VKD3D_SHADER_WARNING_VSIR_DYNAMIC_DESCRIPTOR_ARRAY,
+                    "Resource descriptor array %u is being dynamically indexed, "
+                    "not recording a combined resource-sampler pair.", resource->idx[0].offset);
+        if ((dynamic_sampler = sampler && sampler->idx[1].rel_addr))
+            vkd3d_shader_scan_warning(context, VKD3D_SHADER_WARNING_VSIR_DYNAMIC_DESCRIPTOR_ARRAY,
+                    "Sampler descriptor array %u is being dynamically indexed, "
+                    "not recording a combined resource-sampler pair.", sampler->idx[0].offset);
+        if (dynamic_resource || dynamic_sampler)
+            return;
 
         for (i = 0; i < info->descriptor_count; ++i)
         {

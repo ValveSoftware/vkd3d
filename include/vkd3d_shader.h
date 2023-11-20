@@ -1507,6 +1507,10 @@ struct vkd3d_shader_combined_resource_sampler_info
  * particularly useful when targeting environments without separate binding
  * points for samplers and resources, like OpenGL.
  *
+ * No resource-sampler pairs are returned for dynamic accesses to
+ * resource/sampler descriptor arrays, as can occur in Direct3D shader model
+ * 5.1 shaders.
+ *
  * Members of this structure are allocated by vkd3d-shader and should be freed
  * with vkd3d_shader_free_scan_combined_resource_sampler_info() when no longer
  * needed.
