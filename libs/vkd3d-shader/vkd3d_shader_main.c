@@ -645,6 +645,16 @@ struct vkd3d_shader_scan_context
     size_t combined_samplers_size;
 };
 
+static VKD3D_PRINTF_FUNC(3, 4) void vkd3d_shader_scan_error(struct vkd3d_shader_scan_context *context,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_verror(context->message_context, &context->location, error, format, args);
+    va_end(args);
+}
+
 static void vkd3d_shader_scan_context_init(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_version *version,
         const struct vkd3d_shader_compile_info *compile_info,
@@ -1024,16 +1034,6 @@ static void vkd3d_shader_scan_typed_resource_declaration(struct vkd3d_shader_sca
 
     vkd3d_shader_scan_resource_declaration(context, &semantic->resource,
             semantic->resource_type, resource_data_type, semantic->sample_count, 0, false);
-}
-
-static void vkd3d_shader_scan_error(struct vkd3d_shader_scan_context *context,
-        enum vkd3d_shader_error error, const char *format, ...)
-{
-    va_list args;
-
-    va_start(args, format);
-    vkd3d_shader_verror(context->message_context, &context->location, error, format, args);
-    va_end(args);
 }
 
 static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *context,
