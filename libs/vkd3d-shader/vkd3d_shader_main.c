@@ -1065,6 +1065,8 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
     struct vkd3d_shader_cf_info *cf_info;
     unsigned int i;
 
+    context->location = instruction->location;
+
     switch (instruction->handler_idx)
     {
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
@@ -1292,7 +1294,6 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
         }
     }
 
-    ++context->location.line;
     return VKD3D_OK;
 }
 
