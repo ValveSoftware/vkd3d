@@ -1797,6 +1797,8 @@ static uint32_t vkd3d_spirv_get_type_id(struct vkd3d_spirv_builder *builder,
                 break;
             case VKD3D_SHADER_COMPONENT_DOUBLE:
                 return vkd3d_spirv_get_op_type_float(builder, 64);
+            case VKD3D_SHADER_COMPONENT_UINT64:
+                return vkd3d_spirv_get_op_type_int(builder, 64, 0);
             default:
                 FIXME("Unhandled component type %#x.\n", component_type);
                 return 0;
@@ -1830,6 +1832,8 @@ static uint32_t vkd3d_spirv_get_type_id_for_data_type(struct vkd3d_spirv_builder
                 break;
             case VKD3D_DATA_DOUBLE:
                 return vkd3d_spirv_get_op_type_float(builder, 64);
+            case VKD3D_DATA_UINT64:
+                return vkd3d_spirv_get_op_type_int(builder, 64, 0);
             case VKD3D_DATA_BOOL:
                 return vkd3d_spirv_get_op_type_bool(builder);
             default:
@@ -2988,7 +2992,7 @@ static uint32_t spirv_compiler_get_constant64(struct spirv_compiler *compiler,
     assert(0 < component_count && component_count <= VKD3D_DVEC2_SIZE);
     type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
 
-    if (component_type != VKD3D_SHADER_COMPONENT_DOUBLE)
+    if (component_type != VKD3D_SHADER_COMPONENT_DOUBLE && component_type != VKD3D_SHADER_COMPONENT_UINT64)
     {
         FIXME("Unhandled component_type %#x.\n", component_type);
         return vkd3d_spirv_get_op_undef(builder, type_id);
