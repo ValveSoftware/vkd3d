@@ -4000,7 +4000,7 @@ static uint32_t spirv_compiler_emit_neg(struct spirv_compiler *compiler,
     type_id = spirv_compiler_get_type_id_for_reg(compiler, reg, write_mask);
     if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
         return vkd3d_spirv_build_op_fnegate(builder, type_id, val_id);
-    else if (reg->data_type == VKD3D_DATA_INT || reg->data_type == VKD3D_DATA_UINT)
+    else if (data_type_is_integer(reg->data_type))
         return vkd3d_spirv_build_op_snegate(builder, type_id, val_id);
 
     FIXME("Unhandled data type %#x.\n", reg->data_type);
