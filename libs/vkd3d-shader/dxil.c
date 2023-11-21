@@ -2860,17 +2860,19 @@ static const struct vkd3d_shader_immediate_constant_buffer *resolve_forward_init
 
     assert(index);
     --index;
-    if (!(value = sm6_parser_get_value_safe(sm6, index)) || !sm6_value_is_icb(value))
+    if (!(value = sm6_parser_get_value_safe(sm6, index)) || (!sm6_value_is_icb(value) && !sm6_value_is_undef(value)))
     {
         WARN("Invalid initialiser index %zu.\n", index);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
                 "Global variable initialiser value index %zu is invalid.", index);
         return NULL;
     }
-    else
+    else if (sm6_value_is_icb(value))
     {
         return value->u.icb;
     }
+    /* In VSIR, initialisation with undefined values of objects is implied, not explicit. */
+    return NULL;
 }
 
 static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
@@ -4282,6 +4284,57 @@ static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_dst_param *dst_param;
+    const struct sm6_type *pointee_type;
+    const struct sm6_value *ptr, *src;
+    unsigned int i = 0, alignment;
+    uint64_t alignment_code;
+
+    if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
+            || !sm6_value_validate_is_register(ptr, sm6)
+            || !sm6_value_validate_is_pointer(ptr, sm6))
+    {
+        return;
+    }
+
+    pointee_type = ptr->type->u.pointer.type;
+    if (!(src = sm6_parser_get_value_by_ref(sm6, record, pointee_type, &i)))
+        return;
+    if (!sm6_value_validate_is_numeric(src, sm6))
+        return;
+
+    if (pointee_type != src->type)
+    {
+        WARN("Type mismatch.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Type mismatch in pointer store arguments.");
+    }
+
+    if (!dxil_record_validate_operand_count(record, i + 2, i + 2, sm6))
+        return;
+
+    alignment_code = record->operands[i++];
+    if (!bitcode_parse_alignment(alignment_code, &alignment))
+        WARN("Invalid alignment %"PRIu64".\n", alignment_code);
+
+    if (record->operands[i])
+        WARN("Ignoring volatile modifier.\n");
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(&src_param[0], src);
+
+    dst_param = instruction_dst_params_alloc(ins, 1, sm6);
+    dst_param_init(dst_param);
+    dst_param->reg = ptr->u.reg;
+    dst_param->reg.alignment = alignment;
+}
+
 static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -4687,6 +4740,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 sm6_parser_emit_ret(sm6, record, code_block, ins);
                 is_terminator = true;
                 ret_found = true;
+                break;
+            case FUNC_CODE_INST_STORE:
+                sm6_parser_emit_store(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_VSELECT:
                 sm6_parser_emit_vselect(sm6, record, ins, dst);
