@@ -3052,6 +3052,13 @@ static uint32_t spirv_compiler_get_constant_double_vector(struct spirv_compiler 
             component_count, (const uint64_t *)values);
 }
 
+static uint32_t spirv_compiler_get_constant_uint64_vector(struct spirv_compiler *compiler,
+        uint64_t value, unsigned int component_count)
+{
+    const uint64_t values[] = {value, value};
+    return spirv_compiler_get_constant64(compiler, VKD3D_SHADER_COMPONENT_UINT64, component_count, values);
+}
+
 static uint32_t spirv_compiler_get_type_id_for_reg(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, uint32_t write_mask)
 {
@@ -4326,7 +4333,8 @@ static void spirv_compiler_emit_interpolation_decorations(struct spirv_compiler 
 }
 
 static uint32_t spirv_compiler_emit_int_to_bool(struct spirv_compiler *compiler,
-        enum vkd3d_shader_conditional_op condition, unsigned int component_count, uint32_t val_id)
+        enum vkd3d_shader_conditional_op condition, enum vkd3d_data_type data_type,
+        unsigned int component_count, uint32_t val_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id;
@@ -4337,7 +4345,9 @@ static uint32_t spirv_compiler_emit_int_to_bool(struct spirv_compiler *compiler,
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_BOOL, component_count);
     op = condition & VKD3D_SHADER_CONDITIONAL_OP_Z ? SpvOpIEqual : SpvOpINotEqual;
     return vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, op, type_id, val_id,
-            spirv_compiler_get_constant_uint_vector(compiler, 0, component_count));
+            data_type == VKD3D_DATA_UINT64
+            ? spirv_compiler_get_constant_uint64_vector(compiler, 0, component_count)
+            : spirv_compiler_get_constant_uint_vector(compiler, 0, component_count));
 }
 
 static uint32_t spirv_compiler_emit_bool_to_int(struct spirv_compiler *compiler,
@@ -6984,7 +6994,7 @@ static void spirv_compiler_emit_movc(struct spirv_compiler *compiler,
 
     if (src[0].reg.data_type != VKD3D_DATA_BOOL)
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
-                VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, condition_id);
+                VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, component_count, condition_id);
     val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, src1_id, src2_id);
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
@@ -7009,7 +7019,7 @@ static void spirv_compiler_emit_swapc(struct spirv_compiler *compiler,
     type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_FLOAT, component_count);
 
     condition_id = spirv_compiler_emit_int_to_bool(compiler,
-            VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, condition_id);
+            VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, component_count, condition_id);
 
     val_id = vkd3d_spirv_build_op_select(builder, type_id, condition_id, src2_id, src1_id);
     spirv_compiler_emit_store_dst(compiler, &dst[0], val_id);
@@ -7171,13 +7181,6 @@ static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
     div_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSDiv : SpvOpUDiv;
     mod_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSRem : SpvOpUMod;
 
-    if (dst[0].reg.data_type == VKD3D_DATA_UINT64 || dst[1].reg.data_type == VKD3D_DATA_UINT64)
-    {
-        FIXME("Unsupported 64-bit result.\n");
-        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
-                "Bool cast to 64-bit integer is not supported.");
-    }
-
     if (dst[0].reg.type != VKD3DSPR_NULL)
     {
         component_count = vsir_write_mask_component_count(dst[0].write_mask);
@@ -7187,9 +7190,11 @@ static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
         src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst[0].write_mask);
 
         condition_id = spirv_compiler_emit_int_to_bool(compiler,
-                VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, src1_id);
-        uint_max_id = spirv_compiler_get_constant_uint_vector(compiler,
-                0xffffffff, component_count);
+                VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src1_id);
+        if (dst[0].reg.data_type == VKD3D_DATA_UINT64)
+            uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
+        else
+            uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, 0xffffffff, component_count);
 
         val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, div_op, type_id, src0_id, src1_id);
         /* The SPIR-V spec says: "The resulting value is undefined if Operand 2 is 0." */
@@ -7209,9 +7214,11 @@ static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
             src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst[1].write_mask);
 
             condition_id = spirv_compiler_emit_int_to_bool(compiler,
-                    VKD3D_SHADER_CONDITIONAL_OP_NZ, component_count, src1_id);
-            uint_max_id = spirv_compiler_get_constant_uint_vector(compiler,
-                    0xffffffff, component_count);
+                    VKD3D_SHADER_CONDITIONAL_OP_NZ, src[1].reg.data_type, component_count, src1_id);
+            if (dst[1].reg.data_type == VKD3D_DATA_UINT64)
+                uint_max_id = spirv_compiler_get_constant_uint64_vector(compiler, UINT64_MAX, component_count);
+            else
+                uint_max_id = spirv_compiler_get_constant_uint_vector(compiler, 0xffffffff, component_count);
         }
 
         val_id = vkd3d_spirv_build_op_tr2(builder, &builder->function_stream, mod_op, type_id, src0_id, src1_id);
@@ -7502,7 +7509,7 @@ static uint32_t spirv_compiler_emit_conditional_branch(struct spirv_compiler *co
     uint32_t condition_id, merge_block_id;
 
     condition_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
-    condition_id = spirv_compiler_emit_int_to_bool(compiler, instruction->flags, 1, condition_id);
+    condition_id = spirv_compiler_emit_int_to_bool(compiler, instruction->flags, src->reg.data_type, 1, condition_id);
 
     merge_block_id = vkd3d_spirv_alloc_id(builder);
 
@@ -7635,7 +7642,7 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
                 return VKD3D_ERROR_OUT_OF_MEMORY;
 
             val_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
-            condition_id = spirv_compiler_emit_int_to_bool(compiler, instruction->flags, 1, val_id);
+            condition_id = spirv_compiler_emit_int_to_bool(compiler, instruction->flags, src->reg.data_type, 1, val_id);
 
             true_label = vkd3d_spirv_alloc_id(builder);
             merge_block_id = vkd3d_spirv_alloc_id(builder);
