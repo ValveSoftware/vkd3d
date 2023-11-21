@@ -3932,7 +3932,7 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
     assert(reg_info.component_type != VKD3D_SHADER_COMPONENT_DOUBLE);
     spirv_compiler_emit_dereference_register(compiler, reg, &reg_info);
 
-    write_mask32 = (reg->data_type == VKD3D_DATA_DOUBLE) ? vsir_write_mask_32_from_64(write_mask) : write_mask;
+    write_mask32 = data_type_is_64_bit(reg->data_type) ? vsir_write_mask_32_from_64(write_mask) : write_mask;
 
     /* Intermediate value (no storage class). */
     if (reg_info.storage_class == SpvStorageClassMax)
@@ -4148,7 +4148,7 @@ static void spirv_compiler_emit_store_reg(struct spirv_compiler *compiler,
     component_type = vkd3d_component_type_from_data_type(reg->data_type);
     if (component_type != reg_info.component_type)
     {
-        if (reg->data_type == VKD3D_DATA_DOUBLE)
+        if (data_type_is_64_bit(reg->data_type))
             src_write_mask = vsir_write_mask_32_from_64(write_mask);
         type_id = vkd3d_spirv_get_type_id(builder, reg_info.component_type,
                 vsir_write_mask_component_count(src_write_mask));

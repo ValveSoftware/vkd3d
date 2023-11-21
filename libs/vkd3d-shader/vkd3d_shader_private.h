@@ -620,6 +620,11 @@ static inline bool data_type_is_bool(enum vkd3d_data_type data_type)
     return data_type == VKD3D_DATA_BOOL;
 }
 
+static inline bool data_type_is_64_bit(enum vkd3d_data_type data_type)
+{
+    return data_type == VKD3D_DATA_DOUBLE;
+}
+
 enum vsir_dimension
 {
     VSIR_DIMENSION_NONE,
