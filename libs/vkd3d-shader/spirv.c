@@ -6697,12 +6697,14 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_ISHR,       SpvOpShiftRightArithmetic},
         {VKD3DSIH_ITOD,       SpvOpConvertSToF},
         {VKD3DSIH_ITOF,       SpvOpConvertSToF},
+        {VKD3DSIH_ITOI,       SpvOpSConvert},
         {VKD3DSIH_MUL,        SpvOpFMul},
         {VKD3DSIH_NOT,        SpvOpNot},
         {VKD3DSIH_OR,         SpvOpBitwiseOr},
         {VKD3DSIH_USHR,       SpvOpShiftRightLogical},
         {VKD3DSIH_UTOD,       SpvOpConvertUToF},
         {VKD3DSIH_UTOF,       SpvOpConvertUToF},
+        {VKD3DSIH_UTOU,       SpvOpUConvert},
         {VKD3DSIH_XOR,        SpvOpBitwiseXor},
     };
     unsigned int i;

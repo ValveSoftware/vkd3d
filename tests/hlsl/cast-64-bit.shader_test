@@ -37,8 +37,8 @@ float4 main() : sv_target
 [test]
 uniform 0 uint64_t2 0x500000001 0x100000002
 uniform 4 uint4 10 4 0 0
-todo draw quad
-todo probe all rgba (1.0, 2.0, 2147483648.0, 1073741824.0)
+draw quad
+probe all rgba (1.0, 2.0, 2147483648.0, 1073741824.0)
 
 
 [pixel shader]
@@ -55,5 +55,5 @@ float4 main() : sv_target
 [test]
 uniform 0 int64_t2 -21474836481 0x100000002
 uniform 4 int4 -20 8 0 0
-todo draw quad
-todo probe all rgba (-1.0, 2.0, 1073741824.0, 536870912.0)
+draw quad
+probe all rgba (-1.0, 2.0, 1073741824.0, 536870912.0)
