@@ -1518,12 +1518,14 @@ static void copy_propagation_set_value(struct hlsl_ctx *ctx, struct copy_propaga
 }
 
 static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
-        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
+        const struct copy_propagation_state *state, const struct hlsl_ir_load *load,
         unsigned int swizzle, struct hlsl_ir_node *instr)
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
+    const struct hlsl_deref *deref = &load->src;
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_ir_node *new_instr = NULL;
+    unsigned int time = load->node.index;
     unsigned int start, count, i;
     unsigned int ret_swizzle = 0;
 
@@ -1535,7 +1537,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
         struct copy_propagation_value *value;
 
         if (!(value = copy_propagation_get_value(state, var, start + hlsl_swizzle_get_component(swizzle, i),
-                instr->index)))
+                time)))
             return false;
 
         if (!new_instr)
@@ -1570,12 +1572,14 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
 }
 
 static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
-        const struct copy_propagation_state *state, const struct hlsl_deref *deref,
+        const struct copy_propagation_state *state, const struct hlsl_ir_load *load,
         unsigned int swizzle, struct hlsl_ir_node *instr)
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
+    const struct hlsl_deref *deref = &load->src;
     const struct hlsl_ir_var *var = deref->var;
     struct hlsl_constant_value values = {0};
+    unsigned int time = load->node.index;
     unsigned int start, count, i;
     struct hlsl_ir_node *cons;
 
@@ -1587,7 +1591,7 @@ static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
         struct copy_propagation_value *value;
 
         if (!(value = copy_propagation_get_value(state, var, start + hlsl_swizzle_get_component(swizzle, i),
-                instr->index)) || value->node->type != HLSL_IR_CONSTANT)
+                time)) || value->node->type != HLSL_IR_CONSTANT)
             return false;
 
         values.u[i] = hlsl_ir_constant(value->node)->value.u[value->component];
@@ -1624,10 +1628,10 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
             return false;
     }
 
-    if (copy_propagation_replace_with_constant_vector(ctx, state, &load->src, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
+    if (copy_propagation_replace_with_constant_vector(ctx, state, load, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
         return true;
 
-    if (copy_propagation_replace_with_single_instr(ctx, state, &load->src, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
+    if (copy_propagation_replace_with_single_instr(ctx, state, load, HLSL_SWIZZLE(X, Y, Z, W), &load->node))
         return true;
 
     return false;
@@ -1642,10 +1646,10 @@ static bool copy_propagation_transform_swizzle(struct hlsl_ctx *ctx,
         return false;
     load = hlsl_ir_load(swizzle->val.node);
 
-    if (copy_propagation_replace_with_constant_vector(ctx, state, &load->src, swizzle->swizzle, &swizzle->node))
+    if (copy_propagation_replace_with_constant_vector(ctx, state, load, swizzle->swizzle, &swizzle->node))
         return true;
 
-    if (copy_propagation_replace_with_single_instr(ctx, state, &load->src, swizzle->swizzle, &swizzle->node))
+    if (copy_propagation_replace_with_single_instr(ctx, state, load, swizzle->swizzle, &swizzle->node))
         return true;
 
     return false;

@@ -18,7 +18,58 @@ float4 main() : sv_target
 [test]
 uniform 0 float 0.0
 draw quad
-todo(sm<6) probe all rgba (2.0, 2.0, 2.0, 2.0)
+probe all rgba (2.0, 2.0, 2.0, 2.0)
 uniform 0 float 1.0
 draw quad
-todo(sm<6) probe all rgba (-2.0, -2.0, -2.0, -2.0)
+probe all rgba (-2.0, -2.0, -2.0, -2.0)
+
+
+[pixel shader]
+float cond;
+
+float4 main() : sv_target
+{
+    float2 r = {1, 2};
+    float2 tmp;
+
+    // invalidate r
+    if (cond)
+        r = float2(10, 20);
+
+    tmp = r;
+    r = tmp;
+    return r.y;
+}
+
+[test]
+uniform 0 float 0.0
+draw quad
+probe all rgba (2.0, 2.0, 2.0, 2.0)
+uniform 0 float 1.0
+draw quad
+probe all rgba (20.0, 20.0, 20.0, 20.0)
+
+
+[pixel shader]
+float cond;
+
+float4 main() : sv_target
+{
+    float2 r = {3, 4};
+
+    // invalidate r
+    if (cond)
+        r = float2(30, 40);
+
+    r = r;
+    r = float2(1, r.y);
+
+    return float4(r, 0, 0);
+}
+[test]
+uniform 0 float 0.0
+draw quad
+probe all rgba (1.0, 4.0, 0.0, 0.0)
+uniform 0 float 1.0
+draw quad
+probe all rgba (1.0, 40.0, 0.0, 0.0)
