@@ -3736,10 +3736,19 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_OpenSharedHandleByName(ID3D12Devic
 static HRESULT STDMETHODCALLTYPE d3d12_device_MakeResident(ID3D12Device5 *iface,
         UINT object_count, ID3D12Pageable * const *objects)
 {
-    FIXME_ONCE("iface %p, object_count %u, objects %p stub!\n",
-            iface, object_count, objects);
+    ID3D12Fence *fence;
+    HRESULT hr;
 
-    return S_OK;
+    TRACE("iface %p, object_count %u, objects %p.\n", iface, object_count, objects);
+
+    if (FAILED(hr = ID3D12Device5_CreateFence(iface, 0, 0, &IID_ID3D12Fence, (void **)&fence)))
+        return hr;
+
+    hr = ID3D12Device5_EnqueueMakeResident(iface, 0, object_count, objects, fence, 1);
+    if (SUCCEEDED(hr))
+        ID3D12Fence_SetEventOnCompletion(fence, 1, NULL);
+    ID3D12Fence_Release(fence);
+    return hr;
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_Evict(ID3D12Device5 *iface,
