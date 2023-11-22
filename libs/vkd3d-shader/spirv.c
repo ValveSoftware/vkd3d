@@ -4520,7 +4520,7 @@ static void spirv_compiler_emit_register_execution_mode(struct spirv_compiler *c
                     VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT))
             {
                 FIXME("The target environment does not support stencil export.\n");
-                spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_STENCIL_EXPORT_UNSUPPORTED,
+                spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
                         "Cannot export stencil reference value. "
                         "The target environment does not support stencil export.");
             }
@@ -5524,6 +5524,14 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
     {
         vkd3d_spirv_enable_capability(&compiler->spirv_builder, SpvCapabilityFloat64);
         flags &= ~(VKD3DSGF_ENABLE_DOUBLE_PRECISION_FLOAT_OPS | VKD3DSGF_ENABLE_11_1_DOUBLE_EXTENSIONS);
+    }
+
+    if (flags & VKD3DSGF_ENABLE_INT64)
+    {
+        FIXME("Unsupported 64-bit integer ops.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                "Support for 64-bit integers is not implemented.");
+        flags &= ~VKD3DSGF_ENABLE_INT64;
     }
 
     if (flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS))
