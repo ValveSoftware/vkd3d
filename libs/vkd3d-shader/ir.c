@@ -309,6 +309,7 @@ void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_reg
     reg->idx[2].is_in_bounds = false;
     reg->idx_count = idx_count;
     reg->dimension = VSIR_DIMENSION_SCALAR;
+    reg->alignment = 0;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,

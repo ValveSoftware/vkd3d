@@ -2207,6 +2207,18 @@ static bool sm6_value_validate_is_pointer(const struct sm6_value *value, struct 
     return true;
 }
 
+static bool sm6_value_validate_is_numeric(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_type_is_numeric(value->type))
+    {
+        WARN("Operand result type class %u is not numeric.\n", value->type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "A numeric operand passed to a DXIL instruction is not numeric.");
+        return false;
+    }
+    return true;
+}
+
 static bool sm6_value_validate_is_bool(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     const struct sm6_type *type = value->type;
@@ -3989,6 +4001,57 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+{
+    const struct sm6_type *elem_type = NULL, *pointee_type;
+    struct vkd3d_shader_src_param *src_param;
+    unsigned int alignment, i = 0;
+    const struct sm6_value *ptr;
+    uint64_t alignment_code;
+
+    if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i)))
+        return;
+    if (!sm6_value_validate_is_register(ptr, sm6)
+            || !sm6_value_validate_is_pointer(ptr, sm6)
+            || !dxil_record_validate_operand_count(record, i + 2, i + 3, sm6))
+        return;
+
+    if (record->operand_count > i + 2 && !(elem_type = sm6_parser_get_type(sm6, record->operands[i++])))
+        return;
+
+    if (!elem_type)
+    {
+        elem_type = ptr->type->u.pointer.type;
+    }
+    else if (elem_type != (pointee_type = ptr->type->u.pointer.type))
+    {
+        WARN("Type mismatch.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "Type mismatch in pointer load arguments.");
+    }
+
+    dst->type = elem_type;
+
+    if (!sm6_value_validate_is_numeric(dst, sm6))
+        return;
+
+    alignment_code = record->operands[i++];
+    if (!bitcode_parse_alignment(alignment_code, &alignment))
+        WARN("Invalid alignment %"PRIu64".\n", alignment_code);
+
+    if (record->operands[i])
+        WARN("Ignoring volatile modifier.\n");
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(&src_param[0], ptr);
+    src_param->reg.alignment = alignment;
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record *record,
         struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
 {
@@ -4193,6 +4256,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_GEP:
                 sm6_parser_emit_gep(sm6, record, ins, dst);
+                break;
+            case FUNC_CODE_INST_LOAD:
+                sm6_parser_emit_load(sm6, record, ins, dst);
                 break;
             case FUNC_CODE_INST_RET:
                 sm6_parser_emit_ret(sm6, record, code_block, ins);

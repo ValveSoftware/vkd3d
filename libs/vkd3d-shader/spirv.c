@@ -3525,6 +3525,9 @@ static void spirv_compiler_emit_dereference_register(struct spirv_compiler *comp
             indexes[index_count++] = spirv_compiler_emit_register_addressing(compiler, &reg->idx[0]);
     }
 
+    if (reg->alignment)
+        WARN("Ignoring alignment %u.\n", reg->alignment);
+
     if (index_count)
     {
         component_count = vkd3d_write_mask_component_count(register_info->write_mask);

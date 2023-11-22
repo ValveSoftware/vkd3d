@@ -827,6 +827,8 @@ struct vkd3d_shader_register
     struct vkd3d_shader_register_index idx[3];
     unsigned int idx_count;
     enum vsir_dimension dimension;
+    /* known address alignment for optimisation, or zero */
+    unsigned int alignment;
     union
     {
         DWORD immconst_uint[VKD3D_VEC4_SIZE];
