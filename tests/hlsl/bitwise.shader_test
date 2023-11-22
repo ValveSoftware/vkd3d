@@ -160,3 +160,88 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
+
+
+[require]
+shader model >= 6.0
+int64
+
+[pixel shader]
+int64_t2 a;
+int2 s;
+
+float4 main() : sv_target
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    int z = s.x;
+    int w = s.y;
+
+    return float4(x >> y, x >> -y, x >> z, x >> w);
+}
+
+[test]
+uniform 0 int64_t2 9223372036854775807 -1
+uniform 4 int4 34 66 0 0
+todo draw quad
+probe all rgba (0.0, 4.611686018e18, 536870912.0, 2.305843009e18) 1
+uniform 0 int64_t2 -1 -1
+uniform 4 int4 34 66 0 0
+todo draw quad
+probe all rgba (-1.0, -1.0, -1.0, -1.0) 1
+
+[pixel shader]
+uint64_t2 a;
+uint2 s;
+
+float4 main() : sv_target
+{
+    uint64_t x = a.x;
+    uint64_t y = a.y;
+    uint z = s.x;
+    uint w = s.y;
+
+    return float4(x >> y, x >> -y, x >> z, x >> w);
+}
+
+[test]
+uniform 0 uint64_t2 0xffffffffffffffff 1
+uniform 4 uint4 34 66 0 0
+todo draw quad
+probe all rgba (9.223372036e18, 1.0, 1073741823.0, 4.611686018e18) 1
+
+[pixel shader]
+uint64_t2 a;
+uint2 s;
+
+float4 main() : sv_target
+{
+    uint64_t x = a.x;
+    uint64_t y = a.y;
+    uint z = s.x;
+    uint w = s.y;
+
+    return float4(x << y, x << -y, x << z, x << w);
+}
+
+[test]
+uniform 0 uint64_t2 0x83 1
+uniform 4 uint4 34 66 0 0
+todo draw quad
+probe all rgba (262.0, 9.223372036e18, 2250562863104.0, 524.0) 1
+
+[pixel shader]
+uint64_t2 a;
+
+float4 main() : sv_target
+{
+    uint64_t x = a.x;
+    uint64_t y = a.y;
+
+    return float4(x ^ y, x & y, x | y, ~x);
+}
+
+[test]
+uniform 0 uint64_t2 0x300000000 0x500000000
+todo draw quad
+probe all rgba (25769803776.0, 4294967296.0, 30064771072.0, 1.844674404e19) 1
