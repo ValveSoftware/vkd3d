@@ -119,3 +119,80 @@ uniform 0 float4 45.0 5.0 50.0 10.0
 uniform 4 float4 3.0 8.0 2.0 5.0
 draw quad
 probe all rgba (9.0, 5.0, 1.0, 3.0)
+
+[require]
+shader model >= 6.0
+int64
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x + y, x - y, x * (y >> 4), x / y);
+}
+
+[test]
+uniform 0 int64_t2 5000000000 16000000000
+todo draw quad
+probe all rgba (21.0e9, -11.0e9, 5.0e18, 0.0) 1
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x % y, +x, -x, y / x);
+}
+
+[test]
+uniform 0 int64_t2 5000000000 16000000000
+todo draw quad
+probe all rgba (5.0e9, 5.0e9, -5.0e9, 3.0)
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x / y, -x / y, x / -y, -x / -y);
+}
+
+[test]
+uniform 0 int64_t2 42000000000 5000000000
+todo draw quad
+probe all rgba (8.0, -8.0, -8.0, 8.0)
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    int64_t x = a.x;
+    int64_t y = a.y;
+    return float4(x % y, -x % y, x % -y, -x % -y);
+}
+
+[test]
+uniform 0 int64_t2 42000000000 5000000000
+todo draw quad
+probe all rgba (2.0e9, -2.0e9, 2.0e9, -2.0e9)
+
+[pixel shader]
+uniform int64_t2 a;
+
+float4 main() : SV_TARGET
+{
+    return float4(abs(a), 0, 0);
+}
+
+[test]
+uniform 0 int64_t2 5000000000 -7000000000
+todo draw quad
+probe all rgba (5.0, 7.0, 0.0, 10.0)

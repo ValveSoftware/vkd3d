@@ -90,3 +90,53 @@ float4 main() : SV_TARGET
 uniform 0 float4 1.0 0.0 0.0 0.0
 draw quad
 probe all rgba (1e99, 1e99, 1e99, 1e99)
+
+[require]
+shader model >= 5.0
+float64
+
+[pixel shader todo]
+uniform double2 a;
+
+float4 main() : SV_TARGET
+{
+    double x = a.x;
+    double y = a.y;
+    return float4(x + y, x - y, x * y, x / y);
+}
+
+[test]
+uniform 0 double2 7.5 -2.5
+todo(sm<6) draw quad
+probe all rgba (5.0, 10.0, -18.75, -3.0)
+
+[pixel shader todo]
+uniform double2 a;
+
+float4 main() : SV_TARGET
+{
+    double x = a.x;
+    double y = a.y;
+    return x * y;
+}
+
+[test]
+uniform 0 double2 3.0e-300 2.5e300
+todo(sm<6) draw quad
+probe all rgba (7.5, 7.5, 7.5, 7.5)
+
+% Note: DXC does not support modulo on doubles.
+[pixel shader todo]
+uniform double2 a;
+
+float4 main() : SV_TARGET
+{
+    double x = a.x;
+    double y = a.y;
+    return x / y;
+}
+
+[test]
+uniform 0 double2 1.5e300 2.0e299
+todo(sm<6) draw quad
+probe all rgba (7.5, 7.5, 7.5, 7.5)
