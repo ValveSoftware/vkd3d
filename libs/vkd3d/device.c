@@ -3994,10 +3994,11 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_EnqueueMakeResident(ID3D12Device5 
         D3D12_RESIDENCY_FLAGS flags, UINT num_objects, ID3D12Pageable *const *objects,
         ID3D12Fence *fence, UINT64 fence_value)
 {
-    FIXME("iface %p, flags %#x, num_objects %u, objects %p, fence %p, fence_value %#"PRIx64" stub!\n",
+    FIXME_ONCE("iface %p, flags %#x, num_objects %u, objects %p, fence %p, fence_value %#"PRIx64" stub!\n",
             iface, flags, num_objects, objects, fence, fence_value);
 
-    return E_NOTIMPL;
+    ID3D12Fence_Signal(fence, fence_value);
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommandList1(ID3D12Device5 *iface,
