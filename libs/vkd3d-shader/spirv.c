@@ -6764,8 +6764,8 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
      * Microsoft fxc will compile immediate constants larger than 5 bits.
      * Fixing up the constants would be more elegant, but the simplest way is
      * to let this handle constants too. */
-    if (instruction->handler_idx == VKD3DSIH_ISHL || instruction->handler_idx == VKD3DSIH_ISHR
-            || instruction->handler_idx == VKD3DSIH_USHR)
+    if (!(instruction->flags & VKD3DSI_SHIFT_UNMASKED) && (instruction->handler_idx == VKD3DSIH_ISHL
+            || instruction->handler_idx == VKD3DSIH_ISHR || instruction->handler_idx == VKD3DSIH_USHR))
     {
         uint32_t mask_id = spirv_compiler_get_constant_vector(compiler,
                 VKD3D_SHADER_COMPONENT_UINT, vkd3d_write_mask_component_count(dst->write_mask), 0x1f);

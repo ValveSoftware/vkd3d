@@ -3279,6 +3279,12 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
     }
     else
     {
+        if (handler_idx == VKD3DSIH_ISHL || handler_idx == VKD3DSIH_ISHR || handler_idx == VKD3DSIH_USHR)
+        {
+            /* DXC emits AND instructions where necessary to mask shift counts. Shift binops
+             * do not imply masking the shift as the TPF equivalents do. */
+            ins->flags |= VKD3DSI_SHIFT_UNMASKED;
+        }
         instruction_dst_param_init_ssa_scalar(ins, sm6);
     }
 }

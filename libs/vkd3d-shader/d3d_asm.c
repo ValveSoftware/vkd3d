@@ -1577,6 +1577,12 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
                 shader_addline(buffer, "p");
             break;
 
+        case VKD3DSIH_ISHL:
+        case VKD3DSIH_ISHR:
+        case VKD3DSIH_USHR:
+            if (ins->flags & VKD3DSI_SHIFT_UNMASKED)
+                shader_addline(buffer, "_unmasked");
+            /* fall through */
         default:
             shader_dump_precise_flags(compiler, ins->flags);
             break;

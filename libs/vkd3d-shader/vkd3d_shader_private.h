@@ -741,6 +741,7 @@ enum vkd3d_tessellator_domain
 #define VKD3DSI_RESINFO_UINT            0x2
 #define VKD3DSI_SAMPLE_INFO_UINT        0x1
 #define VKD3DSI_SAMPLER_COMPARISON_MODE 0x1
+#define VKD3DSI_SHIFT_UNMASKED          0x1
 
 #define VKD3DSI_PRECISE_X         0x100
 #define VKD3DSI_PRECISE_Y         0x200
