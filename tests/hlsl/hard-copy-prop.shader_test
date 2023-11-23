@@ -1,0 +1,24 @@
+[pixel shader]
+float cond;
+
+float4 main() : sv_target
+{
+    float4 a = {1, 2, 3, 4};
+    float4 b;
+
+    // invalidate a
+    if (cond)
+        a = float4(-1, -2, -3, -4);
+
+    b = a;
+    a.y = 357;
+    return b.y;
+}
+
+[test]
+uniform 0 float 0.0
+draw quad
+todo(sm<6) probe all rgba (2.0, 2.0, 2.0, 2.0)
+uniform 0 float 1.0
+draw quad
+todo(sm<6) probe all rgba (-2.0, -2.0, -2.0, -2.0)

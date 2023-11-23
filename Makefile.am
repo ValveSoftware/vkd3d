@@ -103,6 +103,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/gather.shader_test \
 	tests/hlsl/getdimensions.shader_test \
 	tests/hlsl/half.shader_test \
+	tests/hlsl/hard-copy-prop.shader_test \
 	tests/hlsl/initializer-flatten.shader_test \
 	tests/hlsl/initializer-implicit-array.shader_test \
 	tests/hlsl/initializer-invalid-arg-count.shader_test \
