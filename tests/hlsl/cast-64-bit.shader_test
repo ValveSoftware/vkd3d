@@ -20,6 +20,7 @@ probe all rgba (-4.5, 8.5, 2.0, 2.0)
 
 [require]
 shader model >= 6.0
+int64
 
 [pixel shader]
 uniform uint64_t2 l;

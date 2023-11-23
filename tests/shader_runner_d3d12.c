@@ -52,6 +52,8 @@ struct d3d12_shader_runner
     ID3D12GraphicsCommandList *compute_list;
 
     IDxcCompiler3 *dxc_compiler;
+
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -94,6 +96,16 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
         ID3D10Blob_Release(errors);
     }
     return blob;
+}
+
+static bool d3d12_runner_check_requirements(struct shader_runner *r)
+{
+    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
+
+    if (runner->r.require_int64 && !runner->options1.Int64ShaderOps)
+        return false;
+
+    return true;
 }
 
 #define MAX_RESOURCE_DESCRIPTORS (MAX_RESOURCES * 2)
@@ -561,6 +573,7 @@ static void d3d12_runner_release_readback(struct shader_runner *r, struct resour
 
 static const struct shader_runner_ops d3d12_runner_ops =
 {
+    .check_requirements = d3d12_runner_check_requirements,
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
     .dispatch = d3d12_runner_dispatch,
@@ -601,6 +614,12 @@ void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader
     hr = ID3D12Device_CreateCommandList(device, 0, D3D12_COMMAND_LIST_TYPE_COMPUTE,
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1,
+            &runner.options1, sizeof(runner.options1));
+    ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
+    if (maximum_shader_model >= SHADER_MODEL_6_0)
+        trace("Int64ShaderOps: %u.\n", runner.options1.Int64ShaderOps);
 
     run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, minimum_shader_model, maximum_shader_model);
 

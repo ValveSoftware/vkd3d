@@ -191,6 +191,10 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
                 runner->compile_options |= options[i].option;
         }
     }
+    else if (match_string(line, "int64", &line))
+    {
+        runner->require_int64 = true;
+    }
     else
     {
         fatal_error("Unknown require directive '%s'.\n", line);
@@ -1311,6 +1315,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 state = STATE_REQUIRE;
                 runner->minimum_shader_model = minimum_shader_model;
                 runner->maximum_shader_model = maximum_shader_model;
+                runner->require_int64 = false;
                 runner->compile_options = 0;
                 skip_tests = false;
             }
