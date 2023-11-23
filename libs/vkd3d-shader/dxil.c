@@ -472,11 +472,23 @@ struct sm6_symbol
     const char *name;
 };
 
+enum sm6_block_terminator_type
+{
+    TERMINATOR_RET,
+};
+
+struct sm6_block_terminator
+{
+    enum sm6_block_terminator_type type;
+};
+
 struct sm6_block
 {
     struct vkd3d_shader_instruction *instructions;
     size_t instruction_capacity;
     size_t instruction_count;
+
+    struct sm6_block_terminator terminator;
 };
 
 struct sm6_function
@@ -4297,6 +4309,8 @@ static void sm6_parser_emit_ret(struct sm6_parser *sm6, const struct dxil_record
     if (record->operand_count)
         FIXME("Non-void return is not implemented.\n");
 
+    code_block->terminator.type = TERMINATOR_RET;
+
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
@@ -4797,6 +4811,19 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
     return VKD3D_OK;
 }
 
+static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_parser *sm6)
+{
+    switch (block->terminator.type)
+    {
+        case TERMINATOR_RET:
+            sm6_parser_add_instruction(sm6, VKD3DSIH_RET);
+            break;
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
 static bool sm6_block_emit_instructions(struct sm6_block *block, struct sm6_parser *sm6)
 {
     struct vkd3d_shader_instruction *ins = sm6_parser_require_space(sm6, block->instruction_count + 1);
@@ -4807,7 +4834,7 @@ static bool sm6_block_emit_instructions(struct sm6_block *block, struct sm6_pars
     memcpy(ins, block->instructions, block->instruction_count * sizeof(*block->instructions));
     sm6->p.instructions.count += block->instruction_count;
 
-    sm6_parser_add_instruction(sm6, VKD3DSIH_RET);
+    sm6_block_emit_terminator(block, sm6);
 
     return true;
 }
