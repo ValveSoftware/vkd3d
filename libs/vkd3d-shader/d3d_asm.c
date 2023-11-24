@@ -831,6 +831,13 @@ static void shader_print_uint_literal(struct vkd3d_d3d_asm_compiler *compiler,
             prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
 }
 
+static void shader_print_uint64_literal(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, uint64_t i, const char *suffix)
+{
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%"PRIu64"%s%s",
+            prefix, compiler->colours.literal, i, compiler->colours.reset, suffix);
+}
+
 static void shader_print_hex_literal(struct vkd3d_d3d_asm_compiler *compiler,
         const char *prefix, unsigned int i, const char *suffix)
 {
@@ -1222,6 +1229,12 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 shader_print_double_literal(compiler, "", reg->u.immconst_f64[0], "");
                 if (reg->dimension == VSIR_DIMENSION_VEC4)
                     shader_print_double_literal(compiler, ", ", reg->u.immconst_f64[1], "");
+            }
+            else if (reg->data_type == VKD3D_DATA_UINT64)
+            {
+                shader_print_uint64_literal(compiler, "", reg->u.immconst_u64[0], "");
+                if (reg->dimension == VSIR_DIMENSION_VEC4)
+                    shader_print_uint64_literal(compiler, "", reg->u.immconst_u64[1], "");
             }
             else
             {

@@ -490,7 +490,15 @@ enum sm6_block_terminator_type
 {
     TERMINATOR_UNCOND_BR,
     TERMINATOR_COND_BR,
+    TERMINATOR_SWITCH,
     TERMINATOR_RET,
+};
+
+struct terminator_case
+{
+    const struct sm6_block *block;
+    uint64_t value;
+    bool is_default;
 };
 
 struct sm6_block_terminator
@@ -499,6 +507,8 @@ struct sm6_block_terminator
     enum sm6_block_terminator_type type;
     const struct sm6_block *true_block;
     const struct sm6_block *false_block;
+    struct terminator_case *cases;
+    unsigned int case_count;
 };
 
 struct sm6_block
@@ -1996,6 +2006,13 @@ static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *v
     if (!sm6_value_is_constant(value))
         return UINT_MAX;
     return register_get_uint_value(&value->u.reg);
+}
+
+static uint64_t sm6_value_get_constant_uint64(const struct sm6_value *value)
+{
+    if (!sm6_value_is_constant(value))
+        return UINT64_MAX;
+    return register_get_uint64_value(&value->u.reg);
 }
 
 static unsigned int sm6_parser_alloc_ssa_id(struct sm6_parser *sm6)
@@ -4568,6 +4585,89 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
     dst_param->reg.alignment = alignment;
 }
 
+static void sm6_parser_emit_switch(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct sm6_function *function, struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
+{
+    struct sm6_block_terminator *terminator = &code_block->terminator;
+    const struct sm6_type *type;
+    const struct sm6_value *src;
+    unsigned int i = 1, j;
+
+    if (record->operand_count < 3 || !(record->operand_count & 1))
+    {
+        WARN("Invalid operand count %u.\n", record->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a switch instruction.", record->operand_count);
+        return;
+    }
+
+    if (!(type = sm6_parser_get_type(sm6, record->operands[0])))
+        return;
+
+    if (!(src = sm6_parser_get_value_by_ref(sm6, record, type, &i))
+            || !sm6_value_validate_is_register(src, sm6))
+        return;
+    assert(i == 2);
+
+    if (src->type != type)
+    {
+        WARN("Type mismatch.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                "The type of a switch selector value does not match the selector type.");
+    }
+    if (!sm6_type_is_integer(type))
+    {
+        WARN("Selector is not scalar integer.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Selector type class %u of a switch instruction is not scalar integer.", type->class);
+        return;
+    }
+
+    terminator->conditional_reg = src->u.reg;
+    terminator->type = TERMINATOR_SWITCH;
+
+    terminator->case_count = record->operand_count / 2u;
+    if (!(terminator->cases = vkd3d_calloc(terminator->case_count, sizeof(*terminator->cases))))
+    {
+        ERR("Failed to allocate case array.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                "Out of memory allocating a switch case array.");
+        return;
+    }
+
+    /* Executes 'operand_count / 2' times because operand_count is uneven. */
+    for (; i < record->operand_count; i += 2)
+    {
+        j = i / 2u - 1;
+        terminator->cases[j].block = sm6_function_get_block(function, record->operands[i], sm6);
+        /* For structurisation it is convenient to store the default in the case array. */
+        terminator->cases[j].is_default = !j;
+    }
+
+    for (i = 3; i < record->operand_count; i += 2)
+    {
+        if (!(src = sm6_parser_get_value_safe(sm6, record->operands[i])))
+            return;
+
+        if (src->type != type)
+        {
+            WARN("Type mismatch.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                    "The type of a switch case value does not match the selector type.");
+        }
+        if (!sm6_value_is_constant(src))
+        {
+            WARN("Case value is not a constant.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "A switch case value is not a constant.");
+        }
+
+        terminator->cases[i / 2u].value = sm6_value_get_constant_uint64(src);
+    }
+
+    ins->handler_idx = VKD3DSIH_NOP;
+}
+
 static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -5049,6 +5149,10 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             case FUNC_CODE_INST_STORE:
                 sm6_parser_emit_store(sm6, record, ins, dst);
                 break;
+            case FUNC_CODE_INST_SWITCH:
+                sm6_parser_emit_switch(sm6, record, function, code_block, ins);
+                is_terminator = true;
+                break;
             case FUNC_CODE_INST_VSELECT:
                 sm6_parser_emit_vselect(sm6, record, ins, dst);
                 break;
@@ -5090,6 +5194,7 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
 {
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_instruction *ins;
+    unsigned int i, count;
 
     switch (block->terminator.type)
     {
@@ -5112,6 +5217,53 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
             src_params[0].reg = block->terminator.conditional_reg;
             vsir_src_param_init_label(&src_params[1], block->terminator.true_block->id);
             vsir_src_param_init_label(&src_params[2], block->terminator.false_block->id);
+            break;
+
+        case TERMINATOR_SWITCH:
+            ins = sm6_parser_add_instruction(sm6, VKD3DSIH_SWITCH_MONOLITHIC);
+            if (!(src_params = instruction_src_params_alloc(ins, block->terminator.case_count * 2u + 1, sm6)))
+                return;
+            src_param_init(&src_params[0]);
+            src_params[0].reg = block->terminator.conditional_reg;
+            /* TODO: emit the merge block id. */
+            vsir_src_param_init_label(&src_params[2], 0);
+
+            for (i = 0, count = 3; i < block->terminator.case_count; ++i)
+            {
+                const struct terminator_case *switch_case;
+                const struct sm6_block *case_block;
+
+                switch_case = &block->terminator.cases[i];
+                if (!(case_block = switch_case->block))
+                {
+                    assert(sm6->p.failed);
+                    continue;
+                }
+                if (switch_case->is_default)
+                {
+                    vsir_src_param_init_label(&src_params[1], case_block->id);
+                    continue;
+                }
+
+                if (src_params[0].reg.data_type == VKD3D_DATA_UINT64)
+                {
+                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST64, VKD3D_DATA_UINT64, 0);
+                    src_params[count++].reg.u.immconst_u64[0] = switch_case->value;
+                }
+                else
+                {
+                    if (switch_case->value > UINT_MAX)
+                    {
+                        WARN("Truncating 64-bit constant %"PRIx64".\n", switch_case->value);
+                        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_TYPE_MISMATCH,
+                                "Truncating 64-bit switch case value %"PRIx64" to 32 bits.", switch_case->value);
+                    }
+                    vsir_src_param_init(&src_params[count], VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
+                    src_params[count++].reg.u.immconst_u32[0] = switch_case->value;
+                }
+                vsir_src_param_init_label(&src_params[count++], case_block->id);
+            }
+
             break;
 
         case TERMINATOR_RET:
@@ -6322,6 +6474,7 @@ static void sm6_block_destroy(struct sm6_block *block)
     for (i = 0; i < block->phi_count; ++i)
         sm6_phi_destroy(&block->phi[i]);
     vkd3d_free(block->phi);
+    vkd3d_free(block->terminator.cases);
     vkd3d_free(block);
 }
 

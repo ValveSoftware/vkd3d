@@ -887,6 +887,8 @@ struct vkd3d_shader_src_param
     enum vkd3d_shader_src_modifier modifiers;
 };
 
+void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count);
 void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id);
 
 struct vkd3d_shader_index_range
