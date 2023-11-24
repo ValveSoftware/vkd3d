@@ -474,12 +474,14 @@ struct sm6_symbol
 
 enum sm6_block_terminator_type
 {
+    TERMINATOR_UNCOND_BR,
     TERMINATOR_RET,
 };
 
 struct sm6_block_terminator
 {
     enum sm6_block_terminator_type type;
+    const struct sm6_block *true_block;
 };
 
 struct sm6_block
@@ -488,6 +490,9 @@ struct sm6_block
     size_t instruction_capacity;
     size_t instruction_count;
 
+    /* A nonzero id. */
+    unsigned int id;
+
     struct sm6_block_terminator terminator;
 };
 
@@ -495,7 +500,8 @@ struct sm6_function
 {
     const struct sm6_value *declaration;
 
-    struct sm6_block *blocks[1];
+    struct sm6_block **blocks;
+    size_t block_capacity;
     size_t block_count;
 
     size_t value_count;
@@ -3306,6 +3312,45 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
     }
 }
 
+static const struct sm6_block *sm6_function_get_block(const struct sm6_function *function, uint64_t index,
+        struct sm6_parser *sm6)
+{
+    if (index >= function->block_count)
+    {
+        WARN("Invalid code block index %#"PRIx64".\n", index);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid code block index %#"PRIx64" for a control flow instruction.", index);
+        return NULL;
+    }
+    return function->blocks[index];
+}
+
+static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct sm6_function *function, struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
+{
+    if (record->operand_count != 1 && record->operand_count < 3)
+    {
+        WARN("Invalid operand count %u.\n", record->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a branch instruction.", record->operand_count);
+        return;
+    }
+
+    if (record->operand_count == 1)
+    {
+        code_block->terminator.type = TERMINATOR_UNCOND_BR;
+        code_block->terminator.true_block = sm6_function_get_block(function, record->operands[0], sm6);
+    }
+    else
+    {
+        FIXME("Conditional branch is not implemented.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Conditional branch is not implemented.");
+    }
+
+    ins->handler_idx = VKD3DSIH_NOP;
+}
+
 static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
 {
     switch (op)
@@ -4655,6 +4700,31 @@ static void metadata_attachment_record_apply(const struct dxil_record *record, e
     }
 }
 
+static bool sm6_function_blocks_reserve(struct sm6_function *function, unsigned int reserve)
+{
+    if (!vkd3d_array_reserve((void **)&function->blocks, &function->block_capacity,
+            reserve, sizeof(*function->blocks)))
+    {
+        ERR("Failed to allocate code block array.\n");
+        return false;
+    }
+    return true;
+}
+
+static struct sm6_block *sm6_function_create_block(struct sm6_function *function)
+{
+    struct sm6_block *block;
+
+    if (!(block = sm6_block_create()))
+        return NULL;
+
+    function->blocks[function->block_count++] = block;
+    /* Set the id to the array index + 1. */
+    block->id = function->block_count;
+
+    return block;
+}
+
 static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_function *function)
 {
@@ -4694,16 +4764,18 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
         WARN("Function contains no blocks.\n");
         return VKD3D_ERROR_INVALID_SHADER;
     }
-    if (block_count > 1)
-    {
-        FIXME("Branched shaders are not supported yet.\n");
-        return VKD3D_ERROR_INVALID_SHADER;
-    }
 
-    if (!(function->blocks[0] = sm6_block_create()))
-    {
-        ERR("Failed to allocate code block.\n");
+    if (!sm6_function_blocks_reserve(function, block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    /* Pre-allocate all blocks to simplify instruction parsing. */
+    for (i = 0; i < block_count; ++i)
+    {
+        if (!sm6_function_create_block(function))
+        {
+            ERR("Failed to allocate code block.\n");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
     }
     function->block_count = block_count;
     code_block = function->blocks[0];
@@ -4722,10 +4794,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             return VKD3D_ERROR_INVALID_SHADER;
         }
 
-        /* block->record_count - 1 is the instruction count, but some instructions
-         * can emit >1 IR instruction, so extra may be used. */
+        /* Some instructions can emit >1 IR instruction, so extra may be used. */
         if (!vkd3d_array_reserve((void **)&code_block->instructions, &code_block->instruction_capacity,
-                max(code_block->instruction_count + 1, block->record_count), sizeof(*code_block->instructions)))
+                code_block->instruction_count + 1, sizeof(*code_block->instructions)))
         {
             ERR("Failed to allocate instructions.\n");
             return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -4747,6 +4818,10 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 break;
             case FUNC_CODE_INST_BINOP:
                 sm6_parser_emit_binop(sm6, record, ins, dst);
+                break;
+            case FUNC_CODE_INST_BR:
+                sm6_parser_emit_br(sm6, record, function, code_block, ins);
+                is_terminator = true;
                 break;
             case FUNC_CODE_INST_CALL:
                 sm6_parser_emit_call(sm6, record, code_block, ins, dst);
@@ -4813,8 +4888,20 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
 
 static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_parser *sm6)
 {
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+
     switch (block->terminator.type)
     {
+        case TERMINATOR_UNCOND_BR:
+            if (!block->terminator.true_block)
+                return;
+            ins = sm6_parser_add_instruction(sm6, VKD3DSIH_BRANCH);
+            if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
+                return;
+            vsir_src_param_init_label(&src_params[0], block->terminator.true_block->id);
+            break;
+
         case TERMINATOR_RET:
             sm6_parser_add_instruction(sm6, VKD3DSIH_RET);
             break;
@@ -4822,21 +4909,6 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
         default:
             vkd3d_unreachable();
     }
-}
-
-static bool sm6_block_emit_instructions(struct sm6_block *block, struct sm6_parser *sm6)
-{
-    struct vkd3d_shader_instruction *ins = sm6_parser_require_space(sm6, block->instruction_count + 1);
-
-    if (!ins)
-        return false;
-
-    memcpy(ins, block->instructions, block->instruction_count * sizeof(*block->instructions));
-    sm6->p.instructions.count += block->instruction_count;
-
-    sm6_block_emit_terminator(block, sm6);
-
-    return true;
 }
 
 static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const struct dxil_block *block,
@@ -4906,6 +4978,35 @@ static void sm6_parser_emit_label(struct sm6_parser *sm6, unsigned int label_id)
     if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
         return;
     vsir_src_param_init_label(src_param, label_id);
+}
+
+static enum vkd3d_result sm6_function_emit_blocks(const struct sm6_function *function, struct sm6_parser *sm6)
+{
+    unsigned int i;
+
+    sm6->p.shader_desc.block_count = function->block_count;
+
+    for (i = 0; i < function->block_count; ++i)
+    {
+        const struct sm6_block *block = function->blocks[i];
+
+        /* Space for the label and terminator. */
+        if (!sm6_parser_require_space(sm6, block->instruction_count + 2))
+        {
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+                    "Out of memory emitting shader instructions.");
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+        sm6_parser_emit_label(sm6, block->id);
+
+        memcpy(&sm6->p.instructions.elements[sm6->p.instructions.count], block->instructions,
+                block->instruction_count * sizeof(*block->instructions));
+        sm6->p.instructions.count += block->instruction_count;
+
+        sm6_block_emit_terminator(block, sm6);
+    }
+
+    return VKD3D_OK;
 }
 
 static bool sm6_parser_allocate_named_metadata(struct sm6_parser *sm6)
@@ -5971,6 +6072,7 @@ static void sm6_functions_cleanup(struct sm6_function *functions, size_t count)
     {
         for (j = 0; j < functions[i].block_count; ++j)
             sm6_block_destroy(functions[i].blocks[j]);
+        vkd3d_free(functions[i].blocks);
     }
     vkd3d_free(functions);
 }
@@ -6267,13 +6369,8 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
 
     assert(sm6->function_count == 1);
-    sm6_parser_emit_label(sm6, 1);
-    if (!sm6_block_emit_instructions(fn->blocks[0], sm6))
-    {
-        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
-                "Out of memory emitting shader instructions.");
-        return VKD3D_ERROR_OUT_OF_MEMORY;
-    }
+    if ((ret = sm6_function_emit_blocks(fn, sm6)) < 0)
+        return ret;
 
     dxil_block_destroy(&sm6->root_block);
 
