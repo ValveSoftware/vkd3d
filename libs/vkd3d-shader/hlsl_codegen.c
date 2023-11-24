@@ -4089,7 +4089,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         [VKD3D_SHADER_TYPE_COMPUTE] = "Compute",
     };
 
-    unsigned int type;
+    enum vkd3d_shader_register_type type;
     uint32_t reg;
     bool builtin;
 
@@ -4097,6 +4097,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
     if (ctx->profile->major_version < 4)
     {
+        D3DSHADER_PARAM_REGISTER_TYPE sm1_type;
         D3DDECLUSAGE usage;
         uint32_t usage_idx;
 
@@ -4104,7 +4105,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
         if (ctx->profile->major_version == 1 && output && ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
             return;
 
-        builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &type, &reg);
+        builtin = hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &sm1_type, &reg);
         if (!builtin && !hlsl_sm1_usage_from_semantic(&var->semantic, &usage, &usage_idx))
         {
             hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SEMANTIC,
@@ -4114,6 +4115,7 @@ static void allocate_semantic_register(struct hlsl_ctx *ctx, struct hlsl_ir_var 
 
         if ((!output && !var->last_read) || (output && !var->first_write))
             return;
+        type = (enum vkd3d_shader_register_type)sm1_type;
     }
     else
     {
