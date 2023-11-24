@@ -3265,7 +3265,7 @@ static void test_create_pipeline_state(void)
     struct d3d12_render_target_formats_subobject
     {
         DECLSPEC_ALIGN(sizeof(void *)) D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type;
-        D3D12_RT_FORMAT_ARRAY render_target_formats;
+        struct D3D12_RT_FORMAT_ARRAY render_target_formats;
     };
 
     struct d3d12_depth_stencil_format_subobject

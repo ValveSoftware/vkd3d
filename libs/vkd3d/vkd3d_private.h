@@ -1334,7 +1334,7 @@ struct d3d12_pipeline_state_desc
     D3D12_INPUT_LAYOUT_DESC input_layout;
     D3D12_INDEX_BUFFER_STRIP_CUT_VALUE strip_cut_value;
     D3D12_PRIMITIVE_TOPOLOGY_TYPE primitive_topology_type;
-    D3D12_RT_FORMAT_ARRAY rtv_formats;
+    struct D3D12_RT_FORMAT_ARRAY rtv_formats;
     DXGI_FORMAT dsv_format;
     DXGI_SAMPLE_DESC sample_desc;
     D3D12_VIEW_INSTANCING_DESC view_instancing_desc;
