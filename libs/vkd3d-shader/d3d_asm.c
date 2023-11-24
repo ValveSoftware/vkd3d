@@ -242,6 +242,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_NRM                             ] = "nrm",
     [VKD3DSIH_OR                              ] = "or",
     [VKD3DSIH_PHASE                           ] = "phase",
+    [VKD3DSIH_PHI                             ] = "phi",
     [VKD3DSIH_POW                             ] = "pow",
     [VKD3DSIH_RCP                             ] = "rcp",
     [VKD3DSIH_REP                             ] = "rep",

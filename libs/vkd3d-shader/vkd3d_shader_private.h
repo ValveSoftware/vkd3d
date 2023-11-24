@@ -436,6 +436,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_NRM,
     VKD3DSIH_OR,
     VKD3DSIH_PHASE,
+    VKD3DSIH_PHI,
     VKD3DSIH_POW,
     VKD3DSIH_RCP,
     VKD3DSIH_REP,
@@ -1197,6 +1198,11 @@ static inline bool register_is_constant(const struct vkd3d_shader_register *reg)
 static inline bool vsir_register_is_label(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_LABEL;
+}
+
+static inline bool register_is_ssa(const struct vkd3d_shader_register *reg)
+{
+    return reg->type == VKD3DSPR_SSA;
 }
 
 struct vkd3d_shader_param_node

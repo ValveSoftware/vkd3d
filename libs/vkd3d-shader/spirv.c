@@ -3852,7 +3852,12 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
 
     ssa = spirv_compiler_get_ssa_register_info(compiler, reg);
     val_id = ssa->id;
-    assert(val_id);
+    if (!val_id)
+    {
+        /* Should only be from a missing instruction implementation. */
+        assert(compiler->failed);
+        return 0;
+    }
     assert(vkd3d_swizzle_is_scalar(swizzle));
 
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
