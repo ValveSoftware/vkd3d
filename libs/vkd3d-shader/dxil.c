@@ -4895,8 +4895,7 @@ static enum vkd3d_result sm6_parser_resources_init(struct sm6_parser *sm6)
 static void signature_element_read_additional_element_values(struct signature_element *e,
         const struct sm6_metadata_node *node, struct sm6_parser *sm6)
 {
-    unsigned int i, operand_count, value;
-    enum dxil_element_additional_tag tag;
+    unsigned int i, operand_count, value, tag;
 
     if (node->operand_count < 11 || !node->operands[10])
         return;
@@ -5254,8 +5253,7 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
 {
     const struct sm6_metadata_value *m = sm6_parser_find_named_metadata(sm6, "dx.entryPoints");
     const struct sm6_metadata_node *node, *entry_node = m ? m->u.node : NULL;
-    enum dxil_shader_properties_tag tag;
-    unsigned int i, operand_count;
+    unsigned int i, operand_count, tag;
     const struct sm6_value *value;
     enum vkd3d_result ret;
 
