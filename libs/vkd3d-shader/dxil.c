@@ -475,13 +475,16 @@ struct sm6_symbol
 enum sm6_block_terminator_type
 {
     TERMINATOR_UNCOND_BR,
+    TERMINATOR_COND_BR,
     TERMINATOR_RET,
 };
 
 struct sm6_block_terminator
 {
+    struct vkd3d_shader_register conditional_reg;
     enum sm6_block_terminator_type type;
     const struct sm6_block *true_block;
+    const struct sm6_block *false_block;
 };
 
 struct sm6_block
@@ -3328,6 +3331,9 @@ static const struct sm6_block *sm6_function_get_block(const struct sm6_function 
 static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record *record,
         struct sm6_function *function, struct sm6_block *code_block, struct vkd3d_shader_instruction *ins)
 {
+    const struct sm6_value *value;
+    unsigned int i = 2;
+
     if (record->operand_count != 1 && record->operand_count < 3)
     {
         WARN("Invalid operand count %u.\n", record->operand_count);
@@ -3343,9 +3349,22 @@ static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record 
     }
     else
     {
-        FIXME("Conditional branch is not implemented.\n");
-        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
-                "Conditional branch is not implemented.");
+        if (!sm6->bool_type)
+        {
+            WARN("Bool type not found.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+                    "Module does not define a boolean type for conditions.");
+            return;
+        }
+        if (!(value = sm6_parser_get_value_by_ref(sm6, record, sm6->bool_type, &i))
+                || !sm6_value_validate_is_bool(value, sm6))
+            return;
+        dxil_record_validate_operand_max_count(record, i, sm6);
+
+        code_block->terminator.type = TERMINATOR_COND_BR;
+        code_block->terminator.conditional_reg = value->u.reg;
+        code_block->terminator.true_block = sm6_function_get_block(function, record->operands[0], sm6);
+        code_block->terminator.false_block = sm6_function_get_block(function, record->operands[1], sm6);
     }
 
     ins->handler_idx = VKD3DSIH_NOP;
@@ -4900,6 +4919,18 @@ static void sm6_block_emit_terminator(const struct sm6_block *block, struct sm6_
             if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
                 return;
             vsir_src_param_init_label(&src_params[0], block->terminator.true_block->id);
+            break;
+
+        case TERMINATOR_COND_BR:
+            if (!block->terminator.true_block || !block->terminator.false_block)
+                return;
+            ins = sm6_parser_add_instruction(sm6, VKD3DSIH_BRANCH);
+            if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+                return;
+            src_param_init(&src_params[0]);
+            src_params[0].reg = block->terminator.conditional_reg;
+            vsir_src_param_init_label(&src_params[1], block->terminator.true_block->id);
+            vsir_src_param_init_label(&src_params[2], block->terminator.false_block->id);
             break;
 
         case TERMINATOR_RET:
