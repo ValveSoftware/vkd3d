@@ -6852,7 +6852,7 @@ fail:
 static HRESULT d3d12_command_queue_wait_binary_semaphore_locked(struct d3d12_command_queue *command_queue,
         struct d3d12_fence *fence, uint64_t value)
 {
-    static const VkPipelineStageFlagBits wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    static const VkPipelineStageFlags wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     const struct vkd3d_vk_device_procs *vk_procs;
     struct vkd3d_signaled_semaphore *semaphore;
     uint64_t completed_value = 0;
@@ -6948,7 +6948,7 @@ fail:
 static HRESULT d3d12_command_queue_wait_locked(struct d3d12_command_queue *command_queue,
         struct d3d12_fence *fence, uint64_t value)
 {
-    static const VkPipelineStageFlagBits wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    static const VkPipelineStageFlags wait_stage_mask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     VkTimelineSemaphoreSubmitInfoKHR timeline_submit_info;
     const struct vkd3d_vk_device_procs *vk_procs;
     struct vkd3d_queue *queue;
