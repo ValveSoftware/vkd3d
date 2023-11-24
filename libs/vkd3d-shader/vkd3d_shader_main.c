@@ -890,6 +890,21 @@ static void vkd3d_shader_scan_combined_sampler_declaration(
             &semantic->resource.range, semantic->resource_type, VKD3D_SHADER_RESOURCE_DATA_FLOAT);
 }
 
+static const struct vkd3d_shader_descriptor_info1 *find_descriptor(
+        const struct vkd3d_shader_scan_descriptor_info1 *info,
+        enum vkd3d_shader_descriptor_type type, unsigned int register_id)
+{
+    for (unsigned int i = 0; i < info->descriptor_count; ++i)
+    {
+        const struct vkd3d_shader_descriptor_info1 *d = &info->descriptors[i];
+
+        if (d->type == type && d->register_id == register_id)
+            return d;
+    }
+
+    return NULL;
+}
+
 static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_context *context,
         const struct vkd3d_shader_register *resource, const struct vkd3d_shader_register *sampler)
 {
@@ -915,7 +930,6 @@ static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_co
 
     if (vkd3d_shader_ver_ge(context->version, 5, 1))
     {
-        const struct vkd3d_shader_scan_descriptor_info1 *info = context->scan_descriptor_info;
         const struct vkd3d_shader_descriptor_info1 *d;
         bool dynamic_resource, dynamic_sampler;
 
@@ -930,30 +944,13 @@ static void vkd3d_shader_scan_combined_sampler_usage(struct vkd3d_shader_scan_co
         if (dynamic_resource || dynamic_sampler)
             return;
 
-        for (i = 0; i < info->descriptor_count; ++i)
-        {
-            d = &info->descriptors[i];
-            if (d->type != VKD3D_SHADER_DESCRIPTOR_TYPE_SRV)
-                continue;
-            if (d->register_id != resource->idx[0].offset)
-                continue;
+        if ((d = find_descriptor(context->scan_descriptor_info,
+                VKD3D_SHADER_DESCRIPTOR_TYPE_SRV, resource->idx[0].offset)))
             resource_space = d->register_space;
-            break;
-        }
 
-        if (sampler)
-        {
-            for (i = 0; i < info->descriptor_count; ++i)
-            {
-                d = &info->descriptors[i];
-                if (d->type != VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER)
-                    continue;
-                if (d->register_id != sampler->idx[0].offset)
-                    continue;
-                sampler_space = d->register_space;
-                break;
-            }
-        }
+        if (sampler && (d = find_descriptor(context->scan_descriptor_info,
+                VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER, sampler->idx[0].offset)))
+            sampler_space = d->register_space;
     }
 
     for (i = 0; i < info->combined_sampler_count; ++i)
