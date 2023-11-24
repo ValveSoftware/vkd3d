@@ -2301,7 +2301,6 @@ static bool normalize_switch_cases(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
     struct hlsl_ir_switch_case *c, *def = NULL;
     bool missing_terminal_break = false;
     struct hlsl_ir_node *node;
-    struct hlsl_ir_jump *jump;
     struct hlsl_ir_switch *s;
 
     if (instr->type != HLSL_IR_SWITCH)
@@ -2320,10 +2319,7 @@ static bool normalize_switch_cases(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
         {
             node = LIST_ENTRY(list_tail(&c->body.instrs), struct hlsl_ir_node, entry);
             if (node->type == HLSL_IR_JUMP)
-            {
-                jump = hlsl_ir_jump(node);
-                terminal_break = jump->type == HLSL_IR_JUMP_BREAK;
-            }
+                terminal_break = (hlsl_ir_jump(node)->type == HLSL_IR_JUMP_BREAK);
         }
 
         missing_terminal_break |= !terminal_break;
