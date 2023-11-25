@@ -942,6 +942,13 @@ typedef enum D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS
 } D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS;
 cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS)")
 
+typedef enum D3D12_MESSAGE_CALLBACK_FLAGS
+{
+    D3D12_MESSAGE_CALLBACK_FLAG_NONE = 0x00,
+    D3D12_MESSAGE_CALLBACK_IGNORE_FILTERS = 0x01,
+} D3D12_MESSAGE_CALLBACK_FLAGS;
+cpp_quote("DEFINE_ENUM_FLAG_OPERATORS(D3D12_MESSAGE_CALLBACK_FLAGS)")
+
 typedef struct D3D12_DEBUG_DEVICE_GPU_BASED_VALIDATION_SETTINGS
 {
     UINT MaxMessagesPerCommandList;
@@ -1145,4 +1152,20 @@ interface ID3D12InfoQueue : IUnknown
     BOOL GetBreakOnID([in] D3D12_MESSAGE_ID id);
     void SetMuteDebugOutput([in] BOOL mute);
     BOOL GetMuteDebugOutput();
+}
+
+typedef void (__stdcall *D3D12MessageFunc)(D3D12_MESSAGE_CATEGORY category,
+    D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, const char *description, void *context);
+
+[
+    uuid(2852dd88-b484-4c0c-b6b1-67168500e600),
+    object,
+    local,
+    pointer_default(unique)
+]
+interface ID3D12InfoQueue1 : ID3D12InfoQueue
+{
+    HRESULT RegisterMessageCallback([in] D3D12MessageFunc func,
+        [in] D3D12_MESSAGE_CALLBACK_FLAGS flags, [in] void *context, [in, out] DWORD *cookie);
+    HRESULT UnregisterMessageCallback([in] DWORD cookie);
 }
