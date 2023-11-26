@@ -4311,6 +4311,7 @@ static void write_sm4_dcl_semantic(const struct tpf_writer *tpf, const struct hl
                     { HLSL_STORAGE_CENTROID | HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE_CENTROID },
                     { HLSL_STORAGE_NOPERSPECTIVE, VKD3DSIM_LINEAR_NOPERSPECTIVE },
                     { HLSL_STORAGE_CENTROID, VKD3DSIM_LINEAR_CENTROID },
+                    { HLSL_STORAGE_CENTROID | HLSL_STORAGE_LINEAR, VKD3DSIM_LINEAR_CENTROID },
                 };
                 unsigned int i;
 

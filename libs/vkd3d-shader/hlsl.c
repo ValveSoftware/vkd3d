@@ -2255,6 +2255,8 @@ struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsig
 
     if (modifiers & HLSL_STORAGE_EXTERN)
         vkd3d_string_buffer_printf(string, "extern ");
+    if (modifiers & HLSL_STORAGE_LINEAR)
+        vkd3d_string_buffer_printf(string, "linear ");
     if (modifiers & HLSL_STORAGE_NOINTERPOLATION)
         vkd3d_string_buffer_printf(string, "nointerpolation ");
     if (modifiers & HLSL_STORAGE_CENTROID)

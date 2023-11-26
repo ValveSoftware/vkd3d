@@ -95,6 +95,7 @@ if                      {return KW_IF;                  }
 in                      {return KW_IN;                  }
 inline                  {return KW_INLINE;              }
 inout                   {return KW_INOUT;               }
+linear                  {return KW_LINEAR;              }
 matrix                  {return KW_MATRIX;              }
 namespace               {return KW_NAMESPACE;           }
 nointerpolation         {return KW_NOINTERPOLATION;     }

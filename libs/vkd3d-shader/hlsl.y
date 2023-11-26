@@ -4893,6 +4893,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
 %token KW_IN
 %token KW_INLINE
 %token KW_INOUT
+%token KW_LINEAR
 %token KW_MATRIX
 %token KW_NAMESPACE
 %token KW_NOINTERPOLATION
@@ -6261,6 +6262,10 @@ var_modifiers:
     | KW_CENTROID var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_STORAGE_CENTROID, &@1);
+        }
+    | KW_LINEAR var_modifiers
+        {
+            $$ = add_modifiers(ctx, $2, HLSL_STORAGE_LINEAR, &@1);
         }
     | KW_NOPERSPECTIVE var_modifiers
         {
