@@ -459,6 +459,7 @@ struct dxil_record
 {
     unsigned int code;
     unsigned int operand_count;
+    const struct dxil_record *attachment;
     uint64_t operands[];
 };
 
@@ -817,6 +818,7 @@ static enum vkd3d_result sm6_parser_read_unabbrev_record(struct sm6_parser *sm6)
 
     record->code = code;
     record->operand_count = count;
+    record->attachment = NULL;
 
     for (i = 0; i < count; ++i)
         record->operands[i] = sm6_parser_read_vbr(sm6, 6);
@@ -1033,6 +1035,7 @@ static enum vkd3d_result sm6_parser_read_abbrev_record(struct sm6_parser *sm6, u
         if (!abbrev->operands[i + 1].read_operand(sm6, abbrev->operands[i + 1].context, &record->operands[i]))
             goto fail;
     record->operand_count = count;
+    record->attachment = NULL;
 
     /* An array can occur only as the last operand. */
     if (abbrev->is_array)
@@ -2625,6 +2628,13 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 FIXME("Unhandled constant code %u.\n", record->code);
                 dst->u.reg.type = VKD3DSPR_UNDEF;
                 break;
+        }
+
+        if (record->attachment)
+        {
+            WARN("Ignoring metadata attachment.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Ignoring a metadata attachment for a constant.");
         }
 
         ++sm6->value_count;
@@ -4328,6 +4338,208 @@ static bool sm6_metadata_get_uint64_value(const struct sm6_parser *sm6,
     return true;
 }
 
+static void sm6_parser_metadata_attachment_block_init(struct sm6_parser *sm6, const struct dxil_block *target_block,
+        const struct dxil_block *block)
+{
+    struct dxil_record *target_record;
+    const struct dxil_record *record;
+    unsigned int i;
+    uint64_t index;
+
+    for (i = 0; i < block->record_count; ++i)
+    {
+        record = block->records[i];
+        if (record->code != METADATA_ATTACHMENT)
+        {
+            WARN("Ignoring record with code %u.\n", record->code);
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Ignoring a metadata attachment record with code %u.", record->code);
+            continue;
+        }
+        if (!(record->operand_count & 1))
+        {
+            WARN("Ignoring function attachment.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Ignoring a metadata function attachment.");
+            continue;
+        }
+
+        index = record->operands[0];
+        if (!target_block->record_count || index >= target_block->record_count - 1)
+        {
+            WARN("Invalid record index %"PRIu64".\n", index);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Invalid record index %"PRIu64" for a metadata attachment.", index);
+            continue;
+        }
+        /* 'index' is an instruction index, but records[0] is DECLAREBLOCKS, not an instruction. */
+        target_record = target_block->records[index + 1];
+        if (target_record->attachment)
+        {
+            WARN("Overwriting record attachment.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "The target record for a metadata attachment already has an attachment.");
+        }
+        target_record->attachment = record;
+    }
+}
+
+static void sm6_parser_metadata_attachments_init(struct sm6_parser *sm6, const struct dxil_block *block)
+{
+    unsigned int i;
+
+    for (i = 0; i < block->child_block_count; ++i)
+    {
+        if (block->child_blocks[i]->id == METADATA_ATTACHMENT_BLOCK)
+            sm6_parser_metadata_attachment_block_init(sm6, block, block->child_blocks[i]);
+    }
+}
+
+static const struct sm6_metadata_value *sm6_parser_find_metadata_kind(const struct sm6_parser *sm6, uint64_t id)
+{
+    unsigned int i, j;
+
+    for (i = 0; i < ARRAY_SIZE(sm6->metadata_tables); ++i)
+    {
+        for (j = 0; j < sm6->metadata_tables[i].count; ++j)
+        {
+            if (sm6->metadata_tables[i].values[j].type == VKD3D_METADATA_KIND
+                    && sm6->metadata_tables[i].values[j].u.kind.id == id)
+                return &sm6->metadata_tables[i].values[j];
+        }
+    }
+
+    return NULL;
+}
+
+static const struct sm6_metadata_value *sm6_parser_metadata_get_value(const struct sm6_parser *sm6, uint64_t index)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(sm6->metadata_tables); ++i)
+    {
+        if (sm6->metadata_tables[i].count > index)
+            break;
+        index -= sm6->metadata_tables[i].count;
+    }
+
+    return (index < sm6->metadata_tables[i].count) ? &sm6->metadata_tables[i].values[index] : NULL;
+}
+
+static bool metadata_node_get_unary_uint(const struct sm6_metadata_node *node, unsigned int *operand,
+        struct sm6_parser *sm6)
+{
+    if (node->operand_count != 1)
+    {
+        FIXME("Ignoring node with %u operands.\n", node->operand_count);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                "Ignoring metadata attachment node with %u operands; expected unary.", node->operand_count);
+        return false;
+    }
+    if (!sm6_metadata_value_is_value(node->operands[0])
+            || !sm6_metadata_get_uint_value(sm6, node->operands[0], operand))
+    {
+        WARN("Failed to get operand value.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                "Failed to get a metadata attachment operand value; ignoring the attachment.");
+        return false;
+    }
+
+    return true;
+}
+
+static void metadata_attachment_record_apply(const struct dxil_record *record, enum bitcode_function_code func_code,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst, struct sm6_parser *sm6)
+{
+    static const char *ignored_names[] =
+    {
+        "alias.scope",
+        "dx.controlflow.hints",
+        "llvm.loop",
+        "noalias",
+        "tbaa",
+        "range",
+    };
+    const struct sm6_metadata_node *node;
+    const struct sm6_metadata_value *m;
+    unsigned int i, j, operand;
+    bool ignored = false;
+    const char *name;
+
+    if (record->attachment)
+    {
+        WARN("Ignoring nested metadata attachment.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                "Ignoring a nested metadata attachment.");
+    }
+
+    assert(record->operand_count & 1);
+    for (i = 1; i < record->operand_count; i += 2)
+    {
+        if (!(m = sm6_parser_find_metadata_kind(sm6, record->operands[i])))
+        {
+            WARN("Failed to find metadata kind %"PRIx64".\n", record->operands[i]);
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Failed to find metadata kind %"PRIx64" for an attachment.", record->operands[i]);
+            continue;
+        }
+        name = m->u.kind.name;
+
+        m = sm6_parser_metadata_get_value(sm6, record->operands[i + 1]);
+        if (!m || !sm6_metadata_value_is_node(m))
+        {
+            WARN("Failed to retrieve metadata attachment node.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                    "Failed to retrieve a metadata attachment node.");
+            continue;
+        }
+        node = m->u.node;
+
+        if (!strcmp(name, "dx.precise"))
+        {
+            if (!sm6_value_is_register(dst))
+            {
+                WARN("Precise value is not a register.\n");
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                        "A value marked as precise is not a register.");
+            }
+            else if (metadata_node_get_unary_uint(node, &operand, sm6) && operand)
+            {
+                ins->flags |= sm6_type_is_scalar(dst->type) ? VKD3DSI_PRECISE_X : VKD3DSI_PRECISE_XYZW;
+            }
+        }
+        else if (!strcmp(name, "dx.nonuniform"))
+        {
+            if (!sm6_value_is_register(dst))
+            {
+                WARN("Non-uniform value is not a register.\n");
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                        "A value marked as non-uniform is not a register.");
+            }
+            else if (metadata_node_get_unary_uint(node, &operand, sm6))
+            {
+                dst->u.reg.non_uniform = !!operand;
+            }
+        }
+        else
+        {
+            for (j = 0; j < ARRAY_SIZE(ignored_names); ++j)
+                if (!strcmp(name, ignored_names[j]))
+                    break;
+            if (j == ARRAY_SIZE(ignored_names))
+            {
+                WARN("Ignoring metadata attachment '%s'.\n", name);
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_ATTACHMENT,
+                        "Ignoring a metadata attachment named '%s'.", name);
+            }
+            ignored = true;
+        }
+
+        if (func_code != FUNC_CODE_INST_CALL && !ignored)
+            WARN("Metadata attachment target is not a function call.\n");
+    }
+}
+
 static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const struct dxil_block *block,
         struct sm6_function *function)
 {
@@ -4453,6 +4665,9 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             return VKD3D_ERROR;
         assert(ins->handler_idx != VKD3DSIH_INVALID);
 
+        if (record->attachment)
+            metadata_attachment_record_apply(record->attachment, record->code, ins, dst, sm6);
+
         if (is_terminator)
         {
             ++block_idx;
@@ -4505,6 +4720,8 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
 
     sm6->p.location.line = block->id;
     sm6->p.location.column = 0;
+
+    sm6_parser_metadata_attachments_init(sm6, block);
 
     switch (block->id)
     {
