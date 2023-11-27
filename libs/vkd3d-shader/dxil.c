@@ -2884,6 +2884,7 @@ static void dst_param_io_init(struct vkd3d_shader_dst_param *param,
     /* DXIL types do not have signedness. Load signed elements as unsigned. */
     component_type = e->component_type == VKD3D_SHADER_COMPONENT_INT ? VKD3D_SHADER_COMPONENT_UINT : e->component_type;
     vsir_register_init(&param->reg, reg_type, vkd3d_data_type_from_component_type(component_type), 0);
+    param->reg.dimension = VSIR_DIMENSION_VEC4;
 }
 
 static void sm6_parser_init_signature(struct sm6_parser *sm6, const struct shader_signature *s,
