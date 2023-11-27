@@ -296,8 +296,28 @@ enum dx_intrinsic_opcode
 {
     DX_LOAD_INPUT                   =   4,
     DX_STORE_OUTPUT                 =   5,
+    DX_EXP                          =  21,
+    DX_FRC                          =  22,
+    DX_LOG                          =  23,
+    DX_SQRT                         =  24,
+    DX_RSQRT                        =  25,
+    DX_ROUND_NE                     =  26,
+    DX_ROUND_NI                     =  27,
+    DX_ROUND_PI                     =  28,
+    DX_ROUND_Z                      =  29,
+    DX_BFREV                        =  30,
+    DX_COUNT_BITS                   =  31,
+    DX_FIRST_BIT_LO                 =  32,
+    DX_FIRST_BIT_HI                 =  33,
+    DX_FIRST_BIT_SHI                =  34,
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
+    DX_DERIV_COARSEX                =  83,
+    DX_DERIV_COARSEY                =  84,
+    DX_DERIV_FINEX                  =  85,
+    DX_DERIV_FINEY                  =  86,
+    DX_LEGACY_F32TOF16              = 130,
+    DX_LEGACY_F16TOF32              = 131,
 };
 
 enum dxil_cast_code
@@ -1573,6 +1593,11 @@ static bool sm6_type_is_bool_i16_i32_i64(const struct sm6_type *type)
     return type->class == TYPE_CLASS_INTEGER && (type->u.width == 1 || type->u.width >= 16);
 }
 
+static bool sm6_type_is_i16_i32_i64(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_INTEGER && type->u.width >= 16;
+}
+
 static bool sm6_type_is_bool(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_INTEGER && type->u.width == 1;
@@ -1586,6 +1611,16 @@ static inline bool sm6_type_is_i8(const struct sm6_type *type)
 static inline bool sm6_type_is_i32(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_INTEGER && type->u.width == 32;
+}
+
+static bool sm6_type_is_float(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_FLOAT && type->u.width == 32;
+}
+
+static bool sm6_type_is_f16_f32(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_FLOAT && (type->u.width == 16 || type->u.width == 32);
 }
 
 static inline bool sm6_type_is_floating_point(const struct sm6_type *type)
@@ -3205,6 +3240,67 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
     }
 }
 
+static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
+{
+    switch (op)
+    {
+        case DX_EXP:
+            return VKD3DSIH_EXP;
+        case DX_FRC:
+            return VKD3DSIH_FRC;
+        case DX_LOG:
+            return VKD3DSIH_LOG;
+        case DX_SQRT:
+            return VKD3DSIH_SQRT;
+        case DX_RSQRT:
+            return VKD3DSIH_RSQ;
+        case DX_ROUND_NE:
+            return VKD3DSIH_ROUND_NE;
+        case DX_ROUND_NI:
+            return VKD3DSIH_ROUND_NI;
+        case DX_ROUND_PI:
+            return VKD3DSIH_ROUND_PI;
+        case DX_ROUND_Z:
+            return VKD3DSIH_ROUND_Z;
+        case DX_BFREV:
+            return VKD3DSIH_BFREV;
+        case DX_COUNT_BITS:
+            return VKD3DSIH_COUNTBITS;
+        case DX_FIRST_BIT_LO:
+            return VKD3DSIH_FIRSTBIT_LO;
+        case DX_FIRST_BIT_HI:
+            return VKD3DSIH_FIRSTBIT_HI;
+        case DX_FIRST_BIT_SHI:
+            return VKD3DSIH_FIRSTBIT_SHI;
+        case DX_DERIV_COARSEX:
+            return VKD3DSIH_DSX_COARSE;
+        case DX_DERIV_COARSEY:
+            return VKD3DSIH_DSY_COARSE;
+        case DX_DERIV_FINEX:
+            return VKD3DSIH_DSX_FINE;
+        case DX_DERIV_FINEY:
+            return VKD3DSIH_DSY_FINE;
+        case DX_LEGACY_F32TOF16:
+            return VKD3DSIH_F32TOF16;
+        case DX_LEGACY_F16TOF32:
+            return VKD3DSIH_F16TOF32;
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, struct sm6_block *code_block,
+        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, map_dx_unary_op(op));
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(src_param, operands[0]);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, struct sm6_block *code_block,
         enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
 {
@@ -3378,7 +3474,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, struct sm6_b
 
 struct sm6_dx_opcode_info
 {
-    const char ret_type;
+    const char *ret_type;
     const char *operand_info;
     void (*handler)(struct sm6_parser *, struct sm6_block *, enum dx_intrinsic_opcode,
             const struct sm6_value **, struct vkd3d_shader_instruction *);
@@ -3389,16 +3485,40 @@ struct sm6_dx_opcode_info
     b -> constant int1
     c -> constant int8/16/32
     i -> int32
+    m -> int16/32/64
+    f -> float
+    e -> half/float
+    g -> half/float/double
     H -> handle
     v -> void
     o -> overloaded
  */
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
-    [DX_CBUFFER_LOAD_LEGACY           ] = {'o', "Hi",   sm6_parser_emit_dx_cbuffer_load},
-    [DX_CREATE_HANDLE                 ] = {'H', "ccib", sm6_parser_emit_dx_create_handle},
-    [DX_LOAD_INPUT                    ] = {'o', "ii8i", sm6_parser_emit_dx_load_input},
-    [DX_STORE_OUTPUT                  ] = {'v', "ii8o", sm6_parser_emit_dx_store_output},
+    [DX_BFREV                         ] = {"m0", "m",   sm6_parser_emit_dx_unary},
+    [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
+    [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
+    [DX_DERIV_COARSEX                 ] = {"e0", "e",   sm6_parser_emit_dx_unary},
+    [DX_DERIV_COARSEY                 ] = {"e0", "e",   sm6_parser_emit_dx_unary},
+    [DX_DERIV_FINEX                   ] = {"e0", "e",   sm6_parser_emit_dx_unary},
+    [DX_DERIV_FINEY                   ] = {"e0", "e",   sm6_parser_emit_dx_unary},
+    [DX_EXP                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_FIRST_BIT_HI                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_FIRST_BIT_LO                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_FIRST_BIT_SHI                 ] = {"i", "m",    sm6_parser_emit_dx_unary},
+    [DX_FRC                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_LEGACY_F16TOF32               ] = {"f", "i",    sm6_parser_emit_dx_unary},
+    [DX_LEGACY_F32TOF16               ] = {"i", "f",    sm6_parser_emit_dx_unary},
+    [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
+    [DX_LOG                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_ROUND_NE                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_ROUND_NI                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_ROUND_PI                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_ROUND_Z                       ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_RSQRT                         ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_SQRT                          ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,
@@ -3423,6 +3543,14 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
                     && type->u.width <= 32;
         case 'i':
             return sm6_type_is_i32(type);
+        case 'm':
+            return sm6_type_is_i16_i32_i64(type);
+        case 'f':
+            return sm6_type_is_float(type);
+        case 'e':
+            return sm6_type_is_f16_f32(type);
+        case 'g':
+            return sm6_type_is_floating_point(type);
         case 'H':
             return (is_return || sm6_value_is_handle(value)) && type == sm6->handle_type;
         case 'v':
@@ -3436,6 +3564,17 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
     }
 }
 
+static bool operand_types_match(struct sm6_value *dst, const struct sm6_value **operands, unsigned int operand_count,
+        char index_char)
+{
+    unsigned int i = index_char - '0';
+
+    assert(i < 10);
+    if (i >= operand_count)
+        return false;
+    return dst->type == operands[i]->type;
+}
+
 static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op, const char *name,
         const struct sm6_value **operands, unsigned int operand_count, struct sm6_value *dst)
 {
@@ -3444,7 +3583,9 @@ static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_
 
     info = &sm6_dx_op_table[op];
 
-    if (!sm6_parser_validate_operand_type(sm6, dst, info->ret_type, true))
+    assert(info->ret_type[0]);
+    if (!sm6_parser_validate_operand_type(sm6, dst, info->ret_type[0], true)
+            || (info->ret_type[1] && !operand_types_match(dst, operands, operand_count, info->ret_type[1])))
     {
         WARN("Failed to validate return type for dx intrinsic id %u, '%s'.\n", op, name);
         /* Return type validation failure is not so critical. We only need to set
