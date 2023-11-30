@@ -606,7 +606,7 @@ static void shader_dump_resource_type(struct vkd3d_d3d_asm_compiler *compiler, e
         vkd3d_string_buffer_printf(&compiler->buffer, "unknown");
 }
 
-static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, const enum vkd3d_data_type *type)
+static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_data_type type)
 {
     static const char *const data_type_names[] =
     {
@@ -624,18 +624,27 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, const
         [VKD3D_DATA_CONTINUED] = "<continued>",
         [VKD3D_DATA_UNUSED   ] = "<unused>",
     };
+
     const char *name;
+
+    if (type < ARRAY_SIZE(data_type_names))
+        name = data_type_names[type];
+    else
+        name = "unknown";
+
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s", name);
+}
+
+static void shader_dump_resource_data_type(struct vkd3d_d3d_asm_compiler *compiler, const enum vkd3d_data_type *type)
+{
     int i;
 
     vkd3d_string_buffer_printf(&compiler->buffer, "(");
 
     for (i = 0; i < 4; i++)
     {
-        if (type[i] < ARRAY_SIZE(data_type_names))
-            name = data_type_names[type[i]];
-        else
-            name = "unknown";
-        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s", i == 0 ? "" : ",", name);
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s", i == 0 ? "" : ",");
+        shader_dump_data_type(compiler, type[i]);
     }
 
     vkd3d_string_buffer_printf(&compiler->buffer, ")");
@@ -682,7 +691,7 @@ static void shader_dump_decl_usage(struct vkd3d_d3d_asm_compiler *compiler,
         if (semantic->resource.reg.reg.type == VKD3DSPR_UAV)
             shader_dump_uav_flags(compiler, flags);
         shader_addline(buffer, " ");
-        shader_dump_data_type(compiler, semantic->resource_data_type);
+        shader_dump_resource_data_type(compiler, semantic->resource_data_type);
     }
     else
     {
@@ -1889,7 +1898,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
                     || ins->resource_data_type[1] != VKD3D_DATA_FLOAT
                     || ins->resource_data_type[2] != VKD3D_DATA_FLOAT
                     || ins->resource_data_type[3] != VKD3D_DATA_FLOAT)
-                shader_dump_data_type(compiler, ins->resource_data_type);
+                shader_dump_resource_data_type(compiler, ins->resource_data_type);
 
             for (i = 0; i < ins->dst_count; ++i)
             {
