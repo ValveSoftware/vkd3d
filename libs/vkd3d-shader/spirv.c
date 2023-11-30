@@ -4455,7 +4455,7 @@ static const struct vkd3d_spirv_builtin *get_spirv_builtin_for_sysval(
     enum vkd3d_shader_spirv_environment environment;
     unsigned int i;
 
-    if (!sysval)
+    if (sysval == VKD3D_SHADER_SV_NONE || sysval == VKD3D_SHADER_SV_TARGET)
         return NULL;
 
     /* In pixel shaders, SV_Position is mapped to SpvBuiltInFragCoord. */
