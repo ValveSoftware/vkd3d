@@ -5842,7 +5842,7 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
 
     if (flags & ~(VKD3DSGF_REFACTORING_ALLOWED | VKD3DSGF_ENABLE_RAW_AND_STRUCTURED_BUFFERS))
         FIXME("Unhandled global flags %#"PRIx64".\n", (uint64_t)flags);
-    else
+    else if (flags)
         WARN("Unhandled global flags %#"PRIx64".\n", (uint64_t)flags);
 }
 
