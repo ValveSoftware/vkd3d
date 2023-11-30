@@ -2008,6 +2008,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instructio
         {
             case VKD3DSIH_ELSE:
             case VKD3DSIH_IF:
+            case VKD3DSIH_IFC:
             case VKD3DSIH_LOOP:
             case VKD3DSIH_SWITCH:
                 ++indent;
