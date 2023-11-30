@@ -1315,9 +1315,15 @@ struct vkd3d_string_buffer_cache
     size_t count, max_count, capacity;
 };
 
+enum vsir_asm_dialect
+{
+    VSIR_ASM_VSIR,
+    VSIR_ASM_D3D,
+};
+
 enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
         const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out);
+        struct vkd3d_shader_code *out, enum vsir_asm_dialect dialect);
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);
 struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list);
 void vkd3d_string_buffer_init(struct vkd3d_string_buffer *buffer);

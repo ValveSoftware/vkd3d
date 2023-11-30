@@ -1546,7 +1546,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
-            ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
+            ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
@@ -1623,7 +1623,7 @@ static int compile_d3d_bytecode(const struct vkd3d_shader_compile_info *compile_
 
     if (compile_info->target_type == VKD3D_SHADER_TARGET_D3D_ASM)
     {
-        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out);
+        ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
         vkd3d_shader_parser_destroy(parser);
         return ret;
     }

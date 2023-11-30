@@ -364,6 +364,7 @@ struct vkd3d_d3d_asm_compiler
     struct vkd3d_string_buffer buffer;
     struct vkd3d_shader_version shader_version;
     struct vkd3d_d3d_asm_colours colours;
+    enum vsir_asm_dialect dialect;
 };
 
 static int VKD3D_PRINTF_FUNC(2, 3) shader_addline(struct vkd3d_string_buffer *buffer, const char *format, ...)
@@ -1277,6 +1278,32 @@ static void shader_print_non_uniform(struct vkd3d_d3d_asm_compiler *compiler, co
                 compiler->colours.modifier, compiler->colours.reset);
 }
 
+static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
+        const struct vkd3d_shader_register *reg)
+{
+    static const char *dimensions[] =
+    {
+        [VSIR_DIMENSION_NONE]   = "",
+        [VSIR_DIMENSION_SCALAR] = "s:",
+        [VSIR_DIMENSION_VEC4]   = "v4:",
+    };
+
+    struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *dimension;
+
+    if (compiler->dialect != VSIR_ASM_VSIR)
+        return;
+
+    if (reg->dimension < ARRAY_SIZE(dimensions))
+        dimension = dimensions[reg->dimension];
+    else
+        dimension = "??";
+
+    shader_addline(buffer, " <%s", dimension);
+    shader_dump_data_type(compiler, reg->data_type);
+    shader_addline(buffer, ">");
+}
+
 static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_dst_param *param, bool is_declaration)
 {
@@ -1306,6 +1333,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
 
     shader_print_precision(compiler, &param->reg);
     shader_print_non_uniform(compiler, &param->reg);
+    shader_dump_reg_type(compiler, &param->reg);
 }
 
 static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1379,6 +1407,7 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
 
     shader_print_precision(compiler, &param->reg);
     shader_print_non_uniform(compiler, &param->reg);
+    shader_dump_reg_type(compiler, &param->reg);
 }
 
 static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1924,10 +1953,13 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
 
 enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
         const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
-        struct vkd3d_shader_code *out)
+        struct vkd3d_shader_code *out, enum vsir_asm_dialect dialect)
 {
     enum vkd3d_shader_compile_option_formatting_flags formatting;
-    struct vkd3d_d3d_asm_compiler compiler;
+    struct vkd3d_d3d_asm_compiler compiler =
+    {
+        .dialect = dialect,
+    };
     enum vkd3d_result result = VKD3D_OK;
     struct vkd3d_string_buffer *buffer;
     unsigned int indent, i, j;
@@ -2053,7 +2085,7 @@ void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instruction
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(instructions, shader_version, NULL, &code) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(instructions, shader_version, NULL, &code, VSIR_ASM_VSIR) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;
