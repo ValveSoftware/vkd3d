@@ -623,6 +623,9 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum 
         [VKD3D_DATA_DOUBLE   ] = "double",
         [VKD3D_DATA_CONTINUED] = "<continued>",
         [VKD3D_DATA_UNUSED   ] = "<unused>",
+        [VKD3D_DATA_UINT8    ] = "uint8",
+        [VKD3D_DATA_UINT64   ] = "uint64",
+        [VKD3D_DATA_BOOL     ] = "bool",
     };
 
     const char *name;
