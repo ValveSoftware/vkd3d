@@ -633,7 +633,7 @@ static void shader_dump_data_type(struct vkd3d_d3d_asm_compiler *compiler, enum 
     if (type < ARRAY_SIZE(data_type_names))
         name = data_type_names[type];
     else
-        name = "unknown";
+        name = "<unknown>";
 
     vkd3d_string_buffer_printf(&compiler->buffer, "%s", name);
 }
