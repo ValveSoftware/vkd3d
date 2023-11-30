@@ -4500,8 +4500,11 @@ static const struct vkd3d_spirv_builtin *vkd3d_get_spirv_builtin(const struct sp
     if ((builtin = get_spirv_builtin_for_register(reg_type)))
         return builtin;
 
-    if (sysval != VKD3D_SHADER_SV_NONE || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_PATCHCONST))
+    if ((sysval != VKD3D_SHADER_SV_NONE && sysval != VKD3D_SHADER_SV_TARGET)
+            || (reg_type != VKD3DSPR_OUTPUT && reg_type != VKD3DSPR_PATCHCONST))
+    {
         FIXME("Unhandled builtin (register type %#x, sysval %#x).\n", reg_type, sysval);
+    }
     return NULL;
 }
 
