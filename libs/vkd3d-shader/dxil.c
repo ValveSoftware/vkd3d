@@ -1237,7 +1237,7 @@ static size_t dxil_block_compute_module_decl_count(const struct dxil_block *bloc
     size_t i, count;
 
     for (i = 0, count = 0; i < block->record_count; ++i)
-        count += block->records[i]->code == MODULE_CODE_FUNCTION;
+        count += block->records[i]->code == MODULE_CODE_FUNCTION || block->records[i]->code == MODULE_CODE_GLOBALVAR;
     return count;
 }
 
