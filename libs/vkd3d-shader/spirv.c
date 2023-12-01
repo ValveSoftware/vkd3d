@@ -6435,9 +6435,9 @@ static void spirv_compiler_emit_resource_declaration(struct spirv_compiler *comp
 }
 
 static void spirv_compiler_emit_workgroup_memory(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, unsigned int size, unsigned int structure_stride)
+        const struct vkd3d_shader_register *reg, unsigned int size, unsigned int structure_stride, bool zero_init)
 {
-    uint32_t type_id, array_type_id, length_id, pointer_type_id, var_id;
+    uint32_t type_id, array_type_id, length_id, pointer_type_id, var_id, init_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const SpvStorageClass storage_class = SpvStorageClassWorkgroup;
     struct vkd3d_symbol reg_symbol;
@@ -6447,8 +6447,9 @@ static void spirv_compiler_emit_workgroup_memory(struct spirv_compiler *compiler
     array_type_id = vkd3d_spirv_get_op_type_array(builder, type_id, length_id);
 
     pointer_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, array_type_id);
+    init_id = zero_init ? vkd3d_spirv_get_op_constant_null(builder, array_type_id) : 0;
     var_id = vkd3d_spirv_build_op_variable(builder, &builder->global_stream,
-            pointer_type_id, storage_class, 0);
+            pointer_type_id, storage_class, init_id);
 
     spirv_compiler_emit_register_debug_name(builder, var_id, reg);
 
@@ -6464,7 +6465,7 @@ static void spirv_compiler_emit_dcl_tgsm_raw(struct spirv_compiler *compiler,
 {
     const struct vkd3d_shader_tgsm_raw *tgsm_raw = &instruction->declaration.tgsm_raw;
     spirv_compiler_emit_workgroup_memory(compiler, &tgsm_raw->reg.reg,
-            tgsm_raw->byte_count / 4, 0);
+            tgsm_raw->byte_count / 4, 0, tgsm_raw->zero_init);
 }
 
 static void spirv_compiler_emit_dcl_tgsm_structured(struct spirv_compiler *compiler,
@@ -6473,7 +6474,7 @@ static void spirv_compiler_emit_dcl_tgsm_structured(struct spirv_compiler *compi
     const struct vkd3d_shader_tgsm_structured *tgsm_structured = &instruction->declaration.tgsm_structured;
     unsigned int stride = tgsm_structured->byte_stride / 4;
     spirv_compiler_emit_workgroup_memory(compiler, &tgsm_structured->reg.reg,
-            tgsm_structured->structure_count * stride, stride);
+            tgsm_structured->structure_count * stride, stride, tgsm_structured->zero_init);
 }
 
 static void spirv_compiler_emit_dcl_input(struct spirv_compiler *compiler,

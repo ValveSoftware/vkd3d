@@ -1089,6 +1089,7 @@ struct vkd3d_shader_tgsm_raw
 {
     struct vkd3d_shader_dst_param reg;
     unsigned int byte_count;
+    bool zero_init;
 };
 
 struct vkd3d_shader_tgsm_structured
@@ -1096,6 +1097,7 @@ struct vkd3d_shader_tgsm_structured
     struct vkd3d_shader_dst_param reg;
     unsigned int byte_stride;
     unsigned int structure_count;
+    bool zero_init;
 };
 
 struct vkd3d_shader_thread_group_size
