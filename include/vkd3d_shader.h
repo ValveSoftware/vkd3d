@@ -191,6 +191,8 @@ enum vkd3d_shader_compile_option_fragment_coordinate_origin
     /** Fragment coordinates originate from the lower-left. This matches the
      * traditional behaviour of OpenGL environments. */
     VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_LOWER_LEFT = 0x00000001,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN),
 };
 
 enum vkd3d_shader_compile_option_name
