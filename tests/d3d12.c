@@ -2991,9 +2991,9 @@ static void test_root_signature_limits(void)
 static void test_create_compute_pipeline_state(void)
 {
     D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_state_desc;
+    ID3D12PipelineState *pipeline_state, *pipeline_state2;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     ID3D12RootSignature *root_signature;
-    ID3D12PipelineState *pipeline_state;
     ID3D12Device *device, *tmp_device;
     ID3D10Blob *bytecode;
     ULONG refcount;
@@ -3035,6 +3035,13 @@ static void test_create_compute_pipeline_state(void)
     hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
             &IID_ID3D12PipelineState, (void **)&pipeline_state);
     ok(hr == S_OK, "Failed to create compute pipeline, hr %#x.\n", hr);
+
+    hr = ID3D12Device_CreateComputePipelineState(device, &pipeline_state_desc,
+            &IID_ID3D12PipelineState, (void **)&pipeline_state2);
+    ok(hr == S_OK, "Failed to create compute pipeline, hr %#x.\n", hr);
+    ok(pipeline_state != pipeline_state2, "Got the same pipeline state object.\n");
+    refcount = ID3D12PipelineState_Release(pipeline_state2);
+    ok(!refcount, "ID3D12PipelineState has %u references left.\n", (unsigned int)refcount);
 
     refcount = get_refcount(root_signature);
     ok(refcount == 1, "Got unexpected refcount %u.\n", (unsigned int)refcount);
