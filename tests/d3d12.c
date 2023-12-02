@@ -2633,14 +2633,18 @@ static void test_create_unordered_access_view(void)
 
 static void test_create_root_signature(void)
 {
+    ID3D12RootSignature *root_signature, *root_signature2;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     D3D12_DESCRIPTOR_RANGE descriptor_ranges[2];
     D3D12_RESOURCE_BINDING_TIER binding_tier;
     D3D12_ROOT_PARAMETER root_parameters[3];
-    ID3D12RootSignature *root_signature;
     ID3D12Device *device, *tmp_device;
+    unsigned int size;
     ULONG refcount;
     HRESULT hr;
+
+    static const GUID test_guid
+            = {0xfdb37466, 0x428f, 0x4edf, {0xa3, 0x7f, 0x9b, 0x1d, 0xf4, 0x88, 0xc5, 0xfc}};
 
     if (!(device = create_device()))
     {
@@ -2652,6 +2656,43 @@ static void test_create_root_signature(void)
      * due to the need for partial binding support. It is also required for overlapping
      * ranges of different types. */
     binding_tier = get_resource_binding_tier(device);
+
+    /* empty root signature */
+    root_signature_desc.NumParameters = 0;
+    root_signature_desc.pParameters = NULL;
+    root_signature_desc.NumStaticSamplers = 0;
+    root_signature_desc.pStaticSamplers = NULL;
+    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+
+    /* Creating the same root signature twice returns the same interface pointer.
+     *
+     * However, the root signature object actually gets destroyed after releasing
+     * the last reference. Re-creating the same root descriptor later does not
+     * reliably return the same interface pointer, although it might do so if the
+     * heap manager reuses the allocation. */
+    hr = create_root_signature(device, &root_signature_desc, &root_signature2);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    todo ok(root_signature == root_signature2, "Got different root signature pointers.\n");
+    refcount = ID3D12RootSignature_Release(root_signature2);
+    todo ok(refcount == 1, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+
+    hr = 0xdeadbeef;
+    hr = ID3D12RootSignature_SetPrivateData(root_signature, &test_guid, sizeof(hr), &hr);
+    ok(hr == S_OK, "Failed to set private data, hr %#x.\n", hr);
+    hr = ID3D12RootSignature_GetPrivateData(root_signature, &test_guid, &size, NULL);
+    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+    refcount = ID3D12RootSignature_Release(root_signature);
+    ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
+
+    hr = create_root_signature(device, &root_signature_desc, &root_signature);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    hr = ID3D12RootSignature_GetPrivateData(root_signature, &test_guid, &size, NULL);
+    ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+    refcount = ID3D12RootSignature_Release(root_signature);
+    ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
 
     /* descriptor table */
     descriptor_ranges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -2684,6 +2725,12 @@ static void test_create_root_signature(void)
     check_interface(root_signature, &IID_ID3D12DeviceChild, true);
     check_interface(root_signature, &IID_ID3D12Pageable, false);
     check_interface(root_signature, &IID_ID3D12RootSignature, true);
+
+    hr = create_root_signature(device, &root_signature_desc, &root_signature2);
+    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
+    todo ok(root_signature == root_signature2, "Got different root signature pointers.\n");
+    refcount = ID3D12RootSignature_Release(root_signature2);
+    todo ok(refcount == 1, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
 
     refcount = ID3D12RootSignature_Release(root_signature);
     ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
@@ -2746,17 +2793,6 @@ static void test_create_root_signature(void)
     root_parameters[0].DescriptorTable.NumDescriptorRanges = 1;
     hr = create_root_signature(device, &root_signature_desc, &root_signature);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
-
-    /* empty root signature */
-    root_signature_desc.NumParameters = 0;
-    root_signature_desc.pParameters = NULL;
-    root_signature_desc.NumStaticSamplers = 0;
-    root_signature_desc.pStaticSamplers = NULL;
-    root_signature_desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-    hr = create_root_signature(device, &root_signature_desc, &root_signature);
-    ok(hr == S_OK, "Failed to create root signature, hr %#x.\n", hr);
-    refcount = ID3D12RootSignature_Release(root_signature);
-    ok(!refcount, "ID3D12RootSignature has %u references left.\n", (unsigned int)refcount);
 
     /* root constants */
     root_parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
