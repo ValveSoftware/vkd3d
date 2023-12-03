@@ -65,6 +65,11 @@ commas or semicolons.
  * VKD3D_DISABLE_EXTENSIONS - a list of Vulkan extensions that libvkd3d should
    not use even if available.
 
+ * VKD3D_SHADER_CONFIG - a list of options that change the behavior of
+   libvkd3d-shader.
+    * force_validation - Enable (additional) validation of libvkd3d-shader's
+      internal representation of shaders.
+
  * VKD3D_SHADER_DEBUG - controls the debug level for log messages produced by
    libvkd3d-shader. See VKD3D_DEBUG for accepted values.
 
