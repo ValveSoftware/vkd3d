@@ -2148,12 +2148,14 @@ VKD3D_SHADER_API int vkd3d_shader_convert_root_signature(struct vkd3d_shader_ver
  *
  * Currently this function supports the following code types:
  * - VKD3D_SHADER_SOURCE_DXBC_TPF
+ * - VKD3D_SHADER_SOURCE_D3D_BYTECODE
  *
  * \param compile_info A chained structure containing scan parameters.
  * \n
- * The DXBC_TPF scanner supports the following chained structures:
+ * The scanner supports the following chained structures:
  * - vkd3d_shader_scan_descriptor_info
  * - vkd3d_shader_scan_signature_info
+ * - vkd3d_shader_scan_combined_resource_sampler_info
  * \n
  * Although the \a compile_info parameter is read-only, chained structures
  * passed to this function need not be, and may serve as output parameters,
