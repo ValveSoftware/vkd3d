@@ -3227,9 +3227,9 @@ static void test_create_graphics_pipeline_state(void)
 
 static void test_create_pipeline_state(void)
 {
+    ID3D12PipelineState *pipeline_state, *pipeline_state2;
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc;
     ID3D12RootSignature *root_signature;
-    ID3D12PipelineState *pipeline_state;
     ID3D12Device2 *device2;
     ID3D12Device *device;
     unsigned int i;
@@ -3685,6 +3685,13 @@ static void test_create_pipeline_state(void)
 
         if (hr == S_OK)
         {
+            hr = ID3D12Device2_CreatePipelineState(device2, &tests[i].stream_desc, &IID_ID3D12PipelineState,
+                    (void **)&pipeline_state2);
+            ok(hr == S_OK, "Got unexpected return value %#x.\n", hr);
+            ok(pipeline_state != pipeline_state2, "Got the same pipeline state object.\n");
+            refcount = ID3D12PipelineState_Release(pipeline_state2);
+            ok(!refcount, "ID3D12PipelineState has %u references left.\n", (unsigned int)refcount);
+
             refcount = ID3D12PipelineState_Release(pipeline_state);
             ok(!refcount, "ID3D12PipelineState has %u references left.\n", (unsigned int)refcount);
         }
