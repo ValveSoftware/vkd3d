@@ -194,3 +194,60 @@ uniform 8 int 3
 uniform 9 int 4
 todo(sm>=6) draw quad
 todo(sm>=6) probe all rgba (1126, 3344, 5566, 3788)
+
+
+[pixel shader]
+uniform float4 f[4];
+uniform uint4 u;
+uniform uint4 v;
+
+float4 main() : sv_target
+{
+    float temp[4];
+    temp[0] = f[u.x].x;
+    temp[1] = f[u.y].x;
+    temp[2] = f[u.z].x;
+    temp[3] = f[u.w].x;
+    return float4(temp[v.x], temp[v.y], temp[v.z], temp[v.w]);
+}
+
+% FXC is incapable of compiling this correctly, but results differ for SM1-3 vs SM4-5.
+[require]
+shader model < 4.0
+
+[test]
+uniform 0 float 1.0
+uniform 4 float 2.0
+uniform 8 float 3.0
+uniform 12 float 4.0
+uniform 16 uint4 3 1 0 2
+uniform 20 uint4 0 3 1 2
+draw quad
+todo probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+[require]
+shader model >= 4.0
+shader model < 6.0
+
+[test]
+uniform 0 float 1.0
+uniform 4 float 2.0
+uniform 8 float 3.0
+uniform 12 float 4.0
+uniform 16 uint4 3 1 0 2
+uniform 20 uint4 0 3 1 2
+draw quad
+todo probe all rgba (4.0, 4.0, 4.0, 4.0)
+
+[require]
+shader model >= 6.0
+
+[test]
+uniform 0 float 1.0
+uniform 4 float 2.0
+uniform 8 float 3.0
+uniform 12 float 4.0
+uniform 16 uint4 3 1 0 2
+uniform 20 uint4 0 3 1 2
+todo(sm>=6) draw quad
+todo(sm>=6) probe all rgba (4.0, 3.0, 2.0, 1.0)
