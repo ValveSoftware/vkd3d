@@ -1691,7 +1691,7 @@ HRESULT vkd3d_render_pass_cache_find(struct vkd3d_render_pass_cache *cache,
     HRESULT hr = S_OK;
     unsigned int i;
 
-    vkd3d_mutex_lock(&device->mutex);
+    vkd3d_mutex_lock(&device->pipeline_cache_mutex);
 
     for (i = 0; i < cache->render_pass_count; ++i)
     {
@@ -1708,7 +1708,7 @@ HRESULT vkd3d_render_pass_cache_find(struct vkd3d_render_pass_cache *cache,
     if (!found)
         hr = vkd3d_render_pass_cache_create_pass_locked(cache, device, key, vk_render_pass);
 
-    vkd3d_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->pipeline_cache_mutex);
 
     return hr;
 }
@@ -3615,7 +3615,7 @@ static VkPipeline d3d12_pipeline_state_find_compiled_pipeline(const struct d3d12
 
     *vk_render_pass = VK_NULL_HANDLE;
 
-    vkd3d_mutex_lock(&device->mutex);
+    vkd3d_mutex_lock(&device->pipeline_cache_mutex);
 
     LIST_FOR_EACH_ENTRY(current, &graphics->compiled_pipelines, struct vkd3d_compiled_pipeline, entry)
     {
@@ -3627,7 +3627,7 @@ static VkPipeline d3d12_pipeline_state_find_compiled_pipeline(const struct d3d12
         }
     }
 
-    vkd3d_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->pipeline_cache_mutex);
 
     return vk_pipeline;
 }
@@ -3646,7 +3646,7 @@ static bool d3d12_pipeline_state_put_pipeline_to_cache(struct d3d12_pipeline_sta
     compiled_pipeline->vk_pipeline = vk_pipeline;
     compiled_pipeline->vk_render_pass = vk_render_pass;
 
-    vkd3d_mutex_lock(&device->mutex);
+    vkd3d_mutex_lock(&device->pipeline_cache_mutex);
 
     LIST_FOR_EACH_ENTRY(current, &graphics->compiled_pipelines, struct vkd3d_compiled_pipeline, entry)
     {
@@ -3661,7 +3661,7 @@ static bool d3d12_pipeline_state_put_pipeline_to_cache(struct d3d12_pipeline_sta
     if (compiled_pipeline)
         list_add_tail(&graphics->compiled_pipelines, &compiled_pipeline->entry);
 
-    vkd3d_mutex_unlock(&device->mutex);
+    vkd3d_mutex_unlock(&device->pipeline_cache_mutex);
     return compiled_pipeline;
 }
 

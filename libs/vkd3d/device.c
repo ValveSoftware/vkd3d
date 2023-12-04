@@ -2056,7 +2056,7 @@ static HRESULT d3d12_device_init_pipeline_cache(struct d3d12_device *device)
     VkPipelineCacheCreateInfo cache_info;
     VkResult vr;
 
-    vkd3d_mutex_init(&device->mutex);
+    vkd3d_mutex_init(&device->pipeline_cache_mutex);
 
     cache_info.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
     cache_info.pNext = NULL;
@@ -2080,7 +2080,7 @@ static void d3d12_device_destroy_pipeline_cache(struct d3d12_device *device)
     if (device->vk_pipeline_cache)
         VK_CALL(vkDestroyPipelineCache(device->vk_device, device->vk_pipeline_cache, NULL));
 
-    vkd3d_mutex_destroy(&device->mutex);
+    vkd3d_mutex_destroy(&device->pipeline_cache_mutex);
 }
 
 #define VKD3D_VA_FALLBACK_BASE      0x8000000000000000ull

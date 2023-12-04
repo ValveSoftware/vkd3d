@@ -1757,9 +1757,10 @@ struct d3d12_device
 
     struct vkd3d_gpu_va_allocator gpu_va_allocator;
 
-    struct vkd3d_mutex mutex;
     struct vkd3d_desc_object_cache view_desc_cache;
     struct vkd3d_desc_object_cache cbuffer_desc_cache;
+
+    struct vkd3d_mutex pipeline_cache_mutex;
     struct vkd3d_render_pass_cache render_pass_cache;
     VkPipelineCache vk_pipeline_cache;
 
