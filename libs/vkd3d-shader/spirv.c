@@ -9157,6 +9157,7 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     const struct vkd3d_shader_dst_param *resource;
     uint32_t coordinate_id, sample_id, pointer_id;
     struct vkd3d_shader_register_info reg_info;
+    SpvMemorySemanticsMask memory_semantic;
     struct vkd3d_shader_image image;
     unsigned int structure_stride;
     uint32_t coordinate_mask;
@@ -9251,12 +9252,16 @@ static void spirv_compiler_emit_atomic_instruction(struct spirv_compiler *compil
     if (instruction->flags & VKD3DARF_VOLATILE)
         WARN("Ignoring 'volatile' attribute.\n");
 
+    memory_semantic = (instruction->flags & VKD3DARF_SEQ_CST)
+            ? SpvMemorySemanticsSequentiallyConsistentMask
+            : SpvMemorySemanticsMaskNone;
+
     operands[i++] = pointer_id;
     operands[i++] = spirv_compiler_get_constant_uint(compiler, scope);
-    operands[i++] = spirv_compiler_get_constant_uint(compiler, SpvMemorySemanticsMaskNone);
+    operands[i++] = spirv_compiler_get_constant_uint(compiler, memory_semantic);
     if (instruction->src_count >= 3)
     {
-        operands[i++] = spirv_compiler_get_constant_uint(compiler, SpvMemorySemanticsMaskNone);
+        operands[i++] = spirv_compiler_get_constant_uint(compiler, memory_semantic);
         operands[i++] = spirv_compiler_emit_load_src_with_type(compiler, &src[2], VKD3DSP_WRITEMASK_0, component_type);
     }
     operands[i++] = val_id;
