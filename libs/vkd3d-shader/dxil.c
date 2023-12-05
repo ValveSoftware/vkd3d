@@ -3615,7 +3615,7 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     dst->u.handle.d = d;
 
     reg = &dst->u.handle.reg;
-    /* Set idx_count to 3 for use with load instructions. */
+    /* Set idx_count to 3 for use with load/store instructions. */
     vsir_register_init(reg, d->reg_type, d->reg_data_type, 3);
     reg->dimension = VSIR_DIMENSION_VEC4;
     reg->idx[0].offset = id;
@@ -5892,7 +5892,7 @@ static enum vkd3d_data_type vkd3d_data_type_from_dxil_component_type(enum dxil_c
 }
 
 static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struct sm6_parser *sm6,
-        const struct sm6_metadata_value *type_value, enum dxil_resource_kind kind,
+        const struct sm6_metadata_value *type_value, bool is_uav, enum dxil_resource_kind kind,
         const struct sm6_metadata_value *m, struct vkd3d_shader_instruction *ins)
 {
     enum vkd3d_shader_resource_type resource_type;
@@ -5956,7 +5956,7 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
         }
 
         data_type = vkd3d_data_type_from_dxil_component_type(values[1], sm6);
-        ins->handler_idx = VKD3DSIH_DCL;
+        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_TYPED : VKD3DSIH_DCL;
         for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
             ins->declaration.semantic.resource_data_type[i] = data_type;
         ins->declaration.semantic.resource_type = resource_type;
@@ -6020,7 +6020,7 @@ static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_INVALID);
 
-    if (!(resource = sm6_parser_resources_load_common_info(sm6, node->operands[1], kind,
+    if (!(resource = sm6_parser_resources_load_common_info(sm6, node->operands[1], false, kind,
             node->operands[8], ins)))
     {
         return VKD3D_ERROR_INVALID_SHADER;
@@ -6050,6 +6050,62 @@ static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
                 "Ignoring an SRV descriptor sample count metadata value which is not constant zero or undefined.");
     }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result sm6_parser_resources_load_uav(struct sm6_parser *sm6,
+        const struct sm6_metadata_node *node, struct sm6_descriptor_info *d, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_resource *resource;
+    unsigned int i, values[4];
+
+    if (node->operand_count < 11)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a UAV descriptor.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (node->operand_count > 11)
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 11);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for a UAV descriptor.", node->operand_count - 11);
+    }
+
+    for (i = 6; i < 10; ++i)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &values[i - 6]))
+        {
+            WARN("Failed to load uint value at index %u.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "A UAV descriptor operand metadata value is not an integer.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_INVALID);
+    if (values[1])
+        ins->flags = VKD3DSUF_GLOBALLY_COHERENT;
+    if (values[2])
+        ins->flags |= VKD3DSUF_ORDER_PRESERVING_COUNTER;
+    if (values[3])
+        ins->flags |= VKD3DSUF_RASTERISER_ORDERED_VIEW;
+
+    if (!(resource = sm6_parser_resources_load_common_info(sm6, node->operands[1], true, values[0],
+            node->operands[10], ins)))
+    {
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    d->resource_type = ins->resource_type;
+    d->kind = values[0];
+    d->reg_type = VKD3DSPR_UAV;
+    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UAV;
+    d->resource_data_type = ins->declaration.semantic.resource_data_type[0];
+
+    init_resource_declaration(resource, VKD3DSPR_UAV, d->reg_data_type, d->id, &d->range);
 
     return VKD3D_OK;
 }
@@ -6173,6 +6229,10 @@ static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
                 break;
             case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
                 if ((ret = sm6_parser_resources_load_srv(sm6, node, d, ins)) < 0)
+                    return ret;
+                break;
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
+                if ((ret = sm6_parser_resources_load_uav(sm6, node, d, ins)) < 0)
                     return ret;
                 break;
             default:
