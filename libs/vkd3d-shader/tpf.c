@@ -920,10 +920,11 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
     struct vkd3d_shader_index_range *index_range = &ins->declaration.index_range;
-    unsigned int i, register_idx, register_count, write_mask;
+    unsigned int i, register_idx, register_count;
     enum vkd3d_shader_register_type type;
     struct sm4_index_range_array *ranges;
     unsigned int *io_masks;
+    uint32_t write_mask;
 
     shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE,
             &index_range->dst);
@@ -933,7 +934,7 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
     register_count = index_range->register_count;
     write_mask = index_range->dst.write_mask;
 
-    if (vkd3d_write_mask_component_count(write_mask) != 1)
+    if (vsir_write_mask_component_count(write_mask) != 1)
     {
         WARN("Unhandled write mask %#x.\n", write_mask);
         vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_INDEX_RANGE_MASK,

@@ -605,7 +605,7 @@ static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], u
 
     assert(write_mask <= VKD3DSP_WRITEMASK_ALL);
     component_idx = vsir_write_mask_get_component_idx(write_mask);
-    component_count = vkd3d_write_mask_component_count(write_mask);
+    component_count = vsir_write_mask_component_count(write_mask);
 
     assert(register_idx < MAX_REG_OUTPUT && MAX_REG_OUTPUT - register_idx >= register_count);
 

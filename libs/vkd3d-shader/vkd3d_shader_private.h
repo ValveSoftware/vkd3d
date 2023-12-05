@@ -1531,7 +1531,7 @@ static inline unsigned int vsir_write_mask_get_component_idx(uint32_t write_mask
     return 0;
 }
 
-static inline unsigned int vkd3d_write_mask_component_count(DWORD write_mask)
+static inline unsigned int vsir_write_mask_component_count(uint32_t write_mask)
 {
     unsigned int count = vkd3d_popcount(write_mask & VKD3DSP_WRITEMASK_ALL);
     assert(1 <= count && count <= VKD3D_VEC4_SIZE);
