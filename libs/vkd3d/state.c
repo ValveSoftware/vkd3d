@@ -2129,6 +2129,16 @@ static inline unsigned int typed_uav_compile_option(const struct d3d12_device *d
             : VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV_READ_FORMAT_R32;
 }
 
+static unsigned int feature_flags_compile_option(const struct d3d12_device *device)
+{
+    unsigned int flags = 0;
+
+    if (device->feature_options1.Int64ShaderOps)
+        flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64;
+
+    return flags;
+}
+
 static HRESULT create_shader_stage(struct d3d12_device *device,
         struct VkPipelineShaderStageCreateInfo *stage_desc, enum VkShaderStageFlagBits stage,
         const D3D12_SHADER_BYTECODE *code, const struct vkd3d_shader_interface_info *shader_interface)
@@ -2145,6 +2155,7 @@ static HRESULT create_shader_stage(struct d3d12_device *device,
         {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10},
         {VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV, typed_uav_compile_option(device)},
         {VKD3D_SHADER_COMPILE_OPTION_WRITE_TESS_GEOM_POINT_SIZE, 0},
+        {VKD3D_SHADER_COMPILE_OPTION_FEATURE, feature_flags_compile_option(device)},
     };
 
     stage_desc->sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
