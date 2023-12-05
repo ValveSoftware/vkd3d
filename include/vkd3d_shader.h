@@ -196,6 +196,14 @@ enum vkd3d_shader_compile_option_fragment_coordinate_origin
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN),
 };
 
+/** Advertises feature availability. \since 1.11 */
+enum vkd3d_shader_compile_option_feature_flags
+{
+    VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64         = 0x00000001,
+
+    VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLAGS),
+};
+
 enum vkd3d_shader_compile_option_name
 {
     /**
@@ -253,6 +261,16 @@ enum vkd3d_shader_compile_option_name
      * \since 1.10
      */
     VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN = 0x00000009,
+    /**
+     * This option specifies the shader features available in the target
+     * environment. These are not extensions, i.e. they are always supported
+     * by the driver, but may not be supported by the available hardware.
+     *
+     * \a value is a member of enum vkd3d_shader_compile_option_feature_flags.
+     *
+     * \since 1.11
+     */
+    VKD3D_SHADER_COMPILE_OPTION_FEATURE = 0x0000000a,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

@@ -2396,6 +2396,7 @@ struct spirv_compiler
     struct vkd3d_shader_spec_constant *spec_constants;
     size_t spec_constants_size;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
+    enum vkd3d_shader_compile_option_feature_flags features;
     bool write_tess_geom_point_size;
 
     struct vkd3d_string_buffer_cache string_buffers;
@@ -2551,6 +2552,10 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
                     compiler->fragment_coordinate_origin = SpvExecutionModeOriginLowerLeft;
                 else
                     WARN("Ignoring unrecognised value %#x for option %#x.\n", option->value, option->name);
+                break;
+
+            case VKD3D_SHADER_COMPILE_OPTION_FEATURE:
+                compiler->features = option->value;
                 break;
 
             default:
@@ -5528,9 +5533,16 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
 
     if (flags & VKD3DSGF_ENABLE_INT64)
     {
-        FIXME("Unsupported 64-bit integer ops.\n");
-        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
-                "Support for 64-bit integers is not implemented.");
+        if (compiler->features & VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64)
+        {
+            vkd3d_spirv_enable_capability(&compiler->spirv_builder, SpvCapabilityInt64);
+        }
+        else
+        {
+            WARN("Unsupported 64-bit integer ops.\n");
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                    "The target environment does not support 64-bit integers.");
+        }
         flags &= ~VKD3DSGF_ENABLE_INT64;
     }
 
@@ -7146,6 +7158,13 @@ static void spirv_compiler_emit_int_div(struct spirv_compiler *compiler,
 
     div_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSDiv : SpvOpUDiv;
     mod_op = instruction->handler_idx == VKD3DSIH_IDIV ? SpvOpSRem : SpvOpUMod;
+
+    if (dst[0].reg.data_type == VKD3D_DATA_UINT64 || dst[1].reg.data_type == VKD3D_DATA_UINT64)
+    {
+        FIXME("Unsupported 64-bit result.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                "Bool cast to 64-bit integer is not supported.");
+    }
 
     if (dst[0].reg.type != VKD3DSPR_NULL)
     {
