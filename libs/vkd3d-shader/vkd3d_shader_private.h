@@ -1544,9 +1544,9 @@ static inline unsigned int vkd3d_write_mask_from_component_count(unsigned int co
     return (VKD3DSP_WRITEMASK_0 << component_count) - 1;
 }
 
-static inline unsigned int vkd3d_write_mask_64_from_32(DWORD write_mask32)
+static inline uint32_t vsir_write_mask_64_from_32(uint32_t write_mask32)
 {
-    unsigned int write_mask64 = write_mask32 | (write_mask32 >> 1);
+    uint32_t write_mask64 = write_mask32 | (write_mask32 >> 1);
     return (write_mask64 & VKD3DSP_WRITEMASK_0) | ((write_mask64 & VKD3DSP_WRITEMASK_2) >> 1);
 }
 

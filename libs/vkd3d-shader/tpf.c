@@ -2231,7 +2231,7 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
     }
 
     if (data_type == VKD3D_DATA_DOUBLE)
-        dst_param->write_mask = vkd3d_write_mask_64_from_32(dst_param->write_mask);
+        dst_param->write_mask = vsir_write_mask_64_from_32(dst_param->write_mask);
     /* Some scalar registers are declared with no write mask in shader bytecode. */
     if (!dst_param->write_mask && shader_sm4_is_scalar_register(&dst_param->reg))
         dst_param->write_mask = VKD3DSP_WRITEMASK_0;
