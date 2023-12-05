@@ -5488,7 +5488,7 @@ static void write_sm4_loop(const struct tpf_writer *tpf, const struct hlsl_ir_lo
 
 static void write_sm4_gather(const struct tpf_writer *tpf, const struct hlsl_ir_node *dst,
         const struct hlsl_deref *resource, const struct hlsl_deref *sampler,
-        const struct hlsl_ir_node *coords, DWORD swizzle, const struct hlsl_ir_node *texel_offset)
+        const struct hlsl_ir_node *coords, uint32_t swizzle, const struct hlsl_ir_node *texel_offset)
 {
     struct vkd3d_shader_src_param *src;
     struct sm4_instruction instr;

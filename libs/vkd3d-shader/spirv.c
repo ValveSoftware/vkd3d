@@ -3600,8 +3600,7 @@ static uint32_t spirv_compiler_get_register_id(struct spirv_compiler *compiler,
             SpvStorageClassPrivate, VKD3D_SHADER_COMPONENT_FLOAT, VKD3D_VEC4_SIZE);
 }
 
-static bool vkd3d_swizzle_is_equal(unsigned int dst_write_mask,
-        unsigned int swizzle, unsigned int write_mask)
+static bool vkd3d_swizzle_is_equal(uint32_t dst_write_mask, uint32_t swizzle, uint32_t write_mask)
 {
     return vkd3d_compact_swizzle(VKD3D_SHADER_NO_SWIZZLE, dst_write_mask) == vkd3d_compact_swizzle(swizzle, write_mask);
 }
@@ -3913,7 +3912,7 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
 }
 
 static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, DWORD swizzle, uint32_t write_mask)
+        const struct vkd3d_shader_register *reg, uint32_t swizzle, uint32_t write_mask)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     enum vkd3d_shader_component_type component_type;
@@ -4209,7 +4208,7 @@ static void spirv_compiler_emit_store_dst(struct spirv_compiler *compiler,
 
 static void spirv_compiler_emit_store_dst_swizzled(struct spirv_compiler *compiler,
         const struct vkd3d_shader_dst_param *dst, uint32_t val_id,
-        enum vkd3d_shader_component_type component_type, DWORD swizzle)
+        enum vkd3d_shader_component_type component_type, uint32_t swizzle)
 {
     struct vkd3d_shader_dst_param typed_dst = *dst;
     val_id = spirv_compiler_emit_swizzle(compiler,

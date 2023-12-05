@@ -878,7 +878,7 @@ struct vkd3d_shader_dst_param
 struct vkd3d_shader_src_param
 {
     struct vkd3d_shader_register reg;
-    DWORD swizzle;
+    uint32_t swizzle;
     enum vkd3d_shader_src_modifier modifiers;
 };
 
