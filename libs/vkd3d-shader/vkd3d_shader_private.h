@@ -1562,8 +1562,7 @@ static inline unsigned int vsir_swizzle_get_component(uint32_t swizzle, unsigned
     return (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx)) & VKD3D_SHADER_SWIZZLE_MASK;
 }
 
-static inline unsigned int vkd3d_swizzle_get_component64(DWORD swizzle,
-        unsigned int idx)
+static inline unsigned int vsir_swizzle_get_component64(uint32_t swizzle, unsigned int idx)
 {
     return ((swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx * 2)) & VKD3D_SHADER_SWIZZLE_MASK) / 2u;
 }

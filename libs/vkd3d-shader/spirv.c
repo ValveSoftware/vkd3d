@@ -3702,7 +3702,7 @@ static uint32_t spirv_compiler_emit_load_constant(struct spirv_compiler *compile
 }
 
 static uint32_t spirv_compiler_emit_load_constant64(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, DWORD swizzle, uint32_t write_mask)
+        const struct vkd3d_shader_register *reg, uint32_t swizzle, uint32_t write_mask)
 {
     unsigned int component_count = vsir_write_mask_component_count(write_mask);
     uint64_t values[VKD3D_DVEC2_SIZE] = {0};
@@ -3720,7 +3720,7 @@ static uint32_t spirv_compiler_emit_load_constant64(struct spirv_compiler *compi
         for (i = 0, j = 0; i < VKD3D_DVEC2_SIZE; ++i)
         {
             if (write_mask & (VKD3DSP_WRITEMASK_0 << i))
-                values[j++] = reg->u.immconst_uint64[vkd3d_swizzle_get_component64(swizzle, i)];
+                values[j++] = reg->u.immconst_uint64[vsir_swizzle_get_component64(swizzle, i)];
         }
     }
 
