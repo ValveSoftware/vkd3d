@@ -1109,7 +1109,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
-                        shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
+                        shader_print_float_literal(compiler, "", reg->u.immconst_f32[0], "");
                         break;
                     case VKD3D_DATA_INT:
                         shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
@@ -1129,10 +1129,10 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 switch (reg->data_type)
                 {
                     case VKD3D_DATA_FLOAT:
-                        shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
-                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[1], "");
-                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[2], "");
-                        shader_print_float_literal(compiler, ", ", reg->u.immconst_float[3], "");
+                        shader_print_float_literal(compiler, "", reg->u.immconst_f32[0], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_f32[1], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_f32[2], "");
+                        shader_print_float_literal(compiler, ", ", reg->u.immconst_f32[3], "");
                         break;
                     case VKD3D_DATA_INT:
                         shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
@@ -1882,10 +1882,10 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             vkd3d_string_buffer_printf(buffer, " %sc%u%s", compiler->colours.reg,
                     shader_get_float_offset(ins->dst[0].reg.type, ins->dst[0].reg.idx[0].offset),
                     compiler->colours.reset);
-            shader_print_float_literal(compiler, " = ", ins->src[0].reg.u.immconst_float[0], "");
-            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[1], "");
-            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[2], "");
-            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_float[3], "");
+            shader_print_float_literal(compiler, " = ", ins->src[0].reg.u.immconst_f32[0], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_f32[1], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_f32[2], "");
+            shader_print_float_literal(compiler, ", ", ins->src[0].reg.u.immconst_f32[3], "");
             break;
 
         case VKD3DSIH_DEFI:

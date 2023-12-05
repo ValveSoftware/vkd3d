@@ -2596,7 +2596,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 if (type->u.width == 16)
                     FIXME("Half float type is not supported yet.\n");
                 else if (type->u.width == 32)
-                    dst->u.reg.u.immconst_float[0] = bitcast_uint64_to_float(record->operands[0]);
+                    dst->u.reg.u.immconst_f32[0] = bitcast_uint64_to_float(record->operands[0]);
                 else if (type->u.width == 64)
                     dst->u.reg.u.immconst_double[0] = bitcast_uint64_to_double(record->operands[0]);
                 else

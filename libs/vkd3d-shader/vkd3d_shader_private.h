@@ -842,7 +842,7 @@ struct vkd3d_shader_register
     union
     {
         uint32_t immconst_u32[VKD3D_VEC4_SIZE];
-        float immconst_float[VKD3D_VEC4_SIZE];
+        float immconst_f32[VKD3D_VEC4_SIZE];
         uint64_t immconst_uint64[VKD3D_DVEC2_SIZE];
         double immconst_double[VKD3D_DVEC2_SIZE];
         unsigned fp_body_idx;
