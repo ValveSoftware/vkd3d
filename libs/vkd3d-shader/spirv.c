@@ -9420,9 +9420,9 @@ static void spirv_compiler_emit_sync(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     unsigned int memory_semantics = SpvMemorySemanticsAcquireReleaseMask;
-    unsigned int flags = instruction->flags;
     SpvScope execution_scope = SpvScopeMax;
     SpvScope memory_scope = SpvScopeDevice;
+    uint32_t flags = instruction->flags;
 
     if (flags & VKD3DSSF_GROUP_SHARED_MEMORY)
     {

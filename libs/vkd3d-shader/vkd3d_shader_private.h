@@ -1123,7 +1123,7 @@ struct vkd3d_shader_instruction
 {
     struct vkd3d_shader_location location;
     enum vkd3d_shader_opcode handler_idx;
-    DWORD flags;
+    uint32_t flags;
     unsigned int dst_count;
     unsigned int src_count;
     const struct vkd3d_shader_dst_param *dst;
