@@ -6926,6 +6926,11 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
 
 general_implementation:
     val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    if (dst->reg.data_type != src->reg.data_type)
+    {
+        val_id = vkd3d_spirv_build_op_bitcast(builder, vkd3d_spirv_get_type_id_for_data_type(builder,
+                dst->reg.data_type, vkd3d_write_mask_component_count(dst->write_mask)), val_id);
+    }
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
