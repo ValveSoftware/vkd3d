@@ -1317,7 +1317,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
         static const char write_mask_chars[] = "xyzw";
 
         if (param->reg.data_type == VKD3D_DATA_DOUBLE)
-            write_mask = vkd3d_write_mask_32_from_64(write_mask);
+            write_mask = vsir_write_mask_32_from_64(write_mask);
 
         shader_addline(buffer, ".%s", compiler->colours.write_mask);
         if (write_mask & VKD3DSP_WRITEMASK_0)

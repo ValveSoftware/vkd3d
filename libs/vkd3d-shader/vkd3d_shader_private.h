@@ -1550,9 +1550,9 @@ static inline uint32_t vsir_write_mask_64_from_32(uint32_t write_mask32)
     return (write_mask64 & VKD3DSP_WRITEMASK_0) | ((write_mask64 & VKD3DSP_WRITEMASK_2) >> 1);
 }
 
-static inline unsigned int vkd3d_write_mask_32_from_64(unsigned int write_mask64)
+static inline uint32_t vsir_write_mask_32_from_64(uint32_t write_mask64)
 {
-    unsigned int write_mask32 = (write_mask64 | (write_mask64 << 1))
+    uint32_t write_mask32 = (write_mask64 | (write_mask64 << 1))
             & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_2);
     return write_mask32 | (write_mask32 << 1);
 }
