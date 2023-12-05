@@ -3724,14 +3724,14 @@ static uint32_t spirv_compiler_emit_load_constant64(struct spirv_compiler *compi
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
         for (i = 0; i < component_count; ++i)
-            values[i] = *reg->u.immconst_uint64;
+            values[i] = *reg->u.immconst_u64;
     }
     else
     {
         for (i = 0, j = 0; i < VKD3D_DVEC2_SIZE; ++i)
         {
             if (write_mask & (VKD3DSP_WRITEMASK_0 << i))
-                values[j++] = reg->u.immconst_uint64[vsir_swizzle_get_component64(swizzle, i)];
+                values[j++] = reg->u.immconst_u64[vsir_swizzle_get_component64(swizzle, i)];
         }
     }
 
