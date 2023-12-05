@@ -1381,10 +1381,10 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     if (param->reg.type != VKD3DSPR_IMMCONST && param->reg.type != VKD3DSPR_IMMCONST64
             && param->reg.dimension == VSIR_DIMENSION_VEC4)
     {
-        unsigned int swizzle_x = vkd3d_swizzle_get_component(swizzle, 0);
-        unsigned int swizzle_y = vkd3d_swizzle_get_component(swizzle, 1);
-        unsigned int swizzle_z = vkd3d_swizzle_get_component(swizzle, 2);
-        unsigned int swizzle_w = vkd3d_swizzle_get_component(swizzle, 3);
+        unsigned int swizzle_x = vsir_swizzle_get_component(swizzle, 0);
+        unsigned int swizzle_y = vsir_swizzle_get_component(swizzle, 1);
+        unsigned int swizzle_z = vsir_swizzle_get_component(swizzle, 2);
+        unsigned int swizzle_w = vsir_swizzle_get_component(swizzle, 3);
 
         static const char swizzle_chars[] = "xyzw";
 

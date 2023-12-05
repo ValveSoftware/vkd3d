@@ -1982,10 +1982,10 @@ static uint32_t swizzle_from_sm4(uint32_t s)
 static uint32_t swizzle_to_sm4(uint32_t s)
 {
     uint32_t ret = 0;
-    ret |= ((vkd3d_swizzle_get_component(s, 0)) & 0x3);
-    ret |= ((vkd3d_swizzle_get_component(s, 1)) & 0x3) << 2;
-    ret |= ((vkd3d_swizzle_get_component(s, 2)) & 0x3) << 4;
-    ret |= ((vkd3d_swizzle_get_component(s, 3)) & 0x3) << 6;
+    ret |= ((vsir_swizzle_get_component(s, 0)) & 0x3);
+    ret |= ((vsir_swizzle_get_component(s, 1)) & 0x3) << 2;
+    ret |= ((vsir_swizzle_get_component(s, 2)) & 0x3) << 4;
+    ret |= ((vsir_swizzle_get_component(s, 3)) & 0x3) << 6;
     return ret;
 }
 
@@ -2014,12 +2014,12 @@ static bool register_is_control_point_input(const struct vkd3d_shader_register *
             || priv->p.shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY));
 }
 
-static unsigned int mask_from_swizzle(unsigned int swizzle)
+static uint32_t mask_from_swizzle(uint32_t swizzle)
 {
-    return (1u << vkd3d_swizzle_get_component(swizzle, 0))
-            | (1u << vkd3d_swizzle_get_component(swizzle, 1))
-            | (1u << vkd3d_swizzle_get_component(swizzle, 2))
-            | (1u << vkd3d_swizzle_get_component(swizzle, 3));
+    return (1u << vsir_swizzle_get_component(swizzle, 0))
+            | (1u << vsir_swizzle_get_component(swizzle, 1))
+            | (1u << vsir_swizzle_get_component(swizzle, 2))
+            | (1u << vsir_swizzle_get_component(swizzle, 3));
 }
 
 static bool shader_sm4_validate_input_output_register(struct vkd3d_shader_sm4_parser *priv,
