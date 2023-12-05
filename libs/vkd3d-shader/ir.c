@@ -63,7 +63,7 @@ static void shader_instruction_eliminate_phase_instance_id(struct vkd3d_shader_i
         if (shader_register_is_phase_instance_id(reg))
         {
             vsir_register_init(reg, VKD3DSPR_IMMCONST, reg->data_type, 0);
-            reg->u.immconst_uint[0] = instance_id;
+            reg->u.immconst_u32[0] = instance_id;
             continue;
         }
         shader_register_eliminate_phase_addressing(reg, instance_id);
@@ -1218,7 +1218,7 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
             param->reg.idx_count = 0;
             param->reg.dimension = VSIR_DIMENSION_VEC4;
             for (j = 0; j < 4; ++j)
-                param->reg.u.immconst_uint[j] = normaliser->defs[i].value[j];
+                param->reg.u.immconst_u32[j] = normaliser->defs[i].value[j];
             return;
         }
     }
@@ -1254,7 +1254,7 @@ static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d
 
             get_flat_constant_register_type((struct vkd3d_shader_register *)&ins->dst[0].reg, &def->set, &def->index);
             for (j = 0; j < 4; ++j)
-                def->value[j] = ins->src[0].reg.u.immconst_uint[j];
+                def->value[j] = ins->src[0].reg.u.immconst_u32[j];
 
             vkd3d_shader_instruction_make_nop(ins);
         }

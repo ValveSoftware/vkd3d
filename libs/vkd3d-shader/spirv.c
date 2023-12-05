@@ -3697,14 +3697,14 @@ static uint32_t spirv_compiler_emit_load_constant(struct spirv_compiler *compile
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
         for (i = 0; i < component_count; ++i)
-            values[i] = *reg->u.immconst_uint;
+            values[i] = *reg->u.immconst_u32;
     }
     else
     {
         for (i = 0, j = 0; i < VKD3D_VEC4_SIZE; ++i)
         {
             if (write_mask & (VKD3DSP_WRITEMASK_0 << i))
-                values[j++] = reg->u.immconst_uint[vsir_swizzle_get_component(swizzle, i)];
+                values[j++] = reg->u.immconst_u32[vsir_swizzle_get_component(swizzle, i)];
         }
     }
 
@@ -7829,7 +7829,7 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
                         "The swizzle for a switch case value is not scalar.");
             }
             assert(src->reg.type == VKD3DSPR_IMMCONST);
-            value = *src->reg.u.immconst_uint;
+            value = *src->reg.u.immconst_u32;
 
             if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.case_blocks, &cf_info->u.switch_.case_blocks_size,
                     2 * (cf_info->u.switch_.case_block_count + 1), sizeof(*cf_info->u.switch_.case_blocks)))

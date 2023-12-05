@@ -1112,12 +1112,12 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_float_literal(compiler, "", reg->u.immconst_float[0], "");
                         break;
                     case VKD3D_DATA_INT:
-                        shader_print_int_literal(compiler, "", reg->u.immconst_uint[0], "");
+                        shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
                     case VKD3D_DATA_UINT:
-                        shader_print_uint_literal(compiler, "", reg->u.immconst_uint[0], "");
+                        shader_print_uint_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
                     default:
                         shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
@@ -1135,18 +1135,18 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_float_literal(compiler, ", ", reg->u.immconst_float[3], "");
                         break;
                     case VKD3D_DATA_INT:
-                        shader_print_int_literal(compiler, "", reg->u.immconst_uint[0], "");
-                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[1], "");
-                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[2], "");
-                        shader_print_int_literal(compiler, ", ", reg->u.immconst_uint[3], "");
+                        shader_print_int_literal(compiler, "", reg->u.immconst_u32[0], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[1], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[2], "");
+                        shader_print_int_literal(compiler, ", ", reg->u.immconst_u32[3], "");
                         break;
                     case VKD3D_DATA_RESOURCE:
                     case VKD3D_DATA_SAMPLER:
                     case VKD3D_DATA_UINT:
-                        shader_print_uint_literal(compiler, "", reg->u.immconst_uint[0], "");
-                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[1], "");
-                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[2], "");
-                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_uint[3], "");
+                        shader_print_uint_literal(compiler, "", reg->u.immconst_u32[0], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_u32[1], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_u32[2], "");
+                        shader_print_uint_literal(compiler, ", ", reg->u.immconst_u32[3], "");
                         break;
                     default:
                         shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
@@ -1891,16 +1891,16 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DEFI:
             vkd3d_string_buffer_printf(buffer, " %si%u%s", compiler->colours.reg,
                     ins->dst[0].reg.idx[0].offset, compiler->colours.reset);
-            shader_print_int_literal(compiler, " = ", ins->src[0].reg.u.immconst_uint[0], "");
-            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[1], "");
-            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[2], "");
-            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_uint[3], "");
+            shader_print_int_literal(compiler, " = ", ins->src[0].reg.u.immconst_u32[0], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_u32[1], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_u32[2], "");
+            shader_print_int_literal(compiler, ", ", ins->src[0].reg.u.immconst_u32[3], "");
             break;
 
         case VKD3DSIH_DEFB:
             vkd3d_string_buffer_printf(buffer, " %sb%u%s", compiler->colours.reg,
                     ins->dst[0].reg.idx[0].offset, compiler->colours.reset);
-            shader_print_bool_literal(compiler, " = ", ins->src[0].reg.u.immconst_uint[0], "");
+            shader_print_bool_literal(compiler, " = ", ins->src[0].reg.u.immconst_u32[0], "");
             break;
 
         default:

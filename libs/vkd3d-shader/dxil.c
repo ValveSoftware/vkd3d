@@ -1891,7 +1891,7 @@ static unsigned int register_get_uint_value(const struct vkd3d_shader_register *
         return reg->u.immconst_uint64[0];
     }
 
-    return reg->u.immconst_uint[0];
+    return reg->u.immconst_u32[0];
 }
 
 static uint64_t register_get_uint64_value(const struct vkd3d_shader_register *reg)
@@ -1902,7 +1902,7 @@ static uint64_t register_get_uint64_value(const struct vkd3d_shader_register *re
     if (reg->dimension == VSIR_DIMENSION_VEC4)
         WARN("Returning vec4.x.\n");
 
-    return (reg->type == VKD3DSPR_IMMCONST64) ? reg->u.immconst_uint64[0] : reg->u.immconst_uint[0];
+    return (reg->type == VKD3DSPR_IMMCONST64) ? reg->u.immconst_uint64[0] : reg->u.immconst_u32[0];
 }
 
 static inline bool sm6_value_is_function_dcl(const struct sm6_value *value)
@@ -2577,7 +2577,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
 
                 value = decode_rotated_signed_value(record->operands[0]);
                 if (type->u.width <= 32)
-                    dst->u.reg.u.immconst_uint[0] = value & ((1ull << type->u.width) - 1);
+                    dst->u.reg.u.immconst_u32[0] = value & ((1ull << type->u.width) - 1);
                 else
                     dst->u.reg.u.immconst_uint64[0] = value;
 

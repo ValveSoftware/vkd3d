@@ -1903,19 +1903,19 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
 
     if (register_type == VKD3D_SM4_RT_IMMCONST || register_type == VKD3D_SM4_RT_IMMCONST64)
     {
-        unsigned int dword_count;
+        unsigned int u32_count;
 
         switch (param->dimension)
         {
             case VSIR_DIMENSION_SCALAR:
-                dword_count = 1 + (register_type == VKD3D_SM4_RT_IMMCONST64);
-                if (end - *ptr < dword_count)
+                u32_count = 1 + (register_type == VKD3D_SM4_RT_IMMCONST64);
+                if (end - *ptr < u32_count)
                 {
                     WARN("Invalid ptr %p, end %p.\n", *ptr, end);
                     return false;
                 }
-                memcpy(param->u.immconst_uint, *ptr, dword_count * sizeof(DWORD));
-                *ptr += dword_count;
+                memcpy(param->u.immconst_u32, *ptr, u32_count * sizeof(uint32_t));
+                *ptr += u32_count;
                 break;
 
             case VSIR_DIMENSION_VEC4:
@@ -1924,7 +1924,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
                     WARN("Invalid ptr %p, end %p.\n", *ptr, end);
                     return false;
                 }
-                memcpy(param->u.immconst_uint, *ptr, VKD3D_VEC4_SIZE * sizeof(DWORD));
+                memcpy(param->u.immconst_u32, *ptr, VKD3D_VEC4_SIZE * sizeof(uint32_t));
                 *ptr += 4;
                 break;
 
@@ -3870,7 +3870,7 @@ static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
     if (width == 1)
     {
         src->reg.dimension = VSIR_DIMENSION_SCALAR;
-        src->reg.u.immconst_uint[0] = value->u[0].u;
+        src->reg.u.immconst_u32[0] = value->u[0].u;
     }
     else
     {
@@ -3880,9 +3880,9 @@ static void sm4_src_from_constant_value(struct vkd3d_shader_src_param *src,
         for (i = 0; i < 4; ++i)
         {
             if ((map_writemask & (1u << i)) && (j < width))
-                src->reg.u.immconst_uint[i] = value->u[j++].u;
+                src->reg.u.immconst_u32[i] = value->u[j++].u;
             else
-                src->reg.u.immconst_uint[i] = 0;
+                src->reg.u.immconst_u32[i] = 0;
         }
     }
 }
@@ -4077,12 +4077,12 @@ static void sm4_write_src_register(const struct tpf_writer *tpf, const struct vk
 
     if (src->reg.type == VKD3DSPR_IMMCONST)
     {
-        put_u32(buffer, src->reg.u.immconst_uint[0]);
+        put_u32(buffer, src->reg.u.immconst_u32[0]);
         if (src->reg.dimension == VSIR_DIMENSION_VEC4)
         {
-            put_u32(buffer, src->reg.u.immconst_uint[1]);
-            put_u32(buffer, src->reg.u.immconst_uint[2]);
-            put_u32(buffer, src->reg.u.immconst_uint[3]);
+            put_u32(buffer, src->reg.u.immconst_u32[1]);
+            put_u32(buffer, src->reg.u.immconst_u32[2]);
+            put_u32(buffer, src->reg.u.immconst_u32[3]);
         }
     }
 }
@@ -4617,7 +4617,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
             memset(&instr.srcs[2], 0, sizeof(instr.srcs[2]));
             reg->type = VKD3DSPR_IMMCONST;
             reg->dimension = VSIR_DIMENSION_SCALAR;
-            reg->u.immconst_uint[0] = index->value.u[0].u;
+            reg->u.immconst_u32[0] = index->value.u[0].u;
         }
         else if (tpf->ctx->profile->major_version == 4 && tpf->ctx->profile->minor_version == 0)
         {
@@ -4778,7 +4778,7 @@ static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct 
     sm4_src_from_node(tpf, &instr.srcs[0], arg, instr.dsts[0].write_mask);
     instr.srcs[1].reg.type = VKD3DSPR_IMMCONST;
     instr.srcs[1].reg.dimension = VSIR_DIMENSION_SCALAR;
-    instr.srcs[1].reg.u.immconst_uint[0] = mask;
+    instr.srcs[1].reg.u.immconst_u32[0] = mask;
     instr.src_count = 2;
 
     write_sm4_instruction(tpf, &instr);

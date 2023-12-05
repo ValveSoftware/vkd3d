@@ -987,7 +987,7 @@ static void shader_sm1_read_immconst(struct vkd3d_shader_sm1_parser *sm1, const 
     src_param->reg.idx[2].rel_addr = NULL;
     src_param->reg.idx_count = 0;
     src_param->reg.dimension = dimension;
-    memcpy(src_param->reg.u.immconst_uint, *ptr, count * sizeof(uint32_t));
+    memcpy(src_param->reg.u.immconst_u32, *ptr, count * sizeof(uint32_t));
     src_param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
     src_param->modifiers = 0;
 
