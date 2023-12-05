@@ -872,7 +872,7 @@ struct vkd3d_shader_dst_param
     struct vkd3d_shader_register reg;
     uint32_t write_mask;
     uint32_t modifiers;
-    DWORD shift;
+    unsigned int shift;
 };
 
 struct vkd3d_shader_src_param
