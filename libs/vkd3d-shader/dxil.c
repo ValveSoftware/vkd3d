@@ -171,6 +171,35 @@ enum bitcode_linkage
     LINKAGE_INTERNAL  = 3,
 };
 
+enum dxil_resource_kind
+{
+    RESOURCE_KIND_INVALID                 =  0,
+    RESOURCE_KIND_TEXTURE1D               =  1,
+    RESOURCE_KIND_TEXTURE2D               =  2,
+    RESOURCE_KIND_TEXTURE2DMS             =  3,
+    RESOURCE_KIND_TEXTURE3D               =  4,
+    RESOURCE_KIND_TEXTURECUBE             =  5,
+    RESOURCE_KIND_TEXTURE1DARRAY          =  6,
+    RESOURCE_KIND_TEXTURE2DARRAY          =  7,
+    RESOURCE_KIND_TEXTURE2DMSARRAY        =  8,
+    RESOURCE_KIND_TEXTURECUBEARRAY        =  9,
+    RESOURCE_KIND_TYPEDBUFFER             = 10,
+    RESOURCE_KIND_RAWBUFFER               = 11,
+    RESOURCE_KIND_STRUCTUREDBUFFER        = 12,
+    RESOURCE_KIND_CBUFFER                 = 13,
+    RESOURCE_KIND_SAMPLER                 = 14,
+    RESOURCE_KIND_TBUFFER                 = 15,
+    RESOURCE_KIND_RTACCELERATIONSTRUCTURE = 16,
+    RESOURCE_KIND_FEEDBACKTEXTURE2D       = 17,
+    RESOURCE_KIND_FEEDBACKTEXTURE2DARRAY  = 18,
+};
+
+enum dxil_resource_type
+{
+    RESOURCE_TYPE_NON_RAW_STRUCTURED = 0,
+    RESOURCE_TYPE_RAW_STRUCTURED     = 1,
+};
+
 enum dxil_component_type
 {
     COMPONENT_TYPE_INVALID     =  0,
@@ -614,6 +643,11 @@ struct sm6_descriptor_info
     enum vkd3d_shader_descriptor_type type;
     unsigned int id;
     struct vkd3d_shader_register_range range;
+    enum vkd3d_shader_resource_type resource_type;
+    enum dxil_resource_kind kind;
+    enum vkd3d_data_type resource_data_type;
+    enum vkd3d_shader_register_type reg_type;
+    enum vkd3d_data_type reg_data_type;
 };
 
 struct sm6_parser
@@ -1984,6 +2018,12 @@ static bool sm6_value_is_handle(const struct sm6_value *value)
 static inline bool sm6_value_is_constant(const struct sm6_value *value)
 {
     return sm6_value_is_register(value) && register_is_constant(&value->u.reg);
+}
+
+static bool sm6_value_is_constant_zero(const struct sm6_value *value)
+{
+    /* Constant vectors do not occur. */
+    return sm6_value_is_register(value) && register_is_scalar_constant_zero(&value->u.reg);
 }
 
 static inline bool sm6_value_is_undef(const struct sm6_value *value)
@@ -3575,9 +3615,8 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     dst->u.handle.d = d;
 
     reg = &dst->u.handle.reg;
-    /* Set idx_count to 3 for use with load instructions.
-     * TODO: set register type from resource type when other types are supported. */
-    vsir_register_init(reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
+    /* Set idx_count to 3 for use with load instructions. */
+    vsir_register_init(reg, d->reg_type, d->reg_data_type, 3);
     reg->dimension = VSIR_DIMENSION_VEC4;
     reg->idx[0].offset = id;
     register_index_address_init(&reg->idx[1], operands[2], sm6);
@@ -4729,6 +4768,12 @@ static bool sm6_metadata_value_is_string(const struct sm6_metadata_value *m)
     return m && m->type == VKD3D_METADATA_STRING;
 }
 
+static bool sm6_metadata_value_is_zero_or_undef(const struct sm6_metadata_value *m)
+{
+    return sm6_metadata_value_is_value(m)
+            && (sm6_value_is_undef(m->u.value) || sm6_value_is_constant_zero(m->u.value));
+}
+
 static bool sm6_metadata_get_uint_value(const struct sm6_parser *sm6,
         const struct sm6_metadata_value *m, unsigned int *u)
 {
@@ -5783,6 +5828,232 @@ static bool sm6_parser_resources_load_register_range(struct sm6_parser *sm6,
     return true;
 }
 
+static bool resource_kind_is_texture(enum dxil_resource_kind kind)
+{
+    return kind >= RESOURCE_KIND_TEXTURE1D && kind <= RESOURCE_KIND_TEXTURECUBEARRAY;
+}
+
+static bool resource_kind_is_multisampled(enum dxil_resource_kind kind)
+{
+    return kind == RESOURCE_KIND_TEXTURE2DMS || kind == RESOURCE_KIND_TEXTURE2DMSARRAY;
+}
+
+static enum vkd3d_shader_resource_type shader_resource_type_from_dxil_resource_kind(enum dxil_resource_kind kind)
+{
+    if (resource_kind_is_texture(kind))
+        return kind + 1;
+
+    switch (kind)
+    {
+        case RESOURCE_KIND_TYPEDBUFFER:
+            return VKD3D_SHADER_RESOURCE_BUFFER;
+        default:
+            return VKD3D_SHADER_RESOURCE_NONE;
+    }
+}
+
+static const enum vkd3d_data_type data_type_table[] =
+{
+    [COMPONENT_TYPE_INVALID]     = VKD3D_DATA_UNUSED,
+    [COMPONENT_TYPE_I1]          = VKD3D_DATA_UNUSED,
+    [COMPONENT_TYPE_I16]         = VKD3D_DATA_INT,
+    [COMPONENT_TYPE_U16]         = VKD3D_DATA_UINT,
+    [COMPONENT_TYPE_I32]         = VKD3D_DATA_INT,
+    [COMPONENT_TYPE_U32]         = VKD3D_DATA_UINT,
+    [COMPONENT_TYPE_I64]         = VKD3D_DATA_UNUSED,
+    [COMPONENT_TYPE_U64]         = VKD3D_DATA_UNUSED,
+    [COMPONENT_TYPE_F16]         = VKD3D_DATA_FLOAT,
+    [COMPONENT_TYPE_F32]         = VKD3D_DATA_FLOAT,
+    [COMPONENT_TYPE_F64]         = VKD3D_DATA_DOUBLE,
+    [COMPONENT_TYPE_SNORMF16]    = VKD3D_DATA_SNORM,
+    [COMPONENT_TYPE_UNORMF16]    = VKD3D_DATA_UNORM,
+    [COMPONENT_TYPE_SNORMF32]    = VKD3D_DATA_SNORM,
+    [COMPONENT_TYPE_UNORMF32]    = VKD3D_DATA_UNORM,
+    [COMPONENT_TYPE_SNORMF64]    = VKD3D_DATA_DOUBLE,
+    [COMPONENT_TYPE_UNORMF64]    = VKD3D_DATA_DOUBLE,
+    [COMPONENT_TYPE_PACKEDS8X32] = VKD3D_DATA_UNUSED,
+    [COMPONENT_TYPE_PACKEDU8X32] = VKD3D_DATA_UNUSED,
+};
+
+static enum vkd3d_data_type vkd3d_data_type_from_dxil_component_type(enum dxil_component_type type,
+        struct sm6_parser *sm6)
+{
+    enum vkd3d_data_type data_type;
+
+    if (type >= ARRAY_SIZE(data_type_table) || (data_type = data_type_table[type]) == VKD3D_DATA_UNUSED)
+    {
+        FIXME("Unhandled component type %u.\n", type);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Resource descriptor component type %u is unhandled.", type);
+        return VKD3D_DATA_FLOAT;
+    }
+
+    return data_type;
+}
+
+static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struct sm6_parser *sm6,
+        const struct sm6_metadata_value *type_value, enum dxil_resource_kind kind,
+        const struct sm6_metadata_value *m, struct vkd3d_shader_instruction *ins)
+{
+    enum vkd3d_shader_resource_type resource_type;
+    enum dxil_resource_type dxil_resource_type;
+    const struct sm6_metadata_node *node;
+    enum vkd3d_data_type data_type;
+    unsigned int i, values[2];
+
+    if (!(resource_type = shader_resource_type_from_dxil_resource_kind(kind)))
+    {
+        FIXME("Unhandled resource kind %u.\n", kind);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Resource kind %u is unhandled.", kind);
+        return NULL;
+    }
+    ins->resource_type = resource_type;
+
+    if (!sm6_metadata_value_is_node(m))
+    {
+        WARN("Resource metadata list is not a node.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Resource descriptor metadata list is not a node.");
+        return NULL;
+    }
+
+    node = m->u.node;
+
+    if (node->operand_count < 2)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a resource descriptor.", node->operand_count);
+        return NULL;
+    }
+    if (node->operand_count > 2)
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 2);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for a resource descriptor.", node->operand_count - 2);
+    }
+
+    for (i = 0; i < 2; ++i)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &values[i]))
+        {
+            WARN("Failed to load uint value at index %u.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "A resource descriptor operand metadata value is not an integer.");
+            return NULL;
+        }
+    }
+
+    if ((dxil_resource_type = values[0]) == RESOURCE_TYPE_NON_RAW_STRUCTURED)
+    {
+        if (kind != RESOURCE_KIND_TYPEDBUFFER && !resource_kind_is_texture(kind))
+        {
+            WARN("Unhandled resource kind %u.\n", kind);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource kind %u for a typed resource is unhandled.", kind);
+            return NULL;
+        }
+
+        data_type = vkd3d_data_type_from_dxil_component_type(values[1], sm6);
+        ins->handler_idx = VKD3DSIH_DCL;
+        for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
+            ins->declaration.semantic.resource_data_type[i] = data_type;
+        ins->declaration.semantic.resource_type = resource_type;
+        ins->declaration.semantic.resource.reg.write_mask = VKD3DSP_WRITEMASK_ALL;
+
+        return &ins->declaration.semantic.resource;
+    }
+    else
+    {
+        FIXME("Unhandled resource type %u.\n", dxil_resource_type);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Resource type %u is unhandled.", dxil_resource_type);
+    }
+
+    return NULL;
+}
+
+static void init_resource_declaration(struct vkd3d_shader_resource *resource,
+        enum vkd3d_shader_register_type reg_type, enum vkd3d_data_type data_type, unsigned int id,
+        const struct vkd3d_shader_register_range *range)
+{
+    struct vkd3d_shader_dst_param *param = &resource->reg;
+
+    param->modifiers = 0;
+    param->shift = 0;
+    vsir_register_init(&param->reg, reg_type, data_type, 3);
+    param->reg.idx[0].offset = id;
+    param->reg.idx[1].offset = range->first;
+    param->reg.idx[2].offset = range->last;
+
+    resource->range = *range;
+}
+
+static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
+        const struct sm6_metadata_node *node, struct sm6_descriptor_info *d, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_resource *resource;
+    unsigned int kind;
+
+    if (node->operand_count < 9)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for an SRV descriptor.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (node->operand_count > 9)
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 9);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for an SRV descriptor.", node->operand_count - 9);
+    }
+
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[6], &kind))
+    {
+        WARN("Failed to load resource type.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "SRV resource type metadata value is not an integer.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_INVALID);
+
+    if (!(resource = sm6_parser_resources_load_common_info(sm6, node->operands[1], kind,
+            node->operands[8], ins)))
+    {
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
+    d->resource_type = ins->resource_type;
+    d->kind = kind;
+    d->reg_type = VKD3DSPR_RESOURCE;
+    d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_RESOURCE;
+    d->resource_data_type = ins->declaration.semantic.resource_data_type[0];
+
+    init_resource_declaration(resource, VKD3DSPR_RESOURCE, d->reg_data_type, d->id, &d->range);
+
+    if (resource_kind_is_multisampled(kind))
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[7], &ins->declaration.semantic.sample_count))
+        {
+            WARN("Failed to load sample count.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "SRV sample count metadata value is not an integer.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+    }
+    else if (!sm6_metadata_value_is_zero_or_undef(node->operands[7]))
+    {
+        WARN("Ignoring sample count value.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring an SRV descriptor sample count metadata value which is not constant zero or undefined.");
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_resources_load_cbv(struct sm6_parser *sm6,
         const struct sm6_metadata_node *node, struct sm6_descriptor_info *d, struct vkd3d_shader_instruction *ins)
 {
@@ -5824,6 +6095,10 @@ static enum vkd3d_result sm6_parser_resources_load_cbv(struct sm6_parser *sm6,
     reg->idx[2].offset = d->range.last;
 
     ins->declaration.cb.range = d->range;
+
+    d->reg_type = VKD3DSPR_CONSTBUFFER;
+    d->reg_data_type = VKD3D_DATA_FLOAT;
+    d->resource_data_type = VKD3D_DATA_FLOAT;
 
     return VKD3D_OK;
 }
@@ -5894,6 +6169,10 @@ static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
         {
             case VKD3D_SHADER_DESCRIPTOR_TYPE_CBV:
                 if ((ret = sm6_parser_resources_load_cbv(sm6, node, d, ins)) < 0)
+                    return ret;
+                break;
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
+                if ((ret = sm6_parser_resources_load_srv(sm6, node, d, ins)) < 0)
                     return ret;
                 break;
             default:
