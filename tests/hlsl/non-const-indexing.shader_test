@@ -197,6 +197,26 @@ probe all rgba (1126, 3344, 5566, 3788)
 
 
 [pixel shader]
+uint i, j;
+
+float4 main() : sv_target
+{
+    float mut1[4] = {1, 2, 3, 4};
+
+    /* dxc emits a pointer bitcast, which results in a VSIR MOV with mismatched data types. */
+    mut1[i] = asfloat(j);
+
+    return float4(mut1[0], mut1[1], mut1[2], mut1[3]);
+}
+
+[test]
+uniform 0 uint 1
+uniform 1 uint 0x40a00000
+draw quad
+probe all rgba (1, 5, 3, 4)
+
+
+[pixel shader]
 uniform float4 f[4];
 uniform uint4 u;
 uniform uint4 v;
