@@ -1168,9 +1168,9 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
         {
             if (reg->data_type == VKD3D_DATA_DOUBLE)
             {
-                shader_print_double_literal(compiler, "", reg->u.immconst_double[0], "");
+                shader_print_double_literal(compiler, "", reg->u.immconst_f64[0], "");
                 if (reg->dimension == VSIR_DIMENSION_VEC4)
-                    shader_print_double_literal(compiler, ", ", reg->u.immconst_double[1], "");
+                    shader_print_double_literal(compiler, ", ", reg->u.immconst_f64[1], "");
             }
             else
             {
