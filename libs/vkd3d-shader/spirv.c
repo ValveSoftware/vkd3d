@@ -3604,8 +3604,8 @@ static bool vkd3d_swizzle_is_scalar(unsigned int swizzle)
 }
 
 static uint32_t spirv_compiler_emit_swizzle(struct spirv_compiler *compiler,
-        uint32_t val_id, unsigned int val_write_mask, enum vkd3d_shader_component_type component_type,
-        unsigned int swizzle, unsigned int write_mask)
+        uint32_t val_id, uint32_t val_write_mask, enum vkd3d_shader_component_type component_type,
+        unsigned int swizzle, uint32_t write_mask)
 {
     unsigned int i, component_idx, component_count, val_component_count;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -3622,9 +3622,9 @@ static uint32_t spirv_compiler_emit_swizzle(struct spirv_compiler *compiler,
 
     if (component_count == 1)
     {
-        component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+        component_idx = vsir_write_mask_get_component_idx(write_mask);
         component_idx = vkd3d_swizzle_get_component(swizzle, component_idx);
-        component_idx -= vkd3d_write_mask_get_component_idx(val_write_mask);
+        component_idx -= vsir_write_mask_get_component_idx(val_write_mask);
         return vkd3d_spirv_build_op_composite_extract1(builder, type_id, val_id, component_idx);
     }
 
@@ -3742,7 +3742,7 @@ static uint32_t spirv_compiler_emit_load_undef(struct spirv_compiler *compiler,
 }
 
 static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, DWORD swizzle, DWORD write_mask,
+        const struct vkd3d_shader_register *reg, DWORD swizzle, uint32_t write_mask,
         const struct vkd3d_shader_register_info *reg_info)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -3754,7 +3754,7 @@ static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
     assert(!register_is_constant_or_undef(reg));
     assert(vkd3d_write_mask_component_count(write_mask) == 1);
 
-    component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+    component_idx = vsir_write_mask_get_component_idx(write_mask);
     component_idx = vkd3d_swizzle_get_component(swizzle, component_idx);
     skipped_component_mask = ~reg_info->write_mask & ((VKD3DSP_WRITEMASK_0 << component_idx) - 1);
     if (skipped_component_mask)
@@ -4049,8 +4049,8 @@ static uint32_t spirv_compiler_emit_load_src_with_type(struct spirv_compiler *co
 }
 
 static void spirv_compiler_emit_store_scalar(struct spirv_compiler *compiler,
-        uint32_t dst_id, unsigned int dst_write_mask, enum vkd3d_shader_component_type component_type,
-        SpvStorageClass storage_class, unsigned int write_mask, uint32_t val_id)
+        uint32_t dst_id, uint32_t dst_write_mask, enum vkd3d_shader_component_type component_type,
+        SpvStorageClass storage_class, uint32_t write_mask, uint32_t val_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id, ptr_type_id, index;
@@ -4060,8 +4060,8 @@ static void spirv_compiler_emit_store_scalar(struct spirv_compiler *compiler,
     {
         type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
         ptr_type_id = vkd3d_spirv_get_op_type_pointer(builder, storage_class, type_id);
-        component_idx = vkd3d_write_mask_get_component_idx(write_mask);
-        component_idx -= vkd3d_write_mask_get_component_idx(dst_write_mask);
+        component_idx = vsir_write_mask_get_component_idx(write_mask);
+        component_idx -= vsir_write_mask_get_component_idx(dst_write_mask);
         index = spirv_compiler_get_constant_uint(compiler, component_idx);
         dst_id = vkd3d_spirv_build_op_in_bounds_access_chain1(builder, ptr_type_id, dst_id, index);
     }
@@ -4070,7 +4070,7 @@ static void spirv_compiler_emit_store_scalar(struct spirv_compiler *compiler,
 }
 
 static void spirv_compiler_emit_store(struct spirv_compiler *compiler,
-        uint32_t dst_id, unsigned int dst_write_mask, enum vkd3d_shader_component_type component_type,
+        uint32_t dst_id, uint32_t dst_write_mask, enum vkd3d_shader_component_type component_type,
         SpvStorageClass storage_class, unsigned int write_mask, uint32_t val_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
@@ -4088,7 +4088,7 @@ static void spirv_compiler_emit_store(struct spirv_compiler *compiler,
     {
         type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
         val_id = vkd3d_spirv_build_op_composite_extract1(builder, type_id, val_id,
-                vkd3d_write_mask_get_component_idx(dst_write_mask));
+                vsir_write_mask_get_component_idx(dst_write_mask));
         write_mask &= dst_write_mask;
         component_count = 1;
     }
@@ -4239,7 +4239,7 @@ static void spirv_compiler_emit_store_dst_scalar(struct spirv_compiler *compiler
     uint32_t component_ids[VKD3D_VEC4_SIZE];
     unsigned int component_idx, i;
 
-    component_idx = vkd3d_write_mask_get_component_idx(dst->write_mask);
+    component_idx = vsir_write_mask_get_component_idx(dst->write_mask);
     for (i = 0; i < component_count; ++i)
     {
         if (vkd3d_swizzle_get_component(swizzle, component_idx + i))
@@ -4779,7 +4779,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     enum vkd3d_shader_component_type component_type;
     const struct vkd3d_spirv_builtin *builtin;
     enum vkd3d_shader_sysval_semantic sysval;
-    unsigned int write_mask, reg_write_mask;
+    uint32_t write_mask, reg_write_mask;
     struct vkd3d_symbol *symbol = NULL;
     uint32_t val_id, input_id, var_id;
     uint32_t type_id, float_type_id;
@@ -4822,7 +4822,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     {
         component_type = signature_element->component_type;
         input_component_count = vkd3d_write_mask_component_count(signature_element->mask);
-        component_idx = vkd3d_write_mask_get_component_idx(signature_element->mask);
+        component_idx = vsir_write_mask_get_component_idx(signature_element->mask);
     }
 
     if (needs_private_io_variable(builtin))
@@ -4832,7 +4832,7 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
     }
     else
     {
-        component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+        component_idx = vsir_write_mask_get_component_idx(write_mask);
         reg_write_mask = write_mask >> component_idx;
     }
 
@@ -4988,7 +4988,7 @@ static void calculate_clip_or_cull_distance_mask(const struct signature_element 
         return;
     }
 
-    write_mask = e->mask >> vkd3d_write_mask_get_component_idx(e->mask);
+    write_mask = e->mask >> vsir_write_mask_get_component_idx(e->mask);
     *mask |= (write_mask & VKD3DSP_WRITEMASK_ALL) << (VKD3D_VEC4_SIZE * e->semantic_index);
 }
 
@@ -5126,7 +5126,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     const struct shader_signature *shader_signature;
     const struct vkd3d_spirv_builtin *builtin;
     enum vkd3d_shader_sysval_semantic sysval;
-    unsigned int write_mask, reg_write_mask;
+    uint32_t write_mask, reg_write_mask;
     bool use_private_variable = false;
     struct vkd3d_symbol reg_symbol;
     SpvStorageClass storage_class;
@@ -5152,7 +5152,7 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
 
     write_mask = signature_element->mask;
 
-    component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+    component_idx = vsir_write_mask_get_component_idx(write_mask);
     output_component_count = vkd3d_write_mask_component_count(write_mask);
     if (builtin)
     {
@@ -5317,7 +5317,7 @@ static void spirv_compiler_emit_store_shader_output(struct spirv_compiler *compi
             use_mask |= element->used_mask;
         }
     }
-    index = vkd3d_write_mask_get_component_idx(output->mask);
+    index = vsir_write_mask_get_component_idx(output->mask);
     dst_write_mask >>= index;
     use_mask >>= index;
     write_mask &= dst_write_mask;

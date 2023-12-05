@@ -1516,7 +1516,7 @@ static inline enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval(enum
     return vkd3d_siv_from_sysval_indexed(sysval, 0);
 }
 
-static inline unsigned int vkd3d_write_mask_get_component_idx(DWORD write_mask)
+static inline unsigned int vsir_write_mask_get_component_idx(uint32_t write_mask)
 {
     unsigned int i;
 

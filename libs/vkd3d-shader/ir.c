@@ -593,18 +593,18 @@ struct signature_element *vsir_signature_find_element_for_reg(const struct shade
 }
 
 static unsigned int range_map_get_register_count(uint8_t range_map[][VKD3D_VEC4_SIZE],
-        unsigned int register_idx, unsigned int write_mask)
+        unsigned int register_idx, uint32_t write_mask)
 {
-    return range_map[register_idx][vkd3d_write_mask_get_component_idx(write_mask)];
+    return range_map[register_idx][vsir_write_mask_get_component_idx(write_mask)];
 }
 
 static void range_map_set_register_range(uint8_t range_map[][VKD3D_VEC4_SIZE], unsigned int register_idx,
-        unsigned int register_count, unsigned int write_mask, bool is_dcl_indexrange)
+        unsigned int register_count, uint32_t write_mask, bool is_dcl_indexrange)
 {
     unsigned int i, j, r, c, component_idx, component_count;
 
     assert(write_mask <= VKD3DSP_WRITEMASK_ALL);
-    component_idx = vkd3d_write_mask_get_component_idx(write_mask);
+    component_idx = vsir_write_mask_get_component_idx(write_mask);
     component_count = vkd3d_write_mask_component_count(write_mask);
 
     assert(register_idx < MAX_REG_OUTPUT && MAX_REG_OUTPUT - register_idx >= register_count);
@@ -899,7 +899,7 @@ static bool shader_dst_param_io_normalise(struct vkd3d_shader_dst_param *dst_par
     element_idx = shader_signature_find_element_for_reg(signature, reg_idx, write_mask);
     e = &signature->elements[element_idx];
 
-    dst_param->write_mask >>= vkd3d_write_mask_get_component_idx(e->mask);
+    dst_param->write_mask >>= vsir_write_mask_get_component_idx(e->mask);
     if (is_io_dcl)
     {
         /* Validated in the TPF reader. */
@@ -1011,7 +1011,7 @@ static void shader_src_param_io_normalise(struct vkd3d_shader_src_param *src_par
     reg->idx[id_idx].offset = element_idx;
     reg->idx_count = id_idx + 1;
 
-    if ((component_idx = vkd3d_write_mask_get_component_idx(e->mask)))
+    if ((component_idx = vsir_write_mask_get_component_idx(e->mask)))
     {
         for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
             if (vkd3d_swizzle_get_component(src_param->swizzle, i))
