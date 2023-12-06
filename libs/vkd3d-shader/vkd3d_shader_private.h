@@ -763,9 +763,13 @@ enum vkd3d_shader_atomic_rmw_flags
 
 enum vkd3d_tessellator_domain
 {
+    VKD3D_TESSELLATOR_DOMAIN_INVALID   = 0,
+
     VKD3D_TESSELLATOR_DOMAIN_LINE      = 1,
     VKD3D_TESSELLATOR_DOMAIN_TRIANGLE  = 2,
     VKD3D_TESSELLATOR_DOMAIN_QUAD      = 3,
+
+    VKD3D_TESSELLATOR_DOMAIN_COUNT     = 4,
 };
 
 #define VKD3DSI_NONE                    0x0
