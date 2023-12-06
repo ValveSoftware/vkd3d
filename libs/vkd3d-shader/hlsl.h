@@ -155,7 +155,7 @@ struct hlsl_type
     /* Bitfield for storing type modifiers, subset of HLSL_TYPE_MODIFIERS_MASK.
      * Modifiers that don't fall inside this mask are to be stored in the variable in
      *   hlsl_ir_var.modifiers, or in the struct field in hlsl_ir_field.modifiers. */
-    unsigned int modifiers;
+    uint32_t modifiers;
     /* Size of the type values on each dimension. For non-numeric types, they are set for the
      *   convenience of the sm1/sm4 backends.
      * If type is HLSL_CLASS_SCALAR, then both dimx = 1 and dimy = 1.
@@ -234,7 +234,7 @@ struct hlsl_struct_field
     /* Bitfield for storing modifiers that are not in HLSL_TYPE_MODIFIERS_MASK (these are stored in
      *   type->modifiers instead) and that also are specific to the field and not the whole variable.
      *   In particular, interpolation modifiers. */
-    unsigned int storage_modifiers;
+    uint32_t storage_modifiers;
     /* Offset of the field within the type it belongs to, in register components, for each regset. */
     unsigned int reg_offset[HLSL_REGSET_LAST + 1];
 
@@ -392,7 +392,7 @@ struct hlsl_ir_var
     /* Buffer where the variable's value is stored, in case it is uniform. */
     struct hlsl_buffer *buffer;
     /* Bitfield for storage modifiers (type modifiers are stored in data_type->modifiers). */
-    unsigned int storage_modifiers;
+    uint32_t storage_modifiers;
     /* Optional reservations of registers and/or offsets for variables within constant buffers. */
     struct hlsl_reg_reservation reg_reservation;
 
@@ -1264,7 +1264,7 @@ struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
-        const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
+        const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, uint32_t modifiers,
         const struct hlsl_reg_reservation *reg_reservation);
 struct hlsl_ir_switch_case *hlsl_new_switch_case(struct hlsl_ctx *ctx, unsigned int value, bool is_default,
         struct hlsl_block *body, const struct vkd3d_shader_location *loc);
@@ -1286,7 +1286,7 @@ void hlsl_pop_scope(struct hlsl_ctx *ctx);
 bool hlsl_scope_add_type(struct hlsl_scope *scope, struct hlsl_type *type);
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
-        unsigned int default_majority, unsigned int modifiers);
+        unsigned int default_majority, uint32_t modifiers);
 unsigned int hlsl_type_component_count(const struct hlsl_type *type);
 unsigned int hlsl_type_get_array_element_reg_size(const struct hlsl_type *type, enum hlsl_regset regset);
 struct hlsl_type *hlsl_type_get_component_type(struct hlsl_ctx *ctx, struct hlsl_type *type,

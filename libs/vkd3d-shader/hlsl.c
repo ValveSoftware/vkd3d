@@ -920,7 +920,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 }
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
-        unsigned int default_majority, unsigned int modifiers)
+        unsigned int default_majority, uint32_t modifiers)
 {
     struct hlsl_type *type;
 
@@ -1030,7 +1030,7 @@ struct hlsl_ir_node *hlsl_new_copy(struct hlsl_ctx *ctx, struct hlsl_ir_node *no
 }
 
 struct hlsl_ir_var *hlsl_new_var(struct hlsl_ctx *ctx, const char *name, struct hlsl_type *type,
-        const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, unsigned int modifiers,
+        const struct vkd3d_shader_location *loc, const struct hlsl_semantic *semantic, uint32_t modifiers,
         const struct hlsl_reg_reservation *reg_reservation)
 {
     struct hlsl_ir_var *var;
@@ -2246,7 +2246,7 @@ const char *debug_hlsl_type(struct hlsl_ctx *ctx, const struct hlsl_type *type)
     return ret;
 }
 
-struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, unsigned int modifiers)
+struct vkd3d_string_buffer *hlsl_modifiers_to_string(struct hlsl_ctx *ctx, uint32_t modifiers)
 {
     struct vkd3d_string_buffer *string;
 

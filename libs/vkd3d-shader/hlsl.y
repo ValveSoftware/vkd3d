@@ -40,7 +40,7 @@ struct parse_parameter
     const char *name;
     struct hlsl_semantic semantic;
     struct hlsl_reg_reservation reg_reservation;
-    unsigned int modifiers;
+    uint32_t modifiers;
 };
 
 struct parse_colon_attribute
@@ -75,7 +75,7 @@ struct parse_variable_def
     struct parse_initializer initializer;
 
     struct hlsl_type *basic_type;
-    unsigned int modifiers;
+    uint32_t modifiers;
     struct vkd3d_shader_location modifiers_loc;
 };
 
@@ -405,7 +405,7 @@ static struct hlsl_ir_node *add_implicit_conversion(struct hlsl_ctx *ctx, struct
     return add_cast(ctx, block, node, dst_type, loc);
 }
 
-static DWORD add_modifiers(struct hlsl_ctx *ctx, DWORD modifiers, DWORD mod,
+static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t mod,
         const struct vkd3d_shader_location *loc)
 {
     if (modifiers & mod)
@@ -868,7 +868,7 @@ static const struct hlsl_struct_field *get_struct_field(const struct hlsl_struct
 }
 
 static struct hlsl_type *apply_type_modifiers(struct hlsl_ctx *ctx, struct hlsl_type *type,
-        unsigned int *modifiers, bool force_majority, const struct vkd3d_shader_location *loc)
+        uint32_t *modifiers, bool force_majority, const struct vkd3d_shader_location *loc)
 {
     unsigned int default_majority = 0;
     struct hlsl_type *new_type;
@@ -926,7 +926,7 @@ static bool shader_profile_version_lt(const struct hlsl_ctx *ctx, unsigned int m
 }
 
 static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
-        struct hlsl_type *type, unsigned int modifiers, struct list *defs)
+        struct hlsl_type *type, uint32_t modifiers, struct list *defs)
 {
     struct parse_variable_def *v, *v_next;
     size_t i = 0;
@@ -1019,7 +1019,7 @@ static bool add_typedef(struct hlsl_ctx *ctx, struct hlsl_type *const orig_type,
         }
         else
         {
-            unsigned int var_modifiers = 0;
+            uint32_t var_modifiers = 0;
 
             if (!(type = apply_type_modifiers(ctx, orig_type, &var_modifiers, true, &v->loc)))
             {
@@ -4845,7 +4845,7 @@ static void check_duplicated_switch_cases(struct hlsl_ctx *ctx, const struct hls
     FLOAT floatval;
     bool boolval;
     char *name;
-    DWORD modifiers;
+    uint32_t modifiers;
     struct hlsl_ir_node *instr;
     struct hlsl_block *block;
     struct list *list;
@@ -5283,7 +5283,7 @@ field:
       var_modifiers field_type variables_def ';'
         {
             struct hlsl_type *type;
-            unsigned int modifiers = $1;
+            uint32_t modifiers = $1;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
                 YYABORT;
@@ -5436,7 +5436,7 @@ func_prototype_no_attrs:
     /* var_modifiers is necessary to avoid shift/reduce conflicts. */
       var_modifiers type var_identifier '(' parameters ')' colon_attribute
         {
-            unsigned int modifiers = $1;
+            uint32_t modifiers = $1;
             struct hlsl_ir_var *var;
             struct hlsl_type *type;
 
@@ -5710,7 +5710,7 @@ param_list:
 parameter:
       var_modifiers type_no_void any_identifier arrays colon_attribute
         {
-            unsigned int modifiers = $1;
+            uint32_t modifiers = $1;
             struct hlsl_type *type;
             unsigned int i;
 
@@ -6024,7 +6024,7 @@ typedef:
       KW_TYPEDEF var_modifiers typedef_type type_specs ';'
         {
             struct parse_variable_def *v, *v_next;
-            unsigned int modifiers = $2;
+            uint32_t modifiers = $2;
             struct hlsl_type *type;
 
             if (!(type = apply_type_modifiers(ctx, $3, &modifiers, false, &@2)))
@@ -6161,7 +6161,7 @@ variable_def:
 variable_def_typed:
       var_modifiers struct_spec variable_def
         {
-            unsigned int modifiers = $1;
+            uint32_t modifiers = $1;
             struct hlsl_type *type;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))
@@ -6176,7 +6176,7 @@ variable_def_typed:
         }
     | var_modifiers type variable_def
         {
-            unsigned int modifiers = $1;
+            uint32_t modifiers = $1;
             struct hlsl_type *type;
 
             if (!(type = apply_type_modifiers(ctx, $2, &modifiers, true, &@1)))

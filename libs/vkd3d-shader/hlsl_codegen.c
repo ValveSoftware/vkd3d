@@ -263,7 +263,7 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
 }
 
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
-        struct hlsl_type *type, unsigned int modifiers, struct hlsl_semantic *semantic,
+        struct hlsl_type *type, uint32_t modifiers, struct hlsl_semantic *semantic,
         uint32_t index, bool output, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_semantic new_semantic;
@@ -331,7 +331,7 @@ static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir
 }
 
 static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *lhs,
-        unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = lhs->node.data_type, *vector_type_src, *vector_type_dst;
     struct vkd3d_shader_location *loc = &lhs->node.loc;
@@ -395,7 +395,7 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
 }
 
 static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *lhs,
-        unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct vkd3d_shader_location *loc = &lhs->node.loc;
     struct hlsl_type *type = lhs->node.data_type;
@@ -411,7 +411,7 @@ static void prepend_input_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *
 
         for (i = 0; i < hlsl_type_element_count(type); ++i)
         {
-            unsigned int element_modifiers = modifiers;
+            uint32_t element_modifiers = modifiers;
 
             if (type->class == HLSL_CLASS_ARRAY)
             {
@@ -473,7 +473,7 @@ static void prepend_input_var_copy(struct hlsl_ctx *ctx, struct hlsl_block *bloc
 }
 
 static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *rhs,
-        unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct hlsl_type *type = rhs->node.data_type, *vector_type;
     struct vkd3d_shader_location *loc = &rhs->node.loc;
@@ -529,7 +529,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
 }
 
 static void append_output_copy_recurse(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_load *rhs,
-        unsigned int modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
+        uint32_t modifiers, struct hlsl_semantic *semantic, uint32_t semantic_index)
 {
     struct vkd3d_shader_location *loc = &rhs->node.loc;
     struct hlsl_type *type = rhs->node.data_type;
