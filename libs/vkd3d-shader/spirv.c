@@ -2198,7 +2198,7 @@ static void vkd3d_symbol_make_io(struct vkd3d_symbol *symbol,
 
 static void vkd3d_symbol_set_register_info(struct vkd3d_symbol *symbol,
         uint32_t val_id, SpvStorageClass storage_class,
-        enum vkd3d_shader_component_type component_type, DWORD write_mask)
+        enum vkd3d_shader_component_type component_type, uint32_t write_mask)
 {
     symbol->id = val_id;
     symbol->descriptor_array = NULL;
