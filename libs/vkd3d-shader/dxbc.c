@@ -846,7 +846,7 @@ static int shader_parse_root_parameters(struct root_signature_parser_context *co
 }
 
 static int shader_parse_root_parameters1(struct root_signature_parser_context *context,
-        uint32_t offset, DWORD count, struct vkd3d_shader_root_parameter1 *parameters)
+        uint32_t offset, unsigned int count, struct vkd3d_shader_root_parameter1 *parameters)
 {
     const char *ptr;
     unsigned int i;
