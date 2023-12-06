@@ -791,6 +791,7 @@ struct sm6_parser
     size_t global_symbol_count;
 
     const char *entry_point;
+    const char *patch_constant_function;
 
     struct vkd3d_shader_dst_param *output_params;
     struct vkd3d_shader_dst_param *input_params;
@@ -2790,7 +2791,7 @@ static inline uint64_t decode_rotated_signed_value(uint64_t value)
     return value << 63;
 }
 
-static inline float bitcast_uint64_to_float(uint64_t value)
+static float bitcast_uint_to_float(unsigned int value)
 {
     union
     {
@@ -2812,6 +2813,23 @@ static inline double bitcast_uint64_to_double(uint64_t value)
 
     u.uint64_value = value;
     return u.double_value;
+}
+
+static float register_get_float_value(const struct vkd3d_shader_register *reg)
+{
+    if (!register_is_constant(reg) || !data_type_is_floating_point(reg->data_type))
+        return 0.0;
+
+    if (reg->dimension == VSIR_DIMENSION_VEC4)
+        WARN("Returning vec4.x.\n");
+
+    if (reg->type == VKD3DSPR_IMMCONST64)
+    {
+        WARN("Truncating double to float.\n");
+        return bitcast_uint64_to_double(reg->u.immconst_u64[0]);
+    }
+
+    return bitcast_uint_to_float(reg->u.immconst_u32[0]);
 }
 
 static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, const struct sm6_type *type,
@@ -3098,7 +3116,7 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                 if (type->u.width == 16)
                     dst->u.reg.u.immconst_u32[0] = record->operands[0];
                 else if (type->u.width == 32)
-                    dst->u.reg.u.immconst_f32[0] = bitcast_uint64_to_float(record->operands[0]);
+                    dst->u.reg.u.immconst_f32[0] = bitcast_uint_to_float(record->operands[0]);
                 else if (type->u.width == 64)
                     dst->u.reg.u.immconst_f64[0] = bitcast_uint64_to_double(record->operands[0]);
                 else
@@ -6728,6 +6746,25 @@ static bool sm6_metadata_get_uint64_value(const struct sm6_parser *sm6,
     return true;
 }
 
+static bool sm6_metadata_get_float_value(const struct sm6_parser *sm6,
+        const struct sm6_metadata_value *m, float *f)
+{
+    const struct sm6_value *value;
+
+    if (!m || m->type != VKD3D_METADATA_VALUE)
+        return false;
+
+    value = m->u.value;
+    if (!sm6_value_is_constant(value))
+        return false;
+    if (!sm6_type_is_floating_point(value->type))
+        return false;
+
+    *f = register_get_float_value(&value->u.reg);
+
+    return true;
+}
+
 static void sm6_parser_metadata_attachment_block_init(struct sm6_parser *sm6, const struct dxil_block *target_block,
         const struct dxil_block *block)
 {
@@ -8762,6 +8799,14 @@ static enum vkd3d_result sm6_parser_emit_thread_group(struct sm6_parser *sm6, co
     return VKD3D_OK;
 }
 
+static void sm6_parser_emit_dcl_count(struct sm6_parser *sm6, enum vkd3d_shader_opcode handler_idx, unsigned int count)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    ins = sm6_parser_add_instruction(sm6, handler_idx);
+    ins->declaration.count = count;
+}
+
 static void sm6_parser_emit_dcl_tessellator_domain(struct sm6_parser *sm6,
         enum vkd3d_tessellator_domain tessellator_domain)
 {
@@ -8778,14 +8823,72 @@ static void sm6_parser_emit_dcl_tessellator_domain(struct sm6_parser *sm6,
     ins->declaration.tessellator_domain = tessellator_domain;
 }
 
-static void sm6_parser_validate_control_point_count(struct sm6_parser *sm6, unsigned int count)
+static void sm6_parser_validate_control_point_count(struct sm6_parser *sm6, unsigned int count,
+        const char *type)
 {
     if (!count || count > 32)
     {
-        WARN("Invalid control point count %u.\n", count);
+        WARN("%s control point count %u invalid.\n", type, count);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
-                "Domain shader input control point count %u is invalid.", count);
+                "%s control point count %u is invalid.", type, count);
     }
+}
+
+static void sm6_parser_emit_dcl_tessellator_partitioning(struct sm6_parser *sm6,
+        enum vkd3d_shader_tessellator_partitioning tessellator_partitioning)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!tessellator_partitioning || tessellator_partitioning > VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_EVEN)
+    {
+        WARN("Unhandled partitioning %u.\n", tessellator_partitioning);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader tessellator partitioning %u is unhandled.", tessellator_partitioning);
+    }
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TESSELLATOR_PARTITIONING);
+    ins->declaration.tessellator_partitioning = tessellator_partitioning;
+}
+
+static void sm6_parser_emit_dcl_tessellator_output_primitive(struct sm6_parser *sm6,
+        enum vkd3d_shader_tessellator_output_primitive primitive)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!primitive || primitive > VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CCW)
+    {
+        WARN("Unhandled output primitive %u.\n", primitive);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader tessellator output primitive %u is unhandled.", primitive);
+    }
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE);
+    ins->declaration.tessellator_output_primitive = primitive;
+}
+
+static void sm6_parser_emit_dcl_max_tessellation_factor(struct sm6_parser *sm6, struct sm6_metadata_value *m)
+{
+    struct vkd3d_shader_instruction *ins;
+    float max_tessellation_factor;
+
+    if (!sm6_metadata_get_float_value(sm6, m, &max_tessellation_factor))
+    {
+        WARN("Max tess factor property is not a float value.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader max tessellation factor property operand is not a float.");
+        return;
+    }
+
+    /* Exclude non-finite values. */
+    if (!(max_tessellation_factor >= 1.0f && max_tessellation_factor <= 64.0f))
+    {
+        WARN("Invalid max tess factor %f.\n", max_tessellation_factor);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader max tessellation factor %f is invalid.", max_tessellation_factor);
+    }
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_HS_MAX_TESSFACTOR);
+    ins->declaration.max_tessellation_factor = max_tessellation_factor;
 }
 
 static enum vkd3d_tessellator_domain sm6_parser_ds_properties_init(struct sm6_parser *sm6,
@@ -8830,10 +8933,75 @@ static enum vkd3d_tessellator_domain sm6_parser_ds_properties_init(struct sm6_pa
     }
 
     sm6_parser_emit_dcl_tessellator_domain(sm6, operands[0]);
-    sm6_parser_validate_control_point_count(sm6, operands[1]);
+    sm6_parser_validate_control_point_count(sm6, operands[1], "Domain shader input");
     sm6->p.program.input_control_point_count = operands[1];
 
     return operands[0];
+}
+
+static enum vkd3d_tessellator_domain sm6_parser_hs_properties_init(struct sm6_parser *sm6,
+        const struct sm6_metadata_value *m)
+{
+    const struct sm6_metadata_node *node;
+    unsigned int operands[6] = {0};
+    unsigned int i;
+
+    if (!m || !sm6_metadata_value_is_node(m))
+    {
+        WARN("Missing or invalid HS properties.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader properties node is missing or invalid.");
+        return 0;
+    }
+
+    node = m->u.node;
+    if (node->operand_count < 7)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Hull shader properties operand count %u is invalid.", node->operand_count);
+        return 0;
+    }
+    if (node->operand_count > 7)
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 7);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for hull shader properties.", node->operand_count - 7);
+    }
+
+    m = node->operands[0];
+    if (!sm6_metadata_value_is_value(m) || !sm6_value_is_function_dcl(m->u.value))
+    {
+        WARN("Patch constant function node is not a function value.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                "Hull shader patch constant function node is not a function value.");
+    }
+    else
+    {
+        sm6->patch_constant_function = m->u.value->u.function.name;
+    }
+
+    for (i = 1; i < min(node->operand_count, ARRAY_SIZE(operands)); ++i)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &operands[i]))
+        {
+            WARN("HS property at index %u is not a uint value.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
+                    "Hull shader properties operand at index %u is not an integer.", i);
+        }
+    }
+
+    sm6_parser_validate_control_point_count(sm6, operands[1], "Hull shader input");
+    sm6->p.program.input_control_point_count = operands[1];
+    sm6_parser_validate_control_point_count(sm6, operands[2], "Hull shader output");
+    sm6_parser_emit_dcl_count(sm6, VKD3DSIH_DCL_OUTPUT_CONTROL_POINT_COUNT, operands[2]);
+    sm6->p.program.output_control_point_count = operands[2];
+    sm6_parser_emit_dcl_tessellator_domain(sm6, operands[3]);
+    sm6_parser_emit_dcl_tessellator_partitioning(sm6, operands[4]);
+    sm6_parser_emit_dcl_tessellator_output_primitive(sm6, operands[5]);
+    sm6_parser_emit_dcl_max_tessellation_factor(sm6, node->operands[6]);
+
+    return operands[3];
 }
 
 static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
@@ -8915,6 +9083,9 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
                     break;
                 case SHADER_PROPERTIES_DOMAIN:
                     tessellator_domain = sm6_parser_ds_properties_init(sm6, node->operands[i + 1]);
+                    break;
+                case SHADER_PROPERTIES_HULL:
+                    tessellator_domain = sm6_parser_hs_properties_init(sm6, node->operands[i + 1]);
                     break;
                case SHADER_PROPERTIES_COMPUTE:
                     if ((ret = sm6_parser_emit_thread_group(sm6, node->operands[i + 1])) < 0)
