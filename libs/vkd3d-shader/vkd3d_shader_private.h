@@ -980,6 +980,11 @@ static inline bool vsir_sysval_semantic_is_tess_factor(enum vkd3d_shader_sysval_
         && sysval_semantic <= VKD3D_SHADER_SV_TESS_FACTOR_LINEDEN;
 }
 
+static inline bool vsir_sysval_semantic_is_clip_cull(enum vkd3d_shader_sysval_semantic sysval_semantic)
+{
+    return sysval_semantic == VKD3D_SHADER_SV_CLIP_DISTANCE || sysval_semantic == VKD3D_SHADER_SV_CULL_DISTANCE;
+}
+
 struct signature_element *vsir_signature_find_element_for_reg(const struct shader_signature *signature,
         unsigned int reg_idx, unsigned int write_mask);
 void shader_signature_cleanup(struct shader_signature *signature);
