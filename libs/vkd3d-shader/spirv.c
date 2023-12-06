@@ -4011,7 +4011,7 @@ static uint32_t spirv_compiler_emit_abs(struct spirv_compiler *compiler,
 }
 
 static uint32_t spirv_compiler_emit_neg(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_register *reg, DWORD write_mask, uint32_t val_id)
+        const struct vkd3d_shader_register *reg, uint32_t write_mask, uint32_t val_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     uint32_t type_id;
