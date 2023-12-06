@@ -1519,7 +1519,7 @@ static void copy_propagation_set_value(struct hlsl_ctx *ctx, struct copy_propaga
 
 static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
         const struct copy_propagation_state *state, const struct hlsl_ir_load *load,
-        unsigned int swizzle, struct hlsl_ir_node *instr)
+        uint32_t swizzle, struct hlsl_ir_node *instr)
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
     const struct hlsl_deref *deref = &load->src;
@@ -1527,7 +1527,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
     struct hlsl_ir_node *new_instr = NULL;
     unsigned int time = load->node.index;
     unsigned int start, count, i;
-    unsigned int ret_swizzle = 0;
+    uint32_t ret_swizzle = 0;
 
     if (!hlsl_component_index_range_from_deref(ctx, deref, &start, &count))
         return false;
@@ -1573,7 +1573,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
 
 static bool copy_propagation_replace_with_constant_vector(struct hlsl_ctx *ctx,
         const struct copy_propagation_state *state, const struct hlsl_ir_load *load,
-        unsigned int swizzle, struct hlsl_ir_node *instr)
+        uint32_t swizzle, struct hlsl_ir_node *instr)
 {
     const unsigned int instr_component_count = hlsl_type_component_count(instr->data_type);
     const struct hlsl_deref *deref = &load->src;
@@ -2239,7 +2239,7 @@ static bool fold_swizzle_chains(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     if (next_instr->type == HLSL_IR_SWIZZLE)
     {
         struct hlsl_ir_node *new_swizzle;
-        unsigned int combined_swizzle;
+        uint32_t combined_swizzle;
 
         combined_swizzle = hlsl_combine_swizzles(hlsl_ir_swizzle(next_instr)->swizzle,
                 swizzle->swizzle, instr->data_type->dimx);
@@ -3145,7 +3145,7 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
 
         for (i = 0; i < dimx; ++i)
         {
-            unsigned int s = hlsl_swizzle_from_writemask(1 << i);
+            uint32_t s = hlsl_swizzle_from_writemask(1 << i);
 
             if (!(comps[i] = hlsl_new_swizzle(ctx, s, 1, mult, &instr->loc)))
                 return false;

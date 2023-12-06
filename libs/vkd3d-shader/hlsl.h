@@ -65,7 +65,7 @@
 #define HLSL_SWIZZLE_MASK (0x3u)
 #define HLSL_SWIZZLE_SHIFT(idx) (2u * (idx))
 
-static inline unsigned int hlsl_swizzle_get_component(unsigned int swizzle, unsigned int idx)
+static inline unsigned int hlsl_swizzle_get_component(uint32_t swizzle, unsigned int idx)
 {
     return (swizzle >> HLSL_SWIZZLE_SHIFT(idx)) & HLSL_SWIZZLE_MASK;
 }
@@ -622,7 +622,7 @@ struct hlsl_ir_swizzle
 {
     struct hlsl_ir_node node;
     struct hlsl_src val;
-    DWORD swizzle;
+    uint32_t swizzle;
 };
 
 struct hlsl_ir_index
@@ -1250,7 +1250,7 @@ struct hlsl_ir_node *hlsl_new_resource_store(struct hlsl_ctx *ctx, const struct 
         struct hlsl_ir_node *coords, struct hlsl_ir_node *value, const struct vkd3d_shader_location *loc);
 struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
         struct hlsl_struct_field *fields, size_t field_count);
-struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, DWORD s, unsigned int components,
+struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned int components,
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *template,
         struct hlsl_type *type, const struct vkd3d_shader_location *loc);
@@ -1304,10 +1304,10 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type);
 unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type);
 
-unsigned int hlsl_combine_swizzles(unsigned int first, unsigned int second, unsigned int dim);
+uint32_t hlsl_combine_swizzles(uint32_t first, uint32_t second, unsigned int dim);
 unsigned int hlsl_combine_writemasks(unsigned int first, unsigned int second);
-unsigned int hlsl_map_swizzle(unsigned int swizzle, unsigned int writemask);
-unsigned int hlsl_swizzle_from_writemask(unsigned int writemask);
+uint32_t hlsl_map_swizzle(uint32_t swizzle, unsigned int writemask);
+uint32_t hlsl_swizzle_from_writemask(unsigned int writemask);
 
 struct hlsl_type *hlsl_deref_get_type(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);
 enum hlsl_regset hlsl_deref_get_regset(struct hlsl_ctx *ctx, const struct hlsl_deref *deref);

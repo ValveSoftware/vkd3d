@@ -1717,7 +1717,7 @@ static enum hlsl_ir_expr_op op_from_assignment(enum parse_assign_op op)
     return ops[op];
 }
 
-static bool invert_swizzle(unsigned int *swizzle, unsigned int *writemask, unsigned int *ret_width)
+static bool invert_swizzle(uint32_t *swizzle, unsigned int *writemask, unsigned int *ret_width)
 {
     unsigned int i, j, bit = 0, inverted = 0, width, new_writemask = 0, new_swizzle = 0;
 
@@ -1791,8 +1791,9 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         else if (lhs->type == HLSL_IR_SWIZZLE)
         {
             struct hlsl_ir_swizzle *swizzle = hlsl_ir_swizzle(lhs);
-            unsigned int width, s = swizzle->swizzle;
             struct hlsl_ir_node *new_swizzle;
+            uint32_t s = swizzle->swizzle;
+            unsigned int width;
 
             if (lhs->data_type->class == HLSL_CLASS_MATRIX)
                 hlsl_fixme(ctx, &lhs->loc, "Matrix assignment with a writemask.");
