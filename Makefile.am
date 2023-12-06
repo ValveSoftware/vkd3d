@@ -483,7 +483,7 @@ cross_implibs = crosslibs/d3d12
 CROSS_CPPFLAGS = -I$(srcdir)/include -I$(srcdir)/include/private -I$(builddir)/include -I$(builddir)/tests
 CROSS_CFLAGS = -g -O2 -Wall -municode ${CROSS_CPPFLAGS} -D__USE_MINGW_ANSI_STDIO=0 -DVKD3D_CROSSTEST=1
 EXTRA_DIST += $(cross_implibs:=.cross32.def) $(cross_implibs:=.cross64.def)
-EXTRA_DIST += tests/shader_runner_d3d11.c tests/shader_runner_d3d9.c
+EXTRA_DIST += tests/driver.c tests/shader_runner_d3d11.c tests/shader_runner_d3d9.c
 
 shader_runner_cross_sources = \
 	$(srcdir)/tests/shader_runner.c \
