@@ -130,13 +130,13 @@ static void skip_dword_unknown(const char **ptr, unsigned int count)
     }
 }
 
-static const char *shader_get_string(const char *data, size_t data_size, DWORD offset)
+static const char *shader_get_string(const char *data, size_t data_size, size_t offset)
 {
     size_t len, max_len;
 
     if (offset >= data_size)
     {
-        WARN("Invalid offset %#x (data size %#lx).\n", offset, (long)data_size);
+        WARN("Invalid offset %#zx (data size %#zx).\n", offset, data_size);
         return NULL;
     }
 
@@ -399,7 +399,8 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
 
     for (i = 0; i < count; ++i)
     {
-        uint32_t name_offset, mask;
+        size_t name_offset;
+        uint32_t mask;
 
         e[i].sort_index = i;
 
@@ -411,7 +412,7 @@ static int shader_parse_signature(const struct vkd3d_shader_dxbc_section_desc *s
         name_offset = read_u32(&ptr);
         if (!(e[i].semantic_name = shader_get_string(data, section->data.size, name_offset)))
         {
-            WARN("Invalid name offset %#x (data size %#zx).\n", name_offset, section->data.size);
+            WARN("Invalid name offset %#zx (data size %#zx).\n", name_offset, section->data.size);
             vkd3d_free(e);
             return VKD3D_ERROR_INVALID_ARGUMENT;
         }
