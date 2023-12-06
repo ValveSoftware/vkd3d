@@ -230,7 +230,7 @@ static int parse_dxbc(const struct vkd3d_shader_code *dxbc, struct vkd3d_shader_
         chunk_offset = read_u32(&ptr);
         TRACE("chunk %u at offset %#x\n", i, chunk_offset);
 
-        if (chunk_offset >= data_size || !require_space(chunk_offset, 2, sizeof(DWORD), data_size))
+        if (chunk_offset >= data_size || !require_space(chunk_offset, 2, sizeof(uint32_t), data_size))
         {
             WARN("Invalid chunk offset %#x (data size %zu).\n", chunk_offset, data_size);
             vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHUNK_OFFSET,
@@ -593,7 +593,7 @@ static int shader_parse_descriptor_ranges(struct root_signature_parser_context *
     const char *ptr;
     unsigned int i;
 
-    if (!require_space(offset, 5 * count, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 5 * count, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u, count %u).\n", context->data_size, offset, count);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -672,7 +672,7 @@ static int shader_parse_descriptor_table(struct root_signature_parser_context *c
     unsigned int count;
     const char *ptr;
 
-    if (!require_space(offset, 2, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 2, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u).\n", context->data_size, offset);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -699,7 +699,7 @@ static int shader_parse_descriptor_table1(struct root_signature_parser_context *
     unsigned int count;
     const char *ptr;
 
-    if (!require_space(offset, 2, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 2, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u).\n", context->data_size, offset);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -724,7 +724,7 @@ static int shader_parse_root_constants(struct root_signature_parser_context *con
 {
     const char *ptr;
 
-    if (!require_space(offset, 3, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 3, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u).\n", context->data_size, offset);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -746,7 +746,7 @@ static int shader_parse_root_descriptor(struct root_signature_parser_context *co
 {
     const char *ptr;
 
-    if (!require_space(offset, 2, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 2, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u).\n", context->data_size, offset);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -778,7 +778,7 @@ static int shader_parse_root_descriptor1(struct root_signature_parser_context *c
 {
     const char *ptr;
 
-    if (!require_space(offset, 3, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 3, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u).\n", context->data_size, offset);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -804,7 +804,7 @@ static int shader_parse_root_parameters(struct root_signature_parser_context *co
     unsigned int i;
     int ret;
 
-    if (!require_space(offset, 3 * count, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 3 * count, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u, count %u).\n", context->data_size, offset, count);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -852,7 +852,7 @@ static int shader_parse_root_parameters1(struct root_signature_parser_context *c
     unsigned int i;
     int ret;
 
-    if (!require_space(offset, 3 * count, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 3 * count, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u, count %u).\n", context->data_size, offset, count);
         return VKD3D_ERROR_INVALID_ARGUMENT;
@@ -899,7 +899,7 @@ static int shader_parse_static_samplers(struct root_signature_parser_context *co
     const char *ptr;
     unsigned int i;
 
-    if (!require_space(offset, 13 * count, sizeof(DWORD), context->data_size))
+    if (!require_space(offset, 13 * count, sizeof(uint32_t), context->data_size))
     {
         WARN("Invalid data size %#x (offset %u, count %u).\n", context->data_size, offset, count);
         return VKD3D_ERROR_INVALID_ARGUMENT;
