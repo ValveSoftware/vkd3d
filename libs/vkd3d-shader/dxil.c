@@ -344,6 +344,7 @@ enum dx_intrinsic_opcode
     DX_FIRST_BIT_SHI                =  34,
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
+    DX_BUFFER_LOAD                  =  68,
     DX_DERIV_COARSEX                =  83,
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
@@ -2060,6 +2061,13 @@ static unsigned int sm6_parser_alloc_ssa_id(struct sm6_parser *sm6)
     return sm6->ssa_next_id++;
 }
 
+static void instruction_init_with_resource(struct vkd3d_shader_instruction *ins,
+        enum vkd3d_shader_opcode handler_idx, const struct sm6_value *resource, struct sm6_parser *sm6)
+{
+    vsir_instruction_init(ins, &sm6->p.location, handler_idx);
+    ins->resource_type = resource->u.handle.d->resource_type;
+}
+
 static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_shader_instruction *ins,
         unsigned int count, struct sm6_parser *sm6)
 {
@@ -3659,6 +3667,41 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_params;
+    const struct sm6_value *resource;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+
+    if (resource->u.handle.d->kind != RESOURCE_KIND_TYPEDBUFFER)
+    {
+        WARN("Resource is not a typed buffer.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_OPERATION,
+                "Resource for a typed buffer load is not a typed buffer.");
+    }
+
+    instruction_init_with_resource(ins, (resource->u.handle.d->type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
+            ? VKD3DSIH_LD_UAV_TYPED : VKD3DSIH_LD, resource, sm6);
+
+    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    src_param_init_from_value(&src_params[0], operands[1]);
+    if (!sm6_value_is_undef(operands[2]))
+    {
+        /* Constant zero would be ok, but is not worth checking for unless it shows up. */
+        WARN("Ignoring structure offset.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring structure offset for a typed buffer load.");
+    }
+    src_param_init_vector_from_reg(&src_params[1], &resource->u.handle.reg);
+
+    instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
+}
+
 static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -3737,6 +3780,7 @@ struct sm6_dx_opcode_info
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
     [DX_BFREV                         ] = {"m0", "m",   sm6_parser_emit_dx_unary},
+    [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
