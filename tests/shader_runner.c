@@ -1130,6 +1130,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
     HRESULT expect_hr = S_OK;
     bool skip_tests = false;
     char line_buffer[256];
+    const char *testname;
     FILE *f;
 
     if (!test_options.filename)
@@ -1143,12 +1144,19 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
     runner->minimum_shader_model = minimum_shader_model;
     runner->maximum_shader_model = maximum_shader_model;
 
+    if ((testname = strrchr(test_options.filename, '/')))
+        ++testname;
+    else
+        testname = test_options.filename;
+
     for (;;)
     {
         char *ret = fgets(line_buffer, sizeof(line_buffer), f);
         const char *line = line_buffer;
 
-        ++line_number;
+        if (line_number++)
+            vkd3d_test_pop_context();
+        vkd3d_test_push_context("%s:%u", testname, line_number);
 
         if (!ret || line[0] == '[')
         {
@@ -1298,9 +1306,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 }
             }
 
-            if (state != STATE_NONE)
-                vkd3d_test_pop_context();
-
             if (!ret)
                 break;
         }
@@ -1443,8 +1448,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     free(runner->input_elements[i].name);
                 runner->input_element_count = 0;
             }
-
-            vkd3d_test_push_context("Section %.*s, line %u", strlen(line_buffer) - 1, line_buffer, line_number);
         }
         else if (line[0] != '%' && line[0] != '\n')
         {
@@ -1498,6 +1501,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             }
         }
     }
+
+    if (line_number)
+        vkd3d_test_pop_context();
 
     for (i = 0; i < runner->input_element_count; ++i)
         free(runner->input_elements[i].name);
