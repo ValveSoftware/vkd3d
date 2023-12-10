@@ -3202,8 +3202,10 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
     unsigned int i = 0;
 
     a = sm6_parser_get_value_by_ref(sm6, record, NULL, &i);
+    if (!a)
+        return;
     b = sm6_parser_get_value_by_ref(sm6, record, a->type, &i);
-    if (!a || !b)
+    if (!b)
         return;
 
     if (!dxil_record_validate_operand_count(record, i + 1, i + 2, sm6))
@@ -3994,8 +3996,10 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
     }
 
     a = sm6_parser_get_value_by_ref(sm6, record, NULL, &i);
+    if (!a)
+        return;
     b = sm6_parser_get_value_by_ref(sm6, record, a->type, &i);
-    if (!a || !b)
+    if (!b)
         return;
 
     if (!dxil_record_validate_operand_count(record, i + 1, i + 2, sm6))
