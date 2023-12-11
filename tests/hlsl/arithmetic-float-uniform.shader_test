@@ -103,7 +103,7 @@ float4 main() : sv_target
 uniform 0 float4 1.00000007 -42.1 4.0 45.0
 uniform 4 float4 1.625 -5.0 4.125 5.0
 uniform 8 float4 1.00000007 -1.0 0.5 -0.5
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (2.62500024, 209.5, 17.0, 224.5) 1
 
 % precise mad() is not allowed to fuse, even though unfused is less precise.
@@ -120,7 +120,7 @@ float4 main() : sv_target
 uniform 0 float4 1.00000007 -42.1 4.0 45.0
 uniform 4 float4 1.625 -5.0 4.125 5.0
 uniform 8 float4 1.00000007 -1.0 0.5 -0.5
-todo draw quad
+todo(sm<6) draw quad
 todo probe all rgba (2.62500048, 209.5, 17.0, 224.5)
 
 [require]
@@ -185,5 +185,5 @@ float4 main() : sv_target
 uniform 0 double2 1.00000007 -42.1
 uniform 4 double2 1.625 -5.0
 uniform 8 double2 1.00000007 -1.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (2.62500024, 209.5, 0.0, 0.0)

@@ -17,7 +17,7 @@ uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
 uniform  8 float4 0.1 0.3 0.0 0.0
 uniform 12 float4 0.2 0.4 0.0 0.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.17, 0.39, 0.17, 0.39) 1
 
 
@@ -66,7 +66,7 @@ probe all rgba (0.5, 0.6, 0.7, 0.8)
 
 
 % The documentation claims these strings are subject to macro expansion.
-% They are not.
+% In SM < 6.0 they are not.
 
 [pixel shader]
 
@@ -90,8 +90,9 @@ float4 main() : sv_target
 [test]
 uniform  0 float4 0.1 0.2 0.0 0.0
 uniform  4 float4 0.3 0.4 0.0 0.0
-todo(sm>=6) draw quad
-probe all rgba (0.23, 0.34, 0.5, 0.5) 1
+draw quad
+if(sm<6) probe all rgba (0.23, 0.34, 0.5, 0.5) 1
+if(sm>=6) probe all rgba (0.17, 0.39, 0.5, 0.5) 1
 
 
 % The majority that applies to a typedef is the latent majority at the time
