@@ -4091,6 +4091,16 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *common_type;
 
+    if (cond->data_type->class > HLSL_CLASS_LAST_NUMERIC)
+    {
+        struct vkd3d_string_buffer *string;
+
+        if ((string = hlsl_type_to_string(ctx, cond->data_type)))
+            hlsl_error(ctx, &cond->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                    "Ternary condition type '%s' is not numeric.", string->buffer);
+        hlsl_release_string_buffer(ctx, string);
+    }
+
     if (first->data_type->class <= HLSL_CLASS_LAST_NUMERIC
             && second->data_type->class <= HLSL_CLASS_LAST_NUMERIC)
     {
