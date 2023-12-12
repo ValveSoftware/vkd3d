@@ -7972,10 +7972,6 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
                 compiler->main_block_open = false;
             break;
 
-        case VKD3DSIH_RETP:
-            spirv_compiler_emit_retc(compiler, instruction);
-            break;
-
         default:
             ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
             break;
@@ -9741,9 +9737,11 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_IF:
         case VKD3DSIH_LOOP:
         case VKD3DSIH_RET:
-        case VKD3DSIH_RETP:
         case VKD3DSIH_SWITCH:
             ret = spirv_compiler_emit_control_flow_instruction(compiler, instruction);
+            break;
+        case VKD3DSIH_RETP:
+            spirv_compiler_emit_retc(compiler, instruction);
             break;
         case VKD3DSIH_DISCARD:
         case VKD3DSIH_TEXKILL:
