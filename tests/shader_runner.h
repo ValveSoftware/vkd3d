@@ -122,6 +122,7 @@ struct shader_runner
     char *fx_source;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
+    bool require_float64;
     bool require_int64;
 
     bool last_render_failed;

@@ -1,5 +1,6 @@
 [require]
 shader model >= 5.0
+float64
 
 [pixel shader todo]
 uniform double2 d;
