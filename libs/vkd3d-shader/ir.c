@@ -1515,16 +1515,26 @@ struct cf_flattener_if_info
     unsigned int else_block_id;
 };
 
+struct cf_flattener_loop_info
+{
+    unsigned int header_block_id;
+    unsigned int continue_block_id;
+    uint32_t merge_block_id;
+};
+
 struct cf_flattener_info
 {
     union
     {
         struct cf_flattener_if_info if_;
+        struct cf_flattener_loop_info loop;
     } u;
 
     enum
     {
         VKD3D_BLOCK_IF,
+        VKD3D_BLOCK_LOOP,
+        VKD3D_BLOCK_SWITCH,
     } current_block;
     bool inside_block;
 };
@@ -1608,8 +1618,8 @@ static void cf_flattener_emit_label(struct cf_flattener *flattener, unsigned int
 
 /* For conditional branches, this returns the false target branch parameter. */
 static struct vkd3d_shader_src_param *cf_flattener_emit_branch(struct cf_flattener *flattener,
-        unsigned int merge_block_id, const struct vkd3d_shader_src_param *condition,
-        unsigned int true_id, unsigned int false_id,
+        unsigned int merge_block_id, unsigned int continue_block_id,
+        const struct vkd3d_shader_src_param *condition, unsigned int true_id, unsigned int false_id,
         unsigned int flags)
 {
     struct vkd3d_shader_src_param *src_params, *false_branch_param;
@@ -1621,7 +1631,7 @@ static struct vkd3d_shader_src_param *cf_flattener_emit_branch(struct cf_flatten
 
     if (condition)
     {
-        if (!(src_params = instruction_src_params_alloc(ins, 4, flattener)))
+        if (!(src_params = instruction_src_params_alloc(ins, 4 + !!continue_block_id, flattener)))
             return NULL;
         src_params[0] = *condition;
         if (flags == VKD3D_SHADER_CONDITIONAL_OP_Z)
@@ -1637,12 +1647,21 @@ static struct vkd3d_shader_src_param *cf_flattener_emit_branch(struct cf_flatten
             false_branch_param = &src_params[2];
         }
         vsir_src_param_init_label(&src_params[3], merge_block_id);
+        if (continue_block_id)
+            vsir_src_param_init_label(&src_params[4], continue_block_id);
     }
     else
     {
-        if (!(src_params = instruction_src_params_alloc(ins, 1, flattener)))
+        if (!(src_params = instruction_src_params_alloc(ins, merge_block_id ? 3 : 1, flattener)))
             return NULL;
         vsir_src_param_init_label(&src_params[0], true_id);
+        if (merge_block_id)
+        {
+            /* An unconditional branch may only have merge information for a loop, which
+             * must have both a merge block and continue block. */
+            vsir_src_param_init_label(&src_params[1], merge_block_id);
+            vsir_src_param_init_label(&src_params[2], continue_block_id);
+        }
         false_branch_param = NULL;
     }
 
@@ -1651,9 +1670,19 @@ static struct vkd3d_shader_src_param *cf_flattener_emit_branch(struct cf_flatten
     return false_branch_param;
 }
 
+static void cf_flattener_emit_conditional_branch_and_merge(struct cf_flattener *flattener,
+        const struct vkd3d_shader_src_param *condition, unsigned int true_id, unsigned int flags)
+{
+    unsigned int merge_block_id;
+
+    merge_block_id = cf_flattener_alloc_block_id(flattener);
+    cf_flattener_emit_branch(flattener, merge_block_id, 0, condition, true_id, merge_block_id, flags);
+    cf_flattener_emit_label(flattener, merge_block_id);
+}
+
 static void cf_flattener_emit_unconditional_branch(struct cf_flattener *flattener, unsigned int target_block_id)
 {
-    cf_flattener_emit_branch(flattener, 0, NULL, target_block_id, 0, 0);
+    cf_flattener_emit_branch(flattener, 0, 0, NULL, target_block_id, 0, 0);
 }
 
 static struct cf_flattener_info *cf_flattener_push_control_flow_level(struct cf_flattener *flattener)
@@ -1677,12 +1706,38 @@ static void cf_flattener_pop_control_flow_level(struct cf_flattener *flattener)
     memset(cf_info, 0, sizeof(*cf_info));
 }
 
+static struct cf_flattener_info *cf_flattener_find_innermost_loop(struct cf_flattener *flattener)
+{
+    int depth;
+
+    for (depth = flattener->control_flow_depth - 1; depth >= 0; --depth)
+    {
+        if (flattener->control_flow_info[depth].current_block == VKD3D_BLOCK_LOOP)
+            return &flattener->control_flow_info[depth];
+    }
+
+    return NULL;
+}
+
+static struct cf_flattener_info *cf_flattener_find_innermost_breakable_cf_construct(struct cf_flattener *flattener)
+{
+    int depth;
+
+    for (depth = flattener->control_flow_depth - 1; depth >= 0; --depth)
+    {
+        if (flattener->control_flow_info[depth].current_block == VKD3D_BLOCK_LOOP
+                || flattener->control_flow_info[depth].current_block == VKD3D_BLOCK_SWITCH)
+            return &flattener->control_flow_info[depth];
+    }
+
+    return NULL;
+}
+
 static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
 {
     struct vkd3d_shader_parser *parser = flattener->parser;
     struct vkd3d_shader_instruction_array *instructions;
     struct vkd3d_shader_instruction *dst_ins;
-    unsigned int depth = 0;
     bool main_block_open;
     size_t i;
 
@@ -1694,9 +1749,9 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
     for (i = 0; i < instructions->count; ++i)
     {
+        unsigned int loop_header_block_id, loop_body_block_id, continue_block_id, merge_block_id, true_block_id;
         const struct vkd3d_shader_instruction *instruction = &instructions->elements[i];
         const struct vkd3d_shader_src_param *src = instruction->src;
-        unsigned int merge_block_id, true_block_id;
         struct cf_flattener_info *cf_info;
 
         flattener->location = instruction->location;
@@ -1717,7 +1772,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
                 true_block_id = cf_flattener_alloc_block_id(flattener);
                 merge_block_id = cf_flattener_alloc_block_id(flattener);
-                cf_info->u.if_.false_param = cf_flattener_emit_branch(flattener, merge_block_id,
+                cf_info->u.if_.false_param = cf_flattener_emit_branch(flattener, merge_block_id, 0,
                         src, true_block_id, merge_block_id, instruction->flags);
                 if (!cf_info->u.if_.false_param)
                     return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -1752,20 +1807,126 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 break;
 
             case VKD3DSIH_LOOP:
+                if (!(cf_info = cf_flattener_push_control_flow_level(flattener)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                loop_header_block_id = cf_flattener_alloc_block_id(flattener);
+                loop_body_block_id = cf_flattener_alloc_block_id(flattener);
+                continue_block_id = cf_flattener_alloc_block_id(flattener);
+                merge_block_id = cf_flattener_alloc_block_id(flattener);
+
+                cf_flattener_emit_unconditional_branch(flattener, loop_header_block_id);
+                cf_flattener_emit_label(flattener, loop_header_block_id);
+                cf_flattener_emit_branch(flattener, merge_block_id, continue_block_id,
+                        NULL, loop_body_block_id, 0, 0);
+
+                cf_flattener_emit_label(flattener, loop_body_block_id);
+
+                cf_info->u.loop.header_block_id = loop_header_block_id;
+                cf_info->u.loop.continue_block_id = continue_block_id;
+                cf_info->u.loop.merge_block_id = merge_block_id;
+                cf_info->current_block = VKD3D_BLOCK_LOOP;
+                cf_info->inside_block = true;
+                break;
+
+            case VKD3DSIH_ENDLOOP:
+                if (cf_info->inside_block)
+                    cf_flattener_emit_unconditional_branch(flattener, cf_info->u.loop.continue_block_id);
+
+                cf_flattener_emit_label(flattener, cf_info->u.loop.continue_block_id);
+                cf_flattener_emit_unconditional_branch(flattener, cf_info->u.loop.header_block_id);
+                cf_flattener_emit_label(flattener, cf_info->u.loop.merge_block_id);
+
+                cf_flattener_pop_control_flow_level(flattener);
+                break;
+
             case VKD3DSIH_SWITCH:
-                ++depth;
+                if (!(cf_info = cf_flattener_push_control_flow_level(flattener)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                cf_info->current_block = VKD3D_BLOCK_SWITCH;
+
+                break;
+
+            case VKD3DSIH_ENDSWITCH:
+                cf_flattener_pop_control_flow_level(flattener);
+
                 if (!cf_flattener_copy_instruction(flattener, instruction))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 break;
 
-            case VKD3DSIH_ENDLOOP:
-            case VKD3DSIH_ENDSWITCH:
-                --depth;
-                if (cf_info)
-                    cf_info->inside_block = true; /* Dead code removal ensures this is correct. */
-                if (!cf_flattener_copy_instruction(flattener, instruction))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
+            case VKD3DSIH_BREAK:
+            {
+                struct cf_flattener_info *breakable_cf_info;
+
+                if (!(breakable_cf_info = cf_flattener_find_innermost_breakable_cf_construct(flattener)))
+                {
+                    FIXME("Unhandled break instruction.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                if (breakable_cf_info->current_block == VKD3D_BLOCK_LOOP)
+                {
+                    cf_flattener_emit_unconditional_branch(flattener, breakable_cf_info->u.loop.merge_block_id);
+                }
+                else if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
+                {
+                    if (!cf_flattener_copy_instruction(flattener, instruction))
+                        return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+
+                cf_info->inside_block = false;
                 break;
+            }
+
+            case VKD3DSIH_BREAKP:
+            {
+                struct cf_flattener_info *loop_cf_info;
+
+                if (!(loop_cf_info = cf_flattener_find_innermost_loop(flattener)))
+                {
+                    ERR("Invalid 'breakc' instruction outside loop.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                cf_flattener_emit_conditional_branch_and_merge(flattener,
+                        src, loop_cf_info->u.loop.merge_block_id, instruction->flags);
+                break;
+            }
+
+            case VKD3DSIH_CONTINUE:
+            {
+                struct cf_flattener_info *loop_cf_info;
+
+                if (!(loop_cf_info = cf_flattener_find_innermost_loop(flattener)))
+                {
+                    ERR("Invalid 'continue' instruction outside loop.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                cf_flattener_emit_unconditional_branch(flattener, loop_cf_info->u.loop.continue_block_id);
+
+                cf_info->inside_block = false;
+                break;
+            }
+
+            case VKD3DSIH_CONTINUEP:
+            {
+                struct cf_flattener_info *loop_cf_info;
+
+                if (!(loop_cf_info = cf_flattener_find_innermost_loop(flattener)))
+                {
+                    ERR("Invalid 'continuec' instruction outside loop.\n");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                cf_flattener_emit_conditional_branch_and_merge(flattener,
+                        src, loop_cf_info->u.loop.continue_block_id, instruction->flags);
+                break;
+            }
 
             case VKD3DSIH_RET:
                 if (!cf_flattener_copy_instruction(flattener, instruction))
@@ -1773,15 +1934,10 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
                 if (cf_info)
                     cf_info->inside_block = false;
-                else if (!depth)
+                else
                     main_block_open = false;
                 break;
 
-            case VKD3DSIH_BREAK:
-            case VKD3DSIH_CONTINUE:
-                if (cf_info)
-                    cf_info->inside_block = false;
-                /* fall through */
             default:
                 if (!cf_flattener_copy_instruction(flattener, instruction))
                     return VKD3D_ERROR_OUT_OF_MEMORY;

@@ -2253,13 +2253,6 @@ static const char *debug_vkd3d_symbol(const struct vkd3d_symbol *symbol)
     }
 }
 
-struct vkd3d_loop_cf_info
-{
-    uint32_t header_block_id;
-    uint32_t continue_block_id;
-    uint32_t merge_block_id;
-};
-
 struct vkd3d_switch_cf_info
 {
     size_t stream_location;
@@ -2276,13 +2269,11 @@ struct vkd3d_control_flow_info
 {
     union
     {
-        struct vkd3d_loop_cf_info loop;
         struct vkd3d_switch_cf_info switch_;
     } u;
 
     enum
     {
-        VKD3D_BLOCK_LOOP,
         VKD3D_BLOCK_SWITCH,
     } current_block;
     bool inside_block;
@@ -2341,7 +2332,6 @@ struct spirv_compiler
 
     enum vkd3d_shader_type shader_type;
 
-    unsigned int loop_id;
     unsigned int switch_id;
     unsigned int control_flow_depth;
     struct vkd3d_control_flow_info *control_flow_info;
@@ -7622,20 +7612,6 @@ static void spirv_compiler_pop_control_flow_level(struct spirv_compiler *compile
     memset(cf_info, 0, sizeof(*cf_info));
 }
 
-static struct vkd3d_control_flow_info *spirv_compiler_find_innermost_loop(
-        struct spirv_compiler *compiler)
-{
-    int depth;
-
-    for (depth = compiler->control_flow_depth - 1; depth >= 0; --depth)
-    {
-        if (compiler->control_flow_info[depth].current_block == VKD3D_BLOCK_LOOP)
-            return &compiler->control_flow_info[depth];
-    }
-
-    return NULL;
-}
-
 static struct vkd3d_control_flow_info *spirv_compiler_find_innermost_breakable_cf_construct(
         struct spirv_compiler *compiler)
 {
@@ -7643,8 +7619,7 @@ static struct vkd3d_control_flow_info *spirv_compiler_find_innermost_breakable_c
 
     for (depth = compiler->control_flow_depth - 1; depth >= 0; --depth)
     {
-        if (compiler->control_flow_info[depth].current_block == VKD3D_BLOCK_LOOP
-                || compiler->control_flow_info[depth].current_block == VKD3D_BLOCK_SWITCH)
+        if (compiler->control_flow_info[depth].current_block == VKD3D_BLOCK_SWITCH)
             return &compiler->control_flow_info[depth];
     }
 
@@ -7657,7 +7632,6 @@ static void spirv_compiler_emit_label(struct spirv_compiler *compiler,
 static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    uint32_t loop_header_block_id, loop_body_block_id, continue_block_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_src_param *src = instruction->src;
     struct vkd3d_control_flow_info *cf_info;
@@ -7672,51 +7646,6 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
             if (cf_info)
                 cf_info->inside_block = true;
             spirv_compiler_emit_label(compiler, instruction);
-            break;
-
-        case VKD3DSIH_LOOP:
-            if (!(cf_info = spirv_compiler_push_control_flow_level(compiler)))
-                return VKD3D_ERROR_OUT_OF_MEMORY;
-
-            loop_header_block_id = vkd3d_spirv_alloc_id(builder);
-            loop_body_block_id = vkd3d_spirv_alloc_id(builder);
-            continue_block_id = vkd3d_spirv_alloc_id(builder);
-            merge_block_id = vkd3d_spirv_alloc_id(builder);
-
-            vkd3d_spirv_build_op_branch(builder, loop_header_block_id);
-            vkd3d_spirv_build_op_label(builder, loop_header_block_id);
-            vkd3d_spirv_build_op_loop_merge(builder, merge_block_id, continue_block_id, SpvLoopControlMaskNone);
-            vkd3d_spirv_build_op_branch(builder, loop_body_block_id);
-
-            vkd3d_spirv_build_op_label(builder, loop_body_block_id);
-
-            cf_info->u.loop.header_block_id = loop_header_block_id;
-            cf_info->u.loop.continue_block_id = continue_block_id;
-            cf_info->u.loop.merge_block_id = merge_block_id;
-            cf_info->current_block = VKD3D_BLOCK_LOOP;
-            cf_info->inside_block = true;
-
-            vkd3d_spirv_build_op_name(builder, loop_header_block_id, "loop%u_header", compiler->loop_id);
-            vkd3d_spirv_build_op_name(builder, loop_body_block_id, "loop%u_body", compiler->loop_id);
-            vkd3d_spirv_build_op_name(builder, continue_block_id, "loop%u_continue", compiler->loop_id);
-            vkd3d_spirv_build_op_name(builder, merge_block_id, "loop%u_merge", compiler->loop_id);
-            ++compiler->loop_id;
-            break;
-
-        case VKD3DSIH_ENDLOOP:
-            assert(compiler->control_flow_depth);
-            assert(cf_info->current_block == VKD3D_BLOCK_LOOP);
-
-            /* The loop block may have already been ended by an unconditional
-             * break instruction right before the end of the loop. */
-            if (cf_info->inside_block)
-                vkd3d_spirv_build_op_branch(builder, cf_info->u.loop.continue_block_id);
-
-            vkd3d_spirv_build_op_label(builder, cf_info->u.loop.continue_block_id);
-            vkd3d_spirv_build_op_branch(builder, cf_info->u.loop.header_block_id);
-            vkd3d_spirv_build_op_label(builder, cf_info->u.loop.merge_block_id);
-
-            spirv_compiler_pop_control_flow_level(compiler);
             break;
 
         case VKD3DSIH_SWITCH:
@@ -7835,11 +7764,7 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
                 return VKD3D_ERROR_INVALID_SHADER;
             }
 
-            if (breakable_cf_info->current_block == VKD3D_BLOCK_LOOP)
-            {
-                vkd3d_spirv_build_op_branch(builder, breakable_cf_info->u.loop.merge_block_id);
-            }
-            else if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
+            if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
             {
                 /* The current case block may have already been ended by an
                  * unconditional continue instruction. */
@@ -7848,58 +7773,6 @@ static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *c
             }
 
             cf_info->inside_block = false;
-            break;
-        }
-
-        case VKD3DSIH_BREAKP:
-        {
-            struct vkd3d_control_flow_info *loop_cf_info;
-
-            assert(compiler->control_flow_depth);
-
-            if (!(loop_cf_info = spirv_compiler_find_innermost_loop(compiler)))
-            {
-                ERR("Invalid 'breakc' instruction outside loop.\n");
-                return VKD3D_ERROR_INVALID_SHADER;
-            }
-
-            merge_block_id = spirv_compiler_emit_conditional_branch(compiler,
-                    instruction, loop_cf_info->u.loop.merge_block_id);
-            vkd3d_spirv_build_op_label(builder, merge_block_id);
-            break;
-        }
-
-        case VKD3DSIH_CONTINUE:
-        {
-            struct vkd3d_control_flow_info *loop_cf_info;
-
-            assert(compiler->control_flow_depth);
-
-            if (!(loop_cf_info = spirv_compiler_find_innermost_loop(compiler)))
-            {
-                ERR("Invalid 'continue' instruction outside loop.\n");
-                return VKD3D_ERROR_INVALID_SHADER;
-            }
-
-            vkd3d_spirv_build_op_branch(builder, loop_cf_info->u.loop.continue_block_id);
-
-            cf_info->inside_block = false;
-            break;
-        }
-
-        case VKD3DSIH_CONTINUEP:
-        {
-            struct vkd3d_control_flow_info *loop_cf_info;
-
-            if (!(loop_cf_info = spirv_compiler_find_innermost_loop(compiler)))
-            {
-                ERR("Invalid 'continuec' instruction outside loop.\n");
-                return VKD3D_ERROR_INVALID_SHADER;
-            }
-
-            merge_block_id = spirv_compiler_emit_conditional_branch(compiler,
-                    instruction, loop_cf_info->u.loop.continue_block_id);
-            vkd3d_spirv_build_op_label(builder, merge_block_id);
             break;
         }
 
@@ -7941,7 +7814,7 @@ static void spirv_compiler_emit_label(struct spirv_compiler *compiler,
 }
 
 static void spirv_compiler_emit_merge(struct spirv_compiler *compiler,
-        uint32_t merge_block_id)
+        uint32_t merge_block_id, uint32_t continue_block_id)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
 
@@ -7949,7 +7822,15 @@ static void spirv_compiler_emit_merge(struct spirv_compiler *compiler,
         return;
 
     merge_block_id = spirv_compiler_get_label_id(compiler, merge_block_id);
-    vkd3d_spirv_build_op_selection_merge(builder, merge_block_id, SpvSelectionControlMaskNone);
+    if (!continue_block_id)
+    {
+        vkd3d_spirv_build_op_selection_merge(builder, merge_block_id, SpvSelectionControlMaskNone);
+    }
+    else
+    {
+        continue_block_id = spirv_compiler_get_label_id(compiler, continue_block_id);
+        vkd3d_spirv_build_op_loop_merge(builder, merge_block_id, continue_block_id, SpvLoopControlMaskNone);
+    }
 }
 
 static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
@@ -7961,6 +7842,11 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
 
     if (vsir_register_is_label(&src[0].reg))
     {
+        if (instruction->src_count > 1)
+        {
+            /* Loop merge only. Must have a merge block and a continue block. */
+            spirv_compiler_emit_merge(compiler, src[1].reg.idx[0].offset, src[2].reg.idx[0].offset);
+        }
         vkd3d_spirv_build_op_branch(builder, spirv_compiler_get_label_id(compiler, src[0].reg.idx[0].offset));
         return;
     }
@@ -7976,7 +7862,8 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
     condition_id = spirv_compiler_emit_int_to_bool(compiler,
             VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, 1, condition_id);
     /* Emit the merge immediately before the branch instruction. */
-    spirv_compiler_emit_merge(compiler, src[3].reg.idx[0].offset);
+    spirv_compiler_emit_merge(compiler, src[3].reg.idx[0].offset,
+            (instruction->src_count > 4) ? src[4].reg.idx[0].offset : 0);
     vkd3d_spirv_build_op_branch_conditional(builder, condition_id,
             spirv_compiler_get_label_id(compiler, src[1].reg.idx[0].offset),
             spirv_compiler_get_label_id(compiler, src[2].reg.idx[0].offset));
