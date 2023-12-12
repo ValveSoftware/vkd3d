@@ -2253,32 +2253,6 @@ static const char *debug_vkd3d_symbol(const struct vkd3d_symbol *symbol)
     }
 }
 
-struct vkd3d_switch_cf_info
-{
-    size_t stream_location;
-    unsigned int id;
-    uint32_t selector_id;
-    uint32_t merge_block_id;
-    uint32_t default_block_id;
-    uint32_t *case_blocks;
-    size_t case_blocks_size;
-    unsigned int case_block_count;
-};
-
-struct vkd3d_control_flow_info
-{
-    union
-    {
-        struct vkd3d_switch_cf_info switch_;
-    } u;
-
-    enum
-    {
-        VKD3D_BLOCK_SWITCH,
-    } current_block;
-    bool inside_block;
-};
-
 struct vkd3d_push_constant_buffer_binding
 {
     struct vkd3d_shader_register reg;
@@ -2331,11 +2305,6 @@ struct spirv_compiler
     uint32_t sample_positions_id;
 
     enum vkd3d_shader_type shader_type;
-
-    unsigned int switch_id;
-    unsigned int control_flow_depth;
-    struct vkd3d_control_flow_info *control_flow_info;
-    size_t control_flow_info_size;
 
     struct vkd3d_shader_interface_info shader_interface;
     struct vkd3d_shader_descriptor_offset_info offset_info;
@@ -2418,8 +2387,6 @@ static const char *spirv_compiler_get_entry_point_name(const struct spirv_compil
 
 static void spirv_compiler_destroy(struct spirv_compiler *compiler)
 {
-    vkd3d_free(compiler->control_flow_info);
-
     vkd3d_free(compiler->output_info);
 
     vkd3d_free(compiler->push_constants);
@@ -7589,208 +7556,6 @@ static void spirv_compiler_emit_kill(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_label(builder, merge_block_id);
 }
 
-static struct vkd3d_control_flow_info *spirv_compiler_push_control_flow_level(
-        struct spirv_compiler *compiler)
-{
-    if (!vkd3d_array_reserve((void **)&compiler->control_flow_info, &compiler->control_flow_info_size,
-            compiler->control_flow_depth + 1, sizeof(*compiler->control_flow_info)))
-    {
-        ERR("Failed to allocate control flow info structure.\n");
-        return NULL;
-    }
-
-    return &compiler->control_flow_info[compiler->control_flow_depth++];
-}
-
-static void spirv_compiler_pop_control_flow_level(struct spirv_compiler *compiler)
-{
-    struct vkd3d_control_flow_info *cf_info;
-
-    assert(compiler->control_flow_depth);
-
-    cf_info = &compiler->control_flow_info[--compiler->control_flow_depth];
-    memset(cf_info, 0, sizeof(*cf_info));
-}
-
-static struct vkd3d_control_flow_info *spirv_compiler_find_innermost_breakable_cf_construct(
-        struct spirv_compiler *compiler)
-{
-    int depth;
-
-    for (depth = compiler->control_flow_depth - 1; depth >= 0; --depth)
-    {
-        if (compiler->control_flow_info[depth].current_block == VKD3D_BLOCK_SWITCH)
-            return &compiler->control_flow_info[depth];
-    }
-
-    return NULL;
-}
-
-static void spirv_compiler_emit_label(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction);
-
-static int spirv_compiler_emit_control_flow_instruction(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
-{
-    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    const struct vkd3d_shader_src_param *src = instruction->src;
-    struct vkd3d_control_flow_info *cf_info;
-    uint32_t merge_block_id, val_id;
-
-    cf_info = compiler->control_flow_depth
-            ? &compiler->control_flow_info[compiler->control_flow_depth - 1] : NULL;
-
-    switch (instruction->handler_idx)
-    {
-        case VKD3DSIH_LABEL:
-            if (cf_info)
-                cf_info->inside_block = true;
-            spirv_compiler_emit_label(compiler, instruction);
-            break;
-
-        case VKD3DSIH_SWITCH:
-            if (!(cf_info = spirv_compiler_push_control_flow_level(compiler)))
-                return VKD3D_ERROR_OUT_OF_MEMORY;
-
-            merge_block_id = vkd3d_spirv_alloc_id(builder);
-
-            assert(src->reg.data_type == VKD3D_DATA_INT);
-            val_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
-
-            vkd3d_spirv_build_op_selection_merge(builder, merge_block_id, SpvSelectionControlMaskNone);
-
-            cf_info->u.switch_.id = compiler->switch_id;
-            cf_info->u.switch_.merge_block_id = merge_block_id;
-            cf_info->u.switch_.stream_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
-            cf_info->u.switch_.selector_id = val_id;
-            cf_info->u.switch_.case_blocks = NULL;
-            cf_info->u.switch_.case_blocks_size = 0;
-            cf_info->u.switch_.case_block_count = 0;
-            cf_info->u.switch_.default_block_id = 0;
-            cf_info->inside_block = false;
-            cf_info->current_block = VKD3D_BLOCK_SWITCH;
-
-            vkd3d_spirv_build_op_name(builder, merge_block_id, "switch%u_merge", compiler->switch_id);
-
-            ++compiler->switch_id;
-
-            if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.case_blocks, &cf_info->u.switch_.case_blocks_size,
-                    10, sizeof(*cf_info->u.switch_.case_blocks)))
-                return VKD3D_ERROR_OUT_OF_MEMORY;
-
-            break;
-
-        case VKD3DSIH_ENDSWITCH:
-            assert(compiler->control_flow_depth);
-            assert(cf_info->current_block == VKD3D_BLOCK_SWITCH);
-            assert(!cf_info->inside_block);
-
-            if (!cf_info->u.switch_.default_block_id)
-                cf_info->u.switch_.default_block_id = cf_info->u.switch_.merge_block_id;
-
-            vkd3d_spirv_build_op_label(builder, cf_info->u.switch_.merge_block_id);
-
-            /* The OpSwitch instruction is inserted when the endswitch
-             * instruction is processed because we do not know the number
-             * of case statements in advance.*/
-            vkd3d_spirv_begin_function_stream_insertion(builder, cf_info->u.switch_.stream_location);
-            vkd3d_spirv_build_op_switch(builder, cf_info->u.switch_.selector_id,
-                    cf_info->u.switch_.default_block_id, cf_info->u.switch_.case_blocks,
-                    cf_info->u.switch_.case_block_count);
-            vkd3d_spirv_end_function_stream_insertion(builder);
-
-            vkd3d_free(cf_info->u.switch_.case_blocks);
-            spirv_compiler_pop_control_flow_level(compiler);
-            break;
-
-        case VKD3DSIH_CASE:
-        {
-            uint32_t label_id, value;
-
-            assert(compiler->control_flow_depth);
-            assert(cf_info->current_block == VKD3D_BLOCK_SWITCH);
-
-            if (src->swizzle != VKD3D_SHADER_SWIZZLE(X, X, X, X))
-            {
-                WARN("Unexpected src swizzle %#x.\n", src->swizzle);
-                spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE,
-                        "The swizzle for a switch case value is not scalar.");
-            }
-            assert(src->reg.type == VKD3DSPR_IMMCONST);
-            value = *src->reg.u.immconst_u32;
-
-            if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.case_blocks, &cf_info->u.switch_.case_blocks_size,
-                    2 * (cf_info->u.switch_.case_block_count + 1), sizeof(*cf_info->u.switch_.case_blocks)))
-                return VKD3D_ERROR_OUT_OF_MEMORY;
-
-            label_id = vkd3d_spirv_alloc_id(builder);
-            if (cf_info->inside_block) /* fall-through */
-                vkd3d_spirv_build_op_branch(builder, label_id);
-
-            cf_info->u.switch_.case_blocks[2 * cf_info->u.switch_.case_block_count + 0] = value;
-            cf_info->u.switch_.case_blocks[2 * cf_info->u.switch_.case_block_count + 1] = label_id;
-            ++cf_info->u.switch_.case_block_count;
-
-            vkd3d_spirv_build_op_label(builder, label_id);
-            cf_info->inside_block = true;
-            vkd3d_spirv_build_op_name(builder, label_id, "switch%u_case%u", cf_info->u.switch_.id, value);
-            break;
-        }
-
-        case VKD3DSIH_DEFAULT:
-            assert(compiler->control_flow_depth);
-            assert(cf_info->current_block == VKD3D_BLOCK_SWITCH);
-            assert(!cf_info->u.switch_.default_block_id);
-
-            cf_info->u.switch_.default_block_id = vkd3d_spirv_alloc_id(builder);
-            if (cf_info->inside_block) /* fall-through */
-                vkd3d_spirv_build_op_branch(builder, cf_info->u.switch_.default_block_id);
-
-            vkd3d_spirv_build_op_label(builder, cf_info->u.switch_.default_block_id);
-            vkd3d_spirv_build_op_name(builder, cf_info->u.switch_.default_block_id,
-                    "switch%u_default", cf_info->u.switch_.id);
-            cf_info->inside_block = true;
-            break;
-
-        case VKD3DSIH_BREAK:
-        {
-            struct vkd3d_control_flow_info *breakable_cf_info;
-
-            assert(compiler->control_flow_depth);
-
-            if (!(breakable_cf_info = spirv_compiler_find_innermost_breakable_cf_construct(compiler)))
-            {
-                FIXME("Unhandled break instruction.\n");
-                return VKD3D_ERROR_INVALID_SHADER;
-            }
-
-            if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
-            {
-                /* The current case block may have already been ended by an
-                 * unconditional continue instruction. */
-                if (breakable_cf_info->inside_block)
-                    vkd3d_spirv_build_op_branch(builder, breakable_cf_info->u.switch_.merge_block_id);
-            }
-
-            cf_info->inside_block = false;
-            break;
-        }
-
-        case VKD3DSIH_RET:
-            spirv_compiler_emit_return(compiler, instruction);
-
-            if (cf_info)
-                cf_info->inside_block = false;
-            break;
-
-        default:
-            ERR("Unexpected instruction %#x.\n", instruction->handler_idx);
-            break;
-    }
-
-    return VKD3D_OK;
-}
-
 static bool spirv_compiler_init_blocks(struct spirv_compiler *compiler, unsigned int block_count)
 {
     compiler->block_count = block_count;
@@ -7867,6 +7632,47 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_branch_conditional(builder, condition_id,
             spirv_compiler_get_label_id(compiler, src[1].reg.idx[0].offset),
             spirv_compiler_get_label_id(compiler, src[2].reg.idx[0].offset));
+}
+
+static void spirv_compiler_emit_switch(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t val_id, default_id;
+    unsigned int i, word_count;
+    uint32_t *cases;
+
+    if (!vkd3d_swizzle_is_scalar(src[0].swizzle))
+    {
+        WARN("Unexpected src swizzle %#x.\n", src[0].swizzle);
+        spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE,
+                "The swizzle for a switch value is not scalar.");
+    }
+
+    word_count = instruction->src_count - 3;
+    if (!(cases = vkd3d_calloc(word_count, sizeof(*cases))))
+    {
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_OUT_OF_MEMORY,
+                "Failed to allocate %u words for switch cases.", word_count);
+        return;
+    }
+
+    val_id = spirv_compiler_emit_load_src(compiler, &src[0], VKD3DSP_WRITEMASK_0);
+    default_id = spirv_compiler_get_label_id(compiler, src[1].reg.idx[0].offset);
+    /* No instructions may occur between the merge and the switch. */
+    spirv_compiler_emit_merge(compiler, src[2].reg.idx[0].offset, 0);
+
+    src = &src[3];
+    for (i = 0; i < word_count; i += 2)
+    {
+        cases[i] = src[i].reg.u.immconst_u32[0];
+        cases[i + 1] = spirv_compiler_get_label_id(compiler, src[i + 1].reg.idx[0].offset);
+    }
+
+    vkd3d_spirv_build_op_switch(builder, val_id, default_id, cases, word_count / 2u);
+
+    vkd3d_free(cases);
 }
 
 static void spirv_compiler_emit_deriv_instruction(struct spirv_compiler *compiler,
@@ -9613,19 +9419,8 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_F32TOF16:
             spirv_compiler_emit_f32tof16(compiler, instruction);
             break;
-        case VKD3DSIH_BREAK:
-        case VKD3DSIH_BREAKP:
-        case VKD3DSIH_CASE:
-        case VKD3DSIH_CONTINUE:
-        case VKD3DSIH_CONTINUEP:
-        case VKD3DSIH_DEFAULT:
-        case VKD3DSIH_ENDLOOP:
-        case VKD3DSIH_ENDSWITCH:
-        case VKD3DSIH_LABEL:
-        case VKD3DSIH_LOOP:
         case VKD3DSIH_RET:
-        case VKD3DSIH_SWITCH:
-            ret = spirv_compiler_emit_control_flow_instruction(compiler, instruction);
+            spirv_compiler_emit_return(compiler, instruction);
             break;
         case VKD3DSIH_RETP:
             spirv_compiler_emit_retc(compiler, instruction);
@@ -9634,8 +9429,14 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_TEXKILL:
             spirv_compiler_emit_kill(compiler, instruction);
             break;
+        case VKD3DSIH_LABEL:
+            spirv_compiler_emit_label(compiler, instruction);
+            break;
         case VKD3DSIH_BRANCH:
             spirv_compiler_emit_branch(compiler, instruction);
+            break;
+        case VKD3DSIH_SWITCH_MONOLITHIC:
+            spirv_compiler_emit_switch(compiler, instruction);
             break;
         case VKD3DSIH_DSX:
         case VKD3DSIH_DSX_COARSE:

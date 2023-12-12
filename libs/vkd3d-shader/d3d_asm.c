@@ -279,6 +279,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_SUB                             ] = "sub",
     [VKD3DSIH_SWAPC                           ] = "swapc",
     [VKD3DSIH_SWITCH                          ] = "switch",
+    [VKD3DSIH_SWITCH_MONOLITHIC               ] = "switch",
     [VKD3DSIH_SYNC                            ] = "sync",
     [VKD3DSIH_TEX                             ] = "texld",
     [VKD3DSIH_TEXBEM                          ] = "texbem",

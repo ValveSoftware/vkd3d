@@ -1522,12 +1522,30 @@ struct cf_flattener_loop_info
     uint32_t merge_block_id;
 };
 
+struct cf_flattener_switch_case
+{
+    unsigned int value;
+    unsigned int block_id;
+};
+
+struct cf_flattener_switch_info
+{
+    size_t ins_location;
+    const struct vkd3d_shader_src_param *condition;
+    unsigned int merge_block_id;
+    unsigned int default_block_id;
+    struct cf_flattener_switch_case *cases;
+    size_t cases_size;
+    unsigned int cases_count;
+};
+
 struct cf_flattener_info
 {
     union
     {
         struct cf_flattener_if_info if_;
         struct cf_flattener_loop_info loop;
+        struct cf_flattener_switch_info switch_;
     } u;
 
     enum
@@ -1844,18 +1862,101 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 if (!(cf_info = cf_flattener_push_control_flow_level(flattener)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
 
-                if (!cf_flattener_copy_instruction(flattener, instruction))
-                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                merge_block_id = cf_flattener_alloc_block_id(flattener);
 
+                cf_info->u.switch_.ins_location = flattener->instruction_count;
+                cf_info->u.switch_.condition = src;
+
+                if (!(dst_ins = cf_flattener_require_space(flattener, 1)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                vsir_instruction_init(dst_ins, &instruction->location, VKD3DSIH_SWITCH_MONOLITHIC);
+                ++flattener->instruction_count;
+
+                cf_info->u.switch_.merge_block_id = merge_block_id;
+                cf_info->u.switch_.cases = NULL;
+                cf_info->u.switch_.cases_size = 0;
+                cf_info->u.switch_.cases_count = 0;
+                cf_info->u.switch_.default_block_id = 0;
+                cf_info->inside_block = false;
                 cf_info->current_block = VKD3D_BLOCK_SWITCH;
+
+                if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.cases, &cf_info->u.switch_.cases_size,
+                        10, sizeof(*cf_info->u.switch_.cases)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
 
                 break;
 
             case VKD3DSIH_ENDSWITCH:
-                cf_flattener_pop_control_flow_level(flattener);
+            {
+                struct vkd3d_shader_src_param *src_params;
+                unsigned int j;
 
-                if (!cf_flattener_copy_instruction(flattener, instruction))
+                if (!cf_info->u.switch_.default_block_id)
+                    cf_info->u.switch_.default_block_id = cf_info->u.switch_.merge_block_id;
+
+                cf_flattener_emit_label(flattener, cf_info->u.switch_.merge_block_id);
+
+                /* The SWITCH instruction is completed when the endswitch
+                 * instruction is processed because we do not know the number
+                 * of case statements or the default block id in advance.*/
+                dst_ins = &flattener->instructions[cf_info->u.switch_.ins_location];
+                if (!(src_params = instruction_src_params_alloc(dst_ins, cf_info->u.switch_.cases_count * 2 + 3, flattener)))
+                {
+                    vkd3d_free(cf_info->u.switch_.cases);
                     return VKD3D_ERROR_OUT_OF_MEMORY;
+                }
+                src_params[0] = *cf_info->u.switch_.condition;
+                vsir_src_param_init_label(&src_params[1], cf_info->u.switch_.default_block_id);
+                vsir_src_param_init_label(&src_params[2], cf_info->u.switch_.merge_block_id);
+                for (j = 0; j < cf_info->u.switch_.cases_count; ++j)
+                {
+                    unsigned int index = j * 2 + 3;
+                    vsir_src_param_init(&src_params[index], VKD3DSPR_IMMCONST, VKD3D_DATA_UINT, 0);
+                    src_params[index].reg.u.immconst_u32[0] = cf_info->u.switch_.cases[j].value;
+                    vsir_src_param_init_label(&src_params[index + 1], cf_info->u.switch_.cases[j].block_id);
+                }
+                vkd3d_free(cf_info->u.switch_.cases);
+
+                cf_flattener_pop_control_flow_level(flattener);
+                break;
+            }
+
+            case VKD3DSIH_CASE:
+            {
+                unsigned int label_id, value;
+
+                if (src->swizzle != VKD3D_SHADER_SWIZZLE(X, X, X, X))
+                {
+                    WARN("Unexpected src swizzle %#x.\n", src->swizzle);
+                    vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE,
+                            "The swizzle for a switch case value is not scalar X.");
+                }
+                value = *src->reg.u.immconst_u32;
+
+                if (!vkd3d_array_reserve((void **)&cf_info->u.switch_.cases, &cf_info->u.switch_.cases_size,
+                        cf_info->u.switch_.cases_count + 1, sizeof(*cf_info->u.switch_.cases)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                label_id = cf_flattener_alloc_block_id(flattener);
+                if (cf_info->inside_block) /* fall-through */
+                    cf_flattener_emit_unconditional_branch(flattener, label_id);
+
+                cf_info->u.switch_.cases[cf_info->u.switch_.cases_count].value = value;
+                cf_info->u.switch_.cases[cf_info->u.switch_.cases_count].block_id = label_id;
+                ++cf_info->u.switch_.cases_count;
+
+                cf_flattener_emit_label(flattener, label_id);
+                cf_info->inside_block = true;
+                break;
+            }
+
+            case VKD3DSIH_DEFAULT:
+                cf_info->u.switch_.default_block_id = cf_flattener_alloc_block_id(flattener);
+                if (cf_info->inside_block) /* fall-through */
+                    cf_flattener_emit_unconditional_branch(flattener, cf_info->u.switch_.default_block_id);
+
+                cf_flattener_emit_label(flattener, cf_info->u.switch_.default_block_id);
+                cf_info->inside_block = true;
                 break;
 
             case VKD3DSIH_BREAK:
@@ -1874,8 +1975,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 }
                 else if (breakable_cf_info->current_block == VKD3D_BLOCK_SWITCH)
                 {
-                    if (!cf_flattener_copy_instruction(flattener, instruction))
-                        return VKD3D_ERROR_OUT_OF_MEMORY;
+                    cf_flattener_emit_unconditional_branch(flattener, breakable_cf_info->u.switch_.merge_block_id);
                 }
 
                 cf_info->inside_block = false;
