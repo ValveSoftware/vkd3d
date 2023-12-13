@@ -19,3 +19,44 @@ float4 main() : sv_target
 [test]
 draw quad
 probe all rgba (197.0, 218.0, 238.0, 257.0)
+
+
+[pixel shader]
+uniform min16uint2 u;
+
+uint4 main() : sv_target
+{
+    min16uint i = 0x7fff, j = 0xffff;
+    return uint4(u.x + i, u.y + j, 0, 0);
+}
+
+[test]
+uniform 0 uint4 0 0 0 0
+draw quad
+probe all rgbaui (0x7fff, 0xffff, 0, 0)
+
+
+% The code d3dcompiler_47 produces for this appears correct, but the result
+% is still zero in Windows.
+[require]
+shader model >= 6.0
+
+[pixel shader]
+uniform min16uint4 u;
+uniform uint i;
+
+uint4 main() : sv_target
+{
+    min16uint arr[4] = {1, 2, 0x7fff, 0xffff};
+    return uint4(u.x + arr[i], u.y + arr[i + 1], 0, 0);
+}
+
+[test]
+uniform 0 uint4 0 0 0 0
+uniform 4 uint 2
+draw quad
+probe all rgbaui (0x7fff, 0xffff, 0, 0)
+uniform 0 uint4 0 0 0 0
+uniform 4 uint 0
+draw quad
+probe all rgbaui (1, 2, 0, 0)
