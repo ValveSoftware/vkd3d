@@ -1540,9 +1540,6 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
 
     scan_info = *compile_info;
 
-    if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
-        return ret;
-
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
@@ -1550,6 +1547,8 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
+            if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
+                return ret;
             if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version,
                     message_context, &parser->location)))
             {
@@ -1560,19 +1559,22 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
 
             ret = vkd3d_glsl_generator_generate(glsl_generator, parser, out);
             vkd3d_glsl_generator_destroy(glsl_generator);
+            vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 
         case VKD3D_SHADER_TARGET_SPIRV_BINARY:
         case VKD3D_SHADER_TARGET_SPIRV_TEXT:
+            if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
+                return ret;
             ret = spirv_compile(parser, &scan_descriptor_info, compile_info, out, message_context);
+            vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 
         default:
             /* Validation should prevent us from reaching this. */
-            assert(0);
+            vkd3d_unreachable();
     }
 
-    vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
     return ret;
 }
 
