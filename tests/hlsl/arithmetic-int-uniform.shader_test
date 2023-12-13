@@ -195,4 +195,4 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 int64_t2 5000000000 -7000000000
 todo draw quad
-probe all rgba (5.0, 7.0, 0.0, 10.0)
+probe all rgba (5.0, 7.0, 0.0, 0.0)
