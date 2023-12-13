@@ -51,3 +51,69 @@ probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
 probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
 probe (1, 1) rgba (0.8, 0.0, 0.7, 1.0)
+
+% The sample count only matters for the external definition in SM4-5;
+% internally it doesn't, you can even avoid it
+
+[require]
+shader model >= 4.0
+shader model < 6.0
+
+[pixel shader]
+static const int size = 2;
+Texture2DMS<float4, size - 1> t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    Texture2DMS<float4, 4> s = t;
+    return s.Load(pos.yx, 0);
+}
+
+[test]
+draw quad
+probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
+probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
+probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
+probe (1, 1) rgba (0.8, 0.0, 0.7, 1.0)
+
+[pixel shader todo]
+static const int size = 2;
+Texture2DMS<float4, size - 1> t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    Texture2DMS<float4> s = t;
+    return s.Load(pos.yx, 0);
+}
+
+[test]
+todo draw quad
+probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
+probe (1, 0) rgba (0.6, 0.5, 0.2, 0.1)
+probe (0, 1) rgba (0.5, 0.7, 0.6, 0.8)
+probe (1, 1) rgba (0.8, 0.0, 0.7, 1.0)
+
+% SM6 is stricter instead
+
+[require]
+shader model >= 6.0
+
+[pixel shader fail]
+static const int size = 2;
+Texture2DMS<float4, size - 1> t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    Texture2DMS<float4, 4> s = t;
+    return s.Load(pos.yx, 0);
+}
+
+[pixel shader fail]
+static const int size = 2;
+Texture2DMS<float4, size - 1> t;
+
+float4 main(float4 pos : sv_position) : sv_target
+{
+    Texture2DMS<float4> s = t;
+    return s.Load(pos.yx, 0);
+}
