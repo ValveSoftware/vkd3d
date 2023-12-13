@@ -223,6 +223,11 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
     }
 }
 
+static bool data_type_is_floating_point(enum vkd3d_data_type data_type)
+{
+    return data_type == VKD3D_DATA_FLOAT || data_type == VKD3D_DATA_DOUBLE;
+}
+
 #define VKD3D_SPIRV_VERSION 0x00010000
 #define VKD3D_SPIRV_GENERATOR_ID 18
 #define VKD3D_SPIRV_GENERATOR_VERSION 11
@@ -4104,7 +4109,7 @@ static uint32_t spirv_compiler_emit_abs(struct spirv_compiler *compiler,
     uint32_t type_id;
 
     type_id = spirv_compiler_get_type_id_for_reg(compiler, reg, write_mask);
-    if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
+    if (data_type_is_floating_point(reg->data_type))
         return vkd3d_spirv_build_op_glsl_std450_fabs(builder, type_id, val_id);
 
     FIXME("Unhandled data type %#x.\n", reg->data_type);
@@ -4118,7 +4123,7 @@ static uint32_t spirv_compiler_emit_neg(struct spirv_compiler *compiler,
     uint32_t type_id;
 
     type_id = spirv_compiler_get_type_id_for_reg(compiler, reg, write_mask);
-    if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
+    if (data_type_is_floating_point(reg->data_type))
         return vkd3d_spirv_build_op_fnegate(builder, type_id, val_id);
     else if (data_type_is_integer(reg->data_type))
         return vkd3d_spirv_build_op_snegate(builder, type_id, val_id);
@@ -4302,7 +4307,7 @@ static uint32_t spirv_compiler_emit_sat(struct spirv_compiler *compiler,
     }
 
     type_id = spirv_compiler_get_type_id_for_reg(compiler, reg, write_mask);
-    if (reg->data_type == VKD3D_DATA_FLOAT || reg->data_type == VKD3D_DATA_DOUBLE)
+    if (data_type_is_floating_point(reg->data_type))
         return vkd3d_spirv_build_op_glsl_std450_nclamp(builder, type_id, val_id, zero_id, one_id);
 
     FIXME("Unhandled data type %#x.\n", reg->data_type);
