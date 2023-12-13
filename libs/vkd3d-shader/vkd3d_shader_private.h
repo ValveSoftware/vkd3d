@@ -623,14 +623,16 @@ enum vkd3d_data_type
     VKD3D_DATA_UINT8,
     VKD3D_DATA_UINT64,
     VKD3D_DATA_BOOL,
+    VKD3D_DATA_UINT16,
+    VKD3D_DATA_HALF,
 
     VKD3D_DATA_COUNT,
 };
 
 static inline bool data_type_is_integer(enum vkd3d_data_type data_type)
 {
-    return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT
-            || data_type == VKD3D_DATA_UINT64;
+    return data_type == VKD3D_DATA_INT || data_type == VKD3D_DATA_UINT8 || data_type == VKD3D_DATA_UINT16
+            || data_type == VKD3D_DATA_UINT || data_type == VKD3D_DATA_UINT64;
 }
 
 static inline bool data_type_is_bool(enum vkd3d_data_type data_type)
@@ -1531,10 +1533,12 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_ty
 {
     switch (data_type)
     {
+        case VKD3D_DATA_HALF: /* Minimum precision. TODO: native 16-bit */
         case VKD3D_DATA_FLOAT:
         case VKD3D_DATA_UNORM:
         case VKD3D_DATA_SNORM:
             return VKD3D_SHADER_COMPONENT_FLOAT;
+        case VKD3D_DATA_UINT16: /* Minimum precision. TODO: native 16-bit */
         case VKD3D_DATA_UINT:
             return VKD3D_SHADER_COMPONENT_UINT;
         case VKD3D_DATA_INT:
