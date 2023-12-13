@@ -3113,6 +3113,12 @@ static struct sm6_phi *sm6_block_phi_require_space(struct sm6_block *block, stru
     return phi;
 }
 
+struct function_emission_state
+{
+    struct sm6_block *code_block;
+    struct vkd3d_shader_instruction *ins;
+};
+
 static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -3479,9 +3485,10 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
     }
 }
 
-static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, struct sm6_block *code_block,
-        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
 {
+    struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_param;
 
     vsir_instruction_init(ins, &sm6->p.location, map_dx_unary_op(op));
@@ -3491,10 +3498,11 @@ static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, struct sm6_block *c
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
-static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, struct sm6_block *code_block,
-        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
 {
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_param;
     const struct sm6_value *buffer;
     const struct sm6_type *type;
@@ -3542,9 +3550,10 @@ static const struct sm6_descriptor_info *sm6_parser_get_descriptor(struct sm6_pa
     return NULL;
 }
 
-static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, struct sm6_block *code_block,
-        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
 {
+    struct vkd3d_shader_instruction *ins = state->ins;
     enum vkd3d_shader_descriptor_type type;
     const struct sm6_descriptor_info *d;
     struct vkd3d_shader_register *reg;
@@ -3578,9 +3587,10 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, struct sm6_
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
-static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, struct sm6_block *code_block,
-        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
 {
+    struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_param;
     const struct shader_signature *signature;
     unsigned int row_index, column_index;
@@ -3610,9 +3620,10 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, struct sm6_blo
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
-static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, struct sm6_block *code_block,
-        enum dx_intrinsic_opcode op, const struct sm6_value **operands, struct vkd3d_shader_instruction *ins)
+static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
 {
+    struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_param;
     struct vkd3d_shader_dst_param *dst_param;
     const struct shader_signature *signature;
@@ -3667,8 +3678,8 @@ struct sm6_dx_opcode_info
 {
     const char *ret_type;
     const char *operand_info;
-    void (*handler)(struct sm6_parser *, struct sm6_block *, enum dx_intrinsic_opcode,
-            const struct sm6_value **, struct vkd3d_shader_instruction *);
+    void (*handler)(struct sm6_parser *, enum dx_intrinsic_opcode, const struct sm6_value **,
+            struct function_emission_state *);
 };
 
 /*
@@ -3820,27 +3831,27 @@ static void sm6_parser_emit_unhandled(struct sm6_parser *sm6, struct vkd3d_shade
     /* dst->is_undefined is not set here because it flags only explicitly undefined values. */
 }
 
-static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, struct sm6_block *code_block, enum dx_intrinsic_opcode op,
+static void sm6_parser_decode_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const char *name, const struct sm6_value **operands, unsigned int operand_count,
-        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+        struct function_emission_state *state, struct sm6_value *dst)
 {
     if (op >= ARRAY_SIZE(sm6_dx_op_table) || !sm6_dx_op_table[op].operand_info)
     {
         FIXME("Unhandled dx intrinsic function id %u, '%s'.\n", op, name);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_UNHANDLED_INTRINSIC,
                 "Call to intrinsic function %s is unhandled.", name);
-        sm6_parser_emit_unhandled(sm6, ins, dst);
+        sm6_parser_emit_unhandled(sm6, state->ins, dst);
         return;
     }
 
     if (sm6_parser_validate_dx_op(sm6, op, name, operands, operand_count, dst))
-        sm6_dx_op_table[op].handler(sm6, code_block, op, operands, ins);
+        sm6_dx_op_table[op].handler(sm6, op, operands, state);
     else
-        sm6_parser_emit_unhandled(sm6, ins, dst);
+        sm6_parser_emit_unhandled(sm6, state->ins, dst);
 }
 
 static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_record *record,
-        struct sm6_block *code_block, struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
+        struct function_emission_state *state, struct sm6_value *dst)
 {
     const struct sm6_value *operands[DXIL_OP_MAX_OPERANDS];
     const struct sm6_value *fn_value, *op_value;
@@ -3922,8 +3933,8 @@ static void sm6_parser_emit_call(struct sm6_parser *sm6, const struct dxil_recor
                 "Expected a constant integer dx intrinsic function id.");
         return;
     }
-    sm6_parser_decode_dx_op(sm6, code_block, register_get_uint_value(&op_value->u.reg),
-            fn_value->u.function.name, &operands[1], operand_count - 1, ins, dst);
+    sm6_parser_decode_dx_op(sm6, register_get_uint_value(&op_value->u.reg),
+            fn_value->u.function.name, &operands[1], operand_count - 1, state, dst);
 }
 
 static enum vkd3d_shader_opcode sm6_map_cast_op(uint64_t code, const struct sm6_type *from,
@@ -5121,8 +5132,11 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
                 is_terminator = true;
                 break;
             case FUNC_CODE_INST_CALL:
-                sm6_parser_emit_call(sm6, record, code_block, ins, dst);
+            {
+                struct function_emission_state state = {code_block, ins};
+                sm6_parser_emit_call(sm6, record, &state, dst);
                 break;
+            }
             case FUNC_CODE_INST_CAST:
                 sm6_parser_emit_cast(sm6, record, ins, dst);
                 break;
