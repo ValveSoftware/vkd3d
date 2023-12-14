@@ -71,6 +71,7 @@ struct vulkan_shader_runner
     } samplers[MAX_SAMPLERS];
 
     bool supports_float64;
+    bool supports_int64;
 
     DECLARE_VK_PFN(vkCreateInstance);
 #define VK_INSTANCE_PFN   DECLARE_VK_PFN
@@ -88,6 +89,8 @@ static bool vulkan_runner_check_requirements(struct shader_runner *r)
     struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
 
     if (runner->r.require_float64 && !runner->supports_float64)
+        return false;
+    if (runner->r.require_int64 && !runner->supports_int64)
         return false;
 
     return true;
@@ -1339,6 +1342,12 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     {
         features.shaderFloat64 = VK_TRUE;
         runner->supports_float64 = true;
+    }
+    trace("shaderInt64: %u.\n", ret_features.shaderInt64);
+    if (ret_features.shaderInt64)
+    {
+        features.shaderInt64 = VK_TRUE;
+        runner->supports_int64 = true;
     }
 
     if ((vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device))))
