@@ -65,6 +65,8 @@ struct d3d11_shader_runner
     IDXGISwapChain *swapchain;
     ID3D11DeviceContext *immediate_context;
     ID3D11RasterizerState *rasterizer_state;
+
+    bool supports_float64;
 };
 
 static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
@@ -252,6 +254,7 @@ static IDXGISwapChain *create_swapchain(ID3D11Device *device, HWND window)
 
 static BOOL init_test_context(struct d3d11_shader_runner *runner)
 {
+    D3D11_FEATURE_DATA_DOUBLES doubles = {0};
     unsigned int rt_width, rt_height;
     D3D11_RASTERIZER_DESC rs_desc;
     D3D11_VIEWPORT vp;
@@ -265,6 +268,12 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
         skip("Failed to create device.\n");
         return FALSE;
     }
+
+    hr = ID3D11Device_CheckFeatureSupport(runner->device, D3D11_FEATURE_DOUBLES,
+            &doubles, sizeof(doubles));
+    ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
+    trace("DoublePrecisionFloatShaderOps: %u.\n", doubles.DoublePrecisionFloatShaderOps);
+    runner->supports_float64 = doubles.DoublePrecisionFloatShaderOps;
 
     rt_width = RENDER_TARGET_WIDTH;
     rt_height = RENDER_TARGET_HEIGHT;
@@ -311,6 +320,16 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
 
     ref = ID3D11Device_Release(runner->device);
     ok(!ref, "Device has %lu references left.\n", ref);
+}
+
+static bool d3d11_runner_check_requirements(struct shader_runner *r)
+{
+    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
+
+    if (runner->r.require_float64 && !runner->supports_float64)
+        return false;
+
+    return true;
 }
 
 static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags, unsigned int size, const void *data)
@@ -724,6 +743,7 @@ static void d3d11_runner_release_readback(struct shader_runner *r, struct resour
 
 static const struct shader_runner_ops d3d11_runner_ops =
 {
+    .check_requirements = d3d11_runner_check_requirements,
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
     .dispatch = d3d11_runner_dispatch,
