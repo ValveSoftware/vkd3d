@@ -86,7 +86,7 @@ AS_IF([test "x$ac_cv_header_spirv_unified1_GLSL_std_450_h" != "xyes" \
        -a "x$ac_cv_header_vulkan_GLSL_std_450_h" != "xyes"],
       [AC_MSG_ERROR([GLSL.std.450.h not found.])])
 
-VKD3D_CHECK_VULKAN_HEADER_VERSION([148], [AC_MSG_ERROR([Vulkan headers are too old, 1.2.148 is required.])])
+VKD3D_CHECK_VULKAN_HEADER_VERSION([228], [AC_MSG_ERROR([Vulkan headers are too old, 1.3.228 is required.])])
 
 AC_CHECK_DECL([SpvCapabilityDemoteToHelperInvocationEXT],, [AC_MSG_ERROR([SPIR-V headers are too old.])], [
 #ifdef HAVE_SPIRV_UNIFIED1_SPIRV_H

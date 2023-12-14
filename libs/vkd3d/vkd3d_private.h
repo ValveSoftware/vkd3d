@@ -133,6 +133,7 @@ struct vkd3d_vulkan_info
     bool EXT_debug_marker;
     bool EXT_depth_clip_enable;
     bool EXT_descriptor_indexing;
+    bool EXT_mutable_descriptor_type;
     bool EXT_robustness2;
     bool EXT_shader_demote_to_helper_invocation;
     bool EXT_shader_stencil_export;

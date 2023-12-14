@@ -94,6 +94,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(EXT_DEBUG_MARKER, EXT_debug_marker),
     VK_EXTENSION(EXT_DEPTH_CLIP_ENABLE, EXT_depth_clip_enable),
     VK_EXTENSION(EXT_DESCRIPTOR_INDEXING, EXT_descriptor_indexing),
+    VK_EXTENSION(EXT_MUTABLE_DESCRIPTOR_TYPE, EXT_mutable_descriptor_type),
     VK_EXTENSION(EXT_ROBUSTNESS_2, EXT_robustness2),
     VK_EXTENSION(EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION, EXT_shader_demote_to_helper_invocation),
     VK_EXTENSION(EXT_SHADER_STENCIL_EXPORT, EXT_shader_stencil_export),
@@ -106,13 +107,32 @@ static HRESULT vkd3d_create_vk_descriptor_heap_layout(struct d3d12_device *devic
 {
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
     VkDescriptorSetLayoutBindingFlagsCreateInfoEXT flags_info;
+    VkMutableDescriptorTypeCreateInfoEXT mutable_info;
+    VkMutableDescriptorTypeListEXT type_list;
     VkDescriptorSetLayoutCreateInfo set_desc;
     VkDescriptorBindingFlagsEXT set_flags;
     VkDescriptorSetLayoutBinding binding;
     VkResult vr;
 
+    static const VkDescriptorType descriptor_types[] =
+    {
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
+        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+        VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
+        VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+    };
+
+    if (device->vk_info.EXT_mutable_descriptor_type && index && index != VKD3D_SET_INDEX_UAV_COUNTER
+            && device->vk_descriptor_heap_layouts[index].applicable_heap_type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)
+    {
+        device->vk_descriptor_heap_layouts[index].vk_set_layout = VK_NULL_HANDLE;
+        return S_OK;
+    }
+
     binding.binding = 0;
-    binding.descriptorType = device->vk_descriptor_heap_layouts[index].type;
+    binding.descriptorType = (device->vk_info.EXT_mutable_descriptor_type && !index)
+            ? VK_DESCRIPTOR_TYPE_MUTABLE_EXT : device->vk_descriptor_heap_layouts[index].type;
     binding.descriptorCount = device->vk_descriptor_heap_layouts[index].count;
     binding.stageFlags = VK_SHADER_STAGE_ALL;
     binding.pImmutableSamplers = NULL;
@@ -131,6 +151,17 @@ static HRESULT vkd3d_create_vk_descriptor_heap_layout(struct d3d12_device *devic
     flags_info.pNext = NULL;
     flags_info.bindingCount = 1;
     flags_info.pBindingFlags = &set_flags;
+
+    if (binding.descriptorType == VK_DESCRIPTOR_TYPE_MUTABLE_EXT)
+    {
+        type_list.descriptorTypeCount = ARRAY_SIZE(descriptor_types);
+        type_list.pDescriptorTypes = descriptor_types;
+        mutable_info.sType = VK_STRUCTURE_TYPE_MUTABLE_DESCRIPTOR_TYPE_CREATE_INFO_EXT;
+        mutable_info.pNext = NULL;
+        mutable_info.mutableDescriptorTypeListCount = 1;
+        mutable_info.pMutableDescriptorTypeLists = &type_list;
+        flags_info.pNext = &mutable_info;
+    }
 
     if ((vr = VK_CALL(vkCreateDescriptorSetLayout(device->vk_device, &set_desc, NULL,
             &device->vk_descriptor_heap_layouts[index].vk_set_layout))) < 0)
@@ -763,6 +794,7 @@ struct vkd3d_physical_device_info
     VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb_features;
     VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT vertex_divisor_features;
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR timeline_semaphore_features;
+    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT mutable_features;
 
     VkPhysicalDeviceFeatures2 features2;
 };
@@ -780,6 +812,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT *buffer_alignment_features;
     VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT *demote_features;
     VkPhysicalDeviceTimelineSemaphoreFeaturesKHR *timeline_semaphore_features;
+    VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT *mutable_features;
     VkPhysicalDeviceDepthClipEnableFeaturesEXT *depth_clip_features;
     VkPhysicalDeviceMaintenance3Properties *maintenance3_properties;
     VkPhysicalDeviceTransformFeedbackPropertiesEXT *xfb_properties;
@@ -800,6 +833,7 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vertex_divisor_features = &info->vertex_divisor_features;
     vertex_divisor_properties = &info->vertex_divisor_properties;
     timeline_semaphore_features = &info->timeline_semaphore_features;
+    mutable_features = &info->mutable_features;
     xfb_features = &info->xfb_features;
     xfb_properties = &info->xfb_properties;
 
@@ -823,6 +857,8 @@ static void vkd3d_physical_device_info_init(struct vkd3d_physical_device_info *i
     vk_prepend_struct(&info->features2, vertex_divisor_features);
     timeline_semaphore_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES_KHR;
     vk_prepend_struct(&info->features2, timeline_semaphore_features);
+    mutable_features->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MUTABLE_DESCRIPTOR_TYPE_FEATURES_EXT;
+    vk_prepend_struct(&info->features2, mutable_features);
 
     if (vulkan_info->KHR_get_physical_device_properties2)
         VK_CALL(vkGetPhysicalDeviceFeatures2KHR(physical_device, &info->features2));
@@ -1594,6 +1630,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
         vulkan_info->EXT_shader_demote_to_helper_invocation = false;
     if (!physical_device_info->texel_buffer_alignment_features.texelBufferAlignment)
         vulkan_info->EXT_texel_buffer_alignment = false;
+    if (!physical_device_info->mutable_features.mutableDescriptorType)
+        vulkan_info->EXT_mutable_descriptor_type = false;
     if (!physical_device_info->timeline_semaphore_features.timelineSemaphore)
         vulkan_info->KHR_timeline_semaphore = false;
 

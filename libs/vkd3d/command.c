@@ -3270,7 +3270,8 @@ static void d3d12_command_list_bind_descriptor_heap(struct d3d12_command_list *l
     {
         VkDescriptorSet vk_descriptor_set = heap->vk_descriptor_sets[set].vk_set;
 
-        if (!vk_descriptor_set)
+        /* Null vk_set_layout means set 0 uses mutable descriptors, and this set is unused. */
+        if (!vk_descriptor_set || !list->device->vk_descriptor_heap_layouts[set].vk_set_layout)
             continue;
 
         VK_CALL(vkCmdBindDescriptorSets(list->vk_command_buffer, bindings->vk_bind_point, rs->vk_pipeline_layout,

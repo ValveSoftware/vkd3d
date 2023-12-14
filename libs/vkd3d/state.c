@@ -848,7 +848,20 @@ static void vkd3d_descriptor_heap_binding_from_descriptor_range(const struct d3d
     const struct vkd3d_device_descriptor_limits *descriptor_limits = &root_signature->device->vk_info.descriptor_limits;
     unsigned int descriptor_set_size;
 
-    switch (range->type)
+    if (root_signature->device->vk_info.EXT_mutable_descriptor_type)
+    {
+        if (range->type == VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER)
+        {
+            binding->set = VKD3D_SET_INDEX_SAMPLER;
+            descriptor_set_size = descriptor_limits->sampler_max_descriptors;
+        }
+        else
+        {
+            binding->set = 0;
+            descriptor_set_size = descriptor_limits->sampled_image_max_descriptors;
+        }
+    }
+    else switch (range->type)
     {
         case VKD3D_SHADER_DESCRIPTOR_TYPE_SRV:
             binding->set = is_buffer ? VKD3D_SET_INDEX_UNIFORM_TEXEL_BUFFER : VKD3D_SET_INDEX_SAMPLED_IMAGE;
@@ -1368,8 +1381,14 @@ static unsigned int d3d12_root_signature_copy_descriptor_set_layouts(const struc
 
     if (device->use_vk_heaps)
     {
+        VkDescriptorSetLayout mutable_layout = device->vk_descriptor_heap_layouts[0].vk_set_layout;
+
         for (set = 0; set < ARRAY_SIZE(device->vk_descriptor_heap_layouts); ++set)
-            vk_set_layouts[i++] = device->vk_descriptor_heap_layouts[set].vk_set_layout;
+        {
+            VkDescriptorSetLayout vk_set_layout = device->vk_descriptor_heap_layouts[set].vk_set_layout;
+            /* All layouts must be valid, so if null, just set it to the mutable one. */
+            vk_set_layouts[i++] = vk_set_layout ? vk_set_layout : mutable_layout;
+        }
     }
 
     return i;
