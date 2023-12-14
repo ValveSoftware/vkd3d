@@ -70,6 +70,8 @@ struct vulkan_shader_runner
         uint32_t binding;
     } samplers[MAX_SAMPLERS];
 
+    bool supports_float64;
+
     DECLARE_VK_PFN(vkCreateInstance);
 #define VK_INSTANCE_PFN   DECLARE_VK_PFN
 #define VK_DEVICE_PFN     DECLARE_VK_PFN
@@ -79,6 +81,16 @@ struct vulkan_shader_runner
 static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r)
 {
     return CONTAINING_RECORD(r, struct vulkan_shader_runner, r);
+}
+
+static bool vulkan_runner_check_requirements(struct shader_runner *r)
+{
+    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
+
+    if (runner->r.require_float64 && !runner->supports_float64)
+        return false;
+
+    return true;
 }
 
 #define VK_CALL(f) (runner->f)
@@ -1157,6 +1169,7 @@ static void vulkan_runner_release_readback(struct shader_runner *r, struct resou
 
 static const struct shader_runner_ops vulkan_runner_ops =
 {
+    .check_requirements = vulkan_runner_check_requirements,
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
     .dispatch = vulkan_runner_dispatch,
@@ -1320,6 +1333,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     ENABLE_FEATURE(fragmentStoresAndAtomics);
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
+
+    trace("shaderFloat64: %u.\n", ret_features.shaderFloat64);
+    if (ret_features.shaderFloat64)
+    {
+        features.shaderFloat64 = VK_TRUE;
+        runner->supports_float64 = true;
+    }
 
     if ((vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device))))
     {
