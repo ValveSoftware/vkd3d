@@ -25,6 +25,14 @@
 #include "shader_runner.h"
 #include "dxcompiler.h"
 
+#ifdef VKD3D_CROSSTEST
+static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
+static const char SHADER_RUNNER[] = "d3d12.dll";
+#else
+static const char HLSL_COMPILER[] = "vkd3d-shader";
+static const char SHADER_RUNNER[] = "vkd3d";
+#endif
+
 struct d3d12_resource
 {
     struct resource r;
@@ -586,8 +594,7 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .release_readback = d3d12_runner_release_readback,
 };
 
-void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader_model,
-        enum shader_model maximum_shader_model)
+void run_shader_tests_d3d12(void *dxc_compiler)
 {
     static const struct test_context_desc desc =
     {
@@ -627,10 +634,17 @@ void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1,
             &runner.options1, sizeof(runner.options1));
     ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
-    if (maximum_shader_model >= SHADER_MODEL_6_0)
+
+    trace("Compiling SM4-SM5 shaders with %s and executing with %s\n", HLSL_COMPILER, SHADER_RUNNER);
+    run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+
+    if (dxc_compiler)
+    {
         trace("Int64ShaderOps: %u.\n", runner.options1.Int64ShaderOps);
 
-    run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, minimum_shader_model, maximum_shader_model);
+        trace("Compiling SM6 shaders with dxcompiler and executing with %s\n", SHADER_RUNNER);
+        run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+    }
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);
     ID3D12CommandAllocator_Release(runner.compute_allocator);

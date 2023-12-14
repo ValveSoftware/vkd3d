@@ -996,6 +996,8 @@ void run_shader_tests_gl(void)
     vkd3d_test_name = "shader_runner_gl";
     if (!gl_runner_init(&runner))
         goto done;
+
+    trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with OpenGL\n");
     run_shader_tests(&runner.r, &gl_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
     gl_runner_cleanup(&runner);
 done:

@@ -1711,61 +1711,50 @@ START_TEST(shader_runner)
 #if defined(VKD3D_CROSSTEST)
     trace("Running tests from a Windows cross build\n");
 
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d9.dll\n");
     run_shader_tests_d3d9();
 
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d11.dll\n");
     run_shader_tests_d3d11();
 
-    trace("Compiling shaders with d3dcompiler_47.dll and executing with d3d12.dll\n");
-    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    run_shader_tests_d3d12(NULL);
 
     print_dll_version("d3dcompiler_47.dll");
     print_dll_version("dxgi.dll");
     print_dll_version("d3d9.dll");
     print_dll_version("d3d11.dll");
     print_dll_version("d3d12.dll");
+
 #elif defined(_WIN32)
     trace("Running tests from a Windows non-cross build\n");
 
-    trace("Compiling shaders with vkd3d-shader and executing with d3d9.dll\n");
     run_shader_tests_d3d9();
 
-    trace("Compiling shaders with vkd3d-shader and executing with d3d11.dll\n");
     run_shader_tests_d3d11();
 
-    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    dxc_compiler = dxcompiler_create();
+    run_shader_tests_d3d12(dxc_compiler);
 
-    if ((dxc_compiler = dxcompiler_create()))
+    if (dxc_compiler)
     {
-        trace("Compiling shaders with dxcompiler and executing with vkd3d\n");
-        run_shader_tests_d3d12(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
         IDxcCompiler3_Release(dxc_compiler);
         print_dll_version(SONAME_LIBDXCOMPILER);
     }
-
     print_dll_version("d3d9.dll");
     print_dll_version("d3d11.dll");
+
 #else
     trace("Running tests from a Unix build\n");
 
 # ifdef HAVE_OPENGL
-    trace("Compiling shaders with vkd3d-shader and executing with OpenGL\n");
     run_shader_tests_gl();
 # endif
 
-    trace("Compiling shaders with vkd3d-shader and executing with Vulkan\n");
     run_shader_tests_vulkan();
 
-    trace("Compiling shaders with vkd3d-shader and executing with vkd3d\n");
-    run_shader_tests_d3d12(NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    dxc_compiler = dxcompiler_create();
+    run_shader_tests_d3d12(dxc_compiler);
 
-    if ((dxc_compiler = dxcompiler_create()))
-    {
-        trace("Compiling shaders with dxcompiler and executing with vkd3d\n");
-        run_shader_tests_d3d12(dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+    if (dxc_compiler)
         IDxcCompiler3_Release(dxc_compiler);
-    }
+
 #endif
 }

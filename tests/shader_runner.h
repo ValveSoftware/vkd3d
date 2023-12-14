@@ -179,5 +179,4 @@ void run_shader_tests_d3d11(void);
 void run_shader_tests_gl(void);
 void run_shader_tests_vulkan(void);
 #endif
-void run_shader_tests_d3d12(void *dxc_compiler, enum shader_model minimum_shader_model,
-        enum shader_model maximum_shader_model);
+void run_shader_tests_d3d12(void *dxc_compiler);

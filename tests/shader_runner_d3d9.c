@@ -27,6 +27,12 @@
 #include "shader_runner.h"
 #include "vkd3d_test.h"
 
+#ifdef VKD3D_CROSSTEST
+static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
+#else
+static const char HLSL_COMPILER[] = "vkd3d-shader";
+#endif
+
 struct d3d9_resource
 {
     struct resource r;
@@ -533,6 +539,8 @@ void run_shader_tests_d3d9(void)
 {
     struct d3d9_shader_runner runner;
     HMODULE d3d9_module;
+
+    trace("Compiling SM2-SM3 shaders with %s and executing with d3d9.dll\n", HLSL_COMPILER);
 
     d3d9_module = LoadLibraryA("d3d9.dll");
     if (d3d9_module)

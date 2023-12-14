@@ -1420,6 +1420,7 @@ void run_shader_tests_vulkan(void)
     if (!init_vulkan_runner(&runner))
         return;
 
+    trace("Compiling SM2-SM5 shaders with vkd3d-shader and executing with Vulkan\n");
     run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_5_1);
 
     cleanup_vulkan_runner(&runner);
