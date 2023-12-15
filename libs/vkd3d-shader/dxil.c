@@ -6070,10 +6070,10 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((ret = dxil_block_init(block, NULL, sm6)) < 0)
     {
         if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                     "Out of memory parsing DXIL bitcode chunk.");
         else if (ret == VKD3D_ERROR_INVALID_SHADER)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_BITCODE,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_BITCODE,
                     "DXIL bitcode chunk has invalid bitcode.");
         else
             vkd3d_unreachable();
@@ -6103,10 +6103,10 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((ret = sm6_parser_type_table_init(sm6)) < 0)
     {
         if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                     "Out of memory parsing DXIL type table.");
         else if (ret == VKD3D_ERROR_INVALID_SHADER)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_TYPE_TABLE,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_TYPE_TABLE,
                     "DXIL type table is invalid.");
         else
             vkd3d_unreachable();
@@ -6116,10 +6116,10 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((ret = sm6_parser_symtab_init(sm6)) < 0)
     {
         if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                     "Out of memory parsing DXIL value symbol table.");
         else if (ret == VKD3D_ERROR_INVALID_SHADER)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_VALUE_SYMTAB,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_VALUE_SYMTAB,
                     "DXIL value symbol table is invalid.");
         else
             vkd3d_unreachable();
@@ -6130,7 +6130,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
             || !(sm6->input_params = shader_parser_get_dst_params(&sm6->p, input_signature->element_count)))
     {
         ERR("Failed to allocate input/output parameters.\n");
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory allocating input/output parameters.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
@@ -6139,7 +6139,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if (!(sm6->functions = vkd3d_calloc(function_count, sizeof(*sm6->functions))))
     {
         ERR("Failed to allocate function array.\n");
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory allocating DXIL function array.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
@@ -6147,14 +6147,14 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if (sm6_parser_compute_max_value_count(sm6, &sm6->root_block, 0) == SIZE_MAX)
     {
         WARN("Value array count overflowed.\n");
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
                 "Overflow occurred in the DXIL module value count.");
         return VKD3D_ERROR_INVALID_SHADER;
     }
     if (!(sm6->values = vkd3d_calloc(sm6->value_capacity, sizeof(*sm6->values))))
     {
         ERR("Failed to allocate value array.\n");
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory allocating DXIL value array.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
@@ -6181,7 +6181,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         if (j == ARRAY_SIZE(sm6->metadata_tables))
         {
             FIXME("Too many metadata tables.\n");
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_METADATA,
                     "A metadata table count greater than %zu is unsupported.", ARRAY_SIZE(sm6->metadata_tables));
             return VKD3D_ERROR_INVALID_SHADER;
         }
@@ -6199,17 +6199,17 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((ret = sm6_parser_module_init(sm6, &sm6->root_block, 0)) < 0)
     {
         if (ret == VKD3D_ERROR_OUT_OF_MEMORY)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                     "Out of memory parsing DXIL module.");
         else if (ret == VKD3D_ERROR_INVALID_SHADER)
-            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_MODULE,
                     "DXIL module is invalid.");
         return ret;
     }
 
     if (!sm6_parser_require_space(sm6, output_signature->element_count + input_signature->element_count))
     {
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory emitting shader signature declarations.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
@@ -6227,7 +6227,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     assert(sm6->function_count == 1);
     if (!sm6_block_emit_instructions(fn->blocks[0], sm6))
     {
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
                 "Out of memory emitting shader instructions.");
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
