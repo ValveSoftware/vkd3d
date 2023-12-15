@@ -307,6 +307,16 @@ void vkd3d_shader_vwarning(struct vkd3d_shader_message_context *context, const s
     vkd3d_string_buffer_printf(&context->messages, "\n");
 }
 
+void vkd3d_shader_warning(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_error error, const char *format, ...)
+{
+    va_list args;
+
+    va_start(args, format);
+    vkd3d_shader_vwarning(context, location, error, format, args);
+    va_end(args);
+}
+
 void vkd3d_shader_verror(struct vkd3d_shader_message_context *context, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_error error, const char *format, va_list args)
 {

@@ -6035,7 +6035,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((magic = sm6->start[0]) != BITCODE_MAGIC)
     {
         WARN("Unknown magic number 0x%08x.\n", magic);
-        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_UNKNOWN_MAGIC_NUMBER,
+        vkd3d_shader_warning(message_context, &location, VKD3D_SHADER_WARNING_DXIL_UNKNOWN_MAGIC_NUMBER,
                 "DXIL bitcode chunk magic number 0x%08x is not the expected 0x%08x.", magic, BITCODE_MAGIC);
     }
 
@@ -6044,7 +6044,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     if ((version.type = version_token >> 16) >= VKD3D_SHADER_TYPE_COUNT)
     {
         FIXME("Unknown shader type %#x.\n", version.type);
-        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_UNKNOWN_SHADER_TYPE,
+        vkd3d_shader_warning(message_context, &location, VKD3D_SHADER_WARNING_DXIL_UNKNOWN_SHADER_TYPE,
                 "Unknown shader type %#x.", version.type);
     }
 
