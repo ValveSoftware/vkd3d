@@ -215,6 +215,15 @@ enum vkd3d_shader_compile_option_feature_flags
      * This corresponds to the "shaderFloat64" feature in the Vulkan API, and
      * the "GL_ARB_gpu_shader_fp64" extension in the OpenGL API. */
     VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64       = 0x00000002,
+    /** The SPIR-V target environment supports wave operations.
+     * This flag is valid only in VKD3D_SHADER_SPIRV_ENVIRONMENT_VULKAN_1_1
+     * or greater, and corresponds to the following minimum requirements in
+     * VkPhysicalDeviceSubgroupProperties:
+     * - subgroupSize >= 4.
+     * - supportedOperations has BASIC, VOTE, ARITHMETIC, BALLOT, SHUFFLE and
+     *       QUAD bits set.
+     * - supportedStages include COMPUTE and FRAGMENT. \since 1.12 */
+    VKD3D_SHADER_COMPILE_OPTION_FEATURE_WAVE_OPS      = 0x00000004,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLAGS),
 };
