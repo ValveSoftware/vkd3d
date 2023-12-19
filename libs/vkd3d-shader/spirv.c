@@ -4298,14 +4298,18 @@ static void spirv_compiler_decorate_builtin(struct spirv_compiler *compiler,
 }
 
 static void spirv_compiler_emit_interpolation_decorations(struct spirv_compiler *compiler,
-        uint32_t id, enum vkd3d_shader_interpolation_mode mode)
+        enum vkd3d_shader_component_type component_type, uint32_t id, enum vkd3d_shader_interpolation_mode mode)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
 
     switch (mode)
     {
         case VKD3DSIM_NONE:
-            break;
+            /* VUID-StandaloneSpirv-Flat-04744: integer or double types must be
+             * decorated 'Flat' for fragment shaders. */
+            if (compiler->shader_type != VKD3D_SHADER_TYPE_PIXEL || component_type == VKD3D_SHADER_COMPONENT_FLOAT)
+                break;
+            /* fall through */
         case VKD3DSIM_CONSTANT:
             vkd3d_spirv_build_op_decorate(builder, id, SpvDecorationFlat, NULL, 0);
             break;
@@ -4901,7 +4905,8 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
         if (component_idx)
             vkd3d_spirv_build_op_decorate1(builder, input_id, SpvDecorationComponent, component_idx);
 
-        spirv_compiler_emit_interpolation_decorations(compiler, input_id, signature_element->interpolation_mode);
+        spirv_compiler_emit_interpolation_decorations(compiler, component_type, input_id,
+                signature_element->interpolation_mode);
     }
 
     var_id = input_id;
