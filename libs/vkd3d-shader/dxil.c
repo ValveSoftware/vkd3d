@@ -3432,6 +3432,7 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, struct sm6_
     /* Set idx_count to 3 for use with load instructions.
      * TODO: set register type from resource type when other types are supported. */
     vsir_register_init(reg, VKD3DSPR_CONSTBUFFER, VKD3D_DATA_FLOAT, 3);
+    reg->dimension = VSIR_DIMENSION_VEC4;
     reg->idx[0].offset = id;
     register_index_address_init(&reg->idx[1], operands[2], sm6);
     reg->non_uniform = !!sm6_value_get_constant_uint(operands[3]);
