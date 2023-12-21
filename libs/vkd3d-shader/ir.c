@@ -1649,6 +1649,26 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK, "Destination has invalid write mask %#x.",
                 dst->write_mask);
 
+    switch (dst->reg.dimension)
+    {
+        case VSIR_DIMENSION_SCALAR:
+            if (dst->write_mask != VKD3DSP_WRITEMASK_0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK, "Scalar destination has invalid write mask %#x.",
+                    dst->write_mask);
+            break;
+
+        case VSIR_DIMENSION_VEC4:
+            if (dst->write_mask == 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK, "Vec4 destination has empty write mask.");
+            break;
+
+        default:
+            if (dst->write_mask != 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_WRITE_MASK, "Destination of dimension %u has invalid write mask %#x.",
+                    dst->reg.dimension, dst->write_mask);
+            break;
+    }
+
     if (dst->modifiers & ~VKD3DSPDM_MASK)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Destination has invalid modifiers %#x.",
                 dst->modifiers);
