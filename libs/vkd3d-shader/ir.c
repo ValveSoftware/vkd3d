@@ -2650,6 +2650,34 @@ static void vsir_validate_src_count(struct validation_context *ctx,
                 instruction->src_count, instruction->handler_idx, count);
 }
 
+static bool vsir_validate_src_min_count(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, unsigned int count)
+{
+    if (instruction->src_count < count)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
+                "Invalid source count %u for an instruction of type %#x, expected at least %u.",
+                instruction->src_count, instruction->handler_idx, count);
+        return false;
+    }
+
+    return true;
+}
+
+static bool vsir_validate_src_max_count(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, unsigned int count)
+{
+    if (instruction->src_count > count)
+    {
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
+                "Invalid source count %u for an instruction of type %#x, expected at most %u.",
+                instruction->src_count, instruction->handler_idx, count);
+        return false;
+    }
+
+    return true;
+}
+
 static const char *name_from_cf_type(enum cf_type type)
 {
     switch (type)
@@ -2854,6 +2882,43 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
                         "Invalid register of type %#x in a LABEL instruction, expected LABEL.",
                         instruction->src[0].reg.type);
+            break;
+
+        case VKD3DSIH_BRANCH:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_dst_count(ctx, instruction, 0);
+            if (!vsir_validate_src_min_count(ctx, instruction, 1))
+                break;
+            if (vsir_register_is_label(&instruction->src[0].reg))
+            {
+                /* Unconditional branch: parameters are jump label,
+                 * optional merge label, optional continue label. */
+                vsir_validate_src_max_count(ctx, instruction, 3);
+
+                for (i = 0; i < instruction->src_count; ++i)
+                {
+                    if (!vsir_register_is_label(&instruction->src[i].reg))
+                        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                                "Invalid register of type %#x in unconditional BRANCH instruction, expected LABEL.",
+                                instruction->src[i].reg.type);
+                }
+            }
+            else
+            {
+                /* Conditional branch: parameters are condition, true
+                 * jump label, false jump label, optional merge label,
+                 * optional continue label. */
+                vsir_validate_src_min_count(ctx, instruction, 3);
+                vsir_validate_src_max_count(ctx, instruction, 5);
+
+                for (i = 1; i < instruction->src_count; ++i)
+                {
+                    if (!vsir_register_is_label(&instruction->src[i].reg))
+                        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                                "Invalid register of type %#x in conditional BRANCH instruction, expected LABEL.",
+                                instruction->src[i].reg.type);
+                }
+            }
             break;
 
         default:
