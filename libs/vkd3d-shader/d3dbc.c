@@ -482,9 +482,23 @@ static void shader_sm1_parse_dst_param(uint32_t param, const struct vkd3d_shader
         dst->reg.dimension = VSIR_DIMENSION_SCALAR;
     else
         dst->reg.dimension = VSIR_DIMENSION_VEC4;
-    dst->write_mask = (param & VKD3D_SM1_WRITEMASK_MASK) >> VKD3D_SM1_WRITEMASK_SHIFT;
     dst->modifiers = (param & VKD3D_SM1_DST_MODIFIER_MASK) >> VKD3D_SM1_DST_MODIFIER_SHIFT;
     dst->shift = (param & VKD3D_SM1_DSTSHIFT_MASK) >> VKD3D_SM1_DSTSHIFT_SHIFT;
+
+    switch (dst->reg.dimension)
+    {
+        case VSIR_DIMENSION_SCALAR:
+            dst->write_mask = VKD3DSP_WRITEMASK_0;
+            break;
+
+        case VSIR_DIMENSION_VEC4:
+            dst->write_mask = (param & VKD3D_SM1_WRITEMASK_MASK) >> VKD3D_SM1_WRITEMASK_SHIFT;
+            break;
+
+        default:
+            dst->write_mask = 0;
+            break;
+    }
 }
 
 static struct signature_element *find_signature_element(const struct shader_signature *signature,
