@@ -2846,6 +2846,16 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 --ctx->depth;
             break;
 
+        case VKD3DSIH_LABEL:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_dst_count(ctx, instruction, 0);
+            vsir_validate_src_count(ctx, instruction, 1);
+            if (instruction->src_count >= 1 && !vsir_register_is_label(&instruction->src[0].reg))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                        "Invalid register of type %#x in a LABEL instruction, expected LABEL.",
+                        instruction->src[0].reg.type);
+            break;
+
         default:
             break;
     }
