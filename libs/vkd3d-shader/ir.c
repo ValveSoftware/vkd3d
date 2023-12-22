@@ -2484,6 +2484,37 @@ static void vsir_validate_register(struct validation_context *ctx,
             break;
         }
 
+        case VKD3DSPR_LABEL:
+            if (reg->precision != VKD3D_SHADER_REGISTER_PRECISION_DEFAULT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_PRECISION, "Invalid precision %#x for a LABEL register.",
+                        reg->precision);
+
+            if (reg->data_type != VKD3D_DATA_UINT)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE, "Invalid data type %#x for a LABEL register.",
+                        reg->data_type);
+
+            if (reg->dimension != VSIR_DIMENSION_NONE)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a LABEL register.",
+                        reg->dimension);
+
+            if (reg->idx_count != 1)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a LABEL register.",
+                        reg->idx_count);
+                break;
+            }
+
+            if (reg->idx[0].rel_addr)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a LABEL register.");
+
+            /* Index == 0 is invalid, but it is temporarily allowed
+             * for intermediate stages. Once we support validation
+             * dialects we can selectively check for that. */
+            if (reg->idx[0].offset > ctx->parser->shader_desc.block_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "LABEL register index %u exceeds the maximum count %u.",
+                        reg->idx[0].offset, ctx->parser->shader_desc.block_count);
+            break;
+
         case VKD3DSPR_NULL:
             if (reg->idx_count != 0)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a NULL register.",
