@@ -1776,5 +1776,7 @@ struct vkd3d_shader_cache;
 int vkd3d_shader_open_cache(struct vkd3d_shader_cache **cache);
 unsigned int vkd3d_shader_cache_incref(struct vkd3d_shader_cache *cache);
 unsigned int vkd3d_shader_cache_decref(struct vkd3d_shader_cache *cache);
+int vkd3d_shader_cache_put(struct vkd3d_shader_cache *cache,
+        const void *key, size_t key_size, const void *value, size_t value_size);
 
 #endif  /* __VKD3D_PRIVATE_H */

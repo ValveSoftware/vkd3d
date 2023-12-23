@@ -35,6 +35,8 @@ HRESULT hresult_from_vkd3d_result(int vkd3d_result)
             return E_INVALIDARG;
         case VKD3D_ERROR_NOT_IMPLEMENTED:
             return E_NOTIMPL;
+        case VKD3D_ERROR_KEY_ALREADY_EXISTS:
+            return DXGI_ERROR_ALREADY_EXISTS;
         default:
             FIXME("Unhandled vkd3d result %d.\n", vkd3d_result);
             return E_FAIL;

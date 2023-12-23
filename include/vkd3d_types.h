@@ -53,6 +53,8 @@ enum vkd3d_result
     VKD3D_ERROR_INVALID_SHADER = -4,
     /** The operation is not implemented in this version of vkd3d. */
     VKD3D_ERROR_NOT_IMPLEMENTED = -5,
+    /** The object or entry already exists. \since 1.12 */
+    VKD3D_ERROR_KEY_ALREADY_EXISTS = -6,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_RESULT),
 };

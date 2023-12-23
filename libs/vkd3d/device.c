@@ -2694,10 +2694,20 @@ static HRESULT STDMETHODCALLTYPE d3d12_cache_session_FindValue(ID3D12ShaderCache
 static HRESULT STDMETHODCALLTYPE d3d12_cache_session_StoreValue(ID3D12ShaderCacheSession *iface,
         const void *key, UINT key_size, const void *value, UINT value_size)
 {
-    FIXME("iface %p, key %p, key_size %#x, value %p, value_size %u stub!\n", iface, key, key_size,
-            value, value_size);
+    struct d3d12_cache_session *session = impl_from_ID3D12ShaderCacheSession(iface);
+    enum vkd3d_result ret;
 
-    return E_NOTIMPL;
+    TRACE("iface %p, key %p, key_size %#x, value %p, value_size %u.\n",
+            iface, key, key_size, value, value_size);
+
+    if (!key || !key_size || !value || !value_size)
+    {
+        WARN("Invalid input parameters, returning E_INVALIDARG.\n");
+        return E_INVALIDARG;
+    }
+
+    ret = vkd3d_shader_cache_put(session->cache, key, key_size, value, value_size);
+    return hresult_from_vkd3d_result(ret);
 }
 
 static void STDMETHODCALLTYPE d3d12_cache_session_SetDeleteOnDestroy(ID3D12ShaderCacheSession *iface)
