@@ -36861,6 +36861,12 @@ static void test_unbounded_resource_arrays(void)
     command_list = context.list;
     queue = context.queue;
 
+    if (get_resource_binding_tier(device) < D3D12_RESOURCE_BINDING_TIER_2)
+    {
+        skip("Device doesn't support resource binding tier 2.\n");
+        goto done;
+    }
+
     memset(&root_signature_desc, 0, sizeof(root_signature_desc));
     root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
     root_signature_desc.pParameters = root_parameters;
@@ -37020,6 +37026,12 @@ static void test_unbounded_samplers(void)
     device = context.device;
     command_list = context.list;
     queue = context.queue;
+
+    if (get_resource_binding_tier(device) < D3D12_RESOURCE_BINDING_TIER_2)
+    {
+        skip("Device doesn't support resource binding tier 2.\n");
+        goto done;
+    }
 
     root_signature_desc.NumParameters = ARRAY_SIZE(root_parameters);
     root_signature_desc.Flags = 0;
