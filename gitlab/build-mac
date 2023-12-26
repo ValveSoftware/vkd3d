@@ -19,6 +19,8 @@ else
     touch ../build_failed
 fi
 
+cat tests/d3d12.log | grep -E 'd3d12: [0-9]+ tests executed' || true
+
 mkdir -p ../artifacts/$COMMIT
 rsync -Rr config.log test-suite.log tests/*.log tests/*/*.log ../artifacts/$COMMIT || true
 
