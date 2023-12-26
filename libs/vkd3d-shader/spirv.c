@@ -1764,6 +1764,15 @@ static uint32_t vkd3d_spirv_build_op_glsl_std450_max(struct vkd3d_spirv_builder 
             GLSLstd450NMax, operands, ARRAY_SIZE(operands));
 }
 
+static uint32_t vkd3d_spirv_build_op_glsl_std450_umin(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t x, uint32_t y)
+{
+    uint32_t glsl_std450_id = vkd3d_spirv_get_glsl_std450_instr_set(builder);
+    uint32_t operands[] = {x, y};
+    return vkd3d_spirv_build_op_ext_inst(builder, result_type, glsl_std450_id,
+            GLSLstd450UMin, operands, ARRAY_SIZE(operands));
+}
+
 static uint32_t vkd3d_spirv_build_op_glsl_std450_nclamp(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t x, uint32_t min, uint32_t max)
 {
@@ -7355,7 +7364,7 @@ static void spirv_compiler_emit_ftou(struct spirv_compiler *compiler,
 static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
-    uint32_t src_ids[4], constituents[VKD3D_VEC4_SIZE], type_id, mask_id;
+    uint32_t src_ids[4], constituents[VKD3D_VEC4_SIZE], type_id, mask_id, size_id, max_count_id;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
@@ -7370,6 +7379,7 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
     component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
     type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
     mask_id = spirv_compiler_get_constant_uint(compiler, 0x1f);
+    size_id = spirv_compiler_get_constant_uint(compiler, 0x20);
 
     switch (instruction->handler_idx)
     {
@@ -7398,6 +7408,9 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
         {
             src_ids[j] = vkd3d_spirv_build_op_and(builder, type_id, src_ids[j], mask_id);
         }
+        max_count_id = vkd3d_spirv_build_op_isub(builder, type_id, size_id, src_ids[src_count - 2]);
+        src_ids[src_count - 1] = vkd3d_spirv_build_op_glsl_std450_umin(builder, type_id,
+                src_ids[src_count - 1], max_count_id);
 
         constituents[k++] = vkd3d_spirv_build_op_trv(builder, &builder->function_stream,
                 op, type_id, src_ids, src_count);
