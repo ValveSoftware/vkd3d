@@ -21394,11 +21394,13 @@ static void test_stencil_load(void)
 
         transition_sub_resource_state(command_list, context.render_target, 0,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        bug_if(is_mvk_device(context.device))
         check_sub_resource_uvec4(context.render_target, 0, queue, command_list, &uvec4);
 
         reset_command_list(command_list, context.allocator);
         transition_sub_resource_state(command_list, texture, 0,
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        bug_if(is_mvk_device(context.device))
         check_sub_resource_uvec4(texture, 0, queue, command_list, &uvec4);
 
         reset_command_list(command_list, context.allocator);
