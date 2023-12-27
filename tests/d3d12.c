@@ -31973,6 +31973,13 @@ static void test_combined_clip_and_cull_distances(void)
     command_list = context.list;
     queue = context.queue;
 
+    if (is_mvk_device(device))
+    {
+        skip("Cull distance not supported on MoltenVK.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
     input_layout.pInputElementDescs = layout_desc;
     input_layout.NumElements = ARRAY_SIZE(layout_desc);
 
