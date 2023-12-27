@@ -901,6 +901,30 @@ bool vkd3d_get_program_name(char program_name[PATH_MAX])
     return true;
 }
 
+#elif defined(WIN32)
+
+bool vkd3d_get_program_name(char program_name[PATH_MAX])
+{
+    char buffer[MAX_PATH];
+    char *p, *name;
+    size_t len;
+
+    *program_name = '\0';
+    len = GetModuleFileNameA(NULL, buffer, ARRAY_SIZE(buffer));
+    if (!(len && len < MAX_PATH))
+        return false;
+
+    name = buffer;
+    if ((p = strrchr(name, '/')))
+        name = p + 1;
+    if ((p = strrchr(name, '\\')))
+        name = p + 1;
+
+    len = strlen(name) + 1;
+    memcpy(program_name, name, len);
+    return true;
+}
+
 #else
 
 bool vkd3d_get_program_name(char program_name[PATH_MAX])
