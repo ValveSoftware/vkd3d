@@ -31626,92 +31626,99 @@ static void test_clip_distance(void)
 
     ID3D12PipelineState_Release(pso);
 
-    /* tessellation shaders */
-    pso_desc.HS = hs;
-    pso_desc.DS = ds;
-    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
-    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
-            &IID_ID3D12PipelineState, (void **)&pso);
-    ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
+    if (is_mvk_device(device))
+    {
+        skip("Clipping not supported in tessellation and geometry shaders on MoltenVK.\n");
+    }
+    else
+    {
+        /* tessellation shaders */
+        pso_desc.HS = hs;
+        pso_desc.DS = ds;
+        pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+        hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+                &IID_ID3D12PipelineState, (void **)&pso);
+        ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
 
-    check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
-            vbv, vb[1], vs_cb, tess_cb, gs_cb);
+        check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
+                vbv, vb[1], vs_cb, tess_cb, gs_cb);
 
-    cb_data.use_constant = false;
-    cb_data.tessellation_factor = 2.0f;
-    update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
+        cb_data.use_constant = false;
+        cb_data.tessellation_factor = 2.0f;
+        update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
 
-    for (i = 0; i < ARRAY_SIZE(vertices); ++i)
-        vertices[i].clip_distance0 = 1.0f;
-    update_buffer_data(vb[1], 0, sizeof(vertices), &vertices);
+        for (i = 0; i < ARRAY_SIZE(vertices); ++i)
+            vertices[i].clip_distance0 = 1.0f;
+        update_buffer_data(vb[1], 0, sizeof(vertices), &vertices);
 
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
-            ID3D12Resource_GetGPUVirtualAddress(vs_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
-            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
-            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
-            ID3D12Resource_GetGPUVirtualAddress(gs_cb));
-    ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
-    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
-    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
-    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
-    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
-    transition_resource_state(command_list, context.render_target,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
+        ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+        ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
+                ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+                ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+                ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
+                ID3D12Resource_GetGPUVirtualAddress(gs_cb));
+        ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
+        ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+        ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+        ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+        ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+        ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
+        transition_resource_state(command_list, context.render_target,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
 
-    ID3D12PipelineState_Release(pso);
-    reset_command_list(command_list, context.allocator);
-    transition_resource_state(command_list, context.render_target,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        ID3D12PipelineState_Release(pso);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, context.render_target,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-    cb_data.use_constant = true;
-    cb_data.clip_distance0 = -1.0f;
-    update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
+        cb_data.use_constant = true;
+        cb_data.clip_distance0 = -1.0f;
+        update_buffer_data(tess_cb, 0, sizeof(cb_data), &cb_data);
 
-    /* geometry shader */
-    pso_desc.GS = gs;
-    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
-            &IID_ID3D12PipelineState, (void **)&pso);
-    ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
+        /* geometry shader */
+        pso_desc.GS = gs;
+        hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
+                &IID_ID3D12PipelineState, (void **)&pso);
+        ok(hr == S_OK, "Failed to create pipeline state, hr %#x.\n", hr);
 
-    check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
-            vbv, vb[1], vs_cb, tess_cb, gs_cb);
+        check_clip_distance(&context, pso, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
+                vbv, vb[1], vs_cb, tess_cb, gs_cb);
 
-    cb_data.use_constant = true;
-    cb_data.clip_distance0 = 1.0f;
-    update_buffer_data(gs_cb, 0, sizeof(cb_data), &cb_data);
-    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
-    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
-            ID3D12Resource_GetGPUVirtualAddress(vs_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
-            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
-            ID3D12Resource_GetGPUVirtualAddress(tess_cb));
-    ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
-            ID3D12Resource_GetGPUVirtualAddress(gs_cb));
-    ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
-    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
-    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
-    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
-    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
-    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
-    transition_resource_state(command_list, context.render_target,
-            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-    check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
+        cb_data.use_constant = true;
+        cb_data.clip_distance0 = 1.0f;
+        update_buffer_data(gs_cb, 0, sizeof(cb_data), &cb_data);
+        ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+        ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 0,
+                ID3D12Resource_GetGPUVirtualAddress(vs_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 1,
+                ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 2,
+                ID3D12Resource_GetGPUVirtualAddress(tess_cb));
+        ID3D12GraphicsCommandList_SetGraphicsRootConstantBufferView(command_list, 3,
+                ID3D12Resource_GetGPUVirtualAddress(gs_cb));
+        ID3D12GraphicsCommandList_SetPipelineState(command_list, pso);
+        ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+        ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+        ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+        ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, ARRAY_SIZE(vbv), vbv);
+        ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+        ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
+        transition_resource_state(command_list, context.render_target,
+                D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
 
-    ID3D12PipelineState_Release(pso);
-    reset_command_list(command_list, context.allocator);
-    transition_resource_state(command_list, context.render_target,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        ID3D12PipelineState_Release(pso);
+        reset_command_list(command_list, context.allocator);
+        transition_resource_state(command_list, context.render_target,
+                D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    }
 
     /* multiple clip distances */
     pso_desc.VS = vs_multiple;
