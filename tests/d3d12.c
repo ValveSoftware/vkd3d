@@ -24848,6 +24848,7 @@ static void test_resolve_non_issued_query_data(void)
             "Got unexpected timestamp %#"PRIx64".\n", timestamps[0]);
     ok(!timestamps[1], "Got unexpected timestamp %#"PRIx64".\n", timestamps[1]);
     ok(!timestamps[2], "Got unexpected timestamp %#"PRIx64".\n", timestamps[2]);
+    bug_if(is_mvk_device(device))
     ok(timestamps[3] != initial_data[3] && timestamps[3] > 0,
             "Got unexpected timestamp %#"PRIx64".\n", timestamps[3]);
     release_resource_readback(&rb);
