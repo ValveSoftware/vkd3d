@@ -25877,7 +25877,13 @@ static void test_instance_id(void)
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
         get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         for (j = 0; j < ARRAY_SIZE(expected_results); ++j)
+        {
+            /* MoltenVK seems to have a bug with instanced draws when
+             * the instance data step rate is zero: in some cases
+             * StartVertexLocation seems to be ignored. */
+            bug_if(is_mvk_device(context.device) && i == 0 && 8 <= j && j < 12)
             check_readback_data_uint(&rb.rb, &expected_results[j].box, tests[i].expected_colors[j], 1);
+        }
         release_resource_readback(&rb);
         reset_command_list(command_list, context.allocator);
         transition_resource_state(command_list, render_target,
