@@ -3723,9 +3723,37 @@ static VkResult d3d12_create_sampler(struct d3d12_device *device, D3D12_FILTER f
     return vr;
 }
 
+static D3D12_STATIC_BORDER_COLOR d3d12_static_border_colour(const float *colour)
+{
+    unsigned int i;
+
+    static const struct
+    {
+        float colour[4];
+        D3D12_STATIC_BORDER_COLOR static_colour;
+    }
+    colours[] =
+    {
+        {{0.0f, 0.0f, 0.0f, 0.0f}, D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK},
+        {{0.0f, 0.0f, 0.0f, 1.0f}, D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK},
+        {{1.0f, 1.0f, 1.0f, 1.0f}, D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE},
+    };
+
+    for (i = 0; i < ARRAY_SIZE(colours); ++i)
+    {
+        if (!memcmp(colour, colours[i].colour, sizeof(colours[i].colour)))
+            return colours[i].static_colour;
+    }
+
+    FIXME("Unhandled border colour {%.8e, %.8e, %.8e, %.8e}.\n", colour[0], colour[1], colour[2], colour[3]);
+
+    return D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+}
+
 void d3d12_desc_create_sampler(struct d3d12_desc *sampler,
         struct d3d12_device *device, const D3D12_SAMPLER_DESC *desc)
 {
+    D3D12_STATIC_BORDER_COLOR static_colour = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
     struct vkd3d_view *view;
 
     if (!desc)
@@ -3737,8 +3765,7 @@ void d3d12_desc_create_sampler(struct d3d12_desc *sampler,
     if (desc->AddressU == D3D12_TEXTURE_ADDRESS_MODE_BORDER
             || desc->AddressV == D3D12_TEXTURE_ADDRESS_MODE_BORDER
             || desc->AddressW == D3D12_TEXTURE_ADDRESS_MODE_BORDER)
-        FIXME("Ignoring border color {%.8e, %.8e, %.8e, %.8e}.\n",
-                desc->BorderColor[0], desc->BorderColor[1], desc->BorderColor[2], desc->BorderColor[3]);
+        static_colour = d3d12_static_border_colour(desc->BorderColor);
 
     if (!(view = vkd3d_view_create(VKD3D_DESCRIPTOR_MAGIC_SAMPLER, VK_DESCRIPTOR_TYPE_SAMPLER,
             VKD3D_VIEW_TYPE_SAMPLER, device)))
@@ -3748,7 +3775,7 @@ void d3d12_desc_create_sampler(struct d3d12_desc *sampler,
 
     if (d3d12_create_sampler(device, desc->Filter, desc->AddressU, desc->AddressV,
             desc->AddressW, desc->MipLODBias, desc->MaxAnisotropy, desc->ComparisonFunc,
-            D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK, desc->MinLOD, desc->MaxLOD, &view->v.u.vk_sampler) < 0)
+            static_colour, desc->MinLOD, desc->MaxLOD, &view->v.u.vk_sampler) < 0)
     {
         vkd3d_view_decref(view, device);
         return;
