@@ -5975,6 +5975,8 @@ static enum vkd3d_shader_resource_type shader_resource_type_from_dxil_resource_k
     switch (kind)
     {
         case RESOURCE_KIND_TYPEDBUFFER:
+        case RESOURCE_KIND_RAWBUFFER:
+        case RESOURCE_KIND_STRUCTUREDBUFFER:
             return VKD3D_SHADER_RESOURCE_BUFFER;
         default:
             return VKD3D_SHADER_RESOURCE_NONE;
@@ -6039,6 +6041,13 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
     }
     ins->resource_type = resource_type;
 
+    if (!m)
+    {
+        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
+        ins->declaration.raw_resource.resource.reg.write_mask = 0;
+        return &ins->declaration.raw_resource.resource;
+    }
+
     if (!sm6_metadata_value_is_node(m))
     {
         WARN("Resource metadata list is not a node.\n");
@@ -6092,6 +6101,39 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
         ins->declaration.semantic.resource.reg.write_mask = VKD3DSP_WRITEMASK_ALL;
 
         return &ins->declaration.semantic.resource;
+    }
+    else if (dxil_resource_type == RESOURCE_TYPE_RAW_STRUCTURED)
+    {
+        if (kind == RESOURCE_KIND_RAWBUFFER)
+        {
+            ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
+            ins->declaration.raw_resource.resource.reg.write_mask = 0;
+
+            return &ins->declaration.raw_resource.resource;
+        }
+
+        if (kind != RESOURCE_KIND_STRUCTUREDBUFFER)
+        {
+            WARN("Unhandled resource kind %u.\n", kind);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource kind %u for a raw or structured buffer is unhandled.", kind);
+            return NULL;
+        }
+
+        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_STRUCTURED : VKD3DSIH_DCL_RESOURCE_STRUCTURED;
+        ins->declaration.structured_resource.byte_stride = values[1];
+        ins->declaration.structured_resource.resource.reg.write_mask = 0;
+
+        /* TODO: 16-bit resources. */
+        if (ins->declaration.structured_resource.byte_stride % 4u)
+        {
+            WARN("Byte stride %u is not a multiple of 4.\n", ins->declaration.structured_resource.byte_stride);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Structured resource byte stride %u is not a multiple of 4.",
+                    ins->declaration.structured_resource.byte_stride);
+        }
+
+        return &ins->declaration.structured_resource.resource;
     }
     else
     {
@@ -6159,7 +6201,8 @@ static enum vkd3d_result sm6_parser_resources_load_srv(struct sm6_parser *sm6,
     d->kind = kind;
     d->reg_type = VKD3DSPR_RESOURCE;
     d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_RESOURCE;
-    d->resource_data_type = ins->declaration.semantic.resource_data_type[0];
+    d->resource_data_type = (ins->handler_idx == VKD3DSIH_DCL)
+            ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
     init_resource_declaration(resource, VKD3DSPR_RESOURCE, d->reg_data_type, d->id, &d->range);
 
@@ -6232,7 +6275,8 @@ static enum vkd3d_result sm6_parser_resources_load_uav(struct sm6_parser *sm6,
     d->kind = values[0];
     d->reg_type = VKD3DSPR_UAV;
     d->reg_data_type = (ins->resource_type == VKD3D_SHADER_RESOURCE_BUFFER) ? VKD3D_DATA_UINT : VKD3D_DATA_UAV;
-    d->resource_data_type = ins->declaration.semantic.resource_data_type[0];
+    d->resource_data_type = (ins->handler_idx == VKD3DSIH_DCL_UAV_TYPED)
+            ? ins->declaration.semantic.resource_data_type[0] : VKD3D_DATA_UNUSED;
 
     init_resource_declaration(resource, VKD3DSPR_UAV, d->reg_data_type, d->id, &d->range);
 
