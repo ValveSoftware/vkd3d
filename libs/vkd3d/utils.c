@@ -549,6 +549,7 @@ bool is_valid_feature_level(D3D_FEATURE_LEVEL feature_level)
         D3D_FEATURE_LEVEL_9_3,
         D3D_FEATURE_LEVEL_9_2,
         D3D_FEATURE_LEVEL_9_1,
+        D3D_FEATURE_LEVEL_1_0_CORE,
     };
     unsigned int i;
 
