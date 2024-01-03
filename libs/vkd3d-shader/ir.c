@@ -442,11 +442,32 @@ void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader
     param->modifiers = VKD3DSPSM_NONE;
 }
 
+void vsir_dst_param_init(struct vkd3d_shader_dst_param *param, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
+{
+    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
+    param->write_mask = VKD3DSP_WRITEMASK_0;
+    param->modifiers = VKD3DSPDM_NONE;
+    param->shift = 0;
+}
+
 void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
 {
     vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UINT, 1);
     param->reg.dimension = VSIR_DIMENSION_NONE;
     param->reg.idx[0].offset = label_id;
+}
+
+static void src_param_init_ssa_bool(struct vkd3d_shader_src_param *src, unsigned int idx)
+{
+    vsir_src_param_init(src, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
+    src->reg.idx[0].offset = idx;
+}
+
+static void dst_param_init_ssa_bool(struct vkd3d_shader_dst_param *dst, unsigned int idx)
+{
+    vsir_dst_param_init(dst, VKD3DSPR_SSA, VKD3D_DATA_BOOL, 1);
+    dst->reg.idx[0].offset = idx;
 }
 
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
@@ -2350,6 +2371,127 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
     return result;
 }
 
+static unsigned int label_from_src_param(const struct vkd3d_shader_src_param *param)
+{
+    assert(param->reg.type == VKD3DSPR_LABEL);
+    return param->reg.idx[0].offset;
+}
+
+static bool reserve_instructions(struct vkd3d_shader_instruction **instructions, size_t *capacity, size_t count)
+{
+    if (!vkd3d_array_reserve((void **)instructions, capacity, count, sizeof(**instructions)))
+    {
+        ERR("Failed to allocate instructions.\n");
+        return false;
+    }
+
+    return true;
+}
+
+static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *parser)
+{
+    unsigned int block_count = parser->program.block_count, ssa_count = parser->program.ssa_count;
+    struct vkd3d_shader_instruction *instructions = NULL;
+    size_t ins_capacity = 0, ins_count = 0, i;
+
+    if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
+        goto fail;
+
+    for (i = 0; i < parser->program.instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        unsigned int case_count, j, default_label;
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_SWITCH_MONOLITHIC:
+                break;
+
+            case VKD3DSIH_PHI:
+                WARN("Unhandled PHI when lowering switch.\n");
+                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Unhandled PHI when lowering switch.");
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
+
+            default:
+                if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
+                    goto fail;
+                instructions[ins_count++] = *ins;
+                continue;
+        }
+
+        case_count = (ins->src_count - 3) / 2;
+        default_label = label_from_src_param(&ins->src[1]);
+
+        /* In principle we can have a switch with no cases, and we
+         * just have to jump to the default label. */
+        if (case_count == 0)
+        {
+            if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
+                goto fail;
+
+            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_BRANCH, 0, 1))
+                goto fail;
+            vsir_src_param_init_label(&instructions[ins_count].src[0], default_label);
+            ++ins_count;
+        }
+
+        if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 3 * case_count - 1))
+            goto fail;
+
+        for (j = 0; j < case_count; ++j)
+        {
+            unsigned int fallthrough_label, case_label = label_from_src_param(&ins->src[3 + 2 * j + 1]);
+
+            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_IEQ, 1, 2))
+                goto fail;
+            dst_param_init_ssa_bool(&instructions[ins_count].dst[0], ssa_count);
+            instructions[ins_count].src[0] = ins->src[0];
+            instructions[ins_count].src[1] = ins->src[3 + 2 * j];
+            ++ins_count;
+
+            /* For all cases except the last one we fall through to
+             * the following case; the last one has to jump to the
+             * default label. */
+            if (j == case_count - 1)
+                fallthrough_label = default_label;
+            else
+                fallthrough_label = block_count + 1;
+
+            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_BRANCH, 0, 3))
+                goto fail;
+            src_param_init_ssa_bool(&instructions[ins_count].src[0], ssa_count);
+            vsir_src_param_init_label(&instructions[ins_count].src[1], case_label);
+            vsir_src_param_init_label(&instructions[ins_count].src[2], fallthrough_label);
+            ++ins_count;
+
+            ++ssa_count;
+
+            if (j != case_count - 1)
+            {
+                if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_LABEL, 0, 1))
+                    goto fail;
+                vsir_src_param_init_label(&instructions[ins_count].src[0], ++block_count);
+                ++ins_count;
+            }
+        }
+    }
+
+    vkd3d_free(parser->program.instructions.elements);
+    parser->program.instructions.elements = instructions;
+    parser->program.instructions.capacity = ins_capacity;
+    parser->program.instructions.count = ins_count;
+    parser->program.block_count = block_count;
+    parser->program.ssa_count = ssa_count;
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(instructions);
+
+    return VKD3D_ERROR_OUT_OF_MEMORY;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -2361,7 +2503,12 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if ((result = instruction_array_lower_texkills(parser)) < 0)
         return result;
 
-    if (!parser->shader_desc.is_dxil)
+    if (parser->shader_desc.is_dxil)
+    {
+        if ((result = lower_switch_to_if_ladder(parser)) < 0)
+            return result;
+    }
+    else
     {
         if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         {

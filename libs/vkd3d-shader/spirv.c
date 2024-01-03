@@ -7830,8 +7830,9 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
     }
 
     condition_id = spirv_compiler_emit_load_src(compiler, &src[0], VKD3DSP_WRITEMASK_0);
-    condition_id = spirv_compiler_emit_int_to_bool(compiler,
-            VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, 1, condition_id);
+    if (src[0].reg.data_type != VKD3D_DATA_BOOL)
+        condition_id = spirv_compiler_emit_int_to_bool(compiler,
+                VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, 1, condition_id);
     /* Emit the merge immediately before the branch instruction. */
     if (instruction->src_count >= 4)
         spirv_compiler_emit_merge(compiler, src[3].reg.idx[0].offset,
