@@ -27923,6 +27923,7 @@ static void test_geometry_shader(void)
     color = get_readback_uint(&rb.rb, 255, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 320, 240, 0);
+    bug_if(is_mvk_device(device))
     ok(compare_color(color, 0xffffff00, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 385, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
@@ -27937,6 +27938,7 @@ static void test_geometry_shader(void)
     color = get_readback_uint(&rb.rb, 255, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 320, 240, 0);
+    bug_if(is_mvk_device(device))
     ok(compare_color(color, 0xffffff00, 1), "Got unexpected color 0x%08x.\n", color);
     color = get_readback_uint(&rb.rb, 385, 240, 0);
     ok(compare_color(color, 0xff0000ff, 1), "Got unexpected color 0x%08x.\n", color);
@@ -28142,12 +28144,15 @@ static void test_layered_rendering(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
+    bug_if(is_mvk_device(device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xff00ff00, 0);
     reset_command_list(command_list, context.allocator);
     check_sub_resource_uint(context.render_target, 1, queue, command_list, 0xffffffff, 0);
     reset_command_list(command_list, context.allocator);
+    bug_if(is_mvk_device(device))
     check_sub_resource_uint(context.render_target, 2, queue, command_list, 0x00000000, 0);
     reset_command_list(command_list, context.allocator);
+    bug_if(is_mvk_device(device))
     check_sub_resource_uint(context.render_target, 3, queue, command_list, 0xffffff00, 0);
 
     ID3D12Resource_Release(vb);
