@@ -603,7 +603,7 @@ static bool io_normaliser_is_in_control_point_phase(const struct io_normaliser *
 static unsigned int shader_signature_find_element_for_reg(const struct shader_signature *signature,
         unsigned int reg_idx, unsigned int write_mask)
 {
-    unsigned int i;
+    unsigned int i, base_write_mask;
 
     for (i = 0; i < signature->element_count; ++i)
     {
@@ -615,7 +615,14 @@ static unsigned int shader_signature_find_element_for_reg(const struct shader_si
         }
     }
 
-    /* Validated in the TPF reader. */
+    /* Validated in the TPF reader, but failure in signature_element_range_expand_mask()
+     * can land us here on an unmatched vector mask. */
+    FIXME("Failed to find signature element for register index %u, mask %#x; using scalar mask.\n",
+            reg_idx, write_mask);
+    base_write_mask = 1u << vsir_write_mask_get_component_idx(write_mask);
+    if (base_write_mask != write_mask)
+        return shader_signature_find_element_for_reg(signature, reg_idx, base_write_mask);
+
     vkd3d_unreachable();
 }
 
@@ -782,6 +789,51 @@ static int signature_element_index_compare(const void *a, const void *b)
     return vkd3d_u32_compare(e->sort_index, f->sort_index);
 }
 
+static unsigned int signature_element_range_expand_mask(struct signature_element *e, unsigned int register_count,
+        uint8_t range_map[][VKD3D_VEC4_SIZE])
+{
+    unsigned int i, j, component_idx, component_count, merged_write_mask = e->mask;
+
+    /* dcl_indexrange instructions can declare a subset of the full mask, and the masks of
+     * the elements within the range may differ. TPF's handling of arrayed inputs with
+     * dcl_indexrange is really just a hack. Here we create a mask which covers all element
+     * masks, and check for collisions with other ranges. */
+
+    for (i = 1; i < register_count; ++i)
+        merged_write_mask |= e[i].mask;
+
+    if (merged_write_mask == e->mask)
+        return merged_write_mask;
+
+    /* Reaching this point is very rare to begin with, and collisions are even rarer or
+     * impossible. If the latter shows up, the fallback in shader_signature_find_element_for_reg()
+     * may be sufficient. */
+
+    component_idx = vsir_write_mask_get_component_idx(e->mask);
+    component_count = vsir_write_mask_component_count(e->mask);
+
+    for (i = e->register_index; i < e->register_index + register_count; ++i)
+    {
+        for (j = 0; j < component_idx; ++j)
+            if (range_map[i][j])
+                break;
+        for (j = component_idx + component_count; j < VKD3D_VEC4_SIZE; ++j)
+            if (range_map[i][j])
+                break;
+    }
+
+    if (i == register_count)
+    {
+        WARN("Expanding mask %#x to %#x for %s, base reg %u, count %u.\n", e->mask, merged_write_mask,
+                e->semantic_name, e->register_index, register_count);
+        return merged_write_mask;
+    }
+
+    WARN("Cannot expand mask %#x to %#x for %s, base reg %u, count %u.\n", e->mask, merged_write_mask,
+            e->semantic_name, e->register_index, register_count);
+    return e->mask;
+}
+
 static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map[][VKD3D_VEC4_SIZE],
         bool is_patch_constant)
 {
@@ -852,6 +904,7 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
         {
             TRACE("Merging %s, base reg %u, count %u.\n", e->semantic_name, e->register_index, register_count);
             e->register_count = register_count;
+            e->mask = signature_element_range_expand_mask(e, register_count, range_map);
         }
     }
     element_count = new_count;

@@ -932,13 +932,6 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
     register_count = index_range->register_count;
     write_mask = index_range->dst.write_mask;
 
-    if (vsir_write_mask_component_count(write_mask) != 1)
-    {
-        WARN("Unhandled write mask %#x.\n", write_mask);
-        vkd3d_shader_parser_warning(&priv->p, VKD3D_SHADER_WARNING_TPF_UNHANDLED_INDEX_RANGE_MASK,
-                "Index range mask %#x is not scalar.", write_mask);
-    }
-
     switch ((type = index_range->dst.reg.type))
     {
         case VKD3DSPR_INPUT:
