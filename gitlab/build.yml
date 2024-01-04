@@ -5,7 +5,7 @@
   image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
   interruptible: true
   needs:
-    - job: build-image
+    - job: image-linux
       optional: true
   dependencies: []
   script:
@@ -68,7 +68,7 @@ build-crosstest:
   image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
   interruptible: true
   needs:
-    - job: build-image
+    - job: image-linux
       optional: true
   dependencies: []
   script:
@@ -94,7 +94,7 @@ build-crosstest:
   image: $CI_REGISTRY/wine/vkd3d:debian-bookworm
   interruptible: true
   needs:
-    - job: build-image
+    - job: image-linux
       optional: true
   dependencies: []
   script:

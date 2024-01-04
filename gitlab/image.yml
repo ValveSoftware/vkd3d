@@ -1,4 +1,4 @@
-build-image:
+image-linux:
   stage: image
   rules:
     - if: $CI_PIPELINE_SOURCE == 'push' && $CI_PROJECT_PATH == "wine/vkd3d" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

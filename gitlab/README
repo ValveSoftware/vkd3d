@@ -5,7 +5,7 @@ vkd3d testing scripts
 These scripts are used by the GitLab CI feature to automatically run
 the vkd3d tests on each merge request.
 
-The CI target build-image, in the file image.yml, builds a Docker
+The CI target image-linux, in the file image.yml, builds a Docker
 image based on Debian bookworm with all the packages required for
 testing, and uploads it to the GitLab container registry. The Docker
 script is in the file image.docker.
