@@ -865,9 +865,8 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
             f = &elements[j];
 
             /* Merge different components of the same register unless sysvals are different,
-             * interpolation modes are different, or it will be relative-addressed. */
+             * or it will be relative-addressed. */
             if (f->register_index != e->register_index || f->sysval_semantic != e->sysval_semantic
-                    || f->interpolation_mode != e->interpolation_mode
                     || range_map_get_register_count(range_map, f->register_index, f->mask) > 1)
                 break;
 
