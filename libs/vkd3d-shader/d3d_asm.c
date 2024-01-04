@@ -44,6 +44,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_BEM                             ] = "bem",
     [VKD3DSIH_BFI                             ] = "bfi",
     [VKD3DSIH_BFREV                           ] = "bfrev",
+    [VKD3DSIH_BRANCH                          ] = "branch",
     [VKD3DSIH_BREAK                           ] = "break",
     [VKD3DSIH_BREAKC                          ] = "breakc",
     [VKD3DSIH_BREAKP                          ] = "breakp",

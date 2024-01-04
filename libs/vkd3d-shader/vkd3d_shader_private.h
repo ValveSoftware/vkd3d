@@ -238,6 +238,7 @@ enum vkd3d_shader_opcode
     VKD3DSIH_BEM,
     VKD3DSIH_BFI,
     VKD3DSIH_BFREV,
+    VKD3DSIH_BRANCH,
     VKD3DSIH_BREAK,
     VKD3DSIH_BREAKC,
     VKD3DSIH_BREAKP,
@@ -1016,6 +1017,7 @@ struct vkd3d_shader_desc
 
     uint32_t temp_count;
     unsigned int ssa_count;
+    unsigned int block_count;
 
     struct
     {
@@ -1183,6 +1185,11 @@ static inline bool vkd3d_shader_instruction_has_texel_offset(const struct vkd3d_
 static inline bool register_is_constant(const struct vkd3d_shader_register *reg)
 {
     return (reg->type == VKD3DSPR_IMMCONST || reg->type == VKD3DSPR_IMMCONST64);
+}
+
+static inline bool vsir_register_is_label(const struct vkd3d_shader_register *reg)
+{
+    return reg->type == VKD3DSPR_LABEL;
 }
 
 struct vkd3d_shader_param_node

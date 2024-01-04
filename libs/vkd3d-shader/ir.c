@@ -312,12 +312,44 @@ void vsir_register_init(struct vkd3d_shader_register *reg, enum vkd3d_shader_reg
     reg->alignment = 0;
 }
 
+static void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d_shader_register_type reg_type,
+        enum vkd3d_data_type data_type, unsigned int idx_count)
+{
+    vsir_register_init(&param->reg, reg_type, data_type, idx_count);
+    param->swizzle = 0;
+    param->modifiers = VKD3DSPSM_NONE;
+}
+
+static void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
+{
+    vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UINT, 1);
+    param->reg.dimension = VSIR_DIMENSION_NONE;
+    param->reg.idx[0].offset = label_id;
+}
+
 void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode handler_idx)
 {
     memset(ins, 0, sizeof(*ins));
     ins->location = *location;
     ins->handler_idx = handler_idx;
+}
+
+static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        unsigned int label_id, void *parser)
+{
+    struct vkd3d_shader_src_param *src_param;
+
+    if (!(src_param = shader_parser_get_src_params(parser, 1)))
+        return false;
+
+    vsir_src_param_init_label(src_param, label_id);
+
+    vsir_instruction_init(ins, location, VKD3DSIH_LABEL);
+    ins->src = src_param;
+    ins->src_count = 1;
+
+    return true;
 }
 
 static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd3d_shader_instruction_array *src_instructions)
@@ -1476,6 +1508,324 @@ static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser 
     return VKD3D_OK;
 }
 
+struct cf_flattener_if_info
+{
+    struct vkd3d_shader_src_param *false_param;
+    uint32_t merge_block_id;
+    unsigned int else_block_id;
+};
+
+struct cf_flattener_info
+{
+    union
+    {
+        struct cf_flattener_if_info if_;
+    } u;
+
+    enum
+    {
+        VKD3D_BLOCK_IF,
+    } current_block;
+    bool inside_block;
+};
+
+struct cf_flattener
+{
+    struct vkd3d_shader_parser *parser;
+
+    struct vkd3d_shader_location location;
+    bool allocation_failed;
+
+    struct vkd3d_shader_instruction *instructions;
+    size_t instruction_capacity;
+    size_t instruction_count;
+
+    unsigned int block_id;
+
+    unsigned int control_flow_depth;
+    struct cf_flattener_info *control_flow_info;
+    size_t control_flow_info_size;
+};
+
+static struct vkd3d_shader_instruction *cf_flattener_require_space(struct cf_flattener *flattener, size_t count)
+{
+    if (!vkd3d_array_reserve((void **)&flattener->instructions, &flattener->instruction_capacity,
+            flattener->instruction_count + count, sizeof(*flattener->instructions)))
+    {
+        ERR("Failed to allocate instructions.\n");
+        flattener->allocation_failed = true;
+        return NULL;
+    }
+    return &flattener->instructions[flattener->instruction_count];
+}
+
+static bool cf_flattener_copy_instruction(struct cf_flattener *flattener,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_shader_instruction *dst_ins;
+
+    if (instruction->handler_idx == VKD3DSIH_NOP)
+        return true;
+
+    if (!(dst_ins = cf_flattener_require_space(flattener, 1)))
+        return false;
+
+    *dst_ins = *instruction;
+    ++flattener->instruction_count;
+    return true;
+}
+
+static unsigned int cf_flattener_alloc_block_id(struct cf_flattener *flattener)
+{
+    return ++flattener->block_id;
+}
+
+static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_shader_instruction *ins,
+        unsigned int count, struct cf_flattener *flattener)
+{
+    struct vkd3d_shader_src_param *params = shader_parser_get_src_params(flattener->parser, count);
+    if (!params)
+    {
+        flattener->allocation_failed = true;
+        return NULL;
+    }
+    ins->src = params;
+    ins->src_count = count;
+    return params;
+}
+
+static void cf_flattener_emit_label(struct cf_flattener *flattener, unsigned int label_id)
+{
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = cf_flattener_require_space(flattener, 1)))
+        return;
+    if (vsir_instruction_init_label(ins, &flattener->location, label_id, flattener->parser))
+        ++flattener->instruction_count;
+    else
+        flattener->allocation_failed = true;
+}
+
+/* For conditional branches, this returns the false target branch parameter. */
+static struct vkd3d_shader_src_param *cf_flattener_emit_branch(struct cf_flattener *flattener,
+        unsigned int merge_block_id, const struct vkd3d_shader_src_param *condition,
+        unsigned int true_id, unsigned int false_id,
+        unsigned int flags)
+{
+    struct vkd3d_shader_src_param *src_params, *false_branch_param;
+    struct vkd3d_shader_instruction *ins;
+
+    if (!(ins = cf_flattener_require_space(flattener, 1)))
+        return NULL;
+    vsir_instruction_init(ins, &flattener->location, VKD3DSIH_BRANCH);
+
+    if (condition)
+    {
+        if (!(src_params = instruction_src_params_alloc(ins, 4, flattener)))
+            return NULL;
+        src_params[0] = *condition;
+        if (flags == VKD3D_SHADER_CONDITIONAL_OP_Z)
+        {
+            vsir_src_param_init_label(&src_params[1], false_id);
+            vsir_src_param_init_label(&src_params[2], true_id);
+            false_branch_param = &src_params[1];
+        }
+        else
+        {
+            vsir_src_param_init_label(&src_params[1], true_id);
+            vsir_src_param_init_label(&src_params[2], false_id);
+            false_branch_param = &src_params[2];
+        }
+        vsir_src_param_init_label(&src_params[3], merge_block_id);
+    }
+    else
+    {
+        if (!(src_params = instruction_src_params_alloc(ins, 1, flattener)))
+            return NULL;
+        vsir_src_param_init_label(&src_params[0], true_id);
+        false_branch_param = NULL;
+    }
+
+    ++flattener->instruction_count;
+
+    return false_branch_param;
+}
+
+static void cf_flattener_emit_unconditional_branch(struct cf_flattener *flattener, unsigned int target_block_id)
+{
+    cf_flattener_emit_branch(flattener, 0, NULL, target_block_id, 0, 0);
+}
+
+static struct cf_flattener_info *cf_flattener_push_control_flow_level(struct cf_flattener *flattener)
+{
+    if (!vkd3d_array_reserve((void **)&flattener->control_flow_info, &flattener->control_flow_info_size,
+            flattener->control_flow_depth + 1, sizeof(*flattener->control_flow_info)))
+    {
+        ERR("Failed to allocate control flow info structure.\n");
+        flattener->allocation_failed = true;
+        return NULL;
+    }
+
+    return &flattener->control_flow_info[flattener->control_flow_depth++];
+}
+
+static void cf_flattener_pop_control_flow_level(struct cf_flattener *flattener)
+{
+    struct cf_flattener_info *cf_info;
+
+    cf_info = &flattener->control_flow_info[--flattener->control_flow_depth];
+    memset(cf_info, 0, sizeof(*cf_info));
+}
+
+static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
+{
+    struct vkd3d_shader_parser *parser = flattener->parser;
+    struct vkd3d_shader_instruction_array *instructions;
+    struct vkd3d_shader_instruction *dst_ins;
+    unsigned int depth = 0;
+    bool main_block_open;
+    size_t i;
+
+    instructions = &parser->instructions;
+    main_block_open = parser->shader_version.type != VKD3D_SHADER_TYPE_HULL;
+
+    if (!cf_flattener_require_space(flattener, instructions->count))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    for (i = 0; i < instructions->count; ++i)
+    {
+        const struct vkd3d_shader_instruction *instruction = &instructions->elements[i];
+        const struct vkd3d_shader_src_param *src = instruction->src;
+        unsigned int merge_block_id, true_block_id;
+        struct cf_flattener_info *cf_info;
+
+        flattener->location = instruction->location;
+
+        cf_info = flattener->control_flow_depth
+                ? &flattener->control_flow_info[flattener->control_flow_depth - 1] : NULL;
+
+        switch (instruction->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Aborting due to not yet implemented feature: Label instruction.");
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
+
+            case VKD3DSIH_IF:
+                if (!(cf_info = cf_flattener_push_control_flow_level(flattener)))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                true_block_id = cf_flattener_alloc_block_id(flattener);
+                merge_block_id = cf_flattener_alloc_block_id(flattener);
+                cf_info->u.if_.false_param = cf_flattener_emit_branch(flattener, merge_block_id,
+                        src, true_block_id, merge_block_id, instruction->flags);
+                if (!cf_info->u.if_.false_param)
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                cf_flattener_emit_label(flattener, true_block_id);
+
+                cf_info->u.if_.merge_block_id = merge_block_id;
+                cf_info->u.if_.else_block_id = 0;
+                cf_info->inside_block = true;
+                cf_info->current_block = VKD3D_BLOCK_IF;
+                break;
+
+            case VKD3DSIH_ELSE:
+                if (cf_info->inside_block)
+                    cf_flattener_emit_unconditional_branch(flattener, cf_info->u.if_.merge_block_id);
+
+                cf_info->u.if_.else_block_id = cf_flattener_alloc_block_id(flattener);
+                cf_info->u.if_.false_param->reg.idx[0].offset = cf_info->u.if_.else_block_id;
+
+                cf_flattener_emit_label(flattener, cf_info->u.if_.else_block_id);
+
+                cf_info->inside_block = true;
+                break;
+
+            case VKD3DSIH_ENDIF:
+                if (cf_info->inside_block)
+                    cf_flattener_emit_unconditional_branch(flattener, cf_info->u.if_.merge_block_id);
+
+                cf_flattener_emit_label(flattener, cf_info->u.if_.merge_block_id);
+
+                cf_flattener_pop_control_flow_level(flattener);
+                break;
+
+            case VKD3DSIH_LOOP:
+            case VKD3DSIH_SWITCH:
+                ++depth;
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                break;
+
+            case VKD3DSIH_ENDLOOP:
+            case VKD3DSIH_ENDSWITCH:
+                --depth;
+                if (cf_info)
+                    cf_info->inside_block = true; /* Dead code removal ensures this is correct. */
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                break;
+
+            case VKD3DSIH_RET:
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                if (cf_info)
+                    cf_info->inside_block = false;
+                else if (!depth)
+                    main_block_open = false;
+                break;
+
+            case VKD3DSIH_BREAK:
+            case VKD3DSIH_CONTINUE:
+                if (cf_info)
+                    cf_info->inside_block = false;
+                /* fall through */
+            default:
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                break;
+        }
+    }
+
+    if (main_block_open)
+    {
+        if (!(dst_ins = cf_flattener_require_space(flattener, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        vsir_instruction_init(dst_ins, &flattener->location, VKD3DSIH_RET);
+        ++flattener->instruction_count;
+    }
+
+    return flattener->allocation_failed ? VKD3D_ERROR_OUT_OF_MEMORY : VKD3D_OK;
+}
+
+static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_parser *parser)
+{
+    struct cf_flattener flattener = {0};
+    enum vkd3d_result result;
+
+    flattener.parser = parser;
+    result = cf_flattener_iterate_instruction_array(&flattener);
+
+    if (result >= 0)
+    {
+        vkd3d_free(parser->instructions.elements);
+        parser->instructions.elements = flattener.instructions;
+        parser->instructions.capacity = flattener.instruction_capacity;
+        parser->instructions.count = flattener.instruction_count;
+        parser->shader_desc.block_count = flattener.block_id;
+    }
+    else
+    {
+        vkd3d_free(flattener.instructions);
+    }
+
+    vkd3d_free(flattener.control_flow_info);
+
+    return result;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -1503,6 +1853,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
     if (result >= 0)
         remove_dead_code(parser);
+
+    if (result >= 0)
+        result = flatten_control_flow_constructs(parser);
 
     if (result >= 0)
         result = normalise_combined_samplers(parser);
