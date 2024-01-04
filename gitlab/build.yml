@@ -130,7 +130,9 @@ build-mac:
     exit_codes:
       - 2
   interruptible: true
-  needs: []
+  needs:
+    - job: image-mac
+      optional: true
   dependencies: []
   tags:
     - mac
@@ -147,14 +149,9 @@ build-mac:
     - system_profiler SPSoftwareDataType SPHardwareDataType > artifacts/systeminfo.txt
     - vulkaninfo > artifacts/vulkaninfo.txt
     - export PATH="/usr/local/opt/bison/bin:/usr/local/opt/flex/bin:$PATH"
-    - git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git
-    - cd wine
-    - mkdir build
-    - cd build
-    - ../configure --enable-win64 --without-x --without-freetype
-    - make tools/widl/widl
-    - cd ../..
-    - export PATH="$PWD/wine/build/tools/widl:$PATH"
+    - curl -o image.zip https://gitlab.winehq.org/api/v4/projects/wine%2Fvkd3d/jobs/artifacts/master/download?job=image-mac
+    - unzip image.zip
+    - export PATH="$PWD/image/bin:$PATH"
     - git rebase $CI_MERGE_REQUEST_DIFF_BASE_SHA --exec ./gitlab/build-mac
     - if [ -f build_failed ] ; then exit 1 ; fi
     - if [ -f tests_failed ] ; then exit 2 ; fi

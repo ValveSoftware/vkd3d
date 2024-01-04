@@ -18,3 +18,32 @@ image-linux:
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"},\"$CI_DEPENDENCY_PROXY_SERVER\":{\"auth\":\"$(printf "%s:%s" "$CI_DEPENDENCY_PROXY_USER" "$CI_DEPENDENCY_PROXY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
     - sed -i "1iFROM $IMAGE_SOURCE" "$DOCKER_FILE"
     - /kaniko/executor --context "$CI_PROJECT_DIR" --dockerfile "$DOCKER_FILE" --destination "$IMAGE_LOCAL"
+
+image-mac:
+  stage: image
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'push' && $CI_PROJECT_PATH == "wine/vkd3d" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - .gitlab-ci.yml
+        - gitlab/image.yml
+  interruptible: true
+  tags:
+    - mac
+  script:
+    - mkdir image
+    - cd image
+    - mkdir bin
+    - export PATH="/usr/local/opt/bison/bin:/usr/local/opt/flex/bin:$PATH"
+    - git clone --depth 1 --branch wine-3.21 https://gitlab.winehq.org/wine/wine.git
+    - cd wine
+    - mkdir build
+    - cd build
+    - ../configure --enable-win64 --without-x --without-freetype
+    - make tools/widl/widl
+    - cd ../..
+    - cp wine/build/tools/widl/widl bin
+    - rm -fr wine
+    - cd ..
+  artifacts:
+    paths:
+      - image
