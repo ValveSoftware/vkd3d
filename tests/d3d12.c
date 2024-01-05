@@ -20549,12 +20549,12 @@ static void test_depth_clip(void)
     destroy_test_context(&context);
 }
 
-#define check_depth_stencil_sampling(a, b, c, d, e, f, g) \
-        check_depth_stencil_sampling_(__LINE__, a, b, c, d, e, f, g)
+#define check_depth_stencil_sampling(a, b, c, d, e, f, g, h) \
+        check_depth_stencil_sampling_(__LINE__, a, b, c, d, e, f, g, h)
 static void check_depth_stencil_sampling_(unsigned int line, struct test_context *context,
         ID3D12PipelineState *pso, ID3D12Resource *cb, ID3D12Resource *texture,
         D3D12_CPU_DESCRIPTOR_HANDLE dsv_handle, ID3D12DescriptorHeap *srv_heap,
-        float expected_value)
+        float expected_value, bool is_bug)
 {
     static const float black[] = {0.0f, 0.0f, 0.0f, 0.0f};
     ID3D12GraphicsCommandList *command_list;
@@ -20585,6 +20585,7 @@ static void check_depth_stencil_sampling_(unsigned int line, struct test_context
 
     transition_sub_resource_state(command_list, context->render_target, 0,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+    bug_if(is_bug)
     check_sub_resource_float_(line, context->render_target, 0, queue, command_list, expected_value, 2);
 
     reset_command_list(command_list, context->allocator);
@@ -20738,6 +20739,7 @@ static void test_depth_stencil_sampling(void)
         DXGI_FORMAT dsv_format;
         DXGI_FORMAT depth_view_format;
         DXGI_FORMAT stencil_view_format;
+        bool is_mvk_bug;
     }
     tests[] =
     {
@@ -20747,8 +20749,10 @@ static void test_depth_stencil_sampling(void)
                 DXGI_FORMAT_R32_FLOAT},
         {DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_D24_UNORM_S8_UINT,
                 DXGI_FORMAT_R24_UNORM_X8_TYPELESS, DXGI_FORMAT_X24_TYPELESS_G8_UINT},
+        /* For 16 bit depth MoltenVK doesn't handle properly the case
+         * when the comparison is tight (i.e., 0.5 <= 0.5). */
         {DXGI_FORMAT_R16_TYPELESS, DXGI_FORMAT_D16_UNORM,
-                DXGI_FORMAT_R16_UNORM},
+                DXGI_FORMAT_R16_UNORM, DXGI_FORMAT_UNKNOWN, true},
     };
 
     memset(&desc, 0, sizeof(desc));
@@ -20851,39 +20855,40 @@ static void test_depth_stencil_sampling(void)
         /* pso_compare */
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f);
+        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 1.0f);
+        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 1.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 0.5f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f);
+        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f,
+                tests[i].is_mvk_bug && is_mvk_device(device));
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 0.6f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f);
+        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 0.0f, false);
 
         ps_constant.x = 0.7f;
         update_buffer_data(cb, 0, sizeof(ps_constant), &ps_constant);
 
         reset_command_list(command_list, context.allocator);
-        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 1.0f);
+        check_depth_stencil_sampling(&context, pso_compare, cb, texture, dsv_handle, srv_heap, 1.0f, false);
 
         /* pso_depth */
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_depth, cb, texture, dsv_handle, srv_heap, 1.0f);
+        check_depth_stencil_sampling(&context, pso_depth, cb, texture, dsv_handle, srv_heap, 1.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH, 0.2f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_depth, cb, texture, dsv_handle, srv_heap, 0.2f);
+        check_depth_stencil_sampling(&context, pso_depth, cb, texture, dsv_handle, srv_heap, 0.2f, false);
 
         if (!tests[i].stencil_view_format)
         {
@@ -20907,33 +20912,33 @@ static void test_depth_stencil_sampling(void)
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 0.0f);
+        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 0.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_STENCIL, 0.0f, 100, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 100.0f);
+        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 100.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_STENCIL, 0.0f, 255, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 255.0f);
+        check_depth_stencil_sampling(&context, pso_stencil, cb, texture, dsv_handle, srv_heap, 255.0f, false);
 
         /* pso_depth_stencil */
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.3f, 3, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 3.3f);
+        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 3.3f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 3, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 4.0f);
+        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 4.0f, false);
 
         reset_command_list(command_list, context.allocator);
         ID3D12GraphicsCommandList_ClearDepthStencilView(command_list, dsv_handle,
                 D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 0.0f, 0, 0, NULL);
-        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 0.0f);
+        check_depth_stencil_sampling(&context, pso_depth_stencil, cb, texture, dsv_handle, srv_heap, 0.0f, false);
 
         destroy_depth_stencil(&ds);
 
