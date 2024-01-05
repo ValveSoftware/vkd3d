@@ -33741,11 +33741,14 @@ static void test_primitive_restart(void)
         unsigned int last_index;
         bool full_quad;
         bool is_todo;
+        bool is_mvk_bug;
     }
     tests[] =
     {
         {D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED, DXGI_FORMAT_R16_UINT,     indices16,     sizeof(indices16), 0x0003, true},
-        {D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED, DXGI_FORMAT_R16_UINT, indices16_max, sizeof(indices16_max), 0xffff, true},
+        /* Metal, and therefore MoltenVK, doesn't support disabling
+         * primitive restart. */
+        {D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED, DXGI_FORMAT_R16_UINT, indices16_max, sizeof(indices16_max), 0xffff, true, false, true},
         {D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED, DXGI_FORMAT_R32_UINT,       indices,       sizeof(indices), 0x0003, true},
         {D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED, DXGI_FORMAT_R32_UINT, indices_max16, sizeof(indices_max16), 0xffff, true},
 
@@ -33821,6 +33824,7 @@ static void test_primitive_restart(void)
         get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
         if (tests[i].full_quad)
         {
+            bug_if(is_mvk_device(context.device) && tests[i].is_mvk_bug)
             todo_if(tests[i].is_todo)
             check_readback_data_uint(&rb.rb, NULL, 0xff00ff00, 0);
         }
