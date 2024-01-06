@@ -6512,7 +6512,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_CopyTileMappings(ID3D12Command
     if (!(op = d3d12_command_queue_op_array_require_space(&command_queue->op_queue)))
     {
         ERR("Failed to add op.\n");
-        return;
+        goto unlock_mutex;
     }
     op->opcode = VKD3D_CS_OP_COPY_MAPPINGS;
     op->u.copy_mappings.dst_resource = dst_resource_impl;
@@ -6524,6 +6524,7 @@ static void STDMETHODCALLTYPE d3d12_command_queue_CopyTileMappings(ID3D12Command
 
     d3d12_command_queue_submit_locked(command_queue);
 
+unlock_mutex:
     vkd3d_mutex_unlock(&command_queue->op_mutex);
 }
 
