@@ -1325,6 +1325,295 @@ static void test_get_blob_part(void)
     ok(!refcount, "Got refcount %u.\n", refcount);
 }
 
+static void check_type_desc_(int line, const D3D12_SHADER_TYPE_DESC *type, const D3D12_SHADER_TYPE_DESC *expect)
+{
+    ok_(line)(type->Class == expect->Class, "Got class %#x.\n", type->Class);
+    ok_(line)(type->Type == expect->Type, "Got type %#x.\n", type->Type);
+    ok_(line)(type->Rows == expect->Rows, "Got %u rows.\n", type->Rows);
+    ok_(line)(type->Columns == expect->Columns, "Got %u columns.\n", type->Columns);
+    ok_(line)(type->Elements == expect->Elements, "Got %u elements.\n", type->Elements);
+    ok_(line)(type->Members == expect->Members, "Got %u members.\n", type->Members);
+    ok_(line)(type->Offset == expect->Offset, "Got %u members.\n", type->Members);
+    ok_(line)(!strcmp(type->Name, expect->Name), "Got name \"%s\".\n", type->Name);
+}
+#define check_type_desc(a, b) check_type_desc_(__LINE__, a, b)
+
+static void test_reflection(void)
+{
+    unsigned int refcount;
+    HRESULT hr;
+
+    static const char vs_source[] =
+        "typedef uint uint_t;\n"
+        "float m;\n"
+        "\n"
+        "cbuffer b1\n"
+        "{\n"
+        "    float a;\n"
+        "    float2 b;\n"
+        "    float4 c;\n"
+        "    float d;\n"
+        "    struct\n"
+        "    {\n"
+        "        float4 a;\n"
+        "        float b;\n"
+        "        float c;\n"
+        "    } s;\n"
+        /* In direct contradiction to the documentation, this does not align. */
+        "    bool g;\n"
+        "    float h[2];\n"
+        "    int i;\n"
+        "    uint_t j;\n"
+        "    float3x1 k;\n"
+        "    row_major float3x1 l;\n"
+        "#pragma pack_matrix(row_major)\n"
+        "    float3x1 o;\n"
+        "    float4 p;\n"
+        "    float q;\n"
+        "    struct r_name {float a;} r;\n"
+        "    column_major float3x1 t;\n"
+        "};\n"
+        "\n"
+        "cbuffer b5 : register(b5)\n"
+        "{\n"
+        "    float4 u;\n"
+        "}\n"
+        "\n"
+        "float4 main(uniform float4 n) : SV_POSITION\n"
+        "{\n"
+        "    return o._31 + m + n + u;\n"
+        "}";
+
+    struct shader_variable
+    {
+        D3D12_SHADER_VARIABLE_DESC var_desc;
+        D3D12_SHADER_TYPE_DESC type_desc;
+        const D3D12_SHADER_TYPE_DESC *field_types;
+    };
+
+    struct shader_buffer
+    {
+        D3D12_SHADER_BUFFER_DESC desc;
+        const struct shader_variable *vars;
+    };
+
+    static const D3D12_SHADER_TYPE_DESC s_field_types[] =
+    {
+        {D3D_SVC_VECTOR, D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"},
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 16, "float"},
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 20, "float"},
+    };
+
+    static const D3D12_SHADER_TYPE_DESC r_field_types[] =
+    {
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+    };
+
+    static const struct shader_variable globals_vars =
+        {{"m",   0,  4, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}};
+    static const struct shader_variable params_vars =
+        {{"n",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+    static const struct shader_variable buffer_vars[] =
+    {
+        {{"a",   0,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}},
+        {{"b",   4,  8,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 2, 0, 0, 0, "float2"}},
+        {{"c",  16, 16,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}},
+        {{"d",  32,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}},
+        {{"s",  48, 24,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 6, 0, ARRAY_SIZE(s_field_types), 0, "<unnamed>"}, s_field_types},
+        {{"g",  72,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_BOOL,  1, 1, 0, 0, 0, "bool"}},
+        {{"h",  80, 20,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 2, 0, 0, "float"}},
+        {{"i", 100,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_INT,   1, 1, 0, 0, 0, "int"}},
+        {{"j", 104,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_UINT,  1, 1, 0, 0, 0, "uint_t"}},
+        {{"k", 112, 12,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_COLUMNS, D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+        {{"l", 128, 36,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_ROWS,    D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+        {{"o", 176, 36, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_ROWS,    D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+        {{"p", 224, 16,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}},
+        {{"q", 240,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}},
+        {{"r", 256,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 1, 0, ARRAY_SIZE(r_field_types), 0, "r_name"}, r_field_types},
+        {{"t", 260, 12,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_COLUMNS, D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+    };
+    static const struct shader_variable b5_vars =
+        {{"u",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
+
+    static const struct shader_buffer vs_buffers[] =
+    {
+        {{"$Globals", D3D_CT_CBUFFER, 1, 16}, &globals_vars},
+        {{"$Params", D3D_CT_CBUFFER, 1, 16}, &params_vars},
+        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(buffer_vars), 272}, buffer_vars},
+        {{"b5", D3D_CT_CBUFFER, 1, 16}, &b5_vars},
+    };
+
+    static const D3D12_SHADER_INPUT_BIND_DESC vs_bindings[] =
+    {
+        {"$Globals", D3D_SIT_CBUFFER, 0, 1},
+        {"$Params", D3D_SIT_CBUFFER, 1, 1},
+        {"b1", D3D_SIT_CBUFFER, 2, 1},
+        {"b5", D3D_SIT_CBUFFER, 5, 1, D3D_SIF_USERPACKED},
+    };
+
+    static const char ps_source[] =
+        "texture2D a;\n"
+        "sampler c {};\n"
+        "SamplerState d {};\n"
+        "sampler e\n"
+        "{\n"
+        "    Texture = a;\n"
+        "    foo = bar + 2;\n"
+        "};\n"
+        "SamplerState f\n"
+        "{\n"
+        "    Texture = a;\n"
+        "    foo = bar + 2;\n"
+        "};\n"
+        "sampler2D g;\n"
+        "sampler b : register(s5);\n"
+        "float4 main(float2 pos : texcoord) : SV_TARGET\n"
+        "{\n"
+        "    return a.Sample(b, pos) + a.Sample(c, pos) + a.Sample(d, pos) + tex2D(f, pos) + tex2D(e, pos)"
+        "            + tex2D(g, pos);\n"
+        "}";
+
+    static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
+    {
+        {"c", D3D_SIT_SAMPLER, 0, 1},
+        {"d", D3D_SIT_SAMPLER, 1, 1},
+        {"e", D3D_SIT_SAMPLER, 2, 1},
+        {"f", D3D_SIT_SAMPLER, 3, 1},
+        {"g", D3D_SIT_SAMPLER, 4, 1},
+        {"b", D3D_SIT_SAMPLER, 5, 1, D3D_SIF_USERPACKED},
+        {"f", D3D_SIT_TEXTURE, 0, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
+        {"e", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
+        {"g", D3D_SIT_TEXTURE, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
+        {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
+    };
+
+    static const struct
+    {
+        const char *source;
+        const char *profile;
+        const D3D12_SHADER_INPUT_BIND_DESC *bindings;
+        size_t binding_count;
+        const struct shader_buffer *buffers;
+        size_t buffer_count;
+    }
+    tests[] =
+    {
+        {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers)},
+        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings)},
+    };
+
+    for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
+    {
+        ID3D10Blob *code = compile_shader_flags(tests[t].source,
+                tests[t].profile, D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY);
+        ID3D12ShaderReflection *reflection;
+        D3D12_SHADER_DESC shader_desc;
+
+        hr = D3DReflect(ID3D10Blob_GetBufferPointer(code), ID3D10Blob_GetBufferSize(code),
+                &IID_ID3D12ShaderReflection, (void **)&reflection);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+        hr = ID3D12ShaderReflection_GetDesc(reflection, &shader_desc);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+        ok(shader_desc.ConstantBuffers == tests[t].buffer_count, "Got %u buffers.\n", shader_desc.ConstantBuffers);
+        todo ok(shader_desc.BoundResources == tests[t].binding_count, "Got %u resources.\n", shader_desc.BoundResources);
+
+        for (unsigned int i = 0; i < shader_desc.ConstantBuffers; ++i)
+        {
+            const struct shader_buffer *expect_buffer = &tests[t].buffers[i];
+            ID3D12ShaderReflectionConstantBuffer *cbuffer;
+            D3D12_SHADER_BUFFER_DESC buffer_desc;
+
+            vkd3d_test_push_context("Buffer %u", i);
+
+            cbuffer = ID3D12ShaderReflection_GetConstantBufferByIndex(reflection, i);
+            hr = ID3D12ShaderReflectionConstantBuffer_GetDesc(cbuffer, &buffer_desc);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            ok(!strcmp(buffer_desc.Name, expect_buffer->desc.Name), "Got name \"%s\".\n", buffer_desc.Name);
+            ok(buffer_desc.Type == expect_buffer->desc.Type, "Got type %#x.\n", buffer_desc.Type);
+            ok(buffer_desc.Variables == expect_buffer->desc.Variables, "Got %u variables.\n", buffer_desc.Variables);
+            ok(buffer_desc.Size == expect_buffer->desc.Size, "Got size %u.\n", buffer_desc.Size);
+            ok(buffer_desc.uFlags == expect_buffer->desc.uFlags, "Got flags %#x.\n", buffer_desc.uFlags);
+
+            for (unsigned int j = 0; j < buffer_desc.Variables; ++j)
+            {
+                const struct shader_variable *expect = &expect_buffer->vars[j];
+                ID3D12ShaderReflectionType *type, *field;
+                ID3D12ShaderReflectionVariable *var;
+                D3D12_SHADER_VARIABLE_DESC var_desc;
+                D3D12_SHADER_TYPE_DESC type_desc;
+
+                vkd3d_test_push_context("Variable %u", j);
+
+                var = ID3D12ShaderReflectionConstantBuffer_GetVariableByIndex(cbuffer, j);
+                hr = ID3D12ShaderReflectionVariable_GetDesc(var, &var_desc);
+                ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+                ok(!strcmp(var_desc.Name, expect->var_desc.Name), "Got name \"%s\".\n", var_desc.Name);
+                ok(var_desc.StartOffset == expect->var_desc.StartOffset, "Got offset %u.\n", var_desc.StartOffset);
+                ok(var_desc.Size == expect->var_desc.Size, "Got size %u.\n", var_desc.Size);
+                ok(var_desc.uFlags == expect->var_desc.uFlags, "Got flags %#x.\n", var_desc.uFlags);
+                ok(!var_desc.DefaultValue, "Got default value %p.\n", var_desc.DefaultValue);
+                todo ok(var_desc.StartTexture == expect->var_desc.StartTexture,
+                        "Got texture offset %u.\n", var_desc.StartTexture);
+                ok(var_desc.TextureSize == expect->var_desc.TextureSize,
+                        "Got texture size %u.\n", var_desc.TextureSize);
+                todo ok(var_desc.StartSampler == expect->var_desc.StartSampler,
+                        "Got sampler offset %u.\n", var_desc.StartSampler);
+                ok(var_desc.SamplerSize == expect->var_desc.SamplerSize,
+                        "Got sampler size %u.\n", var_desc.SamplerSize);
+
+                type = ID3D12ShaderReflectionVariable_GetType(var);
+                hr = ID3D12ShaderReflectionType_GetDesc(type, &type_desc);
+                ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+                check_type_desc(&type_desc, &expect->type_desc);
+
+                for (unsigned int k = 0; k < type_desc.Members; ++k)
+                {
+                    vkd3d_test_push_context("Field %u", k);
+
+                    field = ID3D12ShaderReflectionType_GetMemberTypeByIndex(type, k);
+                    hr = ID3D12ShaderReflectionType_GetDesc(field, &type_desc);
+                    ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+                    check_type_desc(&type_desc, &expect->field_types[k]);
+
+                    vkd3d_test_pop_context();
+                }
+
+                vkd3d_test_pop_context();
+            }
+
+            vkd3d_test_pop_context();
+        }
+
+        for (unsigned int i = 0; i < shader_desc.BoundResources; ++i)
+        {
+            const D3D12_SHADER_INPUT_BIND_DESC *expect = &tests[t].bindings[i];
+            D3D12_SHADER_INPUT_BIND_DESC desc;
+
+            vkd3d_test_push_context("Binding %u", i);
+
+            hr = ID3D12ShaderReflection_GetResourceBindingDesc(reflection, i, &desc);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+            ok(!strcmp(desc.Name, expect->Name), "Got name \"%s\".\n", desc.Name);
+            ok(desc.Type == expect->Type, "Got type %#x.\n", desc.Type);
+            ok(desc.BindPoint == expect->BindPoint, "Got bind point %u.\n", desc.BindPoint);
+            ok(desc.BindCount == expect->BindCount, "Got bind count %u.\n", desc.BindCount);
+            todo_if ((expect->uFlags & D3D_SIF_USERPACKED) && expect->Type != D3D_SIT_CBUFFER)
+                ok(desc.uFlags == expect->uFlags, "Got flags %#x.\n", desc.uFlags);
+            ok(desc.ReturnType == expect->ReturnType, "Got return type %#x.\n", desc.ReturnType);
+            ok(desc.Dimension == expect->Dimension, "Got dimension %#x.\n", desc.Dimension);
+            ok(desc.NumSamples == expect->NumSamples, "Got multisample count %u.\n", desc.NumSamples);
+
+            vkd3d_test_pop_context();
+        }
+
+        ID3D10Blob_Release(code);
+        refcount = ID3D12ShaderReflection_Release(reflection);
+        ok(!refcount, "Got unexpected refcount %u.\n", refcount);
+    }
+}
+
 static void check_signature_element_(int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
         const D3D12_SIGNATURE_PARAMETER_DESC *expect)
 {
@@ -1622,6 +1911,7 @@ START_TEST(hlsl_d3d12)
     run_test(test_thread_id);
     run_test(test_create_blob);
     run_test(test_get_blob_part);
+    run_test(test_reflection);
     run_test(test_signature_reflection);
     run_test(test_disassemble_shader);
 }
