@@ -86,6 +86,7 @@ HRESULT WINAPI D3DGetInputSignatureBlob(const void *data, SIZE_T data_size, ID3D
 HRESULT WINAPI D3DGetOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
 HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename, const D3D_SHADER_MACRO *macros,
         ID3DInclude *include, ID3DBlob **shader, ID3DBlob **error_messages);
+HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection);
 HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID3DBlob **blob);
 
 #endif /* __D3DCOMPILER_H__ */

@@ -19,6 +19,7 @@
 #include "config.h"
 #include "d3d12_crosstest.h"
 #include "vkd3d_common.h"
+#include "vkd3d_d3d12shader.h"
 
 #ifndef D3DERR_INVALIDCALL
 #define D3DERR_INVALIDCALL 0x8876086c
@@ -1316,6 +1317,203 @@ static void test_get_blob_part(void)
     ok(!refcount, "Got refcount %u.\n", refcount);
 }
 
+static void check_signature_element_(int line, const D3D12_SIGNATURE_PARAMETER_DESC *desc,
+        const D3D12_SIGNATURE_PARAMETER_DESC *expect)
+{
+    ok_(line)(!strcmp(desc->SemanticName, expect->SemanticName), "Got name \"%s\".\n", desc->SemanticName);
+    ok_(line)(desc->SemanticIndex == expect->SemanticIndex, "Got index %u.\n", desc->SemanticIndex);
+    ok_(line)(desc->Register == expect->Register, "Got register %u.\n", desc->Register);
+    ok_(line)(desc->SystemValueType == expect->SystemValueType, "Got sysval %u.\n", desc->SystemValueType);
+    ok_(line)(desc->ComponentType == expect->ComponentType, "Got data type %u.\n", desc->ComponentType);
+    ok_(line)(desc->Mask == expect->Mask, "Got mask %#x.\n", desc->Mask);
+    todo_if(desc->ReadWriteMask != expect->ReadWriteMask)
+        ok_(line)(desc->ReadWriteMask == expect->ReadWriteMask, "Got used mask %#x.\n", desc->ReadWriteMask);
+    ok_(line)(desc->Stream == expect->Stream, "Got stream %u.\n", desc->Stream);
+}
+#define check_signature_element(a, b) check_signature_element_(__LINE__, a, b)
+
+static void test_signature_reflection(void)
+{
+    D3D12_SIGNATURE_PARAMETER_DESC desc;
+    ID3D12ShaderReflection *reflection;
+    D3D12_SHADER_DESC shader_desc;
+    ID3D10Blob *code = NULL;
+    unsigned int refcount;
+    HRESULT hr;
+
+    static const char vs1_source[] =
+        "void main(\n"
+        "        in float4 a : apple,\n"
+        "        out float4 b : banana2,\n"
+        "        inout float4 c : color,\n"
+        "        inout float4 d : depth,\n"
+        "        inout float4 e : sv_position,\n"
+        "        in uint3 f : fruit,\n"
+        "        inout bool2 g : grape,\n"
+        "        in int h : honeydew,\n"
+        "        in uint i : sv_vertexid)\n"
+        "{\n"
+        "    b.yw = a.xz;\n"
+        "}";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs1_inputs[] =
+    {
+        {"apple",       0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x5},
+        {"color",       0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"depth",       0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"sv_position", 0, 3, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"fruit",       0, 4, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0x7},
+        {"grape",       0, 5, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0x3, 0x3},
+        {"honeydew",    0, 6, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_SINT32, 0x1},
+        {"sv_vertexid", 0, 7, D3D_NAME_VERTEX_ID, D3D_REGISTER_COMPONENT_UINT32, 0x1},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs1_outputs[] =
+    {
+        {"banana",      2, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0x5},
+        {"color",       0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"depth",       0, 2, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"sv_position", 0, 3, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"grape",       0, 4, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_UINT32, 0x3, 0xc},
+    };
+
+    static const char vs2_source[] =
+        "void main(inout float4 pos : position)\n"
+        "{\n"
+        "}";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs2_inputs[] =
+    {
+        {"position",    0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs2_outputs[] =
+    {
+        {"position",    0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC vs2_legacy_outputs[] =
+    {
+        {"SV_Position", 0, 0, D3D_NAME_POSITION, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const char ps1_source[] =
+        "void main(\n"
+        "        in float2 a : apple,\n"
+        "        out float4 b : sv_target2,\n"
+        "        out float c : sv_depth,\n"
+        "        in float4 d : position,\n"
+        "        in float4 e : sv_position)\n"
+        "{\n"
+        "    b = d;\n"
+        "    c = 0;\n"
+        "}";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps1_inputs[] =
+    {
+        {"apple",       0, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x3},
+        {"position",    0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"sv_position", 0, 2, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps1_outputs[] =
+    {
+        {"sv_target",   2, 2,   D3D_NAME_TARGET, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"sv_depth",    0, ~0u, D3D_NAME_DEPTH,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
+    static const char ps2_source[] =
+        "void main(\n"
+        "        inout float4 a : color2,\n"
+        "        inout float b : depth,\n"
+        "        in float4 c : position)\n"
+        "{\n"
+        "}";
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps2_inputs[] =
+    {
+        {"color",       2, 0, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0xf, 0xf},
+        {"depth",       0, 1, D3D_NAME_UNDEFINED, D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0x1},
+        {"SV_Position", 0, 2, D3D_NAME_POSITION,  D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+    };
+
+    static const D3D12_SIGNATURE_PARAMETER_DESC ps2_outputs[] =
+    {
+        {"SV_Target",   2, 2,   D3D_NAME_TARGET, D3D_REGISTER_COMPONENT_FLOAT32, 0xf},
+        {"SV_Depth",    0, ~0u, D3D_NAME_DEPTH,  D3D_REGISTER_COMPONENT_FLOAT32, 0x1, 0xe},
+    };
+
+    static const char cs1_source[] =
+        "[numthreads(1, 1, 1)]\n"
+        "void main(in uint a : sv_dispatchthreadid)\n"
+        "{\n"
+        "}";
+
+    static const struct
+    {
+        const char *source;
+        const char *target;
+        bool compat;
+        const D3D12_SIGNATURE_PARAMETER_DESC *inputs;
+        unsigned int input_count;
+        const D3D12_SIGNATURE_PARAMETER_DESC *outputs;
+        unsigned int output_count;
+    }
+    tests[] =
+    {
+        {vs1_source,  "vs_4_0", false, vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs1_source,  "vs_4_0", true,  vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs2_source,  "vs_4_0", false, vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
+        {vs2_source,  "vs_4_0", true,  vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_legacy_outputs, ARRAY_SIZE(vs2_legacy_outputs)},
+        {ps1_source,  "ps_4_0", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
+        {ps2_source,  "ps_4_0", true,  ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
+        {cs1_source,  "cs_5_0", false, NULL, 0, NULL, 0},
+    };
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        vkd3d_test_push_context("Test %u", i);
+
+        code = compile_shader_flags(tests[i].source, tests[i].target,
+                tests[i].compat ? D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY : 0);
+
+        hr = D3DReflect(ID3D10Blob_GetBufferPointer(code), ID3D10Blob_GetBufferSize(code),
+                &IID_ID3D12ShaderReflection, (void **)&reflection);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+
+        hr = reflection->lpVtbl->GetDesc(reflection, &shader_desc);
+        ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+        ok(shader_desc.InputParameters == tests[i].input_count,
+                "Got %u input parameters.\n", shader_desc.InputParameters);
+        ok(shader_desc.OutputParameters == tests[i].output_count,
+                "Got %u output parameters.\n", shader_desc.OutputParameters);
+
+        for (unsigned int j = 0; j < shader_desc.InputParameters; ++j)
+        {
+            vkd3d_test_push_context("Input %u", j);
+            hr = reflection->lpVtbl->GetInputParameterDesc(reflection, j, &desc);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            check_signature_element(&desc, &tests[i].inputs[j]);
+            vkd3d_test_pop_context();
+        }
+
+        for (unsigned int j = 0; j < shader_desc.OutputParameters; ++j)
+        {
+            vkd3d_test_push_context("Output %u", j);
+            hr = reflection->lpVtbl->GetOutputParameterDesc(reflection, j, &desc);
+            ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
+            check_signature_element(&desc, &tests[i].outputs[j]);
+            vkd3d_test_pop_context();
+        }
+
+        ID3D10Blob_Release(code);
+        refcount = reflection->lpVtbl->Release(reflection);
+        ok(!refcount, "Got unexpected refcount %u.\n", refcount);
+
+        vkd3d_test_pop_context();
+    }
+}
+
 START_TEST(hlsl_d3d12)
 {
     parse_args(argc, argv);
@@ -1326,4 +1524,5 @@ START_TEST(hlsl_d3d12)
     run_test(test_thread_id);
     run_test(test_create_blob);
     run_test(test_get_blob_part);
+    run_test(test_signature_reflection);
 }
