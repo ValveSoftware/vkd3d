@@ -441,6 +441,7 @@ static void test_scan_signatures(void)
     struct vkd3d_shader_scan_signature_info signature_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO};
     struct vkd3d_shader_hlsl_source_info hlsl_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO};
     struct vkd3d_shader_compile_info compile_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+    struct vkd3d_shader_compile_option options[1];
     struct vkd3d_shader_code dxbc;
     size_t i, j;
     int rc;
@@ -494,6 +495,11 @@ static void test_scan_signatures(void)
     static const struct vkd3d_shader_signature_element vs2_outputs[] =
     {
         {"position",    0, 0, VKD3D_SHADER_SV_NONE, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element vs2_legacy_outputs[] =
+    {
+        {"SV_Position", 0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
     };
 
     static const char vs3_source[] =
@@ -656,6 +662,27 @@ static void test_scan_signatures(void)
         {"VFACE",           0, 0, VKD3D_SHADER_SV_IS_FRONT_FACE,    VKD3D_SHADER_COMPONENT_FLOAT, 1, 0x1, 0x1},
     };
 
+    static const char ps5_source[] =
+        "void main(\n"
+        "        inout float4 a : color2,\n"
+        "        inout float b : depth,\n"
+        "        in float4 c : position)\n"
+        "{\n"
+        "}";
+
+    static const struct vkd3d_shader_signature_element ps5_inputs[] =
+    {
+        {"color",       2, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 0, 0xf, 0xf},
+        {"depth",       0, 0, VKD3D_SHADER_SV_NONE,     VKD3D_SHADER_COMPONENT_FLOAT, 1, 0x1, 0x1},
+        {"SV_Position", 0, 0, VKD3D_SHADER_SV_POSITION, VKD3D_SHADER_COMPONENT_FLOAT, 2, 0xf},
+    };
+
+    static const struct vkd3d_shader_signature_element ps5_outputs[] =
+    {
+        {"SV_Target",   2, 0, VKD3D_SHADER_SV_TARGET,   VKD3D_SHADER_COMPONENT_FLOAT, 2,   0xf, 0xf},
+        {"SV_Depth",    0, 0, VKD3D_SHADER_SV_DEPTH,    VKD3D_SHADER_COMPONENT_FLOAT, ~0u, 0x1, 0x1},
+    };
+
     static const char cs1_source[] =
         "[numthreads(1, 1, 1)]\n"
         "void main(\n"
@@ -670,6 +697,7 @@ static void test_scan_signatures(void)
         const char *source;
         bool sm4;
         const char *profile;
+        bool compat;
         const struct vkd3d_shader_signature_element *inputs;
         size_t input_count;
         const struct vkd3d_shader_signature_element *outputs;
@@ -679,16 +707,20 @@ static void test_scan_signatures(void)
     }
     tests[] =
     {
-        {vs1_source, true,  "vs_4_0", vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
-        {vs2_source, true,  "vs_4_0", vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
-        {vs3_source, false, "vs_1_1", vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
-        {vs3_source, false, "vs_2_0", vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
-        {vs4_source, false, "vs_3_0", vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs)},
-        {ps1_source, true,  "ps_4_0", ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
-        {ps2_source, false, "ps_1_1", ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
-        {ps3_source, false, "ps_2_0", ps3_inputs, ARRAY_SIZE(ps3_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
-        {ps4_source, false, "ps_3_0", ps4_inputs, ARRAY_SIZE(ps4_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
-        {cs1_source, true,  "cs_5_0", NULL, 0, NULL, 0},
+        {vs1_source, true,  "vs_4_0", false, vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs1_source, true,  "vs_4_0", true,  vs1_inputs, ARRAY_SIZE(vs1_inputs), vs1_outputs, ARRAY_SIZE(vs1_outputs)},
+        {vs2_source, true,  "vs_4_0", false, vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_outputs, ARRAY_SIZE(vs2_outputs)},
+        {vs2_source, true,  "vs_4_0", true,  vs2_inputs, ARRAY_SIZE(vs2_inputs), vs2_legacy_outputs, ARRAY_SIZE(vs2_legacy_outputs)},
+        {ps1_source, true,  "ps_4_0", false, ps1_inputs, ARRAY_SIZE(ps1_inputs), ps1_outputs, ARRAY_SIZE(ps1_outputs)},
+        {ps5_source, true,  "ps_4_0", true,  ps5_inputs, ARRAY_SIZE(ps5_inputs), ps5_outputs, ARRAY_SIZE(ps5_outputs)},
+        {cs1_source, true,  "cs_5_0", false, NULL, 0, NULL, 0},
+
+        {vs3_source, false, "vs_1_1", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
+        {vs3_source, false, "vs_2_0", false, vs3_inputs, ARRAY_SIZE(vs3_inputs), vs3_outputs, ARRAY_SIZE(vs3_outputs)},
+        {vs4_source, false, "vs_3_0", false, vs4_inputs, ARRAY_SIZE(vs4_inputs), vs4_outputs, ARRAY_SIZE(vs4_outputs)},
+        {ps2_source, false, "ps_1_1", false, ps2_inputs, ARRAY_SIZE(ps2_inputs), ps2_outputs, ARRAY_SIZE(ps2_outputs)},
+        {ps3_source, false, "ps_2_0", false, ps3_inputs, ARRAY_SIZE(ps3_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
+        {ps4_source, false, "ps_3_0", false, ps4_inputs, ARRAY_SIZE(ps4_inputs), ps3_outputs, ARRAY_SIZE(ps3_outputs)},
     };
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
@@ -700,6 +732,13 @@ static void test_scan_signatures(void)
         compile_info.source_type = VKD3D_SHADER_SOURCE_HLSL;
         compile_info.target_type = tests[i].sm4 ? VKD3D_SHADER_TARGET_DXBC_TPF : VKD3D_SHADER_TARGET_D3D_BYTECODE;
         compile_info.log_level = VKD3D_SHADER_LOG_INFO;
+        compile_info.options = options;
+        compile_info.option_count = 1;
+
+        options[0].name = VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY;
+        options[0].value = 0;
+        if (tests[i].compat)
+            options[0].value = VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
 
         compile_info.next = &hlsl_info;
         hlsl_info.profile = tests[i].profile;
