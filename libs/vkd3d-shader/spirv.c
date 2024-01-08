@@ -1933,6 +1933,8 @@ static bool vkd3d_spirv_compile_module(struct vkd3d_spirv_builder *builder,
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_descriptor_indexing");
     if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityStencilExportEXT))
         vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_shader_stencil_export");
+    if (vkd3d_spirv_capability_is_enabled(builder, SpvCapabilityShaderViewportIndexLayerEXT))
+        vkd3d_spirv_build_op_extension(&stream, "SPV_EXT_shader_viewport_index_layer");
 
     if (builder->ext_instr_set_glsl_450)
         vkd3d_spirv_build_op_ext_inst_import(&stream, builder->ext_instr_set_glsl_450, "GLSL.std.450");
@@ -4241,7 +4243,31 @@ static void spirv_compiler_decorate_builtin(struct spirv_compiler *compiler,
             spirv_compiler_emit_execution_mode(compiler, SpvExecutionModeDepthReplacing, NULL, 0);
             break;
         case SpvBuiltInLayer:
-            vkd3d_spirv_enable_capability(builder, SpvCapabilityGeometry);
+            switch (compiler->shader_type)
+            {
+                case VKD3D_SHADER_TYPE_PIXEL:
+                case VKD3D_SHADER_TYPE_GEOMETRY:
+                    vkd3d_spirv_enable_capability(builder, SpvCapabilityGeometry);
+                    break;
+
+                case VKD3D_SHADER_TYPE_VERTEX:
+                case VKD3D_SHADER_TYPE_DOMAIN:
+                    if (!spirv_compiler_is_target_extension_supported(compiler,
+                            VKD3D_SHADER_SPIRV_EXTENSION_EXT_VIEWPORT_INDEX_LAYER))
+                    {
+                        FIXME("The target environment does not support decoration Layer.\n");
+                        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                                "Cannot use SV_RenderTargetArrayIndex. "
+                                "The target environment does not support decoration Layer.");
+                    }
+                    vkd3d_spirv_enable_capability(builder, SpvCapabilityShaderViewportIndexLayerEXT);
+                    break;
+
+                default:
+                    spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                            "Invalid use of SV_RenderTargetArrayIndex.");
+                    break;
+            }
             break;
         case SpvBuiltInViewportIndex:
             vkd3d_spirv_enable_capability(builder, SpvCapabilityMultiViewport);

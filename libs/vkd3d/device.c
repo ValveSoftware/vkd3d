@@ -98,6 +98,7 @@ static const struct vkd3d_optional_extension_info optional_device_extensions[] =
     VK_EXTENSION(EXT_ROBUSTNESS_2, EXT_robustness2),
     VK_EXTENSION(EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION, EXT_shader_demote_to_helper_invocation),
     VK_EXTENSION(EXT_SHADER_STENCIL_EXPORT, EXT_shader_stencil_export),
+    VK_EXTENSION(EXT_SHADER_VIEWPORT_INDEX_LAYER, EXT_shader_viewport_index_layer),
     VK_EXTENSION(EXT_TEXEL_BUFFER_ALIGNMENT, EXT_texel_buffer_alignment),
     VK_EXTENSION(EXT_TRANSFORM_FEEDBACK, EXT_transform_feedback),
     VK_EXTENSION(EXT_VERTEX_ATTRIBUTE_DIVISOR, EXT_vertex_attribute_divisor),
@@ -1546,8 +1547,6 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     device->feature_options.StandardSwizzle64KBSupported = FALSE;
     device->feature_options.CrossNodeSharingTier = D3D12_CROSS_NODE_SHARING_TIER_NOT_SUPPORTED;
     device->feature_options.CrossAdapterRowMajorTextureSupported = FALSE;
-    /* SPV_EXT_shader_viewport_index_layer */
-    device->feature_options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation = FALSE;
     device->feature_options.ResourceHeapTier = D3D12_RESOURCE_HEAP_TIER_2;
 
     /* Shader Model 6 support. */
@@ -1653,6 +1652,8 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     vkd3d_free(vk_extensions);
 
     device->feature_options.PSSpecifiedStencilRefSupported = vulkan_info->EXT_shader_stencil_export;
+    device->feature_options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation =
+            vulkan_info->EXT_shader_viewport_index_layer;
 
     vkd3d_init_feature_level(vulkan_info, features, &device->feature_options);
     if (vulkan_info->max_feature_level < create_info->minimum_feature_level)
@@ -1677,6 +1678,10 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     if (vulkan_info->EXT_shader_stencil_export)
         vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
                 = VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT;
+
+    if (vulkan_info->EXT_shader_viewport_index_layer)
+        vulkan_info->shader_extensions[vulkan_info->shader_extension_count++]
+                = VKD3D_SHADER_SPIRV_EXTENSION_EXT_VIEWPORT_INDEX_LAYER;
 
     /* Disable unused Vulkan features. */
     features->shaderTessellationAndGeometryPointSize = VK_FALSE;
