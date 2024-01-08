@@ -37943,7 +37943,6 @@ static void test_unused_interpolated_input(void)
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
     get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
-    todo
     check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
     release_resource_readback(&rb);
 

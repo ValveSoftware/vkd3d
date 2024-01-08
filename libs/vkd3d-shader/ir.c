@@ -840,6 +840,7 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
     unsigned int i, j, element_count, new_count, register_count;
     struct signature_element *elements;
     struct signature_element *e, *f;
+    bool used;
 
     element_count = s->element_count;
     if (!(elements = vkd3d_malloc(element_count * sizeof(*elements))))
@@ -860,6 +861,8 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
         if (range_map_get_register_count(range_map, e->register_index, e->mask) > 1)
             continue;
 
+        used = e->used_mask;
+
         for (; j < element_count; ++j)
         {
             f = &elements[j];
@@ -877,6 +880,16 @@ static bool shader_signature_merge(struct shader_signature *s, uint8_t range_map
             e->mask |= f->mask;
             e->used_mask |= f->used_mask;
             e->semantic_index = min(e->semantic_index, f->semantic_index);
+
+            /* The first element may have no interpolation mode if it is unused. Elements which
+             * actually have different interpolation modes are assigned different registers. */
+            if (f->used_mask && !used)
+            {
+                if (e->interpolation_mode && e->interpolation_mode != f->interpolation_mode)
+                    FIXME("Mismatching interpolation modes %u and %u.\n", e->interpolation_mode, f->interpolation_mode);
+                else
+                    e->interpolation_mode = f->interpolation_mode;
+            }
         }
     }
     element_count = new_count;
