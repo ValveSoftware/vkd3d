@@ -2345,8 +2345,6 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
     sm1_instr = (struct sm1_instruction)
     {
-        .opcode = D3DSIO_TEX,
-
         .dst.type = D3DSPR_TEMP,
         .dst.reg = instr->reg.id,
         .dst.writemask = instr->reg.writemask,
@@ -2362,8 +2360,22 @@ static void write_sm1_resource_load(struct hlsl_ctx *ctx, struct vkd3d_bytecode_
 
         .src_count = 2,
     };
-    if (load->load_type == HLSL_RESOURCE_SAMPLE_PROJ)
-        sm1_instr.opcode |= VKD3DSI_TEXLD_PROJECT << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
+
+    switch (load->load_type)
+    {
+        case HLSL_RESOURCE_SAMPLE:
+            sm1_instr.opcode = D3DSIO_TEX;
+            break;
+
+        case HLSL_RESOURCE_SAMPLE_PROJ:
+            sm1_instr.opcode = D3DSIO_TEX;
+            sm1_instr.opcode |= VKD3DSI_TEXLD_PROJECT << VKD3D_SM1_INSTRUCTION_FLAGS_SHIFT;
+            break;
+
+        default:
+            hlsl_fixme(ctx, &instr->loc, "Resource load type %u\n", load->load_type);
+            return;
+    }
 
     assert(instr->reg.allocated);
 
