@@ -37827,6 +37827,130 @@ static void test_hull_shader_punned_array(void)
     destroy_test_context(&context);
 }
 
+static void test_unused_interpolated_input(void)
+{
+    ID3D12GraphicsCommandList *command_list;
+    D3D12_INPUT_LAYOUT_DESC input_layout;
+    struct d3d12_resource_readback rb;
+    struct test_context_desc desc;
+    D3D12_VERTEX_BUFFER_VIEW vbv;
+    struct test_context context;
+    ID3D12CommandQueue *queue;
+    ID3D12Resource *buffer;
+
+    static const DWORD vs_code[] =
+    {
+#if 0
+        void main(float4 in_position : POSITION, float4 in_color : COLOR,
+                out float4 out_position : SV_POSITION, out float2 out_color_xy : COLOR0,
+                out float2 out_color_zw : COLOR1)
+        {
+            out_position = in_position;
+            out_color_xy = in_color.xy;
+            out_color_zw = in_color.zw;
+        }
+#endif
+        0x43425844, 0x300ab133, 0x7ab911f3, 0x18c8bc61, 0x7a2eb5e9, 0x00000001, 0x00000168, 0x00000003,
+        0x0000002c, 0x0000007c, 0x000000e8, 0x4e475349, 0x00000048, 0x00000002, 0x00000008, 0x00000038,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000041, 0x00000000, 0x00000000,
+        0x00000003, 0x00000001, 0x00000f0f, 0x49534f50, 0x4e4f4954, 0x4c4f4300, 0xab00524f, 0x4e47534f,
+        0x00000064, 0x00000003, 0x00000008, 0x00000050, 0x00000000, 0x00000001, 0x00000003, 0x00000000,
+        0x0000000f, 0x0000005c, 0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x00000c03, 0x0000005c,
+        0x00000001, 0x00000000, 0x00000003, 0x00000001, 0x0000030c, 0x505f5653, 0x5449534f, 0x004e4f49,
+        0x4f4c4f43, 0xabab0052, 0x58454853, 0x00000078, 0x00010050, 0x0000001e, 0x0100086a, 0x0300005f,
+        0x001010f2, 0x00000000, 0x0300005f, 0x001010f2, 0x00000001, 0x04000067, 0x001020f2, 0x00000000,
+        0x00000001, 0x03000065, 0x00102032, 0x00000001, 0x03000065, 0x001020c2, 0x00000001, 0x05000036,
+        0x001020f2, 0x00000000, 0x00101e46, 0x00000000, 0x05000036, 0x001020f2, 0x00000001, 0x00101e46,
+        0x00000001, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE vs = {vs_code, sizeof(vs_code)};
+    static const DWORD ps_code[] =
+    {
+        /* Compiled with fxc, this results in a single input register split into two signature
+         * elements, xy and zw, where xy is unused and has default interpolation. */
+#if 0
+        void main(float4 in_position : SV_POSITION, nointerpolation float2 in_color_xy : COLOR0,
+                nointerpolation float2 in_color_zw : COLOR1, out float4 out_color : SV_TARGET)
+        {
+            /* in_color_xy is unused */
+            out_color.xy = in_color_zw;
+            out_color.zw = in_color_zw;
+        }
+#endif
+        0x43425844, 0xeb0d015d, 0x5dc78d0f, 0x0e0a87d1, 0x93ea3988, 0x00000001, 0x00000110, 0x00000003,
+        0x0000002c, 0x00000098, 0x000000cc, 0x4e475349, 0x00000064, 0x00000003, 0x00000008, 0x00000050,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x0000005c, 0x00000000, 0x00000000,
+        0x00000003, 0x00000001, 0x00000003, 0x0000005c, 0x00000001, 0x00000000, 0x00000003, 0x00000001,
+        0x00000c0c, 0x505f5653, 0x5449534f, 0x004e4f49, 0x4f4c4f43, 0xabab0052, 0x4e47534f, 0x0000002c,
+        0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x0000000f,
+        0x545f5653, 0x45475241, 0xabab0054, 0x58454853, 0x0000003c, 0x00000050, 0x0000000f, 0x0100086a,
+        0x03000862, 0x001010c2, 0x00000001, 0x03000065, 0x001020f2, 0x00000000, 0x05000036, 0x001020f2,
+        0x00000000, 0x00101ee6, 0x00000001, 0x0100003e,
+    };
+    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    static const D3D12_BOX box = {8, 8, 0, 9, 9, 1};
+    static const D3D12_INPUT_ELEMENT_DESC layout_desc[] =
+    {
+        {"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT,       0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+    };
+    static const struct
+    {
+        struct vec2 position;
+        struct vec4 color;
+    }
+    quad[] =
+    {
+        {{-1.0f, -1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{-1.0f,  1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+        {{ 1.0f, -1.0f}, {1.0f, 0.0f, 1.0f, 0.0f}},
+        {{ 1.0f,  1.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
+    };
+
+    memset(&desc, 0, sizeof(desc));
+    desc.no_root_signature = true;
+    if (!init_test_context(&context, &desc))
+        return;
+    command_list = context.list;
+    queue = context.queue;
+
+    context.root_signature = create_empty_root_signature(context.device,
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    input_layout.pInputElementDescs = layout_desc;
+    input_layout.NumElements = ARRAY_SIZE(layout_desc);
+    context.pipeline_state = create_pipeline_state(context.device,
+            context.root_signature, context.render_target_desc.Format, &vs, &ps, &input_layout);
+
+    buffer = create_upload_buffer(context.device, sizeof(quad), quad);
+
+    vbv.BufferLocation = ID3D12Resource_GetGPUVirtualAddress(buffer);
+    vbv.StrideInBytes = sizeof(*quad);
+    vbv.SizeInBytes = sizeof(quad);
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    ID3D12GraphicsCommandList_IASetVertexBuffers(command_list, 0, 1, &vbv);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 4, 1, 0, 0);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    get_resource_readback_with_command_list(context.render_target, 0, &rb, queue, command_list);
+    todo
+    check_readback_data_uint(&rb.rb, &box, 0xff00ff00, 0);
+    release_resource_readback(&rb);
+
+    ID3D12Resource_Release(buffer);
+    destroy_test_context(&context);
+}
+
 START_TEST(d3d12)
 {
     parse_args(argc, argv);
@@ -38009,4 +38133,5 @@ START_TEST(d3d12)
     run_test(test_vs_ps_relative_addressing);
     run_test(test_get_resource_tiling);
     run_test(test_hull_shader_punned_array);
+    run_test(test_unused_interpolated_input);
 }
