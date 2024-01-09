@@ -4270,7 +4270,31 @@ static void spirv_compiler_decorate_builtin(struct spirv_compiler *compiler,
             }
             break;
         case SpvBuiltInViewportIndex:
-            vkd3d_spirv_enable_capability(builder, SpvCapabilityMultiViewport);
+            switch (compiler->shader_type)
+            {
+                case VKD3D_SHADER_TYPE_PIXEL:
+                case VKD3D_SHADER_TYPE_GEOMETRY:
+                    vkd3d_spirv_enable_capability(builder, SpvCapabilityMultiViewport);
+                    break;
+
+                case VKD3D_SHADER_TYPE_VERTEX:
+                case VKD3D_SHADER_TYPE_DOMAIN:
+                    if (!spirv_compiler_is_target_extension_supported(compiler,
+                            VKD3D_SHADER_SPIRV_EXTENSION_EXT_VIEWPORT_INDEX_LAYER))
+                    {
+                        FIXME("The target environment does not support decoration ViewportIndex.\n");
+                        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                                "Cannot use SV_ViewportArrayIndex. "
+                                "The target environment does not support decoration ViewportIndex.");
+                    }
+                    vkd3d_spirv_enable_capability(builder, SpvCapabilityShaderViewportIndexLayerEXT);
+                    break;
+
+                default:
+                    spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_SHADER,
+                            "Invalid use of SV_ViewportArrayIndex.");
+                    break;
+            }
             break;
         case SpvBuiltInSampleId:
             vkd3d_spirv_enable_capability(builder, SpvCapabilitySampleRateShading);
