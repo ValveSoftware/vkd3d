@@ -919,6 +919,7 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
 {
     struct vkd3d_shader_index_range *index_range = &ins->declaration.index_range;
     unsigned int i, register_idx, register_count;
+    const struct shader_signature *signature;
     enum vkd3d_shader_register_type type;
     struct sm4_index_range_array *ranges;
     unsigned int *io_masks;
@@ -938,27 +939,32 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
         case VKD3DSPR_INCONTROLPOINT:
             io_masks = priv->input_register_masks;
             ranges = &priv->input_index_ranges;
+            signature = &priv->p.shader_desc.input_signature;
             break;
         case VKD3DSPR_OUTPUT:
             if (sm4_parser_is_in_fork_or_join_phase(priv))
             {
                 io_masks = priv->patch_constant_register_masks;
                 ranges = &priv->patch_constant_index_ranges;
+                signature = &priv->p.shader_desc.patch_constant_signature;
             }
             else
             {
                 io_masks = priv->output_register_masks;
                 ranges = &priv->output_index_ranges;
+                signature = &priv->p.shader_desc.output_signature;
             }
             break;
         case VKD3DSPR_COLOROUT:
         case VKD3DSPR_OUTCONTROLPOINT:
             io_masks = priv->output_register_masks;
             ranges = &priv->output_index_ranges;
+            signature = &priv->p.shader_desc.output_signature;
             break;
         case VKD3DSPR_PATCHCONST:
             io_masks = priv->patch_constant_register_masks;
             ranges = &priv->patch_constant_index_ranges;
+            signature = &priv->p.shader_desc.patch_constant_signature;
             break;
 
         default:
@@ -996,6 +1002,18 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
 
     for (i = 0; i < register_count; ++i)
     {
+        const struct signature_element *e = vsir_signature_find_element_for_reg(signature, register_idx + i, write_mask);
+        /* Index ranges should not contain non-arrayed sysvals. FXC tries to forbid this but it is buggy,
+         * and can emit a range containing a sysval if the sysval is not actually accessed. */
+        if (e && e->sysval_semantic && register_count > 1 && !vsir_sysval_semantic_is_tess_factor(e->sysval_semantic)
+                && !vsir_sysval_semantic_is_clip_cull(e->sysval_semantic))
+        {
+            WARN("Sysval %u included in an index range declaration.\n", e->sysval_semantic);
+            vkd3d_shader_parser_error(&priv->p, VKD3D_SHADER_ERROR_TPF_INVALID_INDEX_RANGE_DCL,
+                    "Index range base %u, count %u, mask %#x contains sysval %u.",
+                    register_idx, register_count, write_mask, e->sysval_semantic);
+            return;
+        }
         if ((io_masks[register_idx + i] & write_mask) != write_mask)
         {
             WARN("No matching declaration for index range base %u, count %u, mask %#x.\n",
