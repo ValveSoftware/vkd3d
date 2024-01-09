@@ -2666,33 +2666,187 @@ static void materialize_ssas_to_temps_process_src_param(struct vkd3d_shader_pars
     materialize_ssas_to_temps_process_reg(parser, &src->reg);
 }
 
+static const struct vkd3d_shader_src_param *materialize_ssas_to_temps_compute_source(struct vkd3d_shader_instruction *ins,
+        unsigned int label)
+{
+    unsigned int i;
+
+    assert(ins->handler_idx == VKD3DSIH_PHI);
+
+    for (i = 0; i < ins->src_count; i += 2)
+    {
+        if (label_from_src_param(&ins->src[i + 1]) == label)
+            return &ins->src[i];
+    }
+
+    vkd3d_unreachable();
+}
+
+static bool materialize_ssas_to_temps_synthesize_mov(struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_instruction *instruction, const struct vkd3d_shader_location *loc,
+        const struct vkd3d_shader_dst_param *dest, const struct vkd3d_shader_src_param *cond,
+        const struct vkd3d_shader_src_param *source, bool invert)
+{
+    struct vkd3d_shader_src_param *src;
+    struct vkd3d_shader_dst_param *dst;
+
+    if (!vsir_instruction_init_with_params(&parser->program, instruction, loc,
+            cond ? VKD3DSIH_MOVC : VKD3DSIH_MOV, 1, cond ? 3 : 1))
+        return false;
+
+    dst = instruction->dst;
+    src = instruction->src;
+
+    dst[0] = *dest;
+    materialize_ssas_to_temps_process_dst_param(parser, &dst[0]);
+
+    assert(dst[0].write_mask == VKD3DSP_WRITEMASK_0);
+    assert(dst[0].modifiers == 0);
+    assert(dst[0].shift == 0);
+
+    if (cond)
+    {
+        src[0] = *cond;
+        src[1 + invert] = *source;
+        memset(&src[2 - invert], 0, sizeof(src[2 - invert]));
+        src[2 - invert].reg = dst[0].reg;
+        materialize_ssas_to_temps_process_src_param(parser, &src[1]);
+        materialize_ssas_to_temps_process_src_param(parser, &src[2]);
+    }
+    else
+    {
+        src[0] = *source;
+        materialize_ssas_to_temps_process_src_param(parser, &src[0]);
+    }
+
+    return true;
+}
+
 static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_instruction *instructions = NULL;
+    struct materialize_ssas_to_temps_block_data
+    {
+        size_t phi_begin;
+        size_t phi_count;
+    } *block_index = NULL;
     size_t ins_capacity = 0, ins_count = 0, i;
+    unsigned int current_label = 0;
 
     if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
         goto fail;
+
+    if (!(block_index = vkd3d_calloc(parser->program.block_count, sizeof(*block_index))))
+    {
+        ERR("Failed to allocate block index.\n");
+        goto fail;
+    }
+
+    for (i = 0; i < parser->program.instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                current_label = label_from_src_param(&ins->src[0]);
+                break;
+
+            case VKD3DSIH_PHI:
+                assert(current_label != 0);
+                assert(i != 0);
+                if (block_index[current_label - 1].phi_begin == 0)
+                    block_index[current_label - 1].phi_begin = i;
+                block_index[current_label - 1].phi_count += 1;
+                break;
+
+            default:
+                current_label = 0;
+                break;
+        }
+    }
 
     for (i = 0; i < parser->program.instructions.count; ++i)
     {
         struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
         size_t j;
 
-        if (ins->handler_idx == VKD3DSIH_PHI)
-        {
-            WARN("Unhandled PHI when materializing SSA registers.\n");
-            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                    "Unhandled PHI when materializing SSA registers.");
-            vkd3d_free(instructions);
-            return VKD3D_ERROR_NOT_IMPLEMENTED;
-        }
-
         for (j = 0; j < ins->dst_count; ++j)
             materialize_ssas_to_temps_process_dst_param(parser, &ins->dst[j]);
 
         for (j = 0; j < ins->src_count; ++j)
             materialize_ssas_to_temps_process_src_param(parser, &ins->src[j]);
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                current_label = label_from_src_param(&ins->src[0]);
+                break;
+
+            case VKD3DSIH_BRANCH:
+            {
+                if (vsir_register_is_label(&ins->src[0].reg))
+                {
+                    const struct materialize_ssas_to_temps_block_data *data = &block_index[label_from_src_param(&ins->src[0]) - 1];
+
+                    if (!reserve_instructions(&instructions, &ins_capacity, ins_count + data->phi_count))
+                        goto fail;
+
+                    for (j = data->phi_begin; j < data->phi_begin + data->phi_count; ++j)
+                    {
+                        const struct vkd3d_shader_src_param *source;
+
+                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
+                                &parser->program.instructions.elements[j].dst[0], NULL, source, false))
+                            goto fail;
+
+                        ++ins_count;
+                    }
+                }
+                else
+                {
+                    struct materialize_ssas_to_temps_block_data *data_true = &block_index[label_from_src_param(&ins->src[1]) - 1],
+                            *data_false = &block_index[label_from_src_param(&ins->src[2]) - 1];
+                    const struct vkd3d_shader_src_param *cond = &ins->src[0];
+
+                    if (!reserve_instructions(&instructions, &ins_capacity,
+                            ins_count + data_true->phi_count + data_false->phi_count))
+                        goto fail;
+
+                    for (j = data_true->phi_begin; j < data_true->phi_begin + data_true->phi_count; ++j)
+                    {
+                        const struct vkd3d_shader_src_param *source;
+
+                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
+                                &parser->program.instructions.elements[j].dst[0], cond, source, false))
+                            goto fail;
+
+                        ++ins_count;
+                    }
+
+                    for (j = data_false->phi_begin; j < data_false->phi_begin + data_false->phi_count; ++j)
+                    {
+                        const struct vkd3d_shader_src_param *source;
+
+                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
+                                &parser->program.instructions.elements[j].dst[0], cond, source, true))
+                            goto fail;
+
+                        ++ins_count;
+                    }
+                }
+                break;
+            }
+
+            case VKD3DSIH_PHI:
+                continue;
+
+            default:
+                break;
+        }
 
         if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
             goto fail;
@@ -2701,6 +2855,7 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
     }
 
     vkd3d_free(parser->program.instructions.elements);
+    vkd3d_free(block_index);
     parser->program.instructions.elements = instructions;
     parser->program.instructions.capacity = ins_capacity;
     parser->program.instructions.count = ins_count;
@@ -2711,6 +2866,7 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
 
 fail:
     vkd3d_free(instructions);
+    vkd3d_free(block_index);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
