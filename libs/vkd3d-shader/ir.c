@@ -2637,6 +2637,84 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
+static void materialize_ssas_to_temps_process_src_param(struct vkd3d_shader_parser *parser, struct vkd3d_shader_src_param *src);
+
+/* This is idempotent: it can be safely applied more than once on the
+ * same register. */
+static void materialize_ssas_to_temps_process_reg(struct vkd3d_shader_parser *parser, struct vkd3d_shader_register *reg)
+{
+    unsigned int i;
+
+    if (reg->type == VKD3DSPR_SSA)
+    {
+        reg->type = VKD3DSPR_TEMP;
+        reg->idx[0].offset += parser->program.temp_count;
+    }
+
+    for (i = 0; i < reg->idx_count; ++i)
+        if (reg->idx[i].rel_addr)
+            materialize_ssas_to_temps_process_src_param(parser, reg->idx[i].rel_addr);
+}
+
+static void materialize_ssas_to_temps_process_dst_param(struct vkd3d_shader_parser *parser, struct vkd3d_shader_dst_param *dst)
+{
+    materialize_ssas_to_temps_process_reg(parser, &dst->reg);
+}
+
+static void materialize_ssas_to_temps_process_src_param(struct vkd3d_shader_parser *parser, struct vkd3d_shader_src_param *src)
+{
+    materialize_ssas_to_temps_process_reg(parser, &src->reg);
+}
+
+static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *parser)
+{
+    struct vkd3d_shader_instruction *instructions = NULL;
+    size_t ins_capacity = 0, ins_count = 0, i;
+
+    if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
+        goto fail;
+
+    for (i = 0; i < parser->program.instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        size_t j;
+
+        if (ins->handler_idx == VKD3DSIH_PHI)
+        {
+            WARN("Unhandled PHI when materializing SSA registers.\n");
+            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                    "Unhandled PHI when materializing SSA registers.");
+            vkd3d_free(instructions);
+            return VKD3D_ERROR_NOT_IMPLEMENTED;
+        }
+
+        for (j = 0; j < ins->dst_count; ++j)
+            materialize_ssas_to_temps_process_dst_param(parser, &ins->dst[j]);
+
+        for (j = 0; j < ins->src_count; ++j)
+            materialize_ssas_to_temps_process_src_param(parser, &ins->src[j]);
+
+        if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
+            goto fail;
+
+        instructions[ins_count++] = *ins;
+    }
+
+    vkd3d_free(parser->program.instructions.elements);
+    parser->program.instructions.elements = instructions;
+    parser->program.instructions.capacity = ins_capacity;
+    parser->program.instructions.count = ins_count;
+    parser->program.temp_count += parser->program.ssa_count;
+    parser->program.ssa_count = 0;
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(instructions);
+
+    return VKD3D_ERROR_OUT_OF_MEMORY;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -2651,6 +2729,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (parser->shader_desc.is_dxil)
     {
         if ((result = lower_switch_to_if_ladder(&parser->program)) < 0)
+            return result;
+
+        if ((result = materialize_ssas_to_temps(parser)) < 0)
             return result;
     }
     else
