@@ -15,7 +15,15 @@ AS_IF([test "x$vkd3d_pthread_found" = "xno"], [PTHREAD_LIBS=""])
 LIBS="$vkd3d_libs_saved"])
 
 AS_IF([test "x$vkd3d_pthread_found" != "xyes"],
-AC_CHECK_LIB([pthread], [pthread_create],
-             [PTHREAD_LIBS="-lpthread"],
-             [AC_MSG_ERROR([libpthread not found.])]))
+[vkd3d_libs_saved="$LIBS"
+PTHREAD_LIBS="-pthread"
+LIBS="$LIBS $PTHREAD_LIBS"
+
+AC_MSG_CHECKING([checking for pthread_create in $PTHREAD_LIBS])
+AC_TRY_LINK_FUNC([pthread_create], [vkd3d_pthread_found=yes])
+AC_MSG_RESULT([$vkd3d_pthread_found])
+
+AS_IF([test "x$vkd3d_pthread_found" = "xno"], [PTHREAD_LIBS=""])
+
+LIBS="$vkd3d_libs_saved"])
 ])
