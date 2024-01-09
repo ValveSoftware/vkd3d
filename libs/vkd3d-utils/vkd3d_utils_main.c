@@ -70,8 +70,14 @@ HRESULT WINAPI D3D12CreateDeviceVKD3D(IUnknown *adapter, D3D_FEATURE_LEVEL minim
     };
     static const char * const optional_instance_extensions[] =
     {
+        "VK_KHR_android_surface",
+        "VK_KHR_wayland_surface",
+        "VK_KHR_win32_surface",
         "VK_KHR_xcb_surface",
+        "VK_KHR_xlib_surface",
+        "VK_EXT_metal_surface",
         "VK_MVK_macos_surface",
+        "VK_MVK_ios_surface",
     };
     static const char * const device_extensions[] =
     {
