@@ -2075,7 +2075,7 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
         const uint32_t *end, enum vkd3d_data_type data_type, struct vkd3d_shader_src_param *src_param)
 {
     unsigned int dimension, mask;
-    DWORD token;
+    uint32_t token;
 
     if (*ptr >= end)
     {
