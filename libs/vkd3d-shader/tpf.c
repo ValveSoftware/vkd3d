@@ -2242,7 +2242,7 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
     return true;
 }
 
-static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_shader_instruction *ins)
+static void shader_sm4_read_instruction_modifier(uint32_t modifier, struct vkd3d_shader_instruction *ins)
 {
     enum vkd3d_sm4_instruction_modifier modifier_type = modifier & VKD3D_SM4_MODIFIER_MASK;
 
@@ -2278,7 +2278,7 @@ static void shader_sm4_read_instruction_modifier(DWORD modifier, struct vkd3d_sh
 
         case VKD3D_SM5_MODIFIER_DATA_TYPE:
         {
-            DWORD components = (modifier & VKD3D_SM5_MODIFIER_DATA_TYPE_MASK) >> VKD3D_SM5_MODIFIER_DATA_TYPE_SHIFT;
+            uint32_t components = (modifier & VKD3D_SM5_MODIFIER_DATA_TYPE_MASK) >> VKD3D_SM5_MODIFIER_DATA_TYPE_SHIFT;
             unsigned int i;
 
             for (i = 0; i < VKD3D_VEC4_SIZE; i++)
