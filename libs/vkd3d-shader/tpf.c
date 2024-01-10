@@ -2334,9 +2334,9 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     struct vkd3d_shader_src_param *src_params;
     const uint32_t **ptr = &sm4->ptr;
     unsigned int i, len;
-    size_t remaining;
     const uint32_t *p;
-    DWORD precise;
+    uint32_t precise;
+    size_t remaining;
 
     if (*ptr >= sm4->end)
     {
