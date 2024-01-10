@@ -1759,11 +1759,11 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
     const struct vkd3d_sm4_register_type_info *register_type_info;
     enum vkd3d_shader_register_type vsir_register_type;
     enum vkd3d_sm4_register_precision precision;
+    uint32_t token, order, extended, addressing;
     enum vkd3d_sm4_register_type register_type;
     enum vkd3d_sm4_extended_operand_type type;
-    enum vkd3d_sm4_register_modifier m;
     enum vkd3d_sm4_dimension sm4_dimension;
-    uint32_t token, order, extended;
+    enum vkd3d_sm4_register_modifier m;
 
     if (*ptr >= end)
     {
@@ -1861,7 +1861,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
 
     if (order >= 1)
     {
-        DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK0) >> VKD3D_SM4_ADDRESSING_SHIFT0;
+        addressing = (token & VKD3D_SM4_ADDRESSING_MASK0) >> VKD3D_SM4_ADDRESSING_SHIFT0;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[0])))
         {
             ERR("Failed to read register index.\n");
@@ -1871,7 +1871,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
 
     if (order >= 2)
     {
-        DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK1) >> VKD3D_SM4_ADDRESSING_SHIFT1;
+        addressing = (token & VKD3D_SM4_ADDRESSING_MASK1) >> VKD3D_SM4_ADDRESSING_SHIFT1;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[1])))
         {
             ERR("Failed to read register index.\n");
@@ -1881,7 +1881,7 @@ static bool shader_sm4_read_param(struct vkd3d_shader_sm4_parser *priv, const ui
 
     if (order >= 3)
     {
-        DWORD addressing = (token & VKD3D_SM4_ADDRESSING_MASK2) >> VKD3D_SM4_ADDRESSING_SHIFT2;
+        addressing = (token & VKD3D_SM4_ADDRESSING_MASK2) >> VKD3D_SM4_ADDRESSING_SHIFT2;
         if (!(shader_sm4_read_reg_idx(priv, ptr, end, addressing, &param->idx[2])))
         {
             ERR("Failed to read register index.\n");
