@@ -2162,7 +2162,7 @@ static bool shader_sm4_read_dst_param(struct vkd3d_shader_sm4_parser *priv, cons
     enum vkd3d_sm4_swizzle_type swizzle_type;
     enum vkd3d_shader_src_modifier modifier;
     unsigned int dimension, swizzle;
-    DWORD token;
+    uint32_t token;
 
     if (*ptr >= end)
     {
