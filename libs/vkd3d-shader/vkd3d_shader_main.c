@@ -226,6 +226,16 @@ void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *cache, struct
     cache->buffers[cache->count++] = buffer;
 }
 
+void vkd3d_shader_code_from_string_buffer(struct vkd3d_shader_code *code, struct vkd3d_string_buffer *buffer)
+{
+    code->code = buffer->buffer;
+    code->size = buffer->content_size;
+
+    buffer->buffer = NULL;
+    buffer->buffer_size = 0;
+    buffer->content_size = 0;
+}
+
 void vkd3d_shader_message_context_init(struct vkd3d_shader_message_context *context,
         enum vkd3d_shader_log_level log_level)
 {

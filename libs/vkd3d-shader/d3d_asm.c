@@ -2051,7 +2051,6 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
     struct vkd3d_string_buffer *buffer;
     unsigned int indent, i, j;
     const char *indent_str;
-    void *code;
 
     static const struct vkd3d_d3d_asm_colours no_colours =
     {
@@ -2150,18 +2149,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
         }
     }
 
-    if ((code = vkd3d_malloc(buffer->content_size)))
-    {
-        memcpy(code, buffer->buffer, buffer->content_size);
-        out->size = buffer->content_size;
-        out->code = code;
-    }
-    else
-    {
-        result = VKD3D_ERROR_OUT_OF_MEMORY;
-    }
-
-    vkd3d_string_buffer_cleanup(buffer);
+    vkd3d_shader_code_from_string_buffer(out, buffer);
 
     return result;
 }

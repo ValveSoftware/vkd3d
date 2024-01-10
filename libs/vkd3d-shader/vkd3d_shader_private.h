@@ -1409,6 +1409,7 @@ void vkd3d_string_buffer_release(struct vkd3d_string_buffer_cache *list, struct 
         vkd3d_string_buffer_trace_(buffer, __FUNCTION__)
 void vkd3d_string_buffer_trace_(const struct vkd3d_string_buffer *buffer, const char *function);
 int vkd3d_string_buffer_vprintf(struct vkd3d_string_buffer *buffer, const char *format, va_list args);
+void vkd3d_shader_code_from_string_buffer(struct vkd3d_shader_code *code, struct vkd3d_string_buffer *buffer);
 
 struct vkd3d_bytecode_buffer
 {
