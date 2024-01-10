@@ -2084,6 +2084,23 @@ bool shader_instruction_array_reserve(struct vkd3d_shader_instruction_array *ins
     return true;
 }
 
+bool shader_instruction_array_insert_at(struct vkd3d_shader_instruction_array *instructions,
+        unsigned int idx, unsigned int count)
+{
+    assert(idx <= instructions->count);
+
+    if (!shader_instruction_array_reserve(instructions, instructions->count + count))
+        return false;
+
+    memmove(&instructions->elements[idx + count], &instructions->elements[idx],
+            (instructions->count - idx) * sizeof(*instructions->elements));
+    memset(&instructions->elements[idx], 0, count * sizeof(*instructions->elements));
+
+    instructions->count += count;
+
+    return true;
+}
+
 bool shader_instruction_array_add_icb(struct vkd3d_shader_instruction_array *instructions,
         struct vkd3d_shader_immediate_constant_buffer *icb)
 {

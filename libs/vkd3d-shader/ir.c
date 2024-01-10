@@ -65,6 +65,116 @@ static void remove_dcl_temps(struct vsir_program *program)
     }
 }
 
+static bool vsir_instruction_init_with_params(struct vkd3d_shader_parser *parser,
+        struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
+        enum vkd3d_shader_opcode handler_idx, unsigned int dst_count, unsigned int src_count)
+{
+    vsir_instruction_init(ins, location, handler_idx);
+    ins->dst_count = dst_count;
+    ins->src_count = src_count;
+
+    if (!(ins->dst = shader_parser_get_dst_params(parser, ins->dst_count)))
+    {
+        ERR("Failed to allocate %u destination parameters.\n", dst_count);
+        return false;
+    }
+
+    if (!(ins->src = shader_parser_get_src_params(parser, ins->src_count)))
+    {
+        ERR("Failed to allocate %u source parameters.\n", src_count);
+        return false;
+    }
+
+    memset(ins->dst, 0, sizeof(*ins->dst) * ins->dst_count);
+    memset(ins->src, 0, sizeof(*ins->src) * ins->src_count);
+    return true;
+}
+
+static enum vkd3d_result instruction_array_lower_texkills(struct vkd3d_shader_parser *parser)
+{
+    struct vsir_program *program = &parser->program;
+    struct vkd3d_shader_instruction_array *instructions = &program->instructions;
+    struct vkd3d_shader_instruction *texkill_ins, *ins;
+    unsigned int components_read = 3 + (program->shader_version.major >= 2);
+    unsigned int tmp_idx = ~0u;
+    unsigned int i, k;
+
+    for (i = 0; i < instructions->count; ++i)
+    {
+        texkill_ins = &instructions->elements[i];
+
+        if (texkill_ins->handler_idx != VKD3DSIH_TEXKILL)
+            continue;
+
+        if (!shader_instruction_array_insert_at(instructions, i + 1, components_read + 1))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        if (tmp_idx == ~0u)
+            tmp_idx = program->temp_count++;
+
+        /* tmp = ins->dst[0] < 0  */
+
+        ins = &instructions->elements[i + 1];
+        if (!vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_LTO, 1, 2))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+
+        vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+        ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->dst[0].reg.idx[0].offset = tmp_idx;
+        ins->dst[0].write_mask = VKD3DSP_WRITEMASK_ALL;
+
+        ins->src[0].reg = texkill_ins->dst[0].reg;
+        vsir_register_init(&ins->src[1].reg, VKD3DSPR_IMMCONST, VKD3D_DATA_FLOAT, 0);
+        ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->src[1].reg.u.immconst_f32[0] = 0.0f;
+        ins->src[1].reg.u.immconst_f32[1] = 0.0f;
+        ins->src[1].reg.u.immconst_f32[2] = 0.0f;
+        ins->src[1].reg.u.immconst_f32[3] = 0.0f;
+
+        /* tmp.x = tmp.x || tmp.y */
+        /* tmp.x = tmp.x || tmp.z */
+        /* tmp.x = tmp.x || tmp.w, if sm >= 2.0 */
+
+        for (k = 1; k < components_read; ++k)
+        {
+            ins = &instructions->elements[i + 1 + k];
+            if (!(vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_OR, 1, 2)))
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+
+            vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+            ins->dst[0].reg.dimension = VSIR_DIMENSION_VEC4;
+            ins->dst[0].reg.idx[0].offset = tmp_idx;
+            ins->dst[0].write_mask = VKD3DSP_WRITEMASK_0;
+
+            vsir_register_init(&ins->src[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+            ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+            ins->src[0].reg.idx[0].offset = tmp_idx;
+            ins->src[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+            vsir_register_init(&ins->src[1].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+            ins->src[1].reg.dimension = VSIR_DIMENSION_VEC4;
+            ins->src[1].reg.idx[0].offset = tmp_idx;
+            ins->src[1].swizzle = vkd3d_shader_create_swizzle(k, k, k, k);
+        }
+
+        /* discard_nz tmp.x */
+
+        ins = &instructions->elements[i + 1 + components_read];
+        if (!(vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_DISCARD, 0, 1)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
+
+        vsir_register_init(&ins->src[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
+        ins->src[0].reg.dimension = VSIR_DIMENSION_VEC4;
+        ins->src[0].reg.idx[0].offset = tmp_idx;
+        ins->src[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+
+        /* Make the original instruction no-op */
+        vkd3d_shader_instruction_make_nop(texkill_ins);
+    }
+
+    return VKD3D_OK;
+}
+
 static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
         unsigned int instance_id)
 {
@@ -2253,6 +2363,9 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     enum vkd3d_result result = VKD3D_OK;
 
     remove_dcl_temps(&parser->program);
+
+    if ((result = instruction_array_lower_texkills(parser)) < 0)
+        return result;
 
     if (!parser->shader_desc.is_dxil)
     {

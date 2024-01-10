@@ -9558,7 +9558,6 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             spirv_compiler_emit_retc(compiler, instruction);
             break;
         case VKD3DSIH_DISCARD:
-        case VKD3DSIH_TEXKILL:
             spirv_compiler_emit_discard(compiler, instruction);
             break;
         case VKD3DSIH_LABEL:
