@@ -1389,7 +1389,7 @@ bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_sem
         enum vkd3d_shader_type shader_type;
         unsigned int major_version;
         D3DSHADER_PARAM_REGISTER_TYPE type;
-        DWORD offset;
+        unsigned int offset;
     }
     register_table[] =
     {
