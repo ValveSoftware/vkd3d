@@ -1533,6 +1533,12 @@ struct validation_context
         size_t first_seen;
     } *temps;
 
+    struct validation_context_ssa_data
+    {
+        enum vsir_dimension dimension;
+        size_t first_seen;
+    } *ssas;
+
     enum vkd3d_shader_opcode *blocks;
     size_t depth;
     size_t blocks_capacity;
@@ -1649,6 +1655,9 @@ static void vsir_validate_register(struct validation_context *ctx,
         }
 
         case VKD3DSPR_SSA:
+        {
+            struct validation_context_ssa_data *data;
+
             if (reg->idx_count != 1)
             {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a SSA register.",
@@ -1660,9 +1669,36 @@ static void vsir_validate_register(struct validation_context *ctx,
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a SSA register.");
 
             if (reg->idx[0].offset >= ctx->parser->shader_desc.ssa_count)
+            {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "SSA register index %u exceeds the maximum count %u.",
                         reg->idx[0].offset, ctx->parser->shader_desc.ssa_count);
+                break;
+            }
+
+            data = &ctx->ssas[reg->idx[0].offset];
+
+            if (reg->dimension == VSIR_DIMENSION_NONE)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension NONE for a SSA register.");
+                break;
+            }
+
+            /* SSA registers can be scalar or vec4, provided that each
+             * individual register always appears with the same
+             * dimension. */
+            if (data->dimension == VSIR_DIMENSION_NONE)
+            {
+                data->dimension = reg->dimension;
+                data->first_seen = ctx->instruction_idx;
+            }
+            else if (data->dimension != reg->dimension)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a SSA register: "
+                        "it has already been seen with dimension %#x at instruction %zu.",
+                        reg->dimension, data->dimension, data->first_seen);
+            }
             break;
+        }
 
         case VKD3DSPR_NULL:
             if (reg->idx_count != 0)
@@ -1938,6 +1974,9 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (!(ctx.temps = vkd3d_calloc(parser->shader_desc.temp_count, sizeof(*ctx.temps))))
         goto fail;
 
+    if (!(ctx.ssas = vkd3d_calloc(parser->shader_desc.ssa_count, sizeof(*ctx.ssas))))
+        goto fail;
+
     for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
 
@@ -1946,12 +1985,14 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
 
     vkd3d_free(ctx.blocks);
     vkd3d_free(ctx.temps);
+    vkd3d_free(ctx.ssas);
 
     return VKD3D_OK;
 
 fail:
     vkd3d_free(ctx.blocks);
     vkd3d_free(ctx.temps);
+    vkd3d_free(ctx.ssas);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
