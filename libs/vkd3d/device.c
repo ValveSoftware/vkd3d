@@ -4551,7 +4551,7 @@ HRESULT vkd3d_create_thread(struct vkd3d_instance *instance,
         thread_data->data = data;
         if (!(thread->handle = CreateThread(NULL, 0, call_thread_main, thread_data, 0, NULL)))
         {
-            ERR("Failed to create thread, error %d.\n", GetLastError());
+            ERR("Failed to create thread, error %lu.\n", GetLastError());
             vkd3d_free(thread_data);
             hr = E_FAIL;
         }
