@@ -929,6 +929,13 @@ static unsigned int shader_register_normalise_arrayed_addressing(struct vkd3d_sh
         reg->idx[id_idx + 1].rel_addr = NULL;
         reg->idx[id_idx + 1].offset = reg->idx[id_idx].offset;
         reg->idx[id_idx].offset -= register_index;
+        if (id_idx)
+        {
+            /* idx[id_idx] now contains the array index, which must be moved below the control point id. */
+            struct vkd3d_shader_register_index tmp = reg->idx[id_idx];
+            reg->idx[id_idx] = reg->idx[id_idx - 1];
+            reg->idx[id_idx - 1] = tmp;
+        }
         ++id_idx;
     }
     /* Otherwise we have no address for the arrayed register, so insert one. This happens e.g. where

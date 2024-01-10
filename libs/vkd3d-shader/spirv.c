@@ -4722,7 +4722,7 @@ static uint32_t spirv_compiler_emit_builtin_variable_v(struct spirv_compiler *co
     assert(size_count <= ARRAY_SIZE(sizes));
     memcpy(sizes, array_sizes, size_count * sizeof(sizes[0]));
     array_sizes = sizes;
-    sizes[size_count - 1] = max(sizes[size_count - 1], builtin->spirv_array_size);
+    sizes[0] = max(sizes[0], builtin->spirv_array_size);
 
     id = spirv_compiler_emit_array_variable(compiler, &builder->global_stream, storage_class,
             builtin->component_type, builtin->component_count, array_sizes, size_count);
@@ -4793,12 +4793,12 @@ static uint32_t spirv_compiler_emit_input(struct spirv_compiler *compiler,
 
     builtin = get_spirv_builtin_for_sysval(compiler, sysval);
 
-    array_sizes[0] = (reg_type == VKD3DSPR_PATCHCONST ? 0 : compiler->input_control_point_count);
-    array_sizes[1] = signature_element->register_count;
-    if (array_sizes[1] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic)
-            && (!vsir_sysval_semantic_is_clip_cull(signature_element->sysval_semantic) || array_sizes[0]))
+    array_sizes[0] = signature_element->register_count;
+    array_sizes[1] = (reg_type == VKD3DSPR_PATCHCONST ? 0 : compiler->input_control_point_count);
+    if (array_sizes[0] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic)
+            && (!vsir_sysval_semantic_is_clip_cull(signature_element->sysval_semantic) || array_sizes[1]))
     {
-        array_sizes[1] = 0;
+        array_sizes[0] = 0;
     }
 
     write_mask = signature_element->mask;
@@ -5135,10 +5135,10 @@ static void spirv_compiler_emit_output(struct spirv_compiler *compiler,
     /* Don't use builtins for TCS -> TES varyings. See spirv_compiler_emit_input(). */
     if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL && !is_patch_constant)
         sysval = VKD3D_SHADER_SV_NONE;
-    array_sizes[0] = (reg_type == VKD3DSPR_PATCHCONST ? 0 : compiler->output_control_point_count);
-    array_sizes[1] = signature_element->register_count;
-    if (array_sizes[1] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic))
-        array_sizes[1] = 0;
+    array_sizes[0] = signature_element->register_count;
+    array_sizes[1] = (reg_type == VKD3DSPR_PATCHCONST ? 0 : compiler->output_control_point_count);
+    if (array_sizes[0] == 1 && !vsir_sysval_semantic_is_tess_factor(signature_element->sysval_semantic))
+        array_sizes[0] = 0;
 
     builtin = vkd3d_get_spirv_builtin(compiler, reg_type, sysval);
 
