@@ -6907,8 +6907,8 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t src_id[SPIRV_MAX_SRC_COUNT];
     uint32_t instr_set_id, type_id, val_id;
+    unsigned int i, component_count;
     enum GLSLstd450 glsl_inst;
-    unsigned int i;
 
     glsl_inst = spirv_compiler_map_ext_glsl_instruction(instruction);
     if (glsl_inst == GLSLstd450Bad)
@@ -6934,8 +6934,9 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
             || instruction->handler_idx == VKD3DSIH_FIRSTBIT_SHI)
     {
         /* In D3D bits are numbered from the most significant bit. */
+        component_count = vsir_write_mask_component_count(dst->write_mask);
         val_id = vkd3d_spirv_build_op_isub(builder, type_id,
-                spirv_compiler_get_constant_uint(compiler, 31), val_id);
+                spirv_compiler_get_constant_uint_vector(compiler, 31, component_count), val_id);
     }
 
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
