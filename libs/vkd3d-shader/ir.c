@@ -1511,7 +1511,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         vkd3d_shader_trace(instructions, &parser->shader_version);
 
     if (result >= 0 && !parser->failed)
-        vsir_validate(parser);
+        result = vsir_validate(parser);
 
     if (result >= 0 && parser->failed)
         result = VKD3D_ERROR_INVALID_SHADER;
@@ -1526,6 +1526,12 @@ struct validation_context
     bool dcl_temps_found;
     unsigned int temp_count;
     enum vkd3d_shader_opcode phase;
+
+    struct validation_context_temp_data
+    {
+        enum vsir_dimension dimension;
+        size_t first_seen;
+    } *temps;
 
     enum vkd3d_shader_opcode *blocks;
     size_t depth;
@@ -1592,6 +1598,9 @@ static void vsir_validate_register(struct validation_context *ctx,
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
+        {
+            struct validation_context_temp_data *data;
+
             if (reg->idx_count != 1)
             {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a TEMP register.",
@@ -1603,9 +1612,41 @@ static void vsir_validate_register(struct validation_context *ctx,
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
 
             if (reg->idx[0].offset >= temp_count)
+            {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
                         reg->idx[0].offset, temp_count);
+                break;
+            }
+
+            /* parser->shader_desc.temp_count might be smaller then
+             * temp_count if the parser made a mistake; we still don't
+             * want to overflow the array. */
+            if (reg->idx[0].offset >= ctx->parser->shader_desc.temp_count)
+                break;
+            data = &ctx->temps[reg->idx[0].offset];
+
+            if (reg->dimension == VSIR_DIMENSION_NONE)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension NONE for a TEMP register.");
+                break;
+            }
+
+            /* TEMP registers can be scalar or vec4, provided that
+             * each individual register always appears with the same
+             * dimension. */
+            if (data->dimension == VSIR_DIMENSION_NONE)
+            {
+                data->dimension = reg->dimension;
+                data->first_seen = ctx->instruction_idx;
+            }
+            else if (data->dimension != reg->dimension)
+            {
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a TEMP register: "
+                        "it has already been seen with dimension %#x at instruction %zu.",
+                        reg->dimension, data->dimension, data->first_seen);
+            }
             break;
+        }
 
         case VKD3DSPR_SSA:
             if (reg->idx_count != 1)
@@ -1883,7 +1924,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
     }
 }
 
-void vsir_validate(struct vkd3d_shader_parser *parser)
+enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
 {
     struct validation_context ctx =
     {
@@ -1892,7 +1933,10 @@ void vsir_validate(struct vkd3d_shader_parser *parser)
     };
 
     if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
-        return;
+        return VKD3D_OK;
+
+    if (!(ctx.temps = vkd3d_calloc(parser->shader_desc.temp_count, sizeof(*ctx.temps))))
+        goto fail;
 
     for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
@@ -1901,4 +1945,13 @@ void vsir_validate(struct vkd3d_shader_parser *parser)
         validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "%zu nested blocks were not closed.", ctx.depth);
 
     vkd3d_free(ctx.blocks);
+    vkd3d_free(ctx.temps);
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(ctx.blocks);
+    vkd3d_free(ctx.temps);
+
+    return VKD3D_ERROR_OUT_OF_MEMORY;
 }

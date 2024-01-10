@@ -6282,7 +6282,7 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
     vkd3d_free(byte_code);
 
     if (!sm6->p.failed && ret >= 0)
-        vsir_validate(&sm6->p);
+        ret = vsir_validate(&sm6->p);
 
     if (sm6->p.failed && ret >= 0)
         ret = VKD3D_ERROR_INVALID_SHADER;
