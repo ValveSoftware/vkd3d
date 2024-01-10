@@ -267,13 +267,25 @@ static inline int ascii_strcasecmp(const char *a, const char *b)
     return c_a - c_b;
 }
 
+static inline uint64_t vkd3d_atomic_add_fetch_u64(uint64_t volatile *x, uint64_t val)
+{
+#if HAVE_SYNC_ADD_AND_FETCH
+    return __sync_add_and_fetch(x, val);
+#elif defined(_WIN32)
+    return InterlockedAdd64((LONG64 *)x, val);
+#else
+# error "vkd3d_atomic_add_fetch_u64() not implemented for this platform"
+#endif
+}
+
+static inline uint64_t vkd3d_atomic_increment_u64(uint64_t volatile *x)
+{
+    return vkd3d_atomic_add_fetch_u64(x, 1);
+}
+
 #ifndef _WIN32
 # if HAVE_SYNC_ADD_AND_FETCH
 static inline LONG InterlockedIncrement(LONG volatile *x)
-{
-    return __sync_add_and_fetch(x, 1);
-}
-static inline LONG64 InterlockedIncrement64(LONG64 volatile *x)
 {
     return __sync_add_and_fetch(x, 1);
 }

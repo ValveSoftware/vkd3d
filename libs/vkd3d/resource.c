@@ -22,7 +22,7 @@
 #define VKD3D_NULL_BUFFER_SIZE 16
 #define VKD3D_NULL_VIEW_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
-LONG64 object_global_serial_id;
+uint64_t object_global_serial_id;
 
 static inline bool is_cpu_accessible_heap(const D3D12_HEAP_PROPERTIES *properties)
 {
@@ -4314,7 +4314,7 @@ static HRESULT d3d12_descriptor_heap_init(struct d3d12_descriptor_heap *descript
 
     descriptor_heap->ID3D12DescriptorHeap_iface.lpVtbl = &d3d12_descriptor_heap_vtbl;
     descriptor_heap->refcount = 1;
-    descriptor_heap->serial_id = InterlockedIncrement64(&object_global_serial_id);
+    descriptor_heap->serial_id = vkd3d_atomic_increment_u64(&object_global_serial_id);
 
     descriptor_heap->desc = *desc;
 

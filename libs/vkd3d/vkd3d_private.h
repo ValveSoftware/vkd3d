@@ -67,7 +67,7 @@
  * this number to prevent excessive pool memory use. */
 #define VKD3D_MAX_VIRTUAL_HEAP_DESCRIPTORS_PER_TYPE (16 * 1024u)
 
-extern LONG64 object_global_serial_id;
+extern uint64_t object_global_serial_id;
 
 struct d3d12_command_list;
 struct d3d12_device;
