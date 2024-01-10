@@ -1900,5 +1900,5 @@ void vsir_validate(struct vkd3d_shader_parser *parser)
     if (ctx.depth != 0)
         validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "%zu nested blocks were not closed.", ctx.depth);
 
-    free(ctx.blocks);
+    vkd3d_free(ctx.blocks);
 }
