@@ -1593,26 +1593,32 @@ static void vsir_validate_register(struct validation_context *ctx,
     {
         case VKD3DSPR_TEMP:
             if (reg->idx_count != 1)
+            {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a TEMP register.",
                         reg->idx_count);
+                break;
+            }
 
-            if (reg->idx_count >= 1 && reg->idx[0].rel_addr)
+            if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
 
-            if (reg->idx_count >= 1 && reg->idx[0].offset >= temp_count)
+            if (reg->idx[0].offset >= temp_count)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
                         reg->idx[0].offset, temp_count);
             break;
 
         case VKD3DSPR_SSA:
             if (reg->idx_count != 1)
+            {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX_COUNT, "Invalid index count %u for a SSA register.",
                         reg->idx_count);
+                break;
+            }
 
-            if (reg->idx_count >= 1 && reg->idx[0].rel_addr)
+            if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a SSA register.");
 
-            if (reg->idx_count >= 1 && reg->idx[0].offset >= ctx->parser->shader_desc.ssa_count)
+            if (reg->idx[0].offset >= ctx->parser->shader_desc.ssa_count)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "SSA register index %u exceeds the maximum count %u.",
                         reg->idx[0].offset, ctx->parser->shader_desc.ssa_count);
             break;
