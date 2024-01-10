@@ -1523,6 +1523,7 @@ struct validation_context
 {
     struct vkd3d_shader_parser *parser;
     size_t instruction_idx;
+    bool invalid_instruction_idx;
     bool dcl_temps_found;
     unsigned int temp_count;
     enum vkd3d_shader_opcode phase;
@@ -1537,6 +1538,9 @@ struct validation_context
     {
         enum vsir_dimension dimension;
         size_t first_seen;
+        uint32_t write_mask;
+        uint32_t read_mask;
+        size_t first_assigned;
     } *ssas;
 
     enum vkd3d_shader_opcode *blocks;
@@ -1556,8 +1560,16 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
     vkd3d_string_buffer_vprintf(&buf, format, args);
     va_end(args);
 
-    vkd3d_shader_parser_error(ctx->parser, error, "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
-    ERR("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
+    if (ctx->invalid_instruction_idx)
+    {
+        vkd3d_shader_parser_error(ctx->parser, error, "%s", buf.buffer);
+        ERR("VSIR validation error: %s\n", buf.buffer);
+    }
+    else
+    {
+        vkd3d_shader_parser_error(ctx->parser, error, "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
+        ERR("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
+    }
 
     vkd3d_string_buffer_cleanup(&buf);
 }
@@ -1771,6 +1783,23 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
             validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT, "Destination has invalid shift %#x.",
                     dst->shift);
     }
+
+    if (dst->reg.type == VKD3DSPR_SSA && dst->reg.idx[0].offset < ctx->parser->shader_desc.ssa_count)
+    {
+        struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
+
+        if (data->write_mask == 0)
+        {
+            data->write_mask = dst->write_mask;
+            data->first_assigned = ctx->instruction_idx;
+        }
+        else
+        {
+            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SSA_USAGE,
+                    "SSA register is already assigned at instruction %zu.",
+                    data->first_assigned);
+        }
+    }
 }
 
 static void vsir_validate_src_param(struct validation_context *ctx,
@@ -1789,6 +1818,15 @@ static void vsir_validate_src_param(struct validation_context *ctx,
     if (src->modifiers >= VKD3DSPSM_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
                 src->modifiers);
+
+    if (src->reg.type == VKD3DSPR_SSA && src->reg.idx[0].offset < ctx->parser->shader_desc.ssa_count)
+    {
+        struct validation_context_ssa_data *data = &ctx->ssas[src->reg.idx[0].offset];
+        unsigned int i;
+
+        for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
+            data->read_mask |= (1u << vsir_swizzle_get_component(src->swizzle, i));
+    }
 }
 
 static void vsir_validate_dst_count(struct validation_context *ctx,
@@ -1967,6 +2005,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
         .parser = parser,
         .phase = VKD3DSIH_INVALID,
     };
+    unsigned int i;
 
     if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
         return VKD3D_OK;
@@ -1980,8 +2019,20 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
 
+    ctx.invalid_instruction_idx = true;
+
     if (ctx.depth != 0)
         validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "%zu nested blocks were not closed.", ctx.depth);
+
+    for (i = 0; i < parser->shader_desc.ssa_count; ++i)
+    {
+        struct validation_context_ssa_data *data = &ctx.ssas[i];
+
+        if ((data->write_mask | data->read_mask) != data->write_mask)
+            validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SSA_USAGE,
+                    "SSA register %u has invalid read mask %#x, which is not a subset of the write mask %#x "
+                    "at the point of definition.", i, data->read_mask, data->write_mask);
+    }
 
     vkd3d_free(ctx.blocks);
     vkd3d_free(ctx.temps);
