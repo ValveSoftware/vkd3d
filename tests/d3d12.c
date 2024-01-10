@@ -9157,6 +9157,28 @@ static void test_shader_instructions(void)
         0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x0100003e,
     };
     static struct named_shader ps_bits = {"bits", ps_bits_code, sizeof(ps_bits_code)};
+    static const DWORD ps_bits_vector_code[] =
+    {
+#if 0
+        uint2 u;
+
+        uint4 main() : SV_Target
+        {
+            return uint4(countbits(u), firstbithigh(u));
+        }
+#endif
+        0x43425844, 0x799764f6, 0x7e5d98cf, 0x4dd694ef, 0xa30ee79a, 0x00000001, 0x0000013c, 0x00000003,
+        0x0000002c, 0x0000003c, 0x00000070, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001, 0x00000000,
+        0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x000000c4, 0x00000050, 0x00000031,
+        0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2, 0x00000000,
+        0x02000068, 0x00000001, 0x06000087, 0x00100032, 0x00000000, 0x00208046, 0x00000000, 0x00000000,
+        0x0b00001e, 0x00100032, 0x00000000, 0x80100046, 0x00000041, 0x00000000, 0x00004002, 0x0000001f,
+        0x0000001f, 0x00000000, 0x00000000, 0x0d000037, 0x001020c2, 0x00000000, 0x00208406, 0x00000000,
+        0x00000000, 0x00100406, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0xffffffff, 0xffffffff,
+        0x06000086, 0x00102032, 0x00000000, 0x00208046, 0x00000000, 0x00000000, 0x0100003e,
+    };
+    static struct named_shader ps_bits_vector = {"bits_vector", ps_bits_vector_code, sizeof(ps_bits_vector_code)};
     static const DWORD ps_ishr_code[] =
     {
 #if 0
@@ -10528,6 +10550,8 @@ static void test_shader_instructions(void)
         {&ps_bits, {{{0x0000000f, 0x0000000f}}}, {{ 4,   0,   3,   3}}},
         {&ps_bits, {{{0x8000000f, 0x8000000f}}}, {{ 5,   0,  31,  30}}},
         {&ps_bits, {{{0x00080000, 0x00080000}}}, {{ 1,  19,  19,  19}}},
+
+        {&ps_bits_vector, {{{0x11111111, 0x00080000}}}, {{8,   1,  28,  19}}},
 
         {&ps_ishr, {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}, {~0x1fu, 0, 32, 64}}},
                    {{0x00000000, 0x00000000, 0x00000000, 0x00000000}}},
