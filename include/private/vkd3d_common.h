@@ -277,10 +277,6 @@ static inline LONG64 InterlockedIncrement64(LONG64 volatile *x)
 {
     return __sync_add_and_fetch(x, 1);
 }
-static inline LONG InterlockedAdd(LONG volatile *x, LONG val)
-{
-    return __sync_add_and_fetch(x, val);
-}
 # else
 #  error "InterlockedIncrement() not implemented for this platform"
 # endif  /* HAVE_SYNC_ADD_AND_FETCH */
