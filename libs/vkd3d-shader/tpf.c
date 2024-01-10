@@ -2250,7 +2250,7 @@ static void shader_sm4_read_instruction_modifier(uint32_t modifier, struct vkd3d
     {
         case VKD3D_SM4_MODIFIER_AOFFIMMI:
         {
-            static const DWORD recognized_bits = VKD3D_SM4_INSTRUCTION_MODIFIER
+            static const uint32_t recognized_bits = VKD3D_SM4_INSTRUCTION_MODIFIER
                     | VKD3D_SM4_MODIFIER_MASK
                     | VKD3D_SM4_AOFFIMMI_U_MASK
                     | VKD3D_SM4_AOFFIMMI_V_MASK
