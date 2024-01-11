@@ -1365,7 +1365,7 @@ struct vkd3d_buffer
 struct d3d12_command_allocator
 {
     ID3D12CommandAllocator ID3D12CommandAllocator_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     D3D12_COMMAND_LIST_TYPE type;
     VkQueueFlags vk_queue_flags;

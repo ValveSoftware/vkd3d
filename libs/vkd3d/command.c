@@ -1635,7 +1635,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_allocator_QueryInterface(ID3D12Co
 static ULONG STDMETHODCALLTYPE d3d12_command_allocator_AddRef(ID3D12CommandAllocator *iface)
 {
     struct d3d12_command_allocator *allocator = impl_from_ID3D12CommandAllocator(iface);
-    ULONG refcount = InterlockedIncrement(&allocator->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&allocator->refcount);
 
     TRACE("%p increasing refcount to %u.\n", allocator, refcount);
 
@@ -1645,7 +1645,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_allocator_AddRef(ID3D12CommandAlloc
 static ULONG STDMETHODCALLTYPE d3d12_command_allocator_Release(ID3D12CommandAllocator *iface)
 {
     struct d3d12_command_allocator *allocator = impl_from_ID3D12CommandAllocator(iface);
-    ULONG refcount = InterlockedDecrement(&allocator->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&allocator->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", allocator, refcount);
 
