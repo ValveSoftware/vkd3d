@@ -935,7 +935,7 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_AddRef(ID3D12Fence1 *iface)
 
 static void d3d12_fence_incref(struct d3d12_fence *fence)
 {
-    InterlockedIncrement(&fence->internal_refcount);
+    vkd3d_atomic_increment_u32(&fence->internal_refcount);
 }
 
 static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence1 *iface)
@@ -953,7 +953,7 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence1 *iface)
 
 static void d3d12_fence_decref(struct d3d12_fence *fence)
 {
-    ULONG internal_refcount = InterlockedDecrement(&fence->internal_refcount);
+    ULONG internal_refcount = InterlockedDecrement((LONG *)&fence->internal_refcount);
 
     if (!internal_refcount)
     {
