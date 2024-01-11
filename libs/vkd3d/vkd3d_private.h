@@ -622,7 +622,7 @@ struct d3d12_fence
 {
     ID3D12Fence1 ID3D12Fence1_iface;
     LONG internal_refcount;
-    LONG refcount;
+    unsigned int refcount;
 
     D3D12_FENCE_FLAGS flags;
 

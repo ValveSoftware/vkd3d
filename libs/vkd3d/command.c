@@ -926,7 +926,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_fence_QueryInterface(ID3D12Fence1 *iface,
 static ULONG STDMETHODCALLTYPE d3d12_fence_AddRef(ID3D12Fence1 *iface)
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence1(iface);
-    ULONG refcount = InterlockedIncrement(&fence->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&fence->refcount);
 
     TRACE("%p increasing refcount to %u.\n", fence, refcount);
 
@@ -941,7 +941,7 @@ static void d3d12_fence_incref(struct d3d12_fence *fence)
 static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence1 *iface)
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence1(iface);
-    ULONG refcount = InterlockedDecrement(&fence->refcount);
+    ULONG refcount = InterlockedDecrement((LONG *)&fence->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", fence, refcount);
 
