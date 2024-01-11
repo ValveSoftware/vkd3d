@@ -49,3 +49,16 @@ float4 main() : SV_TARGET
 [test]
 draw quad
 probe all rgba (2.0, 2.0, 2.0, 2.0)
+
+
+[pixel shader fail(sm<6) todo]
+float4 v;
+float i;
+
+float4 main() : sv_target
+{
+    float4 p = v;
+    p[i] = 2.0;
+
+    return 0;
+}
