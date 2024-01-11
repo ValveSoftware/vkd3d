@@ -1126,8 +1126,8 @@ struct vkd3d_shader_instruction
     uint32_t flags;
     unsigned int dst_count;
     unsigned int src_count;
-    const struct vkd3d_shader_dst_param *dst;
-    const struct vkd3d_shader_src_param *src;
+    struct vkd3d_shader_dst_param *dst;
+    struct vkd3d_shader_src_param *src;
     struct vkd3d_shader_texel_offset texel_offset;
     enum vkd3d_shader_resource_type resource_type;
     unsigned int resource_stride;

@@ -742,8 +742,7 @@ static bool shader_sm4_read_register_space(struct vkd3d_shader_sm4_parser *priv,
 static void shader_sm4_read_conditional_op(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT,
-            (struct vkd3d_shader_src_param *)&ins->src[0]);
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT, &ins->src[0]);
     ins->flags = (opcode_token & VKD3D_SM4_CONDITIONAL_NZ) ?
             VKD3D_SHADER_CONDITIONAL_OP_NZ : VKD3D_SHADER_CONDITIONAL_OP_Z;
 }
@@ -751,8 +750,7 @@ static void shader_sm4_read_conditional_op(struct vkd3d_shader_instruction *ins,
 static void shader_sm4_read_case_condition(struct vkd3d_shader_instruction *ins, uint32_t opcode,
         uint32_t opcode_token, const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT,
-            (struct vkd3d_shader_src_param *)&ins->src[0]);
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_UINT, &ins->src[0]);
     if (ins->src[0].reg.type != VKD3DSPR_IMMCONST)
     {
         FIXME("Switch case value is not a 32-bit constant.\n");
@@ -1130,9 +1128,8 @@ static void shader_sm4_read_dcl_global_flags(struct vkd3d_shader_instruction *in
 static void shader_sm5_read_fcall(struct vkd3d_shader_instruction *ins, uint32_t opcode, uint32_t opcode_token,
         const uint32_t *tokens, unsigned int token_count, struct vkd3d_shader_sm4_parser *priv)
 {
-    struct vkd3d_shader_src_param *src_params = (struct vkd3d_shader_src_param *)ins->src;
-    src_params[0].reg.u.fp_body_idx = *tokens++;
-    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE, &src_params[0]);
+    ins->src[0].reg.u.fp_body_idx = *tokens++;
+    shader_sm4_read_src_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_OPAQUE, &ins->src[0]);
 }
 
 static void shader_sm5_read_dcl_function_body(struct vkd3d_shader_instruction *ins, uint32_t opcode,

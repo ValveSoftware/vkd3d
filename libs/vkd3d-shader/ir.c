@@ -492,7 +492,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 if (shader_instruction_is_dcl(ins))
                     break;
                 for (j = 0; j < ins->dst_count; ++j)
-                    shader_dst_param_normalise_outpointid((struct vkd3d_shader_dst_param *)&ins->dst[j], &normaliser);
+                    shader_dst_param_normalise_outpointid(&ins->dst[j], &normaliser);
                 break;
         }
     }
@@ -1116,9 +1116,9 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             if (shader_instruction_is_dcl(ins))
                 break;
             for (i = 0; i < ins->dst_count; ++i)
-                shader_dst_param_io_normalise((struct vkd3d_shader_dst_param *)&ins->dst[i], false, normaliser);
+                shader_dst_param_io_normalise(&ins->dst[i], false, normaliser);
             for (i = 0; i < ins->src_count; ++i)
-                shader_src_param_io_normalise((struct vkd3d_shader_src_param *)&ins->src[i], normaliser);
+                shader_src_param_io_normalise(&ins->src[i], normaliser);
             break;
     }
 }
@@ -1310,7 +1310,7 @@ static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d
         else
         {
             for (j = 0; j < ins->src_count; ++j)
-                shader_register_normalise_flat_constants((struct vkd3d_shader_src_param *)&ins->src[j], &normaliser);
+                shader_register_normalise_flat_constants(&ins->src[j], &normaliser);
         }
     }
 
