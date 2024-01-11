@@ -2331,8 +2331,8 @@ static const struct sm6_value *sm6_parser_get_value_by_ref(struct sm6_parser *sm
 
 static bool sm6_parser_declare_function(struct sm6_parser *sm6, const struct dxil_record *record)
 {
+    const struct sm6_type *type, *ret_type;
     const unsigned int max_count = 15;
-    const struct sm6_type *ret_type;
     struct sm6_value *fn;
     unsigned int i, j;
 
@@ -2347,18 +2347,18 @@ static bool sm6_parser_declare_function(struct sm6_parser *sm6, const struct dxi
         fn->u.function.name = "";
     }
 
-    if (!(fn->type = sm6_parser_get_type(sm6, record->operands[0])))
+    if (!(type = sm6_parser_get_type(sm6, record->operands[0])))
         return false;
-    if (!sm6_type_is_function(fn->type))
+    if (!sm6_type_is_function(type))
     {
         WARN("Type is not a function.\n");
         return false;
     }
-    ret_type = fn->type->u.function->ret_type;
+    ret_type = type->u.function->ret_type;
 
-    if (!(fn->type = sm6_type_get_pointer_to_type(fn->type, ADDRESS_SPACE_DEFAULT, sm6)))
+    if (!(fn->type = sm6_type_get_pointer_to_type(type, ADDRESS_SPACE_DEFAULT, sm6)))
     {
-        WARN("Failed to get pointer type for type %u.\n", fn->type->class);
+        WARN("Failed to get pointer type for type %u.\n", type->class);
         return false;
     }
 
