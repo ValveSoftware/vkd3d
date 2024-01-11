@@ -911,7 +911,7 @@ HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID
     }
 
     if (FAILED(hr = D3DCreateBlob(dst_dxbc.size, blob)))
-        WARN("Failed to create blob, hr %#x.\n", hr);
+        WARN("Failed to create blob, hr %s.\n", debugstr_hresult(hr));
     else
         memcpy(ID3D10Blob_GetBufferPointer(*blob), dst_dxbc.code, dst_dxbc.size);
     vkd3d_shader_free_shader_code(&dst_dxbc);
