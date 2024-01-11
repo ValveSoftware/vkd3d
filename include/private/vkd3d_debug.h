@@ -104,6 +104,29 @@ static inline const char *debugstr_guid(const GUID *guid)
             guid->Data4[5], guid->Data4[6], guid->Data4[7]);
 }
 
+static inline const char *debugstr_hresult(HRESULT hr)
+{
+    switch (hr)
+    {
+#define TO_STR(u) case u: return #u;
+        TO_STR(S_OK)
+        TO_STR(S_FALSE)
+        TO_STR(E_NOTIMPL)
+        TO_STR(E_NOINTERFACE)
+        TO_STR(E_POINTER)
+        TO_STR(E_ABORT)
+        TO_STR(E_FAIL)
+        TO_STR(E_OUTOFMEMORY)
+        TO_STR(E_INVALIDARG)
+        TO_STR(DXGI_ERROR_NOT_FOUND)
+        TO_STR(DXGI_ERROR_MORE_DATA)
+        TO_STR(DXGI_ERROR_UNSUPPORTED)
+#undef TO_STR
+        default:
+            return vkd3d_dbg_sprintf("%#x", (int)hr);
+    }
+}
+
 unsigned int vkd3d_env_var_as_uint(const char *name, unsigned int default_value);
 
 struct vkd3d_debug_option
