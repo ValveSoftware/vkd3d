@@ -1645,7 +1645,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_allocator_AddRef(ID3D12CommandAlloc
 static ULONG STDMETHODCALLTYPE d3d12_command_allocator_Release(ID3D12CommandAllocator *iface)
 {
     struct d3d12_command_allocator *allocator = impl_from_ID3D12CommandAllocator(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&allocator->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&allocator->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", allocator, refcount);
 
