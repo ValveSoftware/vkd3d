@@ -780,7 +780,7 @@ static HRESULT get_blob_part(const void *data, SIZE_T data_size,
     }
 
     if (FAILED(hr = D3DCreateBlob(dst_dxbc.size, blob)))
-        WARN("Failed to create blob, hr %#x.\n", hr);
+        WARN("Failed to create blob, hr %s.\n", debugstr_hresult(hr));
     else
         memcpy(ID3D10Blob_GetBufferPointer(*blob), dst_dxbc.code, dst_dxbc.size);
     if (dst_dxbc.code != sections[0].data.code)
