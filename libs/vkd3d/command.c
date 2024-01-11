@@ -941,7 +941,7 @@ static void d3d12_fence_incref(struct d3d12_fence *fence)
 static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence1 *iface)
 {
     struct d3d12_fence *fence = impl_from_ID3D12Fence1(iface);
-    ULONG refcount = InterlockedDecrement((LONG *)&fence->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&fence->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", fence, refcount);
 
