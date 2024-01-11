@@ -619,7 +619,7 @@ HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
 
     if (FAILED(hr = vkd3d_blob_create(data, data_size, blob)))
     {
-        WARN("Failed to create blob object, hr %#x.\n", hr);
+        WARN("Failed to create blob object, hr %s.\n", debugstr_hresult(hr));
         vkd3d_free(data);
     }
     return hr;
