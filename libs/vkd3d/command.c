@@ -953,24 +953,24 @@ static ULONG STDMETHODCALLTYPE d3d12_fence_Release(ID3D12Fence1 *iface)
 
 static void d3d12_fence_decref(struct d3d12_fence *fence)
 {
-    ULONG internal_refcount = InterlockedDecrement((LONG *)&fence->internal_refcount);
+    struct d3d12_device *device;
 
-    if (!internal_refcount)
-    {
-        struct d3d12_device *device = fence->device;
+    if (vkd3d_atomic_decrement_u32(&fence->internal_refcount))
+        return;
 
-        vkd3d_private_store_destroy(&fence->private_store);
+    device = fence->device;
 
-        d3d12_fence_destroy_vk_objects(fence);
+    vkd3d_private_store_destroy(&fence->private_store);
 
-        vkd3d_free(fence->events);
-        vkd3d_free(fence->semaphores);
-        vkd3d_mutex_destroy(&fence->mutex);
-        vkd3d_cond_destroy(&fence->null_event_cond);
-        vkd3d_free(fence);
+    d3d12_fence_destroy_vk_objects(fence);
 
-        d3d12_device_release(device);
-    }
+    vkd3d_free(fence->events);
+    vkd3d_free(fence->semaphores);
+    vkd3d_mutex_destroy(&fence->mutex);
+    vkd3d_cond_destroy(&fence->null_event_cond);
+    vkd3d_free(fence);
+
+    d3d12_device_release(device);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_fence_GetPrivateData(ID3D12Fence1 *iface,
