@@ -20,10 +20,37 @@
 
 #include "hlsl.h"
 
+struct string_entry
+{
+    struct rb_entry entry;
+    /* String points to original data, should not be freed. */
+    const char *string;
+    uint32_t offset;
+};
+
+static int string_storage_compare(const void *key, const struct rb_entry *entry)
+{
+    struct string_entry *string_entry = RB_ENTRY_VALUE(entry, struct string_entry, entry);
+    const char *string = key;
+
+    return strcmp(string, string_entry->string);
+}
+
+static void string_storage_destroy(struct rb_entry *entry, void *context)
+{
+    struct string_entry *string_entry = RB_ENTRY_VALUE(entry, struct string_entry, entry);
+
+    vkd3d_free(string_entry);
+}
+
 struct fx_write_context
 {
+    struct hlsl_ctx *ctx;
+
     struct vkd3d_bytecode_buffer unstructured;
     struct vkd3d_bytecode_buffer structured;
+
+    struct rb_tree strings;
 
     unsigned int min_technique_version;
     unsigned int max_technique_version;
@@ -33,12 +60,13 @@ struct fx_write_context
     int status;
 };
 
-static void fx_write_context_init(const struct hlsl_ctx *ctx, struct fx_write_context *fx)
+static void fx_write_context_init(struct hlsl_ctx *ctx, struct fx_write_context *fx)
 {
     unsigned int version = ctx->profile->major_version;
 
     memset(fx, 0, sizeof(*fx));
 
+    fx->ctx = ctx;
     if (version == 2)
     {
         fx->min_technique_version = 9;
@@ -54,6 +82,16 @@ static void fx_write_context_init(const struct hlsl_ctx *ctx, struct fx_write_co
         fx->min_technique_version = 10;
         fx->max_technique_version = 11;
     }
+
+    rb_init(&fx->strings, string_storage_compare);
+}
+
+static int fx_write_context_cleanup(struct fx_write_context *fx)
+{
+    int status = fx->status;
+    rb_destroy(&fx->strings, string_storage_destroy, NULL);
+
+    return status;
 }
 
 static bool technique_matches_version(const struct hlsl_ir_var *var, const struct fx_write_context *fx)
@@ -68,8 +106,28 @@ static bool technique_matches_version(const struct hlsl_ir_var *var, const struc
 
 static uint32_t fx_put_raw_string(struct fx_write_context *fx, const char *string)
 {
+    struct string_entry *string_entry;
+    struct rb_entry *entry;
+
     /* NULLs are emitted as empty strings using the same 4 bytes at the start of the section. */
-    return string ? put_string(&fx->unstructured, string) : 0;
+    if (!string)
+        return 0;
+
+    if ((entry = rb_get(&fx->strings, string)))
+    {
+        string_entry = RB_ENTRY_VALUE(entry, struct string_entry, entry);
+        return string_entry->offset;
+    }
+
+    if (!(string_entry = hlsl_alloc(fx->ctx, sizeof(*string_entry))))
+        return 0;
+
+    string_entry->offset = put_string(&fx->unstructured, string);
+    string_entry->string = string;
+
+    rb_put(&fx->strings, string, &string_entry->entry);
+
+    return string_entry->offset;
 }
 
 static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -230,7 +288,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     if (fx.status < 0)
         ctx->result = fx.status;
 
-    return fx.status;
+    return fx_write_context_cleanup(&fx);
 }
 
 static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
@@ -294,7 +352,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     if (fx.status < 0)
         ctx->result = fx.status;
 
-    return fx.status;
+    return fx_write_context_cleanup(&fx);
 }
 
 int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
