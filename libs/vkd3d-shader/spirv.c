@@ -1871,8 +1871,6 @@ static void vkd3d_spirv_builder_begin_main_function(struct vkd3d_spirv_builder *
 
     vkd3d_spirv_build_op_function(builder, void_id,
             builder->main_function_id, SpvFunctionControlMaskNone, function_type_id);
-    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
-    builder->main_function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
 }
 
 static void vkd3d_spirv_builder_free(struct vkd3d_spirv_builder *builder)
@@ -2314,7 +2312,7 @@ struct spirv_compiler
     struct vkd3d_push_constant_buffer_binding *push_constants;
     const struct vkd3d_shader_spirv_target_info *spirv_target_info;
 
-    bool after_declarations_section;
+    bool prolog_emitted;
     struct shader_signature input_signature;
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
@@ -2381,6 +2379,8 @@ static bool is_in_fork_or_join_phase(const struct spirv_compiler *compiler)
 
 static void spirv_compiler_emit_initial_declarations(struct spirv_compiler *compiler);
 static size_t spirv_compiler_get_current_function_location(struct spirv_compiler *compiler);
+static void spirv_compiler_emit_main_prolog(struct spirv_compiler *compiler);
+static void spirv_compiler_emit_io_declarations(struct spirv_compiler *compiler);
 
 static const char *spirv_compiler_get_entry_point_name(const struct spirv_compiler *compiler)
 {
@@ -6498,18 +6498,43 @@ static void spirv_compiler_enter_shader_phase(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_function(builder, void_id, function_id,
             SpvFunctionControlMaskNone, function_type_id);
 
-    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
-
     compiler->phase = instruction->handler_idx;
     spirv_compiler_emit_shader_phase_name(compiler, function_id, NULL);
 
     phase = (instruction->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE)
         ? &compiler->control_point_phase : &compiler->patch_constant_phase;
     phase->function_id = function_id;
-    phase->function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
+    /* The insertion location must be set after the label is emitted. */
+    phase->function_location = 0;
 
     if (instruction->handler_idx == VKD3DSIH_HS_CONTROL_POINT_PHASE)
         compiler->emit_default_control_point_phase = instruction->flags;
+}
+
+static void spirv_compiler_initialise_block(struct spirv_compiler *compiler)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    /* Insertion locations must point immediately after the function's initial label. */
+    if (compiler->shader_type == VKD3D_SHADER_TYPE_HULL)
+    {
+        struct vkd3d_shader_phase *phase = (compiler->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE)
+            ? &compiler->control_point_phase : &compiler->patch_constant_phase;
+        if (!phase->function_location)
+            phase->function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
+    }
+    else if (!builder->main_function_location)
+    {
+        builder->main_function_location = vkd3d_spirv_stream_current_location(&builder->function_stream);
+    }
+
+    /* I/O declarations can result in emission of fixups, which must occur after the initial label. */
+    if (!compiler->prolog_emitted)
+    {
+        spirv_compiler_emit_main_prolog(compiler);
+        spirv_compiler_emit_io_declarations(compiler);
+        compiler->prolog_emitted = true;
+    }
 }
 
 static void spirv_compiler_emit_default_control_point_phase(struct spirv_compiler *compiler)
@@ -6524,6 +6549,8 @@ static void spirv_compiler_emit_default_control_point_phase(struct spirv_compile
     unsigned int component_count;
     unsigned int i;
 
+    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
+    spirv_compiler_initialise_block(compiler);
     invocation_id = spirv_compiler_emit_load_invocation_id(compiler);
 
     memset(&invocation, 0, sizeof(invocation));
@@ -6622,6 +6649,7 @@ static void spirv_compiler_emit_hull_shader_main(struct spirv_compiler *compiler
     memset(compiler->descriptor_offset_ids, 0, compiler->offset_info.descriptor_table_count
             * sizeof(*compiler->descriptor_offset_ids));
     vkd3d_spirv_builder_begin_main_function(builder);
+    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
 
     void_id = vkd3d_spirv_get_op_type_void(builder);
 
@@ -7589,6 +7617,8 @@ static void spirv_compiler_emit_label(struct spirv_compiler *compiler,
     --block_id;
     if (block_id < compiler->block_name_count && compiler->block_names[block_id])
         vkd3d_spirv_build_op_name(builder, label_id, compiler->block_names[block_id]);
+
+    spirv_compiler_initialise_block(compiler);
 }
 
 static void spirv_compiler_emit_merge(struct spirv_compiler *compiler,
@@ -9228,22 +9258,10 @@ static void spirv_compiler_emit_main_prolog(struct spirv_compiler *compiler)
         spirv_compiler_emit_point_size(compiler);
 }
 
-static bool is_dcl_instruction(enum vkd3d_shader_opcode handler_idx)
-{
-    return (VKD3DSIH_DCL <= handler_idx && handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
-            || handler_idx == VKD3DSIH_HS_DECLS;
-}
-
 static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
     int ret = VKD3D_OK;
-
-    if (!is_dcl_instruction(instruction->handler_idx) && !compiler->after_declarations_section)
-    {
-        compiler->after_declarations_section = true;
-        spirv_compiler_emit_main_prolog(compiler);
-    }
 
     switch (instruction->handler_idx)
     {
@@ -9691,8 +9709,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);
-
-    spirv_compiler_emit_io_declarations(compiler);
 
     for (i = 0; i < instructions.count && result >= 0; ++i)
     {

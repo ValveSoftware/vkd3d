@@ -320,7 +320,7 @@ static void vsir_src_param_init(struct vkd3d_shader_src_param *param, enum vkd3d
     param->modifiers = VKD3DSPSM_NONE;
 }
 
-static void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
+void vsir_src_param_init_label(struct vkd3d_shader_src_param *param, unsigned int label_id)
 {
     vsir_src_param_init(param, VKD3DSPR_LABEL, VKD3D_DATA_UINT, 1);
     param->reg.dimension = VSIR_DIMENSION_NONE;
@@ -1785,18 +1785,27 @@ static void VKD3D_PRINTF_FUNC(3, 4) cf_flattener_create_block_name(struct cf_fla
     flattener->block_names[block_id] = buffer.buffer;
 }
 
+static bool vsir_instruction_is_dcl(const struct vkd3d_shader_instruction *instruction)
+{
+    enum vkd3d_shader_opcode handler_idx = instruction->handler_idx;
+    return (VKD3DSIH_DCL <= handler_idx && handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
+            || handler_idx == VKD3DSIH_HS_DECLS;
+}
+
 static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
 {
+    bool main_block_open, is_hull_shader, after_declarations_section;
     struct vkd3d_shader_parser *parser = flattener->parser;
     struct vkd3d_shader_instruction_array *instructions;
     struct vkd3d_shader_instruction *dst_ins;
-    bool main_block_open;
     size_t i;
 
     instructions = &parser->instructions;
-    main_block_open = parser->shader_version.type != VKD3D_SHADER_TYPE_HULL;
+    is_hull_shader = parser->shader_version.type == VKD3D_SHADER_TYPE_HULL;
+    main_block_open = !is_hull_shader;
+    after_declarations_section = is_hull_shader;
 
-    if (!cf_flattener_require_space(flattener, instructions->count))
+    if (!cf_flattener_require_space(flattener, instructions->count + 1))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     for (i = 0; i < instructions->count; ++i)
@@ -1808,11 +1817,29 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
         flattener->location = instruction->location;
 
+        /* Declarations should occur before the first code block, which in hull shaders is marked by the first
+         * phase instruction, and in all other shader types begins with the first label instruction. */
+        if (!after_declarations_section && !vsir_instruction_is_dcl(instruction)
+                && instruction->handler_idx != VKD3DSIH_NOP)
+        {
+            after_declarations_section = true;
+            cf_flattener_emit_label(flattener, cf_flattener_alloc_block_id(flattener));
+        }
+
         cf_info = flattener->control_flow_depth
                 ? &flattener->control_flow_info[flattener->control_flow_depth - 1] : NULL;
 
         switch (instruction->handler_idx)
         {
+            case VKD3DSIH_HS_CONTROL_POINT_PHASE:
+            case VKD3DSIH_HS_FORK_PHASE:
+            case VKD3DSIH_HS_JOIN_PHASE:
+                if (!cf_flattener_copy_instruction(flattener, instruction))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+                if (instruction->handler_idx != VKD3DSIH_HS_CONTROL_POINT_PHASE || !instruction->flags)
+                    after_declarations_section = false;
+                break;
+
             case VKD3DSIH_LABEL:
                 vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: Label instruction.");

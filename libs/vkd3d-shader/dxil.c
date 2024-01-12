@@ -4869,6 +4869,18 @@ static enum vkd3d_result sm6_parser_module_init(struct sm6_parser *sm6, const st
     return VKD3D_OK;
 }
 
+static void sm6_parser_emit_label(struct sm6_parser *sm6, unsigned int label_id)
+{
+    struct vkd3d_shader_src_param *src_param;
+    struct vkd3d_shader_instruction *ins;
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_LABEL);
+
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    vsir_src_param_init_label(src_param, label_id);
+}
+
 static bool sm6_parser_allocate_named_metadata(struct sm6_parser *sm6)
 {
     struct dxil_block *block;
@@ -6217,6 +6229,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
 
     sm6->p.shader_desc.ssa_count = sm6->ssa_next_id;
+    sm6->p.shader_desc.block_count = 1;
 
     if (!(fn = sm6_parser_get_function(sm6, sm6->entry_point)))
     {
@@ -6227,6 +6240,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
     }
 
     assert(sm6->function_count == 1);
+    sm6_parser_emit_label(sm6, 1);
     if (!sm6_block_emit_instructions(fn->blocks[0], sm6))
     {
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,

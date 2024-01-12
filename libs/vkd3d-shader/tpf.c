@@ -1117,8 +1117,7 @@ static void shader_sm4_read_dcl_indexable_temp(struct vkd3d_shader_instruction *
     ins->declaration.indexable_temp.alignment = 0;
     ins->declaration.indexable_temp.data_type = VKD3D_DATA_FLOAT;
     ins->declaration.indexable_temp.component_count = *tokens;
-    /* Indexable temp declarations are global, but except for hull shaders the backend currently emits them within a function. */
-    ins->declaration.indexable_temp.has_function_scope = priv->p.shader_version.type != VKD3D_SHADER_TYPE_HULL;
+    ins->declaration.indexable_temp.has_function_scope = false;
 }
 
 static void shader_sm4_read_dcl_global_flags(struct vkd3d_shader_instruction *ins, uint32_t opcode,
