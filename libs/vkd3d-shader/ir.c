@@ -2312,6 +2312,7 @@ struct validation_context
         CF_TYPE_STRUCTURED,
         CF_TYPE_BLOCKS,
     } cf_type;
+    bool inside_block;
 
     struct validation_context_temp_data
     {
@@ -2781,6 +2782,33 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             ctx->cf_type = CF_TYPE_STRUCTURED;
     }
 
+    if (ctx->cf_type == CF_TYPE_BLOCKS && !vsir_instruction_is_dcl(instruction))
+    {
+        switch (instruction->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                if (ctx->inside_block)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid LABEL instruction inside a block.");
+                ctx->inside_block = true;
+                break;
+
+            case VKD3DSIH_RET:
+            case VKD3DSIH_BRANCH:
+            case VKD3DSIH_SWITCH_MONOLITHIC:
+                if (!ctx->inside_block)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x outside any block.",
+                            instruction->handler_idx);
+                ctx->inside_block = false;
+                break;
+
+            default:
+                if (!ctx->inside_block)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x outside any block.",
+                            instruction->handler_idx);
+                break;
+        }
+    }
+
     switch (instruction->handler_idx)
     {
         case VKD3DSIH_DCL_TEMPS:
@@ -3019,6 +3047,9 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
 
     if (ctx.depth != 0)
         validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "%zu nested blocks were not closed.", ctx.depth);
+
+    if (ctx.inside_block)
+        validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Last block was not closed.");
 
     for (i = 0; i < ctx.program->ssa_count; ++i)
     {
