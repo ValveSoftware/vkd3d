@@ -10577,11 +10577,11 @@ static void test_shader_instructions(void)
 
         {&ps_bits_vector, {{{0x11111111, 0x00080000}}}, {{8,   1,  28,  19}}},
 
-        {&ps_firstbit_raw, {{{         0,          0}}}, {{ ~0u, ~0u, ~0u, 0}}, false, true},
+        {&ps_firstbit_raw, {{{         0,          0}}}, {{ ~0u, ~0u, ~0u, 0}}},
         {&ps_firstbit_raw, {{{0x80000000, 0x80000000}}}, {{  31,   0,   1, 0}}},
         {&ps_firstbit_raw, {{{0x80000001, 0x80000001}}}, {{   0,   0,   1, 0}}},
         {&ps_firstbit_raw, {{{0x11111111, 0x11111111}}}, {{   0,   3,   3, 0}}},
-        {&ps_firstbit_raw, {{{0x00080000, 0xffffffff}}}, {{  19,  12, ~0u, 0}}, false, true},
+        {&ps_firstbit_raw, {{{0x00080000, 0xffffffff}}}, {{  19,  12, ~0u, 0}}},
 
         {&ps_ishr, {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}, {~0x1fu, 0, 32, 64}}},
                    {{0x00000000, 0x00000000, 0x00000000, 0x00000000}}},
