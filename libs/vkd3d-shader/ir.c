@@ -2293,6 +2293,12 @@ struct validation_context
     bool dcl_temps_found;
     unsigned int temp_count;
     enum vkd3d_shader_opcode phase;
+    enum cf_type
+    {
+        CF_TYPE_UNKNOWN = 0,
+        CF_TYPE_STRUCTURED,
+        CF_TYPE_BLOCKS,
+    } cf_type;
 
     struct validation_context_temp_data
     {
@@ -2613,6 +2619,29 @@ static void vsir_validate_src_count(struct validation_context *ctx,
                 instruction->src_count, instruction->handler_idx, count);
 }
 
+static const char *name_from_cf_type(enum cf_type type)
+{
+    switch (type)
+    {
+        case CF_TYPE_STRUCTURED:
+            return "structured";
+        case CF_TYPE_BLOCKS:
+            return "block-based";
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void vsir_validate_cf_type(struct validation_context *ctx,
+        const struct vkd3d_shader_instruction *instruction, enum cf_type expected_type)
+{
+    assert(ctx->cf_type != CF_TYPE_UNKNOWN);
+    assert(expected_type != CF_TYPE_UNKNOWN);
+    if (ctx->cf_type != expected_type)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Invalid instruction %#x in %s shader.",
+                instruction->handler_idx, name_from_cf_type(ctx->cf_type));
+}
+
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
     const struct vkd3d_shader_instruction *instruction = &ctx->parser->instructions.elements[ctx->instruction_idx];
@@ -2644,7 +2673,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Phase instruction %#x is only valid in a hull shader.",
                         instruction->handler_idx);
             if (ctx->depth != 0)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "Phase instruction %#x must appear to top level.",
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "Phase instruction %#x must appear to top level.",
                         instruction->handler_idx);
             ctx->phase = instruction->handler_idx;
             ctx->dcl_temps_found = false;
@@ -2659,6 +2688,23 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             ctx->phase == VKD3DSIH_INVALID)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Instruction %#x appear before any phase instruction in a hull shader.",
                 instruction->handler_idx);
+
+    /* We support two different control flow types in shaders:
+     * block-based, like DXIL and SPIR-V, and structured, like D3DBC
+     * and TPF. The shader is detected as block-based when its first
+     * instruction, except for DCL_* and phases, is a LABEL. Currently
+     * we mandate that each shader is either purely block-based or
+     * purely structured. In principle we could allow structured
+     * constructs in a block, provided they are confined in a single
+     * block, but need for that hasn't arisen yet, so we don't. */
+    if (ctx->cf_type == CF_TYPE_UNKNOWN && !(instruction->handler_idx >= VKD3DSIH_DCL
+            && instruction->handler_idx <= VKD3DSIH_DCL_VERTICES_OUT))
+    {
+        if (instruction->handler_idx == VKD3DSIH_LABEL)
+            ctx->cf_type = CF_TYPE_BLOCKS;
+        else
+            ctx->cf_type = CF_TYPE_STRUCTURED;
+    }
 
     switch (instruction->handler_idx)
     {
@@ -2675,6 +2721,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_IF:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -2683,6 +2730,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_IFC:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 2);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -2691,24 +2739,27 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ELSE:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ELSE instruction doesn't terminate IF block.");
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ELSE instruction doesn't terminate IF block.");
             else
                 ctx->blocks[ctx->depth - 1] = instruction->handler_idx;
             break;
 
         case VKD3DSIH_ENDIF:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || (ctx->blocks[ctx->depth - 1] != VKD3DSIH_IF && ctx->blocks[ctx->depth - 1] != VKD3DSIH_ELSE))
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDIF instruction doesn't terminate IF/ELSE block.");
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ENDIF instruction doesn't terminate IF/ELSE block.");
             else
                 --ctx->depth;
             break;
 
         case VKD3DSIH_LOOP:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, ctx->parser->shader_version.major <= 3 ? 2 : 0);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -2717,15 +2768,17 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDLOOP:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_LOOP)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDLOOP instruction doesn't terminate LOOP block.");
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ENDLOOP instruction doesn't terminate LOOP block.");
             else
                 --ctx->depth;
             break;
 
         case VKD3DSIH_REP:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -2734,15 +2787,17 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDREP:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_REP)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDREP instruction doesn't terminate REP block.");
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ENDREP instruction doesn't terminate REP block.");
             else
                 --ctx->depth;
             break;
 
         case VKD3DSIH_SWITCH:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 1);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
@@ -2751,10 +2806,11 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
 
         case VKD3DSIH_ENDSWITCH:
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->depth == 0 || ctx->blocks[ctx->depth - 1] != VKD3DSIH_SWITCH)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "ENDSWITCH instruction doesn't terminate SWITCH block.");
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "ENDSWITCH instruction doesn't terminate SWITCH block.");
             else
                 --ctx->depth;
             break;
@@ -2788,7 +2844,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     ctx.invalid_instruction_idx = true;
 
     if (ctx.depth != 0)
-        validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INSTRUCTION_NESTING, "%zu nested blocks were not closed.", ctx.depth);
+        validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "%zu nested blocks were not closed.", ctx.depth);
 
     for (i = 0; i < parser->shader_desc.ssa_count; ++i)
     {
