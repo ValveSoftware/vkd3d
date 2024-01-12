@@ -28,6 +28,41 @@ uniform 0 uint4 0 0 0 0
 draw quad
 probe all rgba (3.0, 3.0, 3.0, 3.0)
 
+% just a default case
+[pixel shader]
+uint4 v;
+
+float4 main() : sv_target
+{
+    switch (v.x)
+    {
+    default:
+        return 5.0;
+    }
+}
+
+[test]
+uniform 0 uint4 3 0 0 0
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+uniform 0 uint4 1 0 0 0
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+uniform 0 uint4 0 0 0 0
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+
+% completely empty
+[pixel shader fail]
+uint4 v;
+
+float4 main() : sv_target
+{
+    switch (v.x)
+    {
+    }
+}
+
 % falling through is only supported for empty case statements
 [pixel shader]
 uint4 v;
