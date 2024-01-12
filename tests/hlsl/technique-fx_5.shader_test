@@ -37,7 +37,7 @@ float4 main() : sv_target
     return fxGroup;
 }
 
-[effect todo]
+[effect]
 technique
 {
 }
@@ -47,11 +47,11 @@ technique10
 }
 
 % Effects without techniques are allowed for fx_5_0
-[effect todo]
+[effect]
 float4 f;
 
 % fx_2_0 keyword is allowed with fx_5_0 profiles
-[effect todo]
+[effect]
 technique
 {
 }
@@ -90,10 +90,10 @@ float4 technique10;
 [effect fail]
 float4 technique11;
 
-[effect todo]
+[effect]
 float4 technIque10;
 
-[effect todo]
+[effect]
 float4 technIque11;
 
 % Regular shaders with technique blocks
@@ -174,7 +174,7 @@ fxgroup group
 }
 
 % Group provides scope for techniques
-[effect todo]
+[effect]
 fxgroup group1
 {
     technique11 tech0 {}
