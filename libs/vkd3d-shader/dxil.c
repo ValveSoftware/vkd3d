@@ -2691,8 +2691,8 @@ static void sm6_parser_declare_icb(struct sm6_parser *sm6, const struct sm6_type
 }
 
 static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const struct sm6_type *elem_type,
-        unsigned int count, unsigned int alignment, unsigned int init, struct vkd3d_shader_instruction *ins,
-        struct sm6_value *dst)
+        unsigned int count, unsigned int alignment, bool has_function_scope, unsigned int init,
+        struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
     enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
 
@@ -2705,6 +2705,7 @@ static void sm6_parser_declare_indexable_temp(struct sm6_parser *sm6, const stru
     ins->declaration.indexable_temp.alignment = alignment;
     ins->declaration.indexable_temp.data_type = data_type;
     ins->declaration.indexable_temp.component_count = 1;
+    ins->declaration.indexable_temp.has_function_scope = has_function_scope;
     /* The initialiser value index will be resolved later so forward references can be handled. */
     ins->declaration.indexable_temp.initialiser = (void *)(uintptr_t)init;
 
@@ -2832,7 +2833,7 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
         if (is_constant)
             sm6_parser_declare_icb(sm6, scalar_type, count, alignment, init, dst);
         else
-            sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, init, NULL, dst);
+            sm6_parser_declare_indexable_temp(sm6, scalar_type, count, alignment, false, init, NULL, dst);
     }
     else if (address_space == ADDRESS_SPACE_GROUPSHARED)
     {
@@ -3103,7 +3104,7 @@ static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_rec
     if (packed_operands)
         WARN("Ignoring flags %#"PRIx64".\n", packed_operands);
 
-    sm6_parser_declare_indexable_temp(sm6, elem_type, type[0]->u.array.count, alignment, 0, ins, dst);
+    sm6_parser_declare_indexable_temp(sm6, elem_type, type[0]->u.array.count, alignment, true, 0, ins, dst);
 }
 
 static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_type *type_a,

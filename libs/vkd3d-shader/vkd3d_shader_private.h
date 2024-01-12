@@ -820,6 +820,7 @@ struct vkd3d_shader_indexable_temp
     unsigned int alignment;
     enum vkd3d_data_type data_type;
     unsigned int component_count;
+    bool has_function_scope;
     const struct vkd3d_shader_immediate_constant_buffer *initialiser;
 };
 

@@ -5597,7 +5597,10 @@ static void spirv_compiler_emit_dcl_indexable_temp(struct spirv_compiler *compil
     SpvStorageClass storage_class;
     size_t function_location;
 
-    storage_class = SpvStorageClassFunction;
+    /* Indexable temps may be used by more than one function in hull shaders, and
+     * declarations generally should not occur within VSIR code blocks unless function
+     * scope is specified, e.g. DXIL alloca. */
+    storage_class = temp->has_function_scope ? SpvStorageClassFunction : SpvStorageClassPrivate;
 
     vsir_register_init(&reg, VKD3DSPR_IDXTEMP, VKD3D_DATA_FLOAT, 1);
     reg.idx[0].offset = temp->register_idx;
