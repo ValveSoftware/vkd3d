@@ -2334,7 +2334,9 @@ struct spirv_compiler
     const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info;
     unsigned int input_control_point_count;
     unsigned int output_control_point_count;
+
     bool use_vocp;
+    bool emit_point_size;
 
     enum vkd3d_shader_opcode phase;
     bool emit_default_control_point_phase;
@@ -2530,6 +2532,8 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
     if ((shader_interface = vkd3d_find_struct(compile_info->next, INTERFACE_INFO)))
     {
         compiler->xfb_info = vkd3d_find_struct(compile_info->next, TRANSFORM_FEEDBACK_INFO);
+        compiler->emit_point_size = compiler->xfb_info && compiler->xfb_info->element_count
+                && compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY;
 
         compiler->shader_interface = *shader_interface;
         if (shader_interface->push_constant_buffer_count)
@@ -6332,7 +6336,7 @@ static void spirv_compiler_emit_dcl_output_topology(struct spirv_compiler *compi
     {
         case VKD3D_PT_POINTLIST:
             mode = SpvExecutionModeOutputPoints;
-            spirv_compiler_emit_point_size(compiler);
+            compiler->emit_point_size = true;
             break;
         case VKD3D_PT_LINESTRIP:
             mode = SpvExecutionModeOutputLineStrip;
@@ -9220,8 +9224,7 @@ static void spirv_compiler_emit_main_prolog(struct spirv_compiler *compiler)
 {
     spirv_compiler_emit_push_constant_buffers(compiler);
 
-    if (compiler->xfb_info && compiler->xfb_info->element_count
-            && compiler->shader_type != VKD3D_SHADER_TYPE_GEOMETRY)
+    if (compiler->emit_point_size)
         spirv_compiler_emit_point_size(compiler);
 }
 
