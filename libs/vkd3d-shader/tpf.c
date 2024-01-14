@@ -3002,18 +3002,16 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
                 return D3D_SVC_MATRIX_COLUMNS;
             else
                 return D3D_SVC_MATRIX_ROWS;
-        case HLSL_CLASS_OBJECT:
-            return D3D_SVC_OBJECT;
         case HLSL_CLASS_SCALAR:
             return D3D_SVC_SCALAR;
         case HLSL_CLASS_STRUCT:
             return D3D_SVC_STRUCT;
         case HLSL_CLASS_VECTOR:
             return D3D_SVC_VECTOR;
-        default:
-            ERR("Invalid class %#x.\n", type->class);
-            vkd3d_unreachable();
+        case HLSL_CLASS_OBJECT:
+            break;
     }
+    vkd3d_unreachable();
 }
 
 static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
@@ -3029,68 +3027,10 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
             return D3D_SVT_FLOAT;
         case HLSL_TYPE_INT:
             return D3D_SVT_INT;
-        case HLSL_TYPE_PIXELSHADER:
-            return D3D_SVT_PIXELSHADER;
-        case HLSL_TYPE_SAMPLER:
-            switch (type->sampler_dim)
-            {
-                case HLSL_SAMPLER_DIM_1D:
-                    return D3D_SVT_SAMPLER1D;
-                case HLSL_SAMPLER_DIM_2D:
-                    return D3D_SVT_SAMPLER2D;
-                case HLSL_SAMPLER_DIM_3D:
-                    return D3D_SVT_SAMPLER3D;
-                case HLSL_SAMPLER_DIM_CUBE:
-                    return D3D_SVT_SAMPLERCUBE;
-                case HLSL_SAMPLER_DIM_GENERIC:
-                    return D3D_SVT_SAMPLER;
-                default:
-                    vkd3d_unreachable();
-            }
-            break;
-        case HLSL_TYPE_STRING:
-            return D3D_SVT_STRING;
-        case HLSL_TYPE_TEXTURE:
-            switch (type->sampler_dim)
-            {
-                case HLSL_SAMPLER_DIM_1D:
-                    return D3D_SVT_TEXTURE1D;
-                case HLSL_SAMPLER_DIM_2D:
-                    return D3D_SVT_TEXTURE2D;
-                case HLSL_SAMPLER_DIM_2DMS:
-                    return D3D_SVT_TEXTURE2DMS;
-                case HLSL_SAMPLER_DIM_3D:
-                    return D3D_SVT_TEXTURE3D;
-                case HLSL_SAMPLER_DIM_CUBE:
-                    return D3D_SVT_TEXTURECUBE;
-                case HLSL_SAMPLER_DIM_GENERIC:
-                    return D3D_SVT_TEXTURE;
-                default:
-                    vkd3d_unreachable();
-            }
-            break;
         case HLSL_TYPE_UINT:
             return D3D_SVT_UINT;
-        case HLSL_TYPE_VERTEXSHADER:
-            return D3D_SVT_VERTEXSHADER;
         case HLSL_TYPE_VOID:
             return D3D_SVT_VOID;
-        case HLSL_TYPE_UAV:
-            switch (type->sampler_dim)
-            {
-                case HLSL_SAMPLER_DIM_1D:
-                    return D3D_SVT_RWTEXTURE1D;
-                case HLSL_SAMPLER_DIM_2D:
-                    return D3D_SVT_RWTEXTURE2D;
-                case HLSL_SAMPLER_DIM_3D:
-                    return D3D_SVT_RWTEXTURE3D;
-                case HLSL_SAMPLER_DIM_1DARRAY:
-                    return D3D_SVT_RWTEXTURE1DARRAY;
-                case HLSL_SAMPLER_DIM_2DARRAY:
-                    return D3D_SVT_RWTEXTURE2DARRAY;
-                default:
-                    vkd3d_unreachable();
-            }
         default:
             vkd3d_unreachable();
     }
@@ -3116,21 +3056,27 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     if (array_type->class == HLSL_CLASS_STRUCT)
     {
-        field_count = array_type->e.record.field_count;
 
-        for (i = 0; i < field_count; ++i)
+        for (i = 0; i < array_type->e.record.field_count; ++i)
         {
             struct hlsl_struct_field *field = &array_type->e.record.fields[i];
 
+            if (!field->type->reg_size[HLSL_REGSET_NUMERIC])
+                continue;
+
             field->name_bytecode_offset = put_string(buffer, field->name);
             write_sm4_type(ctx, buffer, field->type);
+            ++field_count;
         }
 
         fields_offset = bytecode_align(buffer);
 
-        for (i = 0; i < field_count; ++i)
+        for (i = 0; i < array_type->e.record.field_count; ++i)
         {
             struct hlsl_struct_field *field = &array_type->e.record.fields[i];
+
+            if (!field->type->reg_size[HLSL_REGSET_NUMERIC])
+                continue;
 
             put_u32(buffer, field->name_bytecode_offset);
             put_u32(buffer, field->type->bytecode_offset);
