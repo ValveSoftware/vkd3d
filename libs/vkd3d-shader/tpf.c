@@ -3285,7 +3285,7 @@ static struct extern_resource *sm4_get_extern_resources(struct hlsl_ctx *ctx, un
 
                     extern_resources[*count].name = name;
                     extern_resources[*count].data_type = component_type;
-                    extern_resources[*count].is_user_packed = false;
+                    extern_resources[*count].is_user_packed = !!var->reg_reservation.reg_type;
 
                     extern_resources[*count].regset = regset;
                     extern_resources[*count].id = var->regs[regset].id + regset_offset;
