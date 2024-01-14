@@ -3038,8 +3038,8 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     const struct hlsl_type *array_type = hlsl_get_multiarray_element_type(type);
     const char *name = array_type->name ? array_type->name : "<unnamed>";
     const struct hlsl_profile_info *profile = ctx->profile;
-    unsigned int field_count = 0, array_size = 0;
-    size_t fields_offset = 0, name_offset = 0;
+    unsigned int array_size = 0;
+    size_t name_offset = 0;
     size_t i;
 
     if (type->bytecode_offset)
@@ -3053,6 +3053,8 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
     if (array_type->class == HLSL_CLASS_STRUCT)
     {
+        unsigned int field_count = 0;
+        size_t fields_offset = 0;
 
         for (i = 0; i < array_type->e.record.field_count; ++i)
         {
@@ -3079,17 +3081,19 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             put_u32(buffer, field->type->bytecode_offset);
             put_u32(buffer, field->reg_offset[HLSL_REGSET_NUMERIC]);
         }
-
         type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(D3D_SVC_STRUCT, D3D_SVT_VOID));
+        put_u32(buffer, vkd3d_make_u32(1, hlsl_type_component_count(array_type)));
+        put_u32(buffer, vkd3d_make_u32(array_size, field_count));
+        put_u32(buffer, fields_offset);
     }
     else
     {
+        assert(array_type->class <= HLSL_CLASS_LAST_NUMERIC);
         type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(array_type), sm4_base_type(array_type)));
+        put_u32(buffer, vkd3d_make_u32(array_type->dimy, array_type->dimx));
+        put_u32(buffer, vkd3d_make_u32(array_size, 0));
+        put_u32(buffer, 1);
     }
-
-    put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
-    put_u32(buffer, vkd3d_make_u32(array_size, field_count));
-    put_u32(buffer, fields_offset);
 
     if (profile->major_version >= 5)
     {
