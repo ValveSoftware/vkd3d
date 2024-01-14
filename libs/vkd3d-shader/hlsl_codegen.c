@@ -3761,9 +3761,6 @@ static void allocate_register_reservations(struct hlsl_ctx *ctx)
     {
         unsigned int r;
 
-        if (!hlsl_type_is_resource(var->data_type))
-            continue;
-
         if (var->reg_reservation.reg_type)
         {
             for (r = 0; r <= HLSL_REGSET_LAST_OBJECT; ++r)

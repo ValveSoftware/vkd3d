@@ -198,7 +198,7 @@ filter linear linear linear
 address clamp clamp clamp
 
 % If a struct spans many object register sets and one is reserved, all other used object register sets must be.
-[pixel shader fail(sm<6) todo]
+[pixel shader fail(sm<6)]
 struct
 {
      Texture2D tex;
@@ -242,4 +242,4 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-todo(sm<6) probe all rgba (1.0, 1.0, 1.0, 99.0)
+probe all rgba (1.0, 1.0, 1.0, 99.0)
