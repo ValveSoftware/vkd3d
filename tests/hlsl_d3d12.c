@@ -1370,7 +1370,7 @@ static void test_reflection(void)
         "    float3x1 o;\n"
         "    float4 p;\n"
         "    float q;\n"
-        "    struct r_name {float a;} r;\n"
+        "    struct r_name {float a; float4 b;} r;\n"
         "    column_major float3x1 t;\n"
         "};\n"
         "\n"
@@ -1407,6 +1407,7 @@ static void test_reflection(void)
     static const D3D12_SHADER_TYPE_DESC r_field_types[] =
     {
         {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"},
     };
 
     static const struct shader_variable globals_vars =
@@ -1429,8 +1430,8 @@ static void test_reflection(void)
         {{"o", 176, 36, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_ROWS,    D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
         {{"p", 224, 16,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}},
         {{"q", 240,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_SCALAR,         D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"}},
-        {{"r", 256,  4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 1, 0, ARRAY_SIZE(r_field_types), 0, "r_name"}, r_field_types},
-        {{"t", 260, 12,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_COLUMNS, D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
+        {{"r", 256, 32,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT,         D3D_SVT_VOID,  1, 5, 0, ARRAY_SIZE(r_field_types), 0, "r_name"}, r_field_types},
+        {{"t", 288, 12,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_MATRIX_COLUMNS, D3D_SVT_FLOAT, 3, 1, 0, 0, 0, "float3x1"}},
     };
     static const struct shader_variable b5_vars =
         {{"u",   0, 16, D3D_SVF_USED, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_VECTOR,         D3D_SVT_FLOAT, 1, 4, 0, 0, 0, "float4"}};
@@ -1439,7 +1440,7 @@ static void test_reflection(void)
     {
         {{"$Globals", D3D_CT_CBUFFER, 1, 16}, &globals_vars},
         {{"$Params", D3D_CT_CBUFFER, 1, 16}, &params_vars},
-        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(buffer_vars), 272}, buffer_vars},
+        {{"b1", D3D_CT_CBUFFER, ARRAY_SIZE(buffer_vars), 304}, buffer_vars},
         {{"b5", D3D_CT_CBUFFER, 1, 16}, &b5_vars},
     };
 
@@ -1466,11 +1467,35 @@ static void test_reflection(void)
         "    foo = bar + 2;\n"
         "};\n"
         "sampler2D g;\n"
-        "sampler b : register(s5);\n"
+        "sampler b : register(s7);\n"
+        "struct\n"
+        "{\n"
+        "    float a;\n"
+        "    Texture1D<int2> b;\n"
+        "    float c;\n"
+        "    Texture2D d;\n"
+        "} h : register(t7);\n"
+        "struct\n"
+        "{\n"
+        "    float a;\n"
+        "    Texture2D b;\n"
+        "    SamplerState c;\n"
+        "} i;\n"
+        "struct\n"
+        "{\n"
+        "    Texture2D b;\n"
+        "    SamplerState c;\n"
+        "} j;\n"
+        "struct\n"
+        "{\n"
+        "    Texture2D a;\n"
+        "    Texture1DArray<float> b;\n"
+        "    struct { SamplerState a; } c;\n"
+        "} k;\n"
         "float4 main(float2 pos : texcoord) : SV_TARGET\n"
         "{\n"
         "    return a.Sample(b, pos) + a.Sample(c, pos) + a.Sample(d, pos) + tex2D(f, pos) + tex2D(e, pos)"
-        "            + tex2D(g, pos);\n"
+        "            + tex2D(g, pos) + h.b.Load(h.c).x + k.b.Sample(k.c.a, pos);\n"
         "}";
 
     static const D3D12_SHADER_INPUT_BIND_DESC ps_bindings[] =
@@ -1480,11 +1505,36 @@ static void test_reflection(void)
         {"e", D3D_SIT_SAMPLER, 2, 1},
         {"f", D3D_SIT_SAMPLER, 3, 1},
         {"g", D3D_SIT_SAMPLER, 4, 1},
-        {"b", D3D_SIT_SAMPLER, 5, 1, D3D_SIF_USERPACKED},
+        {"k.c.a", D3D_SIT_SAMPLER, 5, 1},
+        {"b", D3D_SIT_SAMPLER, 7, 1, D3D_SIF_USERPACKED},
         {"f", D3D_SIT_TEXTURE, 0, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
         {"e", D3D_SIT_TEXTURE, 1, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
         {"g", D3D_SIT_TEXTURE, 2, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
         {"a", D3D_SIT_TEXTURE, 3, 1, D3D_SIF_TEXTURE_COMPONENTS, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE2D, ~0u},
+        {"k.b", D3D_SIT_TEXTURE, 5, 1, 0, D3D_RETURN_TYPE_FLOAT, D3D_SRV_DIMENSION_TEXTURE1DARRAY, ~0u},
+        {"h.b", D3D_SIT_TEXTURE, 7, 1, D3D_SIF_USERPACKED | D3D_SIF_TEXTURE_COMPONENT_0, D3D_RETURN_TYPE_SINT, D3D_SRV_DIMENSION_TEXTURE1D, ~0u},
+        {"$Globals", D3D_SIT_CBUFFER, 0, 1},
+    };
+
+    static const D3D12_SHADER_TYPE_DESC ps_h_field_types[] =
+    {
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+    };
+
+    static const D3D12_SHADER_TYPE_DESC ps_i_field_types[] =
+    {
+        {D3D_SVC_SCALAR, D3D_SVT_FLOAT, 1, 1, 0, 0, 0, "float"},
+    };
+
+    static const struct shader_variable ps_globals_vars[] =
+    {
+        {{"h",  0, 8, D3D_SVF_USED, NULL,   7, 1, ~0u, 0}, {D3D_SVC_STRUCT, D3D_SVT_VOID, 1, 4, 0, ARRAY_SIZE(ps_h_field_types), 0, "<unnamed>"}, ps_h_field_types},
+        {{"i", 16, 4,            0, NULL, ~0u, 0, ~0u, 0}, {D3D_SVC_STRUCT, D3D_SVT_VOID, 1, 3, 0, ARRAY_SIZE(ps_i_field_types), 0, "<unnamed>"}, ps_i_field_types},
+    };
+    static const struct shader_buffer ps_buffers[] =
+    {
+        {{"$Globals", D3D_CT_CBUFFER, ARRAY_SIZE(ps_globals_vars), 32}, ps_globals_vars},
     };
 
     static const struct
@@ -1499,7 +1549,7 @@ static void test_reflection(void)
     tests[] =
     {
         {vs_source, "vs_5_0", vs_bindings, ARRAY_SIZE(vs_bindings), vs_buffers, ARRAY_SIZE(vs_buffers)},
-        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings)},
+        {ps_source, "ps_5_0", ps_bindings, ARRAY_SIZE(ps_bindings), ps_buffers, ARRAY_SIZE(ps_buffers)},
     };
 
     for (unsigned int t = 0; t < ARRAY_SIZE(tests); ++t)
@@ -1555,8 +1605,9 @@ static void test_reflection(void)
                 ok(!var_desc.DefaultValue, "Got default value %p.\n", var_desc.DefaultValue);
                 todo ok(var_desc.StartTexture == expect->var_desc.StartTexture,
                         "Got texture offset %u.\n", var_desc.StartTexture);
-                ok(var_desc.TextureSize == expect->var_desc.TextureSize,
-                        "Got texture size %u.\n", var_desc.TextureSize);
+                todo_if (expect->var_desc.TextureSize)
+                    ok(var_desc.TextureSize == expect->var_desc.TextureSize,
+                            "Got texture size %u.\n", var_desc.TextureSize);
                 todo ok(var_desc.StartSampler == expect->var_desc.StartSampler,
                         "Got sampler offset %u.\n", var_desc.StartSampler);
                 ok(var_desc.SamplerSize == expect->var_desc.SamplerSize,
