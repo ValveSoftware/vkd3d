@@ -28,6 +28,40 @@ probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
 probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
 probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
 
+[require]
+shader model >= 4.0
+
+% Identical to the previous, except we prevent DXC from unrolling the
+% loop so we can test non-trivial control flow
+[pixel shader]
+uniform uint iter;
+
+float4 main(float tex : texcoord) : sv_target
+{
+    int i;
+    float x = 0.0;
+    for (i = 0; i < iter; i++)
+    {
+        x += i;
+        if (tex > 0.5 && i == 5)
+            break;
+        if (tex > -0.5 && i >= 7)
+            continue;
+        x -= 1;
+    }
+    return float4(i, x, 0.0, 0.0);
+}
+
+[test]
+uniform 0 uint4 10 0 0 0
+todo(sm>=6) draw quad
+probe (  0, 0, 159, 480) rgba (10.0, 35.0, 0.0, 0.0)
+probe (161, 0, 479, 480) rgba (10.0, 38.0, 0.0, 0.0)
+probe (481, 0, 640, 480) rgba ( 5.0, 10.0, 0.0, 0.0)
+
+[require]
+% Reset requirements
+
 [pixel shader]
 float4 main(float tex : texcoord) : sv_target
 {
