@@ -3042,6 +3042,62 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
         }
 
+        case VKD3DSIH_PHI:
+        {
+            unsigned int incoming_count;
+
+            vsir_validate_cf_type(ctx, instruction, CF_TYPE_BLOCKS);
+            vsir_validate_dst_count(ctx, instruction, 1);
+            vsir_validate_src_min_count(ctx, instruction, 2);
+            if (instruction->src_count % 2 != 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SOURCE_COUNT,
+                        "Invalid source count %u for a PHI instruction, it must be an even number.",
+                        instruction->src_count);
+            incoming_count = instruction->src_count / 2;
+
+            if (!register_is_ssa(&instruction->dst[0].reg))
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                        "Invalid destination of type %#x in PHI instruction, expected SSA.",
+                        instruction->dst[0].reg.type);
+
+            if (instruction->dst[0].reg.dimension != VSIR_DIMENSION_SCALAR)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                        "Invalid destination dimension %#x in PHI instruction, expected scalar.",
+                        instruction->dst[0].reg.dimension);
+
+            if (instruction->dst[0].modifiers != VKD3DSPDM_NONE)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS,
+                        "Invalid modifiers %#x for the destination of a PHI instruction, expected none.",
+                        instruction->dst[0].modifiers);
+
+            if (instruction->dst[0].shift != 0)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SHIFT,
+                        "Invalid shift %#x for the destination of a PHI instruction, expected none.",
+                        instruction->dst[0].shift);
+
+            for (i = 0; i < incoming_count; ++i)
+            {
+                unsigned int value_idx = 2 * i;
+                unsigned int label_idx = 2 * i + 1;
+
+                if (!register_is_constant(&instruction->src[value_idx].reg) && !register_is_ssa(&instruction->src[value_idx].reg))
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                            "Invalid value register for incoming %zu of type %#x in PHI instruction, "
+                            "expected SSA, IMMCONST or IMMCONST64.", i, instruction->src[value_idx].reg.type);
+
+                if (instruction->src[value_idx].reg.dimension != VSIR_DIMENSION_SCALAR)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION,
+                            "Invalid value dimension %#x for incoming %zu in PHI instruction, expected scalar.",
+                            instruction->src[value_idx].reg.dimension, i);
+
+                if (!vsir_register_is_label(&instruction->src[label_idx].reg))
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE,
+                            "Invalid label register for case %zu of type %#x in PHI instruction, "
+                            "expected LABEL.", i, instruction->src[value_idx].reg.type);
+            }
+            break;
+        }
+
         default:
             break;
     }
