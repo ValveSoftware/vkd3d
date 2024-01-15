@@ -2388,15 +2388,47 @@ static bool reserve_instructions(struct vkd3d_shader_instruction **instructions,
     return true;
 }
 
+/* A record represents replacing a jump from block `switch_label' to
+ * block `target_label' with a jump from block `if_label' to block
+ * `target_label'. */
+struct lower_switch_to_if_ladder_block_mapping
+{
+    unsigned int switch_label;
+    unsigned int if_label;
+    unsigned int target_label;
+};
+
+static bool lower_switch_to_if_ladder_add_block_mapping(struct lower_switch_to_if_ladder_block_mapping **block_map,
+        size_t *map_capacity, size_t *map_count, unsigned int switch_label, unsigned int if_label, unsigned int target_label)
+{
+    if (!vkd3d_array_reserve((void **)block_map, map_capacity, *map_count + 1, sizeof(**block_map)))
+    {
+        ERR("Failed to allocate block mapping.\n");
+        return false;
+    }
+
+    (*block_map)[*map_count].switch_label = switch_label;
+    (*block_map)[*map_count].if_label = if_label;
+    (*block_map)[*map_count].target_label = target_label;
+
+    *map_count += 1;
+
+    return true;
+}
+
 static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *parser)
 {
-    unsigned int block_count = parser->program.block_count, ssa_count = parser->program.ssa_count;
+    unsigned int block_count = parser->program.block_count, ssa_count = parser->program.ssa_count, current_label = 0, if_label;
+    size_t ins_capacity = 0, ins_count = 0, i, map_capacity = 0, map_count = 0;
     struct vkd3d_shader_instruction *instructions = NULL;
-    size_t ins_capacity = 0, ins_count = 0, i;
+    struct lower_switch_to_if_ladder_block_mapping *block_map = NULL;
 
     if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
         goto fail;
 
+    /* First subpass: convert SWITCH_MONOLITHIC instructions to
+     * selection ladders, keeping a map between blocks before and
+     * after the subpass. */
     for (i = 0; i < parser->program.instructions.count; ++i)
     {
         struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
@@ -2404,14 +2436,15 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
 
         switch (ins->handler_idx)
         {
+            case VKD3DSIH_LABEL:
+                current_label = label_from_src_param(&ins->src[0]);
+                if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
+                    goto fail;
+                instructions[ins_count++] = *ins;
+                continue;
+
             case VKD3DSIH_SWITCH_MONOLITHIC:
                 break;
-
-            case VKD3DSIH_PHI:
-                WARN("Unhandled PHI when lowering switch.\n");
-                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
-                        "Unhandled PHI when lowering switch.");
-                return VKD3D_ERROR_NOT_IMPLEMENTED;
 
             default:
                 if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
@@ -2438,6 +2471,8 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
 
         if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 3 * case_count - 1))
             goto fail;
+
+        if_label = current_label;
 
         for (j = 0; j < case_count; ++j)
         {
@@ -2467,17 +2502,121 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
 
             ++ssa_count;
 
-            if (j != case_count - 1)
+            if (!lower_switch_to_if_ladder_add_block_mapping(&block_map, &map_capacity, &map_count,
+                    current_label, if_label, case_label))
+                goto fail;
+
+            if (j == case_count - 1)
+            {
+                if (!lower_switch_to_if_ladder_add_block_mapping(&block_map, &map_capacity, &map_count,
+                        current_label, if_label, default_label))
+                    goto fail;
+            }
+            else
             {
                 if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_LABEL, 0, 1))
                     goto fail;
                 vsir_src_param_init_label(&instructions[ins_count].src[0], ++block_count);
                 ++ins_count;
+
+                if_label = block_count;
             }
         }
     }
 
+    /* Second subpass: creating new blocks might have broken
+     * references in PHI instructions, so we use the block map to fix
+     * them. */
+    current_label = 0;
+    for (i = 0; i < ins_count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &instructions[i];
+        struct vkd3d_shader_src_param *new_src;
+        unsigned int j, l, new_src_count = 0;
+
+        switch (ins->handler_idx)
+        {
+            case VKD3DSIH_LABEL:
+                current_label = label_from_src_param(&ins->src[0]);
+                continue;
+
+            case VKD3DSIH_PHI:
+                break;
+
+            default:
+                continue;
+        }
+
+        /* First count how many source parameters we need. */
+        for (j = 0; j < ins->src_count; j += 2)
+        {
+            unsigned int source_label = label_from_src_param(&ins->src[j + 1]);
+            size_t k, match_count = 0;
+
+            for (k = 0; k < map_count; ++k)
+            {
+                struct lower_switch_to_if_ladder_block_mapping *mapping = &block_map[k];
+
+                if (mapping->switch_label == source_label && mapping->target_label == current_label)
+                    match_count += 1;
+            }
+
+            new_src_count += (match_count != 0) ? 2 * match_count : 2;
+        }
+
+        assert(new_src_count >= ins->src_count);
+
+        /* Allocate more source parameters if needed. */
+        if (new_src_count == ins->src_count)
+        {
+            new_src = ins->src;
+        }
+        else
+        {
+            if (!(new_src = shader_parser_get_src_params(parser, new_src_count)))
+            {
+                ERR("Failed to allocate %u source parameters.\n", new_src_count);
+                goto fail;
+            }
+        }
+
+        /* Then do the copy. */
+        for (j = 0, l = 0; j < ins->src_count; j += 2)
+        {
+            unsigned int source_label = label_from_src_param(&ins->src[j + 1]);
+            size_t k, match_count = 0;
+
+            for (k = 0; k < map_count; ++k)
+            {
+                struct lower_switch_to_if_ladder_block_mapping *mapping = &block_map[k];
+
+                if (mapping->switch_label == source_label && mapping->target_label == current_label)
+                {
+                    match_count += 1;
+
+                    new_src[l] = ins->src[j];
+                    new_src[l + 1] = ins->src[j + 1];
+                    new_src[l + 1].reg.idx[0].offset = mapping->if_label;
+                    l += 2;
+                }
+            }
+
+            if (match_count == 0)
+            {
+                new_src[l] = ins->src[j];
+                new_src[l + 1] = ins->src[j + 1];
+                l += 2;
+            }
+        }
+
+        assert(l == new_src_count);
+
+        ins->src_count = new_src_count;
+        ins->src = new_src;
+    }
+
     vkd3d_free(parser->program.instructions.elements);
+    vkd3d_free(block_map);
     parser->program.instructions.elements = instructions;
     parser->program.instructions.capacity = ins_capacity;
     parser->program.instructions.count = ins_count;
@@ -2488,6 +2627,7 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
 
 fail:
     vkd3d_free(instructions);
+    vkd3d_free(block_map);
 
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
