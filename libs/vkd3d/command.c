@@ -313,7 +313,7 @@ static void vkd3d_wait_for_gpu_fence(struct vkd3d_fence_worker *worker,
 
     TRACE("Signaling fence %p value %#"PRIx64".\n", waiting_fence->fence, waiting_fence->value);
     if (FAILED(hr = d3d12_fence_signal(waiting_fence->fence, waiting_fence->value, waiting_fence->u.vk_fence, false)))
-        ERR("Failed to signal D3D12 fence, hr %#x.\n", hr);
+        ERR("Failed to signal d3d12 fence, hr %s.\n", debugstr_hresult(hr));
 
     d3d12_fence_decref(waiting_fence->fence);
 
