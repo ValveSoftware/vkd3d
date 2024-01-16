@@ -43,6 +43,14 @@ static void string_storage_destroy(struct rb_entry *entry, void *context)
     vkd3d_free(string_entry);
 }
 
+struct fx_write_context;
+
+struct fx_write_context_ops
+{
+    uint32_t (*write_string)(const char *string, struct fx_write_context *fx);
+    void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
+};
+
 struct fx_write_context
 {
     struct hlsl_ctx *ctx;
@@ -58,15 +66,24 @@ struct fx_write_context
     uint32_t technique_count;
     uint32_t group_count;
     int status;
+
+    const struct fx_write_context_ops *ops;
 };
 
-static void fx_write_context_init(struct hlsl_ctx *ctx, struct fx_write_context *fx)
+static uint32_t write_string(const char *string, struct fx_write_context *fx)
+{
+    return fx->ops->write_string(string, fx);
+}
+
+static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_context_ops *ops,
+        struct fx_write_context *fx)
 {
     unsigned int version = ctx->profile->major_version;
 
     memset(fx, 0, sizeof(*fx));
 
     fx->ctx = ctx;
+    fx->ops = ops;
     if (version == 2)
     {
         fx->min_technique_version = 9;
@@ -104,7 +121,7 @@ static bool technique_matches_version(const struct hlsl_ir_var *var, const struc
     return type->e.version >= fx->min_technique_version && type->e.version <= fx->max_technique_version;
 }
 
-static uint32_t fx_put_raw_string(struct fx_write_context *fx, const char *string)
+static uint32_t write_fx_4_string(const char *string, struct fx_write_context *fx)
 {
     struct string_entry *string_entry;
     struct rb_entry *entry;
@@ -135,20 +152,20 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t name_offset;
 
-    name_offset = fx_put_raw_string(fx, var->name);
+    name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     put_u32(buffer, 0); /* Annotation count. */
     put_u32(buffer, 0); /* Assignment count. */
 }
 
-static void write_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
+static void write_fx_4_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t name_offset, count = 0;
     struct hlsl_ir_var *pass;
     uint32_t count_offset;
 
-    name_offset = fx_put_raw_string(fx, var->name);
+    name_offset = write_string(var->name, fx);
     put_u32(buffer, name_offset);
     count_offset = put_u32(buffer, 0);
     put_u32(buffer, 0); /* Annotation count. */
@@ -178,7 +195,7 @@ static void write_techniques(struct hlsl_scope *scope, struct fx_write_context *
     {
         if (technique_matches_version(var, fx))
         {
-            write_technique(var, fx);
+            fx->ops->write_technique(var, fx);
             ++fx->technique_count;
         }
     }
@@ -190,7 +207,7 @@ static void write_techniques(struct hlsl_scope *scope, struct fx_write_context *
 static void write_group(struct hlsl_scope *scope, const char *name, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset = fx_put_raw_string(fx, name);
+    uint32_t name_offset = write_string(name, fx);
     uint32_t count_offset, count;
 
     put_u32(buffer, name_offset);
@@ -229,13 +246,105 @@ static void write_groups(struct hlsl_scope *scope, struct fx_write_context *fx)
     }
 }
 
+static uint32_t write_fx_2_string(const char *string, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    const char *s = string ? string : "";
+    uint32_t size, offset;
+
+    size = strlen(s) + 1;
+    offset = put_u32(buffer, size);
+    bytecode_put_bytes(buffer, s, size);
+    return offset;
+}
+
+static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t name_offset;
+
+    name_offset = write_string(var->name, fx);
+    put_u32(buffer, name_offset);
+    put_u32(buffer, 0); /* Annotation count. */
+    put_u32(buffer, 0); /* Pass count. */
+
+    /* FIXME: annotations */
+    /* FIXME: passes */
+}
+
+static const struct fx_write_context_ops fx_2_ops =
+{
+    .write_string = write_fx_2_string,
+    .write_technique = write_fx_2_technique,
+};
+
+static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
+{
+    struct vkd3d_bytecode_buffer buffer = { 0 };
+    struct vkd3d_bytecode_buffer *structured;
+    uint32_t offset, size, technique_count;
+    struct fx_write_context fx;
+
+    fx_write_context_init(ctx, &fx_2_ops, &fx);
+    structured = &fx.structured;
+
+    /* First entry is always zeroed and skipped. */
+    put_u32(&fx.unstructured, 0);
+
+    put_u32(&buffer, 0xfeff0901); /* Version. */
+    offset = put_u32(&buffer, 0);
+
+    put_u32(structured, 0); /* Parameter count */
+    technique_count = put_u32(structured, 0);
+    put_u32(structured, 0); /* Unknown */
+    put_u32(structured, 0); /* Object count */
+
+    /* TODO: parameters */
+
+    write_techniques(ctx->globals, &fx);
+    set_u32(structured, technique_count, fx.technique_count);
+
+    put_u32(structured, 0); /* String count */
+    put_u32(structured, 0); /* Resource count */
+
+    /* TODO: strings */
+    /* TODO: resources */
+
+    size = align(fx.unstructured.size, 4);
+    /* Accounts for additional 4 bytes before the raw data section. */
+    set_u32(&buffer, offset, size);
+
+    bytecode_put_bytes(&buffer, fx.unstructured.data, fx.unstructured.size);
+    bytecode_put_bytes(&buffer, fx.structured.data, fx.structured.size);
+
+    vkd3d_free(fx.unstructured.data);
+    vkd3d_free(fx.structured.data);
+
+    if (!fx.status)
+    {
+        out->code = buffer.data;
+        out->size = buffer.size;
+    }
+
+    if (fx.status < 0)
+        ctx->result = fx.status;
+
+    return fx_write_context_cleanup(&fx);
+}
+
+static const struct fx_write_context_ops fx_4_ops =
+{
+    .write_string = write_fx_4_string,
+    .write_technique = write_fx_4_technique,
+};
+
 static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
     struct vkd3d_bytecode_buffer buffer = { 0 };
     struct fx_write_context fx;
     uint32_t size_offset, size;
 
-    fx_write_context_init(ctx, &fx);
+    fx_write_context_init(ctx, &fx_4_ops, &fx);
 
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
@@ -295,7 +404,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     struct fx_write_context fx;
     uint32_t size_offset, size;
 
-    fx_write_context_init(ctx, &fx);
+    fx_write_context_init(ctx, &fx_4_ops, &fx);
 
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
@@ -357,8 +466,7 @@ int hlsl_emit_effect_binary(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
     if (ctx->profile->major_version == 2)
     {
-        hlsl_fixme(ctx, &ctx->location, "Writing fx_2_0 binaries is not implemented.");
-        return VKD3D_ERROR_NOT_IMPLEMENTED;
+        return hlsl_fx_2_write(ctx, out);
     }
     else if (ctx->profile->major_version == 4)
     {
