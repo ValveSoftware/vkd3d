@@ -2260,38 +2260,43 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (parser->shader_desc.is_dxil)
         return result;
 
-    if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL
-            && (result = remap_output_signature(parser, compile_info)) < 0)
+    if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+    {
+        if ((result = remap_output_signature(parser, compile_info)) < 0)
+            return result;
+    }
+
+    if (parser->program.shader_version.type == VKD3D_SHADER_TYPE_HULL)
+    {
+        if ((result = instruction_array_flatten_hull_shader_phases(instructions)) < 0)
+            return result;
+
+        if ((result = instruction_array_normalise_hull_shader_control_point_io(instructions,
+                &parser->shader_desc.input_signature)) < 0)
+            return result;
+    }
+
+    if ((result = shader_normalise_io_registers(parser)) < 0)
         return result;
 
-    if (parser->program.shader_version.type == VKD3D_SHADER_TYPE_HULL
-            && (result = instruction_array_flatten_hull_shader_phases(instructions)) >= 0)
-    {
-        result = instruction_array_normalise_hull_shader_control_point_io(instructions,
-                &parser->shader_desc.input_signature);
-    }
-    if (result >= 0)
-        result = shader_normalise_io_registers(parser);
+    if ((result = instruction_array_normalise_flat_constants(&parser->program)) < 0)
+        return result;
 
-    if (result >= 0)
-        result = instruction_array_normalise_flat_constants(&parser->program);
+    remove_dead_code(&parser->program);
 
-    if (result >= 0)
-        remove_dead_code(&parser->program);
+    if ((result = flatten_control_flow_constructs(parser)) < 0)
+        return result;
 
-    if (result >= 0)
-        result = flatten_control_flow_constructs(parser);
+    if ((result = normalise_combined_samplers(parser)) < 0)
+        return result;
 
-    if (result >= 0)
-        result = normalise_combined_samplers(parser);
-
-    if (result >= 0 && TRACE_ON())
+    if (TRACE_ON())
         vkd3d_shader_trace(&parser->program);
 
-    if (result >= 0 && !parser->failed)
-        result = vsir_validate(parser);
+    if (!parser->failed && (result = vsir_validate(parser)) < 0)
+        return result;
 
-    if (result >= 0 && parser->failed)
+    if (parser->failed)
         result = VKD3D_ERROR_INVALID_SHADER;
 
     return result;
