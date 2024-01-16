@@ -6639,9 +6639,9 @@ static enum vkd3d_result sm6_parser_emit_thread_group(struct sm6_parser *sm6, co
     unsigned int group_sizes[3];
     unsigned int i;
 
-    if (sm6->p.shader_version.type != VKD3D_SHADER_TYPE_COMPUTE)
+    if (sm6->p.program.shader_version.type != VKD3D_SHADER_TYPE_COMPUTE)
     {
-        WARN("Shader of type %#x has thread group dimensions.\n", sm6->p.shader_version.type);
+        WARN("Shader of type %#x has thread group dimensions.\n", sm6->p.program.shader_version.type);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_PROPERTIES,
                 "Shader has thread group dimensions but is not a compute shader.");
         return VKD3D_ERROR_INVALID_SHADER;

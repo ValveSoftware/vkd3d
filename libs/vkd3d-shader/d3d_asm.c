@@ -2017,10 +2017,11 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
     shader_addline(buffer, "\n");
 }
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
-        const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
+enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, enum vsir_asm_dialect dialect)
 {
+    const struct vkd3d_shader_version *shader_version = &program->shader_version;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
     struct vkd3d_d3d_asm_compiler compiler =
     {
@@ -2089,9 +2090,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instructio
             shader_version->minor, compiler.colours.reset);
 
     indent = 0;
-    for (i = 0; i < instructions->count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &instructions->elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -2145,13 +2146,12 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instructio
     return result;
 }
 
-void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instructions,
-        const struct vkd3d_shader_version *shader_version)
+void vkd3d_shader_trace(const struct vsir_program *program)
 {
     const char *p, *q, *end;
     struct vkd3d_shader_code code;
 
-    if (vkd3d_dxbc_binary_to_text(instructions, shader_version, NULL, &code, VSIR_ASM_VSIR) != VKD3D_OK)
+    if (vkd3d_dxbc_binary_to_text(program, NULL, &code, VSIR_ASM_VSIR) != VKD3D_OK)
         return;
 
     end = (const char *)code.code + code.size;

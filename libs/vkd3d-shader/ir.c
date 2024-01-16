@@ -18,8 +18,9 @@
 
 #include "vkd3d_shader_private.h"
 
-bool vsir_program_init(struct vsir_program *program, unsigned int reserve)
+bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve)
 {
+    program->shader_version = *version;
     return shader_instruction_array_init(&program->instructions, reserve);
 }
 
@@ -1245,8 +1246,8 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
     unsigned int i, j;
 
     normaliser.phase = VKD3DSIH_INVALID;
-    normaliser.shader_type = parser->shader_version.type;
-    normaliser.major = parser->shader_version.major;
+    normaliser.shader_type = parser->program.shader_version.type;
+    normaliser.major = parser->program.shader_version.major;
     normaliser.input_signature = &parser->shader_desc.input_signature;
     normaliser.output_signature = &parser->shader_desc.output_signature;
     normaliser.patch_constant_signature = &parser->shader_desc.patch_constant_signature;
@@ -1878,11 +1879,12 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
     bool main_block_open, is_hull_shader, after_declarations_section;
     struct vkd3d_shader_parser *parser = flattener->parser;
     struct vkd3d_shader_instruction_array *instructions;
+    struct vsir_program *program = &parser->program;
     struct vkd3d_shader_instruction *dst_ins;
     size_t i;
 
-    instructions = &parser->program.instructions;
-    is_hull_shader = parser->shader_version.type == VKD3D_SHADER_TYPE_HULL;
+    instructions = &program->instructions;
+    is_hull_shader = program->shader_version.type == VKD3D_SHADER_TYPE_HULL;
     main_block_open = !is_hull_shader;
     after_declarations_section = is_hull_shader;
 
@@ -2257,11 +2259,11 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (parser->shader_desc.is_dxil)
         return result;
 
-    if (parser->shader_version.type != VKD3D_SHADER_TYPE_PIXEL
+    if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL
             && (result = remap_output_signature(parser, compile_info)) < 0)
         return result;
 
-    if (parser->shader_version.type == VKD3D_SHADER_TYPE_HULL
+    if (parser->program.shader_version.type == VKD3D_SHADER_TYPE_HULL
             && (result = instruction_array_flatten_hull_shader_phases(instructions)) >= 0)
     {
         result = instruction_array_normalise_hull_shader_control_point_io(instructions,
@@ -2283,7 +2285,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         result = normalise_combined_samplers(parser);
 
     if (result >= 0 && TRACE_ON())
-        vkd3d_shader_trace(instructions, &parser->shader_version);
+        vkd3d_shader_trace(&parser->program);
 
     if (result >= 0 && !parser->failed)
         result = vsir_validate(parser);
@@ -2297,6 +2299,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 struct validation_context
 {
     struct vkd3d_shader_parser *parser;
+    const struct vsir_program *program;
     size_t instruction_idx;
     bool invalid_instruction_idx;
     bool dcl_temps_found;
@@ -2364,7 +2367,7 @@ static void vsir_validate_register(struct validation_context *ctx,
     unsigned int i, temp_count = ctx->temp_count;
 
     /* SM1-3 shaders do not include a DCL_TEMPS instruction. */
-    if (ctx->parser->shader_version.major <= 3)
+    if (ctx->program->shader_version.major <= 3)
         temp_count = ctx->parser->shader_desc.temp_count;
 
     if (reg->type >= VKD3DSPR_COUNT)
@@ -2712,10 +2715,11 @@ static void vsir_validate_cf_type(struct validation_context *ctx,
 
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
+    const struct vkd3d_shader_version *version = &ctx->program->shader_version;
     const struct vkd3d_shader_instruction *instruction;
     size_t i;
 
-    instruction = &ctx->parser->program.instructions.elements[ctx->instruction_idx];
+    instruction = &ctx->program->instructions.elements[ctx->instruction_idx];
     ctx->parser->location = instruction->location;
 
     for (i = 0; i < instruction->dst_count; ++i)
@@ -2738,7 +2742,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         case VKD3DSIH_HS_JOIN_PHASE:
             vsir_validate_dst_count(ctx, instruction, 0);
             vsir_validate_src_count(ctx, instruction, 0);
-            if (ctx->parser->shader_version.type != VKD3D_SHADER_TYPE_HULL)
+            if (version->type != VKD3D_SHADER_TYPE_HULL)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Phase instruction %#x is only valid in a hull shader.",
                         instruction->handler_idx);
             if (ctx->depth != 0)
@@ -2753,9 +2757,9 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             break;
     }
 
-    if (ctx->parser->shader_version.type == VKD3D_SHADER_TYPE_HULL &&
-            ctx->phase == VKD3DSIH_INVALID)
-        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER, "Instruction %#x appear before any phase instruction in a hull shader.",
+    if (version->type == VKD3D_SHADER_TYPE_HULL && ctx->phase == VKD3DSIH_INVALID)
+        validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_HANDLER,
+                "Instruction %#x appear before any phase instruction in a hull shader.",
                 instruction->handler_idx);
 
     /* We support two different control flow types in shaders:
@@ -2830,7 +2834,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
         case VKD3DSIH_LOOP:
             vsir_validate_cf_type(ctx, instruction, CF_TYPE_STRUCTURED);
             vsir_validate_dst_count(ctx, instruction, 0);
-            vsir_validate_src_count(ctx, instruction, ctx->parser->shader_version.major <= 3 ? 2 : 0);
+            vsir_validate_src_count(ctx, instruction, version->major <= 3 ? 2 : 0);
             if (!vkd3d_array_reserve((void **)&ctx->blocks, &ctx->blocks_capacity, ctx->depth + 1, sizeof(*ctx->blocks)))
                 return;
             ctx->blocks[ctx->depth++] = instruction->handler_idx;
@@ -2991,6 +2995,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     struct validation_context ctx =
     {
         .parser = parser,
+        .program = &parser->program,
         .phase = VKD3DSIH_INVALID,
     };
     unsigned int i;

@@ -414,6 +414,7 @@ static bool has_relative_address(uint32_t param)
 static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info(
         const struct vkd3d_shader_sm1_parser *sm1, enum vkd3d_sm1_opcode opcode)
 {
+    const struct vkd3d_shader_version *version = &sm1->p.program.shader_version;
     const struct vkd3d_sm1_opcode_info *info;
     unsigned int i = 0;
 
@@ -424,8 +425,8 @@ static const struct vkd3d_sm1_opcode_info *shader_sm1_get_opcode_info(
             return NULL;
 
         if (opcode == info->sm1_opcode
-                && vkd3d_shader_ver_ge(&sm1->p.shader_version, info->min_version.major, info->min_version.minor)
-                && (vkd3d_shader_ver_le(&sm1->p.shader_version, info->max_version.major, info->max_version.minor)
+                && vkd3d_shader_ver_ge(version, info->min_version.major, info->min_version.minor)
+                && (vkd3d_shader_ver_le(version, info->max_version.major, info->max_version.minor)
                         || !info->max_version.major))
             return info;
     }
@@ -567,7 +568,7 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     element->register_count = 1;
     element->mask = mask;
     element->used_mask = is_dcl ? 0 : mask;
-    if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
+    if (sm1->p.program.shader_version.type == VKD3D_SHADER_TYPE_PIXEL && !output)
         element->interpolation_mode = VKD3DSIM_LINEAR;
 
     return true;
@@ -597,20 +598,20 @@ static void add_signature_mask(struct vkd3d_shader_sm1_parser *sm1, bool output,
 static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *sm1,
         const struct vkd3d_shader_register *reg, bool is_dcl, unsigned int mask)
 {
+    const struct vkd3d_shader_version *version = &sm1->p.program.shader_version;
     unsigned int register_index = reg->idx[0].offset;
 
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
-            if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL
-                    && sm1->p.shader_version.major == 1 && !register_index)
+            if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major == 1 && !register_index)
                 return add_signature_element(sm1, true, "COLOR", 0, VKD3D_SHADER_SV_TARGET, 0, is_dcl, mask);
             return true;
 
         case VKD3DSPR_INPUT:
             /* For vertex shaders or sm3 pixel shaders, we should have already
              * had a DCL instruction. Otherwise, this is a colour input. */
-            if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_VERTEX || sm1->p.shader_version.major == 3)
+            if (version->type == VKD3D_SHADER_TYPE_VERTEX || version->major == 3)
             {
                 add_signature_mask(sm1, false, register_index, mask);
                 return true;
@@ -620,19 +621,19 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
 
         case VKD3DSPR_TEXTURE:
             /* For vertex shaders, this is ADDR. */
-            if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_VERTEX)
+            if (version->type == VKD3D_SHADER_TYPE_VERTEX)
                 return true;
             return add_signature_element(sm1, false, "TEXCOORD", register_index,
                     VKD3D_SHADER_SV_NONE, register_index, is_dcl, mask);
 
         case VKD3DSPR_OUTPUT:
-            if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_VERTEX)
+            if (version->type == VKD3D_SHADER_TYPE_VERTEX)
             {
                 /* For sm < 2 vertex shaders, this is TEXCRDOUT.
                  *
                  * For sm3 vertex shaders, this is OUTPUT, but we already
                  * should have had a DCL instruction. */
-                if (sm1->p.shader_version.major == 3)
+                if (version->major == 3)
                 {
                     add_signature_mask(sm1, true, register_index, mask);
                     return true;
@@ -700,6 +701,7 @@ static bool add_signature_element_from_register(struct vkd3d_shader_sm1_parser *
 static bool add_signature_element_from_semantic(struct vkd3d_shader_sm1_parser *sm1,
         const struct vkd3d_shader_semantic *semantic)
 {
+    const struct vkd3d_shader_version *version = &sm1->p.program.shader_version;
     const struct vkd3d_shader_register *reg = &semantic->resource.reg.reg;
     enum vkd3d_shader_sysval_semantic sysval = VKD3D_SHADER_SV_NONE;
     unsigned int mask = semantic->resource.reg.write_mask;
@@ -731,13 +733,13 @@ static bool add_signature_element_from_semantic(struct vkd3d_shader_sm1_parser *
         return add_signature_element_from_register(sm1, reg, true, mask);
 
     /* sm2 pixel shaders use DCL but don't provide a semantic. */
-    if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_PIXEL && sm1->p.shader_version.major == 2)
+    if (version->type == VKD3D_SHADER_TYPE_PIXEL && version->major == 2)
         return add_signature_element_from_register(sm1, reg, true, mask);
 
     /* With the exception of vertex POSITION output, none of these are system
      * values. Pixel POSITION input is not equivalent to SV_Position; the closer
      * equivalent is VPOS, which is not declared as a semantic. */
-    if (sm1->p.shader_version.type == VKD3D_SHADER_TYPE_VERTEX
+    if (version->type == VKD3D_SHADER_TYPE_VERTEX
             && output && semantic->usage == VKD3D_DECL_USAGE_POSITION)
         sysval = VKD3D_SHADER_SV_POSITION;
 
@@ -824,7 +826,7 @@ static void shader_sm1_read_param(struct vkd3d_shader_sm1_parser *sm1,
      * VS >= 2.0 have relative addressing (with token)
      * VS >= 1.0 < 2.0 have relative addressing (without token)
      * The version check below should work in general. */
-    if (sm1->p.shader_version.major < 2)
+    if (sm1->p.program.shader_version.major < 2)
     {
         *addr_token = (1u << 31)
                 | ((VKD3DSPR_ADDR << VKD3D_SM1_REGISTER_TYPE_SHIFT2) & VKD3D_SM1_REGISTER_TYPE_MASK2)
@@ -853,7 +855,7 @@ static void shader_sm1_skip_opcode(const struct vkd3d_shader_sm1_parser *sm1, co
     /* Version 2.0+ shaders may contain address tokens, but fortunately they
      * have a useful length mask - use it here. Version 1.x shaders contain no
      * such tokens. */
-    if (sm1->p.shader_version.major >= 2)
+    if (sm1->p.program.shader_version.major >= 2)
     {
         length = (opcode_token & VKD3D_SM1_INSTRUCTION_LENGTH_MASK) >> VKD3D_SM1_INSTRUCTION_LENGTH_SHIFT;
         *ptr += length;
@@ -1109,7 +1111,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
                 "Invalid opcode %#x (token 0x%08x, shader version %u.%u).",
                 opcode_token & VKD3D_SM1_OPCODE_MASK, opcode_token,
-                sm1->p.shader_version.major, sm1->p.shader_version.minor);
+                sm1->p.program.shader_version.major, sm1->p.program.shader_version.minor);
         goto fail;
     }
 

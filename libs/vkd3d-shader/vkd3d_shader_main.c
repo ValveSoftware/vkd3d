@@ -539,10 +539,9 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
     parser->location.source_name = source_name;
     parser->location.line = 1;
     parser->location.column = 0;
-    parser->shader_version = *version;
     parser->ops = ops;
     parser->config_flags = vkd3d_shader_init_config_flags();
-    return vsir_program_init(&parser->program, instruction_reserve);
+    return vsir_program_init(&parser->program, version, instruction_reserve);
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
@@ -1402,11 +1401,11 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
             descriptor_info1 = &local_descriptor_info1;
     }
 
-    vkd3d_shader_scan_context_init(&context, &parser->shader_version, compile_info,
+    vkd3d_shader_scan_context_init(&context, &parser->program.shader_version, compile_info,
             descriptor_info1, combined_sampler_info, message_context);
 
     if (TRACE_ON())
-        vkd3d_shader_trace(&parser->program.instructions, &parser->shader_version);
+        vkd3d_shader_trace(&parser->program);
 
     for (i = 0; i < parser->program.instructions.count; ++i)
     {
@@ -1583,14 +1582,13 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
-            ret = vkd3d_dxbc_binary_to_text(&parser->program.instructions,
-                    &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
+            ret = vkd3d_dxbc_binary_to_text(&parser->program, compile_info, out, VSIR_ASM_D3D);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
             if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
                 return ret;
-            if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->shader_version,
+            if (!(glsl_generator = vkd3d_glsl_generator_create(&parser->program.shader_version,
                     message_context, &parser->location)))
             {
                 ERR("Failed to create GLSL generator.\n");

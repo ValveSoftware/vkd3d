@@ -1272,10 +1272,11 @@ enum vkd3d_shader_config_flags
 
 struct vsir_program
 {
+    struct vkd3d_shader_version shader_version;
     struct vkd3d_shader_instruction_array instructions;
 };
 
-bool vsir_program_init(struct vsir_program *program, unsigned int reserve);
+bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);
 void vsir_program_cleanup(struct vsir_program *program);
 
 struct vkd3d_shader_parser
@@ -1285,7 +1286,6 @@ struct vkd3d_shader_parser
     bool failed;
 
     struct vkd3d_shader_desc shader_desc;
-    struct vkd3d_shader_version shader_version;
     const struct vkd3d_shader_parser_ops *ops;
     struct vsir_program program;
 
@@ -1344,8 +1344,7 @@ struct vkd3d_shader_scan_descriptor_info1
     unsigned int descriptor_count;
 };
 
-void vkd3d_shader_trace(const struct vkd3d_shader_instruction_array *instructions,
-        const struct vkd3d_shader_version *shader_version);
+void vkd3d_shader_trace(const struct vsir_program *program);
 
 const char *shader_get_type_prefix(enum vkd3d_shader_type type);
 
@@ -1367,8 +1366,8 @@ enum vsir_asm_dialect
     VSIR_ASM_D3D,
 };
 
-enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vkd3d_shader_instruction_array *instructions,
-        const struct vkd3d_shader_version *shader_version, const struct vkd3d_shader_compile_info *compile_info,
+enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
+        const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, enum vsir_asm_dialect dialect);
 void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer);
 struct vkd3d_string_buffer *vkd3d_string_buffer_get(struct vkd3d_string_buffer_cache *list);

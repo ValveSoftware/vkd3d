@@ -711,7 +711,7 @@ static struct vkd3d_shader_sm4_parser *vkd3d_shader_sm4_parser(struct vkd3d_shad
 
 static bool shader_is_sm_5_1(const struct vkd3d_shader_sm4_parser *sm4)
 {
-    const struct vkd3d_shader_version *version = &sm4->p.shader_version;
+    const struct vkd3d_shader_version *version = &sm4->p.program.shader_version;
 
     return version->major >= 5 && version->minor >= 1;
 }
@@ -2020,7 +2020,7 @@ static bool register_is_control_point_input(const struct vkd3d_shader_register *
 {
     return reg->type == VKD3DSPR_INCONTROLPOINT || reg->type == VKD3DSPR_OUTCONTROLPOINT
             || (reg->type == VKD3DSPR_INPUT && (priv->phase == VKD3DSIH_HS_CONTROL_POINT_PHASE
-            || priv->p.shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY));
+            || priv->p.program.shader_version.type == VKD3D_SHADER_TYPE_GEOMETRY));
 }
 
 static uint32_t mask_from_swizzle(uint32_t swizzle)
@@ -2662,7 +2662,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     /* DXBC stores used masks inverted for output signatures, for some reason.
      * We return them un-inverted. */
     uninvert_used_masks(&shader_desc->output_signature);
-    if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL)
+    if (sm4->p.program.shader_version.type == VKD3D_SHADER_TYPE_HULL)
         uninvert_used_masks(&shader_desc->patch_constant_signature);
 
     if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature,
@@ -2697,7 +2697,8 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         }
         ++instructions->count;
     }
-    if (sm4->p.shader_version.type == VKD3D_SHADER_TYPE_HULL && !sm4->has_control_point_phase && !sm4->p.failed)
+    if (sm4->p.program.shader_version.type == VKD3D_SHADER_TYPE_HULL
+            && !sm4->has_control_point_phase && !sm4->p.failed)
         shader_sm4_validate_default_phase_index_ranges(sm4);
 
     if (!sm4->p.failed)
