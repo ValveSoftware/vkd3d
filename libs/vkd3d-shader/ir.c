@@ -18,6 +18,16 @@
 
 #include "vkd3d_shader_private.h"
 
+bool vsir_program_init(struct vsir_program *program, unsigned int reserve)
+{
+    return shader_instruction_array_init(&program->instructions, reserve);
+}
+
+void vsir_program_cleanup(struct vsir_program *program)
+{
+    shader_instruction_array_destroy(&program->instructions);
+}
+
 static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_FORKINSTID || reg->type == VKD3DSPR_JOININSTID;
@@ -1229,7 +1239,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
 
 static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parser *parser)
 {
-    struct io_normaliser normaliser = {parser->instructions};
+    struct io_normaliser normaliser = {parser->program.instructions};
     struct vkd3d_shader_instruction *ins;
     bool has_control_point_phase;
     unsigned int i, j;
@@ -1241,9 +1251,9 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
     normaliser.output_signature = &parser->shader_desc.output_signature;
     normaliser.patch_constant_signature = &parser->shader_desc.patch_constant_signature;
 
-    for (i = 0, has_control_point_phase = false; i < parser->instructions.count; ++i)
+    for (i = 0, has_control_point_phase = false; i < parser->program.instructions.count; ++i)
     {
-        ins = &parser->instructions.elements[i];
+        ins = &parser->program.instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -1286,7 +1296,7 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
             || !shader_signature_merge(&parser->shader_desc.output_signature, normaliser.output_range_map, false)
             || !shader_signature_merge(&parser->shader_desc.patch_constant_signature, normaliser.pc_range_map, true))
     {
-        parser->instructions = normaliser.instructions;
+        parser->program.instructions = normaliser.instructions;
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
@@ -1294,7 +1304,7 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
     for (i = 0; i < normaliser.instructions.count; ++i)
         shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
 
-    parser->instructions = normaliser.instructions;
+    parser->program.instructions = normaliser.instructions;
     parser->shader_desc.use_vocp = normaliser.use_vocp;
     return VKD3D_OK;
 }
@@ -1308,7 +1318,6 @@ struct flat_constant_def
 
 struct flat_constants_normaliser
 {
-    struct vkd3d_shader_parser *parser;
     struct flat_constant_def *defs;
     size_t def_count, defs_capacity;
 };
@@ -1383,14 +1392,14 @@ static void shader_register_normalise_flat_constants(struct vkd3d_shader_src_par
     param->reg.idx_count = 3;
 }
 
-static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result instruction_array_normalise_flat_constants(struct vsir_program *program)
 {
-    struct flat_constants_normaliser normaliser = {.parser = parser};
+    struct flat_constants_normaliser normaliser = {0};
     unsigned int i, j;
 
-    for (i = 0; i < parser->instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
         if (ins->handler_idx == VKD3DSIH_DEF || ins->handler_idx == VKD3DSIH_DEFI || ins->handler_idx == VKD3DSIH_DEFB)
         {
@@ -1422,14 +1431,14 @@ static enum vkd3d_result instruction_array_normalise_flat_constants(struct vkd3d
     return VKD3D_OK;
 }
 
-static void remove_dead_code(struct vkd3d_shader_parser *parser)
+static void remove_dead_code(struct vsir_program *program)
 {
     size_t i, depth = 0;
     bool dead = false;
 
-    for (i = 0; i < parser->instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -1516,15 +1525,15 @@ static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser 
 {
     unsigned int i;
 
-    for (i = 0; i < parser->instructions.count; ++i)
+    for (i = 0; i < parser->program.instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
         struct vkd3d_shader_src_param *srcs;
 
         switch (ins->handler_idx)
         {
             case VKD3DSIH_TEX:
-                if (!(srcs = shader_src_param_allocator_get(&parser->instructions.src_params, 3)))
+                if (!(srcs = shader_src_param_allocator_get(&parser->program.instructions.src_params, 3)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 memset(srcs, 0, sizeof(*srcs) * 3);
 
@@ -1872,7 +1881,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
     struct vkd3d_shader_instruction *dst_ins;
     size_t i;
 
-    instructions = &parser->instructions;
+    instructions = &parser->program.instructions;
     is_hull_shader = parser->shader_version.type == VKD3D_SHADER_TYPE_HULL;
     main_block_open = !is_hull_shader;
     after_declarations_section = is_hull_shader;
@@ -2220,10 +2229,10 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
 
     if (result >= 0)
     {
-        vkd3d_free(parser->instructions.elements);
-        parser->instructions.elements = flattener.instructions;
-        parser->instructions.capacity = flattener.instruction_capacity;
-        parser->instructions.count = flattener.instruction_count;
+        vkd3d_free(parser->program.instructions.elements);
+        parser->program.instructions.elements = flattener.instructions;
+        parser->program.instructions.capacity = flattener.instruction_capacity;
+        parser->program.instructions.count = flattener.instruction_count;
         parser->shader_desc.block_count = flattener.block_id;
     }
     else
@@ -2242,7 +2251,7 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
-    struct vkd3d_shader_instruction_array *instructions = &parser->instructions;
+    struct vkd3d_shader_instruction_array *instructions = &parser->program.instructions;
     enum vkd3d_result result = VKD3D_OK;
 
     if (parser->shader_desc.is_dxil)
@@ -2262,10 +2271,10 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         result = shader_normalise_io_registers(parser);
 
     if (result >= 0)
-        result = instruction_array_normalise_flat_constants(parser);
+        result = instruction_array_normalise_flat_constants(&parser->program);
 
     if (result >= 0)
-        remove_dead_code(parser);
+        remove_dead_code(&parser->program);
 
     if (result >= 0)
         result = flatten_control_flow_constructs(parser);
@@ -2703,9 +2712,10 @@ static void vsir_validate_cf_type(struct validation_context *ctx,
 
 static void vsir_validate_instruction(struct validation_context *ctx)
 {
-    const struct vkd3d_shader_instruction *instruction = &ctx->parser->instructions.elements[ctx->instruction_idx];
+    const struct vkd3d_shader_instruction *instruction;
     size_t i;
 
+    instruction = &ctx->parser->program.instructions.elements[ctx->instruction_idx];
     ctx->parser->location = instruction->location;
 
     for (i = 0; i < instruction->dst_count; ++i)
@@ -2994,7 +3004,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (!(ctx.ssas = vkd3d_calloc(parser->shader_desc.ssa_count, sizeof(*ctx.ssas))))
         goto fail;
 
-    for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->instructions.count; ++ctx.instruction_idx)
+    for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->program.instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
 
     ctx.invalid_instruction_idx = true;

@@ -542,7 +542,7 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
     parser->shader_version = *version;
     parser->ops = ops;
     parser->config_flags = vkd3d_shader_init_config_flags();
-    return shader_instruction_array_init(&parser->instructions, instruction_reserve);
+    return vsir_program_init(&parser->program, instruction_reserve);
 }
 
 void VKD3D_PRINTF_FUNC(3, 4) vkd3d_shader_parser_error(struct vkd3d_shader_parser *parser,
@@ -1406,13 +1406,11 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
             descriptor_info1, combined_sampler_info, message_context);
 
     if (TRACE_ON())
-    {
-        vkd3d_shader_trace(&parser->instructions, &parser->shader_version);
-    }
+        vkd3d_shader_trace(&parser->program.instructions, &parser->shader_version);
 
-    for (i = 0; i < parser->instructions.count; ++i)
+    for (i = 0; i < parser->program.instructions.count; ++i)
     {
-        instruction = &parser->instructions.elements[i];
+        instruction = &parser->program.instructions.elements[i];
         if ((ret = vkd3d_shader_scan_instruction(&context, instruction)) < 0)
             break;
     }
@@ -1585,7 +1583,8 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
-            ret = vkd3d_dxbc_binary_to_text(&parser->instructions, &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
+            ret = vkd3d_dxbc_binary_to_text(&parser->program.instructions,
+                    &parser->shader_version, compile_info, out, VSIR_ASM_D3D);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
@@ -1599,7 +1598,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
                 return VKD3D_ERROR;
             }
 
-            ret = vkd3d_glsl_generator_generate(glsl_generator, parser, out);
+            ret = vkd3d_glsl_generator_generate(glsl_generator, &parser->program, out);
             vkd3d_glsl_generator_destroy(glsl_generator);
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;

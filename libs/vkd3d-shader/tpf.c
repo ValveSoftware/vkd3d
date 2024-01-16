@@ -796,7 +796,7 @@ static void shader_sm4_read_shader_data(struct vkd3d_shader_instruction *ins, ui
     icb->element_count = icb_size / VKD3D_VEC4_SIZE;
     icb->is_null = false;
     memcpy(icb->data, tokens, sizeof(*tokens) * icb_size);
-    shader_instruction_array_add_icb(&priv->p.instructions, icb);
+    shader_instruction_array_add_icb(&priv->p.program.instructions, icb);
     ins->declaration.icb = icb;
 }
 
@@ -1732,7 +1732,7 @@ static void shader_sm4_destroy(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
-    shader_instruction_array_destroy(&parser->instructions);
+    vsir_program_cleanup(&parser->program);
     free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm4);
 }
@@ -2676,7 +2676,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         return VKD3D_ERROR_INVALID_SHADER;
     }
 
-    instructions = &sm4->p.instructions;
+    instructions = &sm4->p.program.instructions;
     while (sm4->ptr != sm4->end)
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))

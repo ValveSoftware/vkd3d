@@ -9699,8 +9699,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (parser->shader_desc.block_count && !spirv_compiler_init_blocks(compiler, parser->shader_desc.block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    instructions = parser->instructions;
-    memset(&parser->instructions, 0, sizeof(parser->instructions));
+    instructions = parser->program.instructions;
+    memset(&parser->program.instructions, 0, sizeof(parser->program.instructions));
 
     compiler->input_signature = shader_desc->input_signature;
     compiler->output_signature = shader_desc->output_signature;

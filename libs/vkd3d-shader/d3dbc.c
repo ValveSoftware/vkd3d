@@ -883,7 +883,7 @@ static void shader_sm1_destroy(struct vkd3d_shader_parser *parser)
 {
     struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
 
-    shader_instruction_array_destroy(&parser->instructions);
+    vsir_program_cleanup(&parser->program);
     free_shader_desc(&sm1->p.shader_desc);
     vkd3d_free(sm1);
 }
@@ -1334,7 +1334,7 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
         return ret;
     }
 
-    instructions = &sm1->p.instructions;
+    instructions = &sm1->p.program.instructions;
     while (!shader_sm1_is_end(sm1))
     {
         if (!shader_instruction_array_reserve(instructions, instructions->count + 1))

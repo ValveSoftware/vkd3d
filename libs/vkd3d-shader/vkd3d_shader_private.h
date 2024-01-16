@@ -1270,6 +1270,14 @@ enum vkd3d_shader_config_flags
     VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION = 0x00000001,
 };
 
+struct vsir_program
+{
+    struct vkd3d_shader_instruction_array instructions;
+};
+
+bool vsir_program_init(struct vsir_program *program, unsigned int reserve);
+void vsir_program_cleanup(struct vsir_program *program);
+
 struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
@@ -1279,7 +1287,7 @@ struct vkd3d_shader_parser
     struct vkd3d_shader_desc shader_desc;
     struct vkd3d_shader_version shader_version;
     const struct vkd3d_shader_parser_ops *ops;
-    struct vkd3d_shader_instruction_array instructions;
+    struct vsir_program program;
 
     uint64_t config_flags;
 };
@@ -1301,13 +1309,13 @@ void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
 static inline struct vkd3d_shader_dst_param *shader_parser_get_dst_params(
         struct vkd3d_shader_parser *parser, unsigned int count)
 {
-    return shader_dst_param_allocator_get(&parser->instructions.dst_params, count);
+    return shader_dst_param_allocator_get(&parser->program.instructions.dst_params, count);
 }
 
 static inline struct vkd3d_shader_src_param *shader_parser_get_src_params(
         struct vkd3d_shader_parser *parser, unsigned int count)
 {
-    return shader_src_param_allocator_get(&parser->instructions.src_params, count);
+    return shader_src_param_allocator_get(&parser->program.instructions.src_params, count);
 }
 
 static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
@@ -1461,7 +1469,7 @@ struct vkd3d_glsl_generator;
 struct vkd3d_glsl_generator *vkd3d_glsl_generator_create(const struct vkd3d_shader_version *version,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location);
 int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
-        struct vkd3d_shader_parser *parser, struct vkd3d_shader_code *out);
+        struct vsir_program *program, struct vkd3d_shader_code *out);
 void vkd3d_glsl_generator_destroy(struct vkd3d_glsl_generator *generator);
 
 #define SPIRV_MAX_SRC_COUNT 6

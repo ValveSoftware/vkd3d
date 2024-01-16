@@ -2572,7 +2572,7 @@ static enum vkd3d_result value_allocate_constant_array(struct sm6_value *dst, co
                 "Out of memory allocating an immediate constant buffer of count %u.", count);
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
-    if (!shader_instruction_array_add_icb(&sm6->p.instructions, icb))
+    if (!shader_instruction_array_add_icb(&sm6->p.program.instructions, icb))
     {
         ERR("Failed to store icb object.\n");
         vkd3d_free(icb);
@@ -2768,12 +2768,12 @@ static bool bitcode_parse_alignment(uint64_t encoded_alignment, unsigned int *al
 
 static struct vkd3d_shader_instruction *sm6_parser_require_space(struct sm6_parser *sm6, size_t extra)
 {
-    if (!shader_instruction_array_reserve(&sm6->p.instructions, sm6->p.instructions.count + extra))
+    if (!shader_instruction_array_reserve(&sm6->p.program.instructions, sm6->p.program.instructions.count + extra))
     {
         ERR("Failed to allocate instruction.\n");
         return NULL;
     }
-    return &sm6->p.instructions.elements[sm6->p.instructions.count];
+    return &sm6->p.program.instructions.elements[sm6->p.program.instructions.count];
 }
 
 /* Space should be reserved before calling this. It is intended to require no checking of the returned pointer. */
@@ -2783,7 +2783,7 @@ static struct vkd3d_shader_instruction *sm6_parser_add_instruction(struct sm6_pa
     struct vkd3d_shader_instruction *ins = sm6_parser_require_space(sm6, 1);
     assert(ins);
     vsir_instruction_init(ins, &sm6->p.location, handler_idx);
-    ++sm6->p.instructions.count;
+    ++sm6->p.program.instructions.count;
     return ins;
 }
 
@@ -3046,9 +3046,9 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
     }
 
     /* Resolve initialiser forward references. */
-    for (i = 0; i < sm6->p.instructions.count; ++i)
+    for (i = 0; i < sm6->p.program.instructions.count; ++i)
     {
-        ins = &sm6->p.instructions.elements[i];
+        ins = &sm6->p.program.instructions.elements[i];
         if (ins->handler_idx == VKD3DSIH_DCL_INDEXABLE_TEMP && ins->declaration.indexable_temp.initialiser)
         {
             ins->declaration.indexable_temp.initialiser = resolve_forward_initialiser(
@@ -5505,9 +5505,9 @@ static enum vkd3d_result sm6_function_emit_blocks(const struct sm6_function *fun
         sm6_parser_emit_label(sm6, block->id);
         sm6_block_emit_phi(block, sm6);
 
-        memcpy(&sm6->p.instructions.elements[sm6->p.instructions.count], block->instructions,
+        memcpy(&sm6->p.program.instructions.elements[sm6->p.program.instructions.count], block->instructions,
                 block->instruction_count * sizeof(*block->instructions));
-        sm6->p.instructions.count += block->instruction_count;
+        sm6->p.program.instructions.count += block->instruction_count;
 
         sm6_block_emit_terminator(block, sm6);
     }
@@ -6289,7 +6289,7 @@ static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
         }
 
         ++sm6->descriptor_count;
-        ++sm6->p.instructions.count;
+        ++sm6->p.program.instructions.count;
     }
 
     return VKD3D_OK;
@@ -6896,7 +6896,7 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
 
     dxil_block_destroy(&sm6->root_block);
     dxil_global_abbrevs_cleanup(sm6->abbrevs, sm6->abbrev_count);
-    shader_instruction_array_destroy(&parser->instructions);
+    vsir_program_cleanup(&parser->program);
     sm6_type_table_cleanup(sm6->types, sm6->type_count);
     sm6_symtab_cleanup(sm6->global_symbols, sm6->global_symbol_count);
     sm6_functions_cleanup(sm6->functions, sm6->function_count);
