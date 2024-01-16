@@ -176,9 +176,7 @@ static void write_techniques(struct hlsl_scope *scope, struct fx_write_context *
 
     LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
     {
-        const struct hlsl_type *type = var->data_type;
-
-        if (type->base_type == HLSL_TYPE_TECHNIQUE && type->e.version == 10)
+        if (technique_matches_version(var, fx))
         {
             write_technique(var, fx);
             ++fx->technique_count;
