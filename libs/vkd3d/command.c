@@ -6564,7 +6564,7 @@ static void d3d12_command_queue_submit_locked(struct d3d12_command_queue *queue)
     if (queue->op_queue.count == 1 && !queue->is_flushing)
     {
         if (FAILED(hr = d3d12_command_queue_flush_ops_locked(queue, &flushed_any)))
-            ERR("Cannot flush queue, hr %#x.\n", hr);
+            ERR("Failed to flush queue, hr %s.\n", debugstr_hresult(hr));
     }
 }
 
