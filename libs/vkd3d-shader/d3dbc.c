@@ -765,13 +765,13 @@ static void record_constant_register(struct vkd3d_shader_sm1_parser *sm1,
 static void shader_sm1_scan_register(struct vkd3d_shader_sm1_parser *sm1,
         const struct vkd3d_shader_register *reg, unsigned int mask, bool from_def)
 {
-    struct vkd3d_shader_desc *desc = &sm1->p.shader_desc;
+    struct vsir_program *program = &sm1->p.program;
     uint32_t register_index = reg->idx[0].offset;
 
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
-            desc->temp_count = max(desc->temp_count, register_index + 1);
+            program->temp_count = max(program->temp_count, register_index + 1);
             break;
 
         case VKD3DSPR_CONST:

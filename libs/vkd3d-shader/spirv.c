@@ -9687,8 +9687,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if ((result = vkd3d_shader_normalise(parser, compile_info)) < 0)
         return result;
 
-    if (parser->shader_desc.temp_count)
-        spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
+    if (program->temp_count)
+        spirv_compiler_emit_temps(compiler, program->temp_count);
     if (program->ssa_count)
         spirv_compiler_allocate_ssa_register_ids(compiler, program->ssa_count);
 

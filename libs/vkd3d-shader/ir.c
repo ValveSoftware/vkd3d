@@ -2369,7 +2369,7 @@ static void vsir_validate_register(struct validation_context *ctx,
 
     /* SM1-3 shaders do not include a DCL_TEMPS instruction. */
     if (ctx->program->shader_version.major <= 3)
-        temp_count = ctx->parser->shader_desc.temp_count;
+        temp_count = ctx->program->temp_count;
 
     if (reg->type >= VKD3DSPR_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE, "Invalid register type %#x.",
@@ -2421,10 +2421,10 @@ static void vsir_validate_register(struct validation_context *ctx,
                 break;
             }
 
-            /* parser->shader_desc.temp_count might be smaller then
-             * temp_count if the parser made a mistake; we still don't
-             * want to overflow the array. */
-            if (reg->idx[0].offset >= ctx->parser->shader_desc.temp_count)
+            /* program->temp_count might be smaller then temp_count if the
+             * parser made a mistake; we still don't want to overflow the
+             * array. */
+            if (reg->idx[0].offset >= ctx->program->temp_count)
                 break;
             data = &ctx->temps[reg->idx[0].offset];
 
@@ -2788,9 +2788,10 @@ static void vsir_validate_instruction(struct validation_context *ctx)
             vsir_validate_src_count(ctx, instruction, 0);
             if (ctx->dcl_temps_found)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_DUPLICATE_DCL_TEMPS, "Duplicate DCL_TEMPS instruction.");
-            if (instruction->declaration.count > ctx->parser->shader_desc.temp_count)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS, "Invalid DCL_TEMPS count %u, expected at most %u.",
-                        instruction->declaration.count, ctx->parser->shader_desc.temp_count);
+            if (instruction->declaration.count > ctx->program->temp_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DCL_TEMPS,
+                        "Invalid DCL_TEMPS count %u, expected at most %u.",
+                        instruction->declaration.count, ctx->program->temp_count);
             ctx->dcl_temps_found = true;
             ctx->temp_count = instruction->declaration.count;
             break;
@@ -3005,7 +3006,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
         return VKD3D_OK;
 
-    if (!(ctx.temps = vkd3d_calloc(parser->shader_desc.temp_count, sizeof(*ctx.temps))))
+    if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
         goto fail;
 
     if (!(ctx.ssas = vkd3d_calloc(ctx.program->ssa_count, sizeof(*ctx.ssas))))

@@ -1072,7 +1072,7 @@ static void shader_sm4_read_declaration_count(struct vkd3d_shader_instruction *i
 {
     ins->declaration.count = *tokens;
     if (opcode == VKD3D_SM4_OP_DCL_TEMPS)
-        priv->p.shader_desc.temp_count = max(priv->p.shader_desc.temp_count, *tokens);
+        priv->p.program.temp_count = max(priv->p.program.temp_count, *tokens);
 }
 
 static void shader_sm4_read_declaration_dst(struct vkd3d_shader_instruction *ins, uint32_t opcode,
