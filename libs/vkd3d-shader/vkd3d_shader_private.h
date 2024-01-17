@@ -827,7 +827,7 @@ struct vkd3d_shader_indexable_temp
 
 struct vkd3d_shader_register_index
 {
-    const struct vkd3d_shader_src_param *rel_addr;
+    struct vkd3d_shader_src_param *rel_addr;
     unsigned int offset;
     /* address is known to fall within the object (for optimisation) */
     bool is_in_bounds;
