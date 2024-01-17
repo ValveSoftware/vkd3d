@@ -4923,7 +4923,7 @@ HRESULT vkd3d_init_null_resources(struct vkd3d_null_resources *null_resources,
     return vkd3d_init_null_resources_data(null_resources, device);
 
 fail:
-    ERR("Failed to initialize NULL resources, hr %#x.\n", hr);
+    ERR("Failed to initialise NULL resources, hr %s.\n", debugstr_hresult(hr));
     vkd3d_destroy_null_resources(null_resources, device);
     return hr;
 }
