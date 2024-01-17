@@ -4582,7 +4582,7 @@ HRESULT vkd3d_join_thread(struct vkd3d_instance *instance, union vkd3d_thread_ha
     if (instance->join_thread)
     {
         if (FAILED(hr = instance->join_thread(thread->handle)))
-            ERR("Failed to join thread, hr %#x.\n", hr);
+            ERR("Failed to join thread, hr %s.\n", debugstr_hresult(hr));
     }
     else
     {
