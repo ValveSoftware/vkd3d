@@ -3706,7 +3706,7 @@ static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_com
             buffer_image_copy.imageExtent.height * buffer_image_copy.imageExtent.depth * layer_count;
     if (FAILED(hr = d3d12_command_list_allocate_transfer_buffer(list, buffer_size, &transfer_buffer)))
     {
-        ERR("Failed to allocate transfer buffer, hr %#x.\n", hr);
+        ERR("Failed to allocate transfer buffer, hr %s.\n", debugstr_hresult(hr));
         return;
     }
 
