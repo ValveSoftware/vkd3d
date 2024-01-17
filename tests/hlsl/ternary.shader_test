@@ -124,7 +124,7 @@ probe all rgba (5.0, 6.0, 7.0, 1.0)
 % * the result operands are scalar;
 % * one is a typeN and the other is a type1xN
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 uniform float4 cond;
 uniform float2x2 a, b;
@@ -135,7 +135,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 uniform float2x2 cond;
 uniform float4 a, b;
@@ -162,7 +162,7 @@ draw quad
 probe all rgba (1.0, 6.0, 7.0, 4.0)
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 uniform float3 cond;
 uniform float4 a, b;
@@ -174,7 +174,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader fail todo]
+[pixel shader fail]
 
 uniform float4 cond;
 uniform float4x1 a, b;

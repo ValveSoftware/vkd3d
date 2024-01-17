@@ -4120,6 +4120,22 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
             common_type = hlsl_get_numeric_type(ctx, cond_type->class,
                     common_type->base_type, cond_type->dimx, cond_type->dimy);
         }
+        else if (cond_type->dimx != common_type->dimx || cond_type->dimy != common_type->dimy)
+        {
+            /* This condition looks wrong but is correct.
+             * floatN is compatible with float1xN, but not with floatNx1. */
+
+            struct vkd3d_string_buffer *cond_string, *value_string;
+
+            cond_string = hlsl_type_to_string(ctx, cond_type);
+            value_string = hlsl_type_to_string(ctx, common_type);
+            if (cond_string && value_string)
+                hlsl_error(ctx, &first->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                        "Ternary condition type '%s' is not compatible with value type '%s'.",
+                        cond_string->buffer, value_string->buffer);
+            hlsl_release_string_buffer(ctx, cond_string);
+            hlsl_release_string_buffer(ctx, value_string);
+        }
 
         if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
             return false;
