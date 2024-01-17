@@ -2272,7 +2272,7 @@ static HRESULT vkd3d_create_compute_pipeline(struct d3d12_device *device,
     VK_CALL(vkDestroyShaderModule(device->vk_device, pipeline_info.stage.module, NULL));
     if (vr < 0)
     {
-        WARN("Failed to create Vulkan compute pipeline, hr %#x.\n", hr);
+        WARN("Failed to create Vulkan compute pipeline, hr %s.\n", debugstr_hresult(hr));
         return hresult_from_vk_result(vr);
     }
 
