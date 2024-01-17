@@ -3844,8 +3844,21 @@ static uint32_t spirv_compiler_emit_load_scalar(struct spirv_compiler *compiler,
 
     if (component_type != reg_info->component_type)
     {
-        type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
-        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        if (component_type == VKD3D_SHADER_COMPONENT_BOOL)
+        {
+            if (reg_info->component_type != VKD3D_SHADER_COMPONENT_UINT)
+            {
+                type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, 1);
+                val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+            }
+            val_id = spirv_compiler_emit_int_to_bool(compiler, VKD3D_SHADER_CONDITIONAL_OP_NZ,
+                    VKD3D_DATA_UINT, 1, val_id);
+        }
+        else
+        {
+            type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
+            val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        }
     }
 
     return val_id;
@@ -4032,8 +4045,21 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
 
     if (component_type != reg_info.component_type)
     {
-        type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
-        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        if (component_type == VKD3D_SHADER_COMPONENT_BOOL)
+        {
+            if (reg_info.component_type != VKD3D_SHADER_COMPONENT_UINT)
+            {
+                type_id = vkd3d_spirv_get_type_id(builder, VKD3D_SHADER_COMPONENT_UINT, component_count);
+                val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+            }
+            val_id = spirv_compiler_emit_int_to_bool(compiler, VKD3D_SHADER_CONDITIONAL_OP_NZ,
+                    VKD3D_DATA_UINT, component_count, val_id);
+        }
+        else
+        {
+            type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
+            val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
+        }
     }
 
     return val_id;
@@ -4227,6 +4253,9 @@ static void spirv_compiler_emit_store_reg(struct spirv_compiler *compiler,
     {
         if (data_type_is_64_bit(reg->data_type))
             src_write_mask = vsir_write_mask_32_from_64(write_mask);
+        if (component_type == VKD3D_SHADER_COMPONENT_BOOL)
+            val_id = spirv_compiler_emit_bool_to_int(compiler,
+                    vsir_write_mask_component_count(src_write_mask), val_id, false);
         type_id = vkd3d_spirv_get_type_id(builder, reg_info.component_type,
                 vsir_write_mask_component_count(src_write_mask));
         val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
