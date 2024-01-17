@@ -2474,7 +2474,7 @@ static HRESULT d3d12_pipeline_state_init_compute(struct d3d12_pipeline_state *st
     if (FAILED(hr = vkd3d_create_compute_pipeline(device, &desc->cs, &shader_interface,
             vk_pipeline_layout, &state->u.compute.vk_pipeline)))
     {
-        WARN("Failed to create Vulkan compute pipeline, hr %#x.\n", hr);
+        WARN("Failed to create Vulkan compute pipeline, hr %s.\n", debugstr_hresult(hr));
         d3d12_pipeline_uav_counter_state_cleanup(&state->uav_counters, device);
         return hr;
     }
