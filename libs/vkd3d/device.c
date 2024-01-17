@@ -4404,7 +4404,7 @@ static HRESULT d3d12_device_init(struct d3d12_device *device,
     if (device->use_vk_heaps && FAILED(hr = vkd3d_create_thread(device->vkd3d_instance,
             device_worker_main, device, &device->worker_thread)))
     {
-        WARN("Failed to create worker thread, hr %#x.\n", hr);
+        WARN("Failed to create worker thread, hr %s.\n", debugstr_hresult(hr));
         goto out_cleanup_descriptor_heap_layouts;
     }
 
