@@ -60,7 +60,7 @@ HRESULT vkd3d_create_device(const struct vkd3d_device_create_info *create_info,
     }
     else if (FAILED(hr = vkd3d_create_instance(create_info->instance_create_info, &instance)))
     {
-        WARN("Failed to create instance, hr %#x.\n", hr);
+        WARN("Failed to create instance, hr %s.\n", debugstr_hresult(hr));
         return E_FAIL;
     }
 
