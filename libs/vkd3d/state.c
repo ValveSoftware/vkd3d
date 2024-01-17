@@ -2400,7 +2400,7 @@ static HRESULT d3d12_pipeline_state_find_and_init_uav_counters(struct d3d12_pipe
     }
 
     if (FAILED(hr = d3d12_pipeline_state_init_uav_counters(state, device, root_signature, &shader_info, stage_flags)))
-        WARN("Failed to create descriptor set layout for UAV counters, hr %#x.\n", hr);
+        WARN("Failed to create descriptor set layout for UAV counters, hr %s.\n", debugstr_hresult(hr));
 
     vkd3d_shader_free_scan_descriptor_info(&shader_info);
 
