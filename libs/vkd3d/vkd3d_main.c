@@ -497,7 +497,7 @@ HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGN
         if (error_blob && messages)
         {
             if (FAILED(hr = vkd3d_blob_create(messages, strlen(messages), error_blob)))
-                ERR("Failed to create error blob, hr %#x.\n", hr);
+                ERR("Failed to create error blob, hr %s.\n", debugstr_hresult(hr));
         }
         return hresult_from_vkd3d_result(ret);
     }
@@ -505,7 +505,7 @@ HRESULT vkd3d_serialize_versioned_root_signature(const D3D12_VERSIONED_ROOT_SIGN
 
     if (FAILED(hr = vkd3d_blob_create((void *)dxbc.code, dxbc.size, blob)))
     {
-        WARN("Failed to create blob object, hr %#x.\n", hr);
+        WARN("Failed to create blob object, hr %s.\n", debugstr_hresult(hr));
         vkd3d_shader_free_shader_code(&dxbc);
     }
     return hr;
