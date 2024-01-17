@@ -1031,8 +1031,6 @@ struct vkd3d_shader_desc
         uint32_t used, external;
     } flat_constant_count[3];
 
-    bool use_vocp;
-
     const char **block_names;
     size_t block_name_count;
 };
@@ -1274,6 +1272,8 @@ struct vsir_program
 {
     struct vkd3d_shader_version shader_version;
     struct vkd3d_shader_instruction_array instructions;
+
+    bool use_vocp;
 };
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);

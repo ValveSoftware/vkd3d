@@ -9680,6 +9680,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_shader_desc *shader_desc = &parser->shader_desc;
     struct vkd3d_shader_instruction_array instructions;
+    struct vsir_program *program = &parser->program;
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
@@ -9699,8 +9700,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     if (parser->shader_desc.block_count && !spirv_compiler_init_blocks(compiler, parser->shader_desc.block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    instructions = parser->program.instructions;
-    memset(&parser->program.instructions, 0, sizeof(parser->program.instructions));
+    instructions = program->instructions;
+    memset(&program->instructions, 0, sizeof(program->instructions));
 
     compiler->input_signature = shader_desc->input_signature;
     compiler->output_signature = shader_desc->output_signature;
@@ -9708,7 +9709,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     memset(&shader_desc->input_signature, 0, sizeof(shader_desc->input_signature));
     memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
     memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
-    compiler->use_vocp = parser->shader_desc.use_vocp;
+    compiler->use_vocp = program->use_vocp;
     compiler->block_names = parser->shader_desc.block_names;
     compiler->block_name_count = parser->shader_desc.block_name_count;
 

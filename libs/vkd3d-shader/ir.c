@@ -1241,20 +1241,21 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
 static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parser *parser)
 {
     struct io_normaliser normaliser = {parser->program.instructions};
+    struct vsir_program *program = &parser->program;
     struct vkd3d_shader_instruction *ins;
     bool has_control_point_phase;
     unsigned int i, j;
 
     normaliser.phase = VKD3DSIH_INVALID;
-    normaliser.shader_type = parser->program.shader_version.type;
-    normaliser.major = parser->program.shader_version.major;
+    normaliser.shader_type = program->shader_version.type;
+    normaliser.major = program->shader_version.major;
     normaliser.input_signature = &parser->shader_desc.input_signature;
     normaliser.output_signature = &parser->shader_desc.output_signature;
     normaliser.patch_constant_signature = &parser->shader_desc.patch_constant_signature;
 
-    for (i = 0, has_control_point_phase = false; i < parser->program.instructions.count; ++i)
+    for (i = 0, has_control_point_phase = false; i < program->instructions.count; ++i)
     {
-        ins = &parser->program.instructions.elements[i];
+        ins = &program->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -1297,7 +1298,7 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
             || !shader_signature_merge(&parser->shader_desc.output_signature, normaliser.output_range_map, false)
             || !shader_signature_merge(&parser->shader_desc.patch_constant_signature, normaliser.pc_range_map, true))
     {
-        parser->program.instructions = normaliser.instructions;
+        program->instructions = normaliser.instructions;
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
@@ -1305,8 +1306,8 @@ static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parse
     for (i = 0; i < normaliser.instructions.count; ++i)
         shader_instruction_normalise_io_params(&normaliser.instructions.elements[i], &normaliser);
 
-    parser->program.instructions = normaliser.instructions;
-    parser->shader_desc.use_vocp = normaliser.use_vocp;
+    program->instructions = normaliser.instructions;
+    program->use_vocp = normaliser.use_vocp;
     return VKD3D_OK;
 }
 
