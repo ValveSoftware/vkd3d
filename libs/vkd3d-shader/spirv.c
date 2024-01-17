@@ -7813,7 +7813,10 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
         if (instruction->src_count > 1)
         {
             /* Loop merge only. Must have a merge block and a continue block. */
-            spirv_compiler_emit_merge(compiler, src[1].reg.idx[0].offset, src[2].reg.idx[0].offset);
+            if (instruction->src_count == 3)
+                spirv_compiler_emit_merge(compiler, src[1].reg.idx[0].offset, src[2].reg.idx[0].offset);
+            else
+                ERR("Invalid branch with %u sources.\n", instruction->src_count);
         }
         vkd3d_spirv_build_op_branch(builder, spirv_compiler_get_label_id(compiler, src[0].reg.idx[0].offset));
         return;
@@ -7830,8 +7833,11 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
     condition_id = spirv_compiler_emit_int_to_bool(compiler,
             VKD3D_SHADER_CONDITIONAL_OP_NZ, src[0].reg.data_type, 1, condition_id);
     /* Emit the merge immediately before the branch instruction. */
-    spirv_compiler_emit_merge(compiler, src[3].reg.idx[0].offset,
-            (instruction->src_count > 4) ? src[4].reg.idx[0].offset : 0);
+    if (instruction->src_count >= 4)
+        spirv_compiler_emit_merge(compiler, src[3].reg.idx[0].offset,
+                (instruction->src_count > 4) ? src[4].reg.idx[0].offset : 0);
+    else
+        ERR("Invalid branch with %u sources.\n", instruction->src_count);
     vkd3d_spirv_build_op_branch_conditional(builder, condition_id,
             spirv_compiler_get_label_id(compiler, src[1].reg.idx[0].offset),
             spirv_compiler_get_label_id(compiler, src[2].reg.idx[0].offset));
