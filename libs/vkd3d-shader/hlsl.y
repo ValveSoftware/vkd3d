@@ -4115,6 +4115,11 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
             if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
                 return false;
         }
+        else if (common_type->dimx == 1 && common_type->dimy == 1)
+        {
+            common_type = hlsl_get_numeric_type(ctx, cond_type->class,
+                    common_type->base_type, cond_type->dimx, cond_type->dimy);
+        }
 
         if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
             return false;
