@@ -2465,10 +2465,11 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a SSA register.");
 
-            if (reg->idx[0].offset >= ctx->parser->shader_desc.ssa_count)
+            if (reg->idx[0].offset >= ctx->program->ssa_count)
             {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "SSA register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, ctx->parser->shader_desc.ssa_count);
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "SSA register index %u exceeds the maximum count %u.",
+                        reg->idx[0].offset, ctx->program->ssa_count);
                 break;
             }
 
@@ -2600,7 +2601,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
                     dst->shift);
     }
 
-    if (dst->reg.type == VKD3DSPR_SSA && dst->reg.idx[0].offset < ctx->parser->shader_desc.ssa_count)
+    if (dst->reg.type == VKD3DSPR_SSA && dst->reg.idx[0].offset < ctx->program->ssa_count)
     {
         struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
 
@@ -2635,7 +2636,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
                 src->modifiers);
 
-    if (src->reg.type == VKD3DSPR_SSA && src->reg.idx[0].offset < ctx->parser->shader_desc.ssa_count)
+    if (src->reg.type == VKD3DSPR_SSA && src->reg.idx[0].offset < ctx->program->ssa_count)
     {
         struct validation_context_ssa_data *data = &ctx->ssas[src->reg.idx[0].offset];
         unsigned int i;
@@ -3007,7 +3008,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (!(ctx.temps = vkd3d_calloc(parser->shader_desc.temp_count, sizeof(*ctx.temps))))
         goto fail;
 
-    if (!(ctx.ssas = vkd3d_calloc(parser->shader_desc.ssa_count, sizeof(*ctx.ssas))))
+    if (!(ctx.ssas = vkd3d_calloc(ctx.program->ssa_count, sizeof(*ctx.ssas))))
         goto fail;
 
     for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->program.instructions.count; ++ctx.instruction_idx)
@@ -3018,7 +3019,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (ctx.depth != 0)
         validator_error(&ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW, "%zu nested blocks were not closed.", ctx.depth);
 
-    for (i = 0; i < parser->shader_desc.ssa_count; ++i)
+    for (i = 0; i < ctx.program->ssa_count; ++i)
     {
         struct validation_context_ssa_data *data = &ctx.ssas[i];
 

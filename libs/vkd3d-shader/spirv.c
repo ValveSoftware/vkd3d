@@ -9689,8 +9689,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     if (parser->shader_desc.temp_count)
         spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
-    if (parser->shader_desc.ssa_count)
-        spirv_compiler_allocate_ssa_register_ids(compiler, parser->shader_desc.ssa_count);
+    if (program->ssa_count)
+        spirv_compiler_allocate_ssa_register_ids(compiler, program->ssa_count);
 
     spirv_compiler_emit_descriptor_declarations(compiler);
 

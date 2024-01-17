@@ -7170,7 +7170,7 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    sm6->p.shader_desc.ssa_count = sm6->ssa_next_id;
+    sm6->p.program.ssa_count = sm6->ssa_next_id;
 
     if (!(fn = sm6_parser_get_function(sm6, sm6->entry_point)))
     {
