@@ -594,7 +594,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
 
     if (FAILED(hr = vkd3d_init_vk_global_procs(instance, create_info->pfn_vkGetInstanceProcAddr)))
     {
-        ERR("Failed to initialize Vulkan global procs, hr %#x.\n", hr);
+        ERR("Failed to initialise Vulkan global procs, hr %s.\n", debugstr_hresult(hr));
         return hr;
     }
 
@@ -674,7 +674,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
 
     if (FAILED(hr = vkd3d_load_vk_instance_procs(&instance->vk_procs, vk_global_procs, vk_instance)))
     {
-        ERR("Failed to load instance procs, hr %#x.\n", hr);
+        ERR("Failed to load instance procs, hr %s.\n", debugstr_hresult(hr));
         if (instance->vk_procs.vkDestroyInstance)
             instance->vk_procs.vkDestroyInstance(vk_instance, NULL);
         if (instance->libvulkan)
