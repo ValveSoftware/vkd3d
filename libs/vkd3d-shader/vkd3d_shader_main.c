@@ -1601,7 +1601,8 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
     switch (compile_info->target_type)
     {
         case VKD3D_SHADER_TARGET_D3D_ASM:
-            ret = vkd3d_dxbc_binary_to_text(&parser->program, compile_info, out, VSIR_ASM_FLAG_NONE);
+            ret = vkd3d_dxbc_binary_to_text(&parser->program, &parser->shader_desc,
+                    compile_info, out, VSIR_ASM_FLAG_NONE);
             break;
 
         case VKD3D_SHADER_TARGET_GLSL:
