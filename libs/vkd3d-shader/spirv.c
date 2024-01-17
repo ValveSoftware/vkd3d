@@ -9680,6 +9680,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     enum vkd3d_result result = VKD3D_OK;
     unsigned int i;
 
+    if ((result = vkd3d_shader_normalise(parser, compile_info)) < 0)
+        return result;
+
     if (parser->shader_desc.temp_count)
         spirv_compiler_emit_temps(compiler, parser->shader_desc.temp_count);
     if (parser->shader_desc.ssa_count)
@@ -9689,9 +9692,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
 
     compiler->location.column = 0;
     compiler->location.line = 1;
-
-    if ((result = vkd3d_shader_normalise(parser, compile_info)) < 0)
-        return result;
 
     if (parser->shader_desc.block_count && !spirv_compiler_init_blocks(compiler, parser->shader_desc.block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
