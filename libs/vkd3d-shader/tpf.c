@@ -1051,7 +1051,7 @@ static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction 
     {
         ins->declaration.primitive_type.type = VKD3D_PT_PATCH;
         ins->declaration.primitive_type.patch_vertex_count = primitive_type - VKD3D_SM5_INPUT_PT_PATCH1 + 1;
-        priv->p.shader_desc.input_control_point_count = ins->declaration.primitive_type.patch_vertex_count;
+        priv->p.program.input_control_point_count = ins->declaration.primitive_type.patch_vertex_count;
     }
     else if (primitive_type >= ARRAY_SIZE(input_primitive_type_table))
     {
@@ -1060,7 +1060,7 @@ static void shader_sm4_read_dcl_input_primitive(struct vkd3d_shader_instruction 
     else
     {
         ins->declaration.primitive_type.type = input_primitive_type_table[primitive_type].vkd3d_type;
-        priv->p.shader_desc.input_control_point_count = input_primitive_type_table[primitive_type].control_point_count;
+        priv->p.program.input_control_point_count = input_primitive_type_table[primitive_type].control_point_count;
     }
 
     if (ins->declaration.primitive_type.type == VKD3D_PT_UNDEFINED)
@@ -1174,9 +1174,9 @@ static void shader_sm5_read_control_point_count(struct vkd3d_shader_instruction 
             >> VKD3D_SM5_CONTROL_POINT_COUNT_SHIFT;
 
     if (opcode == VKD3D_SM5_OP_DCL_INPUT_CONTROL_POINT_COUNT)
-        priv->p.shader_desc.input_control_point_count = ins->declaration.count;
+        priv->p.program.input_control_point_count = ins->declaration.count;
     else
-        priv->p.shader_desc.output_control_point_count = ins->declaration.count;
+        priv->p.program.output_control_point_count = ins->declaration.count;
 }
 
 static void shader_sm5_read_dcl_tessellator_domain(struct vkd3d_shader_instruction *ins, uint32_t opcode,

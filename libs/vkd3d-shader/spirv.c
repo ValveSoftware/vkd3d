@@ -9806,8 +9806,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     compiler->block_names = parser->shader_desc.block_names;
     compiler->block_name_count = parser->shader_desc.block_name_count;
 
-    compiler->input_control_point_count = shader_desc->input_control_point_count;
-    compiler->output_control_point_count = shader_desc->output_control_point_count;
+    compiler->input_control_point_count = program->input_control_point_count;
+    compiler->output_control_point_count = program->output_control_point_count;
 
     if (compiler->shader_type != VKD3D_SHADER_TYPE_HULL)
         spirv_compiler_emit_shader_signature_outputs(compiler);
