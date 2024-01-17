@@ -2071,7 +2071,7 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
 
     if (FAILED(hr = vkd3d_load_vk_device_procs(&device->vk_procs, vk_procs, vk_device)))
     {
-        ERR("Failed to load device procs, hr %#x.\n", hr);
+        ERR("Failed to load device procs, hr %s.\n", debugstr_hresult(hr));
         if (device->vk_procs.vkDestroyDevice)
             device->vk_procs.vkDestroyDevice(vk_device, NULL);
         return hr;
@@ -2081,7 +2081,7 @@ static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
 
     if (FAILED(hr = d3d12_device_create_vkd3d_queues(device, &device_queue_info)))
     {
-        ERR("Failed to create queues, hr %#x.\n", hr);
+        ERR("Failed to create queues, hr %s.\n", debugstr_hresult(hr));
         device->vk_procs.vkDestroyDevice(vk_device, NULL);
         return hr;
     }
