@@ -114,7 +114,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-todo probe all rgba (5.0, 6.0, 7.0, 1.0)
+probe all rgba (5.0, 6.0, 7.0, 1.0)
 
 
 % More restrictions are placed on the type of the first (condition) operand,
@@ -265,7 +265,7 @@ draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
 
-[pixel shader todo]
+[pixel shader]
 
 // "scalar" can mean any 1-component numeric type.
 static float1x1 cond = {0};
@@ -278,7 +278,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe all rgba (5.0, 6.0, 7.0, 8.0)
 
 

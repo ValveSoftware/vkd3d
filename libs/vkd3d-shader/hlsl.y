@@ -4089,13 +4089,14 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
         struct hlsl_ir_node *cond, struct hlsl_ir_node *first, struct hlsl_ir_node *second)
 {
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
+    struct hlsl_type *cond_type = cond->data_type;
     struct hlsl_type *common_type;
 
-    if (cond->data_type->class > HLSL_CLASS_LAST_NUMERIC)
+    if (cond_type->class > HLSL_CLASS_LAST_NUMERIC)
     {
         struct vkd3d_string_buffer *string;
 
-        if ((string = hlsl_type_to_string(ctx, cond->data_type)))
+        if ((string = hlsl_type_to_string(ctx, cond_type)))
             hlsl_error(ctx, &cond->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                     "Ternary condition type '%s' is not numeric.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
@@ -4106,6 +4107,14 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
     {
         if (!(common_type = get_common_numeric_type(ctx, first, second, &first->loc)))
             return false;
+
+        if (cond_type->dimx == 1 && cond_type->dimy == 1)
+        {
+            cond_type = hlsl_get_numeric_type(ctx, common_type->class,
+                    HLSL_TYPE_BOOL, common_type->dimx, common_type->dimy);
+            if (!(cond = add_implicit_conversion(ctx, block, cond, cond_type, &cond->loc)))
+                return false;
+        }
 
         if (!(first = add_implicit_conversion(ctx, block, first, common_type, &first->loc)))
             return false;
