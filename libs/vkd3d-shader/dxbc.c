@@ -552,14 +552,9 @@ static int shdr_handler(const struct vkd3d_shader_dxbc_section_desc *section,
 
 void free_shader_desc(struct vkd3d_shader_desc *desc)
 {
-    size_t i;
-
     shader_signature_cleanup(&desc->input_signature);
     shader_signature_cleanup(&desc->output_signature);
     shader_signature_cleanup(&desc->patch_constant_signature);
-    for (i = 0; i < desc->block_name_count; ++i)
-        vkd3d_free((void *)desc->block_names[i]);
-    vkd3d_free(desc->block_names);
 }
 
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,

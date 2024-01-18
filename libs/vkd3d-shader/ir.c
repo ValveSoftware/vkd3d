@@ -26,6 +26,11 @@ bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_v
 
 void vsir_program_cleanup(struct vsir_program *program)
 {
+    size_t i;
+
+    for (i = 0; i < program->block_name_count; ++i)
+        vkd3d_free((void *)program->block_names[i]);
+    vkd3d_free(program->block_names);
     shader_instruction_array_destroy(&program->instructions);
 }
 
@@ -2235,8 +2240,8 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
 
     vkd3d_free(flattener.control_flow_info);
     /* Simpler to always free these in free_shader_desc(). */
-    parser->shader_desc.block_names = flattener.block_names;
-    parser->shader_desc.block_name_count = flattener.block_name_count;
+    program->block_names = flattener.block_names;
+    program->block_name_count = flattener.block_name_count;
 
     return result;
 }

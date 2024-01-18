@@ -9803,8 +9803,8 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
     memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
     compiler->use_vocp = program->use_vocp;
-    compiler->block_names = parser->shader_desc.block_names;
-    compiler->block_name_count = parser->shader_desc.block_name_count;
+    compiler->block_names = program->block_names;
+    compiler->block_name_count = program->block_name_count;
 
     compiler->input_control_point_count = program->input_control_point_count;
     compiler->output_control_point_count = program->output_control_point_count;
