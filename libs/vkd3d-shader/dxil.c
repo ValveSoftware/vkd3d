@@ -5527,7 +5527,7 @@ static enum vkd3d_result sm6_function_emit_blocks(const struct sm6_function *fun
 {
     unsigned int i;
 
-    sm6->p.shader_desc.block_count = function->block_count;
+    sm6->p.program.block_count = function->block_count;
 
     for (i = 0; i < function->block_count; ++i)
     {

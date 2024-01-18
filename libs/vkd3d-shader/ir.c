@@ -2213,6 +2213,7 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
 
 static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_parser *parser)
 {
+    struct vsir_program *program = &parser->program;
     struct cf_flattener flattener = {0};
     enum vkd3d_result result;
 
@@ -2222,10 +2223,10 @@ static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_par
     if (result >= 0)
     {
         vkd3d_free(parser->program.instructions.elements);
-        parser->program.instructions.elements = flattener.instructions;
-        parser->program.instructions.capacity = flattener.instruction_capacity;
-        parser->program.instructions.count = flattener.instruction_count;
-        parser->shader_desc.block_count = flattener.block_id;
+        program->instructions.elements = flattener.instructions;
+        program->instructions.capacity = flattener.instruction_capacity;
+        program->instructions.count = flattener.instruction_count;
+        program->block_count = flattener.block_id;
     }
     else
     {
@@ -2511,9 +2512,10 @@ static void vsir_validate_register(struct validation_context *ctx,
             /* Index == 0 is invalid, but it is temporarily allowed
              * for intermediate stages. Once we support validation
              * dialects we can selectively check for that. */
-            if (reg->idx[0].offset > ctx->parser->shader_desc.block_count)
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "LABEL register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, ctx->parser->shader_desc.block_count);
+            if (reg->idx[0].offset > ctx->program->block_count)
+                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX,
+                        "LABEL register index %u exceeds the maximum count %u.",
+                        reg->idx[0].offset, ctx->program->block_count);
             break;
 
         case VKD3DSPR_NULL:

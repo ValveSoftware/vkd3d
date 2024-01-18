@@ -1020,8 +1020,6 @@ struct vkd3d_shader_desc
     struct shader_signature output_signature;
     struct shader_signature patch_constant_signature;
 
-    unsigned int block_count;
-
     struct
     {
         uint32_t used, external;
@@ -1270,6 +1268,7 @@ struct vsir_program
     struct vkd3d_shader_instruction_array instructions;
 
     unsigned int input_control_point_count, output_control_point_count;
+    unsigned int block_count;
     unsigned int temp_count;
     unsigned int ssa_count;
     bool use_vocp;

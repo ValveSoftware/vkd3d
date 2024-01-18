@@ -9790,7 +9790,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     compiler->location.column = 0;
     compiler->location.line = 1;
 
-    if (parser->shader_desc.block_count && !spirv_compiler_init_blocks(compiler, parser->shader_desc.block_count))
+    if (program->block_count && !spirv_compiler_init_blocks(compiler, program->block_count))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
     instructions = program->instructions;
