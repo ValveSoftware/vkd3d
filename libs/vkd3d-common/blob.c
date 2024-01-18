@@ -69,7 +69,7 @@ static ULONG STDMETHODCALLTYPE vkd3d_blob_AddRef(ID3DBlob *iface)
 static ULONG STDMETHODCALLTYPE vkd3d_blob_Release(ID3DBlob *iface)
 {
     struct vkd3d_blob *blob = impl_from_ID3DBlob(iface);
-    ULONG refcount = InterlockedDecrement((LONG *)&blob->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&blob->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", blob, refcount);
 
