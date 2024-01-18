@@ -8,7 +8,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -0.3 -0.1 0.7 0.0
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (-0.1, 0.7, -0.3, 0.3)
 
 
