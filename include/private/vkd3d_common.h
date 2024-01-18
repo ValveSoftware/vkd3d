@@ -294,6 +294,11 @@ static inline uint64_t vkd3d_atomic_increment_u64(uint64_t volatile *x)
     return vkd3d_atomic_add_fetch_u64(x, 1);
 }
 
+static inline uint32_t vkd3d_atomic_decrement_u32(uint32_t volatile *x)
+{
+    return vkd3d_atomic_add_fetch_u32(x, ~0u);
+}
+
 static inline uint32_t vkd3d_atomic_increment_u32(uint32_t volatile *x)
 {
     return vkd3d_atomic_add_fetch_u32(x, 1);
@@ -305,15 +310,10 @@ static inline LONG InterlockedIncrement(LONG volatile *x)
     return vkd3d_atomic_increment_u32((uint32_t *)x);
 }
 
-# if HAVE_SYNC_SUB_AND_FETCH
 static inline LONG InterlockedDecrement(LONG volatile *x)
 {
-    return __sync_sub_and_fetch(x, 1);
+    return vkd3d_atomic_decrement_u32((uint32_t *)x);
 }
-# else
-#  error "InterlockedDecrement() not implemented for this platform"
-# endif
-
 #endif  /* _WIN32 */
 
 static inline void vkd3d_parse_version(const char *version, int *major, int *minor)
