@@ -2602,21 +2602,29 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
                     dst->shift);
     }
 
-    if (dst->reg.type == VKD3DSPR_SSA && dst->reg.idx[0].offset < ctx->program->ssa_count)
+    switch (dst->reg.type)
     {
-        struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
+        case VKD3DSPR_SSA:
+            if (dst->reg.idx[0].offset < ctx->parser->program.ssa_count)
+            {
+                struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
 
-        if (data->write_mask == 0)
-        {
-            data->write_mask = dst->write_mask;
-            data->first_assigned = ctx->instruction_idx;
-        }
-        else
-        {
-            validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SSA_USAGE,
-                    "SSA register is already assigned at instruction %zu.",
-                    data->first_assigned);
-        }
+                if (data->write_mask == 0)
+                {
+                    data->write_mask = dst->write_mask;
+                    data->first_assigned = ctx->instruction_idx;
+                }
+                else
+                {
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_SSA_USAGE,
+                            "SSA register is already assigned at instruction %zu.",
+                            data->first_assigned);
+                }
+            }
+            break;
+
+        default:
+            break;
     }
 }
 
@@ -2637,13 +2645,21 @@ static void vsir_validate_src_param(struct validation_context *ctx,
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_MODIFIERS, "Source has invalid modifiers %#x.",
                 src->modifiers);
 
-    if (src->reg.type == VKD3DSPR_SSA && src->reg.idx[0].offset < ctx->program->ssa_count)
+    switch (src->reg.type)
     {
-        struct validation_context_ssa_data *data = &ctx->ssas[src->reg.idx[0].offset];
-        unsigned int i;
+        case VKD3DSPR_SSA:
+            if (src->reg.idx[0].offset < ctx->parser->program.ssa_count)
+            {
+                struct validation_context_ssa_data *data = &ctx->ssas[src->reg.idx[0].offset];
+                unsigned int i;
 
-        for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
-            data->read_mask |= (1u << vsir_swizzle_get_component(src->swizzle, i));
+                for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
+                    data->read_mask |= (1u << vsir_swizzle_get_component(src->swizzle, i));
+            }
+            break;
+
+        default:
+            break;
     }
 }
 
