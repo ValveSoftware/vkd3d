@@ -47,6 +47,19 @@ static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *i
     vsir_instruction_init(ins, &location, VKD3DSIH_NOP);
 }
 
+static void remove_dcl_temps(struct vsir_program *program)
+{
+    unsigned int i;
+
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
+
+        if (ins->handler_idx == VKD3DSIH_DCL_TEMPS)
+            vkd3d_shader_instruction_make_nop(ins);
+    }
+}
+
 static void shader_register_eliminate_phase_addressing(struct vkd3d_shader_register *reg,
         unsigned int instance_id)
 {
@@ -154,9 +167,6 @@ struct hull_flattener
 {
     struct vkd3d_shader_instruction_array instructions;
 
-    unsigned int max_temp_count;
-    unsigned int temp_dcl_idx;
-
     unsigned int instance_count;
     unsigned int phase_body_idx;
     enum vkd3d_shader_opcode phase;
@@ -212,21 +222,6 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
             &ins->declaration.dst.reg))
     {
         vkd3d_shader_instruction_make_nop(ins);
-        return;
-    }
-    else if (ins->handler_idx == VKD3DSIH_DCL_TEMPS && normaliser->phase != VKD3DSIH_INVALID)
-    {
-        /* Leave only the first temp declaration and set it to the max count later. */
-        if (!normaliser->max_temp_count)
-        {
-            normaliser->max_temp_count = ins->declaration.count;
-            normaliser->temp_dcl_idx = index;
-        }
-        else
-        {
-            normaliser->max_temp_count = max(normaliser->max_temp_count, ins->declaration.count);
-            vkd3d_shader_instruction_make_nop(ins);
-        }
         return;
     }
 
@@ -382,9 +377,6 @@ static enum vkd3d_result instruction_array_flatten_hull_shader_phases(struct vkd
 
     if (flattener.phase != VKD3DSIH_INVALID)
     {
-        if (flattener.temp_dcl_idx)
-            instructions->elements[flattener.temp_dcl_idx].declaration.count = flattener.max_temp_count;
-
         if (!shader_instruction_array_reserve(&flattener.instructions, flattener.instructions.count + 1))
             return VKD3D_ERROR_OUT_OF_MEMORY;
         vsir_instruction_init(&instructions->elements[instructions->count++], &flattener.last_ret_location, VKD3DSIH_RET);
@@ -580,9 +572,6 @@ struct io_normaliser
     struct shader_signature *input_signature;
     struct shader_signature *output_signature;
     struct shader_signature *patch_constant_signature;
-
-    unsigned int max_temp_count;
-    unsigned int temp_dcl_idx;
 
     unsigned int instance_count;
     unsigned int phase_body_idx;
@@ -2257,6 +2246,8 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     struct vkd3d_shader_instruction_array *instructions = &parser->program.instructions;
     enum vkd3d_result result = VKD3D_OK;
 
+    remove_dcl_temps(&parser->program);
+
     if (!parser->shader_desc.is_dxil)
     {
         if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
@@ -2309,7 +2300,6 @@ struct validation_context
     size_t instruction_idx;
     bool invalid_instruction_idx;
     bool dcl_temps_found;
-    unsigned int temp_count;
     enum vkd3d_shader_opcode phase;
     enum cf_type
     {
@@ -2371,11 +2361,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
 static void vsir_validate_register(struct validation_context *ctx,
         const struct vkd3d_shader_register *reg)
 {
-    unsigned int i, temp_count = ctx->temp_count;
-
-    /* SM1-3 shaders do not include a DCL_TEMPS instruction. */
-    if (ctx->program->shader_version.major <= 3)
-        temp_count = ctx->program->temp_count;
+    unsigned int i;
 
     if (reg->type >= VKD3DSPR_COUNT)
         validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_REGISTER_TYPE, "Invalid register type %#x.",
@@ -2420,18 +2406,13 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
 
-            if (reg->idx[0].offset >= temp_count)
+            if (reg->idx[0].offset >= ctx->parser->program.temp_count)
             {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, temp_count);
+                        reg->idx[0].offset, ctx->parser->program.temp_count);
                 break;
             }
 
-            /* program->temp_count might be smaller then temp_count if the
-             * parser made a mistake; we still don't want to overflow the
-             * array. */
-            if (reg->idx[0].offset >= ctx->program->temp_count)
-                break;
             data = &ctx->temps[reg->idx[0].offset];
 
             if (reg->dimension == VSIR_DIMENSION_NONE)
@@ -2784,7 +2765,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         instruction->handler_idx);
             ctx->phase = instruction->handler_idx;
             ctx->dcl_temps_found = false;
-            ctx->temp_count = 0;
             return;
 
         default:
@@ -2852,7 +2832,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
                         "Invalid DCL_TEMPS count %u, expected at most %u.",
                         instruction->declaration.count, ctx->program->temp_count);
             ctx->dcl_temps_found = true;
-            ctx->temp_count = instruction->declaration.count;
             break;
 
         case VKD3DSIH_IF:
