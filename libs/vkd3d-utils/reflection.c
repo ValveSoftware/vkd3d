@@ -25,6 +25,8 @@ struct d3d12_reflection
 {
     ID3D12ShaderReflection ID3D12ShaderReflection_iface;
     unsigned int refcount;
+
+    struct vkd3d_shader_scan_signature_info signature_info;
 };
 
 static struct d3d12_reflection *impl_from_ID3D12ShaderReflection(ID3D12ShaderReflection *iface)
@@ -70,6 +72,7 @@ static ULONG STDMETHODCALLTYPE d3d12_reflection_Release(ID3D12ShaderReflection *
 
     if (!refcount)
     {
+        vkd3d_shader_free_scan_signature_info(&reflection->signature_info);
         free(reflection);
     }
 
@@ -80,9 +83,15 @@ static ULONG STDMETHODCALLTYPE d3d12_reflection_Release(ID3D12ShaderReflection *
 
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetDesc(ID3D12ShaderReflection *iface, D3D12_SHADER_DESC *desc)
 {
+    struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
+
     FIXME("iface %p, desc %p partial stub!\n", iface, desc);
 
-    return E_NOTIMPL;
+    desc->InputParameters = reflection->signature_info.input.element_count;
+    desc->OutputParameters = reflection->signature_info.output.element_count;
+    desc->PatchConstantParameters = reflection->signature_info.patch_constant.element_count;
+
+    return S_OK;
 }
 
 static struct ID3D12ShaderReflectionConstantBuffer * STDMETHODCALLTYPE d3d12_reflection_GetConstantBufferByIndex(
@@ -109,20 +118,49 @@ static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetResourceBindingDesc(
     return E_NOTIMPL;
 }
 
+static HRESULT get_signature_parameter(const struct vkd3d_shader_signature *signature,
+        unsigned int index, D3D12_SIGNATURE_PARAMETER_DESC *desc, bool output)
+{
+    const struct vkd3d_shader_signature_element *e;
+
+    if (!desc || index >= signature->element_count)
+    {
+        WARN("Invalid argument specified.\n");
+        return E_INVALIDARG;
+    }
+    e = &signature->elements[index];
+
+    desc->SemanticName = e->semantic_name;
+    desc->SemanticIndex = e->semantic_index;
+    desc->Register = e->register_index;
+    desc->SystemValueType = (D3D_NAME)e->sysval_semantic;
+    desc->ComponentType = (D3D_REGISTER_COMPONENT_TYPE)e->component_type;
+    desc->Mask = e->mask;
+    desc->ReadWriteMask = output ? (e->mask & ~e->used_mask) : e->used_mask;
+    desc->Stream = e->stream_index;
+    desc->MinPrecision = (D3D_MIN_PRECISION)e->min_precision;
+
+    return S_OK;
+}
+
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetInputParameterDesc(
         ID3D12ShaderReflection *iface, UINT index, D3D12_SIGNATURE_PARAMETER_DESC *desc)
 {
-    FIXME("iface %p, index %u, desc %p stub!\n", iface, index, desc);
+    struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, index %u, desc %p.\n", iface, index, desc);
+
+    return get_signature_parameter(&reflection->signature_info.input, index, desc, false);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetOutputParameterDesc(
         ID3D12ShaderReflection *iface, UINT index, D3D12_SIGNATURE_PARAMETER_DESC *desc)
 {
-    FIXME("iface %p, index %u, desc %p stub!\n", iface, index, desc);
+    struct d3d12_reflection *reflection = impl_from_ID3D12ShaderReflection(iface);
 
-    return E_NOTIMPL;
+    TRACE("iface %p, index %u, desc %p.\n", iface, index, desc);
+
+    return get_signature_parameter(&reflection->signature_info.output, index, desc, true);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_reflection_GetPatchConstantParameterDesc(
@@ -251,10 +289,19 @@ static const struct ID3D12ShaderReflectionVtbl d3d12_reflection_vtbl =
 
 static HRESULT d3d12_reflection_init(struct d3d12_reflection *reflection, const void *data, size_t data_size)
 {
+    struct vkd3d_shader_compile_info compile_info = {.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO};
+
     reflection->ID3D12ShaderReflection_iface.lpVtbl = &d3d12_reflection_vtbl;
     reflection->refcount = 1;
 
-    return S_OK;
+    compile_info.source.code = data;
+    compile_info.source.size = data_size;
+    compile_info.source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+
+    compile_info.next = &reflection->signature_info;
+    reflection->signature_info.type = VKD3D_SHADER_STRUCTURE_TYPE_SCAN_SIGNATURE_INFO;
+
+    return hresult_from_vkd3d_result(vkd3d_shader_scan(&compile_info, NULL));
 }
 
 HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection)
