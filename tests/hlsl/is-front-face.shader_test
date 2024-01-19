@@ -22,7 +22,7 @@ float4 main(bool face : sv_isfrontface) : sv_target
 }
 
 [test]
-todo(sm>=6) draw triangle strip 4
+draw triangle strip 4
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex buffer 0]
@@ -32,5 +32,5 @@ probe all rgba (0.0, 1.0, 0.0, 1.0)
  2.0  2.0
 
 [test]
-todo(sm>=6) draw triangle strip 4
+draw triangle strip 4
 probe all rgba (1.0, 2.0, 1.0, 2.0)
