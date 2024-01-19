@@ -3776,38 +3776,39 @@ struct sm6_dx_opcode_info
     H -> handle
     v -> void
     o -> overloaded
+    R -> matches the return type
  */
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
-    [DX_BFREV                         ] = {"m0", "m",   sm6_parser_emit_dx_unary},
+    [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_CREATE_HANDLE                 ] = {"H", "ccib", sm6_parser_emit_dx_create_handle},
-    [DX_DERIV_COARSEX                 ] = {"e0", "e",   sm6_parser_emit_dx_unary},
-    [DX_DERIV_COARSEY                 ] = {"e0", "e",   sm6_parser_emit_dx_unary},
-    [DX_DERIV_FINEX                   ] = {"e0", "e",   sm6_parser_emit_dx_unary},
-    [DX_DERIV_FINEY                   ] = {"e0", "e",   sm6_parser_emit_dx_unary},
-    [DX_EXP                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_DERIV_COARSEX                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
+    [DX_DERIV_COARSEY                 ] = {"e", "R",    sm6_parser_emit_dx_unary},
+    [DX_DERIV_FINEX                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
+    [DX_DERIV_FINEY                   ] = {"e", "R",    sm6_parser_emit_dx_unary},
+    [DX_EXP                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_FIRST_BIT_HI                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_FIRST_BIT_LO                  ] = {"i", "m",    sm6_parser_emit_dx_unary},
     [DX_FIRST_BIT_SHI                 ] = {"i", "m",    sm6_parser_emit_dx_unary},
-    [DX_FRC                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_FRC                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_LEGACY_F16TOF32               ] = {"f", "i",    sm6_parser_emit_dx_unary},
     [DX_LEGACY_F32TOF16               ] = {"i", "f",    sm6_parser_emit_dx_unary},
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
-    [DX_LOG                           ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_ROUND_NE                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_ROUND_NI                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_ROUND_PI                      ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_ROUND_Z                       ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_RSQRT                         ] = {"g0", "g",   sm6_parser_emit_dx_unary},
-    [DX_SQRT                          ] = {"g0", "g",   sm6_parser_emit_dx_unary},
+    [DX_LOG                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ROUND_NE                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ROUND_NI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
 };
 
 static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struct sm6_value *value, char info_type,
-        bool is_return)
+        const struct sm6_type *ret_type, bool is_return)
 {
     const struct sm6_type *type = value->type;
 
@@ -3843,21 +3844,12 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
         case 'o':
             /* TODO: some type checking may be possible */
             return true;
+        case 'R':
+            return type == ret_type;
         default:
             FIXME("Unhandled operand code '%c'.\n", info_type);
             return false;
     }
-}
-
-static bool operand_types_match(struct sm6_value *dst, const struct sm6_value **operands, unsigned int operand_count,
-        char index_char)
-{
-    unsigned int i = index_char - '0';
-
-    assert(i < 10);
-    if (i >= operand_count)
-        return false;
-    return dst->type == operands[i]->type;
 }
 
 static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_opcode op, const char *name,
@@ -3869,8 +3861,7 @@ static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_
     info = &sm6_dx_op_table[op];
 
     assert(info->ret_type[0]);
-    if (!sm6_parser_validate_operand_type(sm6, dst, info->ret_type[0], true)
-            || (info->ret_type[1] && !operand_types_match(dst, operands, operand_count, info->ret_type[1])))
+    if (!sm6_parser_validate_operand_type(sm6, dst, info->ret_type[0], NULL, true))
     {
         WARN("Failed to validate return type for dx intrinsic id %u, '%s'.\n", op, name);
         /* Return type validation failure is not so critical. We only need to set
@@ -3880,7 +3871,7 @@ static bool sm6_parser_validate_dx_op(struct sm6_parser *sm6, enum dx_intrinsic_
     for (i = 0; i < operand_count; ++i)
     {
         const struct sm6_value *value = operands[i];
-        if (!sm6_parser_validate_operand_type(sm6, value, info->operand_info[i], false))
+        if (!sm6_parser_validate_operand_type(sm6, value, info->operand_info[i], dst->type, false))
         {
             WARN("Failed to validate operand %u for dx intrinsic id %u, '%s'.\n", i + 1, op, name);
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
