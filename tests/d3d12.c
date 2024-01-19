@@ -9179,6 +9179,30 @@ static void test_shader_instructions(void)
         0x06000086, 0x00102032, 0x00000000, 0x00208046, 0x00000000, 0x00000000, 0x0100003e,
     };
     static struct named_shader ps_bits_vector = {"bits_vector", ps_bits_vector_code, sizeof(ps_bits_vector_code)};
+    static const DWORD ps_firstbit_raw_code[] =
+    {
+        /* Without the fixup instructions emitted by fxc. */
+#if 0
+        ps_5_0
+        dcl_globalFlags refactoringAllowed
+        dcl_constantBuffer cb0[1], immediateIndexed
+        dcl_output o0.xyzw <v4:float>
+        firstbit_lo o0.x <v4:uint>, cb0[0].x <v4:uint>
+        firstbit_hi o0.y <v4:uint>, cb0[0].x <v4:uint>
+        firstbit_shi o0.z <v4:uint>, cb0[0].y <v4:int>
+        mov o0.w <v4:float>, l(0) <s:float>
+        ret
+#endif
+        0x43425844, 0xea469de0, 0x78a93361, 0xed27f28b, 0x8c34dd51, 0x00000001, 0x00000100, 0x00000003,
+        0x0000002c, 0x0000003c, 0x00000070, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001, 0x00000000,
+        0x0000000f, 0x545f5653, 0x65677261, 0xabab0074, 0x58454853, 0x00000088, 0x00000050, 0x00000022,
+        0x0100086a, 0x04000059, 0x00208e46, 0x00000000, 0x00000001, 0x03000065, 0x001020f2, 0x00000000,
+        0x06000088, 0x00102012, 0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x06000087, 0x00102022,
+        0x00000000, 0x0020800a, 0x00000000, 0x00000000, 0x06000089, 0x00102042, 0x00000000, 0x0020801a,
+        0x00000000, 0x00000000, 0x05000036, 0x00102082, 0x00000000, 0x00004001, 0x00000000, 0x0100003e,
+    };
+    static struct named_shader ps_firstbit_raw = {"firstbit_raw", ps_firstbit_raw_code, sizeof(ps_firstbit_raw_code)};
     static const DWORD ps_ishr_code[] =
     {
 #if 0
@@ -10553,6 +10577,12 @@ static void test_shader_instructions(void)
 
         {&ps_bits_vector, {{{0x11111111, 0x00080000}}}, {{8,   1,  28,  19}}},
 
+        {&ps_firstbit_raw, {{{         0,          0}}}, {{ ~0u, ~0u, ~0u, 0}}, false, true},
+        {&ps_firstbit_raw, {{{0x80000000, 0x80000000}}}, {{  31,   0,   1, 0}}},
+        {&ps_firstbit_raw, {{{0x80000001, 0x80000001}}}, {{   0,   0,   1, 0}}},
+        {&ps_firstbit_raw, {{{0x11111111, 0x11111111}}}, {{   0,   3,   3, 0}}},
+        {&ps_firstbit_raw, {{{0x00080000, 0xffffffff}}}, {{  19,  12, ~0u, 0}}, false, true},
+
         {&ps_ishr, {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}, {~0x1fu, 0, 32, 64}}},
                    {{0x00000000, 0x00000000, 0x00000000, 0x00000000}}},
         {&ps_ishr, {{{0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff}, {~0x1fu, 0, 32, 64}}},
@@ -11119,7 +11149,6 @@ static void test_shader_instructions(void)
             current_ps = uint_tests[i].ps;
             shader.pShaderBytecode = current_ps->code;
             shader.BytecodeLength = current_ps->size;
-            todo_if(uint_tests[i].is_todo)
             context.pipeline_state = create_pipeline_state(context.device,
                     context.root_signature, desc.rt_format, NULL, &shader, NULL);
             if (!context.pipeline_state)
@@ -11146,7 +11175,7 @@ static void test_shader_instructions(void)
 
         transition_resource_state(command_list, context.render_target,
                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        todo_if(uint_tests[i].todo_on_nvidia && is_nvidia_device(context.device))
+        todo_if(uint_tests[i].is_todo || (uint_tests[i].todo_on_nvidia && is_nvidia_device(context.device)))
         check_sub_resource_uvec4(context.render_target, 0, queue, command_list, &uint_tests[i].output.u);
 
         reset_command_list(command_list, context.allocator);
