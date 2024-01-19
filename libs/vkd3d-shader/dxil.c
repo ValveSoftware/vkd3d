@@ -5789,6 +5789,7 @@ static enum vkd3d_shader_minimum_precision minimum_precision_from_dxil_component
 static const enum vkd3d_shader_sysval_semantic sysval_semantic_table[] =
 {
     [SEMANTIC_KIND_ARBITRARY]            = VKD3D_SHADER_SV_NONE,
+    [SEMANTIC_KIND_VERTEXID]             = VKD3D_SHADER_SV_VERTEX_ID,
     [SEMANTIC_KIND_POSITION]             = VKD3D_SHADER_SV_POSITION,
     [SEMANTIC_KIND_TARGET]               = VKD3D_SHADER_SV_TARGET,
 };

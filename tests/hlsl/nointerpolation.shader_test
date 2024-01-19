@@ -23,7 +23,7 @@ float4 main(nointerpolation float4 t : texcoord) : sv_target
 }
 
 [test]
-todo(sm>=6) draw triangle list 3
+draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -50,7 +50,7 @@ float4 main(ps_input input) : sv_target
 }
 
 [test]
-todo(sm>=6) draw triangle list 3
+draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -77,7 +77,7 @@ float4 main(nointerpolation ps_input input) : sv_target
 }
 
 [test]
-todo(sm>=6) draw triangle list 3
+draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -104,7 +104,7 @@ float4 main(centroid ps_input input) : sv_target
 }
 
 [test]
-todo(sm>=6) draw triangle list 3
+draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [vertex shader]
@@ -130,9 +130,25 @@ float4 main(nointerpolation ps_input input) : sv_target
     return input.t;
 }
 
+[require]
+shader model >= 4.0
+shader model < 6.0
+
 [test]
-todo(sm>=6) draw triangle list 3
+draw triangle list 3
 probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+% Centroid for SM 6.
+[require]
+shader model >= 6.0
+
+[test]
+draw triangle list 3
+probe (320,240) rgba (0.250390589, 0.499088615, 0.250520796, 1.0) 1
+
+[require]
+shader model >= 4.0
+
 
 [vertex shader fail todo]
 struct ps_input
