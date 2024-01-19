@@ -1383,31 +1383,39 @@ static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
     shader_addline(buffer, ">");
 }
 
+static void shader_print_write_mask(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, uint32_t mask, const char *suffix)
+{
+    unsigned int i = 0;
+    char buffer[5];
+
+    if (mask & VKD3DSP_WRITEMASK_0)
+        buffer[i++] = 'x';
+    if (mask & VKD3DSP_WRITEMASK_1)
+        buffer[i++] = 'y';
+    if (mask & VKD3DSP_WRITEMASK_2)
+        buffer[i++] = 'z';
+    if (mask & VKD3DSP_WRITEMASK_3)
+        buffer[i++] = 'w';
+    buffer[i++] = '\0';
+
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s.%s%s%s%s", prefix,
+            compiler->colours.write_mask, buffer, compiler->colours.reset, suffix);
+}
+
 static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
         const struct vkd3d_shader_dst_param *param, bool is_declaration)
 {
-    struct vkd3d_string_buffer *buffer = &compiler->buffer;
     uint32_t write_mask = param->write_mask;
 
     shader_dump_register(compiler, &param->reg, is_declaration);
 
     if (write_mask && param->reg.dimension == VSIR_DIMENSION_VEC4)
     {
-        static const char write_mask_chars[] = "xyzw";
-
         if (data_type_is_64_bit(param->reg.data_type))
             write_mask = vsir_write_mask_32_from_64(write_mask);
 
-        shader_addline(buffer, ".%s", compiler->colours.write_mask);
-        if (write_mask & VKD3DSP_WRITEMASK_0)
-            shader_addline(buffer, "%c", write_mask_chars[0]);
-        if (write_mask & VKD3DSP_WRITEMASK_1)
-            shader_addline(buffer, "%c", write_mask_chars[1]);
-        if (write_mask & VKD3DSP_WRITEMASK_2)
-            shader_addline(buffer, "%c", write_mask_chars[2]);
-        if (write_mask & VKD3DSP_WRITEMASK_3)
-            shader_addline(buffer, "%c", write_mask_chars[3]);
-        shader_addline(buffer, "%s", compiler->colours.reset);
+        shader_print_write_mask(compiler, "", write_mask, "");
     }
 
     shader_print_precision(compiler, &param->reg);
