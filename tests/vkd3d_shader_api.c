@@ -1038,6 +1038,610 @@ static void test_scan_combined_resource_samplers(void)
     pfn_free_combined_sampler_info(&combined_sampler_info);
 }
 
+static void test_emit_signature(void)
+{
+    static const uint32_t dxbc_minprec[] =
+    {
+        0x43425844, 0xec41e0af, 0x4d0f3dea, 0x33b9c460, 0x178f7734, 0x00000001, 0x00000310, 0x00000006,
+        0x00000038, 0x000000b0, 0x00000124, 0x00000160, 0x00000264, 0x00000274, 0x46454452, 0x00000070,
+        0x00000000, 0x00000000, 0x00000000, 0x0000003c, 0xffff0500, 0x00000100, 0x0000003c, 0x31314452,
+        0x0000003c, 0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d,
+        0x666f736f, 0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265,
+        0x2e302e30, 0x31303031, 0x36312e31, 0x00343833, 0x31475349, 0x0000006c, 0x00000003, 0x00000008,
+        0x00000000, 0x00000068, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x00000002,
+        0x00000000, 0x00000068, 0x00000001, 0x00000000, 0x00000002, 0x00000001, 0x00000f0f, 0x00000004,
+        0x00000000, 0x00000068, 0x00000002, 0x00000000, 0x00000001, 0x00000002, 0x00000f0f, 0x00000005,
+        0x006d6573, 0x3147534f, 0x00000034, 0x00000001, 0x00000008, 0x00000000, 0x00000028, 0x00000000,
+        0x00000000, 0x00000003, 0x00000000, 0x0000000f, 0x00000001, 0x745f7673, 0x65677261, 0xabab0074,
+        0x58454853, 0x000000fc, 0x00000050, 0x0000003f, 0x0101086a, 0x04001062, 0x801010f2, 0x00008001,
+        0x00000000, 0x04000862, 0x801010f2, 0x00010001, 0x00000001, 0x04000862, 0x801010f2, 0x00014001,
+        0x00000002, 0x04000065, 0x801020f2, 0x00004001, 0x00000000, 0x02000068, 0x00000002, 0x0700002b,
+        0x801000f2, 0x00008001, 0x00000000, 0x80101e46, 0x00010001, 0x00000001, 0x0a000000, 0x801000f2,
+        0x00008001, 0x00000000, 0x80100e46, 0x00008001, 0x00000000, 0x80101e46, 0x00008001, 0x00000000,
+        0x07000056, 0x801000f2, 0x00008001, 0x00000001, 0x80101e46, 0x00014001, 0x00000002, 0x0a000000,
+        0x801000f2, 0x00008001, 0x00000000, 0x80100e46, 0x00008001, 0x00000000, 0x80100e46, 0x00008001,
+        0x00000001, 0x07000036, 0x801020f2, 0x00004001, 0x00000000, 0x80100e46, 0x00008001, 0x00000000,
+        0x0100003e, 0x30494653, 0x00000008, 0x00000010, 0x00000000, 0x54415453, 0x00000094, 0x00000006,
+        0x00000002, 0x00000000, 0x00000004, 0x00000002, 0x00000000, 0x00000000, 0x00000001, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000002, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    };
+    static const uint32_t dxbc_big[] =
+    {
+        0x43425844, 0xe2dff764, 0xaee92ec8, 0xefa3485b, 0x37f05d58, 0x00000001, 0x000005f4, 0x00000005,
+        0x00000034, 0x000000ac, 0x00000234, 0x000002a0, 0x00000558, 0x46454452, 0x00000070, 0x00000000,
+        0x00000000, 0x00000000, 0x0000003c, 0xffff0500, 0x00000100, 0x0000003c, 0x31314452, 0x0000003c,
+        0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d, 0x666f736f,
+        0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265, 0x2e302e30,
+        0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000180, 0x0000000b, 0x00000008, 0x00000110,
+        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000090f, 0x0000011c, 0x00000002, 0x00000000,
+        0x00000003, 0x00000001, 0x00000607, 0x0000011c, 0x00000005, 0x00000000, 0x00000001, 0x00000002,
+        0x00000103, 0x00000122, 0x00000000, 0x00000007, 0x00000001, 0x00000002, 0x00000404, 0x00000131,
+        0x00000000, 0x00000000, 0x00000001, 0x00000002, 0x00000008, 0x0000013f, 0x00000000, 0x00000002,
+        0x00000003, 0x00000003, 0x00000103, 0x0000014f, 0x00000000, 0x00000003, 0x00000003, 0x00000003,
+        0x00000404, 0x0000014f, 0x00000001, 0x00000003, 0x00000003, 0x00000003, 0x00000808, 0x0000013f,
+        0x00000001, 0x00000002, 0x00000003, 0x00000004, 0x00000507, 0x0000015f, 0x00000000, 0x00000009,
+        0x00000001, 0x00000005, 0x00000101, 0x0000016e, 0x00000000, 0x0000000a, 0x00000001, 0x00000005,
+        0x00000202, 0x505f5653, 0x7469736f, 0x006e6f69, 0x4f4c4f43, 0x56530052, 0x6972505f, 0x6974696d,
+        0x44496576, 0x5f565300, 0x74736e49, 0x65636e61, 0x53004449, 0x6c435f56, 0x69447069, 0x6e617473,
+        0x53006563, 0x75435f56, 0x69446c6c, 0x6e617473, 0x53006563, 0x73495f56, 0x6e6f7246, 0x63614674,
+        0x56530065, 0x6d61535f, 0x49656c70, 0x7865646e, 0xababab00, 0x4e47534f, 0x00000064, 0x00000003,
+        0x00000008, 0x00000050, 0x00000001, 0x00000000, 0x00000002, 0x00000001, 0x00000a07, 0x00000050,
+        0x00000005, 0x00000000, 0x00000003, 0x00000005, 0x00000e01, 0x0000005a, 0x00000000, 0x00000000,
+        0x00000003, 0xffffffff, 0x00000e01, 0x545f5653, 0x65677261, 0x56530074, 0x7065445f, 0xab006874,
+        0x58454853, 0x000002b0, 0x00000050, 0x000000ac, 0x0100086a, 0x04002064, 0x00101092, 0x00000000,
+        0x00000001, 0x03001062, 0x00101062, 0x00000001, 0x03000862, 0x00101012, 0x00000002, 0x04000863,
+        0x00101042, 0x00000002, 0x00000007, 0x04001064, 0x00101012, 0x00000003, 0x00000002, 0x04001064,
+        0x00101042, 0x00000003, 0x00000003, 0x04001064, 0x00101082, 0x00000003, 0x00000003, 0x04001064,
+        0x00101052, 0x00000004, 0x00000002, 0x04000863, 0x00101012, 0x00000005, 0x00000009, 0x04000863,
+        0x00101022, 0x00000005, 0x0000000a, 0x03000065, 0x00102052, 0x00000001, 0x03000065, 0x00102012,
+        0x00000005, 0x02000065, 0x0000c001, 0x02000068, 0x00000001, 0x07000000, 0x00100012, 0x00000000,
+        0x0010102a, 0x00000001, 0x0010101a, 0x00000001, 0x05000056, 0x00100022, 0x00000000, 0x0010100a,
+        0x00000002, 0x07000000, 0x00100012, 0x00000000, 0x0010001a, 0x00000000, 0x0010000a, 0x00000000,
+        0x07000000, 0x00100012, 0x00000000, 0x0010000a, 0x00000000, 0x0010100a, 0x00000000, 0x07000000,
+        0x00100012, 0x00000000, 0x0010000a, 0x00000000, 0x0010103a, 0x00000000, 0x07000000, 0x00100012,
+        0x00000000, 0x0010000a, 0x00000000, 0x0010100a, 0x00000003, 0x07000000, 0x00100012, 0x00000000,
+        0x0010000a, 0x00000000, 0x0010100a, 0x00000004, 0x07000000, 0x00100012, 0x00000000, 0x0010000a,
+        0x00000000, 0x0010102a, 0x00000004, 0x07000000, 0x00100012, 0x00000000, 0x0010000a, 0x00000000,
+        0x0010102a, 0x00000003, 0x07000000, 0x00100012, 0x00000000, 0x0010000a, 0x00000000, 0x0010103a,
+        0x00000003, 0x05000056, 0x00100022, 0x00000000, 0x0010102a, 0x00000002, 0x07000000, 0x00100012,
+        0x00000000, 0x0010001a, 0x00000000, 0x0010000a, 0x00000000, 0x07000001, 0x00100022, 0x00000000,
+        0x0010100a, 0x00000005, 0x00004001, 0x3f800000, 0x07000000, 0x00100012, 0x00000000, 0x0010001a,
+        0x00000000, 0x0010000a, 0x00000000, 0x05000056, 0x00100022, 0x00000000, 0x0010101a, 0x00000005,
+        0x07000000, 0x00100012, 0x00000000, 0x0010001a, 0x00000000, 0x0010000a, 0x00000000, 0x0500001b,
+        0x00102052, 0x00000001, 0x00100006, 0x00000000, 0x05000036, 0x00102012, 0x00000005, 0x0010000a,
+        0x00000000, 0x04000036, 0x0000c001, 0x0010000a, 0x00000000, 0x0100003e, 0x54415453, 0x00000094,
+        0x00000014, 0x00000001, 0x00000000, 0x0000000d, 0x0000000c, 0x00000000, 0x00000001, 0x00000001,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000002, 0x00000000, 0x00000004, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    };
+    static const uint32_t dxbc_depthge[] =
+    {
+        0x43425844, 0x520689ae, 0xf26554e6, 0x8f1d15ed, 0xcdf56fa5, 0x00000001, 0x000002a4, 0x00000006,
+        0x00000038, 0x000000b0, 0x000000c0, 0x0000016c, 0x000001f8, 0x00000208, 0x46454452, 0x00000070,
+        0x00000000, 0x00000000, 0x00000000, 0x0000003c, 0xffff0500, 0x00000100, 0x0000003c, 0x31314452,
+        0x0000003c, 0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d,
+        0x666f736f, 0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265,
+        0x2e302e30, 0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000008, 0x00000000, 0x00000008,
+        0x4e47534f, 0x000000a4, 0x00000004, 0x00000008, 0x00000068, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x0000000f, 0x00000072, 0x00000000, 0x00000000, 0x00000003, 0xffffffff, 0x00000e01,
+        0x00000087, 0x00000000, 0x00000000, 0x00000001, 0xffffffff, 0x00000e01, 0x00000093, 0x00000000,
+        0x00000000, 0x00000003, 0xffffffff, 0x00000e01, 0x545f5653, 0x65677261, 0x56530074, 0x5045445f,
+        0x72474854, 0x65746165, 0x75714572, 0x73006c61, 0x6f635f76, 0x41726576, 0x73004547, 0x74735f76,
+        0x69636e65, 0x6665726c, 0xababab00, 0x58454853, 0x00000084, 0x00000050, 0x00000021, 0x0100086a,
+        0x03000065, 0x001020f2, 0x00000000, 0x02000065, 0x00026001, 0x02000065, 0x0000f000, 0x02000065,
+        0x00029001, 0x08000036, 0x001020f2, 0x00000000, 0x00004002, 0x3f800000, 0x40000000, 0x40400000,
+        0x40800000, 0x04000036, 0x00026001, 0x00004001, 0x3f000000, 0x04000036, 0x0000f001, 0x00004001,
+        0x00000003, 0x04000036, 0x00029001, 0x00004001, 0x3f333333, 0x0100003e, 0x30494653, 0x00000008,
+        0x00000200, 0x00000000, 0x54415453, 0x00000094, 0x00000005, 0x00000000, 0x00000000, 0x00000004,
+        0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000004,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000,
+    };
+    static const uint32_t dxbc_depthle[] =
+    {
+        0x43425844, 0x621ee545, 0x22c68205, 0x48945607, 0xc76952a8, 0x00000001, 0x00000238, 0x00000005,
+        0x00000034, 0x000000ac, 0x000000bc, 0x00000118, 0x0000019c, 0x46454452, 0x00000070, 0x00000000,
+        0x00000000, 0x00000000, 0x0000003c, 0xffff0500, 0x00000100, 0x0000003c, 0x31314452, 0x0000003c,
+        0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d, 0x666f736f,
+        0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265, 0x2e302e30,
+        0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000008, 0x00000000, 0x00000008, 0x4e47534f,
+        0x00000054, 0x00000002, 0x00000008, 0x00000038, 0x00000000, 0x00000000, 0x00000003, 0x00000000,
+        0x0000000f, 0x00000042, 0x00000000, 0x00000000, 0x00000003, 0xffffffff, 0x00000e01, 0x545f5653,
+        0x65677261, 0x56530074, 0x5045445f, 0x656c4854, 0x51457373, 0x004c4155, 0x58454853, 0x0000007c,
+        0x00000050, 0x0000001f, 0x0100086a, 0x0200005f, 0x00023001, 0x03000065, 0x001020f2, 0x00000000,
+        0x02000065, 0x00027001, 0x02000068, 0x00000001, 0x08000036, 0x001020f2, 0x00000000, 0x00004002,
+        0x3f800000, 0x40000000, 0x40400000, 0x40800000, 0x04000056, 0x00100012, 0x00000000, 0x0002300a,
+        0x06000000, 0x00027001, 0x0010000a, 0x00000000, 0x00004001, 0x3f000000, 0x0100003e, 0x54415453,
+        0x00000094, 0x00000004, 0x00000001, 0x00000000, 0x00000003, 0x00000001, 0x00000000, 0x00000000,
+        0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000001, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    };
+    static const uint32_t dxbc_hs[] =
+    {
+        0x43425844, 0x943f0a0f, 0x97e66e61, 0x82e4cc08, 0xce70cbd1, 0x00000001, 0x0000064c, 0x00000006,
+        0x00000038, 0x000000b0, 0x000000e0, 0x00000110, 0x000001f0, 0x000005b0, 0x46454452, 0x00000070,
+        0x00000000, 0x00000000, 0x00000000, 0x0000003c, 0x48530500, 0x00000100, 0x0000003c, 0x31314452,
+        0x0000003c, 0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d,
+        0x666f736f, 0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265,
+        0x2e302e30, 0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000028, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x786d6573, 0xababab00,
+        0x4e47534f, 0x00000028, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x0000000f, 0x786d6573, 0xababab00, 0x47534350, 0x000000d8, 0x00000007, 0x00000008,
+        0x000000b0, 0x00000000, 0x0000000b, 0x00000003, 0x00000000, 0x00000e01, 0x000000b0, 0x00000001,
+        0x0000000b, 0x00000003, 0x00000001, 0x00000e01, 0x000000b0, 0x00000002, 0x0000000b, 0x00000003,
+        0x00000002, 0x00000e01, 0x000000b0, 0x00000003, 0x0000000b, 0x00000003, 0x00000003, 0x00000e01,
+        0x000000be, 0x00000000, 0x0000000c, 0x00000003, 0x00000004, 0x00000e01, 0x000000be, 0x00000001,
+        0x0000000c, 0x00000003, 0x00000005, 0x00000e01, 0x000000d2, 0x00000000, 0x00000000, 0x00000003,
+        0x00000006, 0x0000000f, 0x545f5653, 0x46737365, 0x6f746361, 0x56530072, 0x736e495f, 0x54656469,
+        0x46737365, 0x6f746361, 0x65730072, 0xab00786d, 0x58454853, 0x000003b8, 0x00030050, 0x000000ee,
+        0x01000071, 0x0100b093, 0x01008094, 0x01001895, 0x01000896, 0x01001897, 0x0100086a, 0x00001835,
+        0x00000012, 0x3f000000, 0x3dcccccd, 0x00000000, 0x00000000, 0x3f19999a, 0x3e4ccccd, 0x00000000,
+        0x00000000, 0x00000000, 0x3e99999a, 0x00000000, 0x00000000, 0x00000000, 0x3ecccccd, 0x00000000,
+        0x00000000, 0x01000072, 0x0200005f, 0x00016000, 0x0200005f, 0x0000b000, 0x0400005f, 0x002010f2,
+        0x00000016, 0x00000000, 0x03000065, 0x001020f2, 0x00000000, 0x02000068, 0x00000002, 0x04000056,
+        0x00100012, 0x00000000, 0x00016001, 0x04000056, 0x00100022, 0x00000000, 0x0000b001, 0x08000036,
+        0x001000c2, 0x00000000, 0x00004002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x04000036,
+        0x00100012, 0x00000001, 0x00016001, 0x09000000, 0x001020f2, 0x00000000, 0x00100e46, 0x00000000,
+        0x00a01e46, 0x0010000a, 0x00000001, 0x00000000, 0x0100003e, 0x01000073, 0x02000099, 0x00000004,
+        0x0200005f, 0x00017000, 0x04000067, 0x00102012, 0x00000000, 0x0000000b, 0x04000067, 0x00102012,
+        0x00000001, 0x0000000c, 0x04000067, 0x00102012, 0x00000002, 0x0000000d, 0x04000067, 0x00102012,
+        0x00000003, 0x0000000e, 0x02000068, 0x00000001, 0x0400005b, 0x00102012, 0x00000000, 0x00000004,
+        0x04000036, 0x00100012, 0x00000000, 0x0001700a, 0x07000036, 0x00902012, 0x0010000a, 0x00000000,
+        0x0090901a, 0x0010000a, 0x00000000, 0x0100003e, 0x01000073, 0x02000099, 0x00000002, 0x0200005f,
+        0x00017000, 0x04000067, 0x00102012, 0x00000004, 0x0000000f, 0x04000067, 0x00102012, 0x00000005,
+        0x00000010, 0x02000068, 0x00000001, 0x0400005b, 0x00102012, 0x00000004, 0x00000002, 0x04000036,
+        0x00100012, 0x00000000, 0x0001700a, 0x08000036, 0x00d02012, 0x00000004, 0x0010000a, 0x00000000,
+        0x0090900a, 0x0010000a, 0x00000000, 0x0100003e, 0x01000073, 0x0200005f, 0x0000b000, 0x0400005f,
+        0x00219012, 0x00000016, 0x00000000, 0x03000065, 0x00102012, 0x00000006, 0x02000068, 0x00000001,
+        0x04000036, 0x00100012, 0x00000000, 0x0000b001, 0x07000036, 0x00102012, 0x00000006, 0x00a1900a,
+        0x0010000a, 0x00000000, 0x00000000, 0x0100003e, 0x01000073, 0x0200005f, 0x0000b000, 0x0400005f,
+        0x00219022, 0x00000016, 0x00000000, 0x03000065, 0x00102022, 0x00000006, 0x02000068, 0x00000001,
+        0x04000036, 0x00100012, 0x00000000, 0x0000b001, 0x07000036, 0x00102022, 0x00000006, 0x00a1901a,
+        0x0010000a, 0x00000000, 0x00000000, 0x0100003e, 0x01000073, 0x0200005f, 0x0000b000, 0x0400005f,
+        0x00219042, 0x00000016, 0x00000000, 0x03000065, 0x00102042, 0x00000006, 0x02000068, 0x00000001,
+        0x04000036, 0x00100012, 0x00000000, 0x0000b001, 0x07000036, 0x00102042, 0x00000006, 0x00a1902a,
+        0x0010000a, 0x00000000, 0x00000000, 0x0100003e, 0x01000073, 0x0200005f, 0x0000b000, 0x0400005f,
+        0x00219082, 0x00000016, 0x00000000, 0x03000065, 0x00102082, 0x00000006, 0x02000068, 0x00000001,
+        0x04000036, 0x00100012, 0x00000000, 0x0000b001, 0x07000036, 0x00102082, 0x00000006, 0x00a1903a,
+        0x0010000a, 0x00000000, 0x00000000, 0x0100003e, 0x54415453, 0x00000094, 0x00000018, 0x00000002,
+        0x00000004, 0x00000007, 0x00000001, 0x00000000, 0x00000000, 0x00000007, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x0000000e, 0x00000000, 0x00000002, 0x00000000, 0x0000001d, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000010, 0x00000003, 0x00000001, 0x00000003,
+        0x00000000, 0x00000000, 0x00000000,
+    };
+    static const uint32_t dxbc_ds[] =
+    {
+        0x43425844, 0x3744324a, 0x2e7f6684, 0x41142245, 0x9e6ecf04, 0x00000001, 0x0000042c, 0x00000006,
+        0x00000038, 0x000000b0, 0x000000e0, 0x000001c0, 0x000001f4, 0x00000390, 0x46454452, 0x00000070,
+        0x00000000, 0x00000000, 0x00000000, 0x0000003c, 0x44530500, 0x00000100, 0x0000003c, 0x31314452,
+        0x0000003c, 0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d,
+        0x666f736f, 0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265,
+        0x2e302e30, 0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000028, 0x00000001, 0x00000008,
+        0x00000020, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x786d6573, 0xababab00,
+        0x47534350, 0x000000d8, 0x00000007, 0x00000008, 0x000000b0, 0x00000000, 0x0000000b, 0x00000003,
+        0x00000000, 0x00000001, 0x000000b0, 0x00000001, 0x0000000b, 0x00000003, 0x00000001, 0x00000001,
+        0x000000b0, 0x00000002, 0x0000000b, 0x00000003, 0x00000002, 0x00000101, 0x000000b0, 0x00000003,
+        0x0000000b, 0x00000003, 0x00000003, 0x00000001, 0x000000be, 0x00000000, 0x0000000c, 0x00000003,
+        0x00000004, 0x00000101, 0x000000be, 0x00000001, 0x0000000c, 0x00000003, 0x00000005, 0x00000001,
+        0x000000d2, 0x00000000, 0x00000000, 0x00000003, 0x00000006, 0x00000f0f, 0x545f5653, 0x46737365,
+        0x6f746361, 0x56530072, 0x736e495f, 0x54656469, 0x46737365, 0x6f746361, 0x65730072, 0xab00786d,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000001, 0x00000003,
+        0x00000000, 0x0000000f, 0x705f5653, 0x7469736f, 0x006e6f69, 0x58454853, 0x00000194, 0x00040050,
+        0x00000065, 0x01008093, 0x01001895, 0x0100086a, 0x04000061, 0x0011b012, 0x00000002, 0x0000000d,
+        0x04000061, 0x0011b012, 0x00000004, 0x0000000f, 0x0300005f, 0x0011b0f2, 0x00000006, 0x0200005f,
+        0x0001c032, 0x0400005f, 0x002190f2, 0x00000010, 0x00000000, 0x04000067, 0x001020f2, 0x00000000,
+        0x00000001, 0x02000068, 0x00000002, 0x04000036, 0x00100032, 0x00000000, 0x0001c046, 0x05000036,
+        0x001000c2, 0x00000000, 0x0011b006, 0x00000002, 0x07000000, 0x001000f2, 0x00000000, 0x00100e46,
+        0x00000000, 0x0011be46, 0x00000006, 0x05000036, 0x00100012, 0x00000001, 0x0011b00a, 0x00000002,
+        0x05000036, 0x00100042, 0x00000001, 0x0011b00a, 0x00000004, 0x07000000, 0x001000f2, 0x00000000,
+        0x00100e46, 0x00000000, 0x00100a06, 0x00000001, 0x05000036, 0x00100012, 0x00000001, 0x0011b00a,
+        0x00000004, 0x06000036, 0x001000c2, 0x00000001, 0x00219ea6, 0x00000004, 0x00000000, 0x07000000,
+        0x001000f2, 0x00000000, 0x00100e46, 0x00000000, 0x00100e06, 0x00000001, 0x06000036, 0x00100032,
+        0x00000001, 0x00219046, 0x00000004, 0x00000000, 0x08000036, 0x001000c2, 0x00000001, 0x00004002,
+        0x00000000, 0x00000000, 0x40400000, 0x40800000, 0x07000000, 0x001020f2, 0x00000000, 0x00100e46,
+        0x00000000, 0x00100e46, 0x00000001, 0x0100003e, 0x54415453, 0x00000094, 0x0000000d, 0x00000002,
+        0x00000000, 0x00000006, 0x00000004, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000008, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000010, 0x00000000, 0x00000000, 0x00000003,
+        0x00000000, 0x00000000, 0x00000000,
+    };
+    static const uint32_t dxbc_gs[] =
+    {
+        0x43425844, 0xe27a1766, 0x53623db9, 0x85065db9, 0x79f2e81e, 0x00000001, 0x00000324, 0x00000005,
+        0x00000034, 0x000000ac, 0x000000dc, 0x00000174, 0x00000288, 0x46454452, 0x00000070, 0x00000000,
+        0x00000000, 0x00000000, 0x0000003c, 0x47530500, 0x00000100, 0x0000003c, 0x31314452, 0x0000003c,
+        0x00000018, 0x00000020, 0x00000028, 0x00000024, 0x0000000c, 0x00000000, 0x7263694d, 0x666f736f,
+        0x52282074, 0x4c482029, 0x53204c53, 0x65646168, 0x6f432072, 0x6c69706d, 0x31207265, 0x2e302e30,
+        0x31303031, 0x36312e31, 0x00343833, 0x4e475349, 0x00000028, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x7a6d6573, 0xababab00, 0x3547534f,
+        0x00000090, 0x00000004, 0x00000008, 0x00000000, 0x00000078, 0x00000000, 0x00000001, 0x00000003,
+        0x00000000, 0x0000000f, 0x00000000, 0x00000084, 0x00000000, 0x00000000, 0x00000003, 0x00000001,
+        0x0000000f, 0x00000001, 0x00000078, 0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f,
+        0x00000001, 0x00000089, 0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x0000000f, 0x505f5653,
+        0x5449534f, 0x004e4f49, 0x786d6573, 0x6d657300, 0xabab0079, 0x58454853, 0x0000010c, 0x00020050,
+        0x00000043, 0x0100086a, 0x0400005f, 0x002010f2, 0x00000003, 0x00000000, 0x0100185d, 0x0300008f,
+        0x00110000, 0x00000000, 0x0100085c, 0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x03000065,
+        0x001020f2, 0x00000001, 0x0300008f, 0x00110000, 0x00000001, 0x0100085c, 0x04000067, 0x001020f2,
+        0x00000000, 0x00000001, 0x03000065, 0x001020f2, 0x00000001, 0x0200005e, 0x0000000c, 0x08000036,
+        0x001020f2, 0x00000000, 0x00004002, 0x3f800000, 0x40000000, 0x40400000, 0x40800000, 0x06000036,
+        0x001020f2, 0x00000001, 0x00201e46, 0x00000000, 0x00000000, 0x03000075, 0x00110000, 0x00000000,
+        0x08000036, 0x001020f2, 0x00000000, 0x00004002, 0x41300000, 0x41400000, 0x41500000, 0x41600000,
+        0x06000036, 0x001020f2, 0x00000001, 0x00201e46, 0x00000001, 0x00000000, 0x03000075, 0x00110000,
+        0x00000001, 0x0100003e, 0x54415453, 0x00000094, 0x00000007, 0x00000000, 0x00000000, 0x00000005,
+        0x00000000, 0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000002, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000003, 0x00000001, 0x0000000c, 0x00000000, 0x00000000,
+        0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        0x00000000,
+    };
+
+    static const struct emit_signature_test
+    {
+        const char *profile;
+        const struct vkd3d_shader_code dxbc;
+        const char *source;
+        const char *signature;
+        bool is_todo;
+    } tests[] =
+    {
+        {
+            "ps_5_0",
+            {NULL, 0},
+            "float4 main() : SV_Target\n"
+            "{\n"
+            "    return float4(1.0, 2.0, 3.0, 4.0);\n"
+            "}\n",
+            "ps_5_0\n"
+            ".output\n"
+            ".param SV_Target.xyzw, o0.xyzw, float, TARGET\n",
+            false
+        },
+        {
+            "ps_5_0",
+            {dxbc_minprec, sizeof(dxbc_minprec)},
+            "min16float4 main(min10float4 x : sem0, min16int4 y : sem1, min16uint4 z : sem2) : sv_target\n"
+            "{\n"
+            "    return x + y + z;\n"
+            "}\n",
+            "ps_5_0\n"
+            ".input\n"
+            ".param sem.xyzw, v0.xyzw, float, NONE, FIXED_8_2\n"
+            ".param sem1.xyzw, v1.xyzw, int, NONE, INT_16\n"
+            ".param sem2.xyzw, v2.xyzw, uint, NONE, UINT_16\n"
+            ".output\n"
+            ".param sv_target.xyzw, o0.xyzw, float, TARGET, FLOAT_16\n",
+            false
+        },
+        {
+            "ps_5_0",
+            {NULL, 0},
+            "void main(float4 pos : SV_POSITION, float3 color : COLOR2, uint2 color2 : COLOR5,\n"
+            "        out int3 target : sv_target1, out float target2 : SV_TaRgEt5)\n"
+            "{\n"
+            "    float tmp = length(pos) + length(color) + length(color2);\n"
+            "    target.xyz = tmp;\n"
+            "    target2 = tmp;\n"
+            "}\n",
+            "ps_5_0\n"
+            ".input\n"
+            ".param SV_POSITION.xyzw, v0.xyzw, float, POS\n"
+            ".param COLOR2.xyz, v1.xyz, float\n"
+            ".param COLOR5.xy, v2.xy, uint\n"
+            ".output\n"
+            ".param sv_target1.xyz, o1.xyz, int, TARGET\n"
+            ".param SV_TaRgEt5.x, o5.x, float, TARGET\n",
+            false
+        },
+        {
+            "ps_5_0",
+            {NULL, 0},
+            "void main(float4 pos : SV_Position, float3 color : COLOR2, uint2 color2 : COLOR5,\n"
+            "        out int3 target : SV_Target1, out float target2 : SV_Target5)\n"
+            "{\n"
+            "    float tmp = pos.x + pos.w + color.y + color.z + color2.x;\n"
+            "    target.xz = tmp;\n"
+            "    target2 = tmp;\n"
+            "}\n",
+            "ps_5_0\n"
+            ".input\n"
+            ".param SV_Position.xyzw, v0.xw, float, POS\n"
+            ".param COLOR2.xyz, v1.yz, float\n"
+            ".param COLOR5.xy, v2.x, uint\n"
+            ".output\n"
+            ".param SV_Target1.xyz, o1.xz, int, TARGET\n"
+            ".param SV_Target5.x, o5.x, float, TARGET\n",
+            true
+        },
+        {
+            "ps_5_0",
+            {dxbc_big, sizeof(dxbc_big)},
+            "void main(float4 pos : SV_Position, float3 color : COLOR2, uint2 color2 : COLOR5,\n"
+            "        float2 clip : SV_ClipDistance0, float3 clip2 : SV_ClipDistance1,\n"
+            "        float1 cull : SV_CullDistance0, float cull2 : SV_CullDistance1,\n"
+            "        uint prim : SV_PrimitiveID, uint inst : SV_InstanceID,\n"
+            "        bool front : SV_IsFrontFace0, uint sample : SV_SampleIndex,\n"
+            "        out int3 target : SV_Target1, out float target2 : SV_Target5,\n"
+            "        out float depth : SV_Depth)\n"
+            "{\n"
+            "    float tmp = color.y + color.z + color2 + pos.x + pos.w + clip.x + clip2.x + clip2.z\n"
+            "            + cull.x + cull2 + prim + front + sample;\n"
+            "    target.xz = tmp;\n"
+            "    target2 = tmp;\n"
+            "    depth = tmp;\n"
+            "}\n",
+            "ps_5_0\n"
+            ".input\n"
+            ".param SV_Position.xyzw, v0.xw, float, POS\n"
+            ".param COLOR2.xyz, v1.yz, float\n"
+            ".param COLOR5.xy, v2.x, uint\n"
+            ".param SV_PrimitiveID.z, v2.z, uint, PRIMID\n"
+            ".param SV_InstanceID.w, v2.w, uint\n"
+            ".param SV_ClipDistance.xy, v3.x, float, CLIPDST\n"
+            ".param SV_CullDistance.z, v3.z, float, CULLDST\n"
+            ".param SV_CullDistance1.w, v3.w, float, CULLDST\n"
+            ".param SV_ClipDistance1.xyz, v4.xz, float, CLIPDST\n"
+            ".param SV_IsFrontFace.x, v5.x, uint, FFACE\n"
+            ".param SV_SampleIndex.y, v5.y, uint, SAMPLE\n"
+            ".output\n"
+            ".param SV_Target1.xyz, o1.xz, int, TARGET\n"
+            ".param SV_Target5.x, o5.x, float, TARGET\n"
+            ".param SV_Depth, oDepth, float, DEPTH\n",
+            true
+        },
+        {
+            "ps_5_0",
+            {dxbc_depthge, sizeof(dxbc_depthge)},
+            "float4 main(out float depth : SV_DEPTHGreaterEqual, out uint cov : sv_coverAGE,\n"
+            "        out float stref : sv_stencilref) : SV_Target\n"
+            "{\n"
+            "    depth = 0.5;\n"
+            "    cov = 3;\n"
+            "    stref = 0.7;\n"
+            "    return float4(1.0, 2.0, 3.0, 4.0);\n"
+            "}\n",
+            "ps_5_0\n"
+            ".output\n"
+            ".param SV_Target.xyzw, o0.xyzw, float, TARGET\n"
+            ".param SV_DEPTHGreaterEqual, oDepthGE, float, DEPTHGE\n"
+            ".param sv_coverAGE, oMask, uint, COVERAGE\n"
+            ".param sv_stencilref, oStencilRef, float, STENCILREF\n",
+            false
+        },
+        {
+            "ps_5_0",
+            {dxbc_depthle, sizeof(dxbc_depthle)},
+            "float4 main(out float depth : SV_DEPTHlessEQUAL, uint cov : sv_coverage) : SV_Target\n"
+            "{\n"
+            "    depth = 0.5 + cov;\n"
+            "    return float4(1.0, 2.0, 3.0, 4.0);\n"
+            "}\n",
+            "ps_5_0\n"
+            ".output\n"
+            ".param SV_Target.xyzw, o0.xyzw, float, TARGET\n"
+            ".param SV_DEPTHlessEQUAL, oDepthLE, float, DEPTHLE\n",
+            false
+        },
+        {
+            "hs_5_0",
+            {dxbc_hs, sizeof(dxbc_hs)},
+            "struct input_data\n"
+            "{\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "\n"
+            "struct constant_data\n"
+            "{\n"
+            "    float edges[4] : SV_TessFactor;\n"
+            "    float inside[2] : SV_InsideTessFactor;\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "\n"
+            "struct control_point_data\n"
+            "{\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "\n"
+            "constant_data patch_constant(InputPatch<input_data, 22> ip, uint patch_id : SV_PrimitiveID)\n"
+            "{\n"
+            "    constant_data ret;\n"
+            "    ret.edges[0] = 0.1;\n"
+            "    ret.edges[1] = 0.2;\n"
+            "    ret.edges[2] = 0.3;\n"
+            "    ret.edges[3] = 0.4;\n"
+            "    ret.inside[0] = 0.5;\n"
+            "    ret.inside[1] = 0.6;\n"
+            "    ret.x = ip[patch_id].x;\n"
+            "    return ret;\n"
+            "}\n"
+            "\n"
+            "[domain(\"quad\")]\n"
+            "[partitioning(\"integer\")]\n"
+            "[outputtopology(\"triangle_cw\")]\n"
+            "[outputcontrolpoints(16)]\n"
+            "[patchconstantfunc(\"patch_constant\")]\n"
+            "control_point_data main(InputPatch<input_data, 22> ip, uint i : SV_OutputControlPointID, \n"
+            "        uint patch_id : SV_PrimitiveID)\n"
+            "{\n"
+            "    control_point_data ret;\n"
+            "    ret.x = ip[i].x + float4(i, patch_id, 0, 0);\n"
+            "    return ret;\n"
+            "}\n",
+            "hs_5_0\n"
+            ".input\n"
+            ".param semx.xyzw, v0.xyzw, float\n"
+            ".output\n"
+            ".param semx.xyzw, o0.xyzw, float\n"
+            ".patch_constant\n"
+            ".param SV_TessFactor.x, o0.x, float, QUADEDGE\n"
+            ".param SV_TessFactor1.x, o1.x, float, QUADEDGE\n"
+            ".param SV_TessFactor2.x, o2.x, float, QUADEDGE\n"
+            ".param SV_TessFactor3.x, o3.x, float, QUADEDGE\n"
+            ".param SV_InsideTessFactor.x, o4.x, float, QUADINT\n"
+            ".param SV_InsideTessFactor1.x, o5.x, float, QUADINT\n"
+            ".param semx.xyzw, o6.xyzw, float\n",
+            false
+        },
+        {
+            "ds_5_0",
+            {dxbc_ds, sizeof(dxbc_ds)},
+            "struct constant_data\n"
+            "{\n"
+            "    float edges[4] : SV_TessFactor;\n"
+            "    float inside[2] : SV_InsideTessFactor;\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "\n"
+            "struct control_point_data\n"
+            "{\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "\n"
+            "[domain(\"quad\")]\n"
+            "float4 main(constant_data input, float2 location : SV_DomainLocation,\n"
+            "        const OutputPatch<control_point_data, 16> patch) : SV_position\n"
+            "{\n"
+            "    return float4(location, 3.0, 4.0) + input.x + input.edges[2] + input.inside[0] + patch[4].x;\n"
+            "}\n",
+            "ds_5_0\n"
+            ".input\n"
+            ".param semx.xyzw, vicp0.xyzw, float\n"
+            ".output\n"
+            ".param SV_position.xyzw, o0.xyzw, float, POS\n"
+            ".patch_constant\n"
+            ".param SV_TessFactor.x, vpc0, float, QUADEDGE\n"
+            ".param SV_TessFactor1.x, vpc1, float, QUADEDGE\n"
+            ".param SV_TessFactor2.x, vpc2.x, float, QUADEDGE\n"
+            ".param SV_TessFactor3.x, vpc3, float, QUADEDGE\n"
+            ".param SV_InsideTessFactor.x, vpc4.x, float, QUADINT\n"
+            ".param SV_InsideTessFactor1.x, vpc5, float, QUADINT\n"
+            ".param semx.xyzw, vpc6.xyzw, float\n",
+            false
+        },
+        {
+            "gs_5_0",
+            {dxbc_gs, sizeof(dxbc_gs)},
+            "struct input_data\n"
+            "{\n"
+            "    float4 z : semz;\n"
+            "};\n"
+            "\n"
+            "struct output_data\n"
+            "{\n"
+            "    float4 pos : SV_POSITION;\n"
+            "    float4 x : semx;\n"
+            "};\n"
+            "struct output_data2\n"
+            "{\n"
+            "    float4 pos : SV_POSITION;\n"
+            "    float4 y : semy;\n"
+            "};\n"
+            "\n"
+            "[maxvertexcount(12)]\n"
+            "void main(triangle input_data input[3], inout PointStream<output_data> s, inout PointStream<output_data2> s2)\n"
+            "{\n"
+            "    output_data output;\n"
+            "    output.pos = float4(1.0, 2.0, 3.0, 4.0);\n"
+            "    output.x = input[0].z;\n"
+            "    s.Append(output);\n"
+            "    output_data2 output2;\n"
+            "    output2.pos = float4(11.0, 12.0, 13.0, 14.0);\n"
+            "    output2.y = input[1].z;\n"
+            "    s2.Append(output2);\n"
+            "}\n",
+            "gs_5_0\n"
+            ".input\n"
+            ".param semz.xyzw, v0.xyzw, float\n"
+            ".output\n"
+            ".param SV_POSITION.xyzw, o0.xyzw, float, POS\n"
+            ".param semx.xyzw, o1.xyzw, float\n"
+            ".param SV_POSITION.xyzw, o0.xyzw, float, POS, NONE, m1\n"
+            ".param semy.xyzw, o1.xyzw, float, NONE, NONE, m1\n",
+            false
+        },
+    };
+
+    struct vkd3d_shader_hlsl_source_info hlsl_info =
+    {
+        .type = VKD3D_SHADER_STRUCTURE_TYPE_HLSL_SOURCE_INFO,
+        .entry_point = "main",
+    };
+    struct vkd3d_shader_compile_info compile_info =
+    {
+        .type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO,
+        .next = &hlsl_info,
+        .source_type = VKD3D_SHADER_SOURCE_HLSL,
+        .target_type = VKD3D_SHADER_TARGET_DXBC_TPF,
+        .log_level = VKD3D_SHADER_LOG_NONE,
+    };
+    struct vkd3d_shader_compile_option disassemble_options[] =
+    {
+        {
+            .name = VKD3D_SHADER_COMPILE_OPTION_FORMATTING,
+            .value = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES
+        },
+    };
+    struct vkd3d_shader_compile_info disassemble_info =
+    {
+        .type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO,
+        .source_type = VKD3D_SHADER_SOURCE_DXBC_TPF,
+        .target_type = VKD3D_SHADER_TARGET_D3D_ASM,
+        .options = disassemble_options,
+        .option_count = ARRAY_SIZE(disassemble_options),
+        .log_level = VKD3D_SHADER_LOG_NONE,
+    };
+    struct vkd3d_shader_code dxbc, disasm;
+    unsigned int i;
+    char *ptr;
+    int rc;
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        const struct emit_signature_test *test = &tests[i];
+
+        vkd3d_test_push_context("%u", i);
+
+        if (test->dxbc.size == 0)
+        {
+            hlsl_info.profile = test->profile;
+            compile_info.source.code = test->source;
+            compile_info.source.size = strlen(test->source);
+            rc = vkd3d_shader_compile(&compile_info, &dxbc, NULL);
+            ok(rc == VKD3D_OK, "Cannot compile HLSL shader, rc %d.\n", rc);
+            disassemble_info.source = dxbc;
+        }
+        else
+        {
+            disassemble_info.source = test->dxbc;
+        }
+
+        rc = vkd3d_shader_compile(&disassemble_info, &disasm, NULL);
+        ok(rc == VKD3D_OK, "Cannot disassemble shader, rc %d.\n", rc);
+
+        ptr = strstr(disasm.code, ".text\n");
+        ok(ptr, "Cannot find text marker in disassembled code.\n");
+        *ptr = '\0';
+        todo_if(test->is_todo)
+        ok(strcmp(disasm.code, test->signature) == 0, "Unexpected signature description.\n");
+
+        if (test->dxbc.size == 0)
+            vkd3d_shader_free_shader_code(&dxbc);
+        vkd3d_shader_free_shader_code(&disasm);
+
+        vkd3d_test_pop_context();
+    }
+}
+
 START_TEST(vkd3d_shader_api)
 {
     setlocale(LC_ALL, "");
@@ -1051,4 +1655,5 @@ START_TEST(vkd3d_shader_api)
     run_test(test_scan_descriptors);
     run_test(test_build_varying_map);
     run_test(test_scan_combined_resource_samplers);
+    run_test(test_emit_signature);
 }
