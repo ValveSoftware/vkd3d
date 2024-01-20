@@ -150,7 +150,7 @@ static const char *shader_get_string(const char *data, size_t data_size, size_t 
 }
 
 static int parse_dxbc(const struct vkd3d_shader_code *dxbc, struct vkd3d_shader_message_context *message_context,
-        const char *source_name, struct vkd3d_shader_dxbc_desc *desc)
+        const char *source_name, uint32_t flags, struct vkd3d_shader_dxbc_desc *desc)
 {
     const struct vkd3d_shader_location location = {.source_name = source_name};
     struct vkd3d_shader_dxbc_section_desc *sections, *section;
@@ -186,17 +186,20 @@ static int parse_dxbc(const struct vkd3d_shader_code *dxbc, struct vkd3d_shader_
     checksum[1] = read_u32(&ptr);
     checksum[2] = read_u32(&ptr);
     checksum[3] = read_u32(&ptr);
-    vkd3d_compute_dxbc_checksum(data, data_size, calculated_checksum);
-    if (memcmp(checksum, calculated_checksum, sizeof(checksum)))
+    if (!(flags & VKD3D_SHADER_PARSE_DXBC_IGNORE_CHECKSUM))
     {
-        WARN("Checksum {0x%08x, 0x%08x, 0x%08x, 0x%08x} does not match "
-                "calculated checksum {0x%08x, 0x%08x, 0x%08x, 0x%08x}.\n",
-                checksum[0], checksum[1], checksum[2], checksum[3],
-                calculated_checksum[0], calculated_checksum[1],
-                calculated_checksum[2], calculated_checksum[3]);
-        vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHECKSUM,
-                "Invalid DXBC checksum.");
-        return VKD3D_ERROR_INVALID_ARGUMENT;
+        vkd3d_compute_dxbc_checksum(data, data_size, calculated_checksum);
+        if (memcmp(checksum, calculated_checksum, sizeof(checksum)))
+        {
+            WARN("Checksum {0x%08x, 0x%08x, 0x%08x, 0x%08x} does not match "
+                    "calculated checksum {0x%08x, 0x%08x, 0x%08x, 0x%08x}.\n",
+                    checksum[0], checksum[1], checksum[2], checksum[3],
+                    calculated_checksum[0], calculated_checksum[1],
+                    calculated_checksum[2], calculated_checksum[3]);
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_DXBC_INVALID_CHECKSUM,
+                    "Invalid DXBC checksum.");
+            return VKD3D_ERROR_INVALID_ARGUMENT;
+        }
     }
 
     version = read_u32(&ptr);
@@ -287,7 +290,7 @@ static int for_each_dxbc_section(const struct vkd3d_shader_code *dxbc,
     unsigned int i;
     int ret;
 
-    if ((ret = parse_dxbc(dxbc, message_context, source_name, &desc)) < 0)
+    if ((ret = parse_dxbc(dxbc, message_context, source_name, 0, &desc)) < 0)
         return ret;
 
     for (i = 0; i < desc.section_count; ++i)
@@ -313,7 +316,7 @@ int vkd3d_shader_parse_dxbc(const struct vkd3d_shader_code *dxbc,
         *messages = NULL;
     vkd3d_shader_message_context_init(&message_context, VKD3D_SHADER_LOG_INFO);
 
-    ret = parse_dxbc(dxbc, &message_context, NULL, desc);
+    ret = parse_dxbc(dxbc, &message_context, NULL, flags, desc);
 
     vkd3d_shader_message_context_trace_messages(&message_context);
     if (!vkd3d_shader_message_context_copy_messages(&message_context, messages) && ret >= 0)
