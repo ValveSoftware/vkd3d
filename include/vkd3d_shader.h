@@ -1777,10 +1777,10 @@ struct vkd3d_shader_dxbc_desc
  * \endcode
  */
 #define VKD3D_SHADER_SWIZZLE(x, y, z, w) \
-        vkd3d_shader_create_swizzle(VKD3D_SHADER_SWIZZLE_ ## x, \
-                VKD3D_SHADER_SWIZZLE_ ## y, \
-                VKD3D_SHADER_SWIZZLE_ ## z, \
-                VKD3D_SHADER_SWIZZLE_ ## w)
+        (VKD3D_SHADER_SWIZZLE_ ## x << VKD3D_SHADER_SWIZZLE_SHIFT(0) \
+                | VKD3D_SHADER_SWIZZLE_ ## y << VKD3D_SHADER_SWIZZLE_SHIFT(1) \
+                | VKD3D_SHADER_SWIZZLE_ ## z << VKD3D_SHADER_SWIZZLE_SHIFT(2) \
+                | VKD3D_SHADER_SWIZZLE_ ## w << VKD3D_SHADER_SWIZZLE_SHIFT(3))
 
 /** The identity swizzle ".xyzw". */
 #define VKD3D_SHADER_NO_SWIZZLE VKD3D_SHADER_SWIZZLE(X, Y, Z, W)
