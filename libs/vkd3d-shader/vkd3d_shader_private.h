@@ -1605,15 +1605,40 @@ static inline unsigned int vkd3d_write_mask_from_component_count(unsigned int co
 
 static inline uint32_t vsir_write_mask_64_from_32(uint32_t write_mask32)
 {
-    uint32_t write_mask64 = write_mask32 | (write_mask32 >> 1);
-    return (write_mask64 & VKD3DSP_WRITEMASK_0) | ((write_mask64 & VKD3DSP_WRITEMASK_2) >> 1);
+    switch (write_mask32)
+    {
+        case VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1:
+            return VKD3DSP_WRITEMASK_0;
+
+        case VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3:
+            return VKD3DSP_WRITEMASK_1;
+
+        case VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1 | VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3:
+            return VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1;
+
+        default:
+            ERR("Invalid 32 bit writemask when converting to 64 bit: %#x.\n", write_mask32);
+            return VKD3DSP_WRITEMASK_0;
+    }
 }
 
 static inline uint32_t vsir_write_mask_32_from_64(uint32_t write_mask64)
 {
-    uint32_t write_mask32 = (write_mask64 | (write_mask64 << 1))
-            & (VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_2);
-    return write_mask32 | (write_mask32 << 1);
+    switch (write_mask64)
+    {
+        case VKD3DSP_WRITEMASK_0:
+            return VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1;
+
+        case VKD3DSP_WRITEMASK_1:
+            return VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3;
+
+        case VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1:
+            return VKD3DSP_WRITEMASK_0 | VKD3DSP_WRITEMASK_1 | VKD3DSP_WRITEMASK_2 | VKD3DSP_WRITEMASK_3;
+
+        default:
+            ERR("Invalid 64 bit writemask: %#x.\n", write_mask64);
+            return VKD3DSP_WRITEMASK_0;
+    }
 }
 
 static inline unsigned int vsir_swizzle_get_component(uint32_t swizzle, unsigned int idx)
