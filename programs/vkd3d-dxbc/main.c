@@ -70,6 +70,7 @@ enum
     OPTION_LIST,
     OPTION_LIST_DATA,
     OPTION_NO_COLOUR,
+    OPTION_OUTPUT,
     OPTION_VERSION,
 };
 
@@ -79,11 +80,16 @@ struct action
     {
         ACTION_TYPE_EMIT,
     } type;
+    union
+    {
+        const char *output_filename;
+    } u;
 };
 
 struct options
 {
     const char *input_filename;
+    const char *output_filename;
     bool print_help;
     bool list;
     bool list_data;
@@ -141,6 +147,7 @@ static bool has_colour(void)
 
 static bool parse_command_line(int argc, char **argv, struct options *options)
 {
+    struct action *action;
     int option;
 
     static struct option long_options[] =
@@ -152,6 +159,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
         {"list",            no_argument,       NULL, OPTION_LIST},
         {"list-data",       no_argument,       NULL, OPTION_LIST_DATA},
         {"no-colour",       no_argument,       NULL, OPTION_NO_COLOUR},
+        {"output",          required_argument, NULL, OPTION_OUTPUT},
         {"version",         no_argument,       NULL, OPTION_VERSION},
         {NULL,              0,                 NULL, 0},
     };
@@ -180,7 +188,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "ehtV", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "ehtVo:", long_options, NULL)) == -1)
             break;
 
         switch (option)
@@ -191,12 +199,14 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
             case 'e':
             case OPTION_EMIT:
-                action_push(options, ACTION_TYPE_EMIT);
-                if (isatty(fileno(stdout)))
+                action = action_push(options, ACTION_TYPE_EMIT);
+                if (!options->output_filename && isatty(fileno(stdout)))
                 {
-                    fprintf(stderr, "Output is a tty and output format is binary, exiting.\n");
+                    fprintf(stderr, "Output is a tty and output format is binary, exiting.\n"
+                            "If this is really what you intended, specify the output explicitly.\n");
                     return false;
                 }
+                action->u.output_filename = options->output_filename;
                 break;
 
             case 'h':
@@ -221,6 +231,11 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                 options->colours = no_colours;
                 break;
 
+            case OPTION_OUTPUT:
+            case 'o':
+                options->output_filename = optarg;
+                break;
+
             case 'V':
             case OPTION_VERSION:
                 options->print_version = true;
@@ -243,22 +258,28 @@ static void print_usage(const char *program_name)
         "[options...] [file]\n"
         "Options:\n"
         "  --colour                 Enable colour, even when not supported by the output.\n"
-        "  -e, --emit               Emit the content of the DXBC blob to the standard output.\n"
+        "  -e, --emit               Emit the content of the DXBC blob.\n"
         "  -h, --help               Display this information and exit.\n"
         "  -t, --list               List the contents of the DXBC blob.\n"
         "  --list-data              List the data contained in the DXBC sections.\n"
         "  --no-colour              Disable colour, even when supported by the output.\n"
         "  -V, --version            Display version information and exit.\n"
         "  --ignore-checksum        Do not validate the checksum when parsing the DXBC blob.\n"
+        "  -o, --output=<file>      Set the output filename for --emit.\n"
         "  --                       Stop option processing. Any subsequent argument is\n"
         "                           interpreted as a filename.\n"
         "\n"
         "If the input file is '-' or not specified, input will be read from standard\n"
-        "input.\n"
+        "input. Similarly, if the output file is '-' or not specified at the point\n"
+        "--emit is found, output will be written to the standard output.\n"
         "\n"
         "Currently this tool can only re-emit the same DXBC blob it loaded. However, it\n"
         "will recompute the checksum while doing so, so --emit can be useful\n"
-        "together with --ignore-checksum to fix the checksum for a blob.\n";
+        "together with --ignore-checksum to fix the checksum for a blob.\n"
+        "\n"
+        "Options --emit and --output can be specified more than once. The DXBC blob\n"
+        "will be emitted once for each --emit occurrence, each time using the closest\n"
+        "previous --output occurrence as output filename.\n";
 
     fprintf(stderr, "Usage: %s %s", program_name, usage);
 }
@@ -335,6 +356,25 @@ static bool read_input(FILE *f, struct vkd3d_shader_code *dxbc)
     dxbc->size = pos;
 
     return true;
+}
+
+static FILE *open_output(const char *filename, bool *close)
+{
+    FILE *f;
+
+    *close = false;
+
+    if (!filename || !strcmp(filename, "-"))
+        return stdout;
+
+    if (!(f = fopen(filename, "wb")))
+    {
+        fprintf(stderr, "Unable to open '%s' for writing.\n", filename);
+        return NULL;
+    }
+
+    *close = true;
+    return f;
 }
 
 static bool write_output(FILE *f, const struct vkd3d_shader_code *dxbc)
@@ -467,14 +507,14 @@ static void dump_dxbc(const struct vkd3d_shader_code *dxbc, const struct vkd3d_s
 
 int main(int argc, char **argv)
 {
+    bool close_input = false, close_output = false;
     struct vkd3d_shader_code dxbc, serialized;
     struct vkd3d_shader_dxbc_desc dxbc_desc;
-    bool close_input = false;
     struct options options;
+    FILE *input, *output;
     char *messages;
     uint32_t flags;
     int fail = 1;
-    FILE *input;
     size_t i;
     int ret;
 
@@ -537,7 +577,13 @@ int main(int argc, char **argv)
                 if (ret < 0)
                     goto done;
 
-                if (!write_output(stdout, &serialized))
+                if (!(output = open_output(action->u.output_filename, &close_output)))
+                {
+                    vkd3d_shader_free_shader_code(&serialized);
+                    goto done;
+                }
+
+                if (!write_output(output, &serialized))
                 {
                     fprintf(stderr, "Failed to write output blob.\n");
                     vkd3d_shader_free_shader_code(&serialized);
@@ -559,5 +605,7 @@ done:
     free(options.actions);
     if (close_input)
         fclose(input);
+    if (close_output)
+        fclose(output);
     return fail;
 }
