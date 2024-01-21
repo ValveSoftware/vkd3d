@@ -37,6 +37,7 @@ enum
 {
     OPTION_COLOUR = CHAR_MAX + 1,
     OPTION_HELP,
+    OPTION_IGNORE_CHECKSUM,
     OPTION_LIST,
     OPTION_LIST_DATA,
     OPTION_NO_COLOUR,
@@ -50,6 +51,7 @@ struct options
     bool list;
     bool list_data;
     bool print_version;
+    bool ignore_checksum;
 
     struct colours
     {
@@ -86,13 +88,14 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     static struct option long_options[] =
     {
-        {"colour",    no_argument,       NULL, OPTION_COLOUR},
-        {"help",      no_argument,       NULL, OPTION_HELP},
-        {"list",      no_argument,       NULL, OPTION_LIST},
-        {"list-data", no_argument,       NULL, OPTION_LIST_DATA},
-        {"no-colour", no_argument,       NULL, OPTION_NO_COLOUR},
-        {"version",   no_argument,       NULL, OPTION_VERSION},
-        {NULL,        0,                 NULL, 0},
+        {"colour",          no_argument,       NULL, OPTION_COLOUR},
+        {"help",            no_argument,       NULL, OPTION_HELP},
+        {"ignore-checksum", no_argument,       NULL, OPTION_IGNORE_CHECKSUM},
+        {"list",            no_argument,       NULL, OPTION_LIST},
+        {"list-data",       no_argument,       NULL, OPTION_LIST_DATA},
+        {"no-colour",       no_argument,       NULL, OPTION_NO_COLOUR},
+        {"version",         no_argument,       NULL, OPTION_VERSION},
+        {NULL,              0,                 NULL, 0},
     };
 
     static const struct colours colours =
@@ -132,6 +135,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
             case OPTION_HELP:
                 options->print_help = true;
                 return true;
+
+            case OPTION_IGNORE_CHECKSUM:
+                options->ignore_checksum = true;
+                break;
 
             case 't':
             case OPTION_LIST:
@@ -173,6 +180,7 @@ static void print_usage(const char *program_name)
         "  --list-data              List the data contained in the DXBC sections.\n"
         "  --no-colour              Disable colour, even when supported by the output.\n"
         "  -V, --version            Display version information and exit.\n"
+        "  --ignore-checksum        Do not validate the checksum when parsing the DXBC blob.\n"
         "  --                       Stop option processing. Any subsequent argument is\n"
         "                           interpreted as a filename.\n"
         "\n"
@@ -376,6 +384,7 @@ int main(int argc, char **argv)
     struct options options;
     bool close_input;
     char *messages;
+    uint32_t flags;
     int fail = 1;
     FILE *input;
     int ret;
@@ -409,7 +418,11 @@ int main(int argc, char **argv)
         goto done;
     }
 
-    ret = vkd3d_shader_parse_dxbc(&dxbc, 0, &dxbc_desc, &messages);
+    flags = 0;
+    if (options.ignore_checksum)
+        flags |= VKD3D_SHADER_PARSE_DXBC_IGNORE_CHECKSUM;
+
+    ret = vkd3d_shader_parse_dxbc(&dxbc, flags, &dxbc_desc, &messages);
     if (messages)
         fputs(messages, stderr);
     vkd3d_shader_free_messages(messages);
