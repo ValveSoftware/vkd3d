@@ -33,15 +33,52 @@
 #include <term.h>
 #endif
 
+static bool array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size)
+{
+    size_t new_capacity, max_capacity;
+    void *new_elements;
+
+    if (element_count <= *capacity)
+        return true;
+
+    max_capacity = ~(size_t)0 / element_size;
+    if (max_capacity < element_count)
+        return false;
+
+    new_capacity = max(*capacity, 4);
+    while (new_capacity < element_count && new_capacity <= max_capacity / 2)
+        new_capacity *= 2;
+
+    if (new_capacity < element_count)
+        new_capacity = element_count;
+
+    if (!(new_elements = realloc(*elements, new_capacity * element_size)))
+        return false;
+
+    *elements = new_elements;
+    *capacity = new_capacity;
+
+    return true;
+}
+
 enum
 {
     OPTION_COLOUR = CHAR_MAX + 1,
+    OPTION_EMIT,
     OPTION_HELP,
     OPTION_IGNORE_CHECKSUM,
     OPTION_LIST,
     OPTION_LIST_DATA,
     OPTION_NO_COLOUR,
     OPTION_VERSION,
+};
+
+struct action
+{
+    enum action_type
+    {
+        ACTION_TYPE_EMIT,
+    } type;
 };
 
 struct options
@@ -53,6 +90,9 @@ struct options
     bool print_version;
     bool ignore_checksum;
 
+    struct action *actions;
+    size_t action_count, action_capacity;
+
     struct colours
     {
         const char *reset;
@@ -61,6 +101,23 @@ struct options
         const char *label;
     } colours;
 };
+
+static struct action *action_push(struct options *options, enum action_type type)
+{
+    struct action *action;
+
+    if (!array_reserve((void **)&options->actions, &options->action_capacity,
+            options->action_count + 1, sizeof(*options->actions)))
+    {
+        fprintf(stderr, "Out of memory.\n");
+        exit(1);
+    }
+
+    action = &options->actions[options->action_count++];
+    action->type = type;
+
+    return action;
+}
 
 static bool has_colour(void)
 {
@@ -89,6 +146,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     static struct option long_options[] =
     {
         {"colour",          no_argument,       NULL, OPTION_COLOUR},
+        {"emit",            no_argument,       NULL, OPTION_EMIT},
         {"help",            no_argument,       NULL, OPTION_HELP},
         {"ignore-checksum", no_argument,       NULL, OPTION_IGNORE_CHECKSUM},
         {"list",            no_argument,       NULL, OPTION_LIST},
@@ -122,13 +180,23 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
 
     for (;;)
     {
-        if ((option = getopt_long(argc, argv, "htV", long_options, NULL)) == -1)
+        if ((option = getopt_long(argc, argv, "ehtV", long_options, NULL)) == -1)
             break;
 
         switch (option)
         {
             case OPTION_COLOUR:
                 options->colours = colours;
+                break;
+
+            case 'e':
+            case OPTION_EMIT:
+                action_push(options, ACTION_TYPE_EMIT);
+                if (isatty(fileno(stdout)))
+                {
+                    fprintf(stderr, "Output is a tty and output format is binary, exiting.\n");
+                    return false;
+                }
                 break;
 
             case 'h':
@@ -175,6 +243,7 @@ static void print_usage(const char *program_name)
         "[options...] [file]\n"
         "Options:\n"
         "  --colour                 Enable colour, even when not supported by the output.\n"
+        "  -e, --emit               Emit the content of the DXBC blob to the standard output.\n"
         "  -h, --help               Display this information and exit.\n"
         "  -t, --list               List the contents of the DXBC blob.\n"
         "  --list-data              List the data contained in the DXBC sections.\n"
@@ -185,7 +254,11 @@ static void print_usage(const char *program_name)
         "                           interpreted as a filename.\n"
         "\n"
         "If the input file is '-' or not specified, input will be read from standard\n"
-        "input.\n";
+        "input.\n"
+        "\n"
+        "Currently this tool can only re-emit the same DXBC blob it loaded. However, it\n"
+        "will recompute the checksum while doing so, so --emit can be useful\n"
+        "together with --ignore-checksum to fix the checksum for a blob.\n";
 
     fprintf(stderr, "Usage: %s %s", program_name, usage);
 }
@@ -260,6 +333,21 @@ static bool read_input(FILE *f, struct vkd3d_shader_code *dxbc)
 
     dxbc->code = data;
     dxbc->size = pos;
+
+    return true;
+}
+
+static bool write_output(FILE *f, const struct vkd3d_shader_code *dxbc)
+{
+    const char *code = dxbc->code;
+    size_t pos = 0, ret;
+
+    while (pos != dxbc->size)
+    {
+        if (!(ret = fwrite(&code[pos], 1, dxbc->size - pos, f)))
+            return false;
+        pos += ret;
+    }
 
     return true;
 }
@@ -379,26 +467,28 @@ static void dump_dxbc(const struct vkd3d_shader_code *dxbc, const struct vkd3d_s
 
 int main(int argc, char **argv)
 {
+    struct vkd3d_shader_code dxbc, serialized;
     struct vkd3d_shader_dxbc_desc dxbc_desc;
-    struct vkd3d_shader_code dxbc;
+    bool close_input = false;
     struct options options;
-    bool close_input;
     char *messages;
     uint32_t flags;
     int fail = 1;
     FILE *input;
+    size_t i;
     int ret;
 
     if (!parse_command_line(argc, argv, &options))
     {
         print_usage(argv[0]);
-        return 1;
+        goto done;
     }
 
     if (options.print_help || (argc < 2 && isatty(fileno(stdin))))
     {
         print_usage(argv[0]);
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (options.print_version)
@@ -406,7 +496,8 @@ int main(int argc, char **argv)
         const char *version = vkd3d_shader_get_version(NULL, NULL);
 
         fprintf(stdout, "vkd3d-dxbc version " PACKAGE_VERSION " using %s\n", version);
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (!(input = open_input(options.input_filename, &close_input)))
@@ -432,10 +523,40 @@ int main(int argc, char **argv)
     if (options.list || options.list_data)
         dump_dxbc(&dxbc, &dxbc_desc, &options);
 
+    for (i = 0; i < options.action_count; ++i)
+    {
+        struct action *action = &options.actions[i];
+
+        switch (action->type)
+        {
+            case ACTION_TYPE_EMIT:
+                ret = vkd3d_shader_serialize_dxbc(dxbc_desc.section_count, dxbc_desc.sections, &serialized, &messages);
+                if (messages)
+                    fputs(messages, stderr);
+                vkd3d_shader_free_messages(messages);
+                if (ret < 0)
+                    goto done;
+
+                if (!write_output(stdout, &serialized))
+                {
+                    fprintf(stderr, "Failed to write output blob.\n");
+                    vkd3d_shader_free_shader_code(&serialized);
+                    goto done;
+                }
+
+                vkd3d_shader_free_shader_code(&serialized);
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+
     vkd3d_shader_free_dxbc(&dxbc_desc);
     vkd3d_shader_free_shader_code(&dxbc);
     fail = 0;
 done:
+    free(options.actions);
     if (close_input)
         fclose(input);
     return fail;
