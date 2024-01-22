@@ -342,6 +342,9 @@ enum dx_intrinsic_opcode
     DX_ACOS                         =  15,
     DX_ASIN                         =  16,
     DX_ATAN                         =  17,
+    DX_HCOS                         =  18,
+    DX_HSIN                         =  19,
+    DX_HTAN                         =  20,
     DX_EXP                          =  21,
     DX_FRC                          =  22,
     DX_LOG                          =  23,
@@ -3690,6 +3693,12 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_ASIN;
         case DX_ATAN:
             return VKD3DSIH_ATAN;
+        case DX_HCOS:
+            return VKD3DSIH_HCOS;
+        case DX_HSIN:
+            return VKD3DSIH_HSIN;
+        case DX_HTAN:
+            return VKD3DSIH_HTAN;
         case DX_EXP:
             return VKD3DSIH_EXP;
         case DX_FRC:
@@ -4263,6 +4272,9 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_FMIN                          ] = {"g", "RR",   sm6_parser_emit_dx_binary},
     [DX_FRC                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_IBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
+    [DX_HCOS                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_HSIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_HTAN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_IMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_IMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_ISFINITE                      ] = {"1", "g",    sm6_parser_emit_dx_unary},

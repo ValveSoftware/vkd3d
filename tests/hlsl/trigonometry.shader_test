@@ -86,10 +86,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -6.28318531 -0.88137359 0.88137359 6.28318531
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-267.744894, -1.0, 1.0, 267.744894) 2
 uniform 0 float4 -0.0 0.0 -90.0 90.0
-todo draw quad
+todo(sm<6) draw quad
 % mingw does not support "inf" for scanf(), but numbers beyond FLOAT_MAX consistently result in inf.
 probe all rgba (0.0, 0.0, -1.0e39, 1.0e39) 1
 
@@ -104,10 +104,10 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.76274717 -1.3169579 1.3169579 1.76274717
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (3.0, 2.0, 2.0, 3.0) 2
 uniform 0 float4 -0.0 0.0 -90.0 90.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.0, 1.0, 1.0e39, 1.0e39) 1
 
 
@@ -121,8 +121,8 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.57079633 -0.54930614 0.54930614 1.57079633
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-0.91715234, -0.5, 0.5, 0.91715234) 2
 uniform 0 float4 -10.0 -0.0 0.0 10.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-1.0, 0.0, 0.0, 1.0) 1

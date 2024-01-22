@@ -7008,6 +7008,9 @@ static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
         {VKD3DSIH_FIRSTBIT_LO,     GLSLstd450FindILsb},
         {VKD3DSIH_FIRSTBIT_SHI,    GLSLstd450FindSMsb},
         {VKD3DSIH_FRC,             GLSLstd450Fract},
+        {VKD3DSIH_HCOS,            GLSLstd450Cosh},
+        {VKD3DSIH_HSIN,            GLSLstd450Sinh},
+        {VKD3DSIH_HTAN,            GLSLstd450Tanh},
         {VKD3DSIH_IMAX,            GLSLstd450SMax},
         {VKD3DSIH_IMIN,            GLSLstd450SMin},
         {VKD3DSIH_LOG,             GLSLstd450Log2},
@@ -9587,6 +9590,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_ACOS:
         case VKD3DSIH_ASIN:
         case VKD3DSIH_ATAN:
+        case VKD3DSIH_HCOS:
+        case VKD3DSIH_HSIN:
+        case VKD3DSIH_HTAN:
         case VKD3DSIH_DFMA:
         case VKD3DSIH_DMAX:
         case VKD3DSIH_DMIN:
