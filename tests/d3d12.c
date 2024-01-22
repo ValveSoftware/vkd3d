@@ -576,6 +576,21 @@ static bool are_typed_uav_load_additional_formats_supported(ID3D12Device *device
     return options.TypedUAVLoadAdditionalFormats;
 }
 
+static bool is_vs_array_index_supported(ID3D12Device *device)
+{
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    if (FAILED(hr = ID3D12Device_CheckFeatureSupport(device,
+            D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options))))
+    {
+        trace("Failed to check feature support, hr %#x.\n", hr);
+        return false;
+    }
+
+    return options.VPAndRTArrayIndexFromAnyShaderFeedingRasterizerSupportedWithoutGSEmulation;
+}
+
 #define create_cb_root_signature(a, b, c, e) create_cb_root_signature_(__LINE__, a, b, c, e)
 static ID3D12RootSignature *create_cb_root_signature_(unsigned int line,
         ID3D12Device *device, unsigned int reg_idx, D3D12_SHADER_VISIBILITY shader_visibility,
@@ -28143,59 +28158,22 @@ static void test_ps_layer(void)
 
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     static const char vs_code[] =
-            "void main(in uint vertex_id : SV_VertexID, out uint layer : LAYER)\n"
+            "float4 main(in uint vertex_id : SV_VertexID, in uint instance_id : SV_InstanceID,\n"
+            "        out uint layer : SV_RenderTargetArrayIndex) : SV_Position\n"
             "{\n"
-            "    layer = vertex_id;\n"
+            "    layer = instance_id;\n"
+            "    switch (vertex_id)\n"
+            "    {\n"
+            "        case 0:\n"
+            "            return float4(-1, 1, 0, 1);\n"
+            "        case 1:\n"
+            "            return float4(3, 1, 0, 1);\n"
+            "        case 2:\n"
+            "            return float4(-1, -3, 0, 1);\n"
+            "        default:\n"
+            "            return float4(0, 0, 0, 0);\n"
+            "    }\n"
             "}\n";
-    static const DWORD gs_code[] =
-    {
-#if 0
-        struct gs_in
-        {
-            uint layer : LAYER;
-        };
-
-        struct gs_out
-        {
-            float4 position : SV_Position;
-            uint layer : SV_RenderTargetArrayIndex;
-        };
-
-        [maxvertexcount(3)]
-        void main(point gs_in vin[1], inout TriangleStream<gs_out> vout)
-        {
-            gs_out o;
-
-            o.layer = vin[0].layer;
-
-            o.position = float4(-1, 1, 0, 1);
-            vout.Append(o);
-
-            o.position = float4(3, 1, 0, 1);
-            vout.Append(o);
-
-            o.position = float4(-1, -3, 0, 1);
-            vout.Append(o);
-        }
-#endif
-        0x43425844, 0x2589d822, 0x7557587c, 0x7d7e9cc0, 0x6bad86aa, 0x00000001, 0x000001fc, 0x00000003,
-        0x0000002c, 0x0000005c, 0x000000cc, 0x4e475349, 0x00000028, 0x00000001, 0x00000008, 0x00000020,
-        0x00000000, 0x00000000, 0x00000001, 0x00000000, 0x00000101, 0x4559414c, 0xabab0052, 0x3547534f,
-        0x00000068, 0x00000002, 0x00000008, 0x00000000, 0x00000040, 0x00000000, 0x00000001, 0x00000003,
-        0x00000000, 0x0000000f, 0x00000000, 0x0000004c, 0x00000000, 0x00000004, 0x00000001, 0x00000001,
-        0x00000e01, 0x505f5653, 0x7469736f, 0x006e6f69, 0x525f5653, 0x65646e65, 0x72615472, 0x41746567,
-        0x79617272, 0x65646e49, 0xabab0078, 0x58454853, 0x00000128, 0x00020050, 0x0000004a, 0x0100086a,
-        0x0400005f, 0x00201012, 0x00000001, 0x00000000, 0x0100085d, 0x0300008f, 0x00110000, 0x00000000,
-        0x0100285c, 0x04000067, 0x001020f2, 0x00000000, 0x00000001, 0x04000067, 0x00102012, 0x00000001,
-        0x00000004, 0x0200005e, 0x00000003, 0x08000036, 0x001020f2, 0x00000000, 0x00004002, 0xbf800000,
-        0x3f800000, 0x00000000, 0x3f800000, 0x06000036, 0x00102012, 0x00000001, 0x0020100a, 0x00000000,
-        0x00000000, 0x03000075, 0x00110000, 0x00000000, 0x08000036, 0x001020f2, 0x00000000, 0x00004002,
-        0x40400000, 0x3f800000, 0x00000000, 0x3f800000, 0x06000036, 0x00102012, 0x00000001, 0x0020100a,
-        0x00000000, 0x00000000, 0x03000075, 0x00110000, 0x00000000, 0x08000036, 0x001020f2, 0x00000000,
-        0x00004002, 0xbf800000, 0xc0400000, 0x00000000, 0x3f800000, 0x06000036, 0x00102012, 0x00000001,
-        0x0020100a, 0x00000000, 0x00000000, 0x03000075, 0x00110000, 0x00000000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE gs = {gs_code, sizeof(gs_code)};
     static const char ps_code[] =
             "float4 main(float4 p : SV_Position, uint layer : SV_RenderTargetArrayIndex) : SV_Target0\n"
             "{\n"
@@ -28226,14 +28204,21 @@ static void test_ps_layer(void)
         ID3D10Blob_Release(ps_bytecode);
         return;
     }
+
+    if (!is_vs_array_index_supported(context.device))
+    {
+        skip("The device does not support SV_RenderTargetArrayIndex in VS.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
     device = context.device;
     command_list = context.list;
     queue = context.queue;
 
     init_pipeline_state_desc(&pso_desc, context.root_signature,
             context.render_target_desc.Format, &vs, &ps, NULL);
-    pso_desc.GS = gs;
-    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
             &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
     ok(hr == S_OK, "Failed to create graphics pipeline state, hr %#x.\n", hr);
@@ -28245,8 +28230,8 @@ static void test_ps_layer(void)
     ID3D12GraphicsCommandList_RSSetViewports(command_list, 1, &context.viewport);
     ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
-    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
-    ID3D12GraphicsCommandList_DrawInstanced(command_list, 6, 1, 0, 0);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 6, 0, 0);
 
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
