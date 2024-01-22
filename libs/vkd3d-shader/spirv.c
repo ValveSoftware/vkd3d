@@ -6768,6 +6768,8 @@ static SpvOp spirv_compiler_map_alu_instruction(const struct vkd3d_shader_instru
         {VKD3DSIH_INEG,       SpvOpSNegate},
         {VKD3DSIH_ISHL,       SpvOpShiftLeftLogical},
         {VKD3DSIH_ISHR,       SpvOpShiftRightArithmetic},
+        {VKD3DSIH_ISINF,      SpvOpIsInf},
+        {VKD3DSIH_ISNAN,      SpvOpIsNan},
         {VKD3DSIH_ITOD,       SpvOpConvertSToF},
         {VKD3DSIH_ITOF,       SpvOpConvertSToF},
         {VKD3DSIH_ITOI,       SpvOpSConvert},
@@ -9488,6 +9490,8 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_INEG:
         case VKD3DSIH_ISHL:
         case VKD3DSIH_ISHR:
+        case VKD3DSIH_ISINF:
+        case VKD3DSIH_ISNAN:
         case VKD3DSIH_ITOD:
         case VKD3DSIH_ITOF:
         case VKD3DSIH_ITOI:
