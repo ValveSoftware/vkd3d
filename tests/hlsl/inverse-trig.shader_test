@@ -13,23 +13,23 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (3.14159274, 0.0, 0.0, 0.0) 128
 
 uniform 0 float4 -0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (2.094441441, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.57072878, 0.0, 0.0, 0.0) 1024
 
 uniform 0 float4 0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.04715133, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0) 128
 
 [pixel shader todo]
@@ -44,7 +44,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-31416.0, 0.0, 0.0, 0.0)
 
 [require]
@@ -72,15 +72,15 @@ shader model >= 6.0
 % RADV are a bit lower than these, hence the large max ulp difference.
 [test]
 uniform 0 float4 -0.5 0.0 0.0 0.0
-todo draw quad
+draw quad
 probe all rgba (-10472.0, 0.0, 0.0, 0.0) 4096
 
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.5 0.0 0.0 0.0
-todo draw quad
+draw quad
 probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
 
 [require]
@@ -88,7 +88,7 @@ probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
 
 [test]
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (31416.0, 0.0, 0.0, 0.0)
 
 
@@ -102,23 +102,23 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-0.785409629, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 -0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-0.4636476, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.4636476, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.785409629, 0.0, 0.0, 0.0) 512
 
 [pixel shader todo]
@@ -133,64 +133,64 @@ float4 main() : sv_target
 [test]
 % Non-degenerate cases
 uniform 0 float4 1.0 1.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.785385, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 5.0 -5.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (2.356194, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -3.0 -3.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-2.356194, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 1.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 -1.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
 
 % Degenerate cases
 uniform 0 float4 0.00001 0.00002 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (0.463647, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.00001 -0.00002 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (2.677945, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -0.00001 100000.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (-0.000000000099986595, 0.0, 0.0, 0.0) 2048
 
 uniform 0 float4 10000000.0 0.00000001 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 % Negative zero behavior should be to treat it the
 % same as normal zero.
 uniform 0 float4 1000000000.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1000000000.0 -0.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 -1.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -0.0 -1.0 0.0 0.0
-todo draw quad
+todo(sm<6) draw quad
 probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
