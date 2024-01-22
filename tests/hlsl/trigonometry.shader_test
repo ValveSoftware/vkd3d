@@ -13,7 +13,7 @@ float4 main(float tex : texcoord) : sv_target
 }
 
 [test]
-todo(sm<4 | sm>=6) draw quad
+todo(sm<4) draw quad
 probe ( 0, 0) rgba ( 0.00000000,  1.00000000,  0.00000000, 0.0)
 probe ( 1, 0) rgba ( 0.84147098,  0.54030231,  1.55740772, 0.0) 1024
 probe ( 2, 0) rgba ( 0.90929743, -0.41614684, -2.18503986, 0.0) 1024
@@ -72,5 +72,5 @@ float4 main() : sv_target
 % tan(pi/2) is an asymtote and therefore undefined
 % so check 0, pi/4, 3pi/4, pi
 uniform 0 float4 0.0 0.78539816 2.35619449 3.14159265
-todo(sm<4 | sm>=6) draw quad
+todo(sm<4) draw quad
 probe all rgba (0, 1000, -1000.0, 0)
