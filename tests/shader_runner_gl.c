@@ -328,10 +328,46 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format)
     fatal_error("Failed to find format info for format %#x.\n", format);
 }
 
+static void init_resource_2d(struct gl_resource *resource, const struct resource_params *params)
+{
+    unsigned int offset, w, h, i;
+
+    resource->format = get_format_info(params->format);
+    glGenTextures(1, &resource->id);
+    glBindTexture(GL_TEXTURE_2D, resource->id);
+    glTexStorage2D(GL_TEXTURE_2D, params->level_count,
+            resource->format->internal_format, params->width, params->height);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+    if (!params->data)
+        return;
+
+    for (i = 0, offset = 0; i < params->level_count; ++i)
+    {
+        w = get_level_dimension(params->width, i);
+        h = get_level_dimension(params->height, i);
+        glTexSubImage2D(GL_TEXTURE_2D, i, 0, 0, w, h, resource->format->format,
+                resource->format->type, params->data + offset);
+        offset += w * h * params->texel_size;
+    }
+}
+
+static void init_resource_buffer(struct gl_resource *resource, const struct resource_params *params)
+{
+    resource->format = get_format_info(params->format);
+
+    glGenBuffers(1, &resource->id);
+    glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
+    glBufferData(GL_TEXTURE_BUFFER, params->data_size, params->data, GL_STATIC_DRAW);
+
+    glGenTextures(1, &resource->tbo_id);
+    glBindTexture(GL_TEXTURE_BUFFER, resource->tbo_id);
+    glTexBuffer(GL_TEXTURE_BUFFER, resource->format->internal_format, resource->id);
+}
+
 static struct resource *gl_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
 {
     struct gl_resource *resource;
-    unsigned int offset, w, h, i;
 
     resource = calloc(1, sizeof(*resource));
     init_resource(&resource->r, params);
@@ -340,37 +376,14 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
-        case RESOURCE_TYPE_UAV:
-            resource->format = get_format_info(params->format);
-            glGenTextures(1, &resource->id);
-            glBindTexture(GL_TEXTURE_2D, resource->id);
-            glTexStorage2D(GL_TEXTURE_2D, params->level_count,
-                    resource->format->internal_format, params->width, params->height);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-            if (!params->data)
-                break;
-
-            for (i = 0, offset = 0; i < params->level_count; ++i)
-            {
-                w = get_level_dimension(params->width, i);
-                h = get_level_dimension(params->height, i);
-                glTexSubImage2D(GL_TEXTURE_2D, i, 0, 0, w, h, resource->format->format,
-                        resource->format->type, params->data + offset);
-                offset += w * h * params->texel_size;
-            }
+            init_resource_2d(resource, params);
             break;
 
-        case RESOURCE_TYPE_BUFFER_UAV:
-            resource->format = get_format_info(params->format);
-
-            glGenBuffers(1, &resource->id);
-            glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
-            glBufferData(GL_TEXTURE_BUFFER, params->data_size, params->data, GL_STATIC_DRAW);
-
-            glGenTextures(1, &resource->tbo_id);
-            glBindTexture(GL_TEXTURE_BUFFER, resource->tbo_id);
-            glTexBuffer(GL_TEXTURE_BUFFER, resource->format->internal_format, resource->id);
+        case RESOURCE_TYPE_UAV:
+            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+                init_resource_buffer(resource, params);
+            else
+                init_resource_2d(resource, params);
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -391,13 +404,21 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
-        case RESOURCE_TYPE_UAV:
             glDeleteTextures(1, &resource->id);
             break;
 
-        case RESOURCE_TYPE_BUFFER_UAV:
-            glDeleteTextures(1, &resource->tbo_id);
-            /* Fall-through. */
+        case RESOURCE_TYPE_UAV:
+            if (res->dimension == RESOURCE_DIMENSION_BUFFER)
+            {
+                glDeleteTextures(1, &resource->tbo_id);
+                glDeleteBuffers(1, &resource->id);
+            }
+            else
+            {
+                glDeleteTextures(1, &resource->id);
+            }
+            break;
+
         case RESOURCE_TYPE_VERTEX_BUFFER:
             glDeleteBuffers(1, &resource->id);
             break;
@@ -515,13 +536,12 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_UAV:
-            case RESOURCE_TYPE_BUFFER_UAV:
                 binding = &bindings[interface_info.binding_count++];
                 binding->type = VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
                 binding->register_space = 0;
                 binding->register_index = resource->r.slot;
                 binding->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-                if (resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_BUFFER;
                 else
                     binding->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
@@ -650,16 +670,13 @@ static bool gl_runner_dispatch(struct shader_runner *r, unsigned int x, unsigned
         {
             case RESOURCE_TYPE_RENDER_TARGET:
             case RESOURCE_TYPE_VERTEX_BUFFER:
-                break;
-
             case RESOURCE_TYPE_TEXTURE:
-            case RESOURCE_TYPE_BUFFER_UAV:
-                trace("RESOURCE TYPE %#x.\n", resource->r.type);
                 break;
 
             case RESOURCE_TYPE_UAV:
-                glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
-                        0, GL_READ_WRITE, resource->format->internal_format);
+                if (resource->r.dimension != RESOURCE_DIMENSION_BUFFER)
+                    glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
+                            0, GL_READ_WRITE, resource->format->internal_format);
                 break;
         }
     }
@@ -886,13 +903,16 @@ static bool gl_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
-                glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
-                        0, GL_READ_WRITE, resource->format->internal_format);
-                break;
-
-            case RESOURCE_TYPE_BUFFER_UAV:
-                glBindImageTexture(resource->r.slot, resource->tbo_id, 0, GL_TRUE,
-                        0, GL_READ_WRITE, resource->format->internal_format);
+                if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                {
+                    glBindImageTexture(resource->r.slot, resource->tbo_id, 0, GL_TRUE,
+                            0, GL_READ_WRITE, resource->format->internal_format);
+                }
+                else
+                {
+                    glBindImageTexture(resource->r.slot, resource->id, 0, GL_TRUE,
+                            0, GL_READ_WRITE, resource->format->internal_format);
+                }
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
@@ -973,8 +993,7 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     struct gl_resource *resource = gl_resource(res);
     struct resource_readback *rb;
 
-    if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_UAV
-            && resource->r.type != RESOURCE_TYPE_BUFFER_UAV)
+    if (resource->r.type != RESOURCE_TYPE_RENDER_TARGET && resource->r.type != RESOURCE_TYPE_UAV)
         fatal_error("Unhandled resource type %#x.\n", resource->r.type);
 
     rb = malloc(sizeof(*rb));
@@ -986,7 +1005,7 @@ static struct resource_readback *gl_runner_get_resource_readback(struct shader_r
     rb->row_pitch = rb->width * resource->r.texel_size;
     rb->data = malloc(rb->row_pitch * rb->height);
 
-    if (resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+    if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
     {
         glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
         glGetBufferSubData(GL_TEXTURE_BUFFER, 0, rb->row_pitch * rb->height, rb->data);

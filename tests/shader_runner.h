@@ -69,14 +69,20 @@ enum resource_type
     RESOURCE_TYPE_RENDER_TARGET,
     RESOURCE_TYPE_TEXTURE,
     RESOURCE_TYPE_UAV,
-    RESOURCE_TYPE_BUFFER_UAV,
     RESOURCE_TYPE_VERTEX_BUFFER,
+};
+
+enum resource_dimension
+{
+    RESOURCE_DIMENSION_BUFFER,
+    RESOURCE_DIMENSION_2D,
 };
 
 struct resource_params
 {
     unsigned int slot;
     enum resource_type type;
+    enum resource_dimension dimension;
 
     DXGI_FORMAT format;
     enum texture_data_type data_type;
@@ -91,6 +97,7 @@ struct resource
 {
     unsigned int slot;
     enum resource_type type;
+    enum resource_dimension dimension;
 
     DXGI_FORMAT format;
     unsigned int size;

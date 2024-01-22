@@ -189,43 +189,41 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-            resource->resource = create_default_texture2d(device, params->width, params->height, 1,
-                    params->level_count, params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
-            if (params->data)
+            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
             {
-                upload_texture_data_with_states(resource->resource, resource_data,
-                        params->level_count, test_context->queue, test_context->list,
+                D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = { 0 };
+
+                resource->resource = create_default_buffer(device, params->data_size,
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
+                upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
+                        test_context->queue, test_context->list,
                         RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
                 reset_command_list(test_context->list, test_context->allocator);
+
+                uav_desc.Format = params->format;
+                uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+                uav_desc.Buffer.NumElements = params->width * params->height;
+
+                ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
+                        NULL, &uav_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             }
-            ID3D12Device_CreateUnorderedAccessView(device, resource->resource, NULL, NULL,
-                    get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+            else
+            {
+                state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+                resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
+                        params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
+                if (params->data)
+                {
+                    upload_texture_data_with_states(resource->resource, resource_data,
+                            params->level_count, test_context->queue, test_context->list,
+                            RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                    reset_command_list(test_context->list, test_context->allocator);
+                }
+                ID3D12Device_CreateUnorderedAccessView(device, resource->resource, NULL, NULL,
+                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+            }
             break;
 
-        case RESOURCE_TYPE_BUFFER_UAV:
-        {
-            D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = { 0 };
-
-            if (!runner->heap)
-                runner->heap = create_gpu_descriptor_heap(device,
-                        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
-
-            resource->resource = create_default_buffer(device, params->data_size,
-                    D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
-                    test_context->queue, test_context->list,
-                    RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            reset_command_list(test_context->list, test_context->allocator);
-
-            uav_desc.Format = params->format;
-            uav_desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-            uav_desc.Buffer.NumElements = params->width * params->height;
-
-            ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
-                    NULL, &uav_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
-            break;
-        }
         case RESOURCE_TYPE_VERTEX_BUFFER:
             resource->resource = create_upload_buffer(device, params->data_size, params->data);
             break;
@@ -281,7 +279,6 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         {
             case RESOURCE_TYPE_TEXTURE:
             case RESOURCE_TYPE_UAV:
-            case RESOURCE_TYPE_BUFFER_UAV:
                 range = &resource->descriptor_range;
 
                 if (base_resource && resource->r.type == base_resource->r.type && resource->r.slot == slot + 1)
@@ -299,7 +296,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
                 root_param->DescriptorTable.pDescriptorRanges = range;
                 root_param->ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-                if (resource->r.type == RESOURCE_TYPE_UAV || resource->r.type == RESOURCE_TYPE_BUFFER_UAV)
+                if (resource->r.type == RESOURCE_TYPE_UAV)
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
                 else
                     range->RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -403,7 +400,6 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
                 break;
 
             case RESOURCE_TYPE_UAV:
-            case RESOURCE_TYPE_BUFFER_UAV:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
                             get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
@@ -546,7 +542,6 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_UAV:
-            case RESOURCE_TYPE_BUFFER_UAV:
                 if (resource->descriptor_range.NumDescriptors)
                     ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
                             get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));

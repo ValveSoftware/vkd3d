@@ -509,6 +509,7 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
 void init_resource(struct resource *resource, const struct resource_params *params)
 {
     resource->type = params->type;
+    resource->dimension = params->dimension;
     resource->slot = params->slot;
     resource->format = params->format;
     resource->size = params->data_size;
@@ -738,6 +739,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             memset(&params, 0, sizeof(params));
             params.slot = 0;
             params.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.dimension = RESOURCE_DIMENSION_2D;
             params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
             params.data_type = TEXTURE_DATA_FLOAT;
             params.texel_size = 16;
@@ -764,6 +766,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         memset(&params, 0, sizeof(params));
         params.slot = 0;
         params.type = RESOURCE_TYPE_VERTEX_BUFFER;
+        params.dimension = RESOURCE_DIMENSION_BUFFER;
         params.data = malloc(sizeof(quad));
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
@@ -786,6 +789,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             memset(&params, 0, sizeof(params));
             params.slot = 0;
             params.type = RESOURCE_TYPE_RENDER_TARGET;
+            params.dimension = RESOURCE_DIMENSION_2D;
             params.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
             params.data_type = TEXTURE_DATA_FLOAT;
             params.texel_size = 16;
@@ -838,7 +842,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 fatal_error("Malformed buffer UAV index '%s'.\n", line);
             line = rest;
 
-            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_BUFFER_UAV, slot);
+            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_UAV, slot);
         }
         else if (match_string(line, "render target", &line))
         {
@@ -1545,6 +1549,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_RENDER_TARGET;
+                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
@@ -1558,6 +1563,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_TEXTURE;
+                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
@@ -1571,6 +1577,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_UAV;
+                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
@@ -1583,7 +1590,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 memset(&current_resource, 0, sizeof(current_resource));
 
                 current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_BUFFER_UAV;
+                current_resource.type = RESOURCE_TYPE_UAV;
+                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
@@ -1597,6 +1605,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_VERTEX_BUFFER;
+                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
             }
             else if (!strcmp(line, "[test]\n"))
