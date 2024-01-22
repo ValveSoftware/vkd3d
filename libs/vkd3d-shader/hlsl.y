@@ -6763,6 +6763,15 @@ selection_statement:
                 }
             }
 
+            check_condition_type(ctx, condition);
+
+            if (!(condition = add_cast(ctx, $4, condition, hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL), &@4)))
+            {
+                destroy_block($6.then_block);
+                destroy_block($6.else_block);
+                YYABORT;
+            }
+
             if (!(instr = hlsl_new_if(ctx, condition, $6.then_block, $6.else_block, &@2)))
             {
                 destroy_block($6.then_block);
@@ -6771,8 +6780,6 @@ selection_statement:
             }
             destroy_block($6.then_block);
             destroy_block($6.else_block);
-
-            check_condition_type(ctx, condition);
 
             $$ = $4;
             hlsl_block_add_instr($$, instr);
