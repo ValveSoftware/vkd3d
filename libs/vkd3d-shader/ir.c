@@ -2898,8 +2898,7 @@ static void vsir_validate_instruction(struct validation_context *ctx)
      * purely structured. In principle we could allow structured
      * constructs in a block, provided they are confined in a single
      * block, but need for that hasn't arisen yet, so we don't. */
-    if (ctx->cf_type == CF_TYPE_UNKNOWN && !(instruction->handler_idx >= VKD3DSIH_DCL
-            && instruction->handler_idx <= VKD3DSIH_DCL_VERTICES_OUT))
+    if (ctx->cf_type == CF_TYPE_UNKNOWN && !vsir_instruction_is_dcl(instruction))
     {
         if (instruction->handler_idx == VKD3DSIH_LABEL)
             ctx->cf_type = CF_TYPE_BLOCKS;
