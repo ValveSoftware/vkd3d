@@ -39,10 +39,11 @@ static inline bool shader_register_is_phase_instance_id(const struct vkd3d_shade
     return reg->type == VKD3DSPR_FORKINSTID || reg->type == VKD3DSPR_JOININSTID;
 }
 
-static bool shader_instruction_is_dcl(const struct vkd3d_shader_instruction *ins)
+static bool vsir_instruction_is_dcl(const struct vkd3d_shader_instruction *instruction)
 {
-    return (VKD3DSIH_DCL <= ins->handler_idx && ins->handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
-            || ins->handler_idx == VKD3DSIH_HS_DECLS;
+    enum vkd3d_shader_opcode handler_idx = instruction->handler_idx;
+    return (VKD3DSIH_DCL <= handler_idx && handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
+            || handler_idx == VKD3DSIH_HS_DECLS;
 }
 
 static void vkd3d_shader_instruction_make_nop(struct vkd3d_shader_instruction *ins)
@@ -340,7 +341,7 @@ static void flattener_eliminate_phase_related_dcls(struct hull_flattener *normal
         return;
     }
 
-    if (normaliser->phase == VKD3DSIH_INVALID || shader_instruction_is_dcl(ins))
+    if (normaliser->phase == VKD3DSIH_INVALID || vsir_instruction_is_dcl(ins))
         return;
 
     if (normaliser->phase_body_idx == ~0u)
@@ -639,7 +640,7 @@ static enum vkd3d_result instruction_array_normalise_hull_shader_control_point_i
                 normaliser.phase = ins->handler_idx;
                 break;
             default:
-                if (shader_instruction_is_dcl(ins))
+                if (vsir_instruction_is_dcl(ins))
                     break;
                 for (j = 0; j < ins->dst_count; ++j)
                     shader_dst_param_normalise_outpointid(&ins->dst[j], &normaliser);
@@ -1332,7 +1333,7 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
             memset(normaliser->pc_dcl_params, 0, sizeof(normaliser->pc_dcl_params));
             break;
         default:
-            if (shader_instruction_is_dcl(ins))
+            if (vsir_instruction_is_dcl(ins))
                 break;
             for (i = 0; i < ins->dst_count; ++i)
                 shader_dst_param_io_normalise(&ins->dst[i], false, normaliser);
@@ -1970,13 +1971,6 @@ static void VKD3D_PRINTF_FUNC(3, 4) cf_flattener_create_block_name(struct cf_fla
     va_end(args);
 
     flattener->block_names[block_id] = buffer.buffer;
-}
-
-static bool vsir_instruction_is_dcl(const struct vkd3d_shader_instruction *instruction)
-{
-    enum vkd3d_shader_opcode handler_idx = instruction->handler_idx;
-    return (VKD3DSIH_DCL <= handler_idx && handler_idx <= VKD3DSIH_DCL_VERTICES_OUT)
-            || handler_idx == VKD3DSIH_HS_DECLS;
 }
 
 static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
