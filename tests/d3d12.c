@@ -28132,7 +28132,9 @@ static void test_ps_layer(void)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
+    ID3D10Blob *vs_bytecode, *ps_bytecode;
     struct test_context_desc desc;
+    D3D12_SHADER_BYTECODE vs, ps;
     struct test_context context;
     ID3D12CommandQueue *queue;
     ID3D12Device *device;
@@ -28140,23 +28142,11 @@ static void test_ps_layer(void)
     HRESULT hr;
 
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    static const DWORD vs_code[] =
-    {
-#if 0
-        void main(in uint vertex_id : SV_VertexID, out uint layer : LAYER)
-        {
-            layer = vertex_id;
-        }
-#endif
-        0x43425844, 0xd2b4abd8, 0xf9adf7df, 0xed1b4eb0, 0x4bf54391, 0x00000001, 0x000000d8, 0x00000003,
-        0x0000002c, 0x00000060, 0x00000090, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
-        0x00000000, 0x00000006, 0x00000001, 0x00000000, 0x00000101, 0x565f5653, 0x65747265, 0x00444978,
-        0x4e47534f, 0x00000028, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000001,
-        0x00000000, 0x00000e01, 0x4559414c, 0xabab0052, 0x58454853, 0x00000040, 0x00010050, 0x00000010,
-        0x0100086a, 0x04000060, 0x00101012, 0x00000000, 0x00000006, 0x03000065, 0x00102012, 0x00000000,
-        0x05000036, 0x00102012, 0x00000000, 0x0010100a, 0x00000000, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE vs = {vs_code, sizeof(vs_code)};
+    static const char vs_code[] =
+            "void main(in uint vertex_id : SV_VertexID, out uint layer : LAYER)\n"
+            "{\n"
+            "    layer = vertex_id;\n"
+            "}\n";
     static const DWORD gs_code[] =
     {
 #if 0
@@ -28206,26 +28196,11 @@ static void test_ps_layer(void)
         0x0020100a, 0x00000000, 0x00000000, 0x03000075, 0x00110000, 0x00000000, 0x0100003e,
     };
     static const D3D12_SHADER_BYTECODE gs = {gs_code, sizeof(gs_code)};
-    static const DWORD ps_code[] =
-    {
-#if 0
-        float4 main(float4 p : SV_Position, uint layer : SV_RenderTargetArrayIndex) : SV_Target0
-        {
-            return layer / 255.0;
-        }
-#endif
-        0x43425844, 0x53474926, 0xbd247b84, 0x389660f4, 0x331cf598, 0x00000001, 0x00000140, 0x00000003,
-        0x0000002c, 0x00000094, 0x000000c8, 0x4e475349, 0x00000060, 0x00000002, 0x00000008, 0x00000038,
-        0x00000000, 0x00000001, 0x00000003, 0x00000000, 0x0000000f, 0x00000044, 0x00000000, 0x00000004,
-        0x00000001, 0x00000001, 0x00000101, 0x505f5653, 0x7469736f, 0x006e6f69, 0x525f5653, 0x65646e65,
-        0x72615472, 0x41746567, 0x79617272, 0x65646e49, 0xabab0078, 0x4e47534f, 0x0000002c, 0x00000001,
-        0x00000008, 0x00000020, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x0000000f, 0x545f5653,
-        0x65677261, 0xabab0074, 0x58454853, 0x00000070, 0x00000050, 0x0000001c, 0x0100086a, 0x04000864,
-        0x00101012, 0x00000001, 0x00000004, 0x03000065, 0x001020f2, 0x00000000, 0x02000068, 0x00000001,
-        0x05000056, 0x00100012, 0x00000000, 0x0010100a, 0x00000001, 0x0a000038, 0x001020f2, 0x00000000,
-        0x00100006, 0x00000000, 0x00004002, 0x3b808081, 0x3b808081, 0x3b808081, 0x3b808081, 0x0100003e,
-    };
-    static const D3D12_SHADER_BYTECODE ps = {ps_code, sizeof(ps_code)};
+    static const char ps_code[] =
+            "float4 main(float4 p : SV_Position, uint layer : SV_RenderTargetArrayIndex) : SV_Target0\n"
+            "{\n"
+            "    return layer / 255.0;\n"
+            "}\n";
     static const unsigned int expected_results[] =
     {
         0x00000000,
@@ -28236,11 +28211,21 @@ static void test_ps_layer(void)
         0x05050505,
     };
 
+    vs_bytecode = compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0");
+    vs = shader_bytecode_from_blob(vs_bytecode);
+
+    ps_bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(ps_bytecode);
+
     memset(&desc, 0, sizeof(desc));
     desc.rt_array_size = 6;
     desc.no_pipeline = true;
     if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(vs_bytecode);
+        ID3D10Blob_Release(ps_bytecode);
         return;
+    }
     device = context.device;
     command_list = context.list;
     queue = context.queue;
@@ -28273,6 +28258,9 @@ static void test_ps_layer(void)
     }
 
     destroy_test_context(&context);
+
+    ID3D10Blob_Release(vs_bytecode);
+    ID3D10Blob_Release(ps_bytecode);
 }
 
 static void test_nop_tessellation_shaders(void)
