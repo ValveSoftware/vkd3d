@@ -28238,6 +28238,103 @@ static void test_ps_layer(void)
     ID3D10Blob_Release(ps_bytecode);
 }
 
+static void test_ps_viewport_index(void)
+{
+    ID3D12GraphicsCommandList *command_list;
+    ID3D10Blob *vs_bytecode, *ps_bytecode;
+    struct test_context_desc desc;
+    D3D12_SHADER_BYTECODE vs, ps;
+    struct test_context context;
+    D3D12_VIEWPORT viewports[4];
+    ID3D12CommandQueue *queue;
+    D3D12_BOX box;
+
+    static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    static const char vs_code[] =
+            "float4 main(in uint vertex_id : SV_VertexID, in uint instance_id : SV_InstanceID,\n"
+            "        out uint viewport : SV_ViewportArrayIndex) : SV_Position\n"
+            "{\n"
+            "    viewport = instance_id;\n"
+            "    switch (vertex_id)\n"
+            "    {\n"
+            "        case 0:\n"
+            "            return float4(-1, 1, 0, 1);\n"
+            "        case 1:\n"
+            "            return float4(3, 1, 0, 1);\n"
+            "        case 2:\n"
+            "            return float4(-1, -3, 0, 1);\n"
+            "        default:\n"
+            "            return float4(0, 0, 0, 0);\n"
+            "    }\n"
+            "}\n";
+    static const char ps_code[] =
+            "float4 main(float4 p : SV_Position, uint viewport : SV_ViewportArrayIndex) : SV_Target0\n"
+            "{\n"
+            "    return viewport / 255.0;\n"
+            "}\n";
+
+    vs_bytecode = compile_shader(vs_code, sizeof(vs_code) - 1, "vs_4_0");
+    vs = shader_bytecode_from_blob(vs_bytecode);
+
+    ps_bytecode = compile_shader(ps_code, sizeof(ps_code) - 1, "ps_4_0");
+    ps = shader_bytecode_from_blob(ps_bytecode);
+
+    memset(&desc, 0, sizeof(desc));
+    desc.vs = &vs;
+    desc.ps = &ps;
+    if (!init_test_context(&context, &desc))
+    {
+        ID3D10Blob_Release(vs_bytecode);
+        ID3D10Blob_Release(ps_bytecode);
+        return;
+    }
+
+    if (!is_vs_array_index_supported(context.device))
+    {
+        skip("The device does not support SV_ViewportArrayIndex in VS.\n");
+        destroy_test_context(&context);
+        return;
+    }
+
+    command_list = context.list;
+    queue = context.queue;
+
+    ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
+
+    set_viewport(&viewports[0],
+            0.0f, 0.0f,
+            context.render_target_desc.Width / 2, context.render_target_desc.Height / 2, 0.0f, 1.0f);
+    set_viewport(&viewports[1],
+            context.render_target_desc.Width / 2, 0.0f,
+            context.render_target_desc.Width, context.render_target_desc.Height / 2, 0.0f, 1.0f);
+    set_viewport(&viewports[2],
+            0.0f, context.render_target_desc.Height / 2,
+            context.render_target_desc.Width / 2, context.render_target_desc.Height, 0.0f, 1.0f);
+    set_viewport(&viewports[3],
+            context.render_target_desc.Width / 2, context.render_target_desc.Height / 2,
+            context.render_target_desc.Width, context.render_target_desc.Height, 0.0f, 1.0f);
+
+    ID3D12GraphicsCommandList_OMSetRenderTargets(command_list, 1, &context.rtv, false, NULL);
+    ID3D12GraphicsCommandList_RSSetScissorRects(command_list, 1, &context.scissor_rect);
+    ID3D12GraphicsCommandList_RSSetViewports(command_list, ARRAY_SIZE(viewports), viewports);
+    ID3D12GraphicsCommandList_SetGraphicsRootSignature(command_list, context.root_signature);
+    ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
+    ID3D12GraphicsCommandList_IASetPrimitiveTopology(command_list, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ID3D12GraphicsCommandList_DrawInstanced(command_list, 3, 4, 0, 0);
+
+    transition_resource_state(command_list, context.render_target,
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+    set_box(&box, 0, 0, 0, context.render_target_desc.Width / 2, context.render_target_desc.Height / 2, 1);
+    check_sub_resource_uint_with_box(context.render_target, 0, queue, command_list, &box, 0x00000000, 0);
+    reset_command_list(command_list, context.allocator);
+
+    destroy_test_context(&context);
+
+    ID3D10Blob_Release(vs_bytecode);
+    ID3D10Blob_Release(ps_bytecode);
+}
+
 static void test_nop_tessellation_shaders(void)
 {
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -38077,6 +38174,7 @@ START_TEST(d3d12)
     run_test(test_geometry_shader);
     run_test(test_layered_rendering);
     run_test(test_ps_layer);
+    run_test(test_ps_viewport_index);
     run_test(test_nop_tessellation_shaders);
     run_test(test_quad_tessellation);
     run_test(test_tessellation_dcl_index_range);

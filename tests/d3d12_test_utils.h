@@ -585,6 +585,18 @@ static inline void check_sub_resource_uint_(unsigned int line, ID3D12Resource *t
     release_resource_readback(&rb);
 }
 
+#define check_sub_resource_uint_with_box(a, b, c, d, e, f, g) check_sub_resource_uint_with_box_(__LINE__, a, b, c, d, e, f, g)
+static inline void check_sub_resource_uint_with_box_(unsigned int line, ID3D12Resource *texture,
+        unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
+        const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
+{
+    struct d3d12_resource_readback rb;
+
+    get_resource_readback_with_command_list(texture, sub_resource_idx, &rb, queue, command_list);
+    check_readback_data_uint_(line, &rb.rb, box, expected, max_diff);
+    release_resource_readback(&rb);
+}
+
 #define check_sub_resource_vec4(a, b, c, d, e, f) check_sub_resource_vec4_(__LINE__, a, b, c, d, e, f)
 static inline void check_sub_resource_vec4_(unsigned int line, ID3D12Resource *texture,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
