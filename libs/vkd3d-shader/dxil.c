@@ -328,6 +328,9 @@ enum dx_intrinsic_opcode
 {
     DX_LOAD_INPUT                   =   4,
     DX_STORE_OUTPUT                 =   5,
+    DX_ISNAN                        =   8,
+    DX_ISINF                        =   9,
+    DX_ISFINITE                     =  10,
     DX_EXP                          =  21,
     DX_FRC                          =  22,
     DX_LOG                          =  23,
@@ -3494,6 +3497,12 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
 {
     switch (op)
     {
+        case DX_ISNAN:
+            return VKD3DSIH_ISNAN;
+        case DX_ISINF:
+            return VKD3DSIH_ISINF;
+        case DX_ISFINITE:
+            return VKD3DSIH_ISFINITE;
         case DX_EXP:
             return VKD3DSIH_EXP;
         case DX_FRC:
@@ -3806,6 +3815,7 @@ struct sm6_dx_opcode_info
 };
 
 /*
+    1 -> int1
     8 -> int8
     b -> constant int1
     c -> constant int8/16/32
@@ -3839,6 +3849,9 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_FRC                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_IMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_IMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
+    [DX_ISFINITE                      ] = {"1", "g",    sm6_parser_emit_dx_unary},
+    [DX_ISINF                         ] = {"1", "g",    sm6_parser_emit_dx_unary},
+    [DX_ISNAN                         ] = {"1", "g",    sm6_parser_emit_dx_unary},
     [DX_LEGACY_F16TOF32               ] = {"f", "i",    sm6_parser_emit_dx_unary},
     [DX_LEGACY_F32TOF16               ] = {"i", "f",    sm6_parser_emit_dx_unary},
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
@@ -3867,6 +3880,8 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
         case 0:
             FIXME("Invalid operand count.\n");
             return false;
+        case '1':
+            return sm6_type_is_bool(type);
         case '8':
             return sm6_type_is_i8(type);
         case 'b':
