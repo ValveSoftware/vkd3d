@@ -225,8 +225,11 @@ enum vkd3d_shader_error
 enum vkd3d_shader_opcode
 {
     VKD3DSIH_ABS,
+    VKD3DSIH_ACOS,
     VKD3DSIH_ADD,
     VKD3DSIH_AND,
+    VKD3DSIH_ASIN,
+    VKD3DSIH_ATAN,
     VKD3DSIH_ATOMIC_AND,
     VKD3DSIH_ATOMIC_CMP_STORE,
     VKD3DSIH_ATOMIC_IADD,

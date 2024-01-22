@@ -339,6 +339,9 @@ enum dx_intrinsic_opcode
     DX_COS                          =  12,
     DX_SIN                          =  13,
     DX_TAN                          =  14,
+    DX_ACOS                         =  15,
+    DX_ASIN                         =  16,
+    DX_ATAN                         =  17,
     DX_EXP                          =  21,
     DX_FRC                          =  22,
     DX_LOG                          =  23,
@@ -3625,6 +3628,12 @@ static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
             return VKD3DSIH_ISFINITE;
         case DX_TAN:
             return VKD3DSIH_TAN;
+        case DX_ACOS:
+            return VKD3DSIH_ACOS;
+        case DX_ASIN:
+            return VKD3DSIH_ASIN;
+        case DX_ATAN:
+            return VKD3DSIH_ATAN;
         case DX_EXP:
             return VKD3DSIH_EXP;
         case DX_FRC:
@@ -4127,6 +4136,9 @@ struct sm6_dx_opcode_info
  */
 static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
 {
+    [DX_ACOS                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ASIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ATAN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},

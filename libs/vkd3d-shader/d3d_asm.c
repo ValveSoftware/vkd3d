@@ -30,8 +30,11 @@
 static const char * const shader_opcode_names[] =
 {
     [VKD3DSIH_ABS                             ] = "abs",
+    [VKD3DSIH_ACOS                            ] = "acos",
     [VKD3DSIH_ADD                             ] = "add",
     [VKD3DSIH_AND                             ] = "and",
+    [VKD3DSIH_ASIN                            ] = "asin",
+    [VKD3DSIH_ATAN                            ] = "atan",
     [VKD3DSIH_ATOMIC_AND                      ] = "atomic_and",
     [VKD3DSIH_ATOMIC_CMP_STORE                ] = "atomic_cmp_store",
     [VKD3DSIH_ATOMIC_IADD                     ] = "atomic_iadd",
