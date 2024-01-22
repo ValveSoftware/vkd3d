@@ -994,6 +994,7 @@ struct test_context_desc
     bool no_render_target;
     bool no_root_signature;
     bool no_pipeline;
+    const D3D12_SHADER_BYTECODE *vs;
     const D3D12_SHADER_BYTECODE *ps;
 };
 
@@ -1153,7 +1154,7 @@ static inline bool init_test_context_(unsigned int line, struct test_context *co
 
     context->pipeline_state = create_pipeline_state_(line, device,
             context->root_signature, context->render_target_desc.Format,
-            NULL, desc ? desc->ps : NULL, NULL);
+            desc ? desc->vs : NULL, desc ? desc->ps : NULL, NULL);
 
     return true;
 }

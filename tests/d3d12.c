@@ -28145,16 +28145,13 @@ static void test_layered_rendering(void)
 
 static void test_ps_layer(void)
 {
-    D3D12_GRAPHICS_PIPELINE_STATE_DESC pso_desc;
     ID3D12GraphicsCommandList *command_list;
     ID3D10Blob *vs_bytecode, *ps_bytecode;
     struct test_context_desc desc;
     D3D12_SHADER_BYTECODE vs, ps;
     struct test_context context;
     ID3D12CommandQueue *queue;
-    ID3D12Device *device;
     unsigned int i;
-    HRESULT hr;
 
     static const float white[] = {1.0f, 1.0f, 1.0f, 1.0f};
     static const char vs_code[] =
@@ -28197,7 +28194,8 @@ static void test_ps_layer(void)
 
     memset(&desc, 0, sizeof(desc));
     desc.rt_array_size = 6;
-    desc.no_pipeline = true;
+    desc.vs = &vs;
+    desc.ps = &ps;
     if (!init_test_context(&context, &desc))
     {
         ID3D10Blob_Release(vs_bytecode);
@@ -28212,16 +28210,8 @@ static void test_ps_layer(void)
         return;
     }
 
-    device = context.device;
     command_list = context.list;
     queue = context.queue;
-
-    init_pipeline_state_desc(&pso_desc, context.root_signature,
-            context.render_target_desc.Format, &vs, &ps, NULL);
-    pso_desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-    hr = ID3D12Device_CreateGraphicsPipelineState(device, &pso_desc,
-            &IID_ID3D12PipelineState, (void **)&context.pipeline_state);
-    ok(hr == S_OK, "Failed to create graphics pipeline state, hr %#x.\n", hr);
 
     ID3D12GraphicsCommandList_ClearRenderTargetView(command_list, context.rtv, white, 0, NULL);
 
