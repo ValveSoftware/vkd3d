@@ -3594,11 +3594,17 @@ static bool vkd3d_swizzle_is_equal(uint32_t dst_write_mask, uint32_t swizzle, ui
     return vkd3d_compact_swizzle(VKD3D_SHADER_NO_SWIZZLE, dst_write_mask) == vkd3d_compact_swizzle(swizzle, write_mask);
 }
 
-static bool vkd3d_swizzle_is_scalar(uint32_t swizzle)
+static bool vkd3d_swizzle_is_scalar(uint32_t swizzle, const struct vkd3d_shader_register *reg)
 {
     unsigned int component_idx = vsir_swizzle_get_component(swizzle, 0);
-    return vsir_swizzle_get_component(swizzle, 1) == component_idx
-            && vsir_swizzle_get_component(swizzle, 2) == component_idx
+
+    if (vsir_swizzle_get_component(swizzle, 1) != component_idx)
+        return false;
+
+    if (data_type_is_64_bit(reg->data_type))
+        return true;
+
+    return vsir_swizzle_get_component(swizzle, 2) == component_idx
             && vsir_swizzle_get_component(swizzle, 3) == component_idx;
 }
 
@@ -3719,7 +3725,7 @@ static uint32_t spirv_compiler_emit_load_constant64(struct spirv_compiler *compi
         for (i = 0, j = 0; i < VKD3D_DVEC2_SIZE; ++i)
         {
             if (write_mask & (VKD3DSP_WRITEMASK_0 << i))
-                values[j++] = reg->u.immconst_u64[vsir_swizzle_get_component64(swizzle, i)];
+                values[j++] = reg->u.immconst_u64[vsir_swizzle_get_component(swizzle, i)];
         }
     }
 
@@ -3886,7 +3892,7 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
         assert(compiler->failed);
         return 0;
     }
-    assert(vkd3d_swizzle_is_scalar(swizzle));
+    assert(vkd3d_swizzle_is_scalar(swizzle, reg));
 
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
@@ -3954,6 +3960,7 @@ static uint32_t spirv_compiler_emit_load_reg(struct spirv_compiler *compiler,
         val_id = vkd3d_spirv_build_op_load(builder, type_id, reg_info.id, SpvMemoryAccessMaskNone);
     }
 
+    swizzle = data_type_is_64_bit(reg->data_type) ? vsir_swizzle_32_from_64(swizzle) : swizzle;
     val_id = spirv_compiler_emit_swizzle(compiler,
             val_id, reg_info.write_mask, reg_info.component_type, swizzle, write_mask32);
 
@@ -7047,11 +7054,11 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
 static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction)
 {
+    uint32_t val_id, dst_val_id, type_id, dst_id, src_id, write_mask32, swizzle32;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
     struct vkd3d_shader_register_info dst_reg_info, src_reg_info;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
-    uint32_t val_id, dst_val_id, type_id, dst_id, src_id;
     uint32_t components[VKD3D_VEC4_SIZE];
     unsigned int i, component_count;
 
@@ -7075,7 +7082,9 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
         return;
     }
 
-    component_count = vsir_write_mask_component_count(dst->write_mask);
+    write_mask32 = data_type_is_64_bit(dst->reg.data_type) ? vsir_write_mask_32_from_64(dst->write_mask) : dst->write_mask;
+    swizzle32 = data_type_is_64_bit(dst->reg.data_type) ? vsir_swizzle_32_from_64(src->swizzle) : src->swizzle;
+    component_count = vsir_write_mask_component_count(write_mask32);
     if (component_count != 1 && component_count != VKD3D_VEC4_SIZE
             && dst_reg_info.write_mask == VKD3DSP_WRITEMASK_ALL)
     {
@@ -7088,8 +7097,8 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
 
         for (i = 0; i < ARRAY_SIZE(components); ++i)
         {
-            if (dst->write_mask & (VKD3DSP_WRITEMASK_0 << i))
-                components[i] = VKD3D_VEC4_SIZE + vsir_swizzle_get_component(src->swizzle, i);
+            if (write_mask32 & (VKD3DSP_WRITEMASK_0 << i))
+                components[i] = VKD3D_VEC4_SIZE + vsir_swizzle_get_component(swizzle32, i);
             else
                 components[i] = i;
         }
@@ -7823,7 +7832,7 @@ static void spirv_compiler_emit_branch(struct spirv_compiler *compiler,
         return;
     }
 
-    if (!vkd3d_swizzle_is_scalar(src->swizzle))
+    if (!vkd3d_swizzle_is_scalar(src->swizzle, &src->reg))
     {
         WARN("Unexpected src swizzle %#x.\n", src->swizzle);
         spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE,
@@ -7854,7 +7863,7 @@ static void spirv_compiler_emit_switch(struct spirv_compiler *compiler,
     unsigned int i, word_count;
     uint32_t *cases;
 
-    if (!vkd3d_swizzle_is_scalar(src[0].swizzle))
+    if (!vkd3d_swizzle_is_scalar(src[0].swizzle, &src[0].reg))
     {
         WARN("Unexpected src swizzle %#x.\n", src[0].swizzle);
         spirv_compiler_warning(compiler, VKD3D_SHADER_WARNING_SPV_INVALID_SWIZZLE,

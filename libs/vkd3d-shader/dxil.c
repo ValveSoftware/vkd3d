@@ -36,6 +36,10 @@ static const unsigned int SHADER_DESCRIPTOR_TYPE_COUNT = 4;
 
 static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
 
+#define VKD3D_SHADER_SWIZZLE_64_MASK \
+        (VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(0) \
+                | VKD3D_SHADER_SWIZZLE_MASK << VKD3D_SHADER_SWIZZLE_SHIFT(1))
+
 enum bitcode_block_id
 {
     BLOCKINFO_BLOCK           =  0,
@@ -2216,6 +2220,8 @@ static inline void src_param_init(struct vkd3d_shader_src_param *param)
 static void src_param_init_scalar(struct vkd3d_shader_src_param *param, unsigned int component_idx)
 {
     param->swizzle = vkd3d_shader_create_swizzle(component_idx, component_idx, component_idx, component_idx);
+    if (data_type_is_64_bit(param->reg.data_type))
+        param->swizzle &= VKD3D_SHADER_SWIZZLE_64_MASK;
     param->modifiers = VKD3DSPSM_NONE;
 }
 
@@ -3638,6 +3644,8 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
     type = sm6_type_get_scalar_type(dst->type, 0);
     assert(type);
     src_param->reg.data_type = vkd3d_data_type_from_sm6_type(type);
+    if (data_type_is_64_bit(src_param->reg.data_type))
+        src_param->swizzle = vsir_swizzle_64_from_32(src_param->swizzle);
 
     instruction_dst_param_init_ssa_vector(ins, sm6_type_max_vector_size(type), sm6);
 }
@@ -4538,8 +4546,8 @@ static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
     src_param = instruction_src_params_alloc(ins, 1, sm6);
-    src_param_init_from_value(src_param, src);
-    src_param->swizzle = vkd3d_shader_create_swizzle(elem_idx, elem_idx, elem_idx, elem_idx);
+    src_param_init_scalar(src_param, elem_idx);
+    src_param->reg = src->u.reg;
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }

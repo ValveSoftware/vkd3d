@@ -1641,14 +1641,53 @@ static inline uint32_t vsir_write_mask_32_from_64(uint32_t write_mask64)
     }
 }
 
+static inline uint32_t vsir_swizzle_64_from_32(uint32_t swizzle32)
+{
+    switch (swizzle32)
+    {
+        case VKD3D_SHADER_SWIZZLE(X, Y, X, Y):
+            return VKD3D_SHADER_SWIZZLE(X, X, X, X);
+
+        case VKD3D_SHADER_SWIZZLE(X, Y, Z, W):
+            return VKD3D_SHADER_SWIZZLE(X, Y, X, X);
+
+        case VKD3D_SHADER_SWIZZLE(Z, W, X, Y):
+            return VKD3D_SHADER_SWIZZLE(Y, X, X, X);
+
+        case VKD3D_SHADER_SWIZZLE(Z, W, Z, W):
+            return VKD3D_SHADER_SWIZZLE(Y, Y, X, X);
+
+        default:
+            ERR("Invalid 32 bit swizzle when converting to 64 bit: %#x.\n", swizzle32);
+            return VKD3D_SHADER_SWIZZLE(X, X, X, X);
+    }
+}
+
+static inline uint32_t vsir_swizzle_32_from_64(uint32_t swizzle64)
+{
+    switch (swizzle64)
+    {
+        case VKD3D_SHADER_SWIZZLE(X, X, X, X):
+            return VKD3D_SHADER_SWIZZLE(X, Y, X, Y);
+
+        case VKD3D_SHADER_SWIZZLE(X, Y, X, X):
+            return VKD3D_SHADER_SWIZZLE(X, Y, Z, W);
+
+        case VKD3D_SHADER_SWIZZLE(Y, X, X, X):
+            return VKD3D_SHADER_SWIZZLE(Z, W, X, Y);
+
+        case VKD3D_SHADER_SWIZZLE(Y, Y, X, X):
+            return VKD3D_SHADER_SWIZZLE(Z, W, Z, W);
+
+        default:
+            ERR("Invalid 64 bit swizzle: %#x.\n", swizzle64);
+            return VKD3D_SHADER_SWIZZLE(X, Y, X, Y);
+    }
+}
+
 static inline unsigned int vsir_swizzle_get_component(uint32_t swizzle, unsigned int idx)
 {
     return (swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx)) & VKD3D_SHADER_SWIZZLE_MASK;
-}
-
-static inline unsigned int vsir_swizzle_get_component64(uint32_t swizzle, unsigned int idx)
-{
-    return ((swizzle >> VKD3D_SHADER_SWIZZLE_SHIFT(idx * 2)) & VKD3D_SHADER_SWIZZLE_MASK) / 2u;
 }
 
 static inline unsigned int vkd3d_compact_swizzle(uint32_t swizzle, uint32_t write_mask)

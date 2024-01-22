@@ -1389,7 +1389,7 @@ static void shader_dump_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
     {
         static const char write_mask_chars[] = "xyzw";
 
-        if (param->reg.data_type == VKD3D_DATA_DOUBLE)
+        if (data_type_is_64_bit(param->reg.data_type))
             write_mask = vsir_write_mask_32_from_64(write_mask);
 
         shader_addline(buffer, ".%s", compiler->colours.write_mask);
@@ -1454,12 +1454,17 @@ static void shader_dump_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     if (param->reg.type != VKD3DSPR_IMMCONST && param->reg.type != VKD3DSPR_IMMCONST64
             && param->reg.dimension == VSIR_DIMENSION_VEC4)
     {
-        unsigned int swizzle_x = vsir_swizzle_get_component(swizzle, 0);
-        unsigned int swizzle_y = vsir_swizzle_get_component(swizzle, 1);
-        unsigned int swizzle_z = vsir_swizzle_get_component(swizzle, 2);
-        unsigned int swizzle_w = vsir_swizzle_get_component(swizzle, 3);
-
         static const char swizzle_chars[] = "xyzw";
+
+        unsigned int swizzle_x, swizzle_y, swizzle_z, swizzle_w;
+
+        if (data_type_is_64_bit(param->reg.data_type))
+            swizzle = vsir_swizzle_32_from_64(swizzle);
+
+        swizzle_x = vsir_swizzle_get_component(swizzle, 0);
+        swizzle_y = vsir_swizzle_get_component(swizzle, 1);
+        swizzle_z = vsir_swizzle_get_component(swizzle, 2);
+        swizzle_w = vsir_swizzle_get_component(swizzle, 3);
 
         if (swizzle_x == swizzle_y
                 && swizzle_x == swizzle_z

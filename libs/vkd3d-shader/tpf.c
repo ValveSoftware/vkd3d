@@ -2161,6 +2161,9 @@ static bool shader_sm4_read_src_param(struct vkd3d_shader_sm4_parser *priv, cons
             break;
     }
 
+    if (data_type_is_64_bit(data_type))
+        src_param->swizzle = vsir_swizzle_64_from_32(src_param->swizzle);
+
     if (register_is_input_output(&src_param->reg) && !shader_sm4_validate_input_output_register(priv,
             &src_param->reg, mask_from_swizzle(src_param->swizzle)))
         return false;
