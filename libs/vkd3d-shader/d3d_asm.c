@@ -285,6 +285,7 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_SWITCH                          ] = "switch",
     [VKD3DSIH_SWITCH_MONOLITHIC               ] = "switch",
     [VKD3DSIH_SYNC                            ] = "sync",
+    [VKD3DSIH_TAN                             ] = "tan",
     [VKD3DSIH_TEX                             ] = "texld",
     [VKD3DSIH_TEXBEM                          ] = "texbem",
     [VKD3DSIH_TEXBEML                         ] = "texbeml",
