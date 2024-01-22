@@ -1515,6 +1515,25 @@ static uint32_t vkd3d_spirv_build_op_uless_than_equal(struct vkd3d_spirv_builder
             SpvOpULessThanEqual, result_type, operand0, operand1);
 }
 
+static uint32_t vkd3d_spirv_build_op_is_inf(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t operand)
+{
+    return vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpIsInf, result_type, operand);
+}
+
+static uint32_t vkd3d_spirv_build_op_is_nan(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t operand)
+{
+    return vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpIsNan, result_type, operand);
+}
+
+static uint32_t vkd3d_spirv_build_op_logical_equal(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t operand0, uint32_t operand1)
+{
+    return vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
+            SpvOpLogicalEqual, result_type, operand0, operand1);
+}
+
 static uint32_t vkd3d_spirv_build_op_convert_utof(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t unsigned_value)
 {
@@ -6896,6 +6915,23 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
     return VKD3D_OK;
 }
 
+static void spirv_compiler_emit_isfinite(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t type_id, src_id, isinf_id, isnan_id, val_id;
+
+    type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
+    src_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    /* OpIsFinite is only available in Kernel mode. */
+    isinf_id = vkd3d_spirv_build_op_is_inf(builder, type_id, src_id);
+    isnan_id = vkd3d_spirv_build_op_is_nan(builder, type_id, src_id);
+    val_id = vkd3d_spirv_build_op_logical_equal(builder, type_id, isinf_id, isnan_id);
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
 static enum GLSLstd450 spirv_compiler_map_ext_glsl_instruction(
         const struct vkd3d_shader_instruction *instruction)
 {
@@ -9464,6 +9500,9 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_UTOU:
         case VKD3DSIH_XOR:
             ret = spirv_compiler_emit_alu_instruction(compiler, instruction);
+            break;
+        case VKD3DSIH_ISFINITE:
+            spirv_compiler_emit_isfinite(compiler, instruction);
             break;
         case VKD3DSIH_DFMA:
         case VKD3DSIH_DMAX:
