@@ -2027,7 +2027,7 @@ static void d3d12_pipeline_uav_counter_state_cleanup(struct d3d12_pipeline_uav_c
 static ULONG STDMETHODCALLTYPE d3d12_pipeline_state_Release(ID3D12PipelineState *iface)
 {
     struct d3d12_pipeline_state *state = impl_from_ID3D12PipelineState(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&state->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&state->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", state, refcount);
 
