@@ -2154,6 +2154,8 @@ static unsigned int feature_flags_compile_option(const struct d3d12_device *devi
 
     if (device->feature_options1.Int64ShaderOps)
         flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64;
+    if (device->feature_options.DoublePrecisionFloatShaderOps)
+        flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64;
 
     return flags;
 }

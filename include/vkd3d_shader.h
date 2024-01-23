@@ -200,6 +200,7 @@ enum vkd3d_shader_compile_option_fragment_coordinate_origin
 enum vkd3d_shader_compile_option_feature_flags
 {
     VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64         = 0x00000001,
+    VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64       = 0x00000002,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLAGS),
 };
