@@ -7472,7 +7472,7 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
     enum vkd3d_shader_component_type component_type;
-    unsigned int i, j, k, src_count;
+    unsigned int i, j, k, src_count, size;
     uint32_t write_mask;
     SpvOp op;
 
@@ -7481,8 +7481,9 @@ static void spirv_compiler_emit_bitfield_instruction(struct spirv_compiler *comp
 
     component_type = vkd3d_component_type_from_data_type(dst->reg.data_type);
     type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
-    mask_id = spirv_compiler_get_constant_uint(compiler, 0x1f);
-    size_id = spirv_compiler_get_constant_uint(compiler, 0x20);
+    size = (src[src_count - 1].reg.data_type == VKD3D_DATA_UINT64) ? 0x40 : 0x20;
+    mask_id = spirv_compiler_get_constant_uint(compiler, size - 1);
+    size_id = spirv_compiler_get_constant_uint(compiler, size);
 
     switch (instruction->handler_idx)
     {
