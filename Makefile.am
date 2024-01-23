@@ -174,6 +174,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/sm6-uav-rwtexture.shader_test \
 	tests/hlsl/smoothstep.shader_test \
 	tests/hlsl/sqrt.shader_test \
+	tests/hlsl/srv-buffers.shader_test \
 	tests/hlsl/state-block-syntax.shader_test \
 	tests/hlsl/static-initializer.shader_test \
 	tests/hlsl/step.shader_test \

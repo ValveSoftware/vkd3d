@@ -1583,6 +1583,20 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 current_resource.texel_size = 16;
                 current_resource.level_count = 1;
             }
+            else if (sscanf(line, "[buffer srv %u]\n", &index))
+            {
+                state = STATE_RESOURCE;
+
+                memset(&current_resource, 0, sizeof(current_resource));
+
+                current_resource.slot = index;
+                current_resource.type = RESOURCE_TYPE_TEXTURE;
+                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
+                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+                current_resource.data_type = TEXTURE_DATA_FLOAT;
+                current_resource.texel_size = 16;
+                current_resource.level_count = 1;
+            }
             else if (sscanf(line, "[buffer uav %u]\n", &index))
             {
                 state = STATE_RESOURCE;

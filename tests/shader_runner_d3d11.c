@@ -428,6 +428,24 @@ static void init_resource_2d(struct d3d11_shader_runner *runner, struct d3d11_re
     ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
 }
 
+static void init_resource_srv_buffer(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
+        const struct resource_params *params)
+{
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    ID3D11Device *device = runner->device;
+    HRESULT hr;
+
+    resource->buffer = create_buffer(device, D3D11_BIND_SHADER_RESOURCE, params->data_size, params->data);
+    resource->resource = (ID3D11Resource *)resource->buffer;
+
+    srv_desc.Format = params->format;
+    srv_desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
+    srv_desc.Buffer.FirstElement = 0;
+    srv_desc.Buffer.NumElements = params->data_size / params->texel_size;
+    hr = ID3D11Device_CreateShaderResourceView(device, resource->resource, &srv_desc, &resource->srv);
+    ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
+}
+
 static void init_resource_uav_buffer(struct d3d11_shader_runner *runner, struct d3d11_resource *resource,
         const struct resource_params *params)
 {
@@ -460,7 +478,10 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
-            init_resource_2d(runner, resource, params);
+            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+                init_resource_srv_buffer(runner, resource, params);
+            else
+                init_resource_2d(runner, resource, params);
             break;
 
         case RESOURCE_TYPE_UAV:

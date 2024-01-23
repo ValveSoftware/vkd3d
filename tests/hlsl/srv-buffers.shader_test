@@ -1,0 +1,189 @@
+[require]
+shader model >= 4.0
+
+
+[buffer srv 0]
+size (1, 4)
+0.0 1.0 2.0 3.0
+4.0 5.0 6.0 7.0
+8.0 9.0 10.0 11.0
+12.0 13.0 14.0 15.0
+
+
+[pixel shader todo]
+float4 a;
+Buffer<float4> buffer;
+float4 b;
+
+float4 main() : sv_target
+{
+    return float4(a.y, b.z, buffer[1].xw);
+}
+
+[test]
+uniform 0 float4 100 200 300 400
+uniform 4 float4 1000 2000 3000 4000
+todo(sm<6) draw quad
+probe all rgba (200, 3000, 4, 7)
+
+
+[pixel shader todo]
+float4 a;
+Buffer<float3> buffer;
+float4 b;
+
+float4 main() : sv_target
+{
+    return float4(b.w, buffer[2]);
+}
+
+[test]
+uniform 0 float4 100 200 300 400
+uniform 4 float4 1000 2000 3000 4000
+todo(sm<6) draw quad
+probe all rgba (4000.0, 8.0, 9.0, 10.0)
+
+
+[texture 0]
+size (1, 1)
+-1.0 -1.0 -1.0 -1.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+
+[buffer srv 1]
+size (1, 1)
+1.0 2.0 3.0 4.0
+
+[pixel shader todo]
+Texture2D tex;
+sampler sam;
+Buffer<float4> buffer;
+
+float4 main() : sv_target
+{
+    return float4(buffer[0].zw, tex.Sample(sam, float2(0, 0)).zw);
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (3.0, 4.0, -1.0, -1.0)
+
+
+[buffer srv 0]
+size (1, 4)
+0.0 1.0 2.0 3.0
+4.0 5.0 6.0 7.0
+8.0 9.0 10.0 11.0
+12.0 13.0 14.0 15.0
+
+
+[pixel shader todo]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    return buffer.Load(1);
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (4.0, 5.0, 6.0, 7.0)
+
+
+[pixel shader todo]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    return buffer.Load(float2(2, 9999));
+}
+
+[test]
+todo(sm<6) draw quad
+probe all rgba (8.0, 9.0, 10.0, 11.0)
+
+
+[pixel shader fail]
+Buffer buffer;
+sampler sam;
+
+float4 main() : sv_target
+{
+    return buffer.Sample(sam, 0);
+}
+
+
+[pixel shader fail]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    uint u1, u2;
+
+    buffer.GetDimensions(u1, u2);
+    return 0;
+}
+
+
+[pixel shader todo]
+Buffer buf;
+uniform int u;
+
+float4 main() : sv_target
+{
+    return buf[u];
+}
+
+[test]
+uniform 0 int 2
+todo(sm<6) draw quad
+probe all rgba (8.0, 9.0, 10.0, 11.0)
+uniform 0 int 0
+todo(sm<6) draw quad
+probe all rgba (0.0, 1.0, 2.0, 3.0)
+
+
+% Buffer doesn't have offset_dim or sample_index arguments allowed.
+[pixel shader fail]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    // This test fails because the output status must be an l-value.
+    buffer.Load(0, 0);
+    return 0;
+}
+
+[pixel shader fail]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    uint u;
+
+    // This test fails because there is no overload for an argument in-between the load index and
+    // the output status.
+    buffer.Load(0, 0, u);
+    return 0;
+}
+
+
+[require]
+shader model >= 5.0
+
+
+[pixel shader todo]
+Buffer buffer;
+
+float4 main() : sv_target
+{
+    uint width;
+
+    buffer.GetDimensions(width);
+    return width;
+}
+[test]
+todo draw quad
+probe all rgba (4.0, 4.0, 4.0, 4.0)

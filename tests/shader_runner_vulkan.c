@@ -338,9 +338,15 @@ static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vul
 {
     VkFormat format = vkd3d_get_vk_format(params->format);
     VkDevice device = runner->device;
+    VkBufferUsageFlagBits usage;
     void *data;
 
-    resource->buffer = create_buffer(runner, params->data_size, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT,
+    if (params->type == RESOURCE_TYPE_UAV)
+        usage = VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+    else
+        usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+
+    resource->buffer = create_buffer(runner, params->data_size, usage,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
     resource->buffer_view = create_buffer_view(runner, resource->buffer, format);
 
@@ -376,9 +382,6 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
             break;
 
         case RESOURCE_TYPE_TEXTURE:
-            resource_init_2d(runner, resource, params);
-            break;
-
         case RESOURCE_TYPE_UAV:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 resource_init_buffer(runner, resource, params);
@@ -859,7 +862,10 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
                 }
                 else
                 {
-                    binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+                    if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
+                        binding->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+                    else
+                        binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
                 }
                 binding->descriptorCount = 1;
                 binding->stageFlags = VK_SHADER_STAGE_ALL;
@@ -926,13 +932,15 @@ static void bind_resources(struct vulkan_shader_runner *runner, VkPipelineBindPo
             case RESOURCE_TYPE_UAV:
                 if (resource->r.dimension == RESOURCE_DIMENSION_BUFFER)
                 {
-                    assert(resource->r.type == RESOURCE_TYPE_UAV);
                     write.dstSet = descriptor_set;
                     write.dstBinding = resource->binding;
                     write.dstArrayElement = 0;
                     write.descriptorCount = 1;
-                    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+                    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
                     write.pTexelBufferView = &resource->buffer_view;
+
+                    if (resource->r.type == RESOURCE_TYPE_UAV)
+                        write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
 
                     VK_CALL(vkUpdateDescriptorSets(runner->device, 1, &write, 0, NULL));
                 }
@@ -1301,7 +1309,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     VkInstanceCreateInfo instance_desc = {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     VkDeviceCreateInfo device_desc = {.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
     VkPhysicalDeviceFeatures ret_features, features;
-    VkDescriptorPoolSize descriptor_pool_sizes[4];
+    VkDescriptorPoolSize descriptor_pool_sizes[5];
     static const float queue_priority = 1.0f;
     VkFormatProperties format_props;
     uint32_t count, graphics_index;
@@ -1428,6 +1436,8 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     descriptor_pool_sizes[2].descriptorCount = MAX_RESOURCES;
     descriptor_pool_sizes[3].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
     descriptor_pool_sizes[3].descriptorCount = MAX_RESOURCES;
+    descriptor_pool_sizes[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+    descriptor_pool_sizes[4].descriptorCount = MAX_RESOURCES;
 
     descriptor_pool_desc.maxSets = 1;
     descriptor_pool_desc.poolSizeCount = ARRAY_SIZE(descriptor_pool_sizes);

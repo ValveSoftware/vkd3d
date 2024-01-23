@@ -130,7 +130,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
     struct test_context *test_context = &runner->test_context;
     ID3D12Device *device = test_context->device;
-    D3D12_SUBRESOURCE_DATA resource_data[2];
+    D3D12_SUBRESOURCE_DATA resource_data[2] = {0};
     struct d3d12_resource *resource;
     unsigned int buffer_offset = 0;
     D3D12_RESOURCE_STATES state;
@@ -173,15 +173,38 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                    params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_texture_data_with_states(resource->resource, resource_data,
-                    params->level_count, test_context->queue, test_context->list,
-                    RESOURCE_STATE_DO_NOT_CHANGE,
-                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            reset_command_list(test_context->list, test_context->allocator);
-            ID3D12Device_CreateShaderResourceView(device, resource->resource,
-                    NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            {
+                D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc = { 0 };
+
+                resource->resource = create_default_buffer(device, params->data_size,
+                        0, D3D12_RESOURCE_STATE_COPY_DEST);
+                upload_buffer_data_with_states(resource->resource, 0, params->data_size, resource_data[0].pData,
+                        test_context->queue, test_context->list,
+                        RESOURCE_STATE_DO_NOT_CHANGE,
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                reset_command_list(test_context->list, test_context->allocator);
+
+                srv_desc.Format = params->format;
+                srv_desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+                srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                srv_desc.Buffer.NumElements = params->width * params->height;
+
+                ID3D12Device_CreateShaderResourceView(device, resource->resource,
+                        &srv_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            }
+            else
+            {
+                resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
+                        params->format, 0, D3D12_RESOURCE_STATE_COPY_DEST);
+                upload_texture_data_with_states(resource->resource, resource_data,
+                        params->level_count, test_context->queue, test_context->list,
+                        RESOURCE_STATE_DO_NOT_CHANGE,
+                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                reset_command_list(test_context->list, test_context->allocator);
+                ID3D12Device_CreateShaderResourceView(device, resource->resource,
+                        NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+            }
             break;
 
         case RESOURCE_TYPE_UAV:

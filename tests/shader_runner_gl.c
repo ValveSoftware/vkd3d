@@ -376,9 +376,6 @@ static struct resource *gl_runner_create_resource(struct shader_runner *r, const
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
-            init_resource_2d(resource, params);
-            break;
-
         case RESOURCE_TYPE_UAV:
             if (params->dimension == RESOURCE_DIMENSION_BUFFER)
                 init_resource_buffer(resource, params);
@@ -404,9 +401,6 @@ static void gl_runner_destroy_resource(struct shader_runner *r, struct resource 
     {
         case RESOURCE_TYPE_RENDER_TARGET:
         case RESOURCE_TYPE_TEXTURE:
-            glDeleteTextures(1, &resource->id);
-            break;
-
         case RESOURCE_TYPE_UAV:
             if (res->dimension == RESOURCE_DIMENSION_BUFFER)
             {
@@ -505,7 +499,10 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
         sampler->sampler_space = s->sampler_space;
         sampler->sampler_index = s->sampler_index;
         sampler->shader_visibility = VKD3D_SHADER_VISIBILITY_ALL;
-        sampler->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE;
+        /* We don't know if this combined sampler was created from a SRV buffer or a SRV image, so
+         * we pass both flags, otherwise the combined sampler won't be recognized when emitting the
+         * SPIR-V, which will result in a failing assertion. */
+        sampler->flags = VKD3D_SHADER_BINDING_FLAG_IMAGE | VKD3D_SHADER_BINDING_FLAG_BUFFER;
         sampler->binding.set = 0;
         sampler->binding.binding = runner->combined_sampler_count++;
         sampler->binding.count = 1;
@@ -872,8 +869,17 @@ static bool gl_runner_draw(struct shader_runner *r,
         if (!(resource = shader_runner_get_resource(r, RESOURCE_TYPE_TEXTURE, s->resource_index)))
             fatal_error("Resource not found.\n");
 
-        glActiveTexture(GL_TEXTURE0 + s->binding.binding);
-        glBindTexture(GL_TEXTURE_2D, gl_resource(resource)->id);
+        if (resource->dimension == RESOURCE_DIMENSION_BUFFER)
+        {
+            glActiveTexture(GL_TEXTURE0 + s->binding.binding);
+            glBindTexture(GL_TEXTURE_BUFFER, gl_resource(resource)->tbo_id);
+        }
+        else
+        {
+            glActiveTexture(GL_TEXTURE0 + s->binding.binding);
+            glBindTexture(GL_TEXTURE_2D, gl_resource(resource)->id);
+        }
+
         if (s->sampler_index == VKD3D_SHADER_DUMMY_SAMPLER_INDEX)
             continue;
 

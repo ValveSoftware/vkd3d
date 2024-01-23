@@ -240,6 +240,12 @@ static struct resource *d3d9_runner_create_resource(struct shader_runner *r, con
 
         case RESOURCE_TYPE_TEXTURE:
         {
+            if (params->dimension == RESOURCE_DIMENSION_BUFFER)
+            {
+                fatal_error("Buffer resources are not supported.\n");
+                break;
+            }
+
             unsigned int src_buffer_offset = 0;
 
             hr = IDirect3DDevice9_CreateTexture(device, params->width, params->height,
@@ -387,6 +393,8 @@ static bool d3d9_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
+                assert(resource->r.dimension != RESOURCE_DIMENSION_BUFFER);
+
                 hr = IDirect3DDevice9_SetTexture(device, resource->r.slot, (IDirect3DBaseTexture9 *)resource->texture);
                 ok(hr == D3D_OK, "Failed to set texture, hr %#lx.\n", hr);
                 break;
