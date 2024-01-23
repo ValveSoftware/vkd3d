@@ -2328,6 +2328,7 @@ struct spirv_compiler
     uint32_t private_output_variable[MAX_REG_OUTPUT + 1]; /* 1 entry for oDepth */
     uint32_t private_output_variable_write_mask[MAX_REG_OUTPUT + 1]; /* 1 entry for oDepth */
     uint32_t epilogue_function_id;
+    uint32_t discard_function_id;
 
     uint32_t binding_idx;
 
@@ -7626,16 +7627,39 @@ static void spirv_compiler_emit_retc(struct spirv_compiler *compiler,
     vkd3d_spirv_build_op_label(builder, merge_block_id);
 }
 
-static void spirv_compiler_emit_kill(struct spirv_compiler *compiler,
-        const struct vkd3d_shader_instruction *instruction)
+static uint32_t spirv_compiler_get_discard_function_id(struct spirv_compiler *compiler)
 {
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t target_id, merge_block_id;
 
-    target_id = vkd3d_spirv_alloc_id(builder);
-    merge_block_id = spirv_compiler_emit_conditional_branch(compiler, instruction, target_id);
+    if (!compiler->discard_function_id)
+        compiler->discard_function_id = vkd3d_spirv_alloc_id(builder);
 
-    vkd3d_spirv_build_op_label(builder, target_id);
+    return compiler->discard_function_id;
+}
+
+static void spirv_compiler_emit_discard_function(struct spirv_compiler *compiler)
+{
+    uint32_t void_id, bool_id, function_type_id, condition_id, target_block_id, merge_block_id;
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+
+    vkd3d_spirv_build_op_name(builder, compiler->discard_function_id, "discard");
+
+    void_id = vkd3d_spirv_get_op_type_void(builder);
+    bool_id = vkd3d_spirv_get_op_type_bool(builder);
+    function_type_id = vkd3d_spirv_get_op_type_function(builder, void_id, &bool_id, 1);
+
+    vkd3d_spirv_build_op_function(builder, void_id, compiler->discard_function_id,
+            SpvFunctionControlMaskNone, function_type_id);
+    condition_id = vkd3d_spirv_build_op_function_parameter(builder, bool_id);
+
+    vkd3d_spirv_build_op_label(builder, vkd3d_spirv_alloc_id(builder));
+
+    target_block_id = vkd3d_spirv_alloc_id(builder);
+    merge_block_id = vkd3d_spirv_alloc_id(builder);
+    vkd3d_spirv_build_op_selection_merge(builder, merge_block_id, SpvSelectionControlMaskNone);
+    vkd3d_spirv_build_op_branch_conditional(builder, condition_id, target_block_id, merge_block_id);
+
+    vkd3d_spirv_build_op_label(builder, target_block_id);
 
     if (spirv_compiler_is_target_extension_supported(compiler,
             VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION))
@@ -7650,6 +7674,26 @@ static void spirv_compiler_emit_kill(struct spirv_compiler *compiler,
     }
 
     vkd3d_spirv_build_op_label(builder, merge_block_id);
+    vkd3d_spirv_build_op_return(builder);
+    vkd3d_spirv_build_op_function_end(builder);
+}
+
+static void spirv_compiler_emit_discard(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t condition_id, void_id;
+
+    /* discard is not a block terminator in VSIR, and emitting it as such in SPIR-V would cause
+     * a mismatch between the VSIR structure and the SPIR-V one, which would cause problems if
+     * structurisation is necessary. Therefore we emit it as a function call. */
+    condition_id = spirv_compiler_emit_load_src(compiler, src, VKD3DSP_WRITEMASK_0);
+    condition_id = spirv_compiler_emit_int_to_bool(compiler,
+            instruction->flags, src->reg.data_type, 1, condition_id);
+    void_id = vkd3d_spirv_get_op_type_void(builder);
+    vkd3d_spirv_build_op_function_call(builder, void_id, spirv_compiler_get_discard_function_id(compiler),
+            &condition_id, 1);
 }
 
 static bool spirv_compiler_init_blocks(struct spirv_compiler *compiler, unsigned int block_count)
@@ -9515,7 +9559,7 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
             break;
         case VKD3DSIH_DISCARD:
         case VKD3DSIH_TEXKILL:
-            spirv_compiler_emit_kill(compiler, instruction);
+            spirv_compiler_emit_discard(compiler, instruction);
             break;
         case VKD3DSIH_LABEL:
             spirv_compiler_emit_label(compiler, instruction);
@@ -9800,6 +9844,9 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
                     "OpenGL tessellation evaluation shader.\n");
         }
     }
+
+    if (compiler->discard_function_id)
+        spirv_compiler_emit_discard_function(compiler);
 
     if (compiler->epilogue_function_id)
     {
