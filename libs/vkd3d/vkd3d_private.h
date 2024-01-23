@@ -1179,7 +1179,7 @@ struct d3d12_descriptor_set_layout
 struct d3d12_root_signature
 {
     ID3D12RootSignature ID3D12RootSignature_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     VkPipelineLayout vk_pipeline_layout;
     struct d3d12_descriptor_set_layout descriptor_set_layouts[VKD3D_MAX_DESCRIPTOR_SETS];
