@@ -2369,6 +2369,7 @@ struct spirv_compiler
     size_t spec_constants_size;
     enum vkd3d_shader_compile_option_formatting_flags formatting;
     enum vkd3d_shader_compile_option_feature_flags features;
+    enum vkd3d_shader_api_version api_version;
     bool write_tess_geom_point_size;
 
     struct vkd3d_string_buffer_cache string_buffers;
@@ -2513,6 +2514,7 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
                 break;
 
             case VKD3D_SHADER_COMPILE_OPTION_API_VERSION:
+                compiler->api_version = option->value;
                 break;
 
             case VKD3D_SHADER_COMPILE_OPTION_TYPED_UAV:
@@ -2546,6 +2548,10 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
                 break;
         }
     }
+
+    /* Explicit enabling of float64 was not required for API versions <= 1.10. */
+    if (compiler->api_version <= VKD3D_SHADER_API_VERSION_1_10)
+        compiler->features |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64;
 
     rb_init(&compiler->symbol_table, vkd3d_symbol_compare);
 
@@ -5601,7 +5607,16 @@ static void spirv_compiler_emit_dcl_global_flags(struct spirv_compiler *compiler
 
     if (flags & (VKD3DSGF_ENABLE_DOUBLE_PRECISION_FLOAT_OPS | VKD3DSGF_ENABLE_11_1_DOUBLE_EXTENSIONS))
     {
-        vkd3d_spirv_enable_capability(&compiler->spirv_builder, SpvCapabilityFloat64);
+        if (compiler->features & VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64)
+        {
+            vkd3d_spirv_enable_capability(&compiler->spirv_builder, SpvCapabilityFloat64);
+        }
+        else
+        {
+            WARN("Unsupported 64-bit float ops.\n");
+            spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_UNSUPPORTED_FEATURE,
+                    "The target environment does not support 64-bit floating point.");
+        }
         flags &= ~(VKD3DSGF_ENABLE_DOUBLE_PRECISION_FLOAT_OPS | VKD3DSGF_ENABLE_11_1_DOUBLE_EXTENSIONS);
     }
 
