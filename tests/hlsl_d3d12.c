@@ -1583,18 +1583,16 @@ static void test_disassemble_shader(void)
     ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
 
     hr = D3DDisassemble(vs_1_1, sizeof(vs_1_1), 0, NULL, &blob);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D10Blob_Release(blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ID3D10Blob_Release(blob);
 
     hr = D3DDisassemble(vs_2_0, sizeof(vs_2_0), 0, NULL, &blob);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ID3D10Blob_Release(blob);
 
     hr = D3DDisassemble(vs_3_0, sizeof(vs_3_0), 0, NULL, &blob);
-    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
-    if (SUCCEEDED(hr))
-        ID3D10Blob_Release(blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ID3D10Blob_Release(blob);
 
     hr = D3DDisassemble(vs_4_0, sizeof(vs_4_0), 0, NULL, &blob);
     todo ok(hr == S_OK, "Got hr %#x.\n", hr);

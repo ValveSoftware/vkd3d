@@ -587,7 +587,7 @@ static void add_signature_mask(struct vkd3d_shader_sm1_parser *sm1, bool output,
 
     if (!(element = find_signature_element_by_register_index(signature, register_index)))
     {
-        vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_UNDECLARED_SEMANTIC,
+        vkd3d_shader_parser_warning(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_UNDECLARED_SEMANTIC,
                 "%s register %u was used without being declared.", output ? "Output" : "Input", register_index);
         return;
     }
