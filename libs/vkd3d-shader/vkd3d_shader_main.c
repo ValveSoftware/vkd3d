@@ -424,12 +424,12 @@ void set_string(struct vkd3d_bytecode_buffer *buffer, size_t offset, const char 
 static void vkd3d_shader_dump_blob(const char *path, const char *profile,
         const char *suffix, const void *data, size_t size)
 {
-    static LONG shader_id = 0;
+    static unsigned int shader_id = 0;
     char filename[1024];
     unsigned int id;
     FILE *f;
 
-    id = InterlockedIncrement(&shader_id) - 1;
+    id = vkd3d_atomic_increment_u32(&shader_id) - 1;
 
     if (profile)
         snprintf(filename, ARRAY_SIZE(filename), "%s/vkd3d-shader-%u-%s.%s", path, id, profile, suffix);
