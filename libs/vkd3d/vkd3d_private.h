@@ -1288,7 +1288,7 @@ struct d3d12_pipeline_uav_counter_state
 struct d3d12_pipeline_state
 {
     ID3D12PipelineState ID3D12PipelineState_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     union
     {
