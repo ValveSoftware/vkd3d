@@ -19,6 +19,23 @@ todo(sm<6) draw quad
 probe all rgba (-4.5, 8.5, 2.0, 2.0)
 
 
+[pixel shader todo]
+uniform double2 d;
+
+uint4 main() : sv_target
+{
+    uint4 result;
+    asuint(d.x, result.x, result.y);
+    asuint(d.y, result.z, result.w);
+    return result;
+}
+
+[test]
+uniform 0 double2 -4.5 8.500003814697266
+todo draw quad
+probe all rgbaui (0, 0xc0120000, 0x80000000, 0x40210000)
+
+
 [require]
 shader model >= 6.0
 int64
