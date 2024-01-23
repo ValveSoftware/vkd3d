@@ -1137,6 +1137,7 @@ static int vkd3d_shader_scan_instruction(struct vkd3d_shader_scan_context *conte
                     instruction->declaration.structured_resource.byte_stride, false, instruction->flags);
             break;
         case VKD3DSIH_IF:
+        case VKD3DSIH_IFC:
             cf_info = vkd3d_shader_scan_push_cf_info(context);
             cf_info->type = VKD3D_SHADER_BLOCK_IF;
             cf_info->inside_block = true;
