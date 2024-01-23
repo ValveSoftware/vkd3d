@@ -6764,7 +6764,7 @@ static enum vkd3d_result sm6_parser_entry_point_init(struct sm6_parser *sm6)
 
     sm6->entry_point = value->u.function.name;
     if (!sm6_metadata_value_is_string(entry_node->operands[1])
-            || ascii_strcasecmp(sm6->entry_point, entry_node->operands[1]->u.string_value))
+            || strcmp(sm6->entry_point, entry_node->operands[1]->u.string_value))
     {
         WARN("Entry point function name %s mismatch.\n", sm6->entry_point);
         vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_ENTRY_POINT_MISMATCH,
