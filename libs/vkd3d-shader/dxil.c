@@ -6954,7 +6954,7 @@ static struct sm6_function *sm6_parser_get_function(const struct sm6_parser *sm6
 {
     size_t i;
     for (i = 0; i < sm6->function_count; ++i)
-        if (!ascii_strcasecmp(sm6->functions[i].declaration->u.function.name, name))
+        if (!strcmp(sm6->functions[i].declaration->u.function.name, name))
             return &sm6->functions[i];
     return NULL;
 }
