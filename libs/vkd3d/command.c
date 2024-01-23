@@ -2320,7 +2320,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_list_QueryInterface(ID3D12Graphic
 static ULONG STDMETHODCALLTYPE d3d12_command_list_AddRef(ID3D12GraphicsCommandList5 *iface)
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList5(iface);
-    ULONG refcount = InterlockedIncrement(&list->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&list->refcount);
 
     TRACE("%p increasing refcount to %u.\n", list, refcount);
 
@@ -2335,7 +2335,7 @@ static void vkd3d_pipeline_bindings_cleanup(struct vkd3d_pipeline_bindings *bind
 static ULONG STDMETHODCALLTYPE d3d12_command_list_Release(ID3D12GraphicsCommandList5 *iface)
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList5(iface);
-    ULONG refcount = InterlockedDecrement(&list->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&list->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", list, refcount);
 
