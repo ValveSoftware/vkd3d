@@ -1634,7 +1634,7 @@ static enum vkd3d_result sm6_parser_type_table_init(struct sm6_parser *sm6)
                     break;
                 }
 
-                if (!ascii_strcasecmp(struct_name, "dx.types.Handle"))
+                if (!strcmp(struct_name, "dx.types.Handle"))
                     sm6->handle_type = type;
 
                 type->u.struc->name = struct_name;
