@@ -666,6 +666,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
     {
         struct resource_params params;
         struct input_element *element;
+        unsigned int i;
 
         /* For simplicity, draw a large triangle instead. */
         static const struct vec2 quad[] =
@@ -695,6 +696,9 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
             set_resource(runner, runner->ops->create_resource(runner, &params));
         }
+
+        for (i = 0; i < runner->input_element_count; ++i)
+            free(runner->input_elements[i].name);
 
         vkd3d_array_reserve((void **)&runner->input_elements, &runner->input_element_capacity,
                 1, sizeof(*runner->input_elements));
