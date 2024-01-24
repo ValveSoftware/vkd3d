@@ -6230,7 +6230,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_queue_QueryInterface(ID3D12Comman
 static ULONG STDMETHODCALLTYPE d3d12_command_queue_AddRef(ID3D12CommandQueue *iface)
 {
     struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
-    ULONG refcount = InterlockedIncrement(&command_queue->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&command_queue->refcount);
 
     TRACE("%p increasing refcount to %u.\n", command_queue, refcount);
 
@@ -6272,7 +6272,7 @@ static void d3d12_command_queue_op_array_destroy(struct d3d12_command_queue_op_a
 static ULONG STDMETHODCALLTYPE d3d12_command_queue_Release(ID3D12CommandQueue *iface)
 {
     struct d3d12_command_queue *command_queue = impl_from_ID3D12CommandQueue(iface);
-    ULONG refcount = InterlockedDecrement(&command_queue->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&command_queue->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", command_queue, refcount);
 

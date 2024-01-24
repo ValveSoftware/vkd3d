@@ -1622,7 +1622,7 @@ struct d3d12_command_queue_op_array
 struct d3d12_command_queue
 {
     ID3D12CommandQueue ID3D12CommandQueue_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     D3D12_COMMAND_QUEUE_DESC desc;
 
