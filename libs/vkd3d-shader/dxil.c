@@ -2092,8 +2092,9 @@ static void instruction_init_with_resource(struct vkd3d_shader_instruction *ins,
 static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_shader_instruction *ins,
         unsigned int count, struct sm6_parser *sm6)
 {
-    struct vkd3d_shader_src_param *params = shader_parser_get_src_params(&sm6->p, count);
-    if (!params)
+    struct vkd3d_shader_src_param *params;
+
+    if (!(params = vsir_program_get_src_params(&sm6->p.program, count)))
     {
         ERR("Failed to allocate src params.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
@@ -2253,7 +2254,7 @@ static void register_index_address_init(struct vkd3d_shader_register_index *idx,
     }
     else
     {
-        struct vkd3d_shader_src_param *rel_addr = shader_parser_get_src_params(&sm6->p, 1);
+        struct vkd3d_shader_src_param *rel_addr = vsir_program_get_src_params(&sm6->p.program, 1);
         if (rel_addr)
             src_param_init_from_value(rel_addr, address);
         idx->offset = 0;

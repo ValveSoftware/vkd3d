@@ -899,7 +899,7 @@ static void shader_sm1_read_src_param(struct vkd3d_shader_sm1_parser *sm1, const
     shader_sm1_read_param(sm1, ptr, &token, &addr_token);
     if (has_relative_address(token))
     {
-        if (!(src_rel_addr = shader_parser_get_src_params(&sm1->p, 1)))
+        if (!(src_rel_addr = vsir_program_get_src_params(&sm1->p.program, 1)))
         {
             vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY,
                     "Out of memory.");
@@ -920,7 +920,7 @@ static void shader_sm1_read_dst_param(struct vkd3d_shader_sm1_parser *sm1, const
     shader_sm1_read_param(sm1, ptr, &token, &addr_token);
     if (has_relative_address(token))
     {
-        if (!(dst_rel_addr = shader_parser_get_src_params(&sm1->p, 1)))
+        if (!(dst_rel_addr = vsir_program_get_src_params(&sm1->p.program, 1)))
         {
             vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY,
                     "Out of memory.");
@@ -1122,11 +1122,11 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     ins->raw = false;
     ins->structured = false;
     predicated = !!(opcode_token & VKD3D_SM1_INSTRUCTION_PREDICATED);
-    ins->predicate = predicate = predicated ? shader_parser_get_src_params(&sm1->p, 1) : NULL;
+    ins->predicate = predicate = predicated ? vsir_program_get_src_params(program, 1) : NULL;
     ins->dst_count = opcode_info->dst_count;
     ins->dst = dst_param = vsir_program_get_dst_params(program, ins->dst_count);
     ins->src_count = opcode_info->src_count;
-    ins->src = src_params = shader_parser_get_src_params(&sm1->p, ins->src_count);
+    ins->src = src_params = vsir_program_get_src_params(program, ins->src_count);
     if ((!predicate && predicated) || (!src_params && ins->src_count) || (!dst_param && ins->dst_count))
     {
         vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_OUT_OF_MEMORY, "Out of memory.");

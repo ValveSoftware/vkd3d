@@ -66,7 +66,7 @@ static void remove_dcl_temps(struct vsir_program *program)
     }
 }
 
-static bool vsir_instruction_init_with_params(struct vkd3d_shader_parser *parser,
+static bool vsir_instruction_init_with_params(struct vsir_program *program,
         struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
         enum vkd3d_shader_opcode handler_idx, unsigned int dst_count, unsigned int src_count)
 {
@@ -74,13 +74,13 @@ static bool vsir_instruction_init_with_params(struct vkd3d_shader_parser *parser
     ins->dst_count = dst_count;
     ins->src_count = src_count;
 
-    if (!(ins->dst = vsir_program_get_dst_params(&parser->program, ins->dst_count)))
+    if (!(ins->dst = vsir_program_get_dst_params(program, ins->dst_count)))
     {
         ERR("Failed to allocate %u destination parameters.\n", dst_count);
         return false;
     }
 
-    if (!(ins->src = shader_parser_get_src_params(parser, ins->src_count)))
+    if (!(ins->src = vsir_program_get_src_params(program, ins->src_count)))
     {
         ERR("Failed to allocate %u source parameters.\n", src_count);
         return false;
@@ -116,7 +116,7 @@ static enum vkd3d_result instruction_array_lower_texkills(struct vkd3d_shader_pa
         /* tmp = ins->dst[0] < 0  */
 
         ins = &instructions->elements[i + 1];
-        if (!vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_LTO, 1, 2))
+        if (!vsir_instruction_init_with_params(program, ins, &texkill_ins->location, VKD3DSIH_LTO, 1, 2))
             return VKD3D_ERROR_OUT_OF_MEMORY;
 
         vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
@@ -139,7 +139,7 @@ static enum vkd3d_result instruction_array_lower_texkills(struct vkd3d_shader_pa
         for (k = 1; k < components_read; ++k)
         {
             ins = &instructions->elements[i + 1 + k];
-            if (!(vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_OR, 1, 2)))
+            if (!(vsir_instruction_init_with_params(program, ins, &texkill_ins->location, VKD3DSIH_OR, 1, 2)))
                 return VKD3D_ERROR_OUT_OF_MEMORY;
 
             vsir_register_init(&ins->dst[0].reg, VKD3DSPR_TEMP, VKD3D_DATA_UINT, 1);
@@ -160,7 +160,7 @@ static enum vkd3d_result instruction_array_lower_texkills(struct vkd3d_shader_pa
         /* discard_nz tmp.x */
 
         ins = &instructions->elements[i + 1 + components_read];
-        if (!(vsir_instruction_init_with_params(parser, ins, &texkill_ins->location, VKD3DSIH_DISCARD, 0, 1)))
+        if (!(vsir_instruction_init_with_params(program, ins, &texkill_ins->location, VKD3DSIH_DISCARD, 0, 1)))
             return VKD3D_ERROR_OUT_OF_MEMORY;
         ins->flags = VKD3D_SHADER_CONDITIONAL_OP_NZ;
 
@@ -478,12 +478,12 @@ void vsir_instruction_init(struct vkd3d_shader_instruction *ins, const struct vk
     ins->handler_idx = handler_idx;
 }
 
-static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins, const struct vkd3d_shader_location *location,
-        unsigned int label_id, void *parser)
+static bool vsir_instruction_init_label(struct vkd3d_shader_instruction *ins,
+        const struct vkd3d_shader_location *location, unsigned int label_id, struct vsir_program *program)
 {
     struct vkd3d_shader_src_param *src_param;
 
-    if (!(src_param = shader_parser_get_src_params(parser, 1)))
+    if (!(src_param = vsir_program_get_src_params(program, 1)))
         return false;
 
     vsir_src_param_init_label(src_param, label_id);
@@ -1829,8 +1829,9 @@ static unsigned int cf_flattener_alloc_block_id(struct cf_flattener *flattener)
 static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_shader_instruction *ins,
         unsigned int count, struct cf_flattener *flattener)
 {
-    struct vkd3d_shader_src_param *params = shader_parser_get_src_params(flattener->parser, count);
-    if (!params)
+    struct vkd3d_shader_src_param *params;
+
+    if (!(params = vsir_program_get_src_params(&flattener->parser->program, count)))
     {
         flattener->allocation_failed = true;
         return NULL;
@@ -1846,7 +1847,7 @@ static void cf_flattener_emit_label(struct cf_flattener *flattener, unsigned int
 
     if (!(ins = cf_flattener_require_space(flattener, 1)))
         return;
-    if (vsir_instruction_init_label(ins, &flattener->location, label_id, flattener->parser))
+    if (vsir_instruction_init_label(ins, &flattener->location, label_id, &flattener->parser->program))
         ++flattener->instruction_count;
     else
         flattener->allocation_failed = true;
@@ -2416,22 +2417,22 @@ static bool lower_switch_to_if_ladder_add_block_mapping(struct lower_switch_to_i
     return true;
 }
 
-static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result lower_switch_to_if_ladder(struct vsir_program *program)
 {
-    unsigned int block_count = parser->program.block_count, ssa_count = parser->program.ssa_count, current_label = 0, if_label;
+    unsigned int block_count = program->block_count, ssa_count = program->ssa_count, current_label = 0, if_label;
     size_t ins_capacity = 0, ins_count = 0, i, map_capacity = 0, map_count = 0;
     struct vkd3d_shader_instruction *instructions = NULL;
     struct lower_switch_to_if_ladder_block_mapping *block_map = NULL;
 
-    if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
+    if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count))
         goto fail;
 
     /* First subpass: convert SWITCH_MONOLITHIC instructions to
      * selection ladders, keeping a map between blocks before and
      * after the subpass. */
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         unsigned int case_count, j, default_label;
 
         switch (ins->handler_idx)
@@ -2463,7 +2464,8 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
             if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 1))
                 goto fail;
 
-            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_BRANCH, 0, 1))
+            if (!vsir_instruction_init_with_params(program, &instructions[ins_count],
+                    &ins->location, VKD3DSIH_BRANCH, 0, 1))
                 goto fail;
             vsir_src_param_init_label(&instructions[ins_count].src[0], default_label);
             ++ins_count;
@@ -2478,7 +2480,8 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
         {
             unsigned int fallthrough_label, case_label = label_from_src_param(&ins->src[3 + 2 * j + 1]);
 
-            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_IEQ, 1, 2))
+            if (!vsir_instruction_init_with_params(program,
+                    &instructions[ins_count], &ins->location, VKD3DSIH_IEQ, 1, 2))
                 goto fail;
             dst_param_init_ssa_bool(&instructions[ins_count].dst[0], ssa_count);
             instructions[ins_count].src[0] = ins->src[0];
@@ -2493,7 +2496,8 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
             else
                 fallthrough_label = block_count + 1;
 
-            if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_BRANCH, 0, 3))
+            if (!vsir_instruction_init_with_params(program, &instructions[ins_count],
+                    &ins->location, VKD3DSIH_BRANCH, 0, 3))
                 goto fail;
             src_param_init_ssa_bool(&instructions[ins_count].src[0], ssa_count);
             vsir_src_param_init_label(&instructions[ins_count].src[1], case_label);
@@ -2514,7 +2518,8 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
             }
             else
             {
-                if (!vsir_instruction_init_with_params(parser, &instructions[ins_count], &ins->location, VKD3DSIH_LABEL, 0, 1))
+                if (!vsir_instruction_init_with_params(program,
+                        &instructions[ins_count], &ins->location, VKD3DSIH_LABEL, 0, 1))
                     goto fail;
                 vsir_src_param_init_label(&instructions[ins_count].src[0], ++block_count);
                 ++ins_count;
@@ -2573,7 +2578,7 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
         }
         else
         {
-            if (!(new_src = shader_parser_get_src_params(parser, new_src_count)))
+            if (!(new_src = vsir_program_get_src_params(program, new_src_count)))
             {
                 ERR("Failed to allocate %u source parameters.\n", new_src_count);
                 goto fail;
@@ -2615,13 +2620,13 @@ static enum vkd3d_result lower_switch_to_if_ladder(struct vkd3d_shader_parser *p
         ins->src = new_src;
     }
 
-    vkd3d_free(parser->program.instructions.elements);
+    vkd3d_free(program->instructions.elements);
     vkd3d_free(block_map);
-    parser->program.instructions.elements = instructions;
-    parser->program.instructions.capacity = ins_capacity;
-    parser->program.instructions.count = ins_count;
-    parser->program.block_count = block_count;
-    parser->program.ssa_count = ssa_count;
+    program->instructions.elements = instructions;
+    program->instructions.capacity = ins_capacity;
+    program->instructions.count = ins_count;
+    program->block_count = block_count;
+    program->ssa_count = ssa_count;
 
     return VKD3D_OK;
 
@@ -2645,7 +2650,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
     if (parser->shader_desc.is_dxil)
     {
-        if ((result = lower_switch_to_if_ladder(parser)) < 0)
+        if ((result = lower_switch_to_if_ladder(&parser->program)) < 0)
             return result;
     }
     else

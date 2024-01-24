@@ -1742,7 +1742,7 @@ static bool shader_sm4_read_reg_idx(struct vkd3d_shader_sm4_parser *priv, const 
 {
     if (addressing & VKD3D_SM4_ADDRESSING_RELATIVE)
     {
-        struct vkd3d_shader_src_param *rel_addr = shader_parser_get_src_params(&priv->p, 1);
+        struct vkd3d_shader_src_param *rel_addr = vsir_program_get_src_params(&priv->p.program, 1);
 
         if (!(reg_idx->rel_addr = rel_addr))
         {
@@ -2344,6 +2344,7 @@ static void shader_sm4_read_instruction_modifier(uint32_t modifier, struct vkd3d
 static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, struct vkd3d_shader_instruction *ins)
 {
     const struct vkd3d_sm4_opcode_info *opcode_info;
+    struct vsir_program *program = &sm4->p.program;
     uint32_t opcode_token, opcode, previous_token;
     struct vkd3d_shader_dst_param *dst_params;
     struct vkd3d_shader_src_param *src_params;
@@ -2402,7 +2403,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
     ins->predicate = NULL;
     ins->dst_count = strnlen(opcode_info->dst_info, SM4_MAX_DST_COUNT);
     ins->src_count = strnlen(opcode_info->src_info, SM4_MAX_SRC_COUNT);
-    ins->src = src_params = shader_parser_get_src_params(&sm4->p, ins->src_count);
+    ins->src = src_params = vsir_program_get_src_params(program, ins->src_count);
     if (!src_params && ins->src_count)
     {
         ERR("Failed to allocate src parameters.\n");
@@ -2444,7 +2445,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
         precise = (opcode_token & VKD3D_SM5_PRECISE_MASK) >> VKD3D_SM5_PRECISE_SHIFT;
         ins->flags |= precise << VKD3DSI_PRECISE_SHIFT;
 
-        ins->dst = dst_params = vsir_program_get_dst_params(&sm4->p.program, ins->dst_count);
+        ins->dst = dst_params = vsir_program_get_dst_params(program, ins->dst_count);
         if (!dst_params && ins->dst_count)
         {
             ERR("Failed to allocate dst parameters.\n");
