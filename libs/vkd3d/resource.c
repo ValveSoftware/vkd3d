@@ -358,7 +358,7 @@ static ULONG STDMETHODCALLTYPE d3d12_heap_Release(ID3D12Heap *iface)
 
 static void d3d12_heap_resource_destroyed(struct d3d12_heap *heap)
 {
-    if (!InterlockedDecrement(&heap->resource_count) && (!heap->refcount || heap->is_private))
+    if (!InterlockedDecrement((LONG *)&heap->resource_count) && (!heap->refcount || heap->is_private))
         d3d12_heap_destroy(heap);
 }
 
@@ -2174,7 +2174,7 @@ static HRESULT vkd3d_bind_heap_memory(struct d3d12_device *device,
     {
         resource->heap = heap;
         resource->heap_offset = heap_offset;
-        InterlockedIncrement(&heap->resource_count);
+        vkd3d_atomic_increment_u32(&heap->resource_count);
     }
     else
     {
