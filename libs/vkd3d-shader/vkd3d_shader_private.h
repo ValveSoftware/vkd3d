@@ -1287,6 +1287,12 @@ struct vsir_program
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);
 void vsir_program_cleanup(struct vsir_program *program);
 
+static inline struct vkd3d_shader_dst_param *vsir_program_get_dst_params(
+        struct vsir_program *program, unsigned int count)
+{
+    return shader_dst_param_allocator_get(&program->instructions.dst_params, count);
+}
+
 struct vkd3d_shader_parser
 {
     struct vkd3d_shader_message_context *message_context;
@@ -1313,12 +1319,6 @@ bool vkd3d_shader_parser_init(struct vkd3d_shader_parser *parser,
         unsigned int instruction_reserve);
 void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
         enum vkd3d_shader_error error, const char *format, ...) VKD3D_PRINTF_FUNC(3, 4);
-
-static inline struct vkd3d_shader_dst_param *shader_parser_get_dst_params(
-        struct vkd3d_shader_parser *parser, unsigned int count)
-{
-    return shader_dst_param_allocator_get(&parser->program.instructions.dst_params, count);
-}
 
 static inline struct vkd3d_shader_src_param *shader_parser_get_src_params(
         struct vkd3d_shader_parser *parser, unsigned int count)

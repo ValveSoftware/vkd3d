@@ -2108,8 +2108,9 @@ static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_
 static struct vkd3d_shader_dst_param *instruction_dst_params_alloc(struct vkd3d_shader_instruction *ins,
         unsigned int count, struct sm6_parser *sm6)
 {
-    struct vkd3d_shader_dst_param *params = shader_parser_get_dst_params(&sm6->p, count);
-    if (!params)
+    struct vkd3d_shader_dst_param *params;
+
+    if (!(params = vsir_program_get_dst_params(&sm6->p.program, count)))
     {
         ERR("Failed to allocate dst params.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,
@@ -7311,8 +7312,8 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
         return ret;
     }
 
-    if (!(sm6->output_params = shader_parser_get_dst_params(&sm6->p, output_signature->element_count))
-            || !(sm6->input_params = shader_parser_get_dst_params(&sm6->p, input_signature->element_count)))
+    if (!(sm6->output_params = vsir_program_get_dst_params(&sm6->p.program, output_signature->element_count))
+            || !(sm6->input_params = vsir_program_get_dst_params(&sm6->p.program, input_signature->element_count)))
     {
         ERR("Failed to allocate input/output parameters.\n");
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_OUT_OF_MEMORY,

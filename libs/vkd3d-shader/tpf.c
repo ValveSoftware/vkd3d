@@ -2444,7 +2444,7 @@ static void shader_sm4_read_instruction(struct vkd3d_shader_sm4_parser *sm4, str
         precise = (opcode_token & VKD3D_SM5_PRECISE_MASK) >> VKD3D_SM5_PRECISE_SHIFT;
         ins->flags |= precise << VKD3DSI_PRECISE_SHIFT;
 
-        ins->dst = dst_params = shader_parser_get_dst_params(&sm4->p, ins->dst_count);
+        ins->dst = dst_params = vsir_program_get_dst_params(&sm4->p.program, ins->dst_count);
         if (!dst_params && ins->dst_count)
         {
             ERR("Failed to allocate dst parameters.\n");

@@ -1089,6 +1089,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
 {
     struct vkd3d_shader_src_param *src_params, *predicate;
     const struct vkd3d_sm1_opcode_info *opcode_info;
+    struct vsir_program *program = &sm1->p.program;
     struct vkd3d_shader_dst_param *dst_param;
     const uint32_t **ptr = &sm1->ptr;
     uint32_t opcode_token;
@@ -1111,7 +1112,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
         vkd3d_shader_parser_error(&sm1->p, VKD3D_SHADER_ERROR_D3DBC_INVALID_OPCODE,
                 "Invalid opcode %#x (token 0x%08x, shader version %u.%u).",
                 opcode_token & VKD3D_SM1_OPCODE_MASK, opcode_token,
-                sm1->p.program.shader_version.major, sm1->p.program.shader_version.minor);
+                program->shader_version.major, program->shader_version.minor);
         goto fail;
     }
 
@@ -1123,7 +1124,7 @@ static void shader_sm1_read_instruction(struct vkd3d_shader_sm1_parser *sm1, str
     predicated = !!(opcode_token & VKD3D_SM1_INSTRUCTION_PREDICATED);
     ins->predicate = predicate = predicated ? shader_parser_get_src_params(&sm1->p, 1) : NULL;
     ins->dst_count = opcode_info->dst_count;
-    ins->dst = dst_param = shader_parser_get_dst_params(&sm1->p, ins->dst_count);
+    ins->dst = dst_param = vsir_program_get_dst_params(program, ins->dst_count);
     ins->src_count = opcode_info->src_count;
     ins->src = src_params = shader_parser_get_src_params(&sm1->p, ins->src_count);
     if ((!predicate && predicated) || (!src_params && ins->src_count) || (!dst_param && ins->dst_count))

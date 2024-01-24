@@ -74,7 +74,7 @@ static bool vsir_instruction_init_with_params(struct vkd3d_shader_parser *parser
     ins->dst_count = dst_count;
     ins->src_count = src_count;
 
-    if (!(ins->dst = shader_parser_get_dst_params(parser, ins->dst_count)))
+    if (!(ins->dst = vsir_program_get_dst_params(&parser->program, ins->dst_count)))
     {
         ERR("Failed to allocate %u destination parameters.\n", dst_count);
         return false;
