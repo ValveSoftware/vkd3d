@@ -192,7 +192,7 @@ struct vkd3d_instance
 
     uint64_t host_ticks_per_second;
 
-    LONG refcount;
+    unsigned int refcount;
 };
 
 #ifdef _WIN32

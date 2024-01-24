@@ -750,7 +750,7 @@ static void vkd3d_destroy_instance(struct vkd3d_instance *instance)
 
 ULONG vkd3d_instance_incref(struct vkd3d_instance *instance)
 {
-    ULONG refcount = InterlockedIncrement(&instance->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&instance->refcount);
 
     TRACE("%p increasing refcount to %u.\n", instance, refcount);
 
@@ -759,7 +759,7 @@ ULONG vkd3d_instance_incref(struct vkd3d_instance *instance)
 
 ULONG vkd3d_instance_decref(struct vkd3d_instance *instance)
 {
-    ULONG refcount = InterlockedDecrement(&instance->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&instance->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", instance, refcount);
 
