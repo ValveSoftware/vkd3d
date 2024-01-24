@@ -1614,6 +1614,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
     free(runner->input_elements);
     free(runner->vs_source);
     free(runner->ps_source);
+    free(runner->cs_source);
+    free(runner->fx_source);
     free(runner->uniforms);
     for (i = 0; i < runner->resource_count; ++i)
     {
