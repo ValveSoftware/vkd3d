@@ -3,13 +3,13 @@ shader model >= 5.0
 
 [uav 0]
 format r32 float
-size (3, 1)
+size (2d, 3, 1)
 
 0.1 0.2 0.3
 
 [uav 1]
 format r32 float
-size (1, 1)
+size (2d, 1, 1)
 
 0.5
 

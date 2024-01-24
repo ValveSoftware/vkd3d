@@ -5,8 +5,8 @@ shader model >= 4.0
 filter point point point
 address clamp clamp clamp
 
-[texture 0]
-size (3, 3)
+[srv 0]
+size (2d, 3, 3)
 0.0 0.0 0.0 0.4     0.1 0.0 0.5 0.0     0.2 0.0 0.0 0.4
 0.0 0.1 0.5 0.0     0.1 0.1 0.0 0.4     0.2 0.1 0.5 0.0
 0.0 0.2 0.0 0.4     0.1 0.2 0.5 0.0     0.2 0.2 0.0 0.4

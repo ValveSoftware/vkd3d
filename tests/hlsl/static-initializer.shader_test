@@ -61,8 +61,8 @@ filter linear linear linear
 address clamp clamp clamp
 
 
-[texture 0]
-size (1, 1)
+[srv 0]
+size (2d, 1, 1)
 1.0 2.0 3.0 4.0
 
 
@@ -173,7 +173,7 @@ shader model >= 5.0
 
 [uav 1]
 format r32 float
-size (1, 1)
+size (2d, 1, 1)
 
 0.5
 

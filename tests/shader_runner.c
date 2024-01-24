@@ -418,17 +418,25 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
 
 static void parse_resource_directive(struct resource_params *resource, const char *line)
 {
-    int ret;
-
     if (match_string(line, "format", &line))
     {
         resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &line);
     }
     else if (match_string(line, "size", &line))
     {
-        ret = sscanf(line, "( %u , %u )", &resource->width, &resource->height);
-        if (ret < 2)
-            fatal_error("Malformed texture size '%s'.\n", line);
+        if (sscanf(line, "( buffer , %u ) ", &resource->width) == 1)
+        {
+            resource->dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->height = 1;
+        }
+        else if (sscanf(line, "( 2d , %u , %u ) ", &resource->width, &resource->height) == 2)
+        {
+            resource->dimension = RESOURCE_DIMENSION_2D;
+        }
+        else
+        {
+            fatal_error("Malformed resource size '%s'.\n", line);
+        }
     }
     else if (match_string(line, "levels", &line))
     {
@@ -1541,7 +1549,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                 current_sampler->v_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
                 current_sampler->w_address = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
             }
-            else if (sscanf(line, "[render target %u]\n", &index))
+            else if (sscanf(line, "[rtv %u]\n", &index))
             {
                 state = STATE_RESOURCE;
 
@@ -1549,13 +1557,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_RENDER_TARGET;
-                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
                 current_resource.level_count = 1;
             }
-            else if (sscanf(line, "[texture %u]\n", &index))
+            else if (sscanf(line, "[srv %u]\n", &index))
             {
                 state = STATE_RESOURCE;
 
@@ -1563,7 +1570,6 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_TEXTURE;
-                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
@@ -1577,41 +1583,12 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 current_resource.slot = index;
                 current_resource.type = RESOURCE_TYPE_UAV;
-                current_resource.dimension = RESOURCE_DIMENSION_2D;
                 current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
                 current_resource.data_type = TEXTURE_DATA_FLOAT;
                 current_resource.texel_size = 16;
                 current_resource.level_count = 1;
             }
-            else if (sscanf(line, "[buffer srv %u]\n", &index))
-            {
-                state = STATE_RESOURCE;
-
-                memset(&current_resource, 0, sizeof(current_resource));
-
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_TEXTURE;
-                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
-                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 16;
-                current_resource.level_count = 1;
-            }
-            else if (sscanf(line, "[buffer uav %u]\n", &index))
-            {
-                state = STATE_RESOURCE;
-
-                memset(&current_resource, 0, sizeof(current_resource));
-
-                current_resource.slot = index;
-                current_resource.type = RESOURCE_TYPE_UAV;
-                current_resource.dimension = RESOURCE_DIMENSION_BUFFER;
-                current_resource.format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-                current_resource.data_type = TEXTURE_DATA_FLOAT;
-                current_resource.texel_size = 16;
-                current_resource.level_count = 1;
-            }
-            else if (sscanf(line, "[vertex buffer %u]\n", &index))
+            else if (sscanf(line, "[vb %u]\n", &index))
             {
                 state = STATE_RESOURCE;
 

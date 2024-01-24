@@ -5,7 +5,7 @@ shader model >= 4.0
 0 r32g32b32a32 uint apple
 0 r32g32 int sv_position
 
-[vertex buffer 0]
+[vb 0]
 format r32 uint
 0 1 0x80000000 0xffffffff   -2 -2
 0 1 0x80000000 0xffffffff   -2  2

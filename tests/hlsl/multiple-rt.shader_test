@@ -1,10 +1,10 @@
-[render target 0]
+[rtv 0]
 format r32g32b32a32 float
-size (640, 480)
+size (2d, 640, 480)
 
-[render target 1]
+[rtv 1]
 format r32g32b32a32 float
-size (640, 480)
+size (2d, 640, 480)
 
 [pixel shader]
 void main(out float4 o0 : sv_target0, out float4 o1 : sv_target1)

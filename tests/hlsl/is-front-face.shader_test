@@ -4,7 +4,7 @@ shader model >= 4.0
 [input layout]
 0 r32g32 float sv_position
 
-[vertex buffer 0]
+[vb 0]
 -2.0 -2.0
  2.0 -2.0
 -2.0  2.0
@@ -25,7 +25,7 @@ float4 main(bool face : sv_isfrontface) : sv_target
 draw triangle strip 4
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 
-[vertex buffer 0]
+[vb 0]
 -2.0 -2.0
 -2.0  2.0
  2.0 -2.0

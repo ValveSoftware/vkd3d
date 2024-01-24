@@ -2,7 +2,7 @@
 0 r32g32b32a32 float texcoord
 0 r32g32 float position
 
-[vertex buffer 0]
+[vb 0]
 0.0 1.0 0.0 1.0   -2.0 -2.0
 0.0 1.0 0.0 1.0   -2.0  2.0
 0.0 1.0 0.0 1.0    2.0 -2.0

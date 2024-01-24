@@ -6,9 +6,9 @@ shader model >= 5.0
 % lower than the highest render target.
 % This ceases to be true with shader model 5.1.
 
-[render target 1]
+[rtv 1]
 format r32g32b32a32 float
-size (640, 480)
+size (2d, 640, 480)
 
 [pixel shader]
 struct s
@@ -164,9 +164,8 @@ float4 main() : sv_target1
     return 0;
 }
 
-[buffer uav 2]
-size (1, 1)
-
+[uav 2]
+size (buffer, 1)
 0.1 0.2 0.3 0.4
 
 [pixel shader]

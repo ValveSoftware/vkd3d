@@ -166,7 +166,7 @@ void main() { func(); }
 
 [uav 0]
 format r32 float
-size (2, 2)
+size (2d, 2, 2)
 
 1.0 1.0
 1.0 1.0

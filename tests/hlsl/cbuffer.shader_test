@@ -471,8 +471,8 @@ float4 main() : sv_target
 }
 
 
-[texture 0]
-size (1, 1)
+[srv 0]
+size (2d, 1, 1)
 0.0 0.0 0.0 4.0
 
 [sampler 0]
@@ -527,12 +527,12 @@ float4 main() : sv_target
 }
 
 
-[texture 0]
-size (1, 1)
+[srv 0]
+size (2d, 1, 1)
 1.0 1.0 1.0 1.0
 
-[texture 1]
-size (1, 1)
+[srv 1]
+size (2d, 1, 1)
 2.0 2.0 2.0 2.0
 
 
@@ -698,8 +698,8 @@ float4 main() : sv_target
 [require]
 shader model >= 5.0
 
-[texture 0]
-size (1, 1)
+[srv 0]
+size (2d, 1, 1)
 0.0 0.0 0.0 0.5
 
 [pixel shader]

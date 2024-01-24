@@ -1,8 +1,8 @@
 [require]
 shader model >= 4.0
 
-[texture 0]
-size (2, 3)
+[srv 0]
+size (2d, 2, 3)
 
 1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
 1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0
@@ -31,8 +31,8 @@ float4 main() : sv_target
 todo(sm>=6) draw quad
 probe all rgba (2.0, 3.0, 2.0, 3.0)
 
-[texture 1]
-size (2, 2)
+[srv 1]
+size (2d, 2, 2)
 levels 2
 
 1.0 0.0 1.0 0.0     1.0 0.0 1.0 0.0

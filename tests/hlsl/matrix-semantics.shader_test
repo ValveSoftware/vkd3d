@@ -21,21 +21,21 @@ row_major float1x4 main() : sv_target
 draw quad
 probe all rgba (1.0, 2.0, 3.0, 4.0)
 
-[render target 0]
+[rtv 0]
 format r32 float
-size (640, 480)
+size (2d, 640, 480)
 
-[render target 1]
+[rtv 1]
 format r32 float
-size (640, 480)
+size (2d, 640, 480)
 
-[render target 2]
+[rtv 2]
 format r32 float
-size (640, 480)
+size (2d, 640, 480)
 
-[render target 3]
+[rtv 3]
 format r32 float
-size (640, 480)
+size (2d, 640, 480)
 
 [pixel shader fail(sm>=6)]
 row_major float4x1 main() : sv_target
@@ -84,9 +84,9 @@ probe render target 1 all r (2.0)
 probe render target 2 all r (5.0)
 probe render target 3 all r (6.0)
 
-[render target 0]
+[rtv 0]
 format r32g32b32a32 float
-size (640, 480)
+size (2d, 640, 480)
 
 [pixel shader fail(sm>=6)]
 void main(out row_major float1x4 x : sv_target0, out float1x2 y : sv_target1)

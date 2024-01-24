@@ -1,17 +1,17 @@
 [require]
 shader model >= 5.0
 
-[render target 0]
+[rtv 0]
 format r32 uint
-size (640, 480)
+size (2d, 640, 480)
 
 [uav 1]
 format r32 uint
-size (640, 480)
+size (2d, 640, 480)
 
-[texture 0]
+[srv 0]
 format r32g32b32a32 uint
-size (1, 1)
+size (2d, 1, 1)
 0 0 0 0
 
 [vertex shader]
