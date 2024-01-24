@@ -7452,7 +7452,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_signature_AddRef(ID3D12CommandSigna
 static ULONG STDMETHODCALLTYPE d3d12_command_signature_Release(ID3D12CommandSignature *iface)
 {
     struct d3d12_command_signature *signature = impl_from_ID3D12CommandSignature(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&signature->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&signature->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", signature, refcount);
 
