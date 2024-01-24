@@ -7442,7 +7442,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_command_signature_QueryInterface(ID3D12Co
 static ULONG STDMETHODCALLTYPE d3d12_command_signature_AddRef(ID3D12CommandSignature *iface)
 {
     struct d3d12_command_signature *signature = impl_from_ID3D12CommandSignature(iface);
-    ULONG refcount = InterlockedIncrement(&signature->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&signature->refcount);
 
     TRACE("%p increasing refcount to %u.\n", signature, refcount);
 
@@ -7452,7 +7452,7 @@ static ULONG STDMETHODCALLTYPE d3d12_command_signature_AddRef(ID3D12CommandSigna
 static ULONG STDMETHODCALLTYPE d3d12_command_signature_Release(ID3D12CommandSignature *iface)
 {
     struct d3d12_command_signature *signature = impl_from_ID3D12CommandSignature(iface);
-    ULONG refcount = InterlockedDecrement(&signature->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&signature->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", signature, refcount);
 

@@ -1657,7 +1657,7 @@ HRESULT d3d12_command_queue_create(struct d3d12_device *device,
 struct d3d12_command_signature
 {
     ID3D12CommandSignature ID3D12CommandSignature_iface;
-    LONG refcount;
+    unsigned int refcount;
     unsigned int internal_refcount;
 
     D3D12_COMMAND_SIGNATURE_DESC desc;
