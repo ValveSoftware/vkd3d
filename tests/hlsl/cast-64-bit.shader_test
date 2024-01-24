@@ -32,7 +32,7 @@ uint4 main() : sv_target
 
 [test]
 uniform 0 double2 -4.5 8.500003814697266
-todo draw quad
+todo(sm<6) draw quad
 probe all rgbaui (0, 0xc0120000, 0x80000000, 0x40210000)
 
 

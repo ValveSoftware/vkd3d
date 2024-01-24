@@ -367,6 +367,7 @@ enum dx_intrinsic_opcode
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
     DX_DERIV_FINEY                  =  86,
+    DX_SPLIT_DOUBLE                 = 102,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
@@ -1730,6 +1731,11 @@ static bool sm6_type_is_float(const struct sm6_type *type)
 static bool sm6_type_is_f16_f32(const struct sm6_type *type)
 {
     return type->class == TYPE_CLASS_FLOAT && (type->u.width == 16 || type->u.width == 32);
+}
+
+static bool sm6_type_is_double(const struct sm6_type *type)
+{
+    return type->class == TYPE_CLASS_FLOAT && type->u.width == 64;
 }
 
 static inline bool sm6_type_is_floating_point(const struct sm6_type *type)
@@ -3880,6 +3886,19 @@ static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_
     dst->u.reg = dst_params[index].reg;
 }
 
+static void sm6_parser_emit_dx_split_double(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_param;
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    src_param_init_from_value(src_param, operands[0]);
+
+    instruction_dst_param_init_ssa_vector(ins, 2, sm6);
+}
+
 static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -3950,9 +3969,11 @@ struct sm6_dx_opcode_info
     i -> int32
     m -> int16/32/64
     f -> float
+    d -> double
     e -> half/float
     g -> half/float/double
     H -> handle
+    S -> splitdouble
     v -> void
     o -> overloaded
     R -> matches the return type
@@ -3993,6 +4014,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
+    [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
@@ -4029,12 +4051,16 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
             return sm6_type_is_i16_i32_i64(type);
         case 'f':
             return sm6_type_is_float(type);
+        case 'd':
+            return sm6_type_is_double(type);
         case 'e':
             return sm6_type_is_f16_f32(type);
         case 'g':
             return sm6_type_is_floating_point(type);
         case 'H':
             return (is_return || sm6_value_is_handle(value)) && type == sm6->handle_type;
+        case 'S':
+            return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.splitdouble");
         case 'v':
             return !type;
         case 'o':
