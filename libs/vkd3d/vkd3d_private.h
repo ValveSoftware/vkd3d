@@ -1749,7 +1749,7 @@ struct vkd3d_desc_object_cache
 struct d3d12_device
 {
     ID3D12Device5 ID3D12Device5_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     VkDevice vk_device;
     VkPhysicalDevice vk_physical_device;

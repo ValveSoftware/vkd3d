@@ -2531,7 +2531,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_QueryInterface(ID3D12Device5 *ifac
 static ULONG STDMETHODCALLTYPE d3d12_device_AddRef(ID3D12Device5 *iface)
 {
     struct d3d12_device *device = impl_from_ID3D12Device5(iface);
-    ULONG refcount = InterlockedIncrement(&device->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&device->refcount);
 
     TRACE("%p increasing refcount to %u.\n", device, refcount);
 
@@ -2563,7 +2563,7 @@ static HRESULT device_worker_stop(struct d3d12_device *device)
 static ULONG STDMETHODCALLTYPE d3d12_device_Release(ID3D12Device5 *iface)
 {
     struct d3d12_device *device = impl_from_ID3D12Device5(iface);
-    ULONG refcount = InterlockedDecrement(&device->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&device->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", device, refcount);
 
