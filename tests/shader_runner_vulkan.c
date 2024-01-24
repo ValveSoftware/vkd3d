@@ -1252,10 +1252,12 @@ static bool check_device_extensions(struct vulkan_shader_runner *runner)
         if (!has_extension(extensions, count, required_device_extensions[i]))
         {
             skip("The selected Vulkan device does not support %s.\n", required_device_extensions[i]);
+            free(extensions);
             return false;
         }
     }
 
+    free(extensions);
     return true;
 }
 
