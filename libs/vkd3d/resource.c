@@ -358,7 +358,7 @@ static ULONG STDMETHODCALLTYPE d3d12_heap_Release(ID3D12Heap *iface)
 
 static void d3d12_heap_resource_destroyed(struct d3d12_heap *heap)
 {
-    if (!InterlockedDecrement((LONG *)&heap->resource_count) && (!heap->refcount || heap->is_private))
+    if (!vkd3d_atomic_decrement_u32(&heap->resource_count) && (!heap->refcount || heap->is_private))
         d3d12_heap_destroy(heap);
 }
 
