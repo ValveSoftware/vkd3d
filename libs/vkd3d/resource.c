@@ -345,7 +345,7 @@ static void d3d12_heap_destroy(struct d3d12_heap *heap)
 static ULONG STDMETHODCALLTYPE d3d12_heap_Release(ID3D12Heap *iface)
 {
     struct d3d12_heap *heap = impl_from_ID3D12Heap(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&heap->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&heap->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", heap, refcount);
 
