@@ -713,6 +713,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         memcpy(params.data, quad, sizeof(quad));
         params.data_size = sizeof(quad);
         set_resource(runner, runner->ops->create_resource(runner, &params));
+        free(params.data);
 
         if (!runner->vs_source)
             runner->vs_source = strdup(vs_source);
