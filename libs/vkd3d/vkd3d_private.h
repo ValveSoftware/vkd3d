@@ -665,7 +665,7 @@ VkResult vkd3d_create_timeline_semaphore(const struct d3d12_device *device, uint
 struct d3d12_heap
 {
     ID3D12Heap ID3D12Heap_iface;
-    LONG refcount;
+    unsigned int refcount;
     LONG resource_count;
 
     bool is_private;
