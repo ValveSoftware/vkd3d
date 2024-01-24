@@ -179,4 +179,4 @@ float4 main() : sv_target1
 
 [test]
 todo(sm>=6) draw quad
-probe buffer uav 2 (0, 0) rgba (11.1, 12.2, 13.3, 14.4)
+probe uav 2 (0) rgba (11.1, 12.2, 13.3, 14.4)

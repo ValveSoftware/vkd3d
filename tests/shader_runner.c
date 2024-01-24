@@ -842,17 +842,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
             resource = shader_runner_get_resource(runner, RESOURCE_TYPE_UAV, slot);
         }
-        else if (match_string(line, "buffer uav", &line))
-        {
-            slot = strtoul(line, &rest, 10);
-
-            if (rest == line)
-                fatal_error("Malformed buffer UAV index '%s'.\n", line);
-            line = rest;
-
-            resource = shader_runner_get_resource(runner, RESOURCE_TYPE_UAV, slot);
-        }
-        else if (match_string(line, "render target", &line))
+        else if (match_string(line, "rtv", &line))
         {
             slot = strtoul(line, &rest, 10);
 
@@ -881,6 +871,11 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         else if (sscanf(line, " ( %u , %u )%n", &left, &top, &len) == 2)
         {
             set_rect(&rect, left, top, left + 1, top + 1);
+            line += len;
+        }
+        else if (sscanf(line, " ( %u )%n", &left, &len) == 1)
+        {
+            set_rect(&rect, left, 0, left + 1, 1);
             line += len;
         }
         else
