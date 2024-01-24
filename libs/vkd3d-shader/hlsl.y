@@ -4229,6 +4229,7 @@ static unsigned int hlsl_offset_dim_count(enum hlsl_sampler_dim dim)
             return 3;
         case HLSL_SAMPLER_DIM_CUBE:
         case HLSL_SAMPLER_DIM_CUBEARRAY:
+        case HLSL_SAMPLER_DIM_BUFFER:
             /* Offset parameters not supported for these types. */
             return 0;
         default:
@@ -4257,10 +4258,9 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     struct hlsl_ir_node *load;
     bool multisampled;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        hlsl_fixme(ctx, loc, "Method '%s' for buffers.", name);
+        hlsl_fixme(ctx, loc, "Method '%s' for structured buffers.", name);
         return false;
     }
 
@@ -4270,13 +4270,14 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
     multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
 
-    if (params->args_count < 1 + multisampled || params->args_count > 3 + multisampled)
+    if (params->args_count < 1 + multisampled || params->args_count > 2 + multisampled + !!offset_dim)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_WRONG_PARAMETER_COUNT,
                 "Wrong number of arguments to method 'Load': expected between %u and %u, but got %u.",
-                1 + multisampled, 3 + multisampled, params->args_count);
+                1 + multisampled, 2 + multisampled + !!offset_dim, params->args_count);
         return false;
     }
+
     if (multisampled)
     {
         if (!(load_params.sample_index = add_implicit_conversion(ctx, block, params->args[1],
@@ -4284,14 +4285,14 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
             return false;
     }
 
-    assert(offset_dim);
-    if (params->args_count > 1 + multisampled)
+    if (!!offset_dim && params->args_count > 1 + multisampled)
     {
         if (!(load_params.texel_offset = add_implicit_conversion(ctx, block, params->args[1 + multisampled],
                 hlsl_get_vector_type(ctx, HLSL_TYPE_INT, offset_dim), loc)))
             return false;
     }
-    if (params->args_count > 2 + multisampled)
+
+    if (params->args_count > 1 + multisampled + !!offset_dim)
     {
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
     }
@@ -4602,13 +4603,13 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
         { HLSL_SAMPLER_DIM_CUBEARRAY, 5, { ARG_MIP_LEVEL, ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_LEVEL_COUNT } },
         { HLSL_SAMPLER_DIM_2DMS, 3, { ARG_WIDTH, ARG_HEIGHT, ARG_SAMPLE_COUNT } },
         { HLSL_SAMPLER_DIM_2DMSARRAY, 4, { ARG_WIDTH, ARG_HEIGHT, ARG_ELEMENT_COUNT, ARG_SAMPLE_COUNT } },
+        { HLSL_SAMPLER_DIM_BUFFER, 1, { ARG_WIDTH} },
     };
     const struct overload *o = NULL;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        hlsl_fixme(ctx, loc, "Method '%s' for buffers.", name);
+        hlsl_fixme(ctx, loc, "Method '%s' for structured buffers.", name);
         return false;
     }
 
@@ -6024,7 +6025,11 @@ parameter:
         }
 
 texture_type:
-      KW_TEXTURE1D
+      KW_BUFFER
+        {
+            $$ = HLSL_SAMPLER_DIM_BUFFER;
+        }
+    | KW_TEXTURE1D
         {
             $$ = HLSL_SAMPLER_DIM_1D;
         }

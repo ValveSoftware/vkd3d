@@ -10,7 +10,7 @@ size (buffer, 4)
 12.0 13.0 14.0 15.0
 
 
-[pixel shader todo]
+[pixel shader]
 float4 a;
 Buffer<float4> buffer;
 float4 b;
@@ -23,11 +23,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 100 200 300 400
 uniform 4 float4 1000 2000 3000 4000
-todo(sm<6) draw quad
+draw quad
 probe all rgba (200, 3000, 4, 7)
 
 
-[pixel shader todo]
+[pixel shader]
 float4 a;
 Buffer<float3> buffer;
 float4 b;
@@ -40,7 +40,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 100 200 300 400
 uniform 4 float4 1000 2000 3000 4000
-todo(sm<6) draw quad
+draw quad
 probe all rgba (4000.0, 8.0, 9.0, 10.0)
 
 
@@ -56,7 +56,7 @@ address clamp clamp clamp
 size (buffer, 1)
 1.0 2.0 3.0 4.0
 
-[pixel shader todo]
+[pixel shader]
 Texture2D tex;
 sampler sam;
 Buffer<float4> buffer;
@@ -67,7 +67,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 probe all rgba (3.0, 4.0, -1.0, -1.0)
 
 
@@ -79,7 +79,7 @@ size (buffer, 4)
 12.0 13.0 14.0 15.0
 
 
-[pixel shader todo]
+[pixel shader]
 Buffer buffer;
 
 float4 main() : sv_target
@@ -88,11 +88,11 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 probe all rgba (4.0, 5.0, 6.0, 7.0)
 
 
-[pixel shader todo]
+[pixel shader]
 Buffer buffer;
 
 float4 main() : sv_target
@@ -101,7 +101,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm<6) draw quad
+draw quad
 probe all rgba (8.0, 9.0, 10.0, 11.0)
 
 
@@ -127,7 +127,7 @@ float4 main() : sv_target
 }
 
 
-[pixel shader todo]
+[pixel shader]
 Buffer buf;
 uniform int u;
 
@@ -138,15 +138,15 @@ float4 main() : sv_target
 
 [test]
 uniform 0 int 2
-todo(sm<6) draw quad
+draw quad
 probe all rgba (8.0, 9.0, 10.0, 11.0)
 uniform 0 int 0
-todo(sm<6) draw quad
+draw quad
 probe all rgba (0.0, 1.0, 2.0, 3.0)
 
 
 % Buffer doesn't have offset_dim or sample_index arguments allowed.
-[pixel shader fail]
+[pixel shader fail todo]
 Buffer buffer;
 
 float4 main() : sv_target

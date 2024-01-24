@@ -2192,9 +2192,16 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                         return string;
                     }
 
-                    assert(type->sampler_dim < ARRAY_SIZE(dimensions));
                     assert(type->e.resource_format->base_type < ARRAY_SIZE(base_types));
-                    vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
+                    if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
+                    {
+                        vkd3d_string_buffer_printf(string, "Buffer");
+                    }
+                    else
+                    {
+                        assert(type->sampler_dim < ARRAY_SIZE(dimensions));
+                        vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
+                    }
                     if ((inner_string = hlsl_type_to_string(ctx, type->e.resource_format)))
                     {
                         vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);

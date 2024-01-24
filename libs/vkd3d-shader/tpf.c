@@ -4764,6 +4764,13 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
     const struct hlsl_ir_node *dst = &load->node;
     struct sm4_instruction instr;
 
+    if (resource->data_type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER
+            || resource->data_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
+    {
+        hlsl_fixme(tpf->ctx, &load->node.loc, "resinfo for buffers.");
+        return;
+    }
+
     assert(dst->data_type->base_type == HLSL_TYPE_UINT || dst->data_type->base_type == HLSL_TYPE_FLOAT);
 
     memset(&instr, 0, sizeof(instr));
