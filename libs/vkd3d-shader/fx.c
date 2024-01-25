@@ -227,10 +227,10 @@ static void write_techniques(struct hlsl_scope *scope, struct fx_write_context *
     set_status(fx, fx->structured.status);
 }
 
-static void write_group(struct hlsl_scope *scope, const char *name, struct fx_write_context *fx)
+static void write_group(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
-    uint32_t name_offset = write_string(name, fx);
+    uint32_t name_offset = write_string(var ? var->name : NULL, fx);
     uint32_t count_offset, count;
 
     put_u32(buffer, name_offset);
@@ -238,14 +238,15 @@ static void write_group(struct hlsl_scope *scope, const char *name, struct fx_wr
     put_u32(buffer, 0); /* Annotation count */
 
     count = fx->technique_count;
-    write_techniques(scope, fx);
+    write_techniques(var ? var->scope : fx->ctx->globals, fx);
     set_u32(buffer, count_offset, fx->technique_count - count);
 
     ++fx->group_count;
 }
 
-static void write_groups(struct hlsl_scope *scope, struct fx_write_context *fx)
+static void write_groups(struct fx_write_context *fx)
 {
+    struct hlsl_scope *scope = fx->ctx->globals;
     bool needs_default_group = false;
     struct hlsl_ir_var *var;
 
@@ -259,13 +260,13 @@ static void write_groups(struct hlsl_scope *scope, struct fx_write_context *fx)
     }
 
     if (needs_default_group)
-        write_group(scope, NULL, fx);
+        write_group(NULL, fx);
     LIST_FOR_EACH_ENTRY(var, &scope->vars, struct hlsl_ir_var, scope_entry)
     {
         const struct hlsl_type *type = var->data_type;
 
         if (type->base_type == HLSL_TYPE_EFFECT_GROUP)
-            write_group(var->scope, var->name, fx);
+            write_group(var, fx);
     }
 }
 
@@ -444,7 +445,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     /* TODO: objects */
     /* TODO: interface variables */
 
-    write_groups(ctx->globals, &fx);
+    write_groups(&fx);
 
     put_u32(&buffer, 0xfeff2001); /* Version. */
     put_u32(&buffer, 0); /* Buffer count. */
