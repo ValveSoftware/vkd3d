@@ -1514,6 +1514,98 @@ static void test_signature_reflection(void)
     }
 }
 
+static void test_disassemble_shader(void)
+{
+    ID3DBlob *blob;
+    int hr;
+
+    /* A Direct3D 8 vertex shader without dcl_ instructions. */
+    static const uint32_t vs_1_1[] =
+    {
+        0xfffe0101,                                                 /* vs_1_1                 */
+        0x00000005, 0x800f0000, 0x90000000, 0xa0e40000,             /* mul r0, v0.x, c0       */
+        0x00000004, 0x800f0000, 0x90550000, 0xa0e40001, 0x80e40000, /* mad r0, v0.y, c1, r0   */
+        0x00000004, 0x800f0000, 0x90aa0000, 0xa0e40002, 0x80e40000, /* mad r0, v0.z, c2, r0   */
+        0x00000004, 0xc00f0000, 0x90ff0000, 0xa0e40003, 0x80e40000, /* mad oPos, v0.w, c3, r0 */
+        0x0000ffff,                                                 /* end                    */
+    };
+
+    static const uint32_t vs_2_0[] =
+    {
+        0xfffe0200,                                                 /* vs_2_0                 */
+        0x0200001f, 0x80000000, 0x900f0000,                         /* dcl_position v0        */
+        0x0200001f, 0x80000003, 0x900f0001,                         /* dcl_normal v1          */
+        0x0200001f, 0x8001000a, 0x900f0002,                         /* dcl_color1 v2          */
+        0x0200001f, 0x80000005, 0x900f0003,                         /* dcl_texcoord0 v3       */
+        0x02000001, 0xc00f0000, 0x90e40000,                         /* mov oPos, v0           */
+        0x02000001, 0xd00f0001, 0x90e40002,                         /* mov oD1, v2            */
+        0x02000001, 0xe0070000, 0x90e40003,                         /* mov oT0.xyz, v3        */
+        0x02000001, 0xc00f0001, 0x90ff0002,                         /* mov oFog, v2.w         */
+        0x02000001, 0xc00f0002, 0x90ff0001,                         /* mov oPts, v1.w         */
+        0x0000ffff,                                                 /* end                    */
+    };
+
+    /* A shader model 3 vertex shader without dcl_ instructions. */
+    static const uint32_t vs_3_0[] =
+    {
+        0xfffe0300,                                                 /* vs_3_0                  */
+        0x02000001, 0xe00f0000, 0x90e40000,                         /* mov o0, v0              */
+        0x0000ffff,                                                 /* end                     */
+    };
+
+    /* A "shader model 4" d3dbc vertex shader. */
+    static const uint32_t vs_4_0[] =
+    {
+        0xfffe0400,                                                 /* vs_4_0                  */
+        0x02000001, 0xe00f0000, 0x90e40000,                         /* mov o0, v0              */
+        0x0000ffff,                                                 /* end                     */
+    };
+
+    /* An actual shader model 4 dxbc-tpf vertex shader. */
+    static const uint32_t vs_4_0_dxbc[] =
+    {
+#if 0
+        float4 main(float4 position : POSITION) : SV_POSITION
+        {
+            return position;
+        }
+#endif
+        0x43425844, 0xa7a2f22d, 0x83ff2560, 0xe61638bd, 0x87e3ce90, 0x00000001, 0x000000d8, 0x00000003,
+        0x0000002c, 0x00000060, 0x00000094, 0x4e475349, 0x0000002c, 0x00000001, 0x00000008, 0x00000020,
+        0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000f0f, 0x49534f50, 0x4e4f4954, 0xababab00,
+        0x4e47534f, 0x0000002c, 0x00000001, 0x00000008, 0x00000020, 0x00000000, 0x00000001, 0x00000003,
+        0x00000000, 0x0000000f, 0x505f5653, 0x5449534f, 0x004e4f49, 0x52444853, 0x0000003c, 0x00010040,
+        0x0000000f, 0x0300005f, 0x001010f2, 0x00000000, 0x04000067, 0x001020f2, 0x00000000, 0x00000001,
+        0x05000036, 0x001020f2, 0x00000000, 0x00101e46, 0x00000000, 0x0100003e,
+    };
+
+    hr = D3DDisassemble(vs_1_1, 0, 0, NULL, &blob);
+    ok(hr == E_INVALIDARG, "Got hr %#x.\n", hr);
+
+    hr = D3DDisassemble(vs_1_1, sizeof(vs_1_1), 0, NULL, &blob);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D10Blob_Release(blob);
+
+    hr = D3DDisassemble(vs_2_0, sizeof(vs_2_0), 0, NULL, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ID3D10Blob_Release(blob);
+
+    hr = D3DDisassemble(vs_3_0, sizeof(vs_3_0), 0, NULL, &blob);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D10Blob_Release(blob);
+
+    hr = D3DDisassemble(vs_4_0, sizeof(vs_4_0), 0, NULL, &blob);
+    todo ok(hr == S_OK, "Got hr %#x.\n", hr);
+    if (SUCCEEDED(hr))
+        ID3D10Blob_Release(blob);
+
+    hr = D3DDisassemble(vs_4_0_dxbc, sizeof(vs_4_0_dxbc), 0, NULL, &blob);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    ID3D10Blob_Release(blob);
+}
+
 START_TEST(hlsl_d3d12)
 {
     parse_args(argc, argv);
@@ -1525,4 +1617,5 @@ START_TEST(hlsl_d3d12)
     run_test(test_create_blob);
     run_test(test_get_blob_part);
     run_test(test_signature_reflection);
+    run_test(test_disassemble_shader);
 }

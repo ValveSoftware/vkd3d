@@ -928,3 +928,75 @@ void vkd3d_utils_set_log_callback(PFN_vkd3d_log callback)
     vkd3d_set_log_callback(callback);
     vkd3d_dbg_set_log_callback(callback);
 }
+
+HRESULT WINAPI D3DDisassemble(const void *data, SIZE_T data_size,
+        UINT flags, const char *comments, ID3DBlob **blob)
+{
+    enum vkd3d_shader_source_type source_type;
+    struct vkd3d_shader_compile_info info;
+    struct vkd3d_shader_code output;
+    const char *p, *q, *end;
+    char *messages;
+    HRESULT hr;
+    int ret;
+
+    static const struct vkd3d_shader_compile_option options[] =
+    {
+        {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10},
+    };
+
+    TRACE("data %p, data_size %lu, flags %#x, comments %p, blob %p.\n",
+            data, data_size, flags, comments, blob);
+
+    if (flags)
+        FIXME("Ignoring flags %#x.\n", flags);
+
+    if (comments)
+        FIXME("Ignoring comments %s.\n", debugstr_a(comments));
+
+    if (!data_size)
+        return E_INVALIDARG;
+
+    if (data_size >= sizeof(uint32_t) && *(uint32_t *)data == TAG_DXBC)
+        source_type = VKD3D_SHADER_SOURCE_DXBC_TPF;
+    else
+        source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
+
+    info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
+    info.next = NULL;
+    info.source.code = data;
+    info.source.size = data_size;
+    info.source_type = source_type;
+    info.target_type = VKD3D_SHADER_TARGET_D3D_ASM;
+    info.options = options;
+    info.option_count = ARRAY_SIZE(options);
+    info.log_level = VKD3D_SHADER_LOG_INFO;
+    info.source_name = NULL;
+
+    ret = vkd3d_shader_compile(&info, &output, &messages);
+    if (messages && *messages && WARN_ON())
+    {
+        WARN("Compiler log:\n");
+        for (p = messages, end = p + strlen(p); p < end; p = q)
+        {
+            if (!(q = memchr(p, '\n', end - p)))
+                q = end;
+            else
+                ++q;
+            WARN("    %.*s", (int)(q - p), p);
+        }
+        WARN("\n");
+    }
+    vkd3d_shader_free_messages(messages);
+
+    if (ret < 0)
+    {
+        WARN("Failed to disassemble shader, ret %d.\n", ret);
+        return hresult_from_vkd3d_result(ret);
+    }
+
+    if (FAILED(hr = vkd3d_blob_create((void *)output.code, output.size, blob)))
+        vkd3d_shader_free_shader_code(&output);
+
+    return hr;
+}

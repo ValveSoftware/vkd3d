@@ -79,6 +79,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         const void *secondary_data, SIZE_T secondary_data_size, ID3DBlob **shader,
         ID3DBlob **error_messages);
 HRESULT WINAPI D3DCreateBlob(SIZE_T size, ID3DBlob **blob);
+HRESULT WINAPI D3DDisassemble(const void *data, SIZE_T data_size, UINT flags, const char *comments, ID3DBlob **blob);
 HRESULT WINAPI D3DGetBlobPart(const void *data, SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob);
 HRESULT WINAPI D3DGetDebugInfo(const void *data, SIZE_T data_size, ID3DBlob **blob);
 HRESULT WINAPI D3DGetInputAndOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob);
@@ -88,6 +89,9 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
         ID3DInclude *include, ID3DBlob **shader, ID3DBlob **error_messages);
 HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection);
 HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID3DBlob **blob);
+
+typedef HRESULT (WINAPI *pD3DDisassemble)(const void *data, SIZE_T data_size,
+        UINT flags, const char *comments, ID3DBlob **blob);
 
 #endif /* __D3DCOMPILER_H__ */
 #endif /* __VKD3D_D3DCOMPILER_H */

@@ -89,6 +89,10 @@ const char *debugstr_w(const WCHAR *wstr, size_t wchar_size);
 #define TRACE_ON() (vkd3d_dbg_get_level() == VKD3D_DBG_LEVEL_TRACE)
 #endif
 
+#ifndef WARN_ON
+#define WARN_ON() (vkd3d_dbg_get_level() >= VKD3D_DBG_LEVEL_WARN)
+#endif
+
 #define FIXME_ONCE VKD3D_DBG_LOG_ONCE(FIXME, WARN)
 
 #define VKD3D_DEBUG_ENV_NAME(name) const char *const vkd3d_dbg_env_name = name
