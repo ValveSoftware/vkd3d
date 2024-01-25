@@ -50,7 +50,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
 
 
@@ -65,7 +65,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
@@ -79,9 +79,23 @@ float4 main() : sv_target
     return tex.Load(int3(0, 0, 0));
 }
 
+[require]
+shader model >= 4.0
+shader model < 6.0
+
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 99.0)
+
+[require]
+shader model >= 6.0
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 99.0)
+
+[require]
+shader model >= 4.0
 
 
 % Register reservation with incorrect register type.
@@ -109,7 +123,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (4.0, 4.0, 4.0, 99.0)
 
 
@@ -125,7 +139,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (1.0, 1.0, 1.0, 99.0)
 
 
@@ -140,7 +154,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (2.0, 2.0, 2.0, 99.0)
 
 
@@ -154,7 +168,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe all rgba (2.0, 2.0, 2.0, 99.0)
 
 
@@ -227,5 +241,5 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
-todo probe all rgba (1.0, 1.0, 1.0, 99.0)
+draw quad
+todo(sm<6) probe all rgba (1.0, 1.0, 1.0, 99.0)

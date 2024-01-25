@@ -223,16 +223,6 @@ enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d
     }
 }
 
-static inline bool register_is_undef(const struct vkd3d_shader_register *reg)
-{
-    return reg->type == VKD3DSPR_UNDEF;
-}
-
-static inline bool register_is_constant_or_undef(const struct vkd3d_shader_register *reg)
-{
-    return register_is_constant(reg) || register_is_undef(reg);
-}
-
 #define VKD3D_SPIRV_VERSION 0x00010000
 #define VKD3D_SPIRV_GENERATOR_ID 18
 #define VKD3D_SPIRV_GENERATOR_VERSION 10
