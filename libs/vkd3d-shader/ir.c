@@ -2718,6 +2718,7 @@ struct validation_context
     struct validation_context_ssa_data
     {
         enum vsir_dimension dimension;
+        enum vkd3d_data_type data_type;
         size_t first_seen;
         uint32_t write_mask;
         uint32_t read_mask;
@@ -2874,13 +2875,20 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (data->dimension == VSIR_DIMENSION_NONE)
             {
                 data->dimension = reg->dimension;
+                data->data_type = reg->data_type;
                 data->first_seen = ctx->instruction_idx;
             }
-            else if (data->dimension != reg->dimension)
+            else
             {
-                validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a SSA register: "
-                        "it has already been seen with dimension %#x at instruction %zu.",
-                        reg->dimension, data->dimension, data->first_seen);
+                if (data->dimension != reg->dimension)
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DIMENSION, "Invalid dimension %#x for a SSA register: "
+                            "it has already been seen with dimension %#x at instruction %zu.",
+                            reg->dimension, data->dimension, data->first_seen);
+
+                if (data_type_is_64_bit(data->data_type) != data_type_is_64_bit(reg->data_type))
+                    validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_DATA_TYPE, "Invalid data type %#x for a SSA register: "
+                            "it has already been seen with data type %#x at instruction %zu.",
+                            reg->data_type, data->data_type, data->first_seen);
             }
             break;
         }
