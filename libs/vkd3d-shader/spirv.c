@@ -3884,9 +3884,10 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
     }
     assert(vkd3d_swizzle_is_scalar(swizzle, reg));
 
+    reg_component_type = vkd3d_component_type_from_data_type(ssa->data_type);
+
     if (reg->dimension == VSIR_DIMENSION_SCALAR)
     {
-        reg_component_type = vkd3d_component_type_from_data_type(ssa->data_type);
         if (component_type != reg_component_type)
         {
             type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
@@ -3894,6 +3895,14 @@ static uint32_t spirv_compiler_emit_load_ssa_reg(struct spirv_compiler *compiler
         }
 
         return val_id;
+    }
+
+    if (component_type != reg_component_type)
+    {
+        /* Required for resource loads with sampled type int, because DXIL has no signedness.
+         * Only 128-bit vector sizes are used. */
+        type_id = vkd3d_spirv_get_type_id(builder, component_type, VKD3D_VEC4_SIZE);
+        val_id = vkd3d_spirv_build_op_bitcast(builder, type_id, val_id);
     }
 
     type_id = vkd3d_spirv_get_type_id(builder, component_type, 1);
