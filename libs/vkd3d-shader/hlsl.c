@@ -1570,7 +1570,10 @@ bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index)
 
 bool hlsl_index_is_resource_access(struct hlsl_ir_index *index)
 {
-    return index->val.node->data_type->class == HLSL_CLASS_OBJECT;
+    const struct hlsl_type *type = index->val.node->data_type;
+
+    return type->class == HLSL_CLASS_OBJECT
+            && (type->base_type == HLSL_TYPE_TEXTURE || type->base_type == HLSL_TYPE_UAV);
 }
 
 bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index)

@@ -1565,7 +1565,7 @@ static bool copy_propagation_replace_with_single_instr(struct hlsl_ctx *ctx,
             var->name, start, start + count, debug_hlsl_swizzle(swizzle, instr_component_count),
             new_instr, debug_hlsl_swizzle(ret_swizzle, instr_component_count));
 
-    if (instr->data_type->class != HLSL_CLASS_OBJECT)
+    if (new_instr->data_type->class == HLSL_CLASS_SCALAR || new_instr->data_type->class == HLSL_CLASS_VECTOR)
     {
         struct hlsl_ir_node *swizzle_node;
 
@@ -1742,7 +1742,7 @@ static void copy_propagation_record_store(struct hlsl_ctx *ctx, struct hlsl_ir_s
     {
         unsigned int writemask = store->writemask;
 
-        if (store->rhs.node->data_type->class == HLSL_CLASS_OBJECT)
+        if (!hlsl_is_numeric_type(store->rhs.node->data_type))
             writemask = VKD3DSP_WRITEMASK_0;
         copy_propagation_set_value(ctx, var_def, start, writemask, store->rhs.node, store->node.index);
     }

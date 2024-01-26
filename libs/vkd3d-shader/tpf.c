@@ -5707,18 +5707,12 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
     {
         if (instr->data_type)
         {
-            if (instr->data_type->class == HLSL_CLASS_MATRIX)
+            if (instr->data_type->class != HLSL_CLASS_SCALAR && instr->data_type->class != HLSL_CLASS_VECTOR)
             {
-                hlsl_fixme(tpf->ctx, &instr->loc, "Matrix operations need to be lowered.");
+                hlsl_fixme(tpf->ctx, &instr->loc, "Class %#x should have been lowered or removed.",
+                        instr->data_type->class);
                 break;
             }
-            else if (instr->data_type->class == HLSL_CLASS_OBJECT)
-            {
-                hlsl_fixme(tpf->ctx, &instr->loc, "Object copy.");
-                break;
-            }
-
-            assert(instr->data_type->class == HLSL_CLASS_SCALAR || instr->data_type->class == HLSL_CLASS_VECTOR);
 
             if (!instr->reg.allocated)
             {
