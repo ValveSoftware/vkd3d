@@ -4776,7 +4776,9 @@ static void validate_buffer_offsets(struct hlsl_ctx *ctx)
             continue;
 
         if (var1->reg_reservation.offset_type
-                || (var1->data_type->class == HLSL_CLASS_OBJECT && var1->reg_reservation.reg_type))
+                || var1->reg_reservation.reg_type == 's'
+                || var1->reg_reservation.reg_type == 't'
+                || var1->reg_reservation.reg_type == 'u')
             buffer->manually_packed_elements = true;
         else
             buffer->automatically_packed_elements = true;
