@@ -4358,22 +4358,7 @@ static struct hlsl_block *add_constructor(struct hlsl_ctx *ctx, struct hlsl_type
         return NULL;
 
     for (i = 0; i < params->args_count; ++i)
-    {
-        struct hlsl_ir_node *arg = params->args[i];
-
-        if (arg->data_type->class == HLSL_CLASS_OBJECT)
-        {
-            struct vkd3d_string_buffer *string;
-
-            if ((string = hlsl_type_to_string(ctx, arg->data_type)))
-                hlsl_error(ctx, &arg->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                        "Invalid type %s for constructor argument.", string->buffer);
-            hlsl_release_string_buffer(ctx, string);
-            continue;
-        }
-
-        initialize_var_components(ctx, params->instrs, var, &idx, arg);
-    }
+        initialize_var_components(ctx, params->instrs, var, &idx, params->args[i]);
 
     if (!(load = hlsl_new_var_load(ctx, var, loc)))
         return NULL;
