@@ -956,7 +956,7 @@ static bool gen_struct_fields(struct hlsl_ctx *ctx, struct parse_fields *fields,
 
         field->type = type;
 
-        if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_OBJECT)
+        if (hlsl_version_ge(ctx, 5, 1) && hlsl_type_is_resource(type))
         {
             for (k = 0; k < v->arrays.count; ++k)
                 unbounded_res_array |= (v->arrays.sizes[k] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
@@ -2162,7 +2162,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
 
     type = basic_type;
 
-    if (hlsl_version_ge(ctx, 5, 1) && type->class == HLSL_CLASS_OBJECT)
+    if (hlsl_version_ge(ctx, 5, 1) && hlsl_type_is_resource(type))
     {
         for (i = 0; i < v->arrays.count; ++i)
             unbounded_res_array |= (v->arrays.sizes[i] == HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT);
