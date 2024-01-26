@@ -2091,12 +2091,12 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
     }
 }
 
-static bool type_has_object_components(struct hlsl_type *type, bool must_be_in_struct)
+static bool type_has_object_components(const struct hlsl_type *type)
 {
     if (type->class == HLSL_CLASS_OBJECT)
-        return !must_be_in_struct;
+        return true;
     if (type->class == HLSL_CLASS_ARRAY)
-        return type_has_object_components(type->e.array.type, must_be_in_struct);
+        return type_has_object_components(type->e.array.type);
 
     if (type->class == HLSL_CLASS_STRUCT)
     {
@@ -2104,7 +2104,7 @@ static bool type_has_object_components(struct hlsl_type *type, bool must_be_in_s
 
         for (i = 0; i < type->e.record.field_count; ++i)
         {
-            if (type_has_object_components(type->e.record.fields[i].type, false))
+            if (type_has_object_components(type->e.record.fields[i].type))
                 return true;
         }
     }
@@ -2144,6 +2144,18 @@ static void check_invalid_in_out_modifiers(struct hlsl_ctx *ctx, unsigned int mo
                     "Modifiers '%s' are not allowed on non-parameter variables.", string->buffer);
         hlsl_release_string_buffer(ctx, string);
     }
+}
+
+static void check_invalid_object_fields(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var)
+{
+    const struct hlsl_type *type = var->data_type;
+
+    while (type->class == HLSL_CLASS_ARRAY)
+        type = type->e.array.type;
+
+    if (type->class == HLSL_CLASS_STRUCT && type_has_object_components(type))
+        hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
+                "Target profile doesn't support objects as struct members in uniform variables.");
 }
 
 static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
@@ -2271,12 +2283,8 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
         if (!(modifiers & HLSL_STORAGE_STATIC))
             var->storage_modifiers |= HLSL_STORAGE_UNIFORM;
 
-        if (ctx->profile->major_version < 5 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM) &&
-                type_has_object_components(var->data_type, true))
-        {
-            hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
-                    "Target profile doesn't support objects as struct members in uniform variables.");
-        }
+        if (ctx->profile->major_version < 5 && (var->storage_modifiers & HLSL_STORAGE_UNIFORM))
+            check_invalid_object_fields(ctx, var);
 
         if ((func = hlsl_get_first_func_decl(ctx, var->name)))
         {
@@ -2312,7 +2320,7 @@ static void declare_var(struct hlsl_ctx *ctx, struct parse_variable_def *v)
     }
 
     if ((var->storage_modifiers & HLSL_STORAGE_STATIC) && type_has_numeric_components(var->data_type)
-            && type_has_object_components(var->data_type, false))
+            && type_has_object_components(var->data_type))
     {
         hlsl_error(ctx, &var->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                 "Static variables cannot have both numeric and resource components.");
@@ -2400,7 +2408,7 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
 
             /* Initialize statics to zero by default. */
 
-            if (type_has_object_components(var->data_type, false))
+            if (type_has_object_components(var->data_type))
             {
                 free_parse_variable_def(v);
                 continue;
