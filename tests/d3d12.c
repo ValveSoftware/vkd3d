@@ -37211,14 +37211,15 @@ static void test_unbounded_samplers(void)
     {
 #if 0
         Texture2D<float> t1 : register(t1, space1);
-        SamplerState s1[] : register(s1, space1);
+        SamplerState s1[][2] : register(s1, space1);
         RWByteAddressBuffer u1 : register(u1, space1);
 
         [numthreads(64, 1, 1)]
         void main(uint id : SV_DispatchThreadID)
         {
-            /* Should alternate between wrap (address 0.1), or clamp (address 1.0). */
-            uint value = t1.SampleLevel(s1[NonUniformResourceIndex(id)], float2(1.1, 1.1), 0.0);
+            /* wrap yields address 0.1; clamp yields address 1.0.
+             * Samplers alternate (wrap, wrap), (clamp, wrap), (wrap, clamp), (clamp, clamp). */
+            uint value = t1.SampleLevel(s1[NonUniformResourceIndex(id / 2)][NonUniformResourceIndex(id % 2)], float2(1.1, 1.1), 0.0);
             u1.Store(4 * id, value);
         }
 #endif
@@ -37236,7 +37237,7 @@ static void test_unbounded_samplers(void)
         0x00000001, 0x0010001a, 0x00000000, 0x0010000a, 0x00000000, 0x0100003e,
     };
 
-    static const float texture_data[] = {10.0f, 100.0f, 100.0f, 100.0f};
+    static const float texture_data[] = {10.0f, 11.0f, 12.0f, 13.0f};
 
     if (!init_compute_test_context(&context))
         return;
@@ -37294,8 +37295,9 @@ static void test_unbounded_samplers(void)
     {
         memset(&sampler_desc, 0, sizeof(sampler_desc));
         sampler_desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-        sampler_desc.AddressU = sampler_desc.AddressV = sampler_desc.AddressW
-                = (i & 1) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler_desc.AddressU = (i & 1) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler_desc.AddressV = (i & 2) ? D3D12_TEXTURE_ADDRESS_MODE_CLAMP : D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        sampler_desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         ID3D12Device_CreateSampler(device, &sampler_desc, get_cpu_descriptor_handle(&context, sampler_heap, i));
     }
 
@@ -37313,7 +37315,7 @@ static void test_unbounded_samplers(void)
     for (i = 0; i < 64; ++i)
     {
         unsigned int value = get_readback_uint(&rb.rb, i, 0, 0);
-        unsigned int expected = (i & 1) ? 100 : 10;
+        unsigned int expected = 10 + (i % 4);
         ok(value == expected, "Got %u, expected %u at %u.\n", value, expected, i);
     }
     release_resource_readback(&rb);

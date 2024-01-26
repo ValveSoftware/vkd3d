@@ -311,6 +311,7 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
             { D3DCOMPILE_PACK_MATRIX_ROW_MAJOR, "row-major" },
             { D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR, "column-major" },
             { D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY, "backcompat" },
+            { D3DCOMPILE_ENABLE_UNBOUNDED_DESCRIPTOR_TABLES, "unbounded-descriptor-arrays" },
         };
 
         runner->compile_options = 0;
