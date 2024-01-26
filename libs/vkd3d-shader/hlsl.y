@@ -2093,22 +2093,21 @@ static void initialize_var_components(struct hlsl_ctx *ctx, struct hlsl_block *i
 
 static bool type_has_object_components(const struct hlsl_type *type)
 {
-    if (type->class == HLSL_CLASS_OBJECT)
-        return true;
     if (type->class == HLSL_CLASS_ARRAY)
         return type_has_object_components(type->e.array.type);
 
     if (type->class == HLSL_CLASS_STRUCT)
     {
-        unsigned int i;
-
-        for (i = 0; i < type->e.record.field_count; ++i)
+        for (unsigned int i = 0; i < type->e.record.field_count; ++i)
         {
             if (type_has_object_components(type->e.record.fields[i].type))
                 return true;
         }
+
+        return false;
     }
-    return false;
+
+    return !hlsl_is_numeric_type(type);
 }
 
 static bool type_has_numeric_components(struct hlsl_type *type)
