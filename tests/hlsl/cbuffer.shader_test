@@ -759,18 +759,70 @@ float4 main() : sv_target
     return 0;
 }
 
-% Using register() alone is not considered manual packing for non-resources.
+% register(c#) is ignored and does not count as manual packing.
 [pixel shader]
 cbuffer buffer
 {
-    float4 foo : register(c0);
+    float4 foo : register(c1);
     Texture2D tex;
+}
+
+float4 main() : sv_target
+{
+    return foo;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 0.0 0.0 0.0 0.0
+todo(glsl) draw quad
+probe all rgba (1.0, 2.0, 3.0, 4.0)
+
+[pixel shader fail(sm<6)]
+cbuffer buffer
+{
+    float4 foo : register(c1);
+    Texture2D tex : register(t1);
+}
+
+float4 main() : sv_target
+{
+    return foo;
+}
+
+% However, valid register reservations count as manual packing even if they
+% don't make sense for the given variable.
+% sm6 just rejects incorrect reservations.
+
+[pixel shader fail(sm>=6)]
+cbuffer buffer
+{
+    float4 bar : register(t1);
 }
 
 float4 main() : sv_target
 {
     return 0;
 }
+
+[pixel shader todo fail(sm>=6)]
+cbuffer buffer
+{
+    float4 foo : packoffset(c0);
+    float4 bar : register(t1);
+    Texture2D tex : register(s2);
+}
+
+float4 main() : sv_target
+{
+    return foo + bar;
+}
+
+[test]
+uniform 0 float4 1.0 2.0 3.0 4.0
+uniform 4 float4 0.1 0.2 0.3 0.4
+todo draw quad
+probe all rgba (1.1, 2.2, 3.3, 4.4)
 
 
 [require]
@@ -780,7 +832,7 @@ shader model >= 5.0
 size (2d, 1, 1)
 0.0 0.0 0.0 0.5
 
-[pixel shader]
+[pixel shader todo]
 struct apple
 {
     float2 a;
@@ -792,6 +844,7 @@ cbuffer buffer
 {
     float4 foo : packoffset(c3);
     struct apple bar : packoffset(c1);
+    struct apple baz : register(u3);
 }
 
 float4 main() : sv_target
@@ -804,5 +857,6 @@ uniform 0 float4 0.0 1.0 2.0 3.0
 uniform 4 float4 4.0 5.0 6.0 7.0
 uniform 8 float4 8.0 9.0 10.0 11.0
 uniform 12 float4 12.0 13.0 14.0 15.0
-todo(glsl) draw quad
+uniform 16 float4 16.0 17.0 18.0 19.0
+todo(sm<6) draw quad
 probe all rgba (124.0, 135.0, 146.0, 150.5)
