@@ -60,9 +60,6 @@ draw quad
 probe all rgba (3.0, 250.0, 16.0, 4.2949673e+009) 4
 
 
-[require]
-shader model < 6.0
-
 [pixel shader]
 float4 main() : sv_target
 {
@@ -73,4 +70,5 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (-1294967296.0, 3000000000.0, 0.0, 0.0) 4
+if(sm<6)  probe all rgba (-1294967296.0, 3000000000.0, 0.0, 0.0) 4
+if(sm>=6) probe all rgba (3000000000.0, 3000000000.0, 0.0, 0.0) 4

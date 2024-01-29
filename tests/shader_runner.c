@@ -657,14 +657,46 @@ static void read_uint64_t2(const char **line, struct u64vec2 *v)
 
 static void parse_test_directive(struct shader_runner *runner, const char *line)
 {
+    bool skip_directive = false;
+    const char *line_ini;
+    bool match = true;
     char *rest;
     int ret;
 
     runner->is_todo = false;
 
-    if (match_string_with_args(line, "todo", &line, runner->minimum_shader_model))
+    while (match)
     {
-        runner->is_todo = true;
+        match = false;
+
+        if (match_string_with_args(line, "todo", &line, runner->minimum_shader_model))
+        {
+            runner->is_todo = true;
+            match = true;
+        }
+
+        line_ini = line;
+        if (match_string_with_args(line, "if", &line, runner->minimum_shader_model))
+        {
+            match = true;
+        }
+        else if (line != line_ini)
+        {
+            /* Matched "if" but for other shader models. */
+            skip_directive = true;
+            match = true;
+        }
+    }
+
+    if (skip_directive)
+    {
+        const char *new_line;
+
+        if ((new_line = strchr(line, '\n')))
+            line = new_line + 1;
+        else
+            line += strlen(line);
+        return;
     }
 
     if (match_string(line, "dispatch", &line))

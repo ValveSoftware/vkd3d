@@ -11,10 +11,6 @@ draw quad
 probe all rgba (50, 60, 70, 80)
 
 
-% dxcompiler emits a nop shader which returns immediately.
-[require]
-shader model < 6.0
-
 [pixel shader]
 float4 main() : sv_target
 {
@@ -26,10 +22,9 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (5.0, 6.0, 7.0, 8.0)
+% dxcompiler emits a nop shader which returns immediately.
+if(sm<6) probe all rgba (5.0, 6.0, 7.0, 8.0)
 
-[require]
-% reset requirements
 
 [pixel shader]
 float4 main() : sv_target

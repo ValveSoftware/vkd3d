@@ -236,9 +236,6 @@ float4 main() : sv_target
 }
 
 % FXC is incapable of compiling this correctly, but results differ for SM1-3 vs SM4-5.
-[require]
-shader model < 4.0
-
 [test]
 uniform 0 float 1.0
 uniform 4 float 2.0
@@ -246,32 +243,7 @@ uniform 8 float 3.0
 uniform 12 float 4.0
 uniform 16 uint4 3 1 0 2
 uniform 20 uint4 0 3 1 2
-todo draw quad
-todo(sm<4) probe all rgba (1.0, 1.0, 1.0, 1.0)
-
-[require]
-shader model >= 4.0
-shader model < 6.0
-
-[test]
-uniform 0 float 1.0
-uniform 4 float 2.0
-uniform 8 float 3.0
-uniform 12 float 4.0
-uniform 16 uint4 3 1 0 2
-uniform 20 uint4 0 3 1 2
-draw quad
-todo probe all rgba (4.0, 4.0, 4.0, 4.0)
-
-[require]
-shader model >= 6.0
-
-[test]
-uniform 0 float 1.0
-uniform 4 float 2.0
-uniform 8 float 3.0
-uniform 12 float 4.0
-uniform 16 uint4 3 1 0 2
-uniform 20 uint4 0 3 1 2
-draw quad
-probe all rgba (4.0, 3.0, 2.0, 1.0)
+todo(sm<4) draw quad
+if(sm<4)         todo probe all rgba (1.0, 1.0, 1.0, 1.0)
+if(sm>=4 & sm<6) todo probe all rgba (4.0, 4.0, 4.0, 4.0)
+if(sm>=6)        probe all rgba (4.0, 3.0, 2.0, 1.0)
