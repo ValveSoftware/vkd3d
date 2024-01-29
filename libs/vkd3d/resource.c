@@ -1302,7 +1302,7 @@ static ULONG STDMETHODCALLTYPE d3d12_resource_AddRef(ID3D12Resource1 *iface)
 static ULONG STDMETHODCALLTYPE d3d12_resource_Release(ID3D12Resource1 *iface)
 {
     struct d3d12_resource *resource = impl_from_ID3D12Resource1(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&resource->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&resource->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", resource, refcount);
 
