@@ -367,6 +367,7 @@ enum dx_intrinsic_opcode
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
     DX_TEXTURE_LOAD                 =  66,
+    DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
     DX_DERIV_COARSEX                =  83,
     DX_DERIV_COARSEY                =  84,
@@ -2211,6 +2212,13 @@ static void dst_param_init(struct vkd3d_shader_dst_param *param)
     param->shift = 0;
 }
 
+static void dst_param_init_with_mask(struct vkd3d_shader_dst_param *param, unsigned int mask)
+{
+    param->write_mask = mask;
+    param->modifiers = 0;
+    param->shift = 0;
+}
+
 static inline void dst_param_init_scalar(struct vkd3d_shader_dst_param *param, unsigned int component_idx)
 {
     param->write_mask = 1u << component_idx;
@@ -3575,36 +3583,23 @@ static void sm6_parser_emit_br(struct sm6_parser *sm6, const struct dxil_record 
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
-static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const struct sm6_value **operands,
-        const struct sm6_value *z_operand, struct function_emission_state *state,
-        struct vkd3d_shader_register *reg)
+static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, const struct vkd3d_shader_register **operand_regs,
+        unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg)
 {
-    const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
     struct vkd3d_shader_instruction *ins = state->ins;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_dst_param *dst_param;
-    const unsigned int max_operands = 3;
-    unsigned int i, component_count;
     bool all_constant = true;
-
-    for (component_count = 0; component_count < max_operands; ++component_count)
-    {
-        if (!z_operand && operands[component_count]->is_undefined)
-            break;
-        operand_regs[component_count] = &operands[component_count]->u.reg;
-        all_constant &= register_is_constant_or_undef(operand_regs[component_count]);
-    }
-    if (z_operand)
-    {
-        all_constant &= register_is_constant(&z_operand->u.reg);
-        operand_regs[component_count++] = &z_operand->u.reg;
-    }
+    unsigned int i;
 
     if (component_count == 1)
     {
-        *reg = operands[0]->u.reg;
+        *reg = *operand_regs[0];
         return true;
     }
+
+    for (i = 0; i < component_count; ++i)
+        all_constant &= register_is_constant(operand_regs[i]);
 
     if (all_constant)
     {
@@ -3612,10 +3607,12 @@ static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const s
         reg->dimension = VSIR_DIMENSION_VEC4;
         for (i = 0; i < component_count; ++i)
             reg->u.immconst_u32[i] = operand_regs[i]->u.immconst_u32[0];
+        for (; i < VKD3D_VEC4_SIZE; ++i)
+            reg->u.immconst_u32[i] = 0;
         return true;
     }
 
-    register_init_with_id(reg, VKD3DSPR_TEMP, operands[0]->u.reg.data_type, state->temp_idx++);
+    register_init_with_id(reg, VKD3DSPR_TEMP, operand_regs[0]->data_type, state->temp_idx++);
     reg->dimension = VSIR_DIMENSION_VEC4;
 
     for (i = 0; i < component_count; ++i, ++ins)
@@ -3639,6 +3636,40 @@ static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const s
     state->code_block->instruction_count += component_count;
 
     return true;
+}
+
+static bool sm6_parser_emit_composite_construct(struct sm6_parser *sm6, const struct sm6_value **operands,
+        unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg)
+{
+    const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
+    unsigned int i;
+
+    for (i = 0; i < component_count; ++i)
+        operand_regs[i] = &operands[i]->u.reg;
+
+    return sm6_parser_emit_reg_composite_construct(sm6, operand_regs, component_count, state, reg);
+}
+
+static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const struct sm6_value **operands,
+        const struct sm6_value *z_operand, struct function_emission_state *state,
+        struct vkd3d_shader_register *reg)
+{
+    const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
+    const unsigned int max_operands = 3;
+    unsigned int component_count;
+
+    for (component_count = 0; component_count < max_operands; ++component_count)
+    {
+        if (!z_operand && operands[component_count]->is_undefined)
+            break;
+        operand_regs[component_count] = &operands[component_count]->u.reg;
+    }
+    if (z_operand)
+    {
+        operand_regs[component_count++] = &z_operand->u.reg;
+    }
+
+    return sm6_parser_emit_reg_composite_construct(sm6, operand_regs, component_count, state, reg);
 }
 
 static enum vkd3d_shader_opcode map_dx_unary_op(enum dx_intrinsic_opcode op)
@@ -4133,6 +4164,56 @@ static void sm6_parser_emit_dx_texture_load(struct sm6_parser *sm6, enum dx_intr
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
 
+static void sm6_parser_emit_dx_texture_store(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_register coord, texel;
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_dst_param *dst_param;
+    unsigned int write_mask, component_count;
+    struct vkd3d_shader_instruction *ins;
+    const struct sm6_value *resource;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_texture_handle(resource, op, sm6))
+        return;
+
+    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[1], NULL, state, &coord))
+        return;
+
+    write_mask = sm6_value_get_constant_uint(operands[8]);
+    if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
+    {
+        WARN("Invalid write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a texture store operation is invalid.", write_mask);
+        return;
+    }
+    else if (write_mask & (write_mask + 1))
+    {
+        /* In this case, it is unclear which source operands will be defined unless we encounter it in a shader. */
+        FIXME("Unhandled write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a texture store operation is unhandled.", write_mask);
+    }
+    component_count = vsir_write_mask_component_count(write_mask);
+
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[4], component_count, state, &texel))
+        return;
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_STORE_UAV_TYPED);
+
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    src_param_init_vector_from_reg(&src_params[0], &coord);
+    src_param_init_vector_from_reg(&src_params[1], &texel);
+
+    dst_param = instruction_dst_params_alloc(ins, 1, sm6);
+    dst_param->reg = resource->u.handle.reg;
+    dst_param_init_with_mask(dst_param, write_mask);
+}
+
 struct sm6_dx_opcode_info
 {
     const char *ret_type;
@@ -4203,6 +4284,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_TEXTURE_LOAD                  ] = {"o", "HiiiiCCC", sm6_parser_emit_dx_texture_load},
+    [DX_TEXTURE_STORE                 ] = {"v", "Hiiiooooc", sm6_parser_emit_dx_texture_store},
     [DX_UBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
     [DX_UMAX                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
     [DX_UMIN                          ] = {"m", "RR",   sm6_parser_emit_dx_binary},
