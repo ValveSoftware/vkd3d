@@ -3009,6 +3009,194 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
+struct vsir_block_list
+{
+    struct vsir_block **blocks;
+    size_t count, capacity;
+};
+
+static void vsir_block_list_init(struct vsir_block_list *list)
+{
+    memset(list, 0, sizeof(*list));
+}
+
+static void vsir_block_list_cleanup(struct vsir_block_list *list)
+{
+    vkd3d_free(list->blocks);
+}
+
+static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struct vsir_block *block)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+        if (block == list->blocks[i])
+            return VKD3D_OK;
+
+    if (!vkd3d_array_reserve((void **)&list->blocks, &list->capacity, list->count + 1, sizeof(*list->blocks)))
+    {
+        ERR("Cannot extend block list.\n");
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    }
+
+    list->blocks[list->count++] = block;
+
+    return VKD3D_OK;
+}
+
+struct vsir_block
+{
+    unsigned int label;
+    /* `begin' points to the instruction immediately following the
+     * LABEL that introduces the block. `end' points to the terminator
+     * instruction (either BRANCH or RET). They can coincide, meaning
+     * that the block is empty. */
+    struct vkd3d_shader_instruction *begin, *end;
+    struct vsir_block_list predecessors, successors;
+};
+
+static void vsir_block_init(struct vsir_block *block, unsigned int label)
+{
+    assert(label);
+    memset(block, 0, sizeof(*block));
+    block->label = label;
+    vsir_block_list_init(&block->predecessors);
+    vsir_block_list_init(&block->successors);
+}
+
+static void vsir_block_cleanup(struct vsir_block *block)
+{
+    vsir_block_list_cleanup(&block->predecessors);
+    vsir_block_list_cleanup(&block->successors);
+}
+
+struct vsir_cfg
+{
+    struct vsir_program *program;
+    struct vsir_block *blocks;
+    struct vsir_block *entry;
+    size_t block_count;
+};
+
+static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
+{
+    size_t i;
+
+    for (i = 0; i < cfg->block_count; ++i)
+        vsir_block_cleanup(&cfg->blocks[i]);
+
+    vkd3d_free(cfg->blocks);
+}
+
+static enum vkd3d_result vsir_cfg_add_edge(struct vsir_cfg *cfg, struct vsir_block *block,
+        struct vkd3d_shader_src_param *successor_param)
+{
+    unsigned int target = label_from_src_param(successor_param);
+    struct vsir_block *successor = &cfg->blocks[target - 1];
+    enum vkd3d_result ret;
+
+    assert(successor->label != 0);
+
+    if ((ret = vsir_block_list_add(&block->successors, successor)) < 0)
+        return ret;
+
+    if ((ret = vsir_block_list_add(&successor->predecessors, block)) < 0)
+        return ret;
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program)
+{
+    struct vsir_block *current_block = NULL;
+    enum vkd3d_result ret;
+    size_t i;
+
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->program = program;
+    cfg->block_count = program->block_count;
+
+    if (!(cfg->blocks = vkd3d_calloc(cfg->block_count, sizeof(*cfg->blocks))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    for (i = 0; i < program->instructions.count; ++i)
+    {
+        struct vkd3d_shader_instruction *instruction = &program->instructions.elements[i];
+
+        switch (instruction->handler_idx)
+        {
+            case VKD3DSIH_PHI:
+            case VKD3DSIH_SWITCH_MONOLITHIC:
+                vkd3d_unreachable();
+
+            case VKD3DSIH_LABEL:
+            {
+                unsigned int label = label_from_src_param(&instruction->src[0]);
+
+                assert(!current_block);
+                assert(label > 0);
+                assert(label <= cfg->block_count);
+                current_block = &cfg->blocks[label - 1];
+                vsir_block_init(current_block, label);
+                current_block->begin = &program->instructions.elements[i + 1];
+                if (!cfg->entry)
+                    cfg->entry = current_block;
+                break;
+            }
+
+            case VKD3DSIH_BRANCH:
+            case VKD3DSIH_RET:
+                assert(current_block);
+                current_block->end = instruction;
+                current_block = NULL;
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+
+        if (block->label == 0)
+            continue;
+
+        switch (block->end->handler_idx)
+        {
+            case VKD3DSIH_RET:
+                break;
+
+            case VKD3DSIH_BRANCH:
+                if (vsir_register_is_label(&block->end->src[0].reg))
+                {
+                    if ((ret = vsir_cfg_add_edge(cfg, block, &block->end->src[0])) < 0)
+                        goto fail;
+                }
+                else
+                {
+                    if ((ret = vsir_cfg_add_edge(cfg, block, &block->end->src[1])) < 0)
+                        goto fail;
+
+                    if ((ret = vsir_cfg_add_edge(cfg, block, &block->end->src[2])) < 0)
+                        goto fail;
+                }
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+    }
+
+    return VKD3D_OK;
+
+fail:
+    vsir_cfg_cleanup(cfg);
+
+    return ret;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -3022,14 +3210,24 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
     if (parser->shader_desc.is_dxil)
     {
+        struct vsir_cfg cfg;
+
         if ((result = lower_switch_to_if_ladder(&parser->program)) < 0)
             return result;
 
         if ((result = materialize_ssas_to_temps(parser)) < 0)
             return result;
 
-        if ((result = simple_structurizer_run(parser)) < 0)
+        if ((result = vsir_cfg_init(&cfg, &parser->program)) < 0)
             return result;
+
+        if ((result = simple_structurizer_run(parser)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        vsir_cfg_cleanup(&cfg);
     }
     else
     {
