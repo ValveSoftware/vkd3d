@@ -721,7 +721,7 @@ struct d3d12_resource_tile_info
 struct d3d12_resource
 {
     ID3D12Resource1 ID3D12Resource1_iface;
-    LONG refcount;
+    unsigned int refcount;
     unsigned int internal_refcount;
 
     D3D12_RESOURCE_DESC desc;
