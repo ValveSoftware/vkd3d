@@ -1012,7 +1012,7 @@ static ULONG d3d12_resource_incref(struct d3d12_resource *resource)
 
 static ULONG d3d12_resource_decref(struct d3d12_resource *resource)
 {
-    unsigned int refcount = InterlockedDecrement((LONG *)&resource->internal_refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&resource->internal_refcount);
 
     TRACE("%p decreasing refcount to %u.\n", resource, refcount);
 
