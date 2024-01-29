@@ -1,0 +1,208 @@
+[require]
+shader model >= 6.0
+
+[uav 0]
+format r32 float
+size (2, 2)
+
+0.1 0.2
+0.3 0.4
+
+[uav 1]
+size (1, 1)
+
+0.5 0.6 0.7 0.8
+
+[pixel shader]
+RWTexture2D<float4> u : register(u1);
+
+float4 main() : sv_target
+{
+    /* Unlike SM < 6.0, all four components are not required to be written in a single statement. */
+    u[uint2(0, 0)].xy = float2(1, 2);
+    u[uint2(0, 0)].zw = float2(3, 4);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 1 (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
+
+[pixel shader fail]
+Texture2D<float4> u;
+
+float4 main() : sv_target
+{
+    /* SRVs are not writable. */
+    u[uint2(0, 0)].xyzw = float4(1, 2, 3, 4);
+    return 0;
+}
+
+[pixel shader]
+RWTexture2D<float> u;
+RWTexture2D<float4> v;
+
+float4 main() : sv_target
+{
+    u[uint2(0, 0)] = 0.5;
+    u[uint2(0, 1)].x = 0.6;
+    u[uint2(1, 1)] = 0.7;
+    v[uint2(0, 0)].yxwz = float4(1, 2, 3, 4);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 0 (0, 0) r (0.5)
+probe uav 0 (0, 1) r (0.6)
+probe uav 0 (1, 0) r (0.2)
+probe uav 0 (1, 1) r (0.7)
+probe uav 1 (0, 0) rgba (2.0, 1.0, 4.0, 3.0)
+
+
+[uav 2]
+size (1, 1)
+
+0.1 0.2 0.3 0.4
+
+[pixel shader]
+RWTexture2D<float4> u : register(u2);
+
+float4 main() : sv_target1
+{
+    u[uint2(0, 0)] = float4(0.9, 0.8, 0.7, 0.6);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 2 (0, 0) rgba (0.9, 0.8, 0.7, 0.6)
+
+% Uppercase register set name
+[pixel shader]
+RWTexture2D<float4> u : register(U2);
+
+float4 main() : sv_target1
+{
+    u[uint2(0, 0)] = float4(0.9, 0.8, 0.7, 0.6);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 2 (0, 0) rgba (0.9, 0.8, 0.7, 0.6)
+
+% Test that we can declare and use an array of UAVs.
+
+[uav 1]
+size (1, 1)
+
+0.1 0.2 0.3 0.4
+
+[uav 2]
+size (1, 1)
+
+0.5 0.6 0.7 0.8
+
+[pixel shader]
+RWTexture2D<float4> u[2] : register(u1);
+
+float4 main() : sv_target1
+{
+    u[0][uint2(0, 0)] = float4(1.1, 1.2, 1.3, 1.4);
+    u[1][uint2(0, 0)] = float4(2.1, 2.2, 2.3, 2.4);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 1 (0, 0) rgba (1.1, 1.2, 1.3, 1.4)
+probe uav 2 (0, 0) rgba (2.1, 2.2, 2.3, 2.4)
+
+% RWTexture1D types
+[pixel shader]
+
+RWTexture1D<float4> u : register(u1);
+RWTexture1D<float> u0;
+
+float4 main() : sv_target1
+{
+    u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture1DArray types
+[pixel shader]
+
+RWTexture1DArray<float4> u : register(u1);
+RWTexture1DArray<float> u0;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture2D types
+[pixel shader]
+
+RWTexture2D<float4> u : register(u1);
+RWTexture2D<float> u0;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture2DArray types
+[pixel shader]
+
+RWTexture2DArray<float4> u : register(u1);
+RWTexture2DArray<float> u0;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% RWTexture3D types
+[pixel shader]
+
+RWTexture3D<float4> u : register(u1);
+RWTexture3D<float> u0;
+
+float4 main() : sv_target1
+{
+    u[int3(0, 0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% Structs are invalid in SM 6.
+[pixel shader fail]
+struct s
+{
+    float4 a;
+};
+
+RWTexture2D<float4> u : register(u1);
+RWTexture2D<struct s> u0;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
+
+% Matrices are invalid in SM 6.
+[pixel shader fail]
+
+RWTexture2D<float4> u : register(u1);
+RWTexture2D<float2x2> u0;
+
+float4 main() : sv_target1
+{
+    u[int2(0, 0)] = float4(11.1, 12.2, 13.3, 14.4);
+    return 0;
+}
