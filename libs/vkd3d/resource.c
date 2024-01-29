@@ -4020,7 +4020,7 @@ static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_AddRef(ID3D12DescriptorHeap
 static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_Release(ID3D12DescriptorHeap *iface)
 {
     struct d3d12_descriptor_heap *heap = impl_from_ID3D12DescriptorHeap(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&heap->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&heap->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", heap, refcount);
 
