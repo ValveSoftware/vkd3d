@@ -4010,7 +4010,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_descriptor_heap_QueryInterface(ID3D12Desc
 static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_AddRef(ID3D12DescriptorHeap *iface)
 {
     struct d3d12_descriptor_heap *heap = impl_from_ID3D12DescriptorHeap(iface);
-    ULONG refcount = InterlockedIncrement(&heap->refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&heap->refcount);
 
     TRACE("%p increasing refcount to %u.\n", heap, refcount);
 
@@ -4020,7 +4020,7 @@ static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_AddRef(ID3D12DescriptorHeap
 static ULONG STDMETHODCALLTYPE d3d12_descriptor_heap_Release(ID3D12DescriptorHeap *iface)
 {
     struct d3d12_descriptor_heap *heap = impl_from_ID3D12DescriptorHeap(iface);
-    ULONG refcount = InterlockedDecrement(&heap->refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&heap->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", heap, refcount);
 

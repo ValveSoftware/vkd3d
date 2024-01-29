@@ -1046,7 +1046,7 @@ struct d3d12_descriptor_heap_vk_set
 struct d3d12_descriptor_heap
 {
     ID3D12DescriptorHeap ID3D12DescriptorHeap_iface;
-    LONG refcount;
+    unsigned int refcount;
     uint64_t serial_id;
 
     D3D12_DESCRIPTOR_HEAP_DESC desc;
