@@ -1085,7 +1085,7 @@ HRESULT d3d12_descriptor_heap_create(struct d3d12_device *device,
 struct d3d12_query_heap
 {
     ID3D12QueryHeap ID3D12QueryHeap_iface;
-    LONG refcount;
+    unsigned int refcount;
 
     VkQueryPool vk_query_pool;
 
