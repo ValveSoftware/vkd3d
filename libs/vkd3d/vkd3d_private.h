@@ -722,7 +722,7 @@ struct d3d12_resource
 {
     ID3D12Resource1 ID3D12Resource1_iface;
     LONG refcount;
-    LONG internal_refcount;
+    unsigned int internal_refcount;
 
     D3D12_RESOURCE_DESC desc;
     const struct vkd3d_format *format;

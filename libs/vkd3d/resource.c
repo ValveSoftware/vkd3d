@@ -1003,7 +1003,7 @@ static void d3d12_resource_destroy(struct d3d12_resource *resource, struct d3d12
 
 static ULONG d3d12_resource_incref(struct d3d12_resource *resource)
 {
-    ULONG refcount = InterlockedIncrement(&resource->internal_refcount);
+    unsigned int refcount = vkd3d_atomic_increment_u32(&resource->internal_refcount);
 
     TRACE("%p increasing refcount to %u.\n", resource, refcount);
 
@@ -1012,7 +1012,7 @@ static ULONG d3d12_resource_incref(struct d3d12_resource *resource)
 
 static ULONG d3d12_resource_decref(struct d3d12_resource *resource)
 {
-    ULONG refcount = InterlockedDecrement(&resource->internal_refcount);
+    unsigned int refcount = InterlockedDecrement((LONG *)&resource->internal_refcount);
 
     TRACE("%p decreasing refcount to %u.\n", resource, refcount);
 
