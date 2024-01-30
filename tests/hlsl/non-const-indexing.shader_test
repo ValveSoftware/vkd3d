@@ -216,7 +216,11 @@ draw quad
 probe all rgba (1, 5, 3, 4)
 
 
-[pixel shader]
+[require]
+% reset requirements
+
+
+[pixel shader todo(sm<4)]
 uniform float4 f[4];
 uniform uint4 u;
 uniform uint4 v;
