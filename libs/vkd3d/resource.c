@@ -2321,7 +2321,7 @@ static void *vkd3d_desc_object_cache_get(struct vkd3d_desc_object_cache *cache)
         {
             if ((u.object = cache->heads[i].head))
             {
-                vkd3d_atomic_decrement(&cache->free_count);
+                vkd3d_atomic_decrement_u32(&cache->free_count);
                 cache->heads[i].head = u.header->next;
                 vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
                 return u.object;
@@ -2429,7 +2429,7 @@ void vkd3d_view_decref(void *view, struct d3d12_device *device)
 {
     union d3d12_desc_object u = {view};
 
-    if (vkd3d_atomic_decrement(&u.header->refcount))
+    if (vkd3d_atomic_decrement_u32(&u.header->refcount))
         return;
 
     if (u.header->magic != VKD3D_DESCRIPTOR_MAGIC_CBV)

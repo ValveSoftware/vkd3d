@@ -1926,7 +1926,7 @@ static void d3d12_command_signature_incref(struct d3d12_command_signature *signa
 
 static void d3d12_command_signature_decref(struct d3d12_command_signature *signature)
 {
-    unsigned int refcount = vkd3d_atomic_decrement(&signature->internal_refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&signature->internal_refcount);
 
     if (!refcount)
     {
