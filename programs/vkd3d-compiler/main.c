@@ -717,12 +717,13 @@ int main(int argc, char **argv)
     int ret;
 
     if (!parse_command_line(argc, argv, &options))
-        return 1;
+        goto done;
 
     if (options.print_help)
     {
         print_usage(argv[0]);
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (options.print_version)
@@ -730,13 +731,15 @@ int main(int argc, char **argv)
         const char *version = vkd3d_shader_get_version(NULL, NULL);
 
         fprintf(stdout, "vkd3d shader compiler version " PACKAGE_VERSION " using %s\n", version);
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (options.print_source_types)
     {
         print_source_types();
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (options.print_target_types)
@@ -744,11 +747,12 @@ int main(int argc, char **argv)
         if (options.source_type == VKD3D_SHADER_SOURCE_NONE)
         {
             fprintf(stderr, "--print-target-types requires an explicitly specified source type.\n");
-            return 1;
+            goto done;
         }
 
         print_target_types(options.source_type);
-        return 0;
+        fail = 0;
+        goto done;
     }
 
     if (!(input = open_input(options.filename, &close_input)))
@@ -774,7 +778,7 @@ int main(int argc, char **argv)
             if (token == TAG_DXBC)
             {
                 if (!parse_dxbc_source_type(&info.source, &options.source_type))
-                    return 1;
+                    goto done;
             }
             else if ((token & 0xfffe0000) == 0xfffe0000)
                 options.source_type = VKD3D_SHADER_SOURCE_D3D_BYTECODE;
@@ -791,13 +795,13 @@ int main(int argc, char **argv)
         fprintf(stderr, "Target type '%s' is invalid for source type '%s'.\n",
                 get_target_type_info(options.target_type)->name,
                 get_source_type_info(options.source_type)->name);
-        return 1;
+        goto done;
     }
 
     if (!options.preprocess_only && options.source_type == VKD3D_SHADER_SOURCE_HLSL && !options.profile)
     {
         fprintf(stderr, "You need to specify a profile when compiling from HLSL source.\n");
-        return 1;
+        goto done;
     }
 
     if (!options.filename && get_source_type_info(options.source_type)->is_binary && isatty(fileno(input)))
