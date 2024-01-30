@@ -129,8 +129,8 @@ VKD3D_UTILS_API HRESULT WINAPI D3D12CreateDevice(IUnknown *adapter,
 HRESULT WINAPI D3D12CreateRootSignatureDeserializer(const void *data, SIZE_T data_size,
         REFIID iid, void **deserializer)
 {
-    TRACE("data %p, data_size %lu, iid %s, deserializer %p.\n",
-            data, data_size, debugstr_guid(iid), deserializer);
+    TRACE("data %p, data_size %"PRIuPTR", iid %s, deserializer %p.\n",
+            data, (uintptr_t)data_size, debugstr_guid(iid), deserializer);
 
     return vkd3d_create_root_signature_deserializer(data, data_size, iid, deserializer);
 }
@@ -138,8 +138,8 @@ HRESULT WINAPI D3D12CreateRootSignatureDeserializer(const void *data, SIZE_T dat
 HRESULT WINAPI D3D12CreateVersionedRootSignatureDeserializer(const void *data, SIZE_T data_size,
         REFIID iid,void **deserializer)
 {
-    TRACE("data %p, data_size %lu, iid %s, deserializer %p.\n",
-            data, data_size, debugstr_guid(iid), deserializer);
+    TRACE("data %p, data_size %"PRIuPTR", iid %s, deserializer %p.\n",
+            data, (uintptr_t)data_size, debugstr_guid(iid), deserializer);
 
     return vkd3d_create_versioned_root_signature_deserializer(data, data_size, iid, deserializer);
 }
@@ -253,12 +253,12 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     HRESULT hr;
     int ret;
 
-    TRACE("data %p, data_size %lu, filename %s, macros %p, include %p, entry_point %s, "
+    TRACE("data %p, data_size %"PRIuPTR", filename %s, macros %p, include %p, entry_point %s, "
             "profile %s, flags %#x, effect_flags %#x, secondary_flags %#x, secondary_data %p, "
-            "secondary_data_size %lu, shader_blob %p, messages_blob %p.\n",
-            data, data_size, debugstr_a(filename), macros, include, debugstr_a(entry_point),
+            "secondary_data_size %"PRIuPTR", shader_blob %p, messages_blob %p.\n",
+            data, (uintptr_t)data_size, debugstr_a(filename), macros, include, debugstr_a(entry_point),
             debugstr_a(profile), flags, effect_flags, secondary_flags, secondary_data,
-            secondary_data_size, shader_blob, messages_blob);
+            (uintptr_t)secondary_data_size, shader_blob, messages_blob);
 
     if (flags & ~(D3DCOMPILE_DEBUG | D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
         FIXME("Ignoring flags %#x.\n", flags);
@@ -374,9 +374,9 @@ HRESULT WINAPI D3DCompile(const void *data, SIZE_T data_size, const char *filena
         const D3D_SHADER_MACRO *macros, ID3DInclude *include, const char *entrypoint,
         const char *profile, UINT flags, UINT effect_flags, ID3DBlob **shader, ID3DBlob **error_messages)
 {
-    TRACE("data %p, data_size %lu, filename %s, macros %p, include %p, entrypoint %s, "
+    TRACE("data %p, data_size %"PRIuPTR", filename %s, macros %p, include %p, entrypoint %s, "
             "profile %s, flags %#x, effect_flags %#x, shader %p, error_messages %p.\n",
-            data, data_size, debugstr_a(filename), macros, include, debugstr_a(entrypoint),
+            data, (uintptr_t)data_size, debugstr_a(filename), macros, include, debugstr_a(entrypoint),
             debugstr_a(profile), flags, effect_flags, shader, error_messages);
 
     return D3DCompile2(data, data_size, filename, macros, include, entrypoint, profile, flags,
@@ -400,8 +400,8 @@ HRESULT WINAPI D3DPreprocess(const void *data, SIZE_T size, const char *filename
         {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10},
     };
 
-    TRACE("data %p, size %lu, filename %s, macros %p, include %p, preprocessed_blob %p, messages_blob %p.\n",
-            data, size, debugstr_a(filename), macros, include, preprocessed_blob, messages_blob);
+    TRACE("data %p, size %"PRIuPTR", filename %s, macros %p, include %p, preprocessed_blob %p, messages_blob %p.\n",
+            data, (uintptr_t)size, debugstr_a(filename), macros, include, preprocessed_blob, messages_blob);
 
     if (messages_blob)
         *messages_blob = NULL;
@@ -606,7 +606,7 @@ HRESULT WINAPI D3DCreateBlob(SIZE_T data_size, ID3DBlob **blob)
     HRESULT hr;
     void *data;
 
-    TRACE("data_size %lu, blob %p.\n", data_size, blob);
+    TRACE("data_size %"PRIuPTR", blob %p.\n", (uintptr_t)data_size, blob);
 
     if (!blob)
     {
@@ -699,7 +699,8 @@ static HRESULT get_blob_part(const void *data, SIZE_T data_size,
 
     if (!data || !data_size || flags || !blob)
     {
-        WARN("Invalid arguments: data %p, data_size %lu, flags %#x, blob %p.\n", data, data_size, flags, blob);
+        WARN("Invalid arguments: data %p, data_size %"PRIuPTR", flags %#x, blob %p.\n",
+                data, (uintptr_t)data_size, flags, blob);
         return D3DERR_INVALIDCALL;
     }
 
@@ -795,36 +796,36 @@ done:
 
 HRESULT WINAPI D3DGetBlobPart(const void *data, SIZE_T data_size, D3D_BLOB_PART part, UINT flags, ID3DBlob **blob)
 {
-    TRACE("data %p, data_size %lu, part %s, flags %#x, blob %p.\n", data,
-           data_size, debug_d3d_blob_part(part), flags, blob);
+    TRACE("data %p, data_size %"PRIuPTR", part %s, flags %#x, blob %p.\n",
+            data, (uintptr_t)data_size, debug_d3d_blob_part(part), flags, blob);
 
     return get_blob_part(data, data_size, part, flags, blob);
 }
 
 HRESULT WINAPI D3DGetDebugInfo(const void *data, SIZE_T data_size, ID3DBlob **blob)
 {
-    TRACE("data %p, data_size %lu, blob %p.\n", data, data_size, blob);
+    TRACE("data %p, data_size %"PRIuPTR", blob %p.\n", data, (uintptr_t)data_size, blob);
 
     return get_blob_part(data, data_size, D3D_BLOB_DEBUG_INFO, 0, blob);
 }
 
 HRESULT WINAPI D3DGetInputAndOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob)
 {
-    TRACE("data %p, data_size %lu, blob %p.\n", data, data_size, blob);
+    TRACE("data %p, data_size %"PRIuPTR", blob %p.\n", data, (uintptr_t)data_size, blob);
 
     return get_blob_part(data, data_size, D3D_BLOB_INPUT_AND_OUTPUT_SIGNATURE_BLOB, 0, blob);
 }
 
 HRESULT WINAPI D3DGetInputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob)
 {
-    TRACE("data %p, data_size %lu, blob %p.\n", data, data_size, blob);
+    TRACE("data %p, data_size %"PRIuPTR", blob %p.\n", data, (uintptr_t)data_size, blob);
 
     return get_blob_part(data, data_size, D3D_BLOB_INPUT_SIGNATURE_BLOB, 0, blob);
 }
 
 HRESULT WINAPI D3DGetOutputSignatureBlob(const void *data, SIZE_T data_size, ID3DBlob **blob)
 {
-    TRACE("data %p, data_size %lu, blob %p.\n", data, data_size, blob);
+    TRACE("data %p, data_size %"PRIuPTR", blob %p.\n", data, (uintptr_t)data_size, blob);
 
     return get_blob_part(data, data_size, D3D_BLOB_OUTPUT_SIGNATURE_BLOB, 0, blob);
 }
@@ -865,7 +866,7 @@ HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID
     HRESULT hr;
     int ret;
 
-    TRACE("data %p, data_size %lu, flags %#x, blob %p.\n", data, data_size, flags, blob);
+    TRACE("data %p, data_size %"PRIuPTR", flags %#x, blob %p.\n", data, (uintptr_t)data_size, flags, blob);
 
     if (!blob)
     {
@@ -875,7 +876,7 @@ HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size, UINT flags, ID
 
     if (!data || !data_size)
     {
-        WARN("Invalid arguments: data %p, data_size %lu.\n", data, data_size);
+        WARN("Invalid arguments: data %p, data_size %"PRIuPTR".\n", data, (uintptr_t)data_size);
         return D3DERR_INVALIDCALL;
     }
 
@@ -945,8 +946,8 @@ HRESULT WINAPI D3DDisassemble(const void *data, SIZE_T data_size,
         {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10},
     };
 
-    TRACE("data %p, data_size %lu, flags %#x, comments %p, blob %p.\n",
-            data, data_size, flags, comments, blob);
+    TRACE("data %p, data_size %"PRIuPTR", flags %#x, comments %p, blob %p.\n",
+            data, (uintptr_t)data_size, flags, comments, blob);
 
     if (flags)
         FIXME("Ignoring flags %#x.\n", flags);

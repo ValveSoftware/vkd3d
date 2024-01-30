@@ -309,7 +309,8 @@ HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void *
     struct d3d12_reflection *object;
     HRESULT hr;
 
-    TRACE("data %p, data_size %lu, iid %s, reflection %p.\n", data, data_size, debugstr_guid(iid), reflection);
+    TRACE("data %p, data_size %"PRIuPTR", iid %s, reflection %p.\n",
+            data, (uintptr_t)data_size, debugstr_guid(iid), reflection);
 
     if (!IsEqualGUID(iid, &IID_ID3D12ShaderReflection))
     {
