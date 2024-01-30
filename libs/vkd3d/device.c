@@ -4473,8 +4473,8 @@ void d3d12_device_mark_as_removed(struct d3d12_device *device, HRESULT reason,
     va_list args;
 
     va_start(args, message);
-    WARN("Device %p is lost (reason %#x, \"%s\").\n",
-            device, reason, vkd3d_dbg_vsprintf(message, args));
+    WARN("Device %p is lost (reason %s, \"%s\").\n",
+            device, debugstr_hresult(reason), vkd3d_dbg_vsprintf(message, args));
     va_end(args);
 
     device->removed_reason = reason;
