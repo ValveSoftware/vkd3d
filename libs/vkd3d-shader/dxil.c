@@ -4725,8 +4725,8 @@ static void sm6_parser_emit_extractval(struct sm6_parser *sm6, const struct dxil
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
     src_param = instruction_src_params_alloc(ins, 1, sm6);
-    src_param_init_scalar(src_param, elem_idx);
     src_param->reg = src->u.reg;
+    src_param_init_scalar(src_param, elem_idx);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
