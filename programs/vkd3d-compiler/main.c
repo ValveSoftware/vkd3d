@@ -879,6 +879,7 @@ int main(int argc, char **argv)
     fail = 0;
     vkd3d_shader_free_shader_code(&output_code);
 done:
+    free(options.compile_options);
     if (close_output)
         fclose(output);
     if (close_input)
