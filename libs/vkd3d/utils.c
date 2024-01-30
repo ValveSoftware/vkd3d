@@ -678,6 +678,11 @@ const char *debug_d3d12_shader_component_mapping(unsigned int mapping)
             debug_d3d12_shader_component(D3D12_DECODE_SHADER_4_COMPONENT_MAPPING(3, mapping)));
 }
 
+const char *debug_gpu_handle(D3D12_GPU_DESCRIPTOR_HANDLE handle)
+{
+    return vkd3d_dbg_sprintf("{%#"PRIx64"}", handle.ptr);
+}
+
 const char *debug_vk_extent_3d(VkExtent3D extent)
 {
     return vkd3d_dbg_sprintf("(%u, %u, %u)",

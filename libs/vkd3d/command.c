@@ -4499,8 +4499,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetComputeRootDescriptorTable(I
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList5(iface);
 
-    TRACE("iface %p, root_parameter_index %u, base_descriptor %#"PRIx64".\n",
-            iface, root_parameter_index, base_descriptor.ptr);
+    TRACE("iface %p, root_parameter_index %u, base_descriptor %s.\n",
+            iface, root_parameter_index, debug_gpu_handle(base_descriptor));
 
     d3d12_command_list_set_descriptor_table(list, VKD3D_PIPELINE_BIND_POINT_COMPUTE,
             root_parameter_index, base_descriptor);
@@ -4511,8 +4511,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_SetGraphicsRootDescriptorTable(
 {
     struct d3d12_command_list *list = impl_from_ID3D12GraphicsCommandList5(iface);
 
-    TRACE("iface %p, root_parameter_index %u, base_descriptor %#"PRIx64".\n",
-            iface, root_parameter_index, base_descriptor.ptr);
+    TRACE("iface %p, root_parameter_index %u, base_descriptor %s.\n",
+            iface, root_parameter_index, debug_gpu_handle(base_descriptor));
 
     d3d12_command_list_set_descriptor_table(list, VKD3D_PIPELINE_BIND_POINT_GRAPHICS,
             root_parameter_index, base_descriptor);
@@ -5432,8 +5432,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
     struct d3d12_resource *resource_impl;
     VkClearColorValue colour;
 
-    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
-            iface, gpu_handle.ptr, debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
+    TRACE("iface %p, gpu_handle %s, cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
+            iface, debug_gpu_handle(gpu_handle), debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
     if (!(descriptor = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))
@@ -5496,8 +5496,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewFloat(I
     VkClearColorValue colour;
     struct vkd3d_view *view;
 
-    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
-            iface, gpu_handle.ptr, debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
+    TRACE("iface %p, gpu_handle %s, cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
+            iface, debug_gpu_handle(gpu_handle), debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
     if (!(view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))
