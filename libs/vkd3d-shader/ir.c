@@ -3107,6 +3107,7 @@ struct vsir_cfg
 
     struct vsir_block_list *loops;
     size_t loops_count, loops_capacity;
+    size_t *loops_by_header;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3121,6 +3122,7 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
 
     vkd3d_free(cfg->blocks);
     vkd3d_free(cfg->loops);
+    vkd3d_free(cfg->loops_by_header);
 
     if (TRACE_ON())
         vkd3d_string_buffer_cleanup(&cfg->debug_buffer);
@@ -3391,6 +3393,10 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
 {
     size_t i, j;
 
+    if (!(cfg->loops_by_header = vkd3d_calloc(cfg->block_count, sizeof(*cfg->loops_by_header))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    memset(cfg->loops_by_header, 0xff, cfg->block_count * sizeof(*cfg->loops_by_header));
+
     for (i = 0; i < cfg->block_count; ++i)
     {
         struct vsir_block *block = &cfg->blocks[i];
@@ -3411,11 +3417,23 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
             if (!vkd3d_array_reserve((void **)&cfg->loops, &cfg->loops_capacity, cfg->loops_count + 1, sizeof(*cfg->loops)))
                 return VKD3D_ERROR_OUT_OF_MEMORY;
 
-            loop = &cfg->loops[cfg->loops_count++];
+            loop = &cfg->loops[cfg->loops_count];
             vsir_block_list_init(loop);
 
             if ((ret = vsir_cfg_scan_loop(loop, block, header)) < 0)
                 return ret;
+
+            if (cfg->loops_by_header[header->label - 1] != SIZE_MAX)
+            {
+                FIXME("Block %u is header to more than one loop, this is not implemented.\n", header->label);
+                vkd3d_shader_error(cfg->message_context, &header->begin->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                        "Block %u is header to more than one loop, this is not implemented.", header->label);
+                return VKD3D_ERROR_NOT_IMPLEMENTED;
+            }
+
+            cfg->loops_by_header[header->label - 1] = cfg->loops_count;
+
+            ++cfg->loops_count;
         }
     }
 
