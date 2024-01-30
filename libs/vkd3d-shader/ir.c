@@ -3096,6 +3096,19 @@ static void vsir_block_cleanup(struct vsir_block *block)
     vkd3d_free(block->dominates);
 }
 
+static int block_compare(const void *ptr1, const void *ptr2)
+{
+    const struct vsir_block *block1 = *(const struct vsir_block **)ptr1;
+    const struct vsir_block *block2 = *(const struct vsir_block **)ptr2;
+
+    return vkd3d_u32_compare(block1->label, block2->label);
+}
+
+static void vsir_block_list_sort(struct vsir_block_list *list)
+{
+    qsort(list->blocks, list->count, sizeof(*list->blocks), block_compare);
+}
+
 struct vsir_cfg
 {
     struct vkd3d_shader_message_context *message_context;
@@ -3422,6 +3435,8 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
 
             if ((ret = vsir_cfg_scan_loop(loop, block, header)) < 0)
                 return ret;
+
+            vsir_block_list_sort(loop);
 
             if (TRACE_ON())
             {
