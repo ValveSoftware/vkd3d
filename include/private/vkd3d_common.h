@@ -305,11 +305,6 @@ static inline uint32_t vkd3d_atomic_increment_u32(uint32_t volatile *x)
 }
 
 #ifndef _WIN32
-static inline LONG InterlockedIncrement(LONG volatile *x)
-{
-    return vkd3d_atomic_increment_u32((uint32_t *)x);
-}
-
 static inline LONG InterlockedDecrement(LONG volatile *x)
 {
     return vkd3d_atomic_decrement_u32((uint32_t *)x);

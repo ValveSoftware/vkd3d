@@ -101,12 +101,12 @@ static void vkd3d_test_end_todo(void);
 
 struct vkd3d_test_state
 {
-    LONG success_count;
-    LONG failure_count;
-    LONG skip_count;
-    LONG todo_count;
-    LONG todo_success_count;
-    LONG bug_count;
+    unsigned int success_count;
+    unsigned int failure_count;
+    unsigned int skip_count;
+    unsigned int todo_count;
+    unsigned int todo_success_count;
+    unsigned int bug_count;
 
     unsigned int debug_level;
 
@@ -150,13 +150,13 @@ vkd3d_test_check_assert_that(unsigned int line, bool result, const char *fmt, va
 {
     if (result)
     {
-        InterlockedIncrement(&vkd3d_test_state.success_count);
+        vkd3d_atomic_increment_u32(&vkd3d_test_state.success_count);
         if (vkd3d_test_state.debug_level > 1)
             vkd3d_test_printf(line, "Test succeeded.\n");
     }
     else
     {
-        InterlockedIncrement(&vkd3d_test_state.failure_count);
+        vkd3d_atomic_increment_u32(&vkd3d_test_state.failure_count);
         vkd3d_test_printf(line, "Test failed: ");
         vprintf(fmt, args);
     }
@@ -180,7 +180,7 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
 
     if (is_bug && vkd3d_test_state.bug_enabled)
     {
-        InterlockedIncrement(&vkd3d_test_state.bug_count);
+        vkd3d_atomic_increment_u32(&vkd3d_test_state.bug_count);
         if (is_todo)
             result = !result;
         if (result)
@@ -193,12 +193,12 @@ vkd3d_test_check_ok(unsigned int line, bool result, const char *fmt, va_list arg
     {
         if (result)
         {
-            InterlockedIncrement(&vkd3d_test_state.todo_success_count);
+            vkd3d_atomic_increment_u32(&vkd3d_test_state.todo_success_count);
             vkd3d_test_printf(line, "Todo succeeded: ");
         }
         else
         {
-            InterlockedIncrement(&vkd3d_test_state.todo_count);
+            vkd3d_atomic_increment_u32(&vkd3d_test_state.todo_count);
             vkd3d_test_printf(line, "Todo: ");
         }
         vprintf(fmt, args);
@@ -227,7 +227,7 @@ vkd3d_test_skip(unsigned int line, const char *fmt, ...)
     vkd3d_test_printf(line, "Test skipped: ");
     vprintf(fmt, args);
     va_end(args);
-    InterlockedIncrement(&vkd3d_test_state.skip_count);
+    vkd3d_atomic_increment_u32(&vkd3d_test_state.skip_count);
 }
 
 static void VKD3D_PRINTF_FUNC(2, 3) VKD3D_UNUSED
@@ -293,16 +293,14 @@ int main(int argc, char **argv)
 
     vkd3d_test_main(argc, argv);
 
-    printf("%s: %lu tests executed (%lu failures, %lu skipped, %lu todo, %lu bugs).\n",
+    printf("%s: %u tests executed (%u failures, %u skipped, %u todo, %u bugs).\n",
             vkd3d_test_name,
-            (unsigned long)(vkd3d_test_state.success_count
-            + vkd3d_test_state.failure_count + vkd3d_test_state.todo_count
-            + vkd3d_test_state.todo_success_count),
-            (unsigned long)(vkd3d_test_state.failure_count
-            + vkd3d_test_state.todo_success_count),
-            (unsigned long)vkd3d_test_state.skip_count,
-            (unsigned long)vkd3d_test_state.todo_count,
-            (unsigned long)vkd3d_test_state.bug_count);
+            vkd3d_test_state.success_count + vkd3d_test_state.failure_count
+                    + vkd3d_test_state.todo_count + vkd3d_test_state.todo_success_count,
+            vkd3d_test_state.failure_count + vkd3d_test_state.todo_success_count,
+            vkd3d_test_state.skip_count,
+            vkd3d_test_state.todo_count,
+            vkd3d_test_state.bug_count);
 
     if (test_platform)
         free(test_platform);

@@ -625,7 +625,7 @@ static void test_adapter_luid(void)
 struct parent
 {
     IUnknown IUnknown_iface;
-    LONG refcount;
+    unsigned int refcount;
 };
 
 static struct parent *parent_from_IUnknown(IUnknown *iface)
@@ -651,14 +651,14 @@ static ULONG STDMETHODCALLTYPE parent_AddRef(IUnknown *iface)
 {
     struct parent *parent = parent_from_IUnknown(iface);
 
-    return InterlockedIncrement(&parent->refcount);
+    return vkd3d_atomic_increment_u32(&parent->refcount);
 }
 
 static ULONG STDMETHODCALLTYPE parent_Release(IUnknown *iface)
 {
     struct parent *parent = parent_from_IUnknown(iface);
 
-    return InterlockedDecrement(&parent->refcount);
+    return InterlockedDecrement((LONG *)&parent->refcount);
 }
 
 static const struct IUnknownVtbl parent_vtbl =
