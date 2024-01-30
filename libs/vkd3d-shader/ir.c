@@ -3106,6 +3106,43 @@ static enum vkd3d_result vsir_cfg_add_edge(struct vsir_cfg *cfg, struct vsir_blo
     return VKD3D_OK;
 }
 
+static void vsir_cfg_dump_dot(struct vsir_cfg *cfg)
+{
+    size_t i, j;
+
+    TRACE("digraph cfg {\n");
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+        const char *shape;
+
+        if (block->label == 0)
+            continue;
+
+        switch (block->end->handler_idx)
+        {
+            case VKD3DSIH_RET:
+                shape = "trapezium";
+                break;
+
+            case VKD3DSIH_BRANCH:
+                shape = vsir_register_is_label(&block->end->src[0].reg) ? "ellipse" : "box";
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
+
+        TRACE("  n%u [label=\"%u\", shape=\"%s\"];\n", block->label, block->label, shape);
+
+        for (j = 0; j < block->successors.count; ++j)
+            TRACE("  n%u -> n%u;\n", block->label, block->successors.blocks[j]->label);
+    }
+
+    TRACE("}\n");
+}
+
 static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program)
 {
     struct vsir_block *current_block = NULL;
@@ -3188,6 +3225,9 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
                 vkd3d_unreachable();
         }
     }
+
+    if (TRACE_ON())
+        vsir_cfg_dump_dot(cfg);
 
     return VKD3D_OK;
 
