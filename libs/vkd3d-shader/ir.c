@@ -3053,21 +3053,40 @@ struct vsir_block
      * that the block is empty. */
     struct vkd3d_shader_instruction *begin, *end;
     struct vsir_block_list predecessors, successors;
+    uint32_t *dominates;
 };
 
-static void vsir_block_init(struct vsir_block *block, unsigned int label)
+static enum vkd3d_result vsir_block_init(struct vsir_block *block, unsigned int label, size_t block_count)
 {
+    size_t byte_count;
+
+    if (block_count > SIZE_MAX - (sizeof(*block->dominates) * CHAR_BIT - 1))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    block_count = align(block_count, sizeof(*block->dominates) * CHAR_BIT);
+    byte_count = block_count / CHAR_BIT;
+
     assert(label);
     memset(block, 0, sizeof(*block));
     block->label = label;
     vsir_block_list_init(&block->predecessors);
     vsir_block_list_init(&block->successors);
+
+    if (!(block->dominates = vkd3d_malloc(byte_count)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    memset(block->dominates, 0xff, byte_count);
+
+    return VKD3D_OK;
 }
 
 static void vsir_block_cleanup(struct vsir_block *block)
 {
+    if (block->label == 0)
+        return;
     vsir_block_list_cleanup(&block->predecessors);
     vsir_block_list_cleanup(&block->successors);
+    vkd3d_free(block->dominates);
 }
 
 struct vsir_cfg
@@ -3174,7 +3193,9 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
                 assert(label > 0);
                 assert(label <= cfg->block_count);
                 current_block = &cfg->blocks[label - 1];
-                vsir_block_init(current_block, label);
+                assert(current_block->label == 0);
+                if ((ret = vsir_block_init(current_block, label, program->block_count)) < 0)
+                    goto fail;
                 current_block->begin = &program->instructions.elements[i + 1];
                 if (!cfg->entry)
                     cfg->entry = current_block;
@@ -3237,6 +3258,46 @@ fail:
     return ret;
 }
 
+/* Block A dominates block B if every path from the entry point to B
+ * must pass through A. Naively compute the set of blocks that are
+ * dominated by `reference' by running a graph visit starting from the
+ * entry point (which must be the initial value of `current') and
+ * avoiding `reference'. Running this for all the blocks takes
+ * quadratic time: if in the future something better is sought after,
+ * the standard tool seems to be the Lengauer-Tarjan algorithm. */
+static void vsir_cfg_compute_dominators_recurse(struct vsir_block *current, struct vsir_block *reference)
+{
+    size_t i;
+
+    assert(current->label != 0);
+
+    if (current == reference)
+        return;
+
+    if (!bitmap_is_set(reference->dominates, current->label - 1))
+        return;
+
+    bitmap_clear(reference->dominates, current->label - 1);
+
+    for (i = 0; i < current->successors.count; ++i)
+        vsir_cfg_compute_dominators_recurse(current->successors.blocks[i], reference);
+}
+
+static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
+{
+    size_t i;
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+
+        if (block->label == 0)
+            continue;
+
+        vsir_cfg_compute_dominators_recurse(cfg->entry, block);
+    }
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -3260,6 +3321,8 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
         if ((result = vsir_cfg_init(&cfg, &parser->program)) < 0)
             return result;
+
+        vsir_cfg_compute_dominators(&cfg);
 
         if ((result = simple_structurizer_run(parser)) < 0)
         {
