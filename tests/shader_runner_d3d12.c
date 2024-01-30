@@ -241,7 +241,9 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
     D3D12_ROOT_SIGNATURE_DESC root_signature_desc = {0};
     D3D12_ROOT_PARAMETER root_params[17], *root_param;
     D3D12_STATIC_SAMPLER_DESC static_samplers[7];
+    struct d3d12_resource *base_resource = NULL;
     ID3D12RootSignature *root_signature;
+    unsigned int slot;
     HRESULT hr;
     size_t i;
 
@@ -274,6 +276,14 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
             case RESOURCE_TYPE_BUFFER_UAV:
                 range = &resource->descriptor_range;
 
+                if (base_resource && resource->r.type == base_resource->r.type && resource->r.slot == slot + 1)
+                {
+                    ++base_resource->descriptor_range.NumDescriptors;
+                    resource->descriptor_range.NumDescriptors = 0;
+                    ++slot;
+                    continue;
+                }
+
                 resource->root_index = root_signature_desc.NumParameters++;
                 root_param = &root_params[resource->root_index];
                 root_param->ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -289,6 +299,9 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
                 range->BaseShaderRegister = resource->r.slot;
                 range->RegisterSpace = 0;
                 range->OffsetInDescriptorsFromTableStart = 0;
+
+                base_resource = resource;
+                slot = resource->r.slot;
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -376,14 +389,16 @@ static bool d3d12_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
         switch (resource->r.type)
         {
             case RESOURCE_TYPE_TEXTURE:
-                ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
-                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                if (resource->descriptor_range.NumDescriptors)
+                    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
                 break;
 
             case RESOURCE_TYPE_UAV:
             case RESOURCE_TYPE_BUFFER_UAV:
-                ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
-                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                if (resource->descriptor_range.NumDescriptors)
+                    ID3D12GraphicsCommandList_SetComputeRootDescriptorTable(command_list, resource->root_index,
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
                 break;
 
             case RESOURCE_TYPE_RENDER_TARGET:
@@ -517,14 +532,16 @@ static bool d3d12_runner_draw(struct shader_runner *r,
                 break;
 
             case RESOURCE_TYPE_TEXTURE:
-                ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
-                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
+                if (resource->descriptor_range.NumDescriptors)
+                    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot));
                 break;
 
             case RESOURCE_TYPE_UAV:
             case RESOURCE_TYPE_BUFFER_UAV:
-                ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
-                        get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                if (resource->descriptor_range.NumDescriptors)
+                    ID3D12GraphicsCommandList_SetGraphicsRootDescriptorTable(command_list, resource->root_index,
+                            get_gpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
                 break;
 
             case RESOURCE_TYPE_VERTEX_BUFFER:
