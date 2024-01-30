@@ -3348,6 +3348,31 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device7 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS6:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS6 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+                return E_INVALIDARG;
+            }
+
+            data->AdditionalShadingRatesSupported = FALSE;
+            data->PerPrimitiveShadingRateSupportedWithViewportIndexing = FALSE;
+            data->VariableShadingRateTier = D3D12_VARIABLE_SHADING_RATE_TIER_NOT_SUPPORTED;
+            data->ShadingRateImageTileSize = 0;
+            data->BackgroundProcessingSupported = FALSE;
+
+            TRACE("Additional shading rates support %#x.\n", data->AdditionalShadingRatesSupported);
+            TRACE("Per-primitive shading rates with viewport indexing %#x.\n",
+                    data->PerPrimitiveShadingRateSupportedWithViewportIndexing);
+            TRACE("Variable shading rate tier %#x.\n", data->VariableShadingRateTier);
+            TRACE("Shading rate image tile size %#x.\n", data->ShadingRateImageTileSize);
+            TRACE("Background processing support %#x.\n", data->BackgroundProcessingSupported);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
