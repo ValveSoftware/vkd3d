@@ -3888,7 +3888,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateSharedHandle(ID3D12Device7 *
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
 
     FIXME("iface %p, object %p, attributes %p, access %#x, name %s, handle %p stub!\n",
-            iface, object, attributes, access, debugstr_w(name, device->wchar_size), handle);
+            iface, object, attributes, (uint32_t)access, debugstr_w(name, device->wchar_size), handle);
 
     return E_NOTIMPL;
 }
@@ -3908,7 +3908,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_OpenSharedHandleByName(ID3D12Devic
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
 
     FIXME("iface %p, name %s, access %#x, handle %p stub!\n",
-            iface, debugstr_w(name, device->wchar_size), access, handle);
+            iface, debugstr_w(name, device->wchar_size), (uint32_t)access, handle);
 
     return E_NOTIMPL;
 }
