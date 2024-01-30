@@ -940,7 +940,7 @@ static HRESULT vkd3d_create_image(struct d3d12_device *device,
 }
 
 HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
-        const D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_ALLOCATION_INFO *allocation_info)
+        const D3D12_RESOURCE_DESC *desc, struct vkd3d_resource_allocation_info *allocation_info)
 {
     static const D3D12_HEAP_PROPERTIES heap_properties = {D3D12_HEAP_TYPE_DEFAULT};
     const struct vkd3d_vk_device_procs *vk_procs = &device->vk_procs;
@@ -968,8 +968,8 @@ HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
         VK_CALL(vkGetImageMemoryRequirements(device->vk_device, vk_image, &requirements));
         VK_CALL(vkDestroyImage(device->vk_device, vk_image, NULL));
 
-        allocation_info->SizeInBytes = requirements.size;
-        allocation_info->Alignment = requirements.alignment;
+        allocation_info->size_in_bytes = requirements.size;
+        allocation_info->alignment = requirements.alignment;
     }
 
     return hr;

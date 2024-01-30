@@ -770,6 +770,13 @@ static inline bool d3d12_resource_is_texture(const struct d3d12_resource *resour
     return resource->desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER;
 }
 
+struct vkd3d_resource_allocation_info
+{
+    uint64_t offset;
+    uint64_t alignment;
+    uint64_t size_in_bytes;
+};
+
 bool d3d12_resource_is_cpu_accessible(const struct d3d12_resource *resource);
 HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC *desc, struct d3d12_device *device);
 void d3d12_resource_get_tiling(struct d3d12_device *device, const struct d3d12_resource *resource,
@@ -797,7 +804,7 @@ HRESULT vkd3d_create_buffer(struct d3d12_device *device,
         const D3D12_HEAP_PROPERTIES *heap_properties, D3D12_HEAP_FLAGS heap_flags,
         const D3D12_RESOURCE_DESC *desc, VkBuffer *vk_buffer);
 HRESULT vkd3d_get_image_allocation_info(struct d3d12_device *device,
-        const D3D12_RESOURCE_DESC *desc, D3D12_RESOURCE_ALLOCATION_INFO *allocation_info);
+        const D3D12_RESOURCE_DESC *desc, struct vkd3d_resource_allocation_info *allocation_info);
 
 enum vkd3d_view_type
 {

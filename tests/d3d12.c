@@ -32284,11 +32284,9 @@ static void test_resource_allocation_info(void)
                 : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
     }
     info = ID3D12Device_GetResourceAllocationInfo(device, 0, ARRAY_SIZE(desc_array), desc_array);
-    todo
     ok(info.Alignment >= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
             "Got unexpected alignment %"PRIu64".\n", info.Alignment);
     check_alignment(info.SizeInBytes, info.Alignment);
-    todo
     ok(info.SizeInBytes >= total, "Got unexpected size %"PRIu64".\n", info.SizeInBytes);
 
     refcount = ID3D12Device_Release(device);

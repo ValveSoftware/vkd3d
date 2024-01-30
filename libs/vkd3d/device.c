@@ -1969,7 +1969,7 @@ static HRESULT vkd3d_select_queues(const struct vkd3d_instance *vkd3d_instance,
  * which applies to resources of a total size of 4 MiB or less. */
 static bool d3d12_is_64k_msaa_supported(struct d3d12_device *device)
 {
-    D3D12_RESOURCE_ALLOCATION_INFO info;
+    struct vkd3d_resource_allocation_info info;
     D3D12_RESOURCE_DESC resource_desc;
 
     memset(&resource_desc, 0, sizeof(resource_desc));
@@ -1986,7 +1986,7 @@ static bool d3d12_is_64k_msaa_supported(struct d3d12_device *device)
      * resources, which must have 0x10000 in their description, so we might
      * reasonably return true here for 0x20000 or 0x40000. */
     return SUCCEEDED(vkd3d_get_image_allocation_info(device, &resource_desc, &info))
-            && info.Alignment <= 0x10000;
+            && info.alignment <= 0x10000;
 }
 
 static HRESULT vkd3d_create_vk_device(struct d3d12_device *device,
@@ -3566,79 +3566,93 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device7 *
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);
 }
 
+static void d3d12_device_get_resource_allocation_info(struct d3d12_device *device,
+        unsigned int count, const D3D12_RESOURCE_DESC *resource_descs,
+        D3D12_RESOURCE_ALLOCATION_INFO *result)
+{
+    struct vkd3d_resource_allocation_info info;
+    const D3D12_RESOURCE_DESC *desc;
+    uint64_t requested_alignment;
+    unsigned int i;
+
+    result->Alignment = 0;
+    result->SizeInBytes = 0;
+
+    info.offset = 0;
+
+    for (i = 0; i < count; ++i)
+    {
+        desc = &resource_descs[i];
+
+        if (FAILED(d3d12_resource_validate_desc(desc, device)))
+        {
+            WARN("Invalid resource desc.\n");
+            goto invalid;
+        }
+
+        if (desc->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
+        {
+            info.alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+            info.offset = align(info.offset, info.alignment);
+            info.size_in_bytes = align(desc->Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
+        }
+        else
+        {
+            if (FAILED(vkd3d_get_image_allocation_info(device, desc, &info)))
+            {
+                WARN("Failed to get allocation info for texture.\n");
+                goto invalid;
+            }
+
+            requested_alignment = desc->Alignment
+                    ? desc->Alignment : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+            info.alignment = max(info.alignment, requested_alignment);
+            info.size_in_bytes = align(info.size_in_bytes, info.alignment);
+
+            /* Pad by the maximum heap offset increase which may be needed to align to a higher
+             * Vulkan requirement an offset supplied by the calling application. This allows
+             * us to return the standard D3D12 alignment and adjust resource placement later. */
+            if (info.alignment > requested_alignment)
+            {
+                info.size_in_bytes += info.alignment - requested_alignment;
+                info.alignment = requested_alignment;
+            }
+
+            info.offset = align(info.offset, info.alignment);
+        }
+
+        info.offset += info.size_in_bytes;
+
+        result->Alignment = max(result->Alignment, info.alignment);
+        result->SizeInBytes = info.offset;
+    }
+
+    return;
+
+invalid:
+    result->SizeInBytes = UINT64_MAX;
+
+    /* FIXME: Should we support D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT for small MSAA resources? */
+    if (desc->SampleDesc.Count != 1)
+        result->Alignment = D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
+    else
+        result->Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+
+    TRACE("Alignment %#"PRIx64".\n", result->Alignment);
+}
+
 static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResourceAllocationInfo(
         ID3D12Device7 *iface, D3D12_RESOURCE_ALLOCATION_INFO *info, UINT visible_mask,
         UINT count, const D3D12_RESOURCE_DESC *resource_descs)
 {
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
-    const D3D12_RESOURCE_DESC *desc;
-    uint64_t requested_alignment;
 
     TRACE("iface %p, info %p, visible_mask 0x%08x, count %u, resource_descs %p.\n",
             iface, info, visible_mask, count, resource_descs);
 
     debug_ignored_node_mask(visible_mask);
 
-    info->SizeInBytes = 0;
-    info->Alignment = 0;
-
-    if (count != 1)
-    {
-        FIXME("Multiple resource descriptions not supported.\n");
-        return info;
-    }
-
-    desc = &resource_descs[0];
-
-    if (FAILED(d3d12_resource_validate_desc(desc, device)))
-    {
-        WARN("Invalid resource desc.\n");
-        goto invalid;
-    }
-
-    if (desc->Dimension == D3D12_RESOURCE_DIMENSION_BUFFER)
-    {
-        info->SizeInBytes = align(desc->Width, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT);
-        info->Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-    }
-    else
-    {
-        if (FAILED(vkd3d_get_image_allocation_info(device, desc, info)))
-        {
-            WARN("Failed to get allocation info for texture.\n");
-            goto invalid;
-        }
-
-        requested_alignment = desc->Alignment
-                ? desc->Alignment : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-        info->Alignment = max(info->Alignment, requested_alignment);
-
-        info->SizeInBytes = align(info->SizeInBytes, info->Alignment);
-
-        /* Pad by the maximum heap offset increase which may be needed to align to a higher
-         * Vulkan requirement an offset supplied by the calling application. This allows
-         * us to return the standard D3D12 alignment and adjust resource placement later. */
-        if (info->Alignment > requested_alignment)
-        {
-            info->SizeInBytes += info->Alignment - requested_alignment;
-            info->Alignment = requested_alignment;
-        }
-    }
-
-    TRACE("Size %#"PRIx64", alignment %#"PRIx64".\n", info->SizeInBytes, info->Alignment);
-
-    return info;
-
-invalid:
-    info->SizeInBytes = ~(uint64_t)0;
-
-    /* FIXME: Should we support D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT for small MSSA resources? */
-    if (desc->SampleDesc.Count != 1)
-        info->Alignment = D3D12_DEFAULT_MSAA_RESOURCE_PLACEMENT_ALIGNMENT;
-    else
-        info->Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
-
-    TRACE("Alignment %#"PRIx64".\n", info->Alignment);
+    d3d12_device_get_resource_allocation_info(device, count, resource_descs, info);
 
     return info;
 }
