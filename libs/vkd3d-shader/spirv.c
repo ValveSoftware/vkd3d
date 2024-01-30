@@ -9981,6 +9981,7 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
         enum vkd3d_shader_spirv_environment environment = spirv_compiler_get_target_environment(compiler);
         if (vkd3d_spirv_binary_to_text(spirv, environment, compiler->formatting, &text) != VKD3D_OK)
             return VKD3D_ERROR;
+        vkd3d_shader_free_shader_code(spirv);
         *spirv = text;
     }
 
