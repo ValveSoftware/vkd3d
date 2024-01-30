@@ -3391,7 +3391,7 @@ static enum vkd3d_result vsir_cfg_scan_loop(struct vsir_block_list *loop, struct
 
 static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
 {
-    size_t i, j;
+    size_t i, j, k;
 
     if (!(cfg->loops_by_header = vkd3d_calloc(cfg->block_count, sizeof(*cfg->loops_by_header))))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -3422,6 +3422,17 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
 
             if ((ret = vsir_cfg_scan_loop(loop, block, header)) < 0)
                 return ret;
+
+            if (TRACE_ON())
+            {
+                vkd3d_string_buffer_printf(&cfg->debug_buffer, "Back edge %u -> %u with loop:", block->label, header->label);
+
+                for (k = 0; k < loop->count; ++k)
+                    vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", loop->blocks[k]->label);
+
+                TRACE("%s\n", cfg->debug_buffer.buffer);
+                vkd3d_string_buffer_clear(&cfg->debug_buffer);
+            }
 
             if (cfg->loops_by_header[header->label - 1] != SIZE_MAX)
             {
