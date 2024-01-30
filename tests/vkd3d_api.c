@@ -658,7 +658,7 @@ static ULONG STDMETHODCALLTYPE parent_Release(IUnknown *iface)
 {
     struct parent *parent = parent_from_IUnknown(iface);
 
-    return InterlockedDecrement((LONG *)&parent->refcount);
+    return vkd3d_atomic_decrement_u32(&parent->refcount);
 }
 
 static const struct IUnknownVtbl parent_vtbl =

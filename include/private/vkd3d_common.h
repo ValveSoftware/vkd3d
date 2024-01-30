@@ -304,13 +304,6 @@ static inline uint32_t vkd3d_atomic_increment_u32(uint32_t volatile *x)
     return vkd3d_atomic_add_fetch_u32(x, 1);
 }
 
-#ifndef _WIN32
-static inline LONG InterlockedDecrement(LONG volatile *x)
-{
-    return vkd3d_atomic_decrement_u32((uint32_t *)x);
-}
-#endif  /* _WIN32 */
-
 static inline void vkd3d_parse_version(const char *version, int *major, int *minor)
 {
     *major = atoi(version);
