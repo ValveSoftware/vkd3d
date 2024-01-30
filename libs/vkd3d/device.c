@@ -3420,7 +3420,7 @@ static void STDMETHODCALLTYPE d3d12_device_CreateConstantBufferView(ID3D12Device
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
     struct d3d12_desc tmp = {0};
 
-    TRACE("iface %p, desc %p, descriptor %#lx.\n", iface, desc, descriptor.ptr);
+    TRACE("iface %p, desc %p, descriptor %s.\n", iface, desc, debug_cpu_handle(descriptor));
 
     d3d12_desc_create_cbv(&tmp, device, desc);
     d3d12_desc_write_atomic(d3d12_desc_from_cpu_handle(descriptor), &tmp, device);
@@ -3433,8 +3433,8 @@ static void STDMETHODCALLTYPE d3d12_device_CreateShaderResourceView(ID3D12Device
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
     struct d3d12_desc tmp = {0};
 
-    TRACE("iface %p, resource %p, desc %p, descriptor %#lx.\n",
-            iface, resource, desc, descriptor.ptr);
+    TRACE("iface %p, resource %p, desc %p, descriptor %s.\n",
+            iface, resource, desc, debug_cpu_handle(descriptor));
 
     d3d12_desc_create_srv(&tmp, device, unsafe_impl_from_ID3D12Resource(resource), desc);
     d3d12_desc_write_atomic(d3d12_desc_from_cpu_handle(descriptor), &tmp, device);
@@ -3447,8 +3447,8 @@ static void STDMETHODCALLTYPE d3d12_device_CreateUnorderedAccessView(ID3D12Devic
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
     struct d3d12_desc tmp = {0};
 
-    TRACE("iface %p, resource %p, counter_resource %p, desc %p, descriptor %#lx.\n",
-            iface, resource, counter_resource, desc, descriptor.ptr);
+    TRACE("iface %p, resource %p, counter_resource %p, desc %p, descriptor %s.\n",
+            iface, resource, counter_resource, desc, debug_cpu_handle(descriptor));
 
     d3d12_desc_create_uav(&tmp, device, unsafe_impl_from_ID3D12Resource(resource),
             unsafe_impl_from_ID3D12Resource(counter_resource), desc);
@@ -3459,8 +3459,8 @@ static void STDMETHODCALLTYPE d3d12_device_CreateRenderTargetView(ID3D12Device7 
         ID3D12Resource *resource, const D3D12_RENDER_TARGET_VIEW_DESC *desc,
         D3D12_CPU_DESCRIPTOR_HANDLE descriptor)
 {
-    TRACE("iface %p, resource %p, desc %p, descriptor %#lx.\n",
-            iface, resource, desc, descriptor.ptr);
+    TRACE("iface %p, resource %p, desc %p, descriptor %s.\n",
+            iface, resource, desc, debug_cpu_handle(descriptor));
 
     d3d12_rtv_desc_create_rtv(d3d12_rtv_desc_from_cpu_handle(descriptor),
             impl_from_ID3D12Device7(iface), unsafe_impl_from_ID3D12Resource(resource), desc);
@@ -3470,8 +3470,8 @@ static void STDMETHODCALLTYPE d3d12_device_CreateDepthStencilView(ID3D12Device7 
         ID3D12Resource *resource, const D3D12_DEPTH_STENCIL_VIEW_DESC *desc,
         D3D12_CPU_DESCRIPTOR_HANDLE descriptor)
 {
-    TRACE("iface %p, resource %p, desc %p, descriptor %#lx.\n",
-            iface, resource, desc, descriptor.ptr);
+    TRACE("iface %p, resource %p, desc %p, descriptor %s.\n",
+            iface, resource, desc, debug_cpu_handle(descriptor));
 
     d3d12_dsv_desc_create_dsv(d3d12_dsv_desc_from_cpu_handle(descriptor),
             impl_from_ID3D12Device7(iface), unsafe_impl_from_ID3D12Resource(resource), desc);
@@ -3483,7 +3483,7 @@ static void STDMETHODCALLTYPE d3d12_device_CreateSampler(ID3D12Device7 *iface,
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
     struct d3d12_desc tmp = {0};
 
-    TRACE("iface %p, desc %p, descriptor %#lx.\n", iface, desc, descriptor.ptr);
+    TRACE("iface %p, desc %p, descriptor %s.\n", iface, desc, debug_cpu_handle(descriptor));
 
     d3d12_desc_create_sampler(&tmp, device, desc);
     d3d12_desc_write_atomic(d3d12_desc_from_cpu_handle(descriptor), &tmp, device);
@@ -3557,10 +3557,10 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device7 *
         const D3D12_CPU_DESCRIPTOR_HANDLE src_descriptor_range_offset,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
-    TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %#lx, "
-            "src_descriptor_range_offset %#lx, descriptor_heap_type %#x.\n",
-            iface, descriptor_count, dst_descriptor_range_offset.ptr, src_descriptor_range_offset.ptr,
-            descriptor_heap_type);
+    TRACE("iface %p, descriptor_count %u, dst_descriptor_range_offset %s, "
+            "src_descriptor_range_offset %s, descriptor_heap_type %#x.\n",
+            iface, descriptor_count, debug_cpu_handle(dst_descriptor_range_offset),
+            debug_cpu_handle(src_descriptor_range_offset), descriptor_heap_type);
 
     d3d12_device_CopyDescriptors(iface, 1, &dst_descriptor_range_offset, &descriptor_count,
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);

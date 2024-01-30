@@ -5132,8 +5132,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearDepthStencilView(ID3D12Gra
     struct VkAttachmentDescription attachment_desc;
     struct VkAttachmentReference ds_reference;
 
-    TRACE("iface %p, dsv %#lx, flags %#x, depth %.8e, stencil 0x%02x, rect_count %u, rects %p.\n",
-            iface, dsv.ptr, flags, depth, stencil, rect_count, rects);
+    TRACE("iface %p, dsv %s, flags %#x, depth %.8e, stencil 0x%02x, rect_count %u, rects %p.\n",
+            iface, debug_cpu_handle(dsv), flags, depth, stencil, rect_count, rects);
 
     d3d12_command_list_track_resource_usage(list, dsv_desc->resource);
 
@@ -5180,8 +5180,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearRenderTargetView(ID3D12Gra
     struct VkAttachmentReference color_reference;
     VkClearValue clear_value;
 
-    TRACE("iface %p, rtv %#lx, color %p, rect_count %u, rects %p.\n",
-            iface, rtv.ptr, color, rect_count, rects);
+    TRACE("iface %p, rtv %s, color %p, rect_count %u, rects %p.\n",
+            iface, debug_cpu_handle(rtv), color, rect_count, rects);
 
     d3d12_command_list_track_resource_usage(list, rtv_desc->resource);
 
@@ -5432,8 +5432,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewUint(ID
     struct d3d12_resource *resource_impl;
     VkClearColorValue colour;
 
-    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %lx, resource %p, values %p, rect_count %u, rects %p.\n",
-            iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
+    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
+            iface, gpu_handle.ptr, debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
     if (!(descriptor = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))
@@ -5496,8 +5496,8 @@ static void STDMETHODCALLTYPE d3d12_command_list_ClearUnorderedAccessViewFloat(I
     VkClearColorValue colour;
     struct vkd3d_view *view;
 
-    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %lx, resource %p, values %p, rect_count %u, rects %p.\n",
-            iface, gpu_handle.ptr, cpu_handle.ptr, resource, values, rect_count, rects);
+    TRACE("iface %p, gpu_handle %#"PRIx64", cpu_handle %s, resource %p, values %p, rect_count %u, rects %p.\n",
+            iface, gpu_handle.ptr, debug_cpu_handle(cpu_handle), resource, values, rect_count, rects);
 
     resource_impl = unsafe_impl_from_ID3D12Resource(resource);
     if (!(view = d3d12_desc_from_cpu_handle(cpu_handle)->s.u.view))

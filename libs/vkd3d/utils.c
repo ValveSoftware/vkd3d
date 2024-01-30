@@ -632,6 +632,11 @@ HRESULT return_interface(void *iface, REFIID iface_iid,
     return hr;
 }
 
+const char *debug_cpu_handle(D3D12_CPU_DESCRIPTOR_HANDLE handle)
+{
+    return vkd3d_dbg_sprintf("{%#"PRIxPTR"}", (uintptr_t)handle.ptr);
+}
+
 const char *debug_d3d12_box(const D3D12_BOX *box)
 {
     if (!box)
