@@ -41,6 +41,8 @@ enum vkd3d_result
 {
     /** Success. */
     VKD3D_OK = 0,
+    /** Success as a result of there being nothing to do. */
+    VKD3D_FALSE = 1,
     /** An unspecified failure occurred. */
     VKD3D_ERROR = -1,
     /** There are not enough resources available to complete the operation. */

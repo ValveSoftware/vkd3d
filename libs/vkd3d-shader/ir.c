@@ -3038,7 +3038,7 @@ static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struc
 
     for (i = 0; i < list->count; ++i)
         if (block == list->blocks[i])
-            return VKD3D_OK;
+            return VKD3D_FALSE;
 
     if (!vkd3d_array_reserve((void **)&list->blocks, &list->capacity, list->count + 1, sizeof(*list->blocks)))
     {
@@ -3103,6 +3103,9 @@ struct vsir_cfg
     struct vsir_block *entry;
     size_t block_count;
     struct vkd3d_string_buffer debug_buffer;
+
+    struct vsir_block_list *loops;
+    size_t loops_count, loops_capacity;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3112,7 +3115,11 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
     for (i = 0; i < cfg->block_count; ++i)
         vsir_block_cleanup(&cfg->blocks[i]);
 
+    for (i = 0; i < cfg->loops_count; ++i)
+        vsir_block_list_cleanup(&cfg->loops[i]);
+
     vkd3d_free(cfg->blocks);
+    vkd3d_free(cfg->loops);
 
     if (TRACE_ON())
         vkd3d_string_buffer_cleanup(&cfg->debug_buffer);
@@ -3334,6 +3341,84 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
     }
 }
 
+/* A back edge is an edge X -> Y for which block Y dominates block
+ * X. All the other edges are forward edges, and it is required that
+ * the input CFG is reducible, i.e., it is acyclic once you strip away
+ * the back edges.
+ *
+ * Each back edge X -> Y defines a loop: block X is the header block,
+ * block Y is the back edge block, and the loop consists of all the
+ * blocks which are dominated by the header block and have a path to
+ * the back edge block that doesn't pass through the header block
+ * (including the header block itself). It can be proved that all the
+ * blocks in such a path (connecting a loop block to the back edge
+ * block without passing through the header block) belong to the same
+ * loop.
+ *
+ * If the input CFG is reducible, each two loops are either disjoint
+ * or one is a strict subset of the other, provided that each block
+ * has at most one incoming back edge. If this condition does not
+ * hold, a synthetic block can be introduced as the only back edge
+ * block for the given header block, with all the previous back edge
+ * now being forward edges to the synthetic block. This is not
+ * currently implemented (but it is rarely found in practice
+ * anyway). */
+static enum vkd3d_result vsir_cfg_scan_loop(struct vsir_block_list *loop, struct vsir_block *block,
+        struct vsir_block *header)
+{
+    enum vkd3d_result ret;
+    size_t i;
+
+    if ((ret = vsir_block_list_add(loop, block)) < 0)
+        return ret;
+
+    if (ret == VKD3D_FALSE || block == header)
+        return VKD3D_OK;
+
+    for (i = 0; i < block->predecessors.count; ++i)
+    {
+        if ((ret = vsir_cfg_scan_loop(loop, block->predecessors.blocks[i], header)) < 0)
+            return ret;
+    }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
+{
+    size_t i, j;
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+
+        if (block->label == 0)
+            continue;
+
+        for (j = 0; j < block->successors.count; ++j)
+        {
+            struct vsir_block *header = block->successors.blocks[j];
+            struct vsir_block_list *loop;
+            enum vkd3d_result ret;
+
+            /* Is this a back edge? */
+            if (!vsir_block_dominates(header, block))
+                continue;
+
+            if (!vkd3d_array_reserve((void **)&cfg->loops, &cfg->loops_capacity, cfg->loops_count + 1, sizeof(*cfg->loops)))
+                return VKD3D_ERROR_OUT_OF_MEMORY;
+
+            loop = &cfg->loops[cfg->loops_count++];
+            vsir_block_list_init(loop);
+
+            if ((ret = vsir_cfg_scan_loop(loop, block, header)) < 0)
+                return ret;
+        }
+    }
+
+    return VKD3D_OK;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -3359,6 +3444,12 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
             return result;
 
         vsir_cfg_compute_dominators(&cfg);
+
+        if ((result = vsir_cfg_compute_loops(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
 
         if ((result = simple_structurizer_run(parser)) < 0)
         {
