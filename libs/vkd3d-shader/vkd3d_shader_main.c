@@ -71,7 +71,7 @@ void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer)
     vkd3d_free(buffer->buffer);
 }
 
-static void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
+void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 {
     buffer->buffer[0] = '\0';
     buffer->content_size = 0;

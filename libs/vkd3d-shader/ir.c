@@ -3285,7 +3285,11 @@ static void vsir_cfg_compute_dominators_recurse(struct vsir_block *current, stru
 
 static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
 {
-    size_t i;
+    struct vkd3d_string_buffer buf;
+    size_t i, j;
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_init(&buf);
 
     for (i = 0; i < cfg->block_count; ++i)
     {
@@ -3295,7 +3299,27 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
             continue;
 
         vsir_cfg_compute_dominators_recurse(cfg->entry, block);
+
+        if (TRACE_ON())
+        {
+            vkd3d_string_buffer_printf(&buf, "Block %u dominates:", block->label);
+            for (j = 0; j < cfg->block_count; j++)
+            {
+                struct vsir_block *block2 = &cfg->blocks[j];
+
+                if (block2->label == 0)
+                    continue;
+
+                if (bitmap_is_set(block->dominates, j))
+                    vkd3d_string_buffer_printf(&buf, " %u", block2->label);
+            }
+            TRACE("%s\n", buf.buffer);
+            vkd3d_string_buffer_clear(&buf);
+        }
     }
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_cleanup(&buf);
 }
 
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
