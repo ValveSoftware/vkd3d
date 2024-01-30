@@ -294,7 +294,7 @@ static ULONG STDMETHODCALLTYPE d3d12_versioned_root_signature_deserializer_AddRe
 static ULONG STDMETHODCALLTYPE d3d12_versioned_root_signature_deserializer_Release(ID3D12VersionedRootSignatureDeserializer *iface)
 {
     struct d3d12_versioned_root_signature_deserializer *deserializer = impl_from_ID3D12VersionedRootSignatureDeserializer(iface);
-    unsigned int refcount = InterlockedDecrement((LONG *)&deserializer->refcount);
+    unsigned int refcount = vkd3d_atomic_decrement_u32(&deserializer->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", deserializer, refcount);
 
