@@ -3487,8 +3487,8 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateRootSignature(ID3D12Device7 
     struct d3d12_root_signature *object;
     HRESULT hr;
 
-    TRACE("iface %p, node_mask 0x%08x, bytecode %p, bytecode_length %lu, riid %s, root_signature %p.\n",
-            iface, node_mask, bytecode, bytecode_length, debugstr_guid(riid), root_signature);
+    TRACE("iface %p, node_mask 0x%08x, bytecode %p, bytecode_length %"PRIuPTR", riid %s, root_signature %p.\n",
+            iface, node_mask, bytecode, (uintptr_t)bytecode_length, debugstr_guid(riid), root_signature);
 
     debug_ignored_node_mask(node_mask);
 
@@ -4125,7 +4125,8 @@ static LUID * STDMETHODCALLTYPE d3d12_device_GetAdapterLuid(ID3D12Device7 *iface
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePipelineLibrary(ID3D12Device7 *iface,
         const void *blob, SIZE_T blob_size, REFIID iid, void **lib)
 {
-    FIXME("iface %p, blob %p, blob_size %lu, iid %s, lib %p stub!\n", iface, blob, blob_size, debugstr_guid(iid), lib);
+    FIXME("iface %p, blob %p, blob_size %"PRIuPTR", iid %s, lib %p stub!\n",
+            iface, blob, (uintptr_t)blob_size, debugstr_guid(iid), lib);
 
     return DXGI_ERROR_UNSUPPORTED;
 }
@@ -4322,9 +4323,9 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateMetaCommand(ID3D12Device7 *i
         SIZE_T data_size_in_bytes, REFIID iid, void **meta_command)
 {
     FIXME("iface %p, command_id %s, node_mask %#x, parameters_data %p, "
-            "data_size_in_bytes %lu, iid %s, meta_command %p stub!\n", iface,
+            "data_size_in_bytes %"PRIuPTR", iid %s, meta_command %p stub!\n", iface,
             debugstr_guid(command_id), node_mask, parameters_data,
-            data_size_in_bytes, debugstr_guid(iid), meta_command);
+            (uintptr_t)data_size_in_bytes, debugstr_guid(iid), meta_command);
 
     return E_NOTIMPL;
 }

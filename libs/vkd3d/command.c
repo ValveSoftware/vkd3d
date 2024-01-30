@@ -5963,15 +5963,15 @@ static void STDMETHODCALLTYPE d3d12_command_list_EndRenderPass(ID3D12GraphicsCom
 static void STDMETHODCALLTYPE d3d12_command_list_InitializeMetaCommand(ID3D12GraphicsCommandList5 *iface,
         ID3D12MetaCommand *meta_command, const void *parameters_data, SIZE_T data_size_in_bytes)
 {
-    FIXME("iface %p, meta_command %p, parameters_data %p, data_size_in_bytes %lu stub!\n", iface,
-            meta_command, parameters_data, data_size_in_bytes);
+    FIXME("iface %p, meta_command %p, parameters_data %p, data_size_in_bytes %"PRIuPTR" stub!\n", iface,
+            meta_command, parameters_data, (uintptr_t)data_size_in_bytes);
 }
 
 static void STDMETHODCALLTYPE d3d12_command_list_ExecuteMetaCommand(ID3D12GraphicsCommandList5 *iface,
         ID3D12MetaCommand *meta_command, const void *parameters_data, SIZE_T data_size_in_bytes)
 {
-    FIXME("iface %p, meta_command %p, parameters_data %p, data_size_in_bytes %lu stub!\n", iface,
-            meta_command, parameters_data, data_size_in_bytes);
+    FIXME("iface %p, meta_command %p, parameters_data %p, data_size_in_bytes %"PRIuPTR" stub!\n", iface,
+            meta_command, parameters_data, (uintptr_t)data_size_in_bytes);
 }
 
 static void STDMETHODCALLTYPE d3d12_command_list_BuildRaytracingAccelerationStructure(ID3D12GraphicsCommandList5 *iface,

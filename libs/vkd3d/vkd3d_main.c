@@ -222,8 +222,8 @@ HRESULT vkd3d_create_root_signature_deserializer(const void *data, SIZE_T data_s
     struct d3d12_root_signature_deserializer *object;
     HRESULT hr;
 
-    TRACE("data %p, data_size %lu, iid %s, deserializer %p.\n",
-            data, data_size, debugstr_guid(iid), deserializer);
+    TRACE("data %p, data_size %"PRIuPTR", iid %s, deserializer %p.\n",
+            data, (uintptr_t)data_size, debugstr_guid(iid), deserializer);
 
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
@@ -406,8 +406,8 @@ HRESULT vkd3d_create_versioned_root_signature_deserializer(const void *data, SIZ
     struct vkd3d_shader_code dxbc = {data, data_size};
     HRESULT hr;
 
-    TRACE("data %p, data_size %lu, iid %s, deserializer %p.\n",
-            data, data_size, debugstr_guid(iid), deserializer);
+    TRACE("data %p, data_size %"PRIuPTR", iid %s, deserializer %p.\n",
+            data, (uintptr_t)data_size, debugstr_guid(iid), deserializer);
 
     if (!(object = vkd3d_malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
