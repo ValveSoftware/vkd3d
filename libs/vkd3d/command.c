@@ -1921,7 +1921,7 @@ HRESULT d3d12_command_allocator_create(struct d3d12_device *device,
 
 static void d3d12_command_signature_incref(struct d3d12_command_signature *signature)
 {
-    vkd3d_atomic_increment(&signature->internal_refcount);
+    vkd3d_atomic_increment_u32(&signature->internal_refcount);
 }
 
 static void d3d12_command_signature_decref(struct d3d12_command_signature *signature)

@@ -257,11 +257,6 @@ static inline void vkd3d_cond_destroy(struct vkd3d_cond *cond)
 {
 }
 
-static inline unsigned int vkd3d_atomic_increment(unsigned int volatile *x)
-{
-    return InterlockedIncrement((LONG volatile *)x);
-}
-
 static inline unsigned int vkd3d_atomic_decrement(unsigned int volatile *x)
 {
     return InterlockedDecrement((LONG volatile *)x);
@@ -397,15 +392,6 @@ static inline unsigned int vkd3d_atomic_decrement(unsigned int volatile *x)
 # else
 #  error "vkd3d_atomic_decrement() not implemented for this platform"
 # endif  /* HAVE_SYNC_SUB_AND_FETCH */
-
-# if HAVE_SYNC_ADD_AND_FETCH
-static inline unsigned int vkd3d_atomic_increment(unsigned int volatile *x)
-{
-    return __sync_add_and_fetch(x, 1);
-}
-# else
-#  error "vkd3d_atomic_increment() not implemented for this platform"
-# endif  /* HAVE_SYNC_ADD_AND_FETCH */
 
 # if HAVE_SYNC_BOOL_COMPARE_AND_SWAP
 static inline bool vkd3d_atomic_compare_exchange(unsigned int volatile *x, unsigned int cmp, unsigned int xchg)

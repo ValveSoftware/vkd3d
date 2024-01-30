@@ -2314,7 +2314,7 @@ static void *vkd3d_desc_object_cache_get(struct vkd3d_desc_object_cache *cache)
 
     STATIC_ASSERT(!(ARRAY_SIZE(cache->heads) & HEAD_INDEX_MASK));
 
-    i = (vkd3d_atomic_increment(&cache->next_index)) & HEAD_INDEX_MASK;
+    i = vkd3d_atomic_increment_u32(&cache->next_index) & HEAD_INDEX_MASK;
     for (;;)
     {
         if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
@@ -2345,7 +2345,7 @@ static void vkd3d_desc_object_cache_push(struct vkd3d_desc_object_cache *cache, 
 
     /* Using the same index as above may result in a somewhat uneven distribution,
      * but the main objective is to avoid costly spinlock contention. */
-    i = (vkd3d_atomic_increment(&cache->next_index)) & HEAD_INDEX_MASK;
+    i = vkd3d_atomic_increment_u32(&cache->next_index) & HEAD_INDEX_MASK;
     for (;;)
     {
         if (vkd3d_atomic_compare_exchange(&cache->heads[i].spinlock, 0, 1))
@@ -2357,7 +2357,7 @@ static void vkd3d_desc_object_cache_push(struct vkd3d_desc_object_cache *cache, 
     u.header->next = head;
     cache->heads[i].head = u.object;
     vkd3d_atomic_exchange(&cache->heads[i].spinlock, 0);
-    vkd3d_atomic_increment(&cache->free_count);
+    vkd3d_atomic_increment_u32(&cache->free_count);
 }
 
 #undef HEAD_INDEX_MASK
