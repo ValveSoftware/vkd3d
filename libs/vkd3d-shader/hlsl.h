@@ -104,7 +104,7 @@ enum hlsl_base_type
 
 enum hlsl_sampler_dim
 {
-    HLSL_SAMPLER_DIM_GENERIC,
+    HLSL_SAMPLER_DIM_GENERIC = 0,
     HLSL_SAMPLER_DIM_COMPARISON,
     HLSL_SAMPLER_DIM_1D,
     HLSL_SAMPLER_DIM_2D,
@@ -116,10 +116,10 @@ enum hlsl_sampler_dim
     HLSL_SAMPLER_DIM_2DMS,
     HLSL_SAMPLER_DIM_2DMSARRAY,
     HLSL_SAMPLER_DIM_CUBEARRAY,
-    HLSL_SAMPLER_DIM_LAST_TEXTURE = HLSL_SAMPLER_DIM_CUBEARRAY,
     HLSL_SAMPLER_DIM_BUFFER,
     HLSL_SAMPLER_DIM_STRUCTURED_BUFFER,
     HLSL_SAMPLER_DIM_MAX = HLSL_SAMPLER_DIM_STRUCTURED_BUFFER,
+    /* NOTE: Remember to update object_methods[] in hlsl.y if this enum is modified. */
 };
 
 enum hlsl_regset
@@ -149,7 +149,8 @@ struct hlsl_type
     enum hlsl_base_type base_type;
 
     /* If base_type is HLSL_TYPE_SAMPLER, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_SAMPLER.
-     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_TEXTURE.
+     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim can be any value of the enum except
+     *   HLSL_SAMPLER_DIM_GENERIC and HLSL_SAMPLER_DIM_COMPARISON.
      * If base_type is HLSL_TYPE_UAV, then sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
      *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, HLSL_SAMPLER_DIM_2DARRAY,
      *   HLSL_SAMPLER_DIM_BUFFER, or HLSL_SAMPLER_DIM_STRUCTURED_BUFFER.

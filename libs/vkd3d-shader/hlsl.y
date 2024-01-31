@@ -4252,17 +4252,20 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_LOAD};
+    unsigned int sampler_dim, offset_dim;
     struct hlsl_ir_node *load;
     bool multisampled;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBE
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_CUBEARRAY)
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
+        hlsl_fixme(ctx, loc, "Method '%s' for buffers.", name);
+        return false;
     }
+
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     multisampled = object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
             || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY;
@@ -4311,17 +4314,13 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {.type = HLSL_RESOURCE_SAMPLE};
+    unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-    {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
-    }
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     if (params->args_count < 2 || params->args_count > 4 + !!offset_dim)
     {
@@ -4375,17 +4374,13 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = { 0 };
+    unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-    {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
-    }
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     if (!strcmp(name, "SampleCmpLevelZero"))
         load_params.type = HLSL_RESOURCE_SAMPLE_CMP_LZ;
@@ -4449,20 +4444,14 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
         const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     const struct hlsl_type *object_type = object->data_type;
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
     struct hlsl_resource_load_params load_params = {0};
+    unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
     unsigned int read_channel;
 
-    if (object_type->sampler_dim != HLSL_SAMPLER_DIM_2D
-            && object_type->sampler_dim != HLSL_SAMPLER_DIM_2DARRAY
-            && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBE
-            && object_type->sampler_dim != HLSL_SAMPLER_DIM_CUBEARRAY)
-    {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
-    }
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     if (!strcmp(name, "GatherGreen"))
     {
@@ -4616,9 +4605,11 @@ static bool add_getdimensions_method_call(struct hlsl_ctx *ctx, struct hlsl_bloc
     };
     const struct overload *o = NULL;
 
-    if (object_type->sampler_dim > HLSL_SAMPLER_DIM_LAST_TEXTURE)
+    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER
+            || object_type->sampler_dim == HLSL_SAMPLER_DIM_STRUCTURED_BUFFER)
     {
-        hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE, "GetDimensions() is not defined for this type.");
+        hlsl_fixme(ctx, loc, "Method '%s' for buffers.", name);
+        return false;
     }
 
     uint_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_UINT);
@@ -4732,16 +4723,12 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
 {
     const struct hlsl_type *object_type = object->data_type;
     struct hlsl_resource_load_params load_params = { 0 };
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-    {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
-    }
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     if (!strcmp(name, "SampleLevel"))
         load_params.type = HLSL_RESOURCE_SAMPLE_LOD;
@@ -4802,16 +4789,12 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
 {
     const struct hlsl_type *object_type = object->data_type;
     struct hlsl_resource_load_params load_params = { 0 };
-    const unsigned int sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
-    const unsigned int offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
+    unsigned int sampler_dim, offset_dim;
     const struct hlsl_type *sampler_type;
     struct hlsl_ir_node *load;
 
-    if (object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY)
-    {
-        return raise_invalid_method_object_type(ctx, object_type, name, loc);
-    }
+    sampler_dim = hlsl_sampler_dim_count(object_type->sampler_dim);
+    offset_dim = hlsl_offset_dim_count(object_type->sampler_dim);
 
     load_params.type = HLSL_RESOURCE_SAMPLE_GRAD;
 
@@ -4873,25 +4856,27 @@ static const struct method_function
     const char *name;
     bool (*handler)(struct hlsl_ctx *ctx, struct hlsl_block *block, struct hlsl_ir_node *object,
             const char *name, const struct parse_initializer *params, const struct vkd3d_shader_location *loc);
+    bool valid_dims[HLSL_SAMPLER_DIM_MAX + 1];
 }
 object_methods[] =
 {
-    { "Gather",             add_gather_method_call },
-    { "GatherAlpha",        add_gather_method_call },
-    { "GatherBlue",         add_gather_method_call },
-    { "GatherGreen",        add_gather_method_call },
-    { "GatherRed",          add_gather_method_call },
+                                                        /*  g c   1d  2d  3d  cube  1darr  2darr  2dms  2dmsarr  cubearr  buff  sbuff*/
+    { "Gather",             add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
+    { "GatherAlpha",        add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
+    { "GatherBlue",         add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
+    { "GatherGreen",        add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
+    { "GatherRed",          add_gather_method_call,        {0,0,  0,  1,  0,  1,    0,     1,     0,    0,       1,       0,    0}},
 
-    { "GetDimensions",      add_getdimensions_method_call },
+    { "GetDimensions",      add_getdimensions_method_call, {0,0,  1,  1,  1,  1,    1,     1,     1,    1,       1,       1,    1}},
 
-    { "Load",               add_load_method_call },
+    { "Load",               add_load_method_call,          {0,0,  1,  1,  1,  0,    1,     1,     1,    1,       0,       1,    1}},
 
-    { "Sample",             add_sample_method_call },
-    { "SampleBias",         add_sample_lod_method_call },
-    { "SampleCmp",          add_sample_cmp_method_call },
-    { "SampleCmpLevelZero", add_sample_cmp_method_call },
-    { "SampleGrad",         add_sample_grad_method_call },
-    { "SampleLevel",        add_sample_lod_method_call },
+    { "Sample",             add_sample_method_call,        {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "SampleBias",         add_sample_lod_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "SampleCmp",          add_sample_cmp_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "SampleCmpLevelZero", add_sample_cmp_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "SampleGrad",         add_sample_grad_method_call,   {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
+    { "SampleLevel",        add_sample_lod_method_call,    {0,0,  1,  1,  1,  1,    1,     1,     0,    0,       1,       0,    0}},
 };
 
 static int object_method_function_name_compare(const void *a, const void *b)
@@ -4919,8 +4904,10 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
         return false;
     }
 
-    if ((method = bsearch(name, object_methods, ARRAY_SIZE(object_methods),
-            sizeof(*method), object_method_function_name_compare)))
+    method = bsearch(name, object_methods, ARRAY_SIZE(object_methods), sizeof(*method),
+            object_method_function_name_compare);
+
+    if (method && method->valid_dims[object_type->sampler_dim])
     {
         return method->handler(ctx, block, object, name, params, loc);
     }
