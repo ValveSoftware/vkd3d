@@ -551,9 +551,13 @@ static void set_resource(struct shader_runner *runner, struct resource *resource
 
 static void set_uniforms(struct shader_runner *runner, size_t offset, size_t count, const void *uniforms)
 {
+    size_t initial_count = runner->uniform_count;
+
     runner->uniform_count = align(max(runner->uniform_count, offset + count), 4);
     vkd3d_array_reserve((void **)&runner->uniforms, &runner->uniform_capacity,
             runner->uniform_count, sizeof(*runner->uniforms));
+    memset(runner->uniforms + initial_count, 127,
+            (runner->uniform_count - initial_count) * sizeof(*runner->uniforms));
     memcpy(runner->uniforms + offset, uniforms, count * sizeof(*runner->uniforms));
 }
 
