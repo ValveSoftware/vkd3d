@@ -1,7 +1,4 @@
-[require]
-shader model >= 4.0
-
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform float f;
 uniform uint u;
 uniform bool b;
@@ -19,15 +16,19 @@ float4 main() : sv_target
 }
 
 [test]
-uniform 0 float 2.6
-uniform 1 int -2
-uniform 2 int -2
-uniform 3 float -3.6
-draw quad
+if(sm<4) uniform 0 float 2.6
+if(sm<4) uniform 4 float -2
+if(sm<4) uniform 8 float 1.0
+if(sm<4) uniform 12 float -3.6
+if(sm>=4) uniform 0 float 2.6
+if(sm>=4) uniform 1 int -2
+if(sm>=4) uniform 2 int -2
+if(sm>=4) uniform 3 float -3.6
+todo(sm<4) draw quad
 probe all rgba (0.5, 0.5, 0.5, 0.5)
 
-[pixel shader]
 
+[pixel shader]
 float4 main() : sv_target
 {
     float f = 2.6;
@@ -45,4 +46,5 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (0.5, 0.5, 0.5, 0.5)
+if(sm<4) todo probe all rgba (0.5, 4.2949673e+009, 0.5, 0.5)
+if(sm>=4) probe all rgba (0.5, 0.5, 0.5, 0.5)

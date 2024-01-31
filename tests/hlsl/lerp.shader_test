@@ -15,10 +15,8 @@ uniform 8 float4 0.0 1.0 -1.0 0.75
 draw quad
 probe all rgba (2.0, -10.0, -2.0, 76.25)
 
-[require]
-shader model >= 4.0
 
-[pixel shader]
+[pixel shader todo(sm<4)]
 uniform int4 x;
 uniform int4 y;
 uniform int4 s;
@@ -29,10 +27,13 @@ float4 main() : SV_TARGET
 }
 
 [test]
-uniform 0 int4 2 3 4 0
-uniform 4 int4 0 -10 10 1000000
-uniform 8 int4 0 1 -1 1000000
-draw quad
+if(sm<4) uniform 0 float4 2 3 4 0
+if(sm<4) uniform 4 float4 0 -10 10 1000000
+if(sm<4) uniform 8 float4 0 1 -1 1000000
+if(sm>=4) uniform 0 int4 2 3 4 0
+if(sm>=4) uniform 4 int4 0 -10 10 1000000
+if(sm>=4) uniform 8 int4 0 1 -1 1000000
+todo(sm<4) draw quad
 probe all rgba (2.0, -10.0, -2.0, 1e12)
 
 

@@ -69,8 +69,6 @@ uniform 0 float4 -1.9 -1.0 2.9 4.0
 todo draw quad
 probe all rgba (-1.0, -1.0, 2.0, 4.0)
 
-[require]
-shader model >= 4.0
 
 [pixel shader todo]
 uniform int4 i;
@@ -88,6 +86,7 @@ float4 main() : sv_target
 }
 
 [test]
-uniform 0 int4 -2 0 1 -3000000
+if(sm<4)  uniform 0 float4 -2 0 1 -3000000
+if(sm>=4) uniform 0 int4 -2 0 1 -3000000
 todo(sm<6) draw quad
-probe all rgba (-1.0, 0.0, 1.0, -3000000.0)
+probe all rgba (-1.0, 0.0, 1.0, -3000000.0) 4

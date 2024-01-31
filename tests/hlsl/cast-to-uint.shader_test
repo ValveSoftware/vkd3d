@@ -1,5 +1,7 @@
+% On SM1, uints can only be used with known-positive values.
 [require]
 shader model >= 4.0
+
 
 [pixel shader]
 uniform float f;
@@ -26,8 +28,8 @@ uniform 3 float -3.6
 draw quad
 probe all rgba (0.5, 0.5, 0.5, 0.5)
 
-[pixel shader]
 
+[pixel shader]
 float4 main() : sv_target
 {
     float f = 2.6;
