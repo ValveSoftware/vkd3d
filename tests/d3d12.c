@@ -32298,19 +32298,21 @@ static void test_resource_allocation_info(void)
 
     if (SUCCEEDED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device4, (void **)&device4)))
     {
-        ID3D12Device4_GetResourceAllocationInfo1(device4, 0, ARRAY_SIZE(desc_array), desc_array, infos1);
+        info = ID3D12Device4_GetResourceAllocationInfo1(device4, 0, ARRAY_SIZE(desc_array), desc_array, infos1);
+        ok(info.Alignment >= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+                "Got unexpected alignment %"PRIu64".\n", info.Alignment);
+        check_alignment(info.SizeInBytes, info.Alignment);
+        ok(info.SizeInBytes >= total, "Got unexpected size %"PRIu64".\n", info.SizeInBytes);
         ok(!infos1[0].Offset, "Got unexpected offset %"PRIu64".\n", infos1[0].Offset);
 
         for (i = 0; i < ARRAY_SIZE(infos1); ++i)
         {
             vkd3d_test_push_context("Test %u", i);
 
-            todo
             ok(infos1[i].Alignment >= desc_array[i].Alignment,
                     "Got unexpected alignment %"PRIu64".\n", infos1[i].Alignment);
             check_alignment(infos1[i].Offset, infos1[i].Alignment);
             check_alignment(infos1[i].SizeInBytes, infos1[i].Alignment);
-            todo
             ok(infos1[i].SizeInBytes == sizes[i], "Got unexpected size %"PRIu64".\n", infos1[i].SizeInBytes);
 
             if (!i)

@@ -3566,8 +3566,16 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device7 *
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);
 }
 
+static void d3d12_resource_allocation_info1_from_vkd3d(D3D12_RESOURCE_ALLOCATION_INFO1 *result,
+        const struct vkd3d_resource_allocation_info *info)
+{
+    result->Offset = info->offset;
+    result->Alignment = info->alignment;
+    result->SizeInBytes = info->size_in_bytes;
+}
+
 static void d3d12_device_get_resource_allocation_info(struct d3d12_device *device,
-        unsigned int count, const D3D12_RESOURCE_DESC *resource_descs,
+        D3D12_RESOURCE_ALLOCATION_INFO1 *infos1, unsigned int count, const D3D12_RESOURCE_DESC *resource_descs,
         D3D12_RESOURCE_ALLOCATION_INFO *result)
 {
     struct vkd3d_resource_allocation_info info;
@@ -3621,6 +3629,9 @@ static void d3d12_device_get_resource_allocation_info(struct d3d12_device *devic
             info.offset = align(info.offset, info.alignment);
         }
 
+        if (infos1)
+            d3d12_resource_allocation_info1_from_vkd3d(&infos1[i], &info);
+
         info.offset += info.size_in_bytes;
 
         result->Alignment = max(result->Alignment, info.alignment);
@@ -3652,7 +3663,7 @@ static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResour
 
     debug_ignored_node_mask(visible_mask);
 
-    d3d12_device_get_resource_allocation_info(device, count, resource_descs, info);
+    d3d12_device_get_resource_allocation_info(device, NULL, count, resource_descs, info);
 
     return info;
 }
@@ -4175,8 +4186,14 @@ static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResour
         UINT count, const D3D12_RESOURCE_DESC *resource_descs,
         D3D12_RESOURCE_ALLOCATION_INFO1 *info1)
 {
-    FIXME("iface %p, info %p, visible_mask 0x%08x, count %u, resource_descs %p, info1 %p stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+
+    TRACE("iface %p, info %p, visible_mask 0x%08x, count %u, resource_descs %p, info1 %p.\n",
             iface, info, visible_mask, count, resource_descs, info1);
+
+    debug_ignored_node_mask(visible_mask);
+
+    d3d12_device_get_resource_allocation_info(device, info1, count, resource_descs, info);
 
     return info;
 }
