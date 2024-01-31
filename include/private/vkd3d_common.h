@@ -71,7 +71,7 @@
 #define TAG_XNAP VKD3D_MAKE_TAG('X', 'N', 'A', 'P')
 #define TAG_XNAS VKD3D_MAKE_TAG('X', 'N', 'A', 'S')
 
-static inline size_t align(size_t addr, size_t alignment)
+static inline uint64_t align(uint64_t addr, size_t alignment)
 {
     return (addr + (alignment - 1)) & ~(alignment - 1);
 }

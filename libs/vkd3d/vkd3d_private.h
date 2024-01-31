@@ -493,13 +493,13 @@ struct vkd3d_fence_worker
 struct vkd3d_gpu_va_allocation
 {
     D3D12_GPU_VIRTUAL_ADDRESS base;
-    size_t size;
+    uint64_t size;
     void *ptr;
 };
 
 struct vkd3d_gpu_va_slab
 {
-    size_t size;
+    uint64_t size;
     void *ptr;
 };
 
@@ -517,7 +517,7 @@ struct vkd3d_gpu_va_allocator
 };
 
 D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_allocator *allocator,
-        size_t alignment, size_t size, void *ptr);
+        size_t alignment, uint64_t size, void *ptr);
 void *vkd3d_gpu_va_allocator_dereference(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
 void vkd3d_gpu_va_allocator_free(struct vkd3d_gpu_va_allocator *allocator, D3D12_GPU_VIRTUAL_ADDRESS address);
 

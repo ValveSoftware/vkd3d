@@ -2133,7 +2133,7 @@ static void d3d12_device_destroy_pipeline_cache(struct d3d12_device *device)
 #define VKD3D_VA_SLAB_COUNT         (64 * 1024)
 
 static D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate_slab(struct vkd3d_gpu_va_allocator *allocator,
-        size_t aligned_size, void *ptr)
+        uint64_t aligned_size, void *ptr)
 {
     struct vkd3d_gpu_va_slab *slab;
     D3D12_GPU_VIRTUAL_ADDRESS address;
@@ -2149,13 +2149,13 @@ static D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate_slab(struct vkd
     slab_idx = slab - allocator->slabs;
     address = VKD3D_VA_SLAB_BASE + slab_idx * VKD3D_VA_SLAB_SIZE;
 
-    TRACE("Allocated address %#"PRIx64", slab %u, size %zu.\n", address, slab_idx, aligned_size);
+    TRACE("Allocated address %#"PRIx64", slab %u, size %"PRIu64".\n", address, slab_idx, aligned_size);
 
     return address;
 }
 
 static D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate_fallback(struct vkd3d_gpu_va_allocator *allocator,
-        size_t alignment, size_t aligned_size, void *ptr)
+        size_t alignment, uint64_t aligned_size, void *ptr)
 {
     struct vkd3d_gpu_va_allocation *allocation;
     D3D12_GPU_VIRTUAL_ADDRESS base, ceiling;
@@ -2181,17 +2181,17 @@ static D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate_fallback(struct
      * only fail once we have exhausted 63 bits of address space. */
     allocator->fallback_floor = base + aligned_size;
 
-    TRACE("Allocated address %#"PRIx64", size %zu.\n", base, aligned_size);
+    TRACE("Allocated address %#"PRIx64", size %"PRIu64".\n", base, aligned_size);
 
     return base;
 }
 
 D3D12_GPU_VIRTUAL_ADDRESS vkd3d_gpu_va_allocator_allocate(struct vkd3d_gpu_va_allocator *allocator,
-        size_t alignment, size_t size, void *ptr)
+        size_t alignment, uint64_t size, void *ptr)
 {
     D3D12_GPU_VIRTUAL_ADDRESS address;
 
-    if (size > ~(size_t)0 - (alignment - 1))
+    if (size > ~(uint64_t)0 - (alignment - 1))
         return 0;
     size = align(size, alignment);
 
@@ -2227,7 +2227,7 @@ static void *vkd3d_gpu_va_allocator_dereference_slab(struct vkd3d_gpu_va_allocat
     base_offset -= slab_idx * VKD3D_VA_SLAB_SIZE;
     if (base_offset >= slab->size)
     {
-        ERR("Address %#"PRIx64" is %#"PRIx64" bytes into slab %u of size %zu.\n",
+        ERR("Address %#"PRIx64" is %#"PRIx64" bytes into slab %u of size %"PRIu64".\n",
                 address, base_offset, slab_idx, slab->size);
         return NULL;
     }
