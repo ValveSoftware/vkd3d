@@ -275,6 +275,7 @@ static inline void check_readback_data_vec4_(unsigned int line, const struct res
             got.x, got.y, got.z, got.w, expected->x, expected->y, expected->z, expected->w, x, y);
 }
 
+#define check_readback_data_ivec4(a, b, c) check_readback_data_uvec4_(__LINE__, a, b, (const struct uvec4 *)(c))
 #define check_readback_data_uvec4(a, b, c) check_readback_data_uvec4_(__LINE__, a, b, c)
 static inline void check_readback_data_uvec4_(unsigned int line, const struct resource_readback *rb,
         const RECT *rect, const struct uvec4 *expected)

@@ -336,6 +336,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
     formats[] =
     {
         {"r32g32b32a32 float",  TEXTURE_DATA_FLOAT, 16, DXGI_FORMAT_R32G32B32A32_FLOAT},
+        {"r32g32b32a32 sint",   TEXTURE_DATA_SINT,  16, DXGI_FORMAT_R32G32B32A32_SINT},
         {"r32g32b32a32 uint",   TEXTURE_DATA_UINT,  16, DXGI_FORMAT_R32G32B32A32_UINT},
         {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
         {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
@@ -622,12 +623,12 @@ static void read_uint(const char **line, unsigned int *u, bool is_uniform)
     *line = rest + (!is_uniform && *rest == ',');
 }
 
-static void read_int4(const char **line, struct ivec4 *v)
+static void read_int4(const char **line, struct ivec4 *v, bool is_uniform)
 {
-    read_int(line, &v->x, true);
-    read_int(line, &v->y, true);
-    read_int(line, &v->z, true);
-    read_int(line, &v->w, true);
+    read_int(line, &v->x, is_uniform);
+    read_int(line, &v->y, is_uniform);
+    read_int(line, &v->z, is_uniform);
+    read_int(line, &v->w, is_uniform);
 }
 
 static void read_uint4(const char **line, struct uvec4 *v, bool is_uniform)
@@ -907,6 +908,17 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             line = close_parentheses(line);
             todo_if(runner->is_todo) check_readback_data_uvec4(rb, &rect, &v);
         }
+        else if (match_string(line, "rgbai", &line))
+        {
+            struct ivec4 v;
+
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+            read_int4(&line, &v, false);
+            line = close_parentheses(line);
+            todo_if(runner->is_todo) check_readback_data_ivec4(rb, &rect, &v);
+        }
         else if (match_string(line, "rgba", &line))
         {
             struct vec4 v;
@@ -993,7 +1005,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             struct ivec4 v;
 
-            read_int4(&line, &v);
+            read_int4(&line, &v, true);
             set_uniforms(runner, offset, 4, &v);
         }
         else if (match_string(line, "uint4", &line))
