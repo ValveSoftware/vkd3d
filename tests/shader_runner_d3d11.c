@@ -330,7 +330,8 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
     ok(!ref, "Device has %lu references left.\n", ref);
 }
 
-static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags, unsigned int size, const void *data)
+static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags, unsigned int size,
+        unsigned int stride, const void *data)
 {
     D3D11_SUBRESOURCE_DATA resource_data;
     D3D11_BUFFER_DESC buffer_desc;
@@ -341,8 +342,8 @@ static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags
     buffer_desc.Usage = D3D11_USAGE_DEFAULT;
     buffer_desc.BindFlags = bind_flags;
     buffer_desc.CPUAccessFlags = 0;
-    buffer_desc.MiscFlags = 0;
-    buffer_desc.StructureByteStride = 0;
+    buffer_desc.MiscFlags = stride ? D3D11_RESOURCE_MISC_BUFFER_STRUCTURED : 0;
+    buffer_desc.StructureByteStride = stride;
 
     resource_data.pSysMem = data;
     resource_data.SysMemPitch = 0;
@@ -417,7 +418,7 @@ static void init_resource_srv_buffer(struct d3d11_shader_runner *runner, struct 
     ID3D11Device *device = runner->device;
     HRESULT hr;
 
-    resource->buffer = create_buffer(device, D3D11_BIND_SHADER_RESOURCE, params->data_size, params->data);
+    resource->buffer = create_buffer(device, D3D11_BIND_SHADER_RESOURCE, params->data_size, params->stride, params->data);
     resource->resource = (ID3D11Resource *)resource->buffer;
 
     srv_desc.Format = params->format;
@@ -435,7 +436,7 @@ static void init_resource_uav_buffer(struct d3d11_shader_runner *runner, struct 
     ID3D11Device *device = runner->device;
     HRESULT hr;
 
-    resource->buffer = create_buffer(device, D3D11_BIND_UNORDERED_ACCESS, params->data_size, params->data);
+    resource->buffer = create_buffer(device, D3D11_BIND_UNORDERED_ACCESS, params->data_size, params->stride, params->data);
     resource->resource = (ID3D11Resource *)resource->buffer;
 
     uav_desc.Format = params->format;
@@ -474,7 +475,7 @@ static struct resource *d3d11_runner_create_resource(struct shader_runner *r, co
             break;
 
         case RESOURCE_TYPE_VERTEX_BUFFER:
-            resource->buffer = create_buffer(device, D3D11_BIND_VERTEX_BUFFER, params->data_size, params->data);
+            resource->buffer = create_buffer(device, D3D11_BIND_VERTEX_BUFFER, params->data_size, params->stride, params->data);
             resource->resource = (ID3D11Resource *)resource->buffer;
             break;
     }
@@ -538,7 +539,7 @@ static bool d3d11_runner_dispatch(struct shader_runner *r, unsigned int x, unsig
         ID3D11Buffer *cb;
 
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
-                runner->r.uniform_count * sizeof(*runner->r.uniforms), runner->r.uniforms);
+                runner->r.uniform_count * sizeof(*runner->r.uniforms), 0, runner->r.uniforms);
         ID3D11DeviceContext_CSSetConstantBuffers(context, 0, 1, &cb);
         ID3D11Buffer_Release(cb);
     }
@@ -618,7 +619,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     if (runner->r.uniform_count)
     {
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
-                runner->r.uniform_count * sizeof(*runner->r.uniforms), runner->r.uniforms);
+                runner->r.uniform_count * sizeof(*runner->r.uniforms), 0, runner->r.uniforms);
         ID3D11DeviceContext_PSSetConstantBuffers(context, 0, 1, &cb);
     }
 

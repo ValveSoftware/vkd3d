@@ -427,6 +427,13 @@ static void parse_resource_directive(struct resource_params *resource, const cha
     {
         resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &line);
     }
+    else if (match_string(line, "stride", &line))
+    {
+        if (sscanf(line, "%u", &resource->stride) < 1)
+            fatal_error("Malformed texture stride '%s'.\n", line);
+        resource->texel_size = resource->stride;
+        resource->format = DXGI_FORMAT_UNKNOWN;
+    }
     else if (match_string(line, "size", &line))
     {
         if (sscanf(line, "( buffer , %u ) ", &resource->width) == 1)

@@ -290,6 +290,7 @@ static const struct format_info *get_format_info(enum DXGI_FORMAT format)
 
     static const struct format_info format_info[] =
     {
+        {DXGI_FORMAT_UNKNOWN,            1, true,  GL_R32UI,    GL_RED_INTEGER,  GL_UNSIGNED_INT},
         {DXGI_FORMAT_R32G32B32A32_FLOAT, 4, false, GL_RGBA32F,  GL_RGBA,         GL_FLOAT},
         {DXGI_FORMAT_R32G32B32A32_UINT,  4, true,  GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT},
         {DXGI_FORMAT_R32G32_FLOAT,       2, false, GL_RG32F,    GL_RG,           GL_FLOAT},

@@ -330,6 +330,10 @@ static void resource_init_buffer(struct vulkan_shader_runner *runner, struct vul
     else
         usage = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 
+    /* d3d12 requires DXGI_FORMAT_UNKNOWN for structured buffers, but Vulkan requires a defined format. */
+    if (format == VK_FORMAT_UNDEFINED && params->stride)
+        format = VK_FORMAT_R32_UINT;
+
     resource->buffer = create_buffer(runner, params->data_size, usage,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &resource->memory);
     resource->buffer_view = create_buffer_view(runner, resource->buffer, format);

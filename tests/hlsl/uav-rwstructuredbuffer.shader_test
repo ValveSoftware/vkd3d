@@ -1,6 +1,12 @@
 [require]
 shader model >= 5.0
 
+[uav 2]
+stride 16
+size (buffer, 2)
+
+0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8
+
 [pixel shader todo]
 struct s
 {
@@ -22,8 +28,14 @@ RWStructuredBuffer<struct s2> u5;
 float4 main() : sv_target1
 {
     u[0] = float4(11.1, 12.2, 13.3, 14.4);
+    u[1] = float4(15.5, 16.6, 17.7, 18.8);
     return 0;
 }
+
+[test]
+todo draw quad
+probe uav 2 (0) rgba (11.1, 12.2, 13.3, 14.4)
+probe uav 2 (1) rgba (15.5, 16.6, 17.7, 18.8)
 
 [pixel shader todo]
 struct s

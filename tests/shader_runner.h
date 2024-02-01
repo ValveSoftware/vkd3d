@@ -87,6 +87,7 @@ struct resource_params
     DXGI_FORMAT format;
     enum texture_data_type data_type;
     unsigned int texel_size;
+    unsigned int stride;
     unsigned int width, height;
     unsigned int level_count;
     uint8_t *data;
