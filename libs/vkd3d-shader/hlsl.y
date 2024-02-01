@@ -6992,8 +6992,10 @@ primary_expr:
             if (!(var = hlsl_get_var(ctx->cur_scope, $1)))
             {
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Variable \"%s\" is not defined.", $1);
+                vkd3d_free($1);
                 YYABORT;
             }
+            vkd3d_free($1);
             if (!(load = hlsl_new_var_load(ctx, var, &@1)))
                 YYABORT;
             if (!($$ = make_block(ctx, &load->node)))
