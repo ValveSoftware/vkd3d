@@ -7073,12 +7073,17 @@ postfix_expr:
                 if (!(field = get_struct_field(type->e.record.fields, type->e.record.field_count, $3)))
                 {
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_NOT_DEFINED, "Field \"%s\" is not defined.", $3);
+                    vkd3d_free($3);
                     YYABORT;
                 }
 
                 field_idx = field - type->e.record.fields;
                 if (!add_record_access(ctx, $1, node, field_idx, &@2))
+                {
+                    vkd3d_free($3);
                     YYABORT;
+                }
+                vkd3d_free($3);
                 $$ = $1;
             }
             else if (hlsl_is_numeric_type(node->data_type))
@@ -7088,14 +7093,17 @@ postfix_expr:
                 if (!(swizzle = get_swizzle(ctx, node, $3, &@3)))
                 {
                     hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid swizzle \"%s\".", $3);
+                    vkd3d_free($3);
                     YYABORT;
                 }
                 hlsl_block_add_instr($1, swizzle);
+                vkd3d_free($3);
                 $$ = $1;
             }
             else
             {
                 hlsl_error(ctx, &@3, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX, "Invalid subscript \"%s\".", $3);
+                vkd3d_free($3);
                 YYABORT;
             }
         }
