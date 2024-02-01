@@ -5572,11 +5572,11 @@ attribute:
             $$->name = $2;
             hlsl_block_init(&$$->instrs);
             hlsl_block_add_block(&$$->instrs, $4.instrs);
-            vkd3d_free($4.instrs);
             $$->loc = @$;
             $$->args_count = $4.args_count;
             for (i = 0; i < $4.args_count; ++i)
                 hlsl_src_from_node(&$$->args[i], $4.args[i]);
+            free_parse_initializer(&$4);
         }
 
 attribute_list:
