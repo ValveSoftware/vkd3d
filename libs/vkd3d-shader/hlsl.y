@@ -5807,7 +5807,11 @@ func_prototype:
             }
             else
             {
-                free($1.attrs);
+                unsigned int i;
+
+                for (i = 0; i < $1.count; ++i)
+                    hlsl_free_attribute((void *)$1.attrs[i]);
+                vkd3d_free($1.attrs);
             }
             $$ = $2;
         }
