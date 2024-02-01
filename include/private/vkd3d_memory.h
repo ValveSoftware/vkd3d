@@ -65,6 +65,15 @@ static inline char *vkd3d_strdup(const char *string)
     return ptr;
 }
 
+static inline void *vkd3d_memdup(const void *mem, size_t size)
+{
+    void *ptr;
+
+    if ((ptr = vkd3d_malloc(size)))
+        memcpy(ptr, mem, size);
+    return ptr;
+}
+
 bool vkd3d_array_reserve(void **elements, size_t *capacity, size_t element_count, size_t element_size);
 
 #endif  /* __VKD3D_MEMORY_H */
