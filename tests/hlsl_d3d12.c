@@ -525,6 +525,7 @@ static void test_thread_id(void)
     cs_code = compile_shader(cs_source, "cs_5_0");
     context.pipeline_state = create_compute_pipeline_state(device, context.root_signature,
             shader_bytecode(ID3D10Blob_GetBufferPointer(cs_code), ID3D10Blob_GetBufferSize(cs_code)));
+    ID3D10Blob_Release(cs_code);
 
     ID3D12GraphicsCommandList_SetPipelineState(command_list, context.pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, context.root_signature);
