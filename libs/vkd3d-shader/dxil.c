@@ -4138,6 +4138,57 @@ static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_i
     instruction_dst_param_init_ssa_vector(ins, component_count, sm6);
 }
 
+static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    unsigned int write_mask, component_count, operand_count;
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_dst_param *dst_param;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register data;
+    const struct sm6_value *resource;
+    bool raw;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+    raw = resource->u.handle.d->kind == RESOURCE_KIND_RAWBUFFER;
+
+    write_mask = sm6_value_get_constant_uint(operands[7]);
+    if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
+    {
+        WARN("Invalid write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a raw/structured buffer store operation is invalid.", write_mask);
+        return;
+    }
+    else if (write_mask & (write_mask + 1))
+    {
+        /* In this case, it is unclear which source operands will be defined unless we encounter it in a shader. */
+        FIXME("Unhandled write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a raw/structured buffer store operation is unhandled.", write_mask);
+    }
+    component_count = vsir_write_mask_component_count(write_mask);
+
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[3], component_count, state, &data))
+        return;
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, raw ? VKD3DSIH_STORE_RAW : VKD3DSIH_STORE_STRUCTURED);
+    operand_count = 2 + !raw;
+
+    if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
+        return;
+    src_params_init_from_operands(src_params, &operands[1], operand_count - 1);
+    data.data_type = VKD3D_DATA_UINT;
+    src_param_init_vector_from_reg(&src_params[operand_count - 1], &data);
+
+    dst_param = instruction_dst_params_alloc(ins, 1, sm6);
+    dst_param_init_with_mask(dst_param, write_mask);
+    dst_param->reg = resource->u.handle.reg;
+}
+
 static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4193,6 +4244,12 @@ static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intr
     resource = operands[0];
     if (!sm6_value_validate_is_handle(resource, sm6))
         return;
+
+    if (resource->u.handle.d->kind == RESOURCE_KIND_RAWBUFFER
+            || resource->u.handle.d->kind == RESOURCE_KIND_STRUCTUREDBUFFER)
+    {
+        return sm6_parser_emit_dx_raw_buffer_store(sm6, op, operands, state);
+    }
 
     if (resource->u.handle.d->kind != RESOURCE_KIND_TYPEDBUFFER)
     {
