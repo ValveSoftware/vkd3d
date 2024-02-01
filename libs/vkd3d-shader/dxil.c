@@ -383,6 +383,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_LOAD                 =  66,
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
+    DX_BUFFER_STORE                 =  69,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_DERIV_COARSEX                =  83,
@@ -4179,6 +4180,67 @@ static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intri
     instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
 }
 
+static void sm6_parser_emit_dx_buffer_store(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_dst_param *dst_param;
+    unsigned int write_mask, component_count;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register texel;
+    const struct sm6_value *resource;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+
+    if (resource->u.handle.d->kind != RESOURCE_KIND_TYPEDBUFFER)
+    {
+        WARN("Resource is not a typed buffer.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_OPERATION,
+                "Resource for a typed buffer store is not a typed buffer.");
+    }
+
+    write_mask = sm6_value_get_constant_uint(operands[7]);
+    if (!write_mask || write_mask > VKD3DSP_WRITEMASK_ALL)
+    {
+        WARN("Invalid write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a typed buffer store operation is invalid.", write_mask);
+        return;
+    }
+    else if (write_mask & (write_mask + 1))
+    {
+        /* In this case, it is unclear which source operands will be defined unless we encounter it in a shader. */
+        FIXME("Unhandled write mask %#x.\n", write_mask);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Write mask %#x for a typed buffer store operation is unhandled.", write_mask);
+    }
+    component_count = vsir_write_mask_component_count(write_mask);
+
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[3], component_count, state, &texel))
+        return;
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_STORE_UAV_TYPED);
+
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    src_param_init_from_value(&src_params[0], operands[1]);
+    if (!sm6_value_is_undef(operands[2]))
+    {
+        /* Constant zero would have no effect, but is not worth checking for unless it shows up. */
+        WARN("Ignoring structure offset.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring structure offset for a typed buffer store.");
+    }
+    src_param_init_vector_from_reg(&src_params[1], &texel);
+
+    dst_param = instruction_dst_params_alloc(ins, 1, sm6);
+    dst_param_init_with_mask(dst_param, write_mask);
+    dst_param->reg = resource->u.handle.reg;
+}
+
 static unsigned int sm6_value_get_texel_offset(const struct sm6_value *value)
 {
     return sm6_value_is_undef(value) ? 0 : sm6_value_get_constant_uint(value);
@@ -4478,6 +4540,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ATOMIC_CMP_XCHG               ] = {"o", "HiiiRR", sm6_parser_emit_dx_atomic_binop},
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
+    [DX_BUFFER_STORE                  ] = {"v", "Hiiooooc", sm6_parser_emit_dx_buffer_store},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
     [DX_COS                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_COUNT_BITS                    ] = {"i", "m",    sm6_parser_emit_dx_unary},

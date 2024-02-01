@@ -180,7 +180,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe uav 1 (0) rgbai (11, -12, 13, -14)
 probe uav 1 (1) rgbai (-15, 16, -17, 18)
 
@@ -198,5 +198,5 @@ float4 main() : sv_target1
 }
 
 [test]
-todo(sm>=6) draw quad
+draw quad
 probe uav 2 (0) rgba (11.1, 12.2, 13.3, 14.4)
