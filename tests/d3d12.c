@@ -1879,15 +1879,11 @@ static void test_create_committed_resource(void)
         hr = ID3D12Device8_CreateCommittedResource2(device8, &heap_properties, D3D12_HEAP_FLAG_NONE,
                 &resource_desc1, D3D12_RESOURCE_STATE_RENDER_TARGET, &clear_value, NULL,
                 &IID_ID3D12Resource2, (void **)&resource2);
-        todo
         ok(hr == S_OK, "Failed to create committed resource, hr %#x.\n", hr);
 
-        if (!hr)
-        {
-            check_interface(resource2, &IID_ID3D12Resource2, true);
-            ID3D12Resource2_Release(resource2);
-        }
+        check_interface(resource2, &IID_ID3D12Resource2, true);
 
+        ID3D12Resource2_Release(resource2);
         ID3D12Device8_Release(device8);
     }
 
