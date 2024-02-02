@@ -3121,6 +3121,11 @@ static void vsir_block_list_sort(struct vsir_block_list *list)
     qsort(list->blocks, list->count, sizeof(*list->blocks), block_compare);
 }
 
+static bool vsir_block_list_search(struct vsir_block_list *list, struct vsir_block *block)
+{
+    return !!bsearch(&block, list->blocks, list->count, sizeof(*list->blocks), block_compare);
+}
+
 struct vsir_cfg
 {
     struct vkd3d_shader_message_context *message_context;
@@ -3487,15 +3492,36 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
 struct vsir_cfg_node_sorter
 {
     struct vsir_cfg *cfg;
+    struct vsir_cfg_node_sorter_stack_item
+    {
+        struct vsir_block_list *loop;
+        unsigned int seen_count;
+    } *stack;
+    size_t stack_count, stack_capacity;
     struct vsir_block_list available_blocks;
 };
 
 static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cfg_node_sorter *sorter, struct vsir_block *block)
 {
+    struct vsir_block_list *loop = NULL;
+    struct vsir_cfg_node_sorter_stack_item *item;
     enum vkd3d_result ret;
+
+    if (sorter->cfg->loops_by_header[block->label - 1] != SIZE_MAX)
+        loop = &sorter->cfg->loops[sorter->cfg->loops_by_header[block->label - 1]];
 
     if ((ret = vsir_block_list_add_checked(&sorter->available_blocks, block)) < 0)
         return ret;
+
+    if (!loop)
+        return VKD3D_OK;
+
+    if (!vkd3d_array_reserve((void **)&sorter->stack, &sorter->stack_capacity, sorter->stack_count + 1, sizeof(*sorter->stack)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    item = &sorter->stack[sorter->stack_count++];
+    item->loop = loop;
+    item->seen_count = 0;
 
     return VKD3D_OK;
 }
@@ -3507,10 +3533,23 @@ static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cf
  * available list of all the blocks whose incoming degree has reached
  * zero. At each step we pick a block from the available list and
  * strip it away from the graph, updating the incoming degrees and
- * available list. We prefer picking the most recently added block
- * (i.e., from the end of the available list) because it will keep
- * together related blocks in the order, which allow us to generate
- * fewer control flow primitives. */
+ * available list.
+ *
+ * In principle at each step we can pick whatever node we want from
+ * the available list, and will get a topological sort
+ * anyway. However, we use these two criteria to give to the computed
+ * order additional properties:
+ *
+ *  1. we keep track of which loops we're into, and pick blocks
+ *     belonging to the current innermost loop, so that loops are kept
+ *     contiguous in the order; this can always be done when the input
+ *     CFG is reducible;
+ *
+ *  2. subject to the requirement above, we always pick the most
+ *     recently added block to the available list, because this tends
+ *     to keep related blocks and require fewer control flow
+ *     primitives.
+ */
 static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 {
     struct vsir_cfg_node_sorter sorter = { .cfg = cfg };
@@ -3566,11 +3605,50 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
     while (sorter.available_blocks.count != 0)
     {
-        struct vsir_block *block = sorter.available_blocks.blocks[sorter.available_blocks.count - 1];
+        struct vsir_cfg_node_sorter_stack_item *inner_stack_item = NULL;
+        struct vsir_block *block;
+        size_t new_seen_count;
 
-        vsir_block_list_remove_index(&sorter.available_blocks, sorter.available_blocks.count - 1);
+        if (sorter.stack_count != 0)
+            inner_stack_item = &sorter.stack[sorter.stack_count - 1];
+
+        for (i = sorter.available_blocks.count - 1; ; --i)
+        {
+            if (i == SIZE_MAX)
+            {
+                ERR("Couldn't find any viable next block, is the input CFG reducible?\n");
+                ret = VKD3D_ERROR_INVALID_SHADER;
+                goto fail;
+            }
+
+            block = sorter.available_blocks.blocks[i];
+
+            if (!inner_stack_item || vsir_block_list_search(inner_stack_item->loop, block))
+                break;
+        }
+
+        vsir_block_list_remove_index(&sorter.available_blocks, i);
         if ((ret = vsir_block_list_add_checked(&cfg->order, block)) < 0)
             goto fail;
+
+        /* Close loops: since each loop is a strict subset of any
+         * outer loop, we just need to track how many blocks we've
+         * seen; when I close a loop I mark the same number of seen
+         * blocks for the next outer loop. */
+        new_seen_count = 1;
+        while (sorter.stack_count != 0)
+        {
+            inner_stack_item = &sorter.stack[sorter.stack_count - 1];
+
+            inner_stack_item->seen_count += new_seen_count;
+
+            assert(inner_stack_item->seen_count <= inner_stack_item->loop->count);
+            if (inner_stack_item->seen_count != inner_stack_item->loop->count)
+                break;
+
+            new_seen_count = inner_stack_item->loop->count;
+            --sorter.stack_count;
+        }
 
         /* Remove (forward) edges and make new nodes available. */
         for (i = 0; i < block->successors.count; ++i)
@@ -3601,7 +3679,10 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
         goto fail;
     }
 
+    assert(sorter.stack_count == 0);
+
     vkd3d_free(in_degrees);
+    vkd3d_free(sorter.stack);
     vsir_block_list_cleanup(&sorter.available_blocks);
 
     if (TRACE_ON())
@@ -3619,6 +3700,7 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
 fail:
     vkd3d_free(in_degrees);
+    vkd3d_free(sorter.stack);
     vsir_block_list_cleanup(&sorter.available_blocks);
 
     return ret;
