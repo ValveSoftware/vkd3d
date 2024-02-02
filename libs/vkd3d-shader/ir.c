@@ -3056,6 +3056,13 @@ static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struc
     return vsir_block_list_add_checked(list, block);
 }
 
+/* It is guaranteed that the relative order is kept. */
+static void vsir_block_list_remove_index(struct vsir_block_list *list, size_t idx)
+{
+    --list->count;
+    memmove(&list->blocks[idx], &list->blocks[idx + 1], (list->count - idx) * sizeof(*list->blocks));
+}
+
 struct vsir_block
 {
     unsigned int label;
@@ -3126,6 +3133,8 @@ struct vsir_cfg
     struct vsir_block_list *loops;
     size_t loops_count, loops_capacity;
     size_t *loops_by_header;
+
+    struct vsir_block_list order;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3137,6 +3146,8 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
 
     for (i = 0; i < cfg->loops_count; ++i)
         vsir_block_list_cleanup(&cfg->loops[i]);
+
+    vsir_block_list_cleanup(&cfg->order);
 
     vkd3d_free(cfg->blocks);
     vkd3d_free(cfg->loops);
@@ -3217,6 +3228,8 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
     cfg->message_context = message_context;
     cfg->program = program;
     cfg->block_count = program->block_count;
+
+    vsir_block_list_init(&cfg->order);
 
     if (!(cfg->blocks = vkd3d_calloc(cfg->block_count, sizeof(*cfg->blocks))))
         return VKD3D_ERROR_OUT_OF_MEMORY;
@@ -3471,6 +3484,135 @@ static enum vkd3d_result vsir_cfg_compute_loops(struct vsir_cfg *cfg)
     return VKD3D_OK;
 }
 
+struct vsir_cfg_node_sorter
+{
+    struct vsir_cfg *cfg;
+    struct vsir_block_list available_blocks;
+};
+
+static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cfg_node_sorter *sorter, struct vsir_block *block)
+{
+    enum vkd3d_result ret;
+
+    if ((ret = vsir_block_list_add_checked(&sorter->available_blocks, block)) < 0)
+        return ret;
+
+    return VKD3D_OK;
+}
+
+/* Topologically sort the blocks according to the forward edges. By
+ * definition if the input CFG is reducible then its forward edges
+ * form a DAG, so a topological sorting exists. In order to compute it
+ * we keep an array with the incoming degree for each block and an
+ * available list of all the blocks whose incoming degree has reached
+ * zero. At each step we pick a block from the available list and
+ * strip it away from the graph, updating the incoming degrees and
+ * available list. We prefer picking the most recently added block
+ * (i.e., from the end of the available list) because it will keep
+ * together related blocks in the order, which allow us to generate
+ * fewer control flow primitives. */
+static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
+{
+    struct vsir_cfg_node_sorter sorter = { .cfg = cfg };
+    unsigned int *in_degrees = NULL;
+    enum vkd3d_result ret;
+    size_t i;
+
+    if (!(in_degrees = vkd3d_calloc(cfg->block_count, sizeof(*in_degrees))))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+
+        if (block->label == 0)
+        {
+            in_degrees[i] = UINT_MAX;
+            continue;
+        }
+
+        in_degrees[i] = block->predecessors.count;
+
+        /* Do not count back edges. */
+        if (cfg->loops_by_header[i] != SIZE_MAX)
+        {
+            assert(in_degrees[i] > 0);
+            in_degrees[i] -= 1;
+        }
+
+        if (in_degrees[i] == 0 && block != cfg->entry)
+        {
+            WARN("Unexpected entry point %u.\n", block->label);
+            vkd3d_shader_error(cfg->message_context, &block->begin->location, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                    "Block %u is unreachable from the entry point.", block->label);
+            ret = VKD3D_ERROR_INVALID_SHADER;
+            goto fail;
+        }
+    }
+
+    if (in_degrees[cfg->entry->label - 1] != 0)
+    {
+        WARN("Entry point has %u incoming forward edges.\n", in_degrees[cfg->entry->label - 1]);
+        vkd3d_shader_error(cfg->message_context, &cfg->entry->begin->location, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "The entry point block has %u incoming forward edges.", in_degrees[cfg->entry->label - 1]);
+        ret = VKD3D_ERROR_INVALID_SHADER;
+        goto fail;
+    }
+
+    vsir_block_list_init(&sorter.available_blocks);
+
+    if ((ret = vsir_cfg_node_sorter_make_node_available(&sorter, cfg->entry)) < 0)
+        goto fail;
+
+    while (sorter.available_blocks.count != 0)
+    {
+        struct vsir_block *block = sorter.available_blocks.blocks[sorter.available_blocks.count - 1];
+
+        vsir_block_list_remove_index(&sorter.available_blocks, sorter.available_blocks.count - 1);
+        if ((ret = vsir_block_list_add_checked(&cfg->order, block)) < 0)
+            goto fail;
+
+        /* Remove (forward) edges and make new nodes available. */
+        for (i = 0; i < block->successors.count; ++i)
+        {
+            struct vsir_block *successor = block->successors.blocks[i];
+
+            if (vsir_block_dominates(successor, block))
+                continue;
+
+            assert(in_degrees[successor->label - 1] > 0);
+            --in_degrees[successor->label - 1];
+
+            if (in_degrees[successor->label - 1] == 0)
+            {
+                if ((ret = vsir_cfg_node_sorter_make_node_available(&sorter, successor)) < 0)
+                    goto fail;
+            }
+        }
+    }
+
+    if (cfg->order.count != cfg->block_count)
+    {
+        /* There is a cycle of forward edges. */
+        WARN("The control flow graph is not reducible.\n");
+        vkd3d_shader_error(cfg->message_context, &cfg->entry->begin->location, VKD3D_SHADER_ERROR_VSIR_INVALID_CONTROL_FLOW,
+                "The control flow graph is not reducible.");
+        ret = VKD3D_ERROR_INVALID_SHADER;
+        goto fail;
+    }
+
+    vkd3d_free(in_degrees);
+    vsir_block_list_cleanup(&sorter.available_blocks);
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(in_degrees);
+    vsir_block_list_cleanup(&sorter.available_blocks);
+
+    return ret;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -3498,6 +3640,12 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         vsir_cfg_compute_dominators(&cfg);
 
         if ((result = vsir_cfg_compute_loops(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_sort_nodes(&cfg)) < 0)
         {
             vsir_cfg_cleanup(&cfg);
             return result;
