@@ -20321,7 +20321,6 @@ static void test_get_copyable_footprints(void)
         total_size = 0;
         ID3D12Device8_GetCopyableFootprints1(device8, &resource_desc1, 0, 1, 0,
                 layouts, row_counts, row_sizes, &total_size);
-        todo
         check_copyable_footprints(&resource_desc, 0, 1, 0,
                 layouts, row_counts, row_sizes, &total_size);
 

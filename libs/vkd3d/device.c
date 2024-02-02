@@ -4593,19 +4593,15 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints1(ID3D12Device8 
         UINT64 base_offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, UINT *row_counts,
         UINT64 *row_sizes, UINT64 *total_bytes)
 {
-    FIXME("iface %p, desc %p, first_sub_resource %u, sub_resource_count %u, base_offset %#"PRIx64", "
-            "layouts %p, row_counts %p, row_sizes %p, total_bytes %p stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device8(iface);
+
+    TRACE("iface %p, desc %p, first_sub_resource %u, sub_resource_count %u, base_offset %#"PRIx64", "
+            "layouts %p, row_counts %p, row_sizes %p, total_bytes %p.\n",
             iface, desc, first_sub_resource, sub_resource_count, base_offset,
             layouts, row_counts, row_sizes, total_bytes);
 
-    if (layouts)
-        memset(layouts, 0xff, sizeof(*layouts) * sub_resource_count);
-    if (row_counts)
-        memset(row_counts, 0xff, sizeof(*row_counts) * sub_resource_count);
-    if (row_sizes)
-        memset(row_sizes, 0xff, sizeof(*row_sizes) * sub_resource_count);
-    if (total_bytes)
-        *total_bytes = UINT64_MAX;
+    d3d12_device_get_copyable_footprints(device, desc, first_sub_resource, sub_resource_count,
+            base_offset, layouts, row_counts, row_sizes, total_bytes);
 }
 
 static const struct ID3D12Device8Vtbl d3d12_device_vtbl =
