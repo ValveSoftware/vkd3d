@@ -21,10 +21,19 @@
 #include <vkd3d_d3dcommon.h>
 #include <vkd3d_d3d12shader.h>
 
+struct d3d12_variable
+{
+    ID3D12ShaderReflectionVariable ID3D12ShaderReflectionVariable_iface;
+    D3D12_SHADER_VARIABLE_DESC desc;
+    struct d3d12_buffer *buffer;
+};
+
 struct d3d12_buffer
 {
     ID3D12ShaderReflectionConstantBuffer ID3D12ShaderReflectionConstantBuffer_iface;
     D3D12_SHADER_BUFFER_DESC desc;
+
+    struct d3d12_variable *variables;
 };
 
 struct d3d12_reflection
@@ -40,6 +49,71 @@ struct d3d12_reflection
 };
 
 static struct d3d12_buffer null_buffer;
+static struct d3d12_variable null_variable;
+
+static struct d3d12_variable *impl_from_ID3D12ShaderReflectionVariable(ID3D12ShaderReflectionVariable *iface)
+{
+    return CONTAINING_RECORD(iface, struct d3d12_variable, ID3D12ShaderReflectionVariable_iface);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d12_variable_GetDesc(
+        ID3D12ShaderReflectionVariable *iface, D3D12_SHADER_VARIABLE_DESC *desc)
+{
+    struct d3d12_variable *variable = impl_from_ID3D12ShaderReflectionVariable(iface);
+
+    TRACE("iface %p, desc %p.\n", iface, desc);
+
+    if (variable == &null_variable)
+    {
+        WARN("Null variable, returning E_FAIL.\n");
+        return E_FAIL;
+    }
+
+    if (!desc)
+    {
+        WARN("NULL pointer, returning E_FAIL.\n");
+        return E_FAIL;
+    }
+
+    *desc = variable->desc;
+    return S_OK;
+}
+
+static ID3D12ShaderReflectionType * STDMETHODCALLTYPE d3d12_variable_GetType(
+        ID3D12ShaderReflectionVariable *iface)
+{
+    FIXME("iface %p, stub!\n", iface);
+
+    return NULL;
+}
+
+static ID3D12ShaderReflectionConstantBuffer * STDMETHODCALLTYPE d3d12_variable_GetBuffer(
+        ID3D12ShaderReflectionVariable *iface)
+{
+    struct d3d12_variable *variable = impl_from_ID3D12ShaderReflectionVariable(iface);
+
+    TRACE("iface %p.\n", iface);
+
+    return &variable->buffer->ID3D12ShaderReflectionConstantBuffer_iface;
+}
+
+static UINT STDMETHODCALLTYPE d3d12_variable_GetInterfaceSlot(
+        ID3D12ShaderReflectionVariable *iface, UINT index)
+{
+    FIXME("iface %p, index %u, stub!\n", iface, index);
+
+    return 0;
+}
+
+static const struct ID3D12ShaderReflectionVariableVtbl d3d12_variable_vtbl =
+{
+    d3d12_variable_GetDesc,
+    d3d12_variable_GetType,
+    d3d12_variable_GetBuffer,
+    d3d12_variable_GetInterfaceSlot,
+};
+
+static struct d3d12_variable null_variable = {{&d3d12_variable_vtbl}};
 
 static struct d3d12_buffer *impl_from_ID3D12ShaderReflectionConstantBuffer(ID3D12ShaderReflectionConstantBuffer *iface)
 {
@@ -72,9 +146,17 @@ static HRESULT STDMETHODCALLTYPE d3d12_buffer_GetDesc(
 static ID3D12ShaderReflectionVariable * STDMETHODCALLTYPE d3d12_buffer_GetVariableByIndex(
         ID3D12ShaderReflectionConstantBuffer *iface, UINT index)
 {
-    FIXME("iface %p, index %u, stub!\n", iface, index);
+    struct d3d12_buffer *buffer = impl_from_ID3D12ShaderReflectionConstantBuffer(iface);
 
-    return NULL;
+    TRACE("iface %p, index %u.\n", iface, index);
+
+    if (index > buffer->desc.Variables)
+    {
+        WARN("Invalid index %u.\n", index);
+        return &null_variable.ID3D12ShaderReflectionVariable_iface;
+    }
+
+    return &buffer->variables[index].ID3D12ShaderReflectionVariable_iface;
 }
 
 static ID3D12ShaderReflectionVariable * STDMETHODCALLTYPE d3d12_buffer_GetVariableByName(
@@ -138,7 +220,19 @@ static ULONG STDMETHODCALLTYPE d3d12_reflection_Release(ID3D12ShaderReflection *
     if (!refcount)
     {
         for (UINT i = 0; i < reflection->desc.ConstantBuffers; ++i)
-            vkd3d_free((void *)reflection->buffers[i].desc.Name);
+        {
+            struct d3d12_buffer *buffer = &reflection->buffers[i];
+
+            for (UINT j = 0; j < buffer->desc.Variables; ++j)
+            {
+                struct d3d12_variable *variable = &buffer->variables[j];
+
+                vkd3d_free((void *)variable->desc.DefaultValue);
+                vkd3d_free((void *)variable->desc.Name);
+            }
+            vkd3d_free(buffer->variables);
+            vkd3d_free((void *)buffer->desc.Name);
+        }
         vkd3d_free(reflection->buffers);
 
         vkd3d_shader_free_scan_signature_info(&reflection->signature_info);
@@ -439,8 +533,56 @@ struct rdef_buffer
     uint32_t type;
 };
 
+struct rdef_variable
+{
+    uint32_t name_offset;
+    uint32_t offset;
+    uint32_t size;
+    uint32_t flags;
+    uint32_t type_offset;
+    uint32_t default_value_offset;
+    uint32_t resource_binding;
+    uint32_t resource_count;
+    uint32_t sampler_binding;
+    uint32_t sampler_count;
+};
+
+static HRESULT d3d12_variable_init(struct d3d12_variable *variable,
+        const struct rdef_variable *rdef_variable, const struct vkd3d_shader_code *section)
+{
+    HRESULT hr;
+    char *name;
+
+    if (FAILED(hr = get_string(section, rdef_variable->name_offset, &name)))
+        return hr;
+
+    variable->ID3D12ShaderReflectionVariable_iface.lpVtbl = &d3d12_variable_vtbl;
+
+    variable->desc.Name = name;
+    variable->desc.StartOffset = rdef_variable->offset;
+    variable->desc.Size = rdef_variable->size;
+    variable->desc.uFlags = rdef_variable->flags;
+    variable->desc.StartTexture = rdef_variable->resource_binding;
+    variable->desc.TextureSize = rdef_variable->resource_count;
+    variable->desc.StartSampler = rdef_variable->sampler_binding;
+    variable->desc.SamplerSize = rdef_variable->sampler_count;
+
+    if (rdef_variable->default_value_offset)
+    {
+        const void *default_value;
+
+        if (!(default_value = get_data_ptr(section, rdef_variable->default_value_offset, 1, rdef_variable->size)))
+            return E_INVALIDARG;
+
+        if (!(variable->desc.DefaultValue = vkd3d_memdup(default_value, rdef_variable->size)))
+            return E_OUTOFMEMORY;
+    }
+
+    return S_OK;
+}
+
 static HRESULT d3d12_buffer_init(struct d3d12_buffer *buffer, const struct rdef_buffer *rdef_buffer,
-        const struct vkd3d_shader_code *section)
+        const struct vkd3d_shader_code *section, uint32_t variable_size)
 {
     HRESULT hr;
     char *name;
@@ -456,11 +598,31 @@ static HRESULT d3d12_buffer_init(struct d3d12_buffer *buffer, const struct rdef_
     buffer->desc.uFlags = rdef_buffer->flags;
     buffer->desc.Name = name;
 
+    if (!(buffer->variables = vkd3d_calloc(rdef_buffer->var_count, sizeof(*buffer->variables))))
+        return E_OUTOFMEMORY;
+
+    for (uint32_t i = 0; i < rdef_buffer->var_count; ++i)
+    {
+        struct rdef_variable normalized_variable = {0};
+        const struct rdef_variable *rdef_variable;
+
+        if (!(rdef_variable = get_data_ptr(section, rdef_buffer->vars_offset + (i * variable_size), 1, variable_size)))
+            return E_INVALIDARG;
+
+        normalized_variable.resource_binding = ~0u;
+        normalized_variable.sampler_binding = ~0u;
+        memcpy(&normalized_variable, rdef_variable, variable_size);
+
+        if ((hr = d3d12_variable_init(&buffer->variables[i], &normalized_variable, section)))
+            return hr;
+    }
+
     return S_OK;
 }
 
 static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3d_shader_code *section)
 {
+    uint32_t variable_size = offsetof(struct rdef_variable, resource_binding);
     const struct rdef_header *header;
     const struct rdef_rd11 *rd11;
     HRESULT hr;
@@ -494,6 +656,13 @@ static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3
             return E_INVALIDARG;
         }
 
+        if (rd11->variable_size != sizeof(struct rdef_variable))
+        {
+            FIXME("Unexpected variable size %#x.\n", rd11->variable_size);
+            return E_INVALIDARG;
+        }
+        variable_size = rd11->variable_size;
+
         if (rd11->zero)
         {
             FIXME("Unexpected field %#x.\n", rd11->zero);
@@ -516,7 +685,7 @@ static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3
 
         for (uint32_t i = 0; i < header->buffer_count; ++i)
         {
-            if ((hr = d3d12_buffer_init(&reflection->buffers[i], &rdef_buffers[i], section)))
+            if ((hr = d3d12_buffer_init(&reflection->buffers[i], &rdef_buffers[i], section, variable_size)))
                 return hr;
         }
     }
