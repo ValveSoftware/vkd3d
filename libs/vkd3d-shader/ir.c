@@ -3604,6 +3604,17 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
     vkd3d_free(in_degrees);
     vsir_block_list_cleanup(&sorter.available_blocks);
 
+    if (TRACE_ON())
+    {
+        vkd3d_string_buffer_printf(&cfg->debug_buffer, "Block order:");
+
+        for (i = 0; i < cfg->order.count; ++i)
+            vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", cfg->order.blocks[i]->label);
+
+        TRACE("%s\n", cfg->debug_buffer.buffer);
+        vkd3d_string_buffer_clear(&cfg->debug_buffer);
+    }
+
     return VKD3D_OK;
 
 fail:
