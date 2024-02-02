@@ -2255,15 +2255,11 @@ static void test_create_placed_resource(void)
 
         hr = ID3D12Device8_CreatePlacedResource1(device8, heap, 0,
                 &resource_desc1, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource2, (void **)&resource2);
-        todo
         ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
 
-        if (!hr)
-        {
-            check_interface(resource2, &IID_ID3D12Resource2, true);
-            ID3D12Resource2_Release(resource2);
-        }
+        check_interface(resource2, &IID_ID3D12Resource2, true);
 
+        ID3D12Resource2_Release(resource2);
         ID3D12Device8_Release(device8);
     }
 

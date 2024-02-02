@@ -4562,12 +4562,23 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePlacedResource1(ID3D12Device
         D3D12_RESOURCE_STATES initial_state, const D3D12_CLEAR_VALUE *optimized_clear_value,
         REFIID iid, void **resource)
 {
-    FIXME("iface %p, heap %p, heap_offset %#"PRIx64", desc %p, initial_state %#x, "
-            "optimized_clear_value %p, iid %s, resource %p stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device8(iface);
+    struct d3d12_heap *heap_object;
+    struct d3d12_resource *object;
+    HRESULT hr;
+
+    TRACE("iface %p, heap %p, heap_offset %#"PRIx64", desc %p, initial_state %#x, "
+            "optimized_clear_value %p, iid %s, resource %p.\n",
             iface, heap, heap_offset, resource_desc, initial_state,
             optimized_clear_value, debugstr_guid(iid), resource);
 
-    return E_NOTIMPL;
+    heap_object = unsafe_impl_from_ID3D12Heap(heap);
+
+    if (FAILED(hr = d3d12_placed_resource_create(device, heap_object, heap_offset,
+            resource_desc, initial_state, optimized_clear_value, &object)))
+        return hr;
+
+    return return_interface(&object->ID3D12Resource2_iface, &IID_ID3D12Resource2, iid, resource);
 }
 
 static void STDMETHODCALLTYPE d3d12_device_CreateSamplerFeedbackUnorderedAccessView(ID3D12Device8 *iface,
