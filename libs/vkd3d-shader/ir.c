@@ -3032,14 +3032,8 @@ static void vsir_block_list_cleanup(struct vsir_block_list *list)
     vkd3d_free(list->blocks);
 }
 
-static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struct vsir_block *block)
+static enum vkd3d_result vsir_block_list_add_checked(struct vsir_block_list *list, struct vsir_block *block)
 {
-    size_t i;
-
-    for (i = 0; i < list->count; ++i)
-        if (block == list->blocks[i])
-            return VKD3D_FALSE;
-
     if (!vkd3d_array_reserve((void **)&list->blocks, &list->capacity, list->count + 1, sizeof(*list->blocks)))
     {
         ERR("Cannot extend block list.\n");
@@ -3049,6 +3043,17 @@ static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struc
     list->blocks[list->count++] = block;
 
     return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_block_list_add(struct vsir_block_list *list, struct vsir_block *block)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+        if (block == list->blocks[i])
+            return VKD3D_FALSE;
+
+    return vsir_block_list_add_checked(list, block);
 }
 
 struct vsir_block
