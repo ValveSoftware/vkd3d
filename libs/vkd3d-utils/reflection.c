@@ -416,6 +416,19 @@ struct rdef_header
     uint32_t creator_offset;
 };
 
+struct rdef_rd11
+{
+    uint32_t magic;
+    uint32_t header_size;
+    uint32_t buffer_size;
+    uint32_t binding_size;
+    uint32_t variable_size;
+    uint32_t type_size;
+    uint32_t field_size;
+    /* Always zero. Possibly either padding or a null terminator? */
+    uint32_t zero;
+};
+
 struct rdef_buffer
 {
     uint32_t name_offset;
@@ -449,10 +462,44 @@ static HRESULT d3d12_buffer_init(struct d3d12_buffer *buffer, const struct rdef_
 static HRESULT parse_rdef(struct d3d12_reflection *reflection, const struct vkd3d_shader_code *section)
 {
     const struct rdef_header *header;
+    const struct rdef_rd11 *rd11;
     HRESULT hr;
 
     if (!(header = get_data_ptr(section, 0, 1, sizeof(*header))))
         return E_INVALIDARG;
+
+    if (header->major_version >= 5)
+    {
+        if (!(rd11 = get_data_ptr(section, sizeof(*header), 1, sizeof(*rd11))))
+            return E_INVALIDARG;
+
+        /* RD11 is emitted for 5.0, the reversed version for 5.1 and 6.0.
+         * This corresponds to a difference in the binding_size member, but
+         * it's not clear why the magic also changed there. */
+        if (rd11->magic != TAG_RD11 && rd11->magic != TAG_RD11_REVERSE)
+        {
+            FIXME("Unknown tag %#x.\n", rd11->magic);
+            return E_INVALIDARG;
+        }
+
+        if (rd11->header_size != sizeof(struct rdef_header) + sizeof(struct rdef_rd11))
+        {
+            FIXME("Unexpected header size %#x.\n", rd11->header_size);
+            return E_INVALIDARG;
+        }
+
+        if (rd11->buffer_size != sizeof(struct rdef_buffer))
+        {
+            FIXME("Unexpected buffer size %#x.\n", rd11->buffer_size);
+            return E_INVALIDARG;
+        }
+
+        if (rd11->zero)
+        {
+            FIXME("Unexpected field %#x.\n", rd11->zero);
+            return E_INVALIDARG;
+        }
+    }
 
     reflection->desc.ConstantBuffers = header->buffer_count;
 
