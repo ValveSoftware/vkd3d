@@ -527,7 +527,7 @@ float4 main() : sv_target
     {
         switch (v.x)
         {
-            case 0:
+            case 1:
                 for (j = 0; j < v.z; j++)
                 {
                     c += 1.0f;
@@ -535,7 +535,7 @@ float4 main() : sv_target
                         continue;
                 }
                 break;
-            case 1:
+            case 0:
                 c += 2.0f;
                 break;
         }
@@ -545,10 +545,10 @@ float4 main() : sv_target
 }
 
 [test]
-uniform 0 uint4 0 0 3 1
+uniform 0 uint4 1 0 3 1
 draw quad
 probe all rgba (10.0, 11.0, 12.0, 13.0)
-uniform 0 uint4 1 0 3 1
+uniform 0 uint4 0 0 3 1
 draw quad
 probe all rgba (7.0, 8.0, 9.0, 10.0)
 
