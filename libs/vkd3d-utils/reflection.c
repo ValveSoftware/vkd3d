@@ -25,6 +25,13 @@ struct d3d12_type
 {
     ID3D12ShaderReflectionType ID3D12ShaderReflectionType_iface;
     D3D12_SHADER_TYPE_DESC desc;
+
+    struct d3d12_field *fields;
+};
+
+struct d3d12_field
+{
+    struct d3d12_type type;
 };
 
 struct d3d12_variable
@@ -91,9 +98,17 @@ static HRESULT STDMETHODCALLTYPE d3d12_type_GetDesc(
 static ID3D12ShaderReflectionType * STDMETHODCALLTYPE d3d12_type_GetMemberTypeByIndex(
         ID3D12ShaderReflectionType *iface, UINT index)
 {
-    FIXME("iface %p, index %u, stub!\n", iface, index);
+    struct d3d12_type *type = impl_from_ID3D12ShaderReflectionType(iface);
 
-    return NULL;
+    TRACE("iface %p, index %u.\n", iface, index);
+
+    if (index > type->desc.Members)
+    {
+        WARN("Invalid index %u.\n", index);
+        return &null_type.ID3D12ShaderReflectionType_iface;
+    }
+
+    return &type->fields[index].type.ID3D12ShaderReflectionType_iface;
 }
 
 static ID3D12ShaderReflectionType * STDMETHODCALLTYPE d3d12_type_GetMemberTypeByName(
@@ -348,6 +363,9 @@ static ULONG STDMETHODCALLTYPE d3d12_reflection_AddRef(ID3D12ShaderReflection *i
 
 static void free_type(struct d3d12_type *type)
 {
+    for (UINT i = 0; i < type->desc.Members; ++i)
+        free_type(&type->fields[i].type);
+    vkd3d_free(type->fields);
     vkd3d_free((void *)type->desc.Name);
 }
 
@@ -703,8 +721,15 @@ struct rdef_type
     uint32_t name_offset;
 };
 
-static HRESULT d3d12_type_init(struct d3d12_type *type, uint32_t type_offset,
-        uint32_t type_size, const struct vkd3d_shader_code *section)
+struct rdef_field
+{
+    uint32_t name_offset;
+    uint32_t type_offset;
+    uint32_t offset;
+};
+
+static HRESULT d3d12_type_init(struct d3d12_type *type, uint32_t type_offset, uint32_t type_size,
+        const struct vkd3d_shader_code *section, uint32_t field_offset)
 {
     struct rdef_type normalized_type = {0};
     const struct rdef_type *rdef_type;
@@ -726,7 +751,29 @@ static HRESULT d3d12_type_init(struct d3d12_type *type, uint32_t type_offset,
     type->desc.Columns = normalized_type.column_count;
     type->desc.Elements = normalized_type.element_count;
     type->desc.Members = normalized_type.field_count;
+    type->desc.Offset = field_offset;
     type->desc.Name = name;
+
+    if (normalized_type.field_count)
+    {
+        const struct rdef_field *rdef_fields;
+
+        if (!(rdef_fields = get_data_ptr(section, normalized_type.fields_offset,
+                normalized_type.field_count, sizeof(*rdef_fields))))
+            return E_INVALIDARG;
+
+        if (!(type->fields = vkd3d_calloc(normalized_type.field_count, sizeof(*type->fields))))
+            return false;
+
+        for (uint32_t i = 0; i < normalized_type.field_count; ++i)
+        {
+            const struct rdef_field *rdef_field = &rdef_fields[i];
+
+            if ((hr = d3d12_type_init(&type->fields[i].type, rdef_field->type_offset,
+                    type_size, section, rdef_field->offset)))
+                return hr;
+        }
+    }
 
     return S_OK;
 }
@@ -762,7 +809,7 @@ static HRESULT d3d12_variable_init(struct d3d12_variable *variable, const struct
             return E_OUTOFMEMORY;
     }
 
-    return d3d12_type_init(&variable->type, rdef_variable->type_offset, type_size, section);
+    return d3d12_type_init(&variable->type, rdef_variable->type_offset, type_size, section, 0);
 }
 
 static HRESULT d3d12_buffer_init(struct d3d12_buffer *buffer, const struct rdef_buffer *rdef_buffer,
