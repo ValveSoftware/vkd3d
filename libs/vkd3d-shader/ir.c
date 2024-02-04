@@ -3143,6 +3143,16 @@ struct vsir_cfg
     size_t *loops_by_header;
 
     struct vsir_block_list order;
+    struct cfg_loop_interval
+    {
+        /* `begin' is the position of the first block of the loop in
+         * the topological sort; `end' is the position of the first
+         * block after the loop. In other words, `begin' is where a
+         * `continue' instruction would jump and `end' is where a
+         * `break' instruction would jump. */
+        unsigned int begin, end;
+    } *loop_intervals;
+    size_t loop_interval_count, loop_interval_capacity;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3160,9 +3170,27 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
     vkd3d_free(cfg->blocks);
     vkd3d_free(cfg->loops);
     vkd3d_free(cfg->loops_by_header);
+    vkd3d_free(cfg->loop_intervals);
 
     if (TRACE_ON())
         vkd3d_string_buffer_cleanup(&cfg->debug_buffer);
+}
+
+static enum vkd3d_result vsir_cfg_add_loop_interval(struct vsir_cfg *cfg, unsigned int begin,
+        unsigned int end)
+{
+    struct cfg_loop_interval *interval;
+
+    if (!vkd3d_array_reserve((void **)&cfg->loop_intervals, &cfg->loop_interval_capacity,
+            cfg->loop_interval_count + 1, sizeof(*cfg->loop_intervals)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    interval = &cfg->loop_intervals[cfg->loop_interval_count++];
+
+    interval->begin = begin;
+    interval->end = end;
+
+    return VKD3D_OK;
 }
 
 static bool vsir_block_dominates(struct vsir_block *b1, struct vsir_block *b2)
@@ -3399,14 +3427,14 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
  * block without passing through the header block) belong to the same
  * loop.
  *
- * If the input CFG is reducible, each two loops are either disjoint
- * or one is a strict subset of the other, provided that each block
- * has at most one incoming back edge. If this condition does not
- * hold, a synthetic block can be introduced as the only back edge
- * block for the given header block, with all the previous back edge
- * now being forward edges to the synthetic block. This is not
- * currently implemented (but it is rarely found in practice
- * anyway). */
+ * If the input CFG is reducible its loops are properly nested (i.e.,
+ * each two loops are either disjoint or one is contained in the
+ * other), provided that each block has at most one incoming back
+ * edge. If this condition does not hold, a synthetic block can be
+ * introduced as the only back edge block for the given header block,
+ * with all the previous back edge now being forward edges to the
+ * synthetic block. This is not currently implemented (but it is
+ * rarely found in practice anyway). */
 static enum vkd3d_result vsir_cfg_scan_loop(struct vsir_block_list *loop, struct vsir_block *block,
         struct vsir_block *header)
 {
@@ -3499,6 +3527,7 @@ struct vsir_cfg_node_sorter
     {
         struct vsir_block_list *loop;
         unsigned int seen_count;
+        unsigned int begin;
     } *stack;
     size_t stack_count, stack_capacity;
     struct vsir_block_list available_blocks;
@@ -3525,6 +3554,7 @@ static enum vkd3d_result vsir_cfg_node_sorter_make_node_available(struct vsir_cf
     item = &sorter->stack[sorter->stack_count++];
     item->loop = loop;
     item->seen_count = 0;
+    item->begin = sorter->cfg->order.count;
 
     return VKD3D_OK;
 }
@@ -3649,6 +3679,10 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
             if (inner_stack_item->seen_count != inner_stack_item->loop->count)
                 break;
 
+            if ((ret = vsir_cfg_add_loop_interval(cfg, inner_stack_item->begin,
+                    cfg->order.count)) < 0)
+                goto fail;
+
             new_seen_count = inner_stack_item->loop->count;
             --sorter.stack_count;
         }
@@ -3697,6 +3731,9 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
         TRACE("%s\n", cfg->debug_buffer.buffer);
         vkd3d_string_buffer_clear(&cfg->debug_buffer);
+
+        for (i = 0; i < cfg->loop_interval_count; ++i)
+            TRACE("Loop interval %u - %u\n", cfg->loop_intervals[i].begin, cfg->loop_intervals[i].end);
     }
 
     return VKD3D_OK;
