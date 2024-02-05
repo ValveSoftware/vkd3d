@@ -32428,10 +32428,8 @@ static void test_resource_allocation_info(void)
     }
 
     info = ID3D12Device8_GetResourceAllocationInfo2(device8, 0, ARRAY_SIZE(desc_array1), desc_array1, infos1);
-    todo
     ok(info.Alignment >= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
             "Got unexpected alignment %"PRIu64".\n", info.Alignment);
-    todo
     check_alignment(info.SizeInBytes, info.Alignment);
     ok(info.SizeInBytes >= total, "Got unexpected size %"PRIu64".\n", info.SizeInBytes);
     ok(!infos1[0].Offset, "Got unexpected offset %"PRIu64".\n", infos1[0].Offset);

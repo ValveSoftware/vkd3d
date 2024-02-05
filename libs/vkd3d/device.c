@@ -4521,11 +4521,15 @@ static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResour
         D3D12_RESOURCE_ALLOCATION_INFO *info, UINT visible_mask, UINT count,
         const D3D12_RESOURCE_DESC1 *resource_descs, D3D12_RESOURCE_ALLOCATION_INFO1 *info1)
 {
-    FIXME("iface %p, info %p, visible_mask 0x%08x, count %u, resource_descs %p, info1 %p stub!\n",
+    struct d3d12_device *device = impl_from_ID3D12Device8(iface);
+
+    TRACE("iface %p, info %p, visible_mask 0x%08x, count %u, resource_descs %p, info1 %p.\n",
             iface, info, visible_mask, count, resource_descs, info1);
 
-    info->Alignment = 0;
-    info->SizeInBytes = ~(uint64_t)0;
+    debug_ignored_node_mask(visible_mask);
+
+    d3d12_device_get_resource1_allocation_info(device, info1, count, resource_descs, info);
+
     return info;
 }
 

@@ -1857,6 +1857,7 @@ static bool d3d12_resource_validate_texture_alignment(const D3D12_RESOURCE_DESC1
 
 HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC1 *desc, struct d3d12_device *device)
 {
+    const D3D12_MIP_REGION *mip_region = &desc->SamplerFeedbackMipRegion;
     const struct vkd3d_format *format;
 
     switch (desc->Dimension)
@@ -1925,6 +1926,12 @@ HRESULT d3d12_resource_validate_desc(const D3D12_RESOURCE_DESC1 *desc, struct d3
     }
 
     d3d12_validate_resource_flags(desc->Flags);
+
+    if (mip_region->Width && mip_region->Height && mip_region->Depth)
+    {
+        FIXME("Unhandled sampler feedback mip region size (%u, %u, %u).\n", mip_region->Width, mip_region->Height,
+                mip_region->Depth);
+    }
 
     return S_OK;
 }
