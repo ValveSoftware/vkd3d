@@ -32114,6 +32114,7 @@ static void test_resource_allocation_info(void)
 {
     D3D12_RESOURCE_ALLOCATION_INFO info;
     D3D12_RESOURCE_DESC desc;
+    ID3D12Device8 *device8;
     ID3D12Device4 *device4;
     ID3D12Device *device;
     uint64_t total = 0;
@@ -32164,6 +32165,7 @@ static void test_resource_allocation_info(void)
         {260, 512, 1, 1, DXGI_FORMAT_BC1_UNORM},
     };
     D3D12_RESOURCE_ALLOCATION_INFO1 infos1[ARRAY_SIZE(texture_tests)] = {0};
+    D3D12_RESOURCE_DESC1 desc_array1[ARRAY_SIZE(texture_tests)];
     D3D12_RESOURCE_DESC desc_array[ARRAY_SIZE(texture_tests)];
     uint64_t sizes[ARRAY_SIZE(texture_tests)];
 
@@ -32309,6 +32311,61 @@ static void test_resource_allocation_info(void)
         ID3D12Device4_Release(device4);
     }
 
+    if (FAILED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device8, (void **)&device8)))
+    {
+        skip("ID3D12Device8 not available; skipping GetResourceAllocationInfo2() tests.");
+        goto release;
+    }
+
+    for (i = 0; i < ARRAY_SIZE(texture_tests); ++i)
+    {
+        desc_array1[i].Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        desc_array1[i].Alignment = (i < 6) ? D3D12_SMALL_RESOURCE_PLACEMENT_ALIGNMENT
+                : D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        desc_array1[i].Width = texture_tests[i].width;
+        desc_array1[i].Height = texture_tests[i].height;
+        desc_array1[i].DepthOrArraySize = texture_tests[i].array_size;
+        desc_array1[i].MipLevels = texture_tests[i].miplevels;
+        desc_array1[i].Format = texture_tests[i].format;
+        desc_array1[i].SampleDesc.Count = 1;
+        desc_array1[i].SampleDesc.Quality = 0;
+        desc_array1[i].Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        desc_array1[i].Flags = 0;
+        memset(&desc_array1[i].SamplerFeedbackMipRegion, 0, sizeof(desc_array1[i].SamplerFeedbackMipRegion));
+    }
+
+    info = ID3D12Device8_GetResourceAllocationInfo2(device8, 0, ARRAY_SIZE(desc_array1), desc_array1, infos1);
+    todo
+    ok(info.Alignment >= D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+            "Got unexpected alignment %"PRIu64".\n", info.Alignment);
+    todo
+    check_alignment(info.SizeInBytes, info.Alignment);
+    ok(info.SizeInBytes >= total, "Got unexpected size %"PRIu64".\n", info.SizeInBytes);
+    ok(!infos1[0].Offset, "Got unexpected offset %"PRIu64".\n", infos1[0].Offset);
+
+    for (i = 0; i < ARRAY_SIZE(infos1); ++i)
+    {
+        vkd3d_test_push_context("Test %u", i);
+
+        ok(infos1[i].Alignment >= desc_array1[i].Alignment,
+                "Got unexpected alignment %"PRIu64".\n", infos1[i].Alignment);
+        check_alignment(infos1[i].Offset, infos1[i].Alignment);
+        check_alignment(infos1[i].SizeInBytes, infos1[i].Alignment);
+        ok(infos1[i].SizeInBytes == sizes[i], "Got unexpected size %"PRIu64".\n", infos1[i].SizeInBytes);
+
+        if (!i)
+            continue;
+
+        ok(infos1[i].Offset - infos1[i - 1].Offset >= infos1[i - 1].SizeInBytes,
+                "Got unexpected prev size %"PRIu64", prev offset %"PRIu64", offset %"PRIu64".\n",
+                infos1[i - 1].SizeInBytes, infos1[i - 1].Offset, infos1[i].Offset);
+
+        vkd3d_test_pop_context();
+    }
+
+    ID3D12Device8_Release(device8);
+
+release:
     refcount = ID3D12Device_Release(device);
     ok(!refcount, "ID3D12Device has %u references left.\n", (unsigned int)refcount);
 }
