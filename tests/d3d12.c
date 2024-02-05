@@ -2142,13 +2142,16 @@ static void test_create_placed_resource(void)
 {
     ID3D12ProtectedResourceSession *protected_session;
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
-    ID3D12Resource *resource, *resource2;
+    ID3D12Resource *resource, *resource_2;
+    D3D12_RESOURCE_DESC1 resource_desc1;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
+    ID3D12Resource2 *resource2;
     ID3D12Resource1 *resource1;
     D3D12_HEAP_DESC heap_desc;
+    ID3D12Device8 *device8;
     ID3D12Heap *heap;
     unsigned int i;
     ULONG refcount;
@@ -2239,6 +2242,35 @@ static void test_create_placed_resource(void)
     refcount = ID3D12Resource_Release(resource);
     ok(!refcount, "ID3D12Resource has %u references left.\n", (unsigned int)refcount);
 
+    if (SUCCEEDED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device8, (void **)&device8)))
+    {
+        resource_desc1.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+        resource_desc1.Alignment = 0;
+        resource_desc1.Width = 32;
+        resource_desc1.Height = 1;
+        resource_desc1.DepthOrArraySize = 1;
+        resource_desc1.MipLevels = 1;
+        resource_desc1.Format = DXGI_FORMAT_UNKNOWN;
+        resource_desc1.SampleDesc.Count = 1;
+        resource_desc1.SampleDesc.Quality = 0;
+        resource_desc1.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        resource_desc1.Flags = 0;
+        memset(&resource_desc1.SamplerFeedbackMipRegion, 0, sizeof(resource_desc1.SamplerFeedbackMipRegion));
+
+        hr = ID3D12Device8_CreatePlacedResource1(device8, heap, 0,
+                &resource_desc1, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource2, (void **)&resource2);
+        todo
+        ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
+
+        if (!hr)
+        {
+            check_interface(resource2, &IID_ID3D12Resource2, true);
+            ID3D12Resource2_Release(resource2);
+        }
+
+        ID3D12Device8_Release(device8);
+    }
+
     /* The clear value must be NULL for buffers. */
     hr = ID3D12Device_CreatePlacedResource(device, heap, 0,
             &resource_desc, D3D12_RESOURCE_STATE_COMMON, &clear_value,
@@ -2261,11 +2293,11 @@ static void test_create_placed_resource(void)
     ok(!refcount, "Got unexpected refcount %u.\n", (unsigned int)refcount);
 
     hr = ID3D12Device_CreatePlacedResource(device, heap, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
-            &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource, (void **)&resource2);
+            &resource_desc, D3D12_RESOURCE_STATE_COMMON, NULL, &IID_ID3D12Resource, (void **)&resource_2);
     ok(hr == S_OK, "Failed to create placed resource, hr %#x.\n", hr);
 
     ID3D12Resource_Release(resource);
-    ID3D12Resource_Release(resource2);
+    ID3D12Resource_Release(resource_2);
 
     for (i = 0; i < ARRAY_SIZE(invalid_buffer_desc_tests); ++i)
     {
