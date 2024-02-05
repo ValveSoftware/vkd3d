@@ -1545,12 +1545,14 @@ static void test_create_command_signature(void)
 
 static void test_create_committed_resource(void)
 {
+    ID3D12ProtectedResourceSession *protected_session;
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
     D3D12_HEAP_PROPERTIES heap_properties;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
+    ID3D12Resource1 *resource1;
     ID3D12Resource *resource;
     ID3D12Device4 *device4;
     unsigned int i;
@@ -1884,10 +1886,17 @@ static void test_create_committed_resource(void)
 
         hr = ID3D12Device4_CreateCommittedResource1(device4, &heap_properties, D3D12_HEAP_FLAG_NONE,
                 &resource_desc, D3D12_RESOURCE_STATE_RENDER_TARGET, &clear_value, NULL,
-                &IID_ID3D12Resource, (void **)&resource);
+                &IID_ID3D12Resource1, (void **)&resource1);
         ok(hr == S_OK, "Failed to create committed resource, hr %#x.\n", hr);
-        ID3D12Resource_Release(resource);
 
+        check_interface(resource1, &IID_ID3D12Resource1, true);
+
+        hr = ID3D12Resource1_GetProtectedResourceSession(resource1, &IID_ID3D12ProtectedResourceSession,
+                (void **)&protected_session);
+        todo
+        ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+
+        ID3D12Resource1_Release(resource1);
         ID3D12Device4_Release(device4);
     }
 
@@ -2140,12 +2149,14 @@ done:
 
 static void test_create_placed_resource(void)
 {
+    ID3D12ProtectedResourceSession *protected_session;
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
     ID3D12Resource *resource, *resource2;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
+    ID3D12Resource1 *resource1;
     D3D12_HEAP_DESC heap_desc;
     ID3D12Heap *heap;
     unsigned int i;
@@ -2225,6 +2236,15 @@ static void test_create_placed_resource(void)
 
     gpu_address = ID3D12Resource_GetGPUVirtualAddress(resource);
     ok(gpu_address, "Got unexpected GPU virtual address %#"PRIx64".\n", gpu_address);
+
+    if (SUCCEEDED(ID3D12Resource_QueryInterface(resource, &IID_ID3D12Resource1, (void **)&resource1)))
+    {
+        hr = ID3D12Resource1_GetProtectedResourceSession(resource1, &IID_ID3D12ProtectedResourceSession,
+                (void **)&protected_session);
+        todo
+        ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
+        ID3D12Resource1_Release(resource1);
+    }
 
     refcount = ID3D12Resource_Release(resource);
     ok(!refcount, "ID3D12Resource has %u references left.\n", (unsigned int)refcount);
