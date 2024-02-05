@@ -20068,9 +20068,11 @@ static void check_copyable_footprints_(unsigned int line, const D3D12_RESOURCE_D
 static void test_get_copyable_footprints(void)
 {
     D3D12_PLACED_SUBRESOURCE_FOOTPRINT layouts[10];
+    D3D12_RESOURCE_DESC1 resource_desc1;
     uint64_t row_sizes[10], total_size;
     D3D12_RESOURCE_DESC resource_desc;
     unsigned int sub_resource_count;
+    ID3D12Device8 *device8;
     unsigned int i, j, k;
     ID3D12Device *device;
     UINT row_counts[10];
@@ -20307,6 +20309,32 @@ static void test_get_copyable_footprints(void)
             layouts, row_counts, row_sizes, &total_size);
     check_copyable_footprints(&resource_desc, 0, 1, 0,
             layouts, row_counts, row_sizes, &total_size);
+
+    if (SUCCEEDED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device8, (void **)&device8)))
+    {
+        resource_desc1.Dimension = resource_desc.Dimension;
+        resource_desc1.Alignment = resource_desc.Alignment;
+        resource_desc1.Width = resource_desc.Width;
+        resource_desc1.Height = resource_desc.Height;
+        resource_desc1.DepthOrArraySize = resource_desc.DepthOrArraySize;
+        resource_desc1.MipLevels = resource_desc.MipLevels;
+        resource_desc1.Format = resource_desc.Format;
+        resource_desc1.SampleDesc.Count = resource_desc.SampleDesc.Count;
+        resource_desc1.SampleDesc.Quality = resource_desc.SampleDesc.Quality;
+        resource_desc1.Flags = resource_desc.Flags;
+        memset(&resource_desc1.SamplerFeedbackMipRegion, 0, sizeof(resource_desc1.SamplerFeedbackMipRegion));
+        memset(layouts, 0, sizeof(layouts));
+        memset(row_counts, 0, sizeof(row_counts));
+        memset(row_sizes, 0, sizeof(row_sizes));
+        total_size = 0;
+        ID3D12Device8_GetCopyableFootprints1(device8, &resource_desc1, 0, 1, 0,
+                layouts, row_counts, row_sizes, &total_size);
+        todo
+        check_copyable_footprints(&resource_desc, 0, 1, 0,
+                layouts, row_counts, row_sizes, &total_size);
+
+        ID3D12Device8_Release(device8);
+    }
 
     for (i = 0; i < ARRAY_SIZE(invalid_descs); ++i)
     {
