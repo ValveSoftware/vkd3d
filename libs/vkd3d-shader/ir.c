@@ -3068,7 +3068,7 @@ static void vsir_block_list_remove_index(struct vsir_block_list *list, size_t id
 
 struct vsir_block
 {
-    unsigned int label;
+    unsigned int label, order_pos;
     /* `begin' points to the instruction immediately following the
      * LABEL that introduces the block. `end' points to the terminator
      * instruction (either BRANCH or RET). They can coincide, meaning
@@ -3151,6 +3151,27 @@ struct vsir_cfg
          * `continue' instruction would jump and `end' is where a
          * `break' instruction would jump. */
         unsigned int begin, end;
+        /* Each loop interval can be natural or synthetic. Natural
+         * intervals are added to represent loops given by CFG back
+         * edges. Synthetic intervals do not correspond to loops in
+         * the input CFG, but are added to leverage their `break'
+         * instruction in order to execute forward edges.
+         *
+         * For a synthetic loop interval it's not really important
+         * which one is the `begin' block, since we don't need to
+         * execute `continue' for them. So we have some leeway for
+         * moving it provided that these conditions are met: 1. the
+         * interval must contain all `break' instructions that target
+         * it, which in practice means that `begin' can be moved
+         * backward and not forward; 2. intervals must remain properly
+         * nested (for each pair of intervals, either one contains the
+         * other or they are disjoint).
+         *
+         * Subject to these conditions, we try to reuse the same loop
+         * as much as possible (if many forward edges target the same
+         * block), but we still try to keep `begin' as forward as
+         * possible, to keep the loop scope as small as possible. */
+        bool synthetic;
     } *loop_intervals;
     size_t loop_interval_count, loop_interval_capacity;
 };
@@ -3177,7 +3198,7 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
 }
 
 static enum vkd3d_result vsir_cfg_add_loop_interval(struct vsir_cfg *cfg, unsigned int begin,
-        unsigned int end)
+        unsigned int end, bool synthetic)
 {
     struct cfg_loop_interval *interval;
 
@@ -3189,6 +3210,7 @@ static enum vkd3d_result vsir_cfg_add_loop_interval(struct vsir_cfg *cfg, unsign
 
     interval->begin = begin;
     interval->end = end;
+    interval->synthetic = synthetic;
 
     return VKD3D_OK;
 }
@@ -3661,6 +3683,7 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
         }
 
         vsir_block_list_remove_index(&sorter.available_blocks, i);
+        block->order_pos = cfg->order.count;
         if ((ret = vsir_block_list_add_checked(&cfg->order, block)) < 0)
             goto fail;
 
@@ -3680,7 +3703,7 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
                 break;
 
             if ((ret = vsir_cfg_add_loop_interval(cfg, inner_stack_item->begin,
-                    cfg->order.count)) < 0)
+                    cfg->order.count, false)) < 0)
                 goto fail;
 
             new_seen_count = inner_stack_item->loop->count;
@@ -3731,9 +3754,6 @@ static enum vkd3d_result vsir_cfg_sort_nodes(struct vsir_cfg *cfg)
 
         TRACE("%s\n", cfg->debug_buffer.buffer);
         vkd3d_string_buffer_clear(&cfg->debug_buffer);
-
-        for (i = 0; i < cfg->loop_interval_count; ++i)
-            TRACE("Loop interval %u - %u\n", cfg->loop_intervals[i].begin, cfg->loop_intervals[i].end);
     }
 
     return VKD3D_OK;
@@ -3744,6 +3764,127 @@ fail:
     vsir_block_list_cleanup(&sorter.available_blocks);
 
     return ret;
+}
+
+static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_cfg *cfg)
+{
+    enum vkd3d_result ret;
+    size_t i, j, k;
+
+    for (i = 0; i < cfg->block_count; ++i)
+    {
+        struct vsir_block *block = &cfg->blocks[i];
+
+        if (block->label == 0)
+            continue;
+
+        for (j = 0; j < block->successors.count; ++j)
+        {
+            struct vsir_block *successor = block->successors.blocks[j];
+            struct cfg_loop_interval *extend = NULL;
+            unsigned int begin;
+            enum
+            {
+                ACTION_DO_NOTHING,
+                ACTION_CREATE_NEW,
+                ACTION_EXTEND,
+            } action = ACTION_CREATE_NEW;
+
+            /* We've already contructed loop intervals for the back
+             * edges, there's nothing more to do. */
+            if (vsir_block_dominates(successor, block))
+                continue;
+
+            assert(block->order_pos < successor->order_pos);
+
+            /* Jumping from a block to the following one is always
+             * possible, so nothing to do. */
+            if (block->order_pos + 1 == successor->order_pos)
+                continue;
+
+            /* Let's look for a loop interval that already breaks at
+             * `successor' and either contains or can be extended to
+             * contain `block'. */
+            for (k = 0; k < cfg->loop_interval_count; ++k)
+            {
+                struct cfg_loop_interval *interval = &cfg->loop_intervals[k];
+
+                if (interval->end != successor->order_pos)
+                    continue;
+
+                if (interval->begin <= block->order_pos)
+                {
+                    action = ACTION_DO_NOTHING;
+                    break;
+                }
+
+                if (interval->synthetic)
+                {
+                    action = ACTION_EXTEND;
+                    extend = interval;
+                    break;
+                }
+            }
+
+            if (action == ACTION_DO_NOTHING)
+                continue;
+
+            /* Ok, we have to decide where the new or replacing
+             * interval has to begin. These are the rules: 1. it must
+             * begin before `block'; 2. intervals must be properly
+             * nested; 3. the new interval should begin as late as
+             * possible, to limit control flow depth and extension. */
+            begin = block->order_pos;
+
+            /* Our candidate interval is always [begin,
+             * successor->order_pos), and we move `begin' backward
+             * until the candidate interval contains all the intervals
+             * whose endpoint lies in the candidate interval
+             * itself. */
+            for (k = 0; k < cfg->loop_interval_count; ++k)
+            {
+                struct cfg_loop_interval *interval = &cfg->loop_intervals[k];
+
+                if (begin < interval->end && interval->end < successor->order_pos)
+                    begin = min(begin, interval->begin);
+            }
+
+            /* New we have to care about the intervals whose begin
+             * point lies in the candidate interval. We cannot move
+             * the candidate interval endpoint, because it is
+             * important that the loop break target matches
+             * `successor'. So we have to move that interval's begin
+             * point to the begin point of the candidate interval,
+             * i.e. `begin'. But what if the interval we should extend
+             * backward is not synthetic? This cannot happen,
+             * fortunately, because it would mean that there is a jump
+             * entering a loop via a block which is not the loop
+             * header, so the CFG would not be reducible. */
+            for (k = 0; k < cfg->loop_interval_count; ++k)
+            {
+                struct cfg_loop_interval *interval = &cfg->loop_intervals[k];
+
+                if (interval->begin < successor->order_pos && successor->order_pos < interval->end)
+                {
+                    if (interval->synthetic)
+                        interval->begin = min(begin, interval->begin);
+                    assert(begin >= interval->begin);
+                }
+            }
+
+            if (action == ACTION_EXTEND)
+                extend->begin = begin;
+            else if ((ret = vsir_cfg_add_loop_interval(cfg, begin, successor->order_pos, true)) < 0)
+                return ret;
+        }
+    }
+
+    if (TRACE_ON())
+        for (i = 0; i < cfg->loop_interval_count; ++i)
+            TRACE("%s loop interval %u - %u\n", cfg->loop_intervals[i].synthetic ? "Synthetic" : "Natural",
+                    cfg->loop_intervals[i].begin, cfg->loop_intervals[i].end);
+
+    return VKD3D_OK;
 }
 
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
@@ -3779,6 +3920,12 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         }
 
         if ((result = vsir_cfg_sort_nodes(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
         {
             vsir_cfg_cleanup(&cfg);
             return result;
