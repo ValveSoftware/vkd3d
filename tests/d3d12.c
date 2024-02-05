@@ -1507,12 +1507,15 @@ static void test_create_committed_resource(void)
     ID3D12ProtectedResourceSession *protected_session;
     D3D12_GPU_VIRTUAL_ADDRESS gpu_address;
     D3D12_HEAP_PROPERTIES heap_properties;
+    D3D12_RESOURCE_DESC1 resource_desc1;
     D3D12_RESOURCE_DESC resource_desc;
     ID3D12Device *device, *tmp_device;
     D3D12_CLEAR_VALUE clear_value;
     D3D12_RESOURCE_STATES state;
+    ID3D12Resource2 *resource2;
     ID3D12Resource1 *resource1;
     ID3D12Resource *resource;
+    ID3D12Device8 *device8;
     ID3D12Device4 *device4;
     unsigned int i;
     ULONG refcount;
@@ -1856,6 +1859,36 @@ static void test_create_committed_resource(void)
 
         ID3D12Resource1_Release(resource1);
         ID3D12Device4_Release(device4);
+    }
+
+    if (SUCCEEDED(ID3D12Device_QueryInterface(device, &IID_ID3D12Device8, (void **)&device8)))
+    {
+        resource_desc1.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+        resource_desc1.Alignment = 0;
+        resource_desc1.Width = 32;
+        resource_desc1.Height = 32;
+        resource_desc1.DepthOrArraySize = 1;
+        resource_desc1.MipLevels = 1;
+        resource_desc1.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        resource_desc1.SampleDesc.Count = 1;
+        resource_desc1.SampleDesc.Quality = 0;
+        resource_desc1.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+        resource_desc1.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        memset(&resource_desc1.SamplerFeedbackMipRegion, 0, sizeof(resource_desc1.SamplerFeedbackMipRegion));
+
+        hr = ID3D12Device8_CreateCommittedResource2(device8, &heap_properties, D3D12_HEAP_FLAG_NONE,
+                &resource_desc1, D3D12_RESOURCE_STATE_RENDER_TARGET, &clear_value, NULL,
+                &IID_ID3D12Resource2, (void **)&resource2);
+        todo
+        ok(hr == S_OK, "Failed to create committed resource, hr %#x.\n", hr);
+
+        if (!hr)
+        {
+            check_interface(resource2, &IID_ID3D12Resource2, true);
+            ID3D12Resource2_Release(resource2);
+        }
+
+        ID3D12Device8_Release(device8);
     }
 
     refcount = ID3D12Device_Release(device);
