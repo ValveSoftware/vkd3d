@@ -3508,7 +3508,7 @@ static void vk_image_subresource_layers_from_d3d12(VkImageSubresourceLayers *sub
 }
 
 static void vk_extent_3d_from_d3d12_miplevel(VkExtent3D *extent,
-        const D3D12_RESOURCE_DESC *resource_desc, unsigned int miplevel_idx)
+        const D3D12_RESOURCE_DESC1 *resource_desc, unsigned int miplevel_idx)
 {
     extent->width = d3d12_resource_desc_get_width(resource_desc, miplevel_idx);
     extent->height = d3d12_resource_desc_get_height(resource_desc, miplevel_idx);
@@ -3517,7 +3517,7 @@ static void vk_extent_3d_from_d3d12_miplevel(VkExtent3D *extent,
 
 static void vk_buffer_image_copy_from_d3d12(VkBufferImageCopy *copy,
         const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *footprint, unsigned int sub_resource_idx,
-        const D3D12_RESOURCE_DESC *image_desc, const struct vkd3d_format *format,
+        const D3D12_RESOURCE_DESC1 *image_desc, const struct vkd3d_format *format,
         const D3D12_BOX *src_box, unsigned int dst_x, unsigned int dst_y, unsigned int dst_z)
 {
     copy->bufferOffset = footprint->Offset;
@@ -3558,7 +3558,7 @@ static void vk_buffer_image_copy_from_d3d12(VkBufferImageCopy *copy,
 
 static void vk_image_buffer_copy_from_d3d12(VkBufferImageCopy *copy,
         const D3D12_PLACED_SUBRESOURCE_FOOTPRINT *footprint, unsigned int sub_resource_idx,
-        const D3D12_RESOURCE_DESC *image_desc, const struct vkd3d_format *format,
+        const D3D12_RESOURCE_DESC1 *image_desc, const struct vkd3d_format *format,
         const D3D12_BOX *src_box, unsigned int dst_x, unsigned int dst_y, unsigned int dst_z)
 {
     VkDeviceSize row_count = footprint->Footprint.Height / format->block_height;
@@ -3588,7 +3588,7 @@ static void vk_image_buffer_copy_from_d3d12(VkBufferImageCopy *copy,
 
 static void vk_image_copy_from_d3d12(VkImageCopy *image_copy,
         unsigned int src_sub_resource_idx, unsigned int dst_sub_resource_idx,
-        const D3D12_RESOURCE_DESC *src_desc, const D3D12_RESOURCE_DESC *dst_desc,
+        const D3D12_RESOURCE_DESC1 *src_desc, const D3D12_RESOURCE_DESC1 *dst_desc,
         const struct vkd3d_format *src_format, const struct vkd3d_format *dst_format,
         const D3D12_BOX *src_box, unsigned int dst_x, unsigned int dst_y, unsigned int dst_z)
 {
@@ -3621,7 +3621,7 @@ static HRESULT d3d12_command_list_allocate_transfer_buffer(struct d3d12_command_
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
     struct d3d12_device *device = list->device;
     D3D12_HEAP_PROPERTIES heap_properties;
-    D3D12_RESOURCE_DESC buffer_desc;
+    D3D12_RESOURCE_DESC1 buffer_desc;
     HRESULT hr;
 
     memset(&heap_properties, 0, sizeof(heap_properties));
@@ -3671,8 +3671,8 @@ static void d3d12_command_list_copy_incompatible_texture_region(struct d3d12_com
         unsigned int src_sub_resource_idx, const struct vkd3d_format *src_format, unsigned int layer_count)
 {
     const struct vkd3d_vk_device_procs *vk_procs = &list->device->vk_procs;
-    const D3D12_RESOURCE_DESC *dst_desc = &dst_resource->desc;
-    const D3D12_RESOURCE_DESC *src_desc = &src_resource->desc;
+    const D3D12_RESOURCE_DESC1 *dst_desc = &dst_resource->desc;
+    const D3D12_RESOURCE_DESC1 *src_desc = &src_resource->desc;
     unsigned int dst_miplevel_idx, src_miplevel_idx;
     struct vkd3d_buffer transfer_buffer;
     VkBufferImageCopy buffer_image_copy;

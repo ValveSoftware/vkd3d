@@ -182,7 +182,7 @@ struct vkd3d_image_resource_create_info
     const void *next;
 
     VkImage vk_image;
-    D3D12_RESOURCE_DESC desc;
+    D3D12_RESOURCE_DESC1 desc;
     unsigned int flags;
     D3D12_RESOURCE_STATES present_state;
 };

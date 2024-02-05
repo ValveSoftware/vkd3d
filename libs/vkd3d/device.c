@@ -1970,7 +1970,7 @@ static HRESULT vkd3d_select_queues(const struct vkd3d_instance *vkd3d_instance,
 static bool d3d12_is_64k_msaa_supported(struct d3d12_device *device)
 {
     struct vkd3d_resource_allocation_info info;
-    D3D12_RESOURCE_DESC resource_desc;
+    D3D12_RESOURCE_DESC1 resource_desc;
 
     memset(&resource_desc, 0, sizeof(resource_desc));
     resource_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -3732,6 +3732,14 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device7 *
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);
 }
 
+static void d3d12_resource_desc1_from_desc(D3D12_RESOURCE_DESC1 *desc1, const D3D12_RESOURCE_DESC *desc)
+{
+    memcpy(desc1, desc, sizeof(*desc));
+    desc1->SamplerFeedbackMipRegion.Width = 0;
+    desc1->SamplerFeedbackMipRegion.Height = 0;
+    desc1->SamplerFeedbackMipRegion.Depth = 0;
+}
+
 static void d3d12_resource_allocation_info1_from_vkd3d(D3D12_RESOURCE_ALLOCATION_INFO1 *result,
         const struct vkd3d_resource_allocation_info *info)
 {
@@ -3740,12 +3748,12 @@ static void d3d12_resource_allocation_info1_from_vkd3d(D3D12_RESOURCE_ALLOCATION
     result->SizeInBytes = info->size_in_bytes;
 }
 
-static void d3d12_device_get_resource_allocation_info(struct d3d12_device *device,
-        D3D12_RESOURCE_ALLOCATION_INFO1 *infos1, unsigned int count, const D3D12_RESOURCE_DESC *resource_descs,
+static void d3d12_device_get_resource1_allocation_info(struct d3d12_device *device,
+        D3D12_RESOURCE_ALLOCATION_INFO1 *infos1, unsigned int count, const D3D12_RESOURCE_DESC1 *resource_descs,
         D3D12_RESOURCE_ALLOCATION_INFO *result)
 {
     struct vkd3d_resource_allocation_info info;
-    const D3D12_RESOURCE_DESC *desc;
+    const D3D12_RESOURCE_DESC1 *desc;
     uint64_t requested_alignment;
     unsigned int i;
 
@@ -3818,6 +3826,36 @@ invalid:
     TRACE("Alignment %#"PRIx64".\n", result->Alignment);
 }
 
+static void d3d12_device_get_resource_allocation_info(struct d3d12_device *device,
+        D3D12_RESOURCE_ALLOCATION_INFO1 *infos1, unsigned int count, const D3D12_RESOURCE_DESC *resource_descs,
+        D3D12_RESOURCE_ALLOCATION_INFO *result)
+{
+    /* Avoid spurious compiler warning for uninitialized use. */
+    D3D12_RESOURCE_DESC1 resource_descs1[4] = {0};
+    D3D12_RESOURCE_DESC1 *descs1;
+    unsigned int i;
+
+    if (count <= ARRAY_SIZE(resource_descs1))
+    {
+        descs1 = resource_descs1;
+    }
+    else if (!(descs1 = vkd3d_calloc(count, sizeof(*descs1))))
+    {
+        ERR("Failed to allocate %u resource descriptions.\n", count);
+        result->SizeInBytes = UINT64_MAX;
+        result->Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT;
+        return;
+    }
+
+    for (i = 0; i < count; ++i)
+        d3d12_resource_desc1_from_desc(&descs1[i], &resource_descs[i]);
+
+    d3d12_device_get_resource1_allocation_info(device, infos1, count, descs1, result);
+
+    if (descs1 != resource_descs1)
+        vkd3d_free(descs1);
+}
+
 static D3D12_RESOURCE_ALLOCATION_INFO * STDMETHODCALLTYPE d3d12_device_GetResourceAllocationInfo(
         ID3D12Device7 *iface, D3D12_RESOURCE_ALLOCATION_INFO *info, UINT visible_mask,
         UINT count, const D3D12_RESOURCE_DESC *resource_descs)
@@ -3883,6 +3921,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource(ID3D12Devi
         const D3D12_CLEAR_VALUE *optimized_clear_value, REFIID iid, void **resource)
 {
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+    D3D12_RESOURCE_DESC1 resource_desc;
     struct d3d12_resource *object;
     HRESULT hr;
 
@@ -3891,14 +3930,16 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource(ID3D12Devi
             iface, heap_properties, heap_flags, desc, initial_state,
             optimized_clear_value, debugstr_guid(iid), resource);
 
+    d3d12_resource_desc1_from_desc(&resource_desc, desc);
+
     if (FAILED(hr = d3d12_committed_resource_create(device, heap_properties, heap_flags,
-            desc, initial_state, optimized_clear_value, NULL, &object)))
+            &resource_desc, initial_state, optimized_clear_value, NULL, &object)))
     {
         *resource = NULL;
         return hr;
     }
 
-    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
+    return return_interface(&object->ID3D12Resource2_iface, &IID_ID3D12Resource2, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap(ID3D12Device7 *iface,
@@ -3926,6 +3967,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePlacedResource(ID3D12Device7
         const D3D12_CLEAR_VALUE *optimized_clear_value, REFIID iid, void **resource)
 {
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+    D3D12_RESOURCE_DESC1 resource_desc;
     struct d3d12_heap *heap_object;
     struct d3d12_resource *object;
     HRESULT hr;
@@ -3936,12 +3978,13 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreatePlacedResource(ID3D12Device7
             optimized_clear_value, debugstr_guid(iid), resource);
 
     heap_object = unsafe_impl_from_ID3D12Heap(heap);
+    d3d12_resource_desc1_from_desc(&resource_desc, desc);
 
     if (FAILED(hr = d3d12_placed_resource_create(device, heap_object, heap_offset,
-            desc, initial_state, optimized_clear_value, &object)))
+            &resource_desc, initial_state, optimized_clear_value, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
+    return return_interface(&object->ID3D12Resource2_iface, &IID_ID3D12Resource2, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateReservedResource(ID3D12Device7 *iface,
@@ -3949,17 +3992,20 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateReservedResource(ID3D12Devic
         const D3D12_CLEAR_VALUE *optimized_clear_value, REFIID iid, void **resource)
 {
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+    D3D12_RESOURCE_DESC1 resource_desc;
     struct d3d12_resource *object;
     HRESULT hr;
 
     TRACE("iface %p, desc %p, initial_state %#x, optimized_clear_value %p, iid %s, resource %p.\n",
             iface, desc, initial_state, optimized_clear_value, debugstr_guid(iid), resource);
 
+    d3d12_resource_desc1_from_desc(&resource_desc, desc);
+
     if (FAILED(hr = d3d12_reserved_resource_create(device,
-            desc, initial_state, optimized_clear_value, &object)))
+            &resource_desc, initial_state, optimized_clear_value, &object)))
         return hr;
 
-    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
+    return return_interface(&object->ID3D12Resource2_iface, &IID_ID3D12Resource2, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateSharedHandle(ID3D12Device7 *iface,
@@ -4046,22 +4092,15 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_GetDeviceRemovedReason(ID3D12Devic
     return device->removed_reason;
 }
 
-static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device7 *iface,
-        const D3D12_RESOURCE_DESC *desc, UINT first_sub_resource, UINT sub_resource_count,
-        UINT64 base_offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts,
-        UINT *row_counts, UINT64 *row_sizes, UINT64 *total_bytes)
+static void d3d12_device_get_copyable_footprints(struct d3d12_device *device,
+        const D3D12_RESOURCE_DESC1 *desc, unsigned int first_sub_resource, unsigned int sub_resource_count,
+        uint64_t base_offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts, UINT *row_counts,
+        UINT64 *row_sizes, UINT64 *total_bytes)
 {
-    struct d3d12_device *device = impl_from_ID3D12Device7(iface);
-
     unsigned int i, sub_resource_idx, miplevel_idx, row_count, row_size, row_pitch;
     unsigned int width, height, depth, plane_count, sub_resources_per_plane;
     const struct vkd3d_format *format;
     uint64_t offset, size, total;
-
-    TRACE("iface %p, desc %p, first_sub_resource %u, sub_resource_count %u, base_offset %#"PRIx64", "
-            "layouts %p, row_counts %p, row_sizes %p, total_bytes %p.\n",
-            iface, desc, first_sub_resource, sub_resource_count, base_offset,
-            layouts, row_counts, row_sizes, total_bytes);
 
     if (layouts)
         memset(layouts, 0xff, sizeof(*layouts) * sub_resource_count);
@@ -4129,6 +4168,25 @@ static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device7 *
     }
     if (total_bytes)
         *total_bytes = total;
+}
+
+static void STDMETHODCALLTYPE d3d12_device_GetCopyableFootprints(ID3D12Device7 *iface,
+        const D3D12_RESOURCE_DESC *desc, UINT first_sub_resource, UINT sub_resource_count,
+        UINT64 base_offset, D3D12_PLACED_SUBRESOURCE_FOOTPRINT *layouts,
+        UINT *row_counts, UINT64 *row_sizes, UINT64 *total_bytes)
+{
+    struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+    D3D12_RESOURCE_DESC1 resource_desc;
+
+    TRACE("iface %p, desc %p, first_sub_resource %u, sub_resource_count %u, base_offset %#"PRIx64", "
+            "layouts %p, row_counts %p, row_sizes %p, total_bytes %p.\n",
+            iface, desc, first_sub_resource, sub_resource_count, base_offset,
+            layouts, row_counts, row_sizes, total_bytes);
+
+    d3d12_resource_desc1_from_desc(&resource_desc, desc);
+
+    d3d12_device_get_copyable_footprints(device, &resource_desc, first_sub_resource, sub_resource_count,
+            base_offset, layouts, row_counts, row_sizes, total_bytes);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateQueryHeap(ID3D12Device7 *iface,
@@ -4297,6 +4355,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource1(ID3D12Dev
         ID3D12ProtectedResourceSession *protected_session, REFIID iid, void **resource)
 {
     struct d3d12_device *device = impl_from_ID3D12Device7(iface);
+    D3D12_RESOURCE_DESC1 resource_desc;
     struct d3d12_resource *object;
     HRESULT hr;
 
@@ -4305,14 +4364,16 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CreateCommittedResource1(ID3D12Dev
             iface, heap_properties, heap_flags, desc, initial_state,
             optimized_clear_value, protected_session, debugstr_guid(iid), resource);
 
+    d3d12_resource_desc1_from_desc(&resource_desc, desc);
+
     if (FAILED(hr = d3d12_committed_resource_create(device, heap_properties, heap_flags,
-            desc, initial_state, optimized_clear_value, protected_session, &object)))
+            &resource_desc, initial_state, optimized_clear_value, protected_session, &object)))
     {
         *resource = NULL;
         return hr;
     }
 
-    return return_interface(&object->ID3D12Resource1_iface, &IID_ID3D12Resource1, iid, resource);
+    return return_interface(&object->ID3D12Resource2_iface, &IID_ID3D12Resource2, iid, resource);
 }
 
 static HRESULT STDMETHODCALLTYPE d3d12_device_CreateHeap1(ID3D12Device7 *iface,
