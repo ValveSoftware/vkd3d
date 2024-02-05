@@ -1725,7 +1725,7 @@ static HRESULT STDMETHODCALLTYPE d3d12_resource_GetProtectedResourceSession(ID3D
 {
     FIXME("iface %p, iid %s, session %p stub!\n", iface, debugstr_guid(iid), session);
 
-    return E_NOTIMPL;
+    return DXGI_ERROR_NOT_FOUND;
 }
 
 static const struct ID3D12Resource1Vtbl d3d12_resource_vtbl =

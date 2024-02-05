@@ -1893,7 +1893,6 @@ static void test_create_committed_resource(void)
 
         hr = ID3D12Resource1_GetProtectedResourceSession(resource1, &IID_ID3D12ProtectedResourceSession,
                 (void **)&protected_session);
-        todo
         ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
 
         ID3D12Resource1_Release(resource1);
@@ -2241,7 +2240,6 @@ static void test_create_placed_resource(void)
     {
         hr = ID3D12Resource1_GetProtectedResourceSession(resource1, &IID_ID3D12ProtectedResourceSession,
                 (void **)&protected_session);
-        todo
         ok(hr == DXGI_ERROR_NOT_FOUND, "Got unexpected hr %#x.\n", hr);
         ID3D12Resource1_Release(resource1);
     }
