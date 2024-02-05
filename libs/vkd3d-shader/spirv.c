@@ -7082,7 +7082,7 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
     }
 
     write_mask32 = data_type_is_64_bit(dst->reg.data_type) ? vsir_write_mask_32_from_64(dst->write_mask) : dst->write_mask;
-    swizzle32 = data_type_is_64_bit(dst->reg.data_type) ? vsir_swizzle_32_from_64(src->swizzle) : src->swizzle;
+    swizzle32 = data_type_is_64_bit(src->reg.data_type) ? vsir_swizzle_32_from_64(src->swizzle) : src->swizzle;
     component_count = vsir_write_mask_component_count(write_mask32);
     if (component_count != 1 && component_count != VKD3D_VEC4_SIZE
             && dst_reg_info.write_mask == VKD3DSP_WRITEMASK_ALL)
