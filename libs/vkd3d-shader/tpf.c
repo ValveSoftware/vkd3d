@@ -2994,8 +2994,6 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
 {
     switch (type->class)
     {
-        case HLSL_CLASS_ARRAY:
-            return sm4_class(type->e.array.type);
         case HLSL_CLASS_MATRIX:
             assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
             if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
@@ -3004,10 +3002,11 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
                 return D3D_SVC_MATRIX_ROWS;
         case HLSL_CLASS_SCALAR:
             return D3D_SVC_SCALAR;
-        case HLSL_CLASS_STRUCT:
-            return D3D_SVC_STRUCT;
         case HLSL_CLASS_VECTOR:
             return D3D_SVC_VECTOR;
+
+        case HLSL_CLASS_ARRAY:
+        case HLSL_CLASS_STRUCT:
         case HLSL_CLASS_OBJECT:
             break;
     }
@@ -3029,8 +3028,6 @@ static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
             return D3D_SVT_INT;
         case HLSL_TYPE_UINT:
             return D3D_SVT_UINT;
-        case HLSL_TYPE_VOID:
-            return D3D_SVT_VOID;
         default:
             vkd3d_unreachable();
     }
@@ -3082,9 +3079,14 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             put_u32(buffer, field->type->bytecode_offset);
             put_u32(buffer, field->reg_offset[HLSL_REGSET_NUMERIC]);
         }
+
+        type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(D3D_SVC_STRUCT, D3D_SVT_VOID));
+    }
+    else
+    {
+        type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(array_type), sm4_base_type(array_type)));
     }
 
-    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm4_class(type), sm4_base_type(type)));
     put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
     put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);
