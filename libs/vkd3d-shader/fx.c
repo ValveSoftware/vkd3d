@@ -383,7 +383,7 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
     if (type->class == HLSL_CLASS_TEXTURE)
         return texture_type_names[type->sampler_dim];
 
-    if (type->base_type == HLSL_TYPE_UAV)
+    if (type->class == HLSL_CLASS_UAV)
         return uav_type_names[type->sampler_dim];
 
     switch (type->base_type)
@@ -428,6 +428,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_UAV:
             put_u32_unaligned(buffer, 2);
             break;
 
@@ -494,15 +495,8 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         put_u32_unaligned(buffer, texture_type[type->sampler_dim]);
     }
-    else if (type->class == HLSL_CLASS_OBJECT)
+    else if (type->class == HLSL_CLASS_UAV)
     {
-        static const uint32_t object_type[] =
-        {
-            [HLSL_TYPE_PIXELSHADER]      = 5,
-            [HLSL_TYPE_VERTEXSHADER]     = 6,
-            [HLSL_TYPE_RENDERTARGETVIEW] = 19,
-            [HLSL_TYPE_DEPTHSTENCILVIEW] = 20,
-        };
         static const uint32_t uav_type[] =
         {
             [HLSL_SAMPLER_DIM_1D]                = 31,
@@ -514,6 +508,18 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = 40,
         };
 
+        put_u32_unaligned(buffer, uav_type[type->sampler_dim]);
+    }
+    else if (type->class == HLSL_CLASS_OBJECT)
+    {
+        static const uint32_t object_type[] =
+        {
+            [HLSL_TYPE_PIXELSHADER]      = 5,
+            [HLSL_TYPE_VERTEXSHADER]     = 6,
+            [HLSL_TYPE_RENDERTARGETVIEW] = 19,
+            [HLSL_TYPE_DEPTHSTENCILVIEW] = 20,
+        };
+
         switch (type->base_type)
         {
             case HLSL_TYPE_DEPTHSTENCILVIEW:
@@ -521,9 +527,6 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             case HLSL_TYPE_RENDERTARGETVIEW:
             case HLSL_TYPE_VERTEXSHADER:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
-                break;
-            case HLSL_TYPE_UAV:
-                put_u32_unaligned(buffer, uav_type[type->sampler_dim]);
                 break;
             default:
                 hlsl_fixme(ctx, &ctx->location, "Object type %u is not supported.", type->base_type);
@@ -828,6 +831,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
 
+        case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             return false;
     }
@@ -1008,12 +1012,12 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
     switch (type->class)
     {
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_UAV:
             break;
 
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_UAV:
                 case HLSL_TYPE_RENDERTARGETVIEW:
                     break;
                 case HLSL_TYPE_PIXELSHADER:
@@ -1116,12 +1120,12 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
     {
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_UAV:
             return true;
 
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_UAV:
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
                 case HLSL_TYPE_RENDERTARGETVIEW:

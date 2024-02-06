@@ -3011,6 +3011,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TEXTURE:
+        case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -3119,15 +3120,8 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
             return D3D_SIT_SAMPLER;
         case HLSL_CLASS_TEXTURE:
             return D3D_SIT_TEXTURE;
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_UAV:
-                    return D3D_SIT_UAV_RWTYPED;
-                default:
-                    break;
-            }
-
+        case HLSL_CLASS_UAV:
+            return D3D_SIT_UAV_RWTYPED;
         default:
             break;
     }
