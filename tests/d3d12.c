@@ -32214,6 +32214,10 @@ static void test_resource_allocation_info(void)
         return;
     }
 
+    info = ID3D12Device_GetResourceAllocationInfo(device, 0, 0, &desc);
+    ok(info.SizeInBytes == 0, "Got unexpected size %"PRIu64".\n", info.SizeInBytes);
+    /* Alignment on AMD Windows is 1, but this doesn't seem important to check. */
+
     desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     desc.Alignment = 0;
     desc.Width = 32;
