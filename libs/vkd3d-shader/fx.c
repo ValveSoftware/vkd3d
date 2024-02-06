@@ -690,8 +690,8 @@ static void write_buffers(struct fx_write_context *fx)
 static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
     struct vkd3d_bytecode_buffer buffer = { 0 };
-    uint32_t size_offset, size;
     struct fx_write_context fx;
+    uint32_t size_offset;
 
     fx_write_context_init(ctx, &fx_4_ops, &fx);
 
@@ -724,11 +724,10 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Shader count. */
     put_u32(&buffer, 0); /* Inline shader count. */
 
-    size = align(fx.unstructured.size, 4);
-    set_u32(&buffer, size_offset, size);
+    set_u32(&buffer, size_offset, fx.unstructured.size);
 
     bytecode_put_bytes(&buffer, fx.unstructured.data, fx.unstructured.size);
-    bytecode_put_bytes(&buffer, fx.structured.data, fx.structured.size);
+    bytecode_put_bytes_unaligned(&buffer, fx.structured.data, fx.structured.size);
 
     vkd3d_free(fx.unstructured.data);
     vkd3d_free(fx.structured.data);
@@ -750,8 +749,8 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
     struct vkd3d_bytecode_buffer buffer = { 0 };
-    uint32_t size_offset, size;
     struct fx_write_context fx;
+    uint32_t size_offset;
 
     fx_write_context_init(ctx, &fx_4_ops, &fx);
 
@@ -788,11 +787,10 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Interface variable element count. */
     put_u32(&buffer, 0); /* Class instance elements count. */
 
-    size = align(fx.unstructured.size, 4);
-    set_u32(&buffer, size_offset, size);
+    set_u32(&buffer, size_offset, fx.unstructured.size);
 
     bytecode_put_bytes(&buffer, fx.unstructured.data, fx.unstructured.size);
-    bytecode_put_bytes(&buffer, fx.structured.data, fx.structured.size);
+    bytecode_put_bytes_unaligned(&buffer, fx.structured.data, fx.structured.size);
 
     vkd3d_free(fx.unstructured.data);
     vkd3d_free(fx.structured.data);
