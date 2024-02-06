@@ -3012,6 +3012,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:

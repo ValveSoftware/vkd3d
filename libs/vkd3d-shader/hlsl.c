@@ -367,6 +367,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -443,6 +444,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
 
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -575,6 +577,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
 
             case HLSL_CLASS_EFFECT_GROUP:
             case HLSL_CLASS_PASS:
+            case HLSL_CLASS_TECHNIQUE:
             case HLSL_CLASS_VOID:
                 vkd3d_unreachable();
         }
@@ -949,6 +952,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
 
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -1005,9 +1009,9 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
     if (t1->class == HLSL_CLASS_ARRAY)
         return t1->e.array.elements_count == t2->e.array.elements_count
                 && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
-    if (t1->class == HLSL_CLASS_OBJECT)
+    if (t1->class == HLSL_CLASS_TECHNIQUE)
     {
-        if (t1->base_type == HLSL_TYPE_TECHNIQUE && t1->e.version != t2->e.version)
+        if (t1->e.version != t2->e.version)
             return false;
     }
 
@@ -1097,9 +1101,8 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
             type->e.resource.format = old->e.resource.format;
             break;
 
-        case HLSL_CLASS_OBJECT:
-            if (type->base_type == HLSL_TYPE_TECHNIQUE)
-                type->e.version = old->e.version;
+        case HLSL_CLASS_TECHNIQUE:
+            type->e.version = old->e.version;
             break;
 
         default:
@@ -2368,6 +2371,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -3672,7 +3676,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     for (i = 0; i < ARRAY_SIZE(technique_types); ++i)
     {
-        type = hlsl_new_type(ctx, technique_types[i].name, HLSL_CLASS_OBJECT, HLSL_TYPE_TECHNIQUE, 1, 1);
+        type = hlsl_new_simple_type(ctx, technique_types[i].name, HLSL_CLASS_TECHNIQUE);
         type->e.version = technique_types[i].version;
         hlsl_scope_add_type(ctx->globals, type);
     }

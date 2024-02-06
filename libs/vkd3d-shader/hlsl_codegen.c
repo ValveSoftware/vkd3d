@@ -1641,6 +1641,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_VOID:
             vkd3d_unreachable();
     }

@@ -222,7 +222,7 @@ static bool technique_matches_version(const struct hlsl_ir_var *var, const struc
 {
     const struct hlsl_type *type = var->data_type;
 
-    if (type->base_type != HLSL_TYPE_TECHNIQUE)
+    if (type->class != HLSL_CLASS_TECHNIQUE)
         return false;
 
     return type->e.version >= fx->min_technique_version && type->e.version <= fx->max_technique_version;
@@ -439,6 +439,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_ARRAY:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_TECHNIQUE:
             vkd3d_unreachable();
 
         case HLSL_CLASS_SAMPLER:
@@ -839,6 +840,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
 
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_TECHNIQUE:
             /* This cannot appear as an extern variable. */
             break;
     }

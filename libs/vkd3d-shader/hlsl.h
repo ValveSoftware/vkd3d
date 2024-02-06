@@ -83,6 +83,7 @@ enum hlsl_type_class
     HLSL_CLASS_PASS,
     HLSL_CLASS_SAMPLER,
     HLSL_CLASS_STRING,
+    HLSL_CLASS_TECHNIQUE,
     HLSL_CLASS_TEXTURE,
     HLSL_CLASS_UAV,
     HLSL_CLASS_VOID,
@@ -101,7 +102,6 @@ enum hlsl_base_type
     HLSL_TYPE_VERTEXSHADER,
     HLSL_TYPE_RENDERTARGETVIEW,
     HLSL_TYPE_DEPTHSTENCILVIEW,
-    HLSL_TYPE_TECHNIQUE,
 };
 
 enum hlsl_sampler_dim
@@ -145,8 +145,6 @@ struct hlsl_type
     enum hlsl_type_class class;
     /* If class is <= HLSL_CLASS_LAST_NUMERIC, then base_type is <= HLSL_TYPE_LAST_SCALAR.
      * If class is HLSL_CLASS_OBJECT, then base_type is > HLSL_TYPE_LAST_SCALAR.
-     * If class is HLSL_CLASS_OBJECT and base_type is HLSL_TYPE_TECHNIQUE, additional version
-     * field is used to distinguish between technique types.
      * Otherwise, base_type is not used. */
     enum hlsl_base_type base_type;
 
