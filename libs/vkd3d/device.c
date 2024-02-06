@@ -3407,6 +3407,32 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device7 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS9:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS9 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+                return E_INVALIDARG;
+            }
+
+            data->MeshShaderPipelineStatsSupported = FALSE;
+            data->MeshShaderSupportsFullRangeRenderTargetArrayIndex = FALSE;
+            data->AtomicInt64OnTypedResourceSupported = FALSE;
+            data->AtomicInt64OnGroupSharedSupported = FALSE;
+            data->DerivativesInMeshAndAmplificationShadersSupported = FALSE;
+            data->WaveMMATier = D3D12_WAVE_MMA_TIER_NOT_SUPPORTED;
+
+            TRACE("Mesh shader pipeline stats support %#x.\n", data->MeshShaderPipelineStatsSupported);
+            TRACE("Mesh shader RT array index full range %#x.\n", data->MeshShaderSupportsFullRangeRenderTargetArrayIndex);
+            TRACE("Atomic int64 on typed resource %#x.\n", data->AtomicInt64OnTypedResourceSupported);
+            TRACE("Atomic int64 on group shared mem %#x.\n", data->AtomicInt64OnGroupSharedSupported);
+            TRACE("Derivatives in mesh and amp shaders %#x.\n", data->DerivativesInMeshAndAmplificationShadersSupported);
+            TRACE("Wave MMA tier %#x.\n", data->WaveMMATier);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
