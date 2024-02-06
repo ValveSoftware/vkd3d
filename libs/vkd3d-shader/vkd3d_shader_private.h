@@ -1418,6 +1418,7 @@ struct vkd3d_bytecode_buffer
 /* Align to the next 4-byte offset, and return that offset. */
 size_t bytecode_align(struct vkd3d_bytecode_buffer *buffer);
 size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size);
+size_t bytecode_put_bytes_unaligned(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size);
 size_t bytecode_reserve_bytes(struct vkd3d_bytecode_buffer *buffer, size_t size);
 void set_u32(struct vkd3d_bytecode_buffer *buffer, size_t offset, uint32_t value);
 void set_string(struct vkd3d_bytecode_buffer *buffer, size_t offset, const char *string, size_t length);

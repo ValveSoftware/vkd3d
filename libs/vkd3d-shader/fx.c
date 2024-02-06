@@ -145,7 +145,7 @@ static uint32_t write_fx_4_string(const char *string, struct fx_write_context *f
     if (!(string_entry = hlsl_alloc(fx->ctx, sizeof(*string_entry))))
         return 0;
 
-    string_entry->offset = put_string(&fx->unstructured, string);
+    string_entry->offset = bytecode_put_bytes_unaligned(&fx->unstructured, string, strlen(string) + 1);
     string_entry->string = string;
 
     rb_put(&fx->strings, string, &string_entry->entry);

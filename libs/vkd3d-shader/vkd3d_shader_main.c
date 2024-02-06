@@ -366,9 +366,9 @@ size_t bytecode_align(struct vkd3d_bytecode_buffer *buffer)
     return aligned_size;
 }
 
-size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size)
+size_t bytecode_put_bytes_unaligned(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size)
 {
-    size_t offset = bytecode_align(buffer);
+    size_t offset = buffer->size;
 
     if (buffer->status)
         return offset;
@@ -381,6 +381,12 @@ size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *byte
     memcpy(buffer->data + offset, bytes, size);
     buffer->size = offset + size;
     return offset;
+}
+
+size_t bytecode_put_bytes(struct vkd3d_bytecode_buffer *buffer, const void *bytes, size_t size)
+{
+    bytecode_align(buffer);
+    return bytecode_put_bytes_unaligned(buffer, bytes, size);
 }
 
 size_t bytecode_reserve_bytes(struct vkd3d_bytecode_buffer *buffer, size_t size)
