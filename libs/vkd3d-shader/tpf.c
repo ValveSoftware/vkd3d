@@ -3008,6 +3008,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_ARRAY:
         case HLSL_CLASS_STRUCT:
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
@@ -3109,20 +3110,28 @@ static void write_sm4_type(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
 static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
 {
-    if (type->class == HLSL_CLASS_ARRAY)
-        return sm4_resource_type(type->e.array.type);
-
-    switch (type->base_type)
+    switch (type->class)
     {
-        case HLSL_TYPE_SAMPLER:
+        case HLSL_CLASS_ARRAY:
+            return sm4_resource_type(type->e.array.type);
+        case HLSL_CLASS_SAMPLER:
             return D3D_SIT_SAMPLER;
-        case HLSL_TYPE_TEXTURE:
-            return D3D_SIT_TEXTURE;
-        case HLSL_TYPE_UAV:
-            return D3D_SIT_UAV_RWTYPED;
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_TEXTURE:
+                    return D3D_SIT_TEXTURE;
+                case HLSL_TYPE_UAV:
+                    return D3D_SIT_UAV_RWTYPED;
+                default:
+                    break;
+            }
+
         default:
-            vkd3d_unreachable();
+            break;
     }
+
+    vkd3d_unreachable();
 }
 
 static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type)

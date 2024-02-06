@@ -437,6 +437,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_ARRAY:
             vkd3d_unreachable();
 
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             FIXME("Writing type class %u is not implemented.\n", type->class);
@@ -810,7 +811,6 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
                     }
                     break;
 
-                case HLSL_TYPE_SAMPLER:
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
                     hlsl_fixme(ctx, loc, "Write fx 2.0 parameter object type %#x.", type->base_type);
@@ -820,6 +820,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
                     return false;
             }
 
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
@@ -1097,18 +1098,24 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
 {
     const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
 
-    if (type->class != HLSL_CLASS_OBJECT)
-        return false;
-
-    switch (type->base_type)
+    switch (type->class)
     {
-        case HLSL_TYPE_SAMPLER:
-        case HLSL_TYPE_TEXTURE:
-        case HLSL_TYPE_UAV:
-        case HLSL_TYPE_PIXELSHADER:
-        case HLSL_TYPE_VERTEXSHADER:
-        case HLSL_TYPE_RENDERTARGETVIEW:
+        case HLSL_CLASS_SAMPLER:
             return true;
+
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_TEXTURE:
+                case HLSL_TYPE_UAV:
+                case HLSL_TYPE_PIXELSHADER:
+                case HLSL_TYPE_VERTEXSHADER:
+                case HLSL_TYPE_RENDERTARGETVIEW:
+                    return true;
+                default:
+                    return false;
+            }
+
         default:
             return false;
     }

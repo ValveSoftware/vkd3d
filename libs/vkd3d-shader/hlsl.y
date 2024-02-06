@@ -4044,7 +4044,7 @@ static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
+    if (sampler_type->class != HLSL_CLASS_SAMPLER
             || (sampler_type->sampler_dim != dim && sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC))
     {
         struct vkd3d_string_buffer *string;
@@ -4721,8 +4721,7 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
 
@@ -4786,8 +4785,7 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_COMPARISON)
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_COMPARISON)
     {
         struct vkd3d_string_buffer *string;
 
@@ -4897,8 +4895,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
 
@@ -5134,8 +5131,7 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
 
@@ -5197,8 +5193,7 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
     }
 
     sampler_type = params->args[0]->data_type;
-    if (sampler_type->class != HLSL_CLASS_OBJECT || sampler_type->base_type != HLSL_TYPE_SAMPLER
-            || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
+    if (sampler_type->class != HLSL_CLASS_SAMPLER || sampler_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
 

@@ -1513,6 +1513,7 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_VECTOR:
             return D3DXPC_VECTOR;
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
             return D3DXPC_OBJECT;
         case HLSL_CLASS_VOID:
@@ -1552,29 +1553,30 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
                     vkd3d_unreachable();
             }
 
+        case HLSL_CLASS_SAMPLER:
+            switch (type->sampler_dim)
+            {
+                case HLSL_SAMPLER_DIM_1D:
+                    return D3DXPT_SAMPLER1D;
+                case HLSL_SAMPLER_DIM_2D:
+                    return D3DXPT_SAMPLER2D;
+                case HLSL_SAMPLER_DIM_3D:
+                    return D3DXPT_SAMPLER3D;
+                case HLSL_SAMPLER_DIM_CUBE:
+                    return D3DXPT_SAMPLERCUBE;
+                case HLSL_SAMPLER_DIM_GENERIC:
+                    return D3DXPT_SAMPLER;
+                default:
+                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                    vkd3d_unreachable();
+            }
+            break;
+
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
                     return D3DXPT_PIXELSHADER;
-                case HLSL_TYPE_SAMPLER:
-                    switch (type->sampler_dim)
-                    {
-                        case HLSL_SAMPLER_DIM_1D:
-                            return D3DXPT_SAMPLER1D;
-                        case HLSL_SAMPLER_DIM_2D:
-                            return D3DXPT_SAMPLER2D;
-                        case HLSL_SAMPLER_DIM_3D:
-                            return D3DXPT_SAMPLER3D;
-                        case HLSL_SAMPLER_DIM_CUBE:
-                            return D3DXPT_SAMPLERCUBE;
-                        case HLSL_SAMPLER_DIM_GENERIC:
-                            return D3DXPT_SAMPLER;
-                        default:
-                            ERR("Invalid dimension %#x.\n", type->sampler_dim);
-                            vkd3d_unreachable();
-                    }
-                    break;
                 case HLSL_TYPE_TEXTURE:
                     switch (type->sampler_dim)
                     {

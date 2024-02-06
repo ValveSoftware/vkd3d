@@ -226,50 +226,61 @@ unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type)
 
 bool hlsl_type_is_resource(const struct hlsl_type *type)
 {
-    if (type->class == HLSL_CLASS_ARRAY)
-        return hlsl_type_is_resource(type->e.array.type);
-
-    if (type->class == HLSL_CLASS_OBJECT)
+    switch (type->class)
     {
-        switch (type->base_type)
-        {
-            case HLSL_TYPE_TEXTURE:
-            case HLSL_TYPE_SAMPLER:
-            case HLSL_TYPE_UAV:
-                return true;
-            default:
-                return false;
-        }
+        case HLSL_CLASS_ARRAY:
+            return hlsl_type_is_resource(type->e.array.type);
+
+        case HLSL_CLASS_SAMPLER:
+            return true;
+
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_TEXTURE:
+                case HLSL_TYPE_UAV:
+                    return true;
+                default:
+                    return false;
+            }
+
+        default:
+            return false;
     }
-    return false;
 }
 
 /* Only intended to be used for derefs (after copies have been lowered to components or vectors) or
  * resources, since for both their data types span across a single regset. */
 static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
 {
-    if (hlsl_is_numeric_type(type))
-        return HLSL_REGSET_NUMERIC;
-
-    if (type->class == HLSL_CLASS_ARRAY)
-        return type_get_regset(type->e.array.type);
-
-    if (type->class == HLSL_CLASS_OBJECT)
+    switch (type->class)
     {
-        switch (type->base_type)
-        {
-            case HLSL_TYPE_TEXTURE:
-                return HLSL_REGSET_TEXTURES;
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            return HLSL_REGSET_NUMERIC;
 
-            case HLSL_TYPE_SAMPLER:
-                return HLSL_REGSET_SAMPLERS;
+        case HLSL_CLASS_ARRAY:
+            return type_get_regset(type->e.array.type);
 
-            case HLSL_TYPE_UAV:
-                return HLSL_REGSET_UAVS;
+        case HLSL_CLASS_SAMPLER:
+            return HLSL_REGSET_SAMPLERS;
 
-            default:
-                vkd3d_unreachable();
-        }
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_TEXTURE:
+                    return HLSL_REGSET_TEXTURES;
+
+                case HLSL_TYPE_UAV:
+                    return HLSL_REGSET_UAVS;
+
+                default:
+                    vkd3d_unreachable();
+            }
+
+        default:
+            break;
     }
 
     vkd3d_unreachable();
@@ -366,6 +377,10 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             break;
         }
 
+        case HLSL_CLASS_SAMPLER:
+            type->reg_size[HLSL_REGSET_SAMPLERS] = 1;
+            break;
+
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
@@ -429,6 +444,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
             return true;
 
@@ -561,6 +577,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
                 break;
 
             case HLSL_CLASS_OBJECT:
+            case HLSL_CLASS_SAMPLER:
             case HLSL_CLASS_STRING:
                 assert(idx == 0);
                 break;
@@ -933,6 +950,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
             return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
 
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
             return 1;
 
@@ -952,7 +970,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         return false;
     if (t1->base_type != t2->base_type)
         return false;
-    if (t1->base_type == HLSL_TYPE_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE
+    if (t1->class == HLSL_CLASS_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE
             || t1->base_type == HLSL_TYPE_UAV)
     {
         if (t1->sampler_dim != t2->sampler_dim)
@@ -2359,6 +2377,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             }
         }
 
+        case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
@@ -3647,7 +3666,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     for (bt = 0; bt <= HLSL_SAMPLER_DIM_LAST_SAMPLER; ++bt)
     {
-        type = hlsl_new_type(ctx, sampler_names[bt], HLSL_CLASS_OBJECT, HLSL_TYPE_SAMPLER, 1, 1);
+        type = hlsl_new_simple_type(ctx, sampler_names[bt], HLSL_CLASS_SAMPLER);
         type->sampler_dim = bt;
         ctx->builtin_types.sampler[bt] = type;
     }
