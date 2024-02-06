@@ -1506,14 +1506,15 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
                 return D3DXPC_MATRIX_COLUMNS;
             else
                 return D3DXPC_MATRIX_ROWS;
-        case HLSL_CLASS_OBJECT:
-            return D3DXPC_OBJECT;
         case HLSL_CLASS_SCALAR:
             return D3DXPC_SCALAR;
         case HLSL_CLASS_STRUCT:
             return D3DXPC_STRUCT;
         case HLSL_CLASS_VECTOR:
             return D3DXPC_VECTOR;
+        case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_STRING:
+            return D3DXPC_OBJECT;
         case HLSL_CLASS_VOID:
             break;
     }
@@ -1574,8 +1575,6 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
                             vkd3d_unreachable();
                     }
                     break;
-                case HLSL_TYPE_STRING:
-                    return D3DXPT_STRING;
                 case HLSL_TYPE_TEXTURE:
                     switch (type->sampler_dim)
                     {
@@ -1606,6 +1605,9 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
 
         case HLSL_CLASS_STRUCT:
             return D3DXPT_VOID;
+
+        case HLSL_CLASS_STRING:
+            return D3DXPT_STRING;
 
         case HLSL_CLASS_VOID:
             break;

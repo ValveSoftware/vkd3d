@@ -79,6 +79,7 @@ enum hlsl_type_class
     HLSL_CLASS_STRUCT,
     HLSL_CLASS_ARRAY,
     HLSL_CLASS_OBJECT,
+    HLSL_CLASS_STRING,
     HLSL_CLASS_VOID,
 };
 
@@ -101,7 +102,6 @@ enum hlsl_base_type
     HLSL_TYPE_DEPTHSTENCILVIEW,
     HLSL_TYPE_TECHNIQUE,
     HLSL_TYPE_EFFECT_GROUP,
-    HLSL_TYPE_STRING,
 };
 
 enum hlsl_sampler_dim

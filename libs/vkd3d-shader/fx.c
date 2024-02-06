@@ -437,6 +437,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_ARRAY:
             vkd3d_unreachable();
 
+        case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             FIXME("Writing type class %u is not implemented.\n", type->class);
             set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
@@ -810,7 +811,6 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
                     break;
 
                 case HLSL_TYPE_SAMPLER:
-                case HLSL_TYPE_STRING:
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
                     hlsl_fixme(ctx, loc, "Write fx 2.0 parameter object type %#x.", type->base_type);
@@ -819,6 +819,10 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
                 default:
                     return false;
             }
+
+        case HLSL_CLASS_STRING:
+            hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
+            return false;
 
         case HLSL_CLASS_VOID:
             return false;

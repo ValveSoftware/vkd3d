@@ -366,6 +366,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             break;
         }
 
+        case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -428,6 +429,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_STRING:
             return true;
 
         case HLSL_CLASS_VECTOR:
@@ -559,6 +561,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
                 break;
 
             case HLSL_CLASS_OBJECT:
+            case HLSL_CLASS_STRING:
                 assert(idx == 0);
                 break;
 
@@ -930,6 +933,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
             return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
 
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_STRING:
             return 1;
 
         case HLSL_CLASS_VOID:
@@ -2355,6 +2359,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             }
         }
 
+        case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -3532,7 +3537,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"matrix",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},
         {"fxgroup",         HLSL_CLASS_OBJECT, HLSL_TYPE_EFFECT_GROUP,  1, 1},
         {"pass",            HLSL_CLASS_OBJECT, HLSL_TYPE_PASS,          1, 1},
-        {"STRING",          HLSL_CLASS_OBJECT, HLSL_TYPE_STRING,        1, 1},
         {"texture",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
         {"pixelshader",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
         {"vertexshader",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
@@ -3649,6 +3653,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
+    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING));
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {
