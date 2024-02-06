@@ -3157,6 +3157,11 @@ struct vsir_cfg_structure
         STRUCTURE_TYPE_BLOCK,
         /* Execute a loop, which is identified by an index. */
         STRUCTURE_TYPE_LOOP,
+        /* Execute a `return' or a (possibly) multilevel `break' or
+         * `continue', targeting a loop by its index. If `condition'
+         * is non-NULL, then the jump is conditional (this is
+         * currently not allowed for `return'). */
+        STRUCTURE_TYPE_JUMP,
     } type;
     union
     {
@@ -3166,6 +3171,21 @@ struct vsir_cfg_structure
             struct vsir_cfg_structure_list body;
             unsigned idx;
         } loop;
+        struct
+        {
+            enum vsir_cfg_jump_type
+            {
+                /* NONE is available as an intermediate value, but it
+                 * is not allowed in valid structured programs. */
+                JUMP_NONE,
+                JUMP_BREAK,
+                JUMP_CONTINUE,
+                JUMP_RET,
+            } type;
+            unsigned int target;
+            struct vkd3d_shader_src_param *condition;
+            bool invert_condition;
+        } jump;
     } u;
 };
 
@@ -3987,6 +4007,70 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
     return VKD3D_OK;
 }
 
+struct vsir_cfg_edge_action
+{
+    enum vsir_cfg_jump_type jump_type;
+    unsigned int target;
+    struct vsir_block *successor;
+};
+
+static void vsir_cfg_compute_edge_action(struct vsir_cfg *cfg, struct vsir_block *block,
+        struct vsir_block *successor, struct vsir_cfg_edge_action *action)
+{
+    unsigned int i;
+
+    action->target = UINT_MAX;
+    action->successor = successor;
+
+    if (successor->order_pos <= block->order_pos)
+    {
+        /* The successor is before the current block, so we have to
+         * use `continue'. The target loop is the innermost that
+         * contains the current block and has the successor as
+         * `continue' target. */
+        for (i = 0; i < cfg->loop_interval_count; ++i)
+        {
+            struct cfg_loop_interval *interval = &cfg->loop_intervals[i];
+
+            if (interval->begin == successor->order_pos && block->order_pos < interval->end)
+                action->target = i;
+
+            if (interval->begin > successor->order_pos)
+                break;
+        }
+
+        assert(action->target != UINT_MAX);
+        action->jump_type = JUMP_CONTINUE;
+    }
+    else
+    {
+        /* The successor is after the current block, so we have to use
+         * `break', or possibly just jump to the following block. The
+         * target loop is the outermost that contains the current
+         * block and has the successor as `break' target. */
+        for (i = 0; i < cfg->loop_interval_count; ++i)
+        {
+            struct cfg_loop_interval *interval = &cfg->loop_intervals[i];
+
+            if (interval->begin <= block->order_pos && interval->end == successor->order_pos)
+            {
+                action->target = i;
+                break;
+            }
+        }
+
+        if (action->target == UINT_MAX)
+        {
+            assert(successor->order_pos == block->order_pos + 1);
+            action->jump_type = JUMP_NONE;
+        }
+        else
+        {
+            action->jump_type = JUMP_BREAK;
+        }
+    }
+}
+
 static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
 {
     unsigned int i, stack_depth = 1, open_interval_idx = 0;
@@ -4001,6 +4085,7 @@ static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
 
     for (i = 0; i < cfg->order.count; ++i)
     {
+        struct vsir_block *block = cfg->order.blocks[i];
         struct vsir_cfg_structure *structure;
 
         assert(stack_depth > 0);
@@ -4024,9 +4109,88 @@ static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
         /* Execute the block. */
         if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_BLOCK)))
             goto fail;
-        structure->u.block = cfg->order.blocks[i];
+        structure->u.block = block;
 
-        /* TODO: process the jump after the block. */
+        /* Generate between zero and two jump instructions. */
+        switch (block->end->handler_idx)
+        {
+            case VKD3DSIH_BRANCH:
+            {
+                struct vsir_cfg_edge_action action_true, action_false;
+                bool invert_condition = false;
+
+                if (vsir_register_is_label(&block->end->src[0].reg))
+                {
+                    unsigned int target = label_from_src_param(&block->end->src[0]);
+                    struct vsir_block *successor = &cfg->blocks[target - 1];
+
+                    vsir_cfg_compute_edge_action(cfg, block, successor, &action_true);
+                    action_false = action_true;
+                }
+                else
+                {
+                    unsigned int target = label_from_src_param(&block->end->src[1]);
+                    struct vsir_block *successor = &cfg->blocks[target - 1];
+
+                    vsir_cfg_compute_edge_action(cfg, block, successor, &action_true);
+
+                    target = label_from_src_param(&block->end->src[2]);
+                    successor = &cfg->blocks[target - 1];
+
+                    vsir_cfg_compute_edge_action(cfg, block, successor, &action_false);
+                }
+
+                /* This will happen if the branch is unconditional,
+                 * but also if it's conditional with the same target
+                 * in both branches, which can happen in some corner
+                 * cases, e.g. when converting switch instructions to
+                 * selection ladders. */
+                if (action_true.successor == action_false.successor)
+                {
+                    assert(action_true.jump_type == action_false.jump_type);
+                }
+                else
+                {
+                    /* At most one branch can just fall through to the
+                     * next block, in which case we make sure it's the
+                     * false branch. */
+                    if (action_true.jump_type == JUMP_NONE)
+                    {
+                        struct vsir_cfg_edge_action tmp = action_true;
+                        action_true = action_false;
+                        action_false = tmp;
+                        invert_condition = true;
+                    }
+
+                    assert(action_true.jump_type != JUMP_NONE);
+
+                    if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_JUMP)))
+                        goto fail;
+                    structure->u.jump.type = action_true.jump_type;
+                    structure->u.jump.target = action_true.target;
+                    structure->u.jump.condition = &block->end->src[0];
+                    structure->u.jump.invert_condition = invert_condition;
+                }
+
+                if (action_false.jump_type != JUMP_NONE)
+                {
+                    if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_JUMP)))
+                        goto fail;
+                    structure->u.jump.type = action_false.jump_type;
+                    structure->u.jump.target = action_false.target;
+                }
+                break;
+            }
+
+            case VKD3DSIH_RET:
+                if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_JUMP)))
+                    goto fail;
+                structure->u.jump.type = JUMP_RET;
+                break;
+
+            default:
+                vkd3d_unreachable();
+        }
 
         /* Close loop intervals. */
         while (stack_depth > 0)
