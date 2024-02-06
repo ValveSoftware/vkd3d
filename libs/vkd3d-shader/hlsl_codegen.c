@@ -1626,6 +1626,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_OBJECT:
             break;
 
@@ -2611,7 +2612,7 @@ static bool lower_combined_samples(struct hlsl_ctx *ctx, struct hlsl_ir_node *in
 
     hlsl_copy_deref(ctx, &load->sampler, &load->resource);
     load->resource.var = var;
-    assert(hlsl_deref_get_type(ctx, &load->resource)->base_type == HLSL_TYPE_TEXTURE);
+    assert(hlsl_deref_get_type(ctx, &load->resource)->class == HLSL_CLASS_TEXTURE);
     assert(hlsl_deref_get_type(ctx, &load->sampler)->class == HLSL_CLASS_SAMPLER);
 
     return true;

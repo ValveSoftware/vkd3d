@@ -3010,6 +3010,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -3116,11 +3117,11 @@ static D3D_SHADER_INPUT_TYPE sm4_resource_type(const struct hlsl_type *type)
             return sm4_resource_type(type->e.array.type);
         case HLSL_CLASS_SAMPLER:
             return D3D_SIT_SAMPLER;
+        case HLSL_CLASS_TEXTURE:
+            return D3D_SIT_TEXTURE;
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_TEXTURE:
-                    return D3D_SIT_TEXTURE;
                 case HLSL_TYPE_UAV:
                     return D3D_SIT_UAV_RWTYPED;
                 default:
@@ -4569,7 +4570,7 @@ static void write_sm4_ld(const struct tpf_writer *tpf, const struct hlsl_ir_node
         enum hlsl_sampler_dim dim)
 {
     const struct hlsl_type *resource_type = hlsl_deref_get_type(tpf->ctx, resource);
-    bool multisampled = resource_type->base_type == HLSL_TYPE_TEXTURE
+    bool multisampled = resource_type->class == HLSL_CLASS_TEXTURE
             && (resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMS || resource_type->sampler_dim == HLSL_SAMPLER_DIM_2DMSARRAY);
     bool uav = (hlsl_deref_get_regset(tpf->ctx, resource) == HLSL_REGSET_UAVS);
     unsigned int coords_writemask = VKD3DSP_WRITEMASK_ALL;

@@ -232,12 +232,12 @@ bool hlsl_type_is_resource(const struct hlsl_type *type)
             return hlsl_type_is_resource(type->e.array.type);
 
         case HLSL_CLASS_SAMPLER:
+        case HLSL_CLASS_TEXTURE:
             return true;
 
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_TEXTURE:
                 case HLSL_TYPE_UAV:
                     return true;
                 default:
@@ -266,12 +266,12 @@ static enum hlsl_regset type_get_regset(const struct hlsl_type *type)
         case HLSL_CLASS_SAMPLER:
             return HLSL_REGSET_SAMPLERS;
 
+        case HLSL_CLASS_TEXTURE:
+            return HLSL_REGSET_TEXTURES;
+
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_TEXTURE:
-                    return HLSL_REGSET_TEXTURES;
-
                 case HLSL_TYPE_UAV:
                     return HLSL_REGSET_UAVS;
 
@@ -381,6 +381,10 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             type->reg_size[HLSL_REGSET_SAMPLERS] = 1;
             break;
 
+        case HLSL_CLASS_TEXTURE:
+            type->reg_size[HLSL_REGSET_TEXTURES] = 1;
+            break;
+
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VOID:
             break;
@@ -446,6 +450,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TEXTURE:
             return true;
 
         case HLSL_CLASS_VECTOR:
@@ -579,6 +584,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_OBJECT:
             case HLSL_CLASS_SAMPLER:
             case HLSL_CLASS_STRING:
+            case HLSL_CLASS_TEXTURE:
                 assert(idx == 0);
                 break;
 
@@ -827,8 +833,7 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
 
     if (!(type = hlsl_alloc(ctx, sizeof(*type))))
         return NULL;
-    type->class = HLSL_CLASS_OBJECT;
-    type->base_type = HLSL_TYPE_TEXTURE;
+    type->class = HLSL_CLASS_TEXTURE;
     type->dimx = 4;
     type->dimy = 1;
     type->sampler_dim = dim;
@@ -952,6 +957,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_TEXTURE:
             return 1;
 
         case HLSL_CLASS_VOID:
@@ -970,12 +976,12 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         return false;
     if (t1->base_type != t2->base_type)
         return false;
-    if (t1->class == HLSL_CLASS_SAMPLER || t1->base_type == HLSL_TYPE_TEXTURE
+    if (t1->class == HLSL_CLASS_SAMPLER || t1->class == HLSL_CLASS_TEXTURE
             || t1->base_type == HLSL_TYPE_UAV)
     {
         if (t1->sampler_dim != t2->sampler_dim)
             return false;
-        if ((t1->base_type == HLSL_TYPE_TEXTURE || t1->base_type == HLSL_TYPE_UAV)
+        if ((t1->class == HLSL_CLASS_TEXTURE || t1->base_type == HLSL_TYPE_UAV)
                 && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
                 && !hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format))
             return false;
@@ -1096,10 +1102,14 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
             break;
         }
 
+        case HLSL_CLASS_TEXTURE:
+            type->e.resource.format = old->e.resource.format;
+            break;
+
         case HLSL_CLASS_OBJECT:
             if (type->base_type == HLSL_TYPE_TECHNIQUE)
                 type->e.version = old->e.version;
-            if (old->base_type == HLSL_TYPE_TEXTURE || old->base_type == HLSL_TYPE_UAV)
+            if (old->base_type == HLSL_TYPE_UAV)
             {
                 type->e.resource.format = old->e.resource.format;
                 type->e.resource.rasteriser_ordered = old->e.resource.rasteriser_ordered;
@@ -1678,8 +1688,7 @@ bool hlsl_index_is_resource_access(struct hlsl_ir_index *index)
 {
     const struct hlsl_type *type = index->val.node->data_type;
 
-    return type->class == HLSL_CLASS_OBJECT
-            && (type->base_type == HLSL_TYPE_TEXTURE || type->base_type == HLSL_TYPE_UAV);
+    return type->class == HLSL_CLASS_TEXTURE || (type->class == HLSL_CLASS_OBJECT && type->base_type == HLSL_TYPE_UAV);
 }
 
 bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index)
@@ -1700,7 +1709,7 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
     if (!(index = hlsl_alloc(ctx, sizeof(*index))))
         return NULL;
 
-    if (type->class == HLSL_CLASS_OBJECT)
+    if (type->class == HLSL_CLASS_TEXTURE || type->class == HLSL_CLASS_OBJECT)
         type = type->e.resource.format;
     else if (type->class == HLSL_CLASS_MATRIX)
         type = hlsl_get_vector_type(ctx, type->base_type, type->dimx);
@@ -2264,6 +2273,19 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         [HLSL_TYPE_BOOL] = "bool",
     };
 
+    static const char *const dimensions[] =
+    {
+        [HLSL_SAMPLER_DIM_1D]        = "1D",
+        [HLSL_SAMPLER_DIM_2D]        = "2D",
+        [HLSL_SAMPLER_DIM_3D]        = "3D",
+        [HLSL_SAMPLER_DIM_CUBE]      = "Cube",
+        [HLSL_SAMPLER_DIM_1DARRAY]   = "1DArray",
+        [HLSL_SAMPLER_DIM_2DARRAY]   = "2DArray",
+        [HLSL_SAMPLER_DIM_2DMS]      = "2DMS",
+        [HLSL_SAMPLER_DIM_2DMSARRAY] = "2DMSArray",
+        [HLSL_SAMPLER_DIM_CUBEARRAY] = "CubeArray",
+    };
+
     if (!(string = hlsl_get_string_buffer(ctx)))
         return NULL;
 
@@ -2317,47 +2339,34 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             vkd3d_string_buffer_printf(string, "<anonymous struct>");
             return string;
 
+        case HLSL_CLASS_TEXTURE:
+            if (type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+            {
+                vkd3d_string_buffer_printf(string, "Texture");
+                return string;
+            }
+
+            assert(type->e.resource.format->base_type < ARRAY_SIZE(base_types));
+            if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
+            {
+                vkd3d_string_buffer_printf(string, "Buffer");
+            }
+            else
+            {
+                assert(type->sampler_dim < ARRAY_SIZE(dimensions));
+                vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
+            }
+            if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
+            {
+                vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
+                hlsl_release_string_buffer(ctx, inner_string);
+            }
+            return string;
+
         case HLSL_CLASS_OBJECT:
         {
-            static const char *const dimensions[] =
-            {
-                [HLSL_SAMPLER_DIM_1D]        = "1D",
-                [HLSL_SAMPLER_DIM_2D]        = "2D",
-                [HLSL_SAMPLER_DIM_3D]        = "3D",
-                [HLSL_SAMPLER_DIM_CUBE]      = "Cube",
-                [HLSL_SAMPLER_DIM_1DARRAY]   = "1DArray",
-                [HLSL_SAMPLER_DIM_2DARRAY]   = "2DArray",
-                [HLSL_SAMPLER_DIM_2DMS]      = "2DMS",
-                [HLSL_SAMPLER_DIM_2DMSARRAY] = "2DMSArray",
-                [HLSL_SAMPLER_DIM_CUBEARRAY] = "CubeArray",
-            };
-
             switch (type->base_type)
             {
-                case HLSL_TYPE_TEXTURE:
-                    if (type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
-                    {
-                        vkd3d_string_buffer_printf(string, "Texture");
-                        return string;
-                    }
-
-                    assert(type->e.resource.format->base_type < ARRAY_SIZE(base_types));
-                    if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
-                    {
-                        vkd3d_string_buffer_printf(string, "Buffer");
-                    }
-                    else
-                    {
-                        assert(type->sampler_dim < ARRAY_SIZE(dimensions));
-                        vkd3d_string_buffer_printf(string, "Texture%s", dimensions[type->sampler_dim]);
-                    }
-                    if ((inner_string = hlsl_type_to_string(ctx, type->e.resource.format)))
-                    {
-                        vkd3d_string_buffer_printf(string, "<%s>", inner_string->buffer);
-                        hlsl_release_string_buffer(ctx, inner_string);
-                    }
-                    return string;
-
                 case HLSL_TYPE_UAV:
                     if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
                         vkd3d_string_buffer_printf(string, "RWBuffer");
@@ -3556,7 +3565,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"matrix",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},
         {"fxgroup",         HLSL_CLASS_OBJECT, HLSL_TYPE_EFFECT_GROUP,  1, 1},
         {"pass",            HLSL_CLASS_OBJECT, HLSL_TYPE_PASS,          1, 1},
-        {"texture",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
         {"pixelshader",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
         {"vertexshader",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
         {"RenderTargetView",HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1},
@@ -3673,6 +3681,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING));
+    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "texture", HLSL_CLASS_TEXTURE));
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {

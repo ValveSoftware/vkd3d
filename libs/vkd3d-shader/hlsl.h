@@ -81,6 +81,7 @@ enum hlsl_type_class
     HLSL_CLASS_OBJECT,
     HLSL_CLASS_SAMPLER,
     HLSL_CLASS_STRING,
+    HLSL_CLASS_TEXTURE,
     HLSL_CLASS_VOID,
 };
 
@@ -93,7 +94,6 @@ enum hlsl_base_type
     HLSL_TYPE_UINT,
     HLSL_TYPE_BOOL,
     HLSL_TYPE_LAST_SCALAR = HLSL_TYPE_BOOL,
-    HLSL_TYPE_TEXTURE,
     HLSL_TYPE_UAV,
     HLSL_TYPE_PIXELSHADER,
     HLSL_TYPE_VERTEXSHADER,
@@ -151,7 +151,7 @@ struct hlsl_type
     enum hlsl_base_type base_type;
 
     /* If class is HLSL_CLASS_SAMPLER, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_SAMPLER.
-     * If base_type is HLSL_TYPE_TEXTURE, then sampler_dim can be any value of the enum except
+     * If class is HLSL_CLASS_TEXTURE, then sampler_dim can be any value of the enum except
      *   HLSL_SAMPLER_DIM_GENERIC and HLSL_SAMPLER_DIM_COMPARISON.
      * If base_type is HLSL_TYPE_UAV, then sampler_dim must be one of HLSL_SAMPLER_DIM_1D,
      *   HLSL_SAMPLER_DIM_2D, HLSL_SAMPLER_DIM_3D, HLSL_SAMPLER_DIM_1DARRAY, HLSL_SAMPLER_DIM_2DARRAY,
@@ -172,7 +172,6 @@ struct hlsl_type
      * If type is HLSL_CLASS_ARRAY, then dimx and dimy have the same value as in the type of the array elements.
      * If type is HLSL_CLASS_STRUCT, then dimx is the sum of (dimx * dimy) of every component, and dimy = 1.
      * If type is HLSL_CLASS_OBJECT, dimx and dimy depend on the base_type:
-     *   If base_type is HLSL_TYPE_TEXTURE, then dimx = 4 and dimy = 1.
      *   If base_type is HLSL_TYPE_UAV, then dimx is the dimx of e.resource_format, and dimy = 1.
      */
     unsigned int dimx;

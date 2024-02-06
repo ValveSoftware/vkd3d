@@ -833,8 +833,8 @@ static bool add_array_access(struct hlsl_ctx *ctx, struct hlsl_block *block, str
     const struct hlsl_type *expr_type = array->data_type, *index_type = index->data_type;
     struct hlsl_ir_node *return_index, *cast;
 
-    if (expr_type->class == HLSL_CLASS_OBJECT
-            && (expr_type->base_type == HLSL_TYPE_TEXTURE || expr_type->base_type == HLSL_TYPE_UAV)
+    if ((expr_type->class == HLSL_CLASS_TEXTURE
+            || (expr_type->class == HLSL_CLASS_OBJECT && expr_type->base_type == HLSL_TYPE_UAV))
             && expr_type->sampler_dim != HLSL_SAMPLER_DIM_GENERIC)
     {
         unsigned int dim_count = hlsl_sampler_dim_count(expr_type->sampler_dim);
@@ -1941,8 +1941,8 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
             return NULL;
 
         resource_type = hlsl_deref_get_type(ctx, &resource_deref);
-        assert(resource_type->class == HLSL_CLASS_OBJECT);
-        assert(resource_type->base_type == HLSL_TYPE_TEXTURE || resource_type->base_type == HLSL_TYPE_UAV);
+        assert(resource_type->class == HLSL_CLASS_TEXTURE
+                || (resource_type->class == HLSL_CLASS_OBJECT && resource_type->base_type == HLSL_TYPE_UAV));
 
         if (resource_type->base_type != HLSL_TYPE_UAV)
             hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
@@ -5277,8 +5277,7 @@ static bool add_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block, stru
     const struct hlsl_type *object_type = object->data_type;
     const struct method_function *method;
 
-    if (object_type->class != HLSL_CLASS_OBJECT || object_type->base_type != HLSL_TYPE_TEXTURE
-            || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
+    if (object_type->class != HLSL_CLASS_TEXTURE || object_type->sampler_dim == HLSL_SAMPLER_DIM_GENERIC)
     {
         struct vkd3d_string_buffer *string;
 
