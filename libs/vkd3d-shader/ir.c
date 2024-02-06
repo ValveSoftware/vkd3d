@@ -3142,6 +3142,73 @@ static bool vsir_block_list_search(struct vsir_block_list *list, struct vsir_blo
     return !!bsearch(&block, list->blocks, list->count, sizeof(*list->blocks), block_compare);
 }
 
+struct vsir_cfg_structure_list
+{
+    struct vsir_cfg_structure *structures;
+    size_t count, capacity;
+    unsigned int end;
+};
+
+struct vsir_cfg_structure
+{
+    enum vsir_cfg_structure_type
+    {
+        /* Execute a block of the original VSIR program. */
+        STRUCTURE_TYPE_BLOCK,
+        /* Execute a loop, which is identified by an index. */
+        STRUCTURE_TYPE_LOOP,
+    } type;
+    union
+    {
+        struct vsir_block *block;
+        struct
+        {
+            struct vsir_cfg_structure_list body;
+            unsigned idx;
+        } loop;
+    } u;
+};
+
+static void vsir_cfg_structure_init(struct vsir_cfg_structure *structure, enum vsir_cfg_structure_type type);
+static void vsir_cfg_structure_cleanup(struct vsir_cfg_structure *structure);
+
+static void vsir_cfg_structure_list_cleanup(struct vsir_cfg_structure_list *list)
+{
+    unsigned int i;
+
+    for (i = 0; i < list->count; ++i)
+        vsir_cfg_structure_cleanup(&list->structures[i]);
+    vkd3d_free(list->structures);
+}
+
+static struct vsir_cfg_structure *vsir_cfg_structure_list_append(struct vsir_cfg_structure_list *list,
+        enum vsir_cfg_structure_type type)
+{
+    struct vsir_cfg_structure *ret;
+
+    if (!vkd3d_array_reserve((void **)&list->structures, &list->capacity, list->count + 1,
+            sizeof(*list->structures)))
+        return NULL;
+
+    ret = &list->structures[list->count++];
+
+    vsir_cfg_structure_init(ret, type);
+
+    return ret;
+}
+
+static void vsir_cfg_structure_init(struct vsir_cfg_structure *structure, enum vsir_cfg_structure_type type)
+{
+    memset(structure, 0, sizeof(*structure));
+    structure->type = type;
+}
+
+static void vsir_cfg_structure_cleanup(struct vsir_cfg_structure *structure)
+{
+    if (structure->type == STRUCTURE_TYPE_LOOP)
+        vsir_cfg_structure_list_cleanup(&structure->u.loop.body);
+}
+
 struct vsir_cfg
 {
     struct vkd3d_shader_message_context *message_context;
@@ -3187,6 +3254,8 @@ struct vsir_cfg
         bool synthetic;
     } *loop_intervals;
     size_t loop_interval_count, loop_interval_capacity;
+
+    struct vsir_cfg_structure_list structured_program;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3200,6 +3269,8 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
         vsir_block_list_cleanup(&cfg->loops[i]);
 
     vsir_block_list_cleanup(&cfg->order);
+
+    vsir_cfg_structure_list_cleanup(&cfg->structured_program);
 
     vkd3d_free(cfg->blocks);
     vkd3d_free(cfg->loops);
@@ -3916,6 +3987,70 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
+{
+    unsigned int i, stack_depth = 1, open_interval_idx = 0;
+    struct vsir_cfg_structure_list **stack = NULL;
+
+    /* It's enough to allocate up to the maximum interval stacking
+     * depth (plus one for the full program), but this is simpler. */
+    if (!(stack = vkd3d_calloc(cfg->loop_interval_count + 1, sizeof(*stack))))
+        goto fail;
+    cfg->structured_program.end = cfg->order.count;
+    stack[0] = &cfg->structured_program;
+
+    for (i = 0; i < cfg->order.count; ++i)
+    {
+        struct vsir_cfg_structure *structure;
+
+        assert(stack_depth > 0);
+
+        /* Open loop intervals. */
+        while (open_interval_idx < cfg->loop_interval_count)
+        {
+            struct cfg_loop_interval *interval = &cfg->loop_intervals[open_interval_idx];
+
+            if (interval->begin != i)
+                break;
+
+            if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_LOOP)))
+                goto fail;
+            structure->u.loop.idx = open_interval_idx++;
+
+            structure->u.loop.body.end = interval->end;
+            stack[stack_depth++] = &structure->u.loop.body;
+        }
+
+        /* Execute the block. */
+        if (!(structure = vsir_cfg_structure_list_append(stack[stack_depth - 1], STRUCTURE_TYPE_BLOCK)))
+            goto fail;
+        structure->u.block = cfg->order.blocks[i];
+
+        /* TODO: process the jump after the block. */
+
+        /* Close loop intervals. */
+        while (stack_depth > 0)
+        {
+            if (stack[stack_depth - 1]->end != i + 1)
+                break;
+
+            --stack_depth;
+        }
+    }
+
+    assert(stack_depth == 0);
+    assert(open_interval_idx == cfg->loop_interval_count);
+
+    vkd3d_free(stack);
+
+    return VKD3D_OK;
+
+fail:
+    vkd3d_free(stack);
+
+    return VKD3D_ERROR_OUT_OF_MEMORY;
+}
+
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
@@ -3956,6 +4091,12 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         }
 
         if ((result = vsir_cfg_generate_synthetic_loop_intervals(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_build_structured_program(&cfg)) < 0)
         {
             vsir_cfg_cleanup(&cfg);
             return result;
