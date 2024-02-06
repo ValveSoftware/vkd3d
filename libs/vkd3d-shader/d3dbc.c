@@ -1517,6 +1517,7 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TEXTURE:
             return D3DXPC_OBJECT;
+        case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             break;
@@ -1614,6 +1615,7 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
         case HLSL_CLASS_STRING:
             return D3DXPT_STRING;
 
+        case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             break;

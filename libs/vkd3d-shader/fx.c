@@ -437,6 +437,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             break;
 
         case HLSL_CLASS_ARRAY:
+        case HLSL_CLASS_EFFECT_GROUP:
             vkd3d_unreachable();
 
         case HLSL_CLASS_SAMPLER:
@@ -618,7 +619,7 @@ static void write_groups(struct fx_write_context *fx)
     {
         const struct hlsl_type *type = var->data_type;
 
-        if (type->base_type == HLSL_TYPE_EFFECT_GROUP)
+        if (type->class == HLSL_CLASS_EFFECT_GROUP)
             write_group(var, fx);
     }
 }
@@ -834,6 +835,10 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             return false;
+
+        case HLSL_CLASS_EFFECT_GROUP:
+            /* This cannot appear as an extern variable. */
+            break;
     }
 
     vkd3d_unreachable();
