@@ -352,7 +352,6 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
     static const char * const object_type_names[] =
     {
         [HLSL_TYPE_PIXELSHADER]      = "PixelShader",
-        [HLSL_TYPE_VERTEXSHADER]     = "VertexShader",
     };
     static const char * const texture_type_names[] =
     {
@@ -392,11 +391,13 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_RENDER_TARGET_VIEW:
             return "RenderTargetView";
 
+        case HLSL_CLASS_VERTEX_SHADER:
+            return "VertexShader";
+
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
-                case HLSL_TYPE_VERTEXSHADER:
                     return object_type_names[type->base_type];
                 default:
                     return type->name;
@@ -440,6 +441,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VERTEX_SHADER:
             put_u32_unaligned(buffer, 2);
             break;
 
@@ -532,18 +534,20 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         put_u32_unaligned(buffer, 19);
     }
+    else if (type->class == HLSL_CLASS_VERTEX_SHADER)
+    {
+        put_u32_unaligned(buffer, 6);
+    }
     else if (type->class == HLSL_CLASS_OBJECT)
     {
         static const uint32_t object_type[] =
         {
             [HLSL_TYPE_PIXELSHADER]      = 5,
-            [HLSL_TYPE_VERTEXSHADER]     = 6,
         };
 
         switch (type->base_type)
         {
             case HLSL_TYPE_PIXELSHADER:
-            case HLSL_TYPE_VERTEXSHADER:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
                 break;
             default:
@@ -842,7 +846,6 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
-                case HLSL_TYPE_VERTEXSHADER:
                     hlsl_fixme(ctx, loc, "Write fx 2.0 parameter object type %#x.", type->base_type);
                     return false;
 
@@ -852,6 +855,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
 
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
+        case HLSL_CLASS_VERTEX_SHADER:
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
 
@@ -1052,7 +1056,6 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
-                case HLSL_TYPE_VERTEXSHADER:
                     /* FIXME: write shader blobs, once parser support works. */
                     for (i = 0; i < elements_count; ++i)
                         put_u32(buffer, 0);
@@ -1062,6 +1065,13 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
                     hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
                             type->base_type);
             }
+            break;
+
+        case HLSL_CLASS_VERTEX_SHADER:
+            /* FIXME: write shader blobs, once parser support works. */
+            for (i = 0; i < elements_count; ++i)
+                put_u32(buffer, 0);
+            ++fx->shader_variable_count;
             break;
 
         default:
@@ -1153,13 +1163,13 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VERTEX_SHADER:
             return true;
 
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
-                case HLSL_TYPE_VERTEXSHADER:
                     return true;
                 default:
                     return false;

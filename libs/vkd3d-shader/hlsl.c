@@ -370,6 +370,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_VERTEX_SHADER:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -438,6 +439,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VERTEX_SHADER:
             return true;
 
         case HLSL_CLASS_VECTOR:
@@ -578,6 +580,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
             case HLSL_CLASS_STRING:
             case HLSL_CLASS_TEXTURE:
             case HLSL_CLASS_UAV:
+            case HLSL_CLASS_VERTEX_SHADER:
                 assert(idx == 0);
                 break;
 
@@ -956,6 +959,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
+        case HLSL_CLASS_VERTEX_SHADER:
             return 1;
 
         case HLSL_CLASS_EFFECT_GROUP:
@@ -2382,6 +2386,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TECHNIQUE:
+        case HLSL_CLASS_VERTEX_SHADER:
         case HLSL_CLASS_VOID:
             break;
     }
@@ -3558,7 +3563,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"vector",          HLSL_CLASS_VECTOR, HLSL_TYPE_FLOAT,         4, 1},
         {"matrix",          HLSL_CLASS_MATRIX, HLSL_TYPE_FLOAT,         4, 4},
         {"pixelshader",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
-        {"vertexshader",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
     };
 
     static const struct
@@ -3685,6 +3689,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "RenderTargetView", HLSL_CLASS_RENDER_TARGET_VIEW));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "texture", HLSL_CLASS_TEXTURE));
+    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "vertexshader", HLSL_CLASS_VERTEX_SHADER));
 
     for (i = 0; i < ARRAY_SIZE(effect_types); ++i)
     {

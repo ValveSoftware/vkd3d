@@ -88,6 +88,7 @@ enum hlsl_type_class
     HLSL_CLASS_TECHNIQUE,
     HLSL_CLASS_TEXTURE,
     HLSL_CLASS_UAV,
+    HLSL_CLASS_VERTEX_SHADER,
     HLSL_CLASS_VOID,
 };
 
@@ -101,7 +102,6 @@ enum hlsl_base_type
     HLSL_TYPE_BOOL,
     HLSL_TYPE_LAST_SCALAR = HLSL_TYPE_BOOL,
     HLSL_TYPE_PIXELSHADER,
-    HLSL_TYPE_VERTEXSHADER,
 };
 
 enum hlsl_sampler_dim
