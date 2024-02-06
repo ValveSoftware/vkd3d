@@ -3379,6 +3379,76 @@ static void vsir_cfg_dump_dot(struct vsir_cfg *cfg)
     TRACE("}\n");
 }
 
+static void vsir_cfg_structure_list_dump(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list);
+
+static void vsir_cfg_structure_dump(struct vsir_cfg *cfg, struct vsir_cfg_structure *structure)
+{
+    switch (structure->type)
+    {
+        case STRUCTURE_TYPE_BLOCK:
+            TRACE("%sblock %u\n", cfg->debug_buffer.buffer, structure->u.block->label);
+            break;
+
+        case STRUCTURE_TYPE_LOOP:
+            TRACE("%s%u : loop {\n", cfg->debug_buffer.buffer, structure->u.loop.idx);
+
+            vsir_cfg_structure_list_dump(cfg, &structure->u.loop.body);
+
+            TRACE("%s}  # %u\n", cfg->debug_buffer.buffer, structure->u.loop.idx);
+            break;
+
+        case STRUCTURE_TYPE_JUMP:
+        {
+            const char *type_str;
+
+            switch (structure->u.jump.type)
+            {
+                case JUMP_RET:
+                    TRACE("%sret\n", cfg->debug_buffer.buffer);
+                    return;
+
+                case JUMP_BREAK:
+                    type_str = "break";
+                    break;
+
+                case JUMP_CONTINUE:
+                    type_str = "continue";
+                    break;
+
+                default:
+                    vkd3d_unreachable();
+            }
+
+            TRACE("%s%s%s %u\n", cfg->debug_buffer.buffer, type_str,
+                    structure->u.jump.condition ? "c" : "", structure->u.jump.target);
+            break;
+        }
+
+        default:
+            vkd3d_unreachable();
+    }
+}
+
+static void vsir_cfg_structure_list_dump(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
+{
+    unsigned int i;
+
+    vkd3d_string_buffer_printf(&cfg->debug_buffer, "  ");
+
+    for (i = 0; i < list->count; ++i)
+        vsir_cfg_structure_dump(cfg, &list->structures[i]);
+
+    vkd3d_string_buffer_truncate(&cfg->debug_buffer, cfg->debug_buffer.content_size - 2);
+}
+
+static void vsir_cfg_dump_structured_program(struct vsir_cfg *cfg)
+{
+    unsigned int i;
+
+    for (i = 0; i < cfg->structured_program.count; ++i)
+        vsir_cfg_structure_dump(cfg, &cfg->structured_program.structures[i]);
+}
+
 static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program,
         struct vkd3d_shader_message_context *message_context)
 {
@@ -4204,6 +4274,9 @@ static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
 
     assert(stack_depth == 0);
     assert(open_interval_idx == cfg->loop_interval_count);
+
+    if (TRACE_ON())
+        vsir_cfg_dump_structured_program(cfg);
 
     vkd3d_free(stack);
 

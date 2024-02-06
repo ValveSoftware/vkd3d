@@ -73,8 +73,16 @@ void vkd3d_string_buffer_cleanup(struct vkd3d_string_buffer *buffer)
 
 void vkd3d_string_buffer_clear(struct vkd3d_string_buffer *buffer)
 {
-    buffer->buffer[0] = '\0';
-    buffer->content_size = 0;
+    vkd3d_string_buffer_truncate(buffer, 0);
+}
+
+void vkd3d_string_buffer_truncate(struct vkd3d_string_buffer *buffer, size_t size)
+{
+    if (size < buffer->content_size)
+    {
+        buffer->buffer[size] = '\0';
+        buffer->content_size = size;
+    }
 }
 
 static bool vkd3d_string_buffer_resize(struct vkd3d_string_buffer *buffer, int rc)
