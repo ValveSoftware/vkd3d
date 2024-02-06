@@ -1522,72 +1522,94 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
 
 D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
 {
-    switch (type->base_type)
+    switch (type->class)
     {
-        case HLSL_TYPE_BOOL:
-            return D3DXPT_BOOL;
-        /* Actually double behaves differently depending on DLL version:
-         * For <= 36, it maps to D3DXPT_FLOAT.
-         * For 37-40, it maps to zero (D3DXPT_VOID).
-         * For >= 41, it maps to 39, which is D3D_SVT_DOUBLE (note D3D_SVT_*
-         *            values are mostly compatible with D3DXPT_*).
-         * However, the latter two cases look like bugs, and a reasonable
-         * application certainly wouldn't know what to do with them.
-         * For fx_2_0 it's always D3DXPT_FLOAT regardless of DLL version. */
-        case HLSL_TYPE_DOUBLE:
-        case HLSL_TYPE_FLOAT:
-        case HLSL_TYPE_HALF:
-            return D3DXPT_FLOAT;
-        case HLSL_TYPE_INT:
-        case HLSL_TYPE_UINT:
-            return D3DXPT_INT;
-        case HLSL_TYPE_PIXELSHADER:
-            return D3DXPT_PIXELSHADER;
-        case HLSL_TYPE_SAMPLER:
-            switch (type->sampler_dim)
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            switch (type->base_type)
             {
-                case HLSL_SAMPLER_DIM_1D:
-                    return D3DXPT_SAMPLER1D;
-                case HLSL_SAMPLER_DIM_2D:
-                    return D3DXPT_SAMPLER2D;
-                case HLSL_SAMPLER_DIM_3D:
-                    return D3DXPT_SAMPLER3D;
-                case HLSL_SAMPLER_DIM_CUBE:
-                    return D3DXPT_SAMPLERCUBE;
-                case HLSL_SAMPLER_DIM_GENERIC:
-                    return D3DXPT_SAMPLER;
+                case HLSL_TYPE_BOOL:
+                    return D3DXPT_BOOL;
+                /* Actually double behaves differently depending on DLL version:
+                 * For <= 36, it maps to D3DXPT_FLOAT.
+                 * For 37-40, it maps to zero (D3DXPT_VOID).
+                 * For >= 41, it maps to 39, which is D3D_SVT_DOUBLE (note D3D_SVT_*
+                 *            values are mostly compatible with D3DXPT_*).
+                 * However, the latter two cases look like bugs, and a reasonable
+                 * application certainly wouldn't know what to do with them.
+                 * For fx_2_0 it's always D3DXPT_FLOAT regardless of DLL version. */
+                case HLSL_TYPE_DOUBLE:
+                case HLSL_TYPE_FLOAT:
+                case HLSL_TYPE_HALF:
+                    return D3DXPT_FLOAT;
+                case HLSL_TYPE_INT:
+                case HLSL_TYPE_UINT:
+                    return D3DXPT_INT;
                 default:
-                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
                     vkd3d_unreachable();
             }
-            break;
-        case HLSL_TYPE_STRING:
-            return D3DXPT_STRING;
-        case HLSL_TYPE_TEXTURE:
-            switch (type->sampler_dim)
+
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
             {
-                case HLSL_SAMPLER_DIM_1D:
-                    return D3DXPT_TEXTURE1D;
-                case HLSL_SAMPLER_DIM_2D:
-                    return D3DXPT_TEXTURE2D;
-                case HLSL_SAMPLER_DIM_3D:
-                    return D3DXPT_TEXTURE3D;
-                case HLSL_SAMPLER_DIM_CUBE:
-                    return D3DXPT_TEXTURECUBE;
-                case HLSL_SAMPLER_DIM_GENERIC:
-                    return D3DXPT_TEXTURE;
+                case HLSL_TYPE_PIXELSHADER:
+                    return D3DXPT_PIXELSHADER;
+                case HLSL_TYPE_SAMPLER:
+                    switch (type->sampler_dim)
+                    {
+                        case HLSL_SAMPLER_DIM_1D:
+                            return D3DXPT_SAMPLER1D;
+                        case HLSL_SAMPLER_DIM_2D:
+                            return D3DXPT_SAMPLER2D;
+                        case HLSL_SAMPLER_DIM_3D:
+                            return D3DXPT_SAMPLER3D;
+                        case HLSL_SAMPLER_DIM_CUBE:
+                            return D3DXPT_SAMPLERCUBE;
+                        case HLSL_SAMPLER_DIM_GENERIC:
+                            return D3DXPT_SAMPLER;
+                        default:
+                            ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                            vkd3d_unreachable();
+                    }
+                    break;
+                case HLSL_TYPE_STRING:
+                    return D3DXPT_STRING;
+                case HLSL_TYPE_TEXTURE:
+                    switch (type->sampler_dim)
+                    {
+                        case HLSL_SAMPLER_DIM_1D:
+                            return D3DXPT_TEXTURE1D;
+                        case HLSL_SAMPLER_DIM_2D:
+                            return D3DXPT_TEXTURE2D;
+                        case HLSL_SAMPLER_DIM_3D:
+                            return D3DXPT_TEXTURE3D;
+                        case HLSL_SAMPLER_DIM_CUBE:
+                            return D3DXPT_TEXTURECUBE;
+                        case HLSL_SAMPLER_DIM_GENERIC:
+                            return D3DXPT_TEXTURE;
+                        default:
+                            ERR("Invalid dimension %#x.\n", type->sampler_dim);
+                            vkd3d_unreachable();
+                    }
+                    break;
+                case HLSL_TYPE_VERTEXSHADER:
+                    return D3DXPT_VERTEXSHADER;
+                case HLSL_TYPE_VOID:
+                    return D3DXPT_VOID;
                 default:
-                    ERR("Invalid dimension %#x.\n", type->sampler_dim);
                     vkd3d_unreachable();
             }
-            break;
-        case HLSL_TYPE_VERTEXSHADER:
-            return D3DXPT_VERTEXSHADER;
-        case HLSL_TYPE_VOID:
-            return D3DXPT_VOID;
-        default:
             vkd3d_unreachable();
+
+        case HLSL_CLASS_ARRAY:
+            return hlsl_sm1_base_type(type->e.array.type);
+
+        case HLSL_CLASS_STRUCT:
+            return D3DXPT_VOID;
     }
+
+    vkd3d_unreachable();
 }
 
 static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_type *type, unsigned int ctab_start)
