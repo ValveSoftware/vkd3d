@@ -3766,6 +3766,20 @@ fail:
     return ret;
 }
 
+/* Sort loop intervals first by ascending begin time and then by
+ * descending end time, so that inner intervals appear after outer
+ * ones and disjoint intervals appear in their proper order. */
+static int compare_loop_intervals(const void *ptr1, const void *ptr2)
+{
+    const struct cfg_loop_interval *interval1 = ptr1;
+    const struct cfg_loop_interval *interval2 = ptr2;
+
+    if (interval1->begin != interval2->begin)
+        return vkd3d_u32_compare(interval1->begin, interval2->begin);
+
+    return -vkd3d_u32_compare(interval1->end, interval2->end);
+}
+
 static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_cfg *cfg)
 {
     enum vkd3d_result ret;
@@ -3878,6 +3892,8 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
                 return ret;
         }
     }
+
+    qsort(cfg->loop_intervals, cfg->loop_interval_count, sizeof(*cfg->loop_intervals), compare_loop_intervals);
 
     if (TRACE_ON())
         for (i = 0; i < cfg->loop_interval_count; ++i)
