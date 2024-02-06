@@ -1148,6 +1148,11 @@ static inline unsigned int hlsl_sampler_dim_count(enum hlsl_sampler_dim dim)
     }
 }
 
+static inline bool hlsl_var_has_buffer_offset_register_reservation(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var)
+{
+    return var->reg_reservation.reg_type == 'c' && var->buffer == ctx->globals_buffer;
+}
+
 char *hlsl_sprintf_alloc(struct hlsl_ctx *ctx, const char *fmt, ...) VKD3D_PRINTF_FUNC(2, 3);
 
 const char *debug_hlsl_expr_op(enum hlsl_ir_expr_op op);
@@ -1315,6 +1320,9 @@ unsigned int hlsl_type_element_count(const struct hlsl_type *type);
 bool hlsl_type_is_resource(const struct hlsl_type *type);
 unsigned int hlsl_type_get_sm4_offset(const struct hlsl_type *type, unsigned int offset);
 bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2);
+
+void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx);
+void hlsl_prepend_global_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *block);
 
 const struct hlsl_type *hlsl_get_multiarray_element_type(const struct hlsl_type *type);
 unsigned int hlsl_get_multiarray_size(const struct hlsl_type *type);

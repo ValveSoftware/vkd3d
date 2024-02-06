@@ -4335,7 +4335,7 @@ static const struct hlsl_buffer *get_reserved_buffer(struct hlsl_ctx *ctx, uint3
     return NULL;
 }
 
-static void calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, bool register_reservation)
+static void hlsl_calculate_buffer_offset(struct hlsl_ctx *ctx, struct hlsl_ir_var *var, bool register_reservation)
 {
     unsigned int var_reg_size = var->data_type->reg_size[HLSL_REGSET_NUMERIC];
     enum hlsl_type_class var_class = var->data_type->class;
@@ -4449,9 +4449,27 @@ static void validate_buffer_offsets(struct hlsl_ctx *ctx)
     }
 }
 
-static bool var_has_buffer_offset_register_reservation(struct hlsl_ctx *ctx, const struct hlsl_ir_var *var)
+void hlsl_calculate_buffer_offsets(struct hlsl_ctx *ctx)
 {
-    return var->reg_reservation.reg_type == 'c' && var->buffer == ctx->globals_buffer;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->is_uniform || hlsl_type_is_resource(var->data_type))
+            continue;
+
+        if (hlsl_var_has_buffer_offset_register_reservation(ctx, var))
+            hlsl_calculate_buffer_offset(ctx, var, true);
+    }
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!var->is_uniform || hlsl_type_is_resource(var->data_type))
+            continue;
+
+        if (!hlsl_var_has_buffer_offset_register_reservation(ctx, var))
+            hlsl_calculate_buffer_offset(ctx, var, false);
+    }
 }
 
 static void allocate_buffers(struct hlsl_ctx *ctx)
@@ -4469,24 +4487,7 @@ static void allocate_buffers(struct hlsl_ctx *ctx)
             var->buffer = ctx->params_buffer;
     }
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if (!var->is_uniform || hlsl_type_is_resource(var->data_type))
-            continue;
-
-        if (var_has_buffer_offset_register_reservation(ctx, var))
-            calculate_buffer_offset(ctx, var, true);
-    }
-
-    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
-    {
-        if (!var->is_uniform || hlsl_type_is_resource(var->data_type))
-            continue;
-
-        if (!var_has_buffer_offset_register_reservation(ctx, var))
-            calculate_buffer_offset(ctx, var, false);
-    }
-
+    hlsl_calculate_buffer_offsets(ctx);
     validate_buffer_offsets(ctx);
 
     LIST_FOR_EACH_ENTRY(buffer, &ctx->buffers, struct hlsl_buffer, entry)
@@ -4959,6 +4960,17 @@ static void remove_unreachable_code(struct hlsl_ctx *ctx, struct hlsl_block *bod
     }
 }
 
+void hlsl_prepend_global_uniform_copy(struct hlsl_ctx *ctx, struct hlsl_block *body)
+{
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
+    {
+        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
+            prepend_uniform_copy(ctx, body, var);
+    }
+}
+
 int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func,
         enum vkd3d_shader_target_type target_type, struct vkd3d_shader_code *out)
 {
@@ -4987,11 +4999,7 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     lower_ir(ctx, lower_matrix_swizzles, body);
     lower_ir(ctx, lower_index_loads, body);
 
-    LIST_FOR_EACH_ENTRY(var, &ctx->globals->vars, struct hlsl_ir_var, scope_entry)
-    {
-        if (var->storage_modifiers & HLSL_STORAGE_UNIFORM)
-            prepend_uniform_copy(ctx, body, var);
-    }
+    hlsl_prepend_global_uniform_copy(ctx, body);
 
     for (i = 0; i < entry_func->parameters.count; ++i)
     {
