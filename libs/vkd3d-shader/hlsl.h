@@ -78,10 +78,10 @@ enum hlsl_type_class
     HLSL_CLASS_LAST_NUMERIC = HLSL_CLASS_MATRIX,
     HLSL_CLASS_STRUCT,
     HLSL_CLASS_ARRAY,
-    HLSL_CLASS_OBJECT,
     HLSL_CLASS_DEPTH_STENCIL_VIEW,
     HLSL_CLASS_EFFECT_GROUP,
     HLSL_CLASS_PASS,
+    HLSL_CLASS_PIXEL_SHADER,
     HLSL_CLASS_RENDER_TARGET_VIEW,
     HLSL_CLASS_SAMPLER,
     HLSL_CLASS_STRING,
@@ -101,7 +101,6 @@ enum hlsl_base_type
     HLSL_TYPE_UINT,
     HLSL_TYPE_BOOL,
     HLSL_TYPE_LAST_SCALAR = HLSL_TYPE_BOOL,
-    HLSL_TYPE_PIXELSHADER,
 };
 
 enum hlsl_sampler_dim
@@ -144,7 +143,6 @@ struct hlsl_type
 
     enum hlsl_type_class class;
     /* If class is <= HLSL_CLASS_LAST_NUMERIC, then base_type is <= HLSL_TYPE_LAST_SCALAR.
-     * If class is HLSL_CLASS_OBJECT, then base_type is > HLSL_TYPE_LAST_SCALAR.
      * Otherwise, base_type is not used. */
     enum hlsl_base_type base_type;
 

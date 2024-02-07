@@ -1514,7 +1514,7 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
             return D3DXPC_STRUCT;
         case HLSL_CLASS_VECTOR:
             return D3DXPC_VECTOR;
-        case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_TEXTURE:
@@ -1601,16 +1601,6 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
             }
             break;
 
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_PIXELSHADER:
-                    return D3DXPT_PIXELSHADER;
-                default:
-                    vkd3d_unreachable();
-            }
-            vkd3d_unreachable();
-
         case HLSL_CLASS_ARRAY:
             return hlsl_sm1_base_type(type->e.array.type);
 
@@ -1619,6 +1609,9 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
 
         case HLSL_CLASS_STRING:
             return D3DXPT_STRING;
+
+        case HLSL_CLASS_PIXEL_SHADER:
+            return D3DXPT_PIXELSHADER;
 
         case HLSL_CLASS_VERTEX_SHADER:
             return D3DXPT_VERTEXSHADER;

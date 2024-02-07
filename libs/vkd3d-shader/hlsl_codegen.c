@@ -1625,11 +1625,11 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
     {
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VERTEX_SHADER:
-        case HLSL_CLASS_OBJECT:
             break;
 
         case HLSL_CLASS_MATRIX:

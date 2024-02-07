@@ -349,10 +349,6 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
 
 static const char * get_fx_4_type_name(const struct hlsl_type *type)
 {
-    static const char * const object_type_names[] =
-    {
-        [HLSL_TYPE_PIXELSHADER]      = "PixelShader",
-    };
     static const char * const texture_type_names[] =
     {
         [HLSL_SAMPLER_DIM_GENERIC]   = "texture",
@@ -394,14 +390,8 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_VERTEX_SHADER:
             return "VertexShader";
 
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_PIXELSHADER:
-                    return object_type_names[type->base_type];
-                default:
-                    return type->name;
-            }
+        case HLSL_CLASS_PIXEL_SHADER:
+            return "PixelShader";
 
         default:
             return type->name;
@@ -414,7 +404,6 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     uint32_t name_offset, offset, size, stride, numeric_desc;
     uint32_t elements_count = 0;
     const char *name;
-    struct hlsl_ctx *ctx = fx->ctx;
 
     /* Resolve arrays to element type and number of elements. */
     if (type->class == HLSL_CLASS_ARRAY)
@@ -437,7 +426,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             break;
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
-        case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
@@ -534,26 +523,13 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         put_u32_unaligned(buffer, 19);
     }
+    else if (type->class == HLSL_CLASS_PIXEL_SHADER)
+    {
+        put_u32_unaligned(buffer, 5);
+    }
     else if (type->class == HLSL_CLASS_VERTEX_SHADER)
     {
         put_u32_unaligned(buffer, 6);
-    }
-    else if (type->class == HLSL_CLASS_OBJECT)
-    {
-        static const uint32_t object_type[] =
-        {
-            [HLSL_TYPE_PIXELSHADER]      = 5,
-        };
-
-        switch (type->base_type)
-        {
-            case HLSL_TYPE_PIXELSHADER:
-                put_u32_unaligned(buffer, object_type[type->base_type]);
-                break;
-            default:
-                hlsl_fixme(ctx, &ctx->location, "Object type %u is not supported.", type->base_type);
-                return 0;
-        }
     }
     else if (hlsl_is_numeric_type(type))
     {
@@ -842,17 +818,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             }
             break;
 
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_PIXELSHADER:
-                    hlsl_fixme(ctx, loc, "Write fx 2.0 parameter object type %#x.", type->base_type);
-                    return false;
-
-                default:
-                    return false;
-            }
-
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
         case HLSL_CLASS_VERTEX_SHADER:
@@ -1052,21 +1018,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
         case HLSL_CLASS_UAV:
             break;
 
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_PIXELSHADER:
-                    /* FIXME: write shader blobs, once parser support works. */
-                    for (i = 0; i < elements_count; ++i)
-                        put_u32(buffer, 0);
-                    ++fx->shader_variable_count;
-                    break;
-                default:
-                    hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
-                            type->base_type);
-            }
-            break;
-
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_VERTEX_SHADER:
             /* FIXME: write shader blobs, once parser support works. */
             for (i = 0; i < elements_count; ++i)
@@ -1159,21 +1111,13 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
 
     switch (type->class)
     {
+        case HLSL_CLASS_PIXEL_SHADER:
         case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VERTEX_SHADER:
             return true;
-
-        case HLSL_CLASS_OBJECT:
-            switch (type->base_type)
-            {
-                case HLSL_TYPE_PIXELSHADER:
-                    return true;
-                default:
-                    return false;
-            }
 
         default:
             return false;
