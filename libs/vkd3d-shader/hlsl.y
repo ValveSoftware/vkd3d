@@ -1386,10 +1386,6 @@ static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t
 
 static enum hlsl_base_type expr_common_base_type(enum hlsl_base_type t1, enum hlsl_base_type t2)
 {
-    if (t1 > HLSL_TYPE_LAST_SCALAR || t2 > HLSL_TYPE_LAST_SCALAR) {
-        FIXME("Unexpected base type.\n");
-        return HLSL_TYPE_FLOAT;
-    }
     if (t1 == t2)
         return t1 == HLSL_TYPE_BOOL ? HLSL_TYPE_INT : t1;
     if (t1 == HLSL_TYPE_DOUBLE || t2 == HLSL_TYPE_DOUBLE)
@@ -1593,13 +1589,13 @@ static struct hlsl_ir_node *add_unary_logical_expr(struct hlsl_ctx *ctx, struct 
 static struct hlsl_type *get_common_numeric_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *arg1,
         const struct hlsl_ir_node *arg2, const struct vkd3d_shader_location *loc)
 {
-    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     enum hlsl_type_class type;
+    enum hlsl_base_type base;
     unsigned int dimx, dimy;
 
     if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
         return NULL;
-
+    base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     return hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
 }
 
@@ -1636,14 +1632,15 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
         const struct vkd3d_shader_location *loc)
 {
     struct hlsl_type *common_type, *return_type;
-    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     enum hlsl_type_class type;
+    enum hlsl_base_type base;
     unsigned int dimx, dimy;
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
 
     if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
         return NULL;
 
+    base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
     common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     return_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
