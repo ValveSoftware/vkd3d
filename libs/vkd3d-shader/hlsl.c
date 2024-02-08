@@ -3521,6 +3521,9 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         type->e.version = technique_types[i].version;
         hlsl_scope_add_type(ctx->globals, type);
     }
+
+    type = hlsl_new_type(ctx, "RenderTargetView", HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1);
+    hlsl_scope_add_type(ctx->globals, type);
 }
 
 static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info *compile_info,

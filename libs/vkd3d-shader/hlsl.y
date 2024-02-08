@@ -6446,6 +6446,10 @@ type_no_void:
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_REDEFINED, "\"%s\" redefined as a structure.", $2);
             vkd3d_free($2);
         }
+    | KW_RENDERTARGETVIEW
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "RenderTargetView", true, true);
+        }
 
 type:
       type_no_void
