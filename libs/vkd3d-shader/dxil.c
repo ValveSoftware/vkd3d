@@ -394,6 +394,7 @@ enum dx_intrinsic_opcode
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
     DX_RAW_BUFFER_LOAD              = 139,
+    DX_RAW_BUFFER_STORE             = 140,
 };
 
 enum dxil_cast_code
@@ -4141,7 +4142,7 @@ static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_i
 static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
-    unsigned int write_mask, component_count, operand_count;
+    unsigned int write_mask, component_count, alignment = 0, operand_count;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_dst_param *dst_param;
     struct vkd3d_shader_instruction *ins;
@@ -4171,6 +4172,24 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
     }
     component_count = vsir_write_mask_component_count(write_mask);
 
+    if (op == DX_RAW_BUFFER_STORE)
+    {
+        if (!raw && resource->u.handle.d->kind != RESOURCE_KIND_STRUCTUREDBUFFER)
+        {
+            WARN("Resource is not a raw or structured buffer.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_INVALID_OPERATION,
+                    "Resource for a raw buffer store is not a raw or structured buffer.");
+        }
+
+        alignment = sm6_value_get_constant_uint(operands[8]);
+        if (alignment & (alignment - 1))
+        {
+            FIXME("Invalid alignment %#x.\n", alignment);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Alignment %#x for a raw/structured buffer store operation is invalid.", alignment);
+        }
+    }
+
     if (!sm6_parser_emit_composite_construct(sm6, &operands[3], component_count, state, &data))
         return;
 
@@ -4187,6 +4206,7 @@ static void sm6_parser_emit_dx_raw_buffer_store(struct sm6_parser *sm6, enum dx_
     dst_param = instruction_dst_params_alloc(ins, 1, sm6);
     dst_param_init_with_mask(dst_param, write_mask);
     dst_param->reg = resource->u.handle.reg;
+    dst_param->reg.alignment = alignment;
 }
 
 static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -4627,6 +4647,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
     [DX_LOG                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RAW_BUFFER_LOAD               ] = {"o", "Hii8i", sm6_parser_emit_dx_raw_buffer_load},
+    [DX_RAW_BUFFER_STORE              ] = {"v", "Hiioooocc", sm6_parser_emit_dx_raw_buffer_store},
     [DX_ROUND_NE                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_NI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
