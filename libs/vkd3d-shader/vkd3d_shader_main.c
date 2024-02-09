@@ -2048,9 +2048,12 @@ void *shader_param_allocator_get(struct vkd3d_shader_param_allocator *allocator,
 
     if (count > allocator->count - allocator->index)
     {
-        struct vkd3d_shader_param_node *next = shader_param_allocator_node_create(allocator);
+        struct vkd3d_shader_param_node *next;
 
-        if (!next)
+        /* Monolithic switch has no definite parameter count limit. */
+        allocator->count = max(allocator->count, count);
+
+        if (!(next = shader_param_allocator_node_create(allocator)))
             return NULL;
         if (allocator->current)
             allocator->current->next = next;
