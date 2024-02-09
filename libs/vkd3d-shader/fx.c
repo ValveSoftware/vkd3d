@@ -83,6 +83,7 @@ struct fx_write_context
     uint32_t group_count;
     uint32_t buffer_count;
     uint32_t numeric_variable_count;
+    uint32_t object_variable_count;
     int status;
 
     const struct fx_write_context_ops *ops;
@@ -392,9 +393,21 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     }
     else if (type->class == HLSL_CLASS_OBJECT)
     {
-        FIXME("Object types are not supported.\n");
-        set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
-        return 0;
+        static const uint32_t object_type[] =
+        {
+            [HLSL_TYPE_RENDERTARGETVIEW] = 19,
+        };
+
+        switch (type->base_type)
+        {
+            case HLSL_TYPE_RENDERTARGETVIEW:
+                put_u32_unaligned(buffer, object_type[type->base_type]);
+                break;
+            default:
+                FIXME("Object type %u is not supported.\n", type->base_type);
+                set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
+                return 0;
+        }
     }
     else /* Numeric type */
     {
@@ -588,12 +601,12 @@ static const struct fx_write_context_ops fx_4_ops =
     .write_pass = write_fx_4_pass,
 };
 
-static void write_fx_4_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
+static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t semantic_offset, flags = 0;
     uint32_t name_offset, type_offset;
-    enum fx_4_variable_flags
+    enum fx_4_numeric_variable_flags
     {
         HAS_EXPLICIT_BIND_POINT = 0x4,
     };
@@ -613,6 +626,29 @@ static void write_fx_4_variable(struct hlsl_ir_var *var, struct fx_write_context
     put_u32(buffer, var->buffer_offset); /* Offset in the constant buffer */
     put_u32(buffer, 0); /* FIXME: default value offset */
     put_u32(buffer, flags); /* Flags */
+
+    put_u32(buffer, 0); /* Annotations count */
+    /* FIXME: write annotations */
+}
+
+static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t semantic_offset, bind_point = ~0u;
+    uint32_t name_offset, type_offset;
+
+    if (var->reg_reservation.reg_type)
+        bind_point = var->reg_reservation.reg_index;
+
+    type_offset = write_type(var->data_type, fx);
+    name_offset = write_string(var->name, fx);
+    semantic_offset = write_string(var->semantic.name, fx);
+
+    put_u32(buffer, name_offset);
+    put_u32(buffer, type_offset);
+
+    semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
+    put_u32(buffer, bind_point); /* Explicit bind point */
 
     put_u32(buffer, 0); /* Annotations count */
     /* FIXME: write annotations */
@@ -656,7 +692,7 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
         if (var->buffer != b)
             continue;
 
-        write_fx_4_variable(var, fx);
+        write_fx_4_numeric_variable(var, fx);
         size += get_fx_4_type_size(var->data_type);
         ++count;
     }
@@ -687,6 +723,44 @@ static void write_buffers(struct fx_write_context *fx)
     }
 }
 
+static bool is_object_variable(const struct hlsl_ir_var *var)
+{
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
+
+    if (type->class != HLSL_CLASS_OBJECT)
+        return false;
+
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_SAMPLER:
+        case HLSL_TYPE_TEXTURE:
+        case HLSL_TYPE_UAV:
+        case HLSL_TYPE_PIXELSHADER:
+        case HLSL_TYPE_VERTEXSHADER:
+        case HLSL_TYPE_RENDERTARGETVIEW:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static void write_objects(struct fx_write_context *fx)
+{
+    struct hlsl_ir_var *var;
+    uint32_t count = 0;
+
+    LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        if (!is_object_variable(var))
+            continue;
+
+        write_fx_4_object_variable(var, fx);
+        ++count;
+    }
+
+    fx->object_variable_count += count;
+}
+
 static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
     struct vkd3d_bytecode_buffer buffer = { 0 };
@@ -698,7 +772,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
     write_buffers(&fx);
-    /* TODO: objects */
+    write_objects(&fx);
     /* TODO: shared buffers */
     /* TODO: shared objects */
 
@@ -707,7 +781,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, ctx->profile->minor_version == 0 ? 0xfeff1001 : 0xfeff1011); /* Version. */
     put_u32(&buffer, fx.buffer_count); /* Buffer count. */
     put_u32(&buffer, fx.numeric_variable_count); /* Numeric variable count. */
-    put_u32(&buffer, 0); /* Object variable count. */
+    put_u32(&buffer, fx.object_variable_count); /* Object variable count. */
     put_u32(&buffer, 0); /* Pool buffer count. */
     put_u32(&buffer, 0); /* Pool variable count. */
     put_u32(&buffer, 0); /* Pool object count. */
@@ -757,7 +831,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
     write_buffers(&fx);
-    /* TODO: objects */
+    write_objects(&fx);
     /* TODO: interface variables */
 
     write_groups(&fx);
@@ -765,7 +839,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0xfeff2001); /* Version. */
     put_u32(&buffer, fx.buffer_count); /* Buffer count. */
     put_u32(&buffer, fx.numeric_variable_count); /* Numeric variable count. */
-    put_u32(&buffer, 0); /* Object variable count. */
+    put_u32(&buffer, fx.object_variable_count); /* Object variable count. */
     put_u32(&buffer, 0); /* Pool buffer count. */
     put_u32(&buffer, 0); /* Pool variable count. */
     put_u32(&buffer, 0); /* Pool object count. */
