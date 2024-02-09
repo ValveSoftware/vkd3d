@@ -3433,6 +3433,24 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device7 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS10:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS10 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+                return E_INVALIDARG;
+            }
+
+            data->VariableRateShadingSumCombinerSupported = FALSE;
+            data->MeshShaderPerPrimitiveShadingRateSupported = FALSE;
+
+            TRACE("Variable rate shading sum combiner %#x.\n", data->VariableRateShadingSumCombinerSupported);
+            TRACE("Mesh shader per primitive shading rate %#x.\n", data->MeshShaderPerPrimitiveShadingRateSupported);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
