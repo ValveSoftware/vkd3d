@@ -3467,6 +3467,27 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device7 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS12:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS12 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+                return E_INVALIDARG;
+            }
+
+            data->MSPrimitivesPipelineStatisticIncludesCulledPrimitives = D3D12_TRI_STATE_UNKNOWN;
+            data->EnhancedBarriersSupported = FALSE;
+            data->RelaxedFormatCastingSupported = FALSE;
+
+            TRACE("Mesh shader primitives pipeline stats include cull primitives %#x.\n",
+                    data->MSPrimitivesPipelineStatisticIncludesCulledPrimitives);
+            TRACE("Enhanced barriers %#x.\n", data->EnhancedBarriersSupported);
+            TRACE("Relaxed format casting %#x.\n", data->RelaxedFormatCastingSupported);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
