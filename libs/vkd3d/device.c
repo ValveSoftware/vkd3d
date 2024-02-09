@@ -3488,6 +3488,32 @@ static HRESULT STDMETHODCALLTYPE d3d12_device_CheckFeatureSupport(ID3D12Device7 
             return S_OK;
         }
 
+        case D3D12_FEATURE_D3D12_OPTIONS13:
+        {
+            D3D12_FEATURE_DATA_D3D12_OPTIONS13 *data = feature_data;
+
+            if (feature_data_size != sizeof(*data))
+            {
+                WARN("Invalid size %u.\n", feature_data_size);
+                return E_INVALIDARG;
+            }
+
+            data->UnrestrictedBufferTextureCopyPitchSupported = FALSE;
+            data->UnrestrictedVertexElementAlignmentSupported = FALSE;
+            data->InvertedViewportHeightFlipsYSupported = FALSE;
+            data->InvertedViewportDepthFlipsZSupported = FALSE;
+            data->TextureCopyBetweenDimensionsSupported = FALSE;
+            data->AlphaBlendFactorSupported = FALSE;
+
+            TRACE("Unrestricted buffer-texture copy pitch %#x.\n", data->UnrestrictedBufferTextureCopyPitchSupported);
+            TRACE("Unrestricted vertex element alignment %#x.\n", data->UnrestrictedVertexElementAlignmentSupported);
+            TRACE("Inverted viewport height flips Y %#x.\n", data->InvertedViewportHeightFlipsYSupported);
+            TRACE("Inverted viewport depth flips Z %#x.\n", data->InvertedViewportDepthFlipsZSupported);
+            TRACE("Texture copy between dimensions %#x.\n", data->TextureCopyBetweenDimensionsSupported);
+            TRACE("Alpha blend factor support %#x.\n", data->AlphaBlendFactorSupported);
+            return S_OK;
+        }
+
         default:
             FIXME("Unhandled feature %#x.\n", feature);
             return E_NOTIMPL;
