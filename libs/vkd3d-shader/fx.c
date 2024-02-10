@@ -327,6 +327,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     uint32_t name_offset, offset, size, stride, numeric_desc;
     uint32_t elements_count = 0;
+    const char *name;
     static const uint32_t variable_type[] =
     {
         [HLSL_CLASS_SCALAR] = 1,
@@ -334,6 +335,19 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         [HLSL_CLASS_MATRIX] = 1,
         [HLSL_CLASS_OBJECT] = 2,
         [HLSL_CLASS_STRUCT] = 3,
+    };
+    static const char * const texture_type_names[] =
+    {
+        [HLSL_SAMPLER_DIM_GENERIC]   = "texture",
+        [HLSL_SAMPLER_DIM_1D]        = "Texture1D",
+        [HLSL_SAMPLER_DIM_1DARRAY]   = "Texture1DArray",
+        [HLSL_SAMPLER_DIM_2D]        = "Texture2D",
+        [HLSL_SAMPLER_DIM_2DARRAY]   = "Texture2DArray",
+        [HLSL_SAMPLER_DIM_2DMS]      = "Texture2DMS",
+        [HLSL_SAMPLER_DIM_2DMSARRAY] = "Texture2DMSArray",
+        [HLSL_SAMPLER_DIM_3D]        = "Texture3D",
+        [HLSL_SAMPLER_DIM_CUBE]      = "TextureCube",
+        [HLSL_SAMPLER_DIM_CUBEARRAY] = "TextureCubeArray",
     };
 
     /* Resolve arrays to element type and number of elements. */
@@ -343,7 +357,12 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         type = hlsl_get_multiarray_element_type(type);
     }
 
-    name_offset = write_string(type->name, fx);
+    if (type->base_type == HLSL_TYPE_TEXTURE)
+        name = texture_type_names[type->sampler_dim];
+    else
+        name = type->name;
+
+    name_offset = write_string(name, fx);
     offset = put_u32_unaligned(buffer, name_offset);
 
     switch (type->class)
@@ -397,11 +416,27 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         {
             [HLSL_TYPE_RENDERTARGETVIEW] = 19,
         };
+        static const uint32_t texture_type[] =
+        {
+            [HLSL_SAMPLER_DIM_GENERIC]   = 9,
+            [HLSL_SAMPLER_DIM_1D]        = 10,
+            [HLSL_SAMPLER_DIM_1DARRAY]   = 11,
+            [HLSL_SAMPLER_DIM_2D]        = 12,
+            [HLSL_SAMPLER_DIM_2DARRAY]   = 13,
+            [HLSL_SAMPLER_DIM_2DMS]      = 14,
+            [HLSL_SAMPLER_DIM_2DMSARRAY] = 15,
+            [HLSL_SAMPLER_DIM_3D]        = 16,
+            [HLSL_SAMPLER_DIM_CUBE]      = 17,
+            [HLSL_SAMPLER_DIM_CUBEARRAY] = 23,
+        };
 
         switch (type->base_type)
         {
             case HLSL_TYPE_RENDERTARGETVIEW:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
+                break;
+            case HLSL_TYPE_TEXTURE:
+                put_u32_unaligned(buffer, texture_type[type->sampler_dim]);
                 break;
             default:
                 FIXME("Object type %u is not supported.\n", type->base_type);
