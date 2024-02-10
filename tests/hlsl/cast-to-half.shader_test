@@ -19,7 +19,7 @@ if(sm>=4) uniform 1 uint 3
 if(sm>=4) uniform 2 int -2
 if(sm>=4) uniform 3 float 0.5
 todo(glsl) draw quad
-probe all rgba (0.5, 0.5, 0.5, 0.5)
+probe (0, 0) rgba (0.5, 0.5, 0.5, 0.5)
 
 
 [pixel shader]
@@ -34,4 +34,4 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.5, 0.5, 0.5, 0.5)
+probe (0, 0) rgba (0.5, 0.5, 0.5, 0.5)

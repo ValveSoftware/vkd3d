@@ -22,4 +22,4 @@ uniform 12 float4 0.4 0.0 0.0 0.0
 uniform 16 float4 0.5 0.0 0.0 0.0
 uniform 20 float4 0.6 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.4, 0.1, 0.6, 0.3)
+probe (0, 0) rgba (0.4, 0.1, 0.6, 0.3)

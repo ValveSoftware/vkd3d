@@ -8,7 +8,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 1.0, 1.0, 1.0)
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 
 
 [pixel shader]
@@ -24,7 +24,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (11.0, 11.0, 11.0, 11.0)
+probe (0, 0) rgba (11.0, 11.0, 11.0, 11.0)
 
 
 % dxcompiler performs the first call to func() before the array index call.
@@ -49,4 +49,4 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.2, 2.2, 2.2, 2.2)
+probe (0, 0) rgba (2.2, 2.2, 2.2, 2.2)

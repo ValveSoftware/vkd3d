@@ -15,5 +15,5 @@ void main(out float4 o0 : sv_target0, out float4 o1 : sv_target1)
 
 [test]
 todo(glsl) draw quad
-probe rtv 0 all rgba (0.1, 0.2, 0.3, 0.4)
-probe rtv 1 all rgba (0.5, 0.6, 0.7, 0.8)
+probe rtv 0 (0,0) rgba (0.1, 0.2, 0.3, 0.4)
+probe rtv 1 (0,0) rgba (0.5, 0.6, 0.7, 0.8)

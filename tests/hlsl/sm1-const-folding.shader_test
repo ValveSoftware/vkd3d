@@ -10,7 +10,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 % The uint value is never casted to int on SM1-3, just casted to float and treated as such
 [pixel shader]
@@ -22,8 +22,8 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-if(sm<4) todo probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
-if(sm>=4) probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
+if(sm<4) todo probe (0,0) rgba (3.0e+009, 0.0, 0.0, 0.0)
+if(sm>=4) probe (0,0) rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
 
 % On SM1-5 (FXC) the literal is considered signed independently of its value and casted to uint;
 % on SM1-3 compilation fails because the uint would be negative
@@ -36,7 +36,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-if(sm>=4) probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
+if(sm>=4) probe (0,0) rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : SV_TARGET
@@ -47,7 +47,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : SV_TARGET
@@ -57,7 +57,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 % Unsuffixed literals can instead be considered unsigned on SM6
 [pixel shader]
@@ -68,8 +68,8 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-if(sm<6) probe all rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
-if(sm>=6) probe all rgba (3.0e+009, 0.0, 0.0, 0.0)
+if(sm<6) probe (0,0) rgba (-1.29496730e+009, 0.0, 0.0, 0.0)
+if(sm>=6) probe (0,0) rgba (3.0e+009, 0.0, 0.0, 0.0)
 
 % Constant folding is done with uint semantics before converting to float;
 % so constant folding seems to happen before converting integer operations to floats
@@ -82,7 +82,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.70503270e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (1.70503270e+009, 0.0, 0.0, 0.0)
 
 % SM1-3 complains that uint values must be positive, but it's not clear why this is a problem here:
 % the sum should be done before casting to uint, and the result of the int sum should be positive,
@@ -97,7 +97,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-todo probe all rgba (2.14748365e+009, 0.0, 0.0, 0.0)
+todo probe (0,0) rgba (2.14748365e+009, 0.0, 0.0, 0.0)
 
 % Again, no idea of what's happening here
 [pixel shader]
@@ -109,7 +109,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-todo probe all rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
+todo probe (0,0) rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
 
 % This makes sense
 [pixel shader]
@@ -120,7 +120,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.70503270e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (1.70503270e+009, 0.0, 0.0, 0.0)
 
 % This does not again
 [pixel shader]
@@ -131,7 +131,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-todo probe all rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
+todo probe (0,0) rgba (-2.14748365e+009, 0.0, 0.0, 0.0)
 
 % Explicit float literals use float semantics, at least
 [pixel shader]
@@ -143,4 +143,4 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (6.0e+009, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (6.0e+009, 0.0, 0.0, 0.0)

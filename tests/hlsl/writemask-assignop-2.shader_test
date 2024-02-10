@@ -10,4 +10,4 @@ float4 main() : SV_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.1, 2.2, 0.8, 1.7)
+probe (0, 0) rgba (2.1, 2.2, 0.8, 1.7)

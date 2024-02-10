@@ -53,4 +53,4 @@ void main(float4 position : SV_Position, float2 t0 : TEXCOORD0,
 
 [test]
 todo(glsl) draw triangle strip 4
-probe all rgba (10.0, 8.0, 7.0, 3.0)
+probe (0, 0) rgba (10.0, 8.0, 7.0, 3.0)

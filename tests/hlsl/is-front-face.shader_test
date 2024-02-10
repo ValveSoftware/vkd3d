@@ -23,7 +23,7 @@ float4 main(bool face : sv_isfrontface) : sv_target
 
 [test]
 todo(glsl) draw triangle strip 4
-probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe (0, 0, 640, 480) rgba (0.0, 1.0, 0.0, 1.0)
 
 [vb 0]
 -2.0 -2.0
@@ -33,4 +33,4 @@ probe all rgba (0.0, 1.0, 0.0, 1.0)
 
 [test]
 todo(glsl) draw triangle strip 4
-probe all rgba (1.0, 2.0, 1.0, 2.0)
+probe (0, 0, 640, 480) rgba (1.0, 2.0, 1.0, 2.0)

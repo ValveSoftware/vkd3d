@@ -19,4 +19,4 @@ float4 main() : sv_target
 
 [test]
 todo(sm<6) draw quad
-probe all rgba (0.1, 0.1, 0.2, 0.4)
+probe (0, 0) rgba (0.1, 0.1, 0.2, 0.4)

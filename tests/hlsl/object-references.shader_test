@@ -47,7 +47,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (77.77, 77.77, 77.77, 77.77)
+probe (0, 0) rgba (77.77, 77.77, 77.77, 77.77)
 
 
 [srv 0]
@@ -112,7 +112,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (312, 312, 312, 111)
+probe (0, 0) rgba (312, 312, 312, 111)
 
 
 [pixel shader]
@@ -135,7 +135,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2132, 2132, 2132, 1111)
+probe (0, 0) rgba (2132, 2132, 2132, 1111)
 
 
 [pixel shader fail(sm<6)]

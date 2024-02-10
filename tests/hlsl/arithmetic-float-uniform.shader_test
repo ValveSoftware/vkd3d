@@ -11,7 +11,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 5.0 15.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (20.0, -10.0, 75.0, 0.33333333) 1
+probe (0, 0) rgba (20.0, -10.0, 75.0, 0.33333333) 1
 
 [pixel shader]
 uniform float2 a;
@@ -26,7 +26,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 5.0 15.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (5.0, 5.0, -5.0, 3.0) 1
+probe (0, 0) rgba (5.0, 5.0, -5.0, 3.0) 1
 
 [pixel shader]
 uniform float2 a;
@@ -41,7 +41,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 42.0 5.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (2.0, -2.0, 2.0, -2.0) 16
+probe (0, 0) rgba (2.0, -2.0, 2.0, -2.0) 16
 
 [pixel shader]
 uniform float2 a;
@@ -56,7 +56,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 45.0 5.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
 [pixel shader]
 float4 x, y;
@@ -70,7 +70,7 @@ float4 main() : sv_target
 uniform 0 float4 5.0 -42.1 4.0 45.0
 uniform 4 float4 15.0 -5.0 4.1 5.0
 todo(glsl) draw quad
-probe all rgba (5.0, -2.1, 4.0, 0.0) 6
+probe (0, 0) rgba (5.0, -2.1, 4.0, 0.0) 6
 
 [require]
 % Infinities are not allowed in SM1
@@ -89,7 +89,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1e99, 1e99, 1e99, 1e99)
+probe (0, 0) rgba (1e99, 1e99, 1e99, 1e99)
 
 [pixel shader todo]
 uniform float4 a, b, c;
@@ -104,7 +104,7 @@ uniform 0 float4 1.00000007 -42.1 4.0 45.0
 uniform 4 float4 1.625 -5.0 4.125 5.0
 uniform 8 float4 1.00000007 -1.0 0.5 -0.5
 todo(sm<6) draw quad
-probe all rgba (2.62500024, 209.5, 17.0, 224.5) 1
+probe (0, 0) rgba (2.62500024, 209.5, 17.0, 224.5) 1
 
 % precise mad() is not allowed to fuse, even though unfused is less precise.
 [pixel shader todo]
@@ -121,7 +121,7 @@ uniform 0 float4 1.00000007 -42.1 4.0 45.0
 uniform 4 float4 1.625 -5.0 4.125 5.0
 uniform 8 float4 1.00000007 -1.0 0.5 -0.5
 todo(sm<6) draw quad
-probe all rgba (2.62500048, 209.5, 17.0, 224.5)
+probe (0, 0) rgba (2.62500048, 209.5, 17.0, 224.5)
 
 [require]
 shader model >= 5.0
@@ -140,7 +140,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 double2 7.5 -2.5
 todo(sm<6) draw quad
-probe all rgba (5.0, 10.0, -18.75, -3.0)
+probe (0, 0) rgba (5.0, 10.0, -18.75, -3.0)
 
 [pixel shader todo]
 uniform double2 a;
@@ -155,7 +155,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 double2 3.0e-300 2.5e300
 todo(sm<6) draw quad
-probe all rgba (7.5, 7.5, 7.5, 7.5)
+probe (0, 0) rgba (7.5, 7.5, 7.5, 7.5)
 
 % Note: DXC does not support modulo on doubles.
 [pixel shader todo]
@@ -171,7 +171,7 @@ float4 main() : SV_TARGET
 [test]
 uniform 0 double2 1.5e300 2.0e299
 todo(sm<6) draw quad
-probe all rgba (7.5, 7.5, 7.5, 7.5)
+probe (0, 0) rgba (7.5, 7.5, 7.5, 7.5)
 
 [pixel shader todo]
 uniform double2 a, b, c;
@@ -186,7 +186,7 @@ uniform 0 double2 1.00000007 -42.1
 uniform 4 double2 1.625 -5.0
 uniform 8 double2 1.00000007 -1.0
 todo(sm<6) draw quad
-probe all rgba (2.62500024, 209.5, 0.0, 0.0)
+probe (0, 0) rgba (2.62500024, 209.5, 0.0, 0.0)
 
 
 % Test result when instructions might be removed because they are identities such as (+0) or (*1).
@@ -204,4 +204,4 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 0.2 0.3 9.1 3.2
 todo(glsl) draw quad
-probe all rgba (0.4, 0.6, 18.2, 6.4)
+probe (0, 0) rgba (0.4, 0.6, 18.2, 6.4)

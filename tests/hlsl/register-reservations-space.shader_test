@@ -27,7 +27,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1, 1, 1, 99)
+probe (0, 0) rgba (1, 1, 1, 99)
 
 
 [pixel shader fail(sm>=6)]
@@ -40,7 +40,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1, 1, 1, 99)
+probe (0, 0) rgba (1, 1, 1, 99)
 
 
 [pixel shader fail todo]
@@ -62,7 +62,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (0, 0, 0, 99)
+probe (0, 0) rgba (0, 0, 0, 99)
 
 
 [pixel shader fail(sm<6)]
@@ -75,7 +75,7 @@ float4 main() : sv_target
 
 [test]
 draw quad
-probe all rgba (0, 0, 0, 99)
+probe (0, 0) rgba (0, 0, 0, 99)
 
 
 % Specifying a profile is just broken. The first reservation (or, with sm6, the
@@ -91,8 +91,8 @@ float4 main() : sv_target
 
 [test]
 todo(sm<6) draw quad
-if(sm>=6) probe all rgba (2, 2, 2, 99)
-if(sm<6)  probe all rgba (1, 1, 1, 99)
+if(sm>=6) probe (0,0) rgba (2, 2, 2, 99)
+if(sm<6)  probe (0,0) rgba (1, 1, 1, 99)
 
 
 % This actually inheres to 5.1+; it doesn't matter whether "space" is specified.
@@ -107,8 +107,8 @@ float4 main() : sv_target
 
 [test]
 todo(sm<6) draw quad
-if(sm>=6) probe all rgba (2, 2, 2, 99)
-if(sm<6)  probe all rgba (1, 1, 1, 99)
+if(sm>=6) probe (0,0) rgba (2, 2, 2, 99)
+if(sm<6)  probe (0,0) rgba (1, 1, 1, 99)
 
 
 % It's still illegal to specify multiple contradictory reservations with the
@@ -135,8 +135,8 @@ float4 main() : sv_target
 
 [test]
 todo(sm<6) draw quad
-if(sm>=6) probe all rgba (2, 2, 2, 99)
-if(sm<6)  probe all rgba (1, 1, 1, 99)
+if(sm>=6) probe (0,0) rgba (2, 2, 2, 99)
+if(sm<6)  probe (0,0) rgba (1, 1, 1, 99)
 
 
 % Test conflicts.

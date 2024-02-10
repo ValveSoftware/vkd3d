@@ -17,22 +17,22 @@ uniform 0 float 0.0
 clear dsv 1.0
 depth less
 todo(glsl) draw quad
-probe dsv all r (0.0)
+probe dsv (0,0) r (0.0)
 
 uniform 0 float 0.75
 clear dsv 1.0
 todo(glsl) draw quad
-probe dsv all r (0.75)
+probe dsv (0,0) r (0.75)
 
 clear dsv 0.5
 depth greater
 todo(glsl) draw quad
-probe dsv all r (0.75)
+probe dsv (0,0) r (0.75)
 
 depth less
 clear dsv 0.5
 todo(glsl) draw quad
-probe dsv all r (0.5)
+probe dsv (0,0) r (0.5)
 
 
 [require]
@@ -66,15 +66,15 @@ clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
 todo(sm<6) draw quad
-probe all rgba (0.0, 1.0, 0.0, 1.0)
-probe dsv all r (0.75)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv (0,0) r (0.75)
 
 uniform 0 float4 0.75 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 todo(sm<6) draw quad
-probe all rgba (1.0, 1.0, 1.0, 1.0)
-probe dsv all r (0.5)
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+probe dsv (0,0) r (0.5)
 
 
 [pixel shader todo]
@@ -92,19 +92,19 @@ clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 depth greater equal
 todo(sm<6) draw quad
-probe all rgba (0.0, 1.0, 0.0, 1.0)
-probe dsv all r (0.75)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv (0,0) r (0.75)
 
 uniform 0 float4 0.375 0.625 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 todo(sm<6) draw quad
-probe all rgba (0.0, 1.0, 0.0, 1.0)
-probe dsv all r (0.625)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)
+probe dsv (0,0) r (0.625)
 
 uniform 0 float4 0.375 0.375 0.0 0.0
 clear rtv 0 1.0 1.0 1.0 1.0
 clear dsv 0.5
 todo(sm<6) draw quad
-probe all rgba (1.0, 1.0, 1.0, 1.0)
-probe dsv all r (0.5)
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
+probe dsv (0,0) r (0.5)

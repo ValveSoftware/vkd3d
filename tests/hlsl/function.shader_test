@@ -177,7 +177,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.1, 0.2, 0.3, 0.4)
+probe (0, 0) rgba (0.1, 0.2, 0.3, 0.4)
 
 [pixel shader]
 
@@ -201,7 +201,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.5, 0.6, 0.7, 0)
+probe (0, 0) rgba (0.5, 0.6, 0.7, 0)
 
 [pixel shader]
 
@@ -222,7 +222,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.6, 0.1, 0.5, 0)
+probe (0, 0) rgba (0.6, 0.1, 0.5, 0)
 
 % Recursion is forbidden.
 
@@ -276,7 +276,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 6.0, 7.0)
+probe (0, 0) rgba (2.0, 3.0, 6.0, 7.0)
 
 
 [pixel shader]
@@ -294,7 +294,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 6.0, 7.0)
+probe (0, 0) rgba (2.0, 3.0, 6.0, 7.0)
 
 % Inline modifier
 
@@ -313,7 +313,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 6.0, 7.0)
+probe (0, 0) rgba (2.0, 3.0, 6.0, 7.0)
 
 % Inline modifier used on entry point
 
@@ -332,7 +332,7 @@ inline float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 6.0, 7.0)
+probe (0, 0) rgba (2.0, 3.0, 6.0, 7.0)
 
 % Export modifier
 
@@ -344,4 +344,4 @@ export float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 2.0, 3.0, 4.0)
+probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)

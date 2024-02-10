@@ -1039,11 +1039,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
 
         rb = runner->ops->get_resource_readback(runner, resource);
 
-        if (match_string(line, "all", &line))
-        {
-            set_rect(&rect, 0, 0, resource->width, resource->height);
-        }
-        else if (sscanf(line, " ( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
+        if (sscanf(line, " ( %d , %d , %d , %d )%n", &left, &top, &right, &bottom, &len) == 4)
         {
             set_rect(&rect, left, top, right, bottom);
             line += len;

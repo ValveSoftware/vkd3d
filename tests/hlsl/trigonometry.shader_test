@@ -43,7 +43,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 0.0 0.52359877 2.61799387 3.14159265
 todo(sm<4 | glsl) draw quad
-probe all rgba (0.0, 500.0, 500.0, 0.0)
+probe (0, 0) rgba (0.0, 500.0, 500.0, 0.0)
 
 
 [pixel shader todo(sm<4)]
@@ -57,7 +57,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 0.0 0.78539816 1.57079632 2.35619449
 todo(sm<4 | glsl) draw quad
-probe all rgba (1000.0, 707.0, -0.0, -707.0)
+probe (0, 0) rgba (1000.0, 707.0, -0.0, -707.0)
 
 
 [pixel shader todo(sm<4)]
@@ -73,7 +73,7 @@ float4 main() : sv_target
 % so check 0, pi/4, 3pi/4, pi
 uniform 0 float4 0.0 0.78539816 2.35619449 3.14159265
 todo(sm<4 | glsl) draw quad
-probe all rgba (0, 1000, -1000.0, 0)
+probe (0, 0) rgba (0, 1000, -1000.0, 0)
 
 
 [pixel shader]
@@ -87,11 +87,11 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -6.28318531 -0.88137359 0.88137359 6.28318531
 todo(glsl) draw quad
-probe all rgba (-267.744894, -1.0, 1.0, 267.744894) 2
+probe (0, 0) rgba (-267.744894, -1.0, 1.0, 267.744894) 2
 uniform 0 float4 -0.0 0.0 -90.0 90.0
 todo(glsl) draw quad
 % mingw does not support "inf" for scanf(), but numbers beyond FLOAT_MAX consistently result in inf.
-probe all rgba (0.0, 0.0, -1.0e39, 1.0e39) 1
+probe (0, 0) rgba (0.0, 0.0, -1.0e39, 1.0e39) 1
 
 
 [pixel shader]
@@ -105,10 +105,10 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.76274717 -1.3169579 1.3169579 1.76274717
 todo(glsl) draw quad
-probe all rgba (3.0, 2.0, 2.0, 3.0) 2
+probe (0, 0) rgba (3.0, 2.0, 2.0, 3.0) 2
 uniform 0 float4 -0.0 0.0 -90.0 90.0
 todo(glsl) draw quad
-probe all rgba (1.0, 1.0, 1.0e39, 1.0e39) 1
+probe (0, 0) rgba (1.0, 1.0, 1.0e39, 1.0e39) 1
 
 
 [pixel shader]
@@ -122,7 +122,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.57079633 -0.54930614 0.54930614 1.57079633
 todo(glsl) draw quad
-probe all rgba (-0.91715234, -0.5, 0.5, 0.91715234) 2
+probe (0, 0) rgba (-0.91715234, -0.5, 0.5, 0.91715234) 2
 uniform 0 float4 -10.0 -0.0 0.0 10.0
 todo(glsl) draw quad
-probe all rgba (-1.0, 0.0, 0.0, 1.0) 1
+probe (0, 0) rgba (-1.0, 0.0, 0.0, 1.0) 1

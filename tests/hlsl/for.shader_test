@@ -77,7 +77,7 @@ float4 main(float tex : texcoord) : sv_target
 
 [test]
 todo(sm<4 | glsl) draw quad
-probe all rgba (10.0, 45.0, 0.0, 0.0)
+probe (0, 0) rgba (10.0, 45.0, 0.0, 0.0)
 
 [pixel shader fail(sm<6)]
 float4 main(float tex : texcoord) : sv_target

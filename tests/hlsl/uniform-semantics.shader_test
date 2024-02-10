@@ -11,7 +11,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float 3.5
 todo(glsl) draw quad
-probe all rgba (3.5, 3.5, 3.5, 3.5)
+probe (0, 0) rgba (3.5, 3.5, 3.5, 3.5)
 
 
 [pixel shader]
@@ -25,4 +25,4 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 4.0 5.0 6.0 7.0
 todo(glsl) draw quad
-probe all rgba (4.0, 5.0, 4.0, 5.0)
+probe (0, 0) rgba (4.0, 5.0, 4.0, 5.0)

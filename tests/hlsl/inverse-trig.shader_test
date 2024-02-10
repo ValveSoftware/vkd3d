@@ -14,23 +14,23 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (3.14159274, 0.0, 0.0, 0.0) 128
+probe (0, 0) rgba (3.14159274, 0.0, 0.0, 0.0) 128
 
 uniform 0 float4 -0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (2.094441441, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (2.094441441, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.57072878, 0.0, 0.0, 0.0) 1024
+probe (0, 0) rgba (1.57072878, 0.0, 0.0, 0.0) 1024
 
 uniform 0 float4 0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.04715133, 0.0, 0.0, 0.0) 512
+probe (0, 0) rgba (1.04715133, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0) 128
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0) 128
 
 [pixel shader]
 uniform float4 a;
@@ -45,7 +45,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-31416.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (-31416.0, 0.0, 0.0, 0.0)
 
 [require]
 shader model < 6.0
@@ -53,15 +53,15 @@ shader model < 6.0
 [test]
 uniform 0 float4 -0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-10473.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (-10473.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (1.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (10473.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (10473.0, 0.0, 0.0, 0.0)
 
 [require]
 shader model >= 6.0
@@ -73,15 +73,15 @@ shader model >= 6.0
 [test]
 uniform 0 float4 -0.5 0.0 0.0 0.0
 draw quad
-probe all rgba (-10472.0, 0.0, 0.0, 0.0) 4096
+probe (0, 0) rgba (-10472.0, 0.0, 0.0, 0.0) 4096
 
 uniform 0 float4 0.0 0.0 0.0 0.0
 draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.5 0.0 0.0 0.0
 draw quad
-probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
+probe (0, 0) rgba (10472.0, 0.0, 0.0, 0.0) 4096
 
 [require]
 % reset requirements
@@ -89,7 +89,7 @@ probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
 [test]
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (31416.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (31416.0, 0.0, 0.0, 0.0)
 
 
 [pixel shader]
@@ -103,23 +103,23 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-0.785409629, 0.0, 0.0, 0.0) 512
+probe (0, 0) rgba (-0.785409629, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 -0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-0.4636476, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (-0.4636476, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.5 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.4636476, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (0.4636476, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.785409629, 0.0, 0.0, 0.0) 512
+probe (0, 0) rgba (0.785409629, 0.0, 0.0, 0.0) 512
 
 [pixel shader]
 uniform float4 a;
@@ -134,63 +134,63 @@ float4 main() : sv_target
 % Non-degenerate cases
 uniform 0 float4 1.0 1.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.785385, 0.0, 0.0, 0.0) 512
+probe (0, 0) rgba (0.785385, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 5.0 -5.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (2.356194, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (2.356194, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -3.0 -3.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-2.356194, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (-2.356194, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-1.570796, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (-1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 1.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 -1.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (3.1415927, 0.0, 0.0, 0.0) 256
 
 % Degenerate cases
 uniform 0 float4 0.00001 0.00002 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.463647, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (0.463647, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.00001 -0.00002 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (2.677945, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (2.677945, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -0.00001 100000.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (-0.000000000099986595, 0.0, 0.0, 0.0) 2048
+probe (0, 0) rgba (-0.000000000099986595, 0.0, 0.0, 0.0) 2048
 
 uniform 0 float4 10000000.0 0.00000001 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 % Negative zero behavior should be to treat it the
 % same as normal zero.
 uniform 0 float4 1000000000.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 1000000000.0 -0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (1.570796, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (1.570796, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 -1.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (3.1415927, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 -0.0 -1.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (3.1415927, 0.0, 0.0, 0.0) 256
+probe (0, 0) rgba (3.1415927, 0.0, 0.0, 0.0) 256

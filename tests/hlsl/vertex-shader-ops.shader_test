@@ -29,7 +29,7 @@ void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos 
 if(sm<4)  uniform 0 float 0.0
 if(sm>=4) uniform 0 float4 0.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
 
 [vertex shader]
@@ -50,12 +50,12 @@ if(sm<4)  uniform 0 float 3
 if(sm<4)  uniform 4 float 4
 if(sm>=4) uniform 0 int4 3 4 0 0
 todo(glsl) draw quad
-probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)
 if(sm<4)  uniform 0 float -2
 if(sm<4)  uniform 4 float -2
 if(sm>=4) uniform 0 int4 -2 -2 0 0
 todo(glsl) draw quad
-probe all rgba (1.0, 0.0, 0.0, 1.0)
+probe (0, 0) rgba (1.0, 0.0, 0.0, 1.0)
 
 
 [vertex shader]
@@ -76,12 +76,12 @@ if(sm<4)  uniform 0 float 0
 if(sm<4)  uniform 4 float 2
 if(sm>=4) uniform 0 int4 0 2 0 0
 todo(glsl) draw quad
-probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)
 if(sm<4)  uniform 0 float -2
 if(sm<4)  uniform 4 float 8
 if(sm>=4) uniform 0 int4 -2 8 0 0
 todo(glsl) draw quad
-probe all rgba (1.0, 1.0, 1.0, 1.0)
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 
 
 [require]
@@ -104,10 +104,10 @@ if(sm<4)  uniform 4 float 100
 if(sm<4)  uniform 8 float 200
 if(sm>=4) uniform 0 int4 0 100 200 0
 todo(glsl) draw quad
-probe all rgba (0.2, 0.2, 0.2, 0.2)
+probe (0, 0) rgba (0.2, 0.2, 0.2, 0.2)
 if(sm<4)  uniform 0 float -4
 if(sm<4)  uniform 4 float 100
 if(sm<4)  uniform 8 float 200
 if(sm>=4) uniform 0 int4 -4 100 200 0
 todo(glsl) draw quad
-probe all rgba (0.1, 0.1, 0.1, 0.1)
+probe (0, 0) rgba (0.1, 0.1, 0.1, 0.1)

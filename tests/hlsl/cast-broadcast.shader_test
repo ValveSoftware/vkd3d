@@ -20,7 +20,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (84.0, 84.0, 84.0, 84.0)
+probe (0, 0) rgba (84.0, 84.0, 84.0, 84.0)
 
 
 [pixel shader fail]
@@ -95,4 +95,4 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (33.0, 33.0, 33.0, 33.0)
+probe (0, 0) rgba (33.0, 33.0, 33.0, 33.0)

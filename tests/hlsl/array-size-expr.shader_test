@@ -15,7 +15,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (21, 22, 23, 24)
+probe (0, 0) rgba (21, 22, 23, 24)
 
 
 [pixel shader]
@@ -37,7 +37,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (61, 62, 63, 64)
+probe (0, 0) rgba (61, 62, 63, 64)
 
 [pixel shader]
 static const int size = 8;
@@ -50,7 +50,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2, 3, 6, 1)
+probe (0, 0) rgba (2, 3, 6, 1)
 
 % Additional level of indirection
 [pixel shader fail(sm>=6)]
@@ -65,7 +65,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2, 3, 6, 1)
+probe (0, 0) rgba (2, 3, 6, 1)
 
 
 [pixel shader fail(sm>=6)]
@@ -89,4 +89,4 @@ uniform 8 float 0.0
 uniform 12 float 0.0
 uniform 16 float 42.0
 todo(glsl) draw quad
-probe all rgba (42, 42, 42, 42)
+probe (0, 0) rgba (42, 42, 42, 42)

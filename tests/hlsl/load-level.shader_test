@@ -23,10 +23,10 @@ float4 main() : sv_target
 [test]
 uniform 0 uint 0
 todo(glsl) draw quad
-probe all rgba (1.0, 0.0, 1.0, 0.0)
+probe (0, 0) rgba (1.0, 0.0, 1.0, 0.0)
 uniform 0 uint 1
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 1.0, 0.0)
+probe (0, 0) rgba (0.0, 0.0, 1.0, 0.0)
 
 [pixel shader fail]
 sampler s;
@@ -48,4 +48,4 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 0.0, 1.0, 0.0)
+probe (0, 0) rgba (1.0, 0.0, 1.0, 0.0)

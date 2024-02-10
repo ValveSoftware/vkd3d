@@ -14,10 +14,10 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 2.0 3.0 4.0 5.0
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 uniform 0 float4 0.0 10.0 11.0 12.0
 todo(glsl) draw quad
-probe all rgba (-1.0, 9.0, 10.0, 11.0)
+probe (0, 0) rgba (-1.0, 9.0, 10.0, 11.0)
 
 
 [pixel shader]
@@ -36,7 +36,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 1.1 3.0 4.0 5.0
 todo(glsl) draw quad
-probe all rgba (1.1, 2.0, 0.0, 0.0)
+probe (0, 0) rgba (1.1, 2.0, 0.0, 0.0)
 
 
 [pixel shader]
@@ -52,7 +52,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 1.0 0.0 0.0 0.0
 todo(glsl) draw quad
-probe all rgba (0.5, 0.6, 0.7, 0.0)
+probe (0, 0) rgba (0.5, 0.6, 0.7, 0.0)
 
 
 [pixel shader]
@@ -68,7 +68,7 @@ uniform 0 float4 0.0 1.0 0.0 -3.0
 uniform 4 float4 1.0 2.0 3.0 4.0
 uniform 8 float4 5.0 6.0 7.0 8.0
 todo(glsl) draw quad
-probe all rgba (5.0, 2.0, 7.0, 4.0)
+probe (0, 0) rgba (5.0, 2.0, 7.0, 4.0)
 
 
 % The usual type conversion is applied to the first and second expression, as
@@ -98,7 +98,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.0, 1.0, 3.0, 4.0)
+probe (0, 0) rgba (0.0, 1.0, 3.0, 4.0)
 
 
 [pixel shader]
@@ -113,7 +113,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (5.0, 6.0, 7.0, 1.0)
+probe (0, 0) rgba (5.0, 6.0, 7.0, 1.0)
 
 
 % More restrictions are placed on the type of the first (condition) operand,
@@ -158,7 +158,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 6.0, 7.0, 4.0)
+probe (0, 0) rgba (1.0, 6.0, 7.0, 4.0)
 
 
 [pixel shader fail]
@@ -200,7 +200,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 6.0, 7.0, 4.0)
+probe (0, 0) rgba (1.0, 6.0, 7.0, 4.0)
 
 
 [pixel shader todo]
@@ -216,7 +216,7 @@ float4 main() : sv_target
 
 [test]
 todo draw quad
-probe all rgba (1.0, 1.0, 1.0, 1.0)
+probe (0, 0) rgba (1.0, 1.0, 1.0, 1.0)
 
 
 [pixel shader fail]
@@ -243,7 +243,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (3.0, 3.0, 3.0, 3.0)
+probe (0, 0) rgba (3.0, 3.0, 3.0, 3.0)
 
 
 [pixel shader]
@@ -261,7 +261,7 @@ uniform 0 float4 1.0 0.0 0.0 0.0
 uniform 4 float4 1.0 2.0 3.0 4.0
 uniform 8 float4 5.0 6.0 7.0 8.0
 todo(glsl) draw quad
-probe all rgba (1.0, 2.0, 3.0, 4.0)
+probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
 
 
 [pixel shader]
@@ -278,7 +278,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (5.0, 6.0, 7.0, 8.0)
+probe (0, 0) rgba (5.0, 6.0, 7.0, 8.0)
 
 
 [pixel shader]
@@ -296,7 +296,7 @@ uniform 0 float4 1.0 0.0 1.0 0.0
 uniform 4 float4 1.0 2.0 3.0 4.0
 uniform 8 float4 5.0 6.0 7.0 8.0
 todo(glsl) draw quad
-probe all rgba (1.0, 5.0, 1.0, 5.0)
+probe (0, 0) rgba (1.0, 5.0, 1.0, 5.0)
 
 
 [pixel shader]
@@ -313,7 +313,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 3.0, 2.0)
+probe (0, 0) rgba (2.0, 3.0, 3.0, 2.0)
 
 
 % Objects can be used, but their types have to be identical.

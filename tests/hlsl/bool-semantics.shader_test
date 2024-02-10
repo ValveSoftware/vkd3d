@@ -50,4 +50,4 @@ float4 main(struct input i) : sv_target
 
 [test]
 todo(glsl) draw triangle strip 4
-probe all rgba (0.0, 2.0, 2.0, 2.0)
+probe (0, 0, 640, 480) rgba (0.0, 2.0, 2.0, 2.0)

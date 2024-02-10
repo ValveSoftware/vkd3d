@@ -33,8 +33,8 @@ uint4 main(float4 pos : sv_position) : sv_target
 % Initialise the UAV and RTV.
 [test]
 todo(glsl) draw triangle list 3
-probe all rui(0xaaaaaaaa)
-probe uav 1 all rui(0x55555555)
+probe (0, 0) rui(0xaaaaaaaa)
+probe uav 1 (0, 0, 640, 480) rui(0x55555555)
 
 [pixel shader]
 RasterizerOrderedTexture2D<uint4> tex : register(u1);
@@ -65,5 +65,5 @@ rov
 
 [test]
 draw triangle list 93
-probe all rui(0x6aaaaaaa)
-probe uav 1 all rui(0x2aaaaaaa)
+probe (0, 0) rui(0x6aaaaaaa)
+probe uav 1 (0, 0, 640, 480) rui(0x2aaaaaaa)

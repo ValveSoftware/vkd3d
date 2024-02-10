@@ -19,7 +19,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.9 -1.0 2.9 4.0
 todo(sm<6) draw quad
-probe all rgba (-1.0, -1.0, 2.0, 4.0)
+probe (0, 0) rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but cast "x" to float4 first.
 % In SM 6 a cast seems to implicitly promote the type to const,
@@ -44,7 +44,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.9 -1.0 2.9 4.0
 todo draw quad
-probe all rgba (-1.0, -1.0, 2.0, 4.0)
+probe (0, 0) rgba (-1.0, -1.0, 2.0, 4.0)
 
 % As above, but declare "x" as float4 and cast it to int4.
 
@@ -67,7 +67,7 @@ float4 main() : sv_target
 [test]
 uniform 0 float4 -1.9 -1.0 2.9 4.0
 todo draw quad
-probe all rgba (-1.0, -1.0, 2.0, 4.0)
+probe (0, 0) rgba (-1.0, -1.0, 2.0, 4.0)
 
 
 [pixel shader todo]
@@ -89,4 +89,4 @@ float4 main() : sv_target
 if(sm<4)  uniform 0 float4 -2 0 1 -3000000
 if(sm>=4) uniform 0 int4 -2 0 1 -3000000
 todo(sm<6) draw quad
-probe all rgba (-1.0, 0.0, 1.0, -3000000.0) 4
+probe (0, 0) rgba (-1.0, 0.0, 1.0, -3000000.0) 4

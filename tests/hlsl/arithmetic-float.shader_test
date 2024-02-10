@@ -9,7 +9,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (20.0, -10.0, 75.0, 0.33333333)
+probe (0, 0) rgba (20.0, -10.0, 75.0, 0.33333333)
 
 [pixel shader]
 float4 main() : SV_TARGET
@@ -22,7 +22,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (5.0, 5.0, -5.0, 3.0)
+probe (0, 0) rgba (5.0, 5.0, -5.0, 3.0)
 
 [pixel shader]
 float4 main() : SV_TARGET
@@ -35,7 +35,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, -2.0, 2.0, -2.0) 16
+probe (0, 0) rgba (2.0, -2.0, 2.0, -2.0) 16
 
 [pixel shader]
 float4 main() : SV_TARGET
@@ -48,7 +48,7 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (0.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (0.0, 0.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -61,7 +61,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (5.0, -2.1, 4.0, 0.0) 6
+probe (0, 0) rgba (5.0, -2.1, 4.0, 0.0) 6
 
 [require]
 % Infinities are not allowed in SM1
@@ -78,4 +78,4 @@ float4 main() : SV_TARGET
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1e99, 1e99, 1e99, 1e99)
+probe (0, 0) rgba (1e99, 1e99, 1e99, 1e99)

@@ -8,7 +8,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (3.0, 0.0, 0.0, 0.0)
+probe (0, 0) rgba (3.0, 0.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -20,7 +20,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 0.0, 0.0)
+probe (0, 0) rgba (2.0, 3.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -32,7 +32,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -44,7 +44,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 0.0, 0.0)
+probe (0, 0) rgba (2.0, 4.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -56,7 +56,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 2.0, 0.0, 0.0)
+probe (0, 0) rgba (2.0, 2.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -68,7 +68,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -80,7 +80,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -94,7 +94,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 7.0, 9.0)
+probe (0, 0) rgba (2.0, 4.0, 7.0, 9.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -108,7 +108,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 7.0, 9.0)
+probe (0, 0) rgba (2.0, 4.0, 7.0, 9.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -123,7 +123,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -138,7 +138,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -153,7 +153,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 7.0, 12.0, 17.0)
+probe (0, 0) rgba (2.0, 7.0, 12.0, 17.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -168,7 +168,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 7.0, 12.0, 17.0)
+probe (0, 0) rgba (2.0, 7.0, 12.0, 17.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -184,7 +184,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 0.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -200,7 +200,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (9.0, 11.0, 13.0, 0.0)
+probe (0, 0) rgba (9.0, 11.0, 13.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -212,7 +212,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -224,7 +224,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -236,7 +236,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -248,7 +248,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -261,7 +261,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -274,7 +274,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 6.0, 8.0)
+probe (0, 0) rgba (2.0, 4.0, 6.0, 8.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -286,7 +286,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -298,7 +298,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -310,7 +310,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 0.0, 0.0)
+probe (0, 0) rgba (2.0, 4.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -322,7 +322,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 4.0, 0.0, 0.0)
+probe (0, 0) rgba (2.0, 4.0, 0.0, 0.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -337,7 +337,7 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (2.0, 3.0, 4.0, 5.0)
+probe (0, 0) rgba (2.0, 3.0, 4.0, 5.0)
 
 [pixel shader]
 float4 main() : sv_target
@@ -352,4 +352,4 @@ float4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (6.0, 7.0, 8.0, 9.0)
+probe (0, 0) rgba (6.0, 7.0, 8.0, 9.0)

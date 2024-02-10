@@ -9,7 +9,7 @@ float4x1 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 2.0, 3.0, 4.0)
+probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
 
 [pixel shader]
 row_major float1x4 main() : sv_target
@@ -19,7 +19,7 @@ row_major float1x4 main() : sv_target
 
 [test]
 todo(glsl) draw quad
-probe all rgba (1.0, 2.0, 3.0, 4.0)
+probe (0, 0) rgba (1.0, 2.0, 3.0, 4.0)
 
 [rtv 0]
 format r32 float
@@ -45,10 +45,10 @@ row_major float4x1 main() : sv_target
 
 [test]
 todo(sm>=6 | glsl) draw quad
-probe rtv 0 all r (1.0)
-probe rtv 1 all r (2.0)
-probe rtv 2 all r (3.0)
-probe rtv 3 all r (4.0)
+probe rtv 0 (0,0) r (1.0)
+probe rtv 1 (0,0) r (2.0)
+probe rtv 2 (0,0) r (3.0)
+probe rtv 3 (0,0) r (4.0)
 
 [pixel shader fail(sm>=6)]
 float1x4 main() : sv_target
@@ -58,10 +58,10 @@ float1x4 main() : sv_target
 
 [test]
 todo(sm>=6 | glsl) draw quad
-probe rtv 0 all r (1.0)
-probe rtv 1 all r (2.0)
-probe rtv 2 all r (3.0)
-probe rtv 3 all r (4.0)
+probe rtv 0 (0,0) r (1.0)
+probe rtv 1 (0,0) r (2.0)
+probe rtv 2 (0,0) r (3.0)
+probe rtv 3 (0,0) r (4.0)
 
 [pixel shader fail]
 void main(out float1x2 x : sv_target0, out float1x2 y : sv_target1)
@@ -79,10 +79,10 @@ void main(out float1x2 x : sv_target0, out float1x2 y : sv_target2)
 
 [test]
 todo(sm>=6 | glsl) draw quad
-probe rtv 0 all r (1.0)
-probe rtv 1 all r (2.0)
-probe rtv 2 all r (5.0)
-probe rtv 3 all r (6.0)
+probe rtv 0 (0,0) r (1.0)
+probe rtv 1 (0,0) r (2.0)
+probe rtv 2 (0,0) r (5.0)
+probe rtv 3 (0,0) r (6.0)
 
 [rtv 0]
 format r32g32b32a32 float
@@ -97,6 +97,6 @@ void main(out row_major float1x4 x : sv_target0, out float1x2 y : sv_target1)
 
 [test]
 todo(sm>=6 | glsl) draw quad
-probe rtv 0 all rgba (1.0, 2.0, 3.0, 4.0)
-probe rtv 1 all r (5.0)
-probe rtv 2 all r (6.0)
+probe rtv 0 (0,0) rgba (1.0, 2.0, 3.0, 4.0)
+probe rtv 1 (0,0) r (5.0)
+probe rtv 2 (0,0) r (6.0)

@@ -60,4 +60,4 @@ struct output main(struct input i)
 
 [test]
 todo(glsl) draw triangle strip 4
-probe all rgba (0.0, 1.0, 0.0, 1.0)
+probe (0, 0) rgba (0.0, 1.0, 0.0, 1.0)

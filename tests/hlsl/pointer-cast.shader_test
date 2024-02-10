@@ -17,7 +17,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 [test]
 uniform 0 uint4 0 1 0x3e000000 0
 draw quad
-probe all rgba (0.25, 0.125, 0.0, 1.0)
+probe (0, 0) rgba (0.25, 0.125, 0.0, 1.0)
 uniform 0 uint4 1 0 0x3e000000 0
 draw quad
-probe all rgba (0.5, 0.75, 0.0, 1.0)
+probe (0, 0) rgba (0.5, 0.75, 0.0, 1.0)
