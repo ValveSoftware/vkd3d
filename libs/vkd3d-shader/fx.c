@@ -349,6 +349,16 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         [HLSL_SAMPLER_DIM_CUBE]      = "TextureCube",
         [HLSL_SAMPLER_DIM_CUBEARRAY] = "TextureCubeArray",
     };
+    static const char * const uav_type_names[] =
+    {
+        [HLSL_SAMPLER_DIM_1D]                = "RWTexture1D",
+        [HLSL_SAMPLER_DIM_1DARRAY]           = "RWTexture1DArray",
+        [HLSL_SAMPLER_DIM_2D]                = "RWTexture2D",
+        [HLSL_SAMPLER_DIM_2DARRAY]           = "RWTexture2DArray",
+        [HLSL_SAMPLER_DIM_3D]                = "RWTexture3D",
+        [HLSL_SAMPLER_DIM_BUFFER]            = "RWBuffer",
+        [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = "RWStructuredBuffer",
+    };
 
     /* Resolve arrays to element type and number of elements. */
     if (type->class == HLSL_CLASS_ARRAY)
@@ -359,6 +369,8 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
     if (type->base_type == HLSL_TYPE_TEXTURE)
         name = texture_type_names[type->sampler_dim];
+    else if (type->base_type == HLSL_TYPE_UAV)
+        name = uav_type_names[type->sampler_dim];
     else
         name = type->name;
 
@@ -429,6 +441,16 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             [HLSL_SAMPLER_DIM_CUBE]      = 17,
             [HLSL_SAMPLER_DIM_CUBEARRAY] = 23,
         };
+        static const uint32_t uav_type[] =
+        {
+            [HLSL_SAMPLER_DIM_1D]                = 31,
+            [HLSL_SAMPLER_DIM_1DARRAY]           = 32,
+            [HLSL_SAMPLER_DIM_2D]                = 33,
+            [HLSL_SAMPLER_DIM_2DARRAY]           = 34,
+            [HLSL_SAMPLER_DIM_3D]                = 35,
+            [HLSL_SAMPLER_DIM_BUFFER]            = 36,
+            [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = 40,
+        };
 
         switch (type->base_type)
         {
@@ -437,6 +459,9 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
                 break;
             case HLSL_TYPE_TEXTURE:
                 put_u32_unaligned(buffer, texture_type[type->sampler_dim]);
+                break;
+            case HLSL_TYPE_UAV:
+                put_u32_unaligned(buffer, uav_type[type->sampler_dim]);
                 break;
             default:
                 FIXME("Object type %u is not supported.\n", type->base_type);
