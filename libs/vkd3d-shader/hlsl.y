@@ -6450,6 +6450,10 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, "RenderTargetView", true, true);
         }
+    | KW_DEPTHSTENCILVIEW
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "DepthStencilView", true, true);
+        }
 
 type:
       type_no_void

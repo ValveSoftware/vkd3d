@@ -3380,7 +3380,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const struct
     {
-        char name[13];
+        char name[20];
         enum hlsl_type_class class;
         enum hlsl_base_type base_type;
         unsigned int dimx, dimy;
@@ -3396,6 +3396,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"TEXTURE",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
         {"PIXELSHADER",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
         {"VERTEXSHADER",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
+        {"RenderTargetView",HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1},
+        {"DepthStencilView",HLSL_CLASS_OBJECT, HLSL_TYPE_DEPTHSTENCILVIEW, 1, 1},
     };
 
     static const struct
@@ -3521,9 +3523,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         type->e.version = technique_types[i].version;
         hlsl_scope_add_type(ctx->globals, type);
     }
-
-    type = hlsl_new_type(ctx, "RenderTargetView", HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1);
-    hlsl_scope_add_type(ctx->globals, type);
 }
 
 static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compile_info *compile_info,
