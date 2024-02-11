@@ -427,6 +427,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         static const uint32_t object_type[] =
         {
             [HLSL_TYPE_RENDERTARGETVIEW] = 19,
+            [HLSL_TYPE_DEPTHSTENCILVIEW] = 20,
         };
         static const uint32_t texture_type[] =
         {
@@ -454,6 +455,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         switch (type->base_type)
         {
+            case HLSL_TYPE_DEPTHSTENCILVIEW:
             case HLSL_TYPE_RENDERTARGETVIEW:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
                 break;
