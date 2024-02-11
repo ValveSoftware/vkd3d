@@ -2798,6 +2798,99 @@ static bool intrinsic_asin(struct hlsl_ctx *ctx,
     return write_acos_or_asin(ctx, params, loc, true);
 }
 
+static bool write_atan_or_atan2(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc, bool atan2_mode)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_type *type;
+    struct vkd3d_string_buffer *buf;
+    int ret;
+
+    static const char atan2_name[] = "atan2";
+    static const char atan_name[] = "atan";
+
+    static const char atan2_header_template[] =
+            "%s atan2(%s y, %s x)\n"
+            "{\n"
+            "    %s in_y, in_x;\n"
+            "    in_y = y;\n"
+            "    in_x = x;\n";
+    static const char atan_header_template[] =
+            "%s atan(%s y)\n"
+            "{\n"
+            "    %s in_y, in_x;\n"
+            "    in_y = y;\n"
+            "    in_x = 1.0;\n";
+
+    static const char body_template[] =
+            "    %s recip, input, x2, poly_approx, flipped;"
+            "    recip = 1.0 / max(abs(in_y), abs(in_x));\n"
+            "    input = recip * min(abs(in_y), abs(in_x));\n"
+            "    x2 = input * input;\n"
+            "    poly_approx = ((((0.020835\n"
+            "        * x2 - 0.085133)\n"
+            "        * x2 + 0.180141)\n"
+            "        * x2 - 0.330299)\n"
+            "        * x2 + 0.999866)\n"
+            "        * input;\n"
+            "    flipped = poly_approx * -2.0 + 1.570796;\n"
+            "    poly_approx += abs(in_x) < abs(in_y) ? flipped : 0.0;\n"
+            "    poly_approx += in_x < 0.0 ? -3.1415927 : 0.0;\n"
+            "    return (min(in_x, in_y) < 0.0 && max(in_x, in_y) >= 0.0)\n"
+            "        ? -poly_approx\n"
+            "        : poly_approx;\n"
+            "}";
+
+    if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
+        return false;
+    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+
+    if (!(buf = hlsl_get_string_buffer(ctx)))
+        return false;
+
+    if (atan2_mode)
+        ret = vkd3d_string_buffer_printf(buf, atan2_header_template,
+                type->name, type->name, type->name, type->name);
+    else
+        ret = vkd3d_string_buffer_printf(buf, atan_header_template,
+                type->name, type->name, type->name);
+    if (ret < 0)
+    {
+        vkd3d_string_buffer_cleanup(buf);
+        return false;
+    }
+
+    ret = vkd3d_string_buffer_printf(buf, body_template, type->name);
+    if (ret < 0)
+    {
+        vkd3d_string_buffer_cleanup(buf);
+        return false;
+    }
+
+    func = hlsl_compile_internal_function(ctx,
+            atan2_mode ? atan2_name : atan_name, buf->buffer);
+    vkd3d_string_buffer_cleanup(buf);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
+static bool intrinsic_atan(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_atan_or_atan2(ctx, params, loc, false);
+}
+
+
+static bool intrinsic_atan2(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_atan_or_atan2(ctx, params, loc, true);
+}
+
+
 /* Find the type corresponding to the given source type, with the same
  * dimensions but a different base type. */
 static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
@@ -4031,6 +4124,8 @@ intrinsic_functions[] =
     {"asfloat",                             1, true,  intrinsic_asfloat},
     {"asin",                                1, true,  intrinsic_asin},
     {"asuint",                             -1, true,  intrinsic_asuint},
+    {"atan",                                1, true,  intrinsic_atan},
+    {"atan2",                               2, true,  intrinsic_atan2},
     {"ceil",                                1, true,  intrinsic_ceil},
     {"clamp",                               3, true,  intrinsic_clamp},
     {"clip",                                1, true,  intrinsic_clip},
