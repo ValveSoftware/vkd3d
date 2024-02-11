@@ -2666,6 +2666,55 @@ static bool intrinsic_abs(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_ABS, params->args[0], loc);
 }
 
+static bool write_acos_or_asin(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc, bool asin_mode)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_type *type;
+    char *body;
+
+    static const char template[] =
+            "%s %s(%s x)\n"
+            "{\n"
+            "    %s abs_arg = abs(x);\n"
+            "    %s poly_approx = (((-0.018729\n"
+            "        * abs_arg + 0.074261)\n"
+            "        * abs_arg - 0.212114)\n"
+            "        * abs_arg + 1.570729);\n"
+            "    %s correction = sqrt(1.0 - abs_arg);\n"
+            "    %s zero_flip = (x < 0.0) * (-2.0 * correction * poly_approx + 3.141593);\n"
+            "    %s result = poly_approx * correction + zero_flip;\n"
+            "    return %s;\n"
+            "}";
+    static const char fn_name_acos[] = "acos";
+    static const char fn_name_asin[] = "asin";
+    static const char return_stmt_acos[] = "result";
+    static const char return_stmt_asin[] = "-result + 1.570796";
+
+    const char *fn_name = asin_mode ? fn_name_asin : fn_name_acos;
+
+    type = params->args[0]->data_type;
+    type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template,
+            type->name, fn_name, type->name,
+            type->name, type->name, type->name, type->name, type->name,
+            (asin_mode ? return_stmt_asin : return_stmt_acos))))
+        return false;
+    func = hlsl_compile_internal_function(ctx, fn_name, body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
+static bool intrinsic_acos(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_acos_or_asin(ctx, params, loc, false);
+}
+
 static bool intrinsic_all(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2741,6 +2790,12 @@ static bool intrinsic_any(struct hlsl_ctx *ctx,
 
     hlsl_fixme(ctx, loc, "any() implementation for non-float, non-bool");
     return false;
+}
+
+static bool intrinsic_asin(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_acos_or_asin(ctx, params, loc, true);
 }
 
 /* Find the type corresponding to the given source type, with the same
@@ -3970,9 +4025,11 @@ intrinsic_functions[] =
     /* Note: these entries should be kept in alphabetical order. */
     {"D3DCOLORtoUBYTE4",                    1, true,  intrinsic_d3dcolor_to_ubyte4},
     {"abs",                                 1, true,  intrinsic_abs},
+    {"acos",                                1, true,  intrinsic_acos},
     {"all",                                 1, true,  intrinsic_all},
     {"any",                                 1, true,  intrinsic_any},
     {"asfloat",                             1, true,  intrinsic_asfloat},
+    {"asin",                                1, true,  intrinsic_asin},
     {"asuint",                             -1, true,  intrinsic_asuint},
     {"ceil",                                1, true,  intrinsic_ceil},
     {"clamp",                               3, true,  intrinsic_clamp},

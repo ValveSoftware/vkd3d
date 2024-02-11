@@ -3,7 +3,7 @@
 % implementations. DXIL defines intrinsics for inverse trig, to be implemented
 % by the backend.
 
-[pixel shader todo]
+[pixel shader todo(sm<4)]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -13,26 +13,26 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (3.14159274, 0.0, 0.0, 0.0) 128
 
 uniform 0 float4 -0.5 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (2.094441441, 0.0, 0.0, 0.0) 256
 
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (1.57072878, 0.0, 0.0, 0.0) 1024
 
 uniform 0 float4 0.5 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (1.04715133, 0.0, 0.0, 0.0) 512
 
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0) 128
 
-[pixel shader todo]
+[pixel shader todo(sm<4)]
 uniform float4 a;
 
 float4 main() : sv_target
@@ -44,7 +44,7 @@ float4 main() : sv_target
 
 [test]
 uniform 0 float4 -1.0 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (-31416.0, 0.0, 0.0, 0.0)
 
 [require]
@@ -52,15 +52,15 @@ shader model < 6.0
 
 [test]
 uniform 0 float4 -0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<4) draw quad
 probe all rgba (-10473.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.0 0.0 0.0 0.0
-todo draw quad
+todo(sm<4) draw quad
 probe all rgba (1.0, 0.0, 0.0, 0.0)
 
 uniform 0 float4 0.5 0.0 0.0 0.0
-todo draw quad
+todo(sm<4) draw quad
 probe all rgba (10473.0, 0.0, 0.0, 0.0)
 
 [require]
@@ -88,7 +88,7 @@ probe all rgba (10472.0, 0.0, 0.0, 0.0) 4096
 
 [test]
 uniform 0 float4 1.0 0.0 0.0 0.0
-todo(sm<6) draw quad
+todo(sm<4) draw quad
 probe all rgba (31416.0, 0.0, 0.0, 0.0)
 
 
