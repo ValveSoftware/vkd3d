@@ -376,6 +376,7 @@ enum dx_intrinsic_opcode
     DX_UBFE                         =  52,
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
+    DX_SAMPLE                       =  60,
     DX_TEXTURE_LOAD                 =  66,
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
@@ -2428,6 +2429,26 @@ static bool sm6_value_validate_is_texture_handle(const struct sm6_value *value, 
     return true;
 }
 
+static bool sm6_value_validate_is_sampler_handle(const struct sm6_value *value, enum dx_intrinsic_opcode op,
+        struct sm6_parser *sm6)
+{
+    enum dxil_resource_kind kind;
+
+    if (!sm6_value_validate_is_handle(value, sm6))
+        return false;
+
+    kind = value->u.handle.d->kind;
+    if (kind != RESOURCE_KIND_SAMPLER)
+    {
+        WARN("Resource kind %u for op %u is not a sampler.\n", kind, op);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCE_HANDLE,
+                "Resource kind %u for sample operation %u is not a sampler.", kind, op);
+        return false;
+    }
+
+    return true;
+}
+
 static bool sm6_value_validate_is_pointer(const struct sm6_value *value, struct sm6_parser *sm6)
 {
     if (!sm6_type_is_pointer(value->type))
@@ -3661,11 +3682,10 @@ static bool sm6_parser_emit_composite_construct(struct sm6_parser *sm6, const st
 }
 
 static bool sm6_parser_emit_coordinate_construct(struct sm6_parser *sm6, const struct sm6_value **operands,
-        const struct sm6_value *z_operand, struct function_emission_state *state,
+        unsigned int max_operands, const struct sm6_value *z_operand, struct function_emission_state *state,
         struct vkd3d_shader_register *reg)
 {
     const struct vkd3d_shader_register *operand_regs[VKD3D_VEC4_SIZE];
-    const unsigned int max_operands = 3;
     unsigned int component_count;
 
     for (component_count = 0; component_count < max_operands; ++component_count)
@@ -4047,6 +4067,46 @@ static void instruction_set_texel_offset(struct vkd3d_shader_instruction *ins,
     ins->texel_offset.w = sm6_value_get_texel_offset(operands[2]);
 }
 
+static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    const struct sm6_value *resource, *sampler;
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register coord;
+    const unsigned int clamp_idx = 9;
+
+    resource = operands[0];
+    sampler = operands[1];
+    if (!sm6_value_validate_is_texture_handle(resource, op, sm6)
+            || !sm6_value_validate_is_sampler_handle(sampler, op, sm6))
+    {
+        return;
+    }
+
+    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2], VKD3D_VEC4_SIZE, NULL, state, &coord))
+        return;
+
+    ins = state->ins;
+    instruction_init_with_resource(ins, VKD3DSIH_SAMPLE, resource, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+        return;
+
+    if (!sm6_value_is_undef(operands[clamp_idx]))
+    {
+        FIXME("Ignoring LOD clamp value.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring LOD clamp value for a sample operation.");
+    }
+
+    src_param_init_vector_from_reg(&src_params[0], &coord);
+    src_param_init_vector_from_reg(&src_params[1], &resource->u.handle.reg);
+    src_param_init_vector_from_reg(&src_params[2], &sampler->u.handle.reg);
+    instruction_set_texel_offset(ins, &operands[6], sm6);
+
+    instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
+}
+
 static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4157,7 +4217,7 @@ static void sm6_parser_emit_dx_texture_load(struct sm6_parser *sm6, enum dx_intr
     is_uav = resource->u.handle.d->type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV;
 
     mip_level_or_sample_count = (resource_type != VKD3D_SHADER_RESOURCE_BUFFER) ? operands[1] : NULL;
-    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2],
+    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2], 3,
             is_multisample ? NULL : mip_level_or_sample_count, state, &coord))
     {
         return;
@@ -4194,7 +4254,7 @@ static void sm6_parser_emit_dx_texture_store(struct sm6_parser *sm6, enum dx_int
     if (!sm6_value_validate_is_texture_handle(resource, op, sm6))
         return;
 
-    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[1], NULL, state, &coord))
+    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[1], 3, NULL, state, &coord))
         return;
 
     write_mask = sm6_value_get_constant_uint(operands[8]);
@@ -4297,6 +4357,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_PI                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_SAMPLE                        ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
