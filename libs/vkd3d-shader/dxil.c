@@ -1937,6 +1937,16 @@ static const struct sm6_type *sm6_parser_get_type(struct sm6_parser *sm6, uint64
     return &sm6->types[type_id];
 }
 
+static bool resource_kind_is_texture(enum dxil_resource_kind kind)
+{
+    return kind >= RESOURCE_KIND_TEXTURE1D && kind <= RESOURCE_KIND_TEXTURECUBEARRAY;
+}
+
+static bool resource_kind_is_multisampled(enum dxil_resource_kind kind)
+{
+    return kind == RESOURCE_KIND_TEXTURE2DMS || kind == RESOURCE_KIND_TEXTURE2DMSARRAY;
+}
+
 static int global_symbol_compare(const void *a, const void *b)
 {
     return vkd3d_u32_compare(((const struct sm6_symbol *)a)->id, ((const struct sm6_symbol *)b)->id);
@@ -6776,16 +6786,6 @@ static bool sm6_parser_resources_load_register_range(struct sm6_parser *sm6,
     range->last = (size == UINT_MAX) ? UINT_MAX : range->first + size - 1;
 
     return true;
-}
-
-static bool resource_kind_is_texture(enum dxil_resource_kind kind)
-{
-    return kind >= RESOURCE_KIND_TEXTURE1D && kind <= RESOURCE_KIND_TEXTURECUBEARRAY;
-}
-
-static bool resource_kind_is_multisampled(enum dxil_resource_kind kind)
-{
-    return kind == RESOURCE_KIND_TEXTURE2DMS || kind == RESOURCE_KIND_TEXTURE2DMSARRAY;
 }
 
 static enum vkd3d_shader_resource_type shader_resource_type_from_dxil_resource_kind(enum dxil_resource_kind kind)
