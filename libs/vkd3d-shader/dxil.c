@@ -228,6 +228,13 @@ enum dxil_component_type
     COMPONENT_TYPE_PACKEDU8X32 = 18,
 };
 
+enum dxil_sampler_kind
+{
+    SAMPLER_KIND_DEFAULT    = 0,
+    SAMPLER_KIND_COMPARISON = 1,
+    SAMPLER_KIND_MONO       = 2,
+};
+
 enum dxil_semantic_kind
 {
     SEMANTIC_KIND_ARBITRARY            =  0,
@@ -6755,6 +6762,70 @@ static enum vkd3d_result sm6_parser_resources_load_cbv(struct sm6_parser *sm6,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result sm6_parser_resources_load_sampler(struct sm6_parser *sm6,
+        const struct sm6_metadata_node *node, struct sm6_descriptor_info *d, struct vkd3d_shader_instruction *ins)
+{
+    struct vkd3d_shader_register *reg;
+    unsigned int kind;
+
+    if (node->operand_count < 7)
+    {
+        WARN("Invalid operand count %u.\n", node->operand_count);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
+                "Invalid operand count %u for a sampler descriptor.", node->operand_count);
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    if (node->operand_count > 7 && node->operands[7])
+    {
+        WARN("Ignoring %u extra operands.\n", node->operand_count - 7);
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Ignoring %u extra operands for a sampler descriptor.", node->operand_count - 7);
+    }
+
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_DCL_SAMPLER);
+    ins->resource_type = VKD3D_SHADER_RESOURCE_NONE;
+
+    if (!sm6_metadata_get_uint_value(sm6, node->operands[6], &kind))
+    {
+        WARN("Failed to load sampler mode.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                "Sampler mode metadata value is not an integer.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+    switch (kind)
+    {
+        case SAMPLER_KIND_DEFAULT:
+            break;
+        case SAMPLER_KIND_COMPARISON:
+            ins->flags = VKD3DSI_SAMPLER_COMPARISON_MODE;
+            break;
+        default:
+            FIXME("Ignoring sampler kind %u.\n", kind);
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Ignoring sampler kind %u.", kind);
+            break;
+    }
+
+    ins->declaration.sampler.src.swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    ins->declaration.sampler.src.modifiers = VKD3DSPSM_NONE;
+
+    reg = &ins->declaration.sampler.src.reg;
+    vsir_register_init(reg, VKD3DSPR_SAMPLER, VKD3D_DATA_UNUSED, 3);
+    reg->idx[0].offset = d->id;
+    reg->idx[1].offset = d->range.first;
+    reg->idx[2].offset = d->range.last;
+
+    ins->declaration.sampler.range = d->range;
+
+    d->resource_type = ins->resource_type;
+    d->kind = RESOURCE_KIND_SAMPLER;
+    d->reg_type = VKD3DSPR_SAMPLER;
+    d->reg_data_type = VKD3D_DATA_UNUSED;
+    d->resource_data_type = VKD3D_DATA_UNUSED;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
         enum vkd3d_shader_descriptor_type type, const struct sm6_metadata_node *descriptor_node)
 {
@@ -6829,6 +6900,10 @@ static enum vkd3d_result sm6_parser_descriptor_type_init(struct sm6_parser *sm6,
                 break;
             case VKD3D_SHADER_DESCRIPTOR_TYPE_UAV:
                 if ((ret = sm6_parser_resources_load_uav(sm6, node, d, ins)) < 0)
+                    return ret;
+                break;
+            case VKD3D_SHADER_DESCRIPTOR_TYPE_SAMPLER:
+                if ((ret = sm6_parser_resources_load_sampler(sm6, node, d, ins)) < 0)
                     return ret;
                 break;
             default:
