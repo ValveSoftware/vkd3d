@@ -1350,10 +1350,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
                 case STATE_REQUIRE:
                     if (runner->maximum_shader_model < runner->minimum_shader_model
-                            || (runner->ops->check_requirements && !runner->ops->check_requirements(runner)))
-                    {
+                            || !runner->ops->check_requirements(runner))
                         skip_tests = true;
-                    }
                     break;
 
                 case STATE_RESOURCE:

@@ -59,6 +59,12 @@ struct gl_runner
 {
     struct shader_runner r;
 
+    struct
+    {
+        bool float64;
+        bool int64;
+    } caps;
+
     EGLDisplay display;
     EGLContext context;
 
@@ -93,7 +99,7 @@ static bool check_gl_extension(const char *extension, GLint extension_count)
     return false;
 }
 
-static bool check_gl_extensions(void)
+static bool check_gl_extensions(struct gl_runner *runner)
 {
     GLint count;
 
@@ -113,6 +119,11 @@ static bool check_gl_extensions(void)
         if (!check_gl_extension(required_extensions[i], count))
             return false;
     }
+
+    if (check_gl_extension("GL_ARB_gpu_shader_fp64", count))
+        runner->caps.float64 = true;
+    if (check_gl_extension("GL_ARB_gpu_shader_int64", count))
+        runner->caps.int64 = true;
 
     return true;
 }
@@ -210,7 +221,8 @@ static bool gl_runner_init(struct gl_runner *runner)
             continue;
         }
 
-        if (!check_gl_extensions())
+        memset(&runner->caps, 0, sizeof(runner->caps));
+        if (!check_gl_extensions(runner))
         {
             trace("Device %u lacks required extensions.\n", i);
             eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -236,6 +248,9 @@ static bool gl_runner_init(struct gl_runner *runner)
     trace("  GL_VENDOR: %s\n", glGetString(GL_VENDOR));
     trace("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
     trace(" GL_VERSION: %s\n", glGetString(GL_VERSION));
+
+    trace("    float64: %u.\n", runner->caps.float64);
+    trace("      int64: %u.\n", runner->caps.int64);
 
     p_glSpecializeShader = (void *)eglGetProcAddress("glSpecializeShader");
 
@@ -272,6 +287,18 @@ static void gl_runner_cleanup(struct gl_runner *runner)
     ok(ret, "Failed to destroy EGL context.\n");
     ret = eglTerminate(runner->display);
     ok(ret, "Failed to terminate EGL display connection.\n");
+}
+
+static bool gl_runner_check_requirements(struct shader_runner *r)
+{
+    struct gl_runner *runner = gl_runner(r);
+
+    if (r->require_float64 && !runner->caps.float64)
+        return false;
+    if (r->require_int64 && !runner->caps.int64)
+        return false;
+
+    return true;
 }
 
 static const struct format_info *get_format_info(enum DXGI_FORMAT format)
@@ -979,6 +1006,7 @@ static void gl_runner_release_readback(struct shader_runner *runner, struct reso
 
 static const struct shader_runner_ops gl_runner_ops =
 {
+    .check_requirements = gl_runner_check_requirements,
     .create_resource = gl_runner_create_resource,
     .destroy_resource = gl_runner_destroy_resource,
     .dispatch = gl_runner_dispatch,
