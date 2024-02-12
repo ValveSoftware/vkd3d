@@ -388,6 +388,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
     DX_BUFFER_STORE                 =  69,
+    DX_GET_DIMENSIONS               =  72,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_DERIV_COARSEX                =  83,
@@ -2356,6 +2357,23 @@ static void instruction_dst_param_init_ssa_vector(struct vkd3d_shader_instructio
     dst->u.reg = param->reg;
 }
 
+static bool instruction_dst_param_init_temp_vector(struct vkd3d_shader_instruction *ins, struct sm6_parser *sm6)
+{
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    struct vkd3d_shader_dst_param *param;
+
+    if (!(param = instruction_dst_params_alloc(ins, 1, sm6)))
+        return false;
+
+    vsir_dst_param_init(param, VKD3DSPR_TEMP, vkd3d_data_type_from_sm6_type(sm6_type_get_scalar_type(dst->type, 0)), 1);
+    param->write_mask = VKD3DSP_WRITEMASK_ALL;
+    param->reg.idx[0].offset = 0;
+    param->reg.dimension = VSIR_DIMENSION_VEC4;
+    dst->u.reg = param->reg;
+
+    return true;
+}
+
 /* Recurse through the block tree while maintaining a current value count. The current
  * count is the sum of the global count plus all declarations within the current function.
  * Store into value_capacity the highest count seen. */
@@ -4047,6 +4065,80 @@ static void sm6_parser_emit_dx_create_handle(struct sm6_parser *sm6, enum dx_int
     ins->handler_idx = VKD3DSIH_NOP;
 }
 
+static void sm6_parser_emit_dx_get_dimensions(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_instruction *ins = state->ins;
+    struct vkd3d_shader_src_param *src_params;
+    unsigned int is_texture, component_count;
+    enum dxil_resource_kind resource_kind;
+    struct vkd3d_shader_dst_param *dst;
+    const struct sm6_value *resource;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+    is_texture = resource->u.handle.d->resource_type != VKD3D_SHADER_RESOURCE_BUFFER;
+    resource_kind = resource->u.handle.d->kind;
+
+    instruction_init_with_resource(ins, is_texture ? VKD3DSIH_RESINFO : VKD3DSIH_BUFINFO, resource, sm6);
+
+    if (!(src_params = instruction_src_params_alloc(ins, 1 + is_texture, sm6)))
+        return;
+    src_param_init_vector_from_reg(&src_params[is_texture], &resource->u.handle.reg);
+
+    if (is_texture)
+    {
+        ins->flags = VKD3DSI_RESINFO_UINT;
+        src_param_init_from_value(&src_params[0], operands[1]);
+        component_count = VKD3D_VEC4_SIZE;
+
+        if (resource_kind_is_multisampled(resource_kind))
+        {
+            instruction_dst_param_init_temp_vector(ins++, sm6);
+            state->temp_idx = 1;
+
+            /* DXIL does not have an instrinsic for sample info, and resinfo is expected to return
+             * the sample count in .w for MS textures. The result is always a struct of 4 x uint32. */
+            vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_SAMPLE_INFO);
+            ins->flags = VKD3DSI_SAMPLE_INFO_UINT;
+
+            if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
+                return;
+            src_param_init_vector_from_reg(&src_params[0], &resource->u.handle.reg);
+            src_params[0].swizzle = VKD3D_SHADER_SWIZZLE(X, X, X, X);
+
+            if (!instruction_dst_param_init_temp_vector(ins, sm6))
+                return;
+            dst = ins->dst;
+            dst->write_mask = VKD3DSP_WRITEMASK_3;
+
+            /* Move the result to an SSA in case another instruction overwrites r0 before
+             * the components are extracted for use. */
+            ++ins;
+            vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+            if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
+                return;
+            src_param_init_vector_from_reg(&src_params[0], &dst->reg);
+
+            state->ins = ins;
+            state->code_block->instruction_count += 2;
+        }
+    }
+    else
+    {
+        if (!operands[1]->is_undefined)
+        {
+            WARN("Ignoring unexpected operand.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Ignoring an unexpected defined LOD value for buffer GetDimensions.");
+        }
+        component_count = 1 + (resource_kind == RESOURCE_KIND_STRUCTUREDBUFFER);
+    }
+
+    instruction_dst_param_init_ssa_vector(ins, component_count, sm6);
+}
+
 static enum vkd3d_shader_opcode sm6_dx_map_tertiary_op(enum dx_intrinsic_opcode op)
 {
     switch (op)
@@ -4636,6 +4728,7 @@ struct sm6_dx_opcode_info
     e -> half/float
     g -> half/float/double
     H -> handle
+    D -> Dimensions
     S -> splitdouble
     v -> void
     o -> overloaded
@@ -4666,6 +4759,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_FMAX                          ] = {"g", "RR",   sm6_parser_emit_dx_binary},
     [DX_FMIN                          ] = {"g", "RR",   sm6_parser_emit_dx_binary},
     [DX_FRC                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_GET_DIMENSIONS                ] = {"D", "Hi",   sm6_parser_emit_dx_get_dimensions},
     [DX_IBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
     [DX_HCOS                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_HSIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
@@ -4743,6 +4837,8 @@ static bool sm6_parser_validate_operand_type(struct sm6_parser *sm6, const struc
             return sm6_type_is_floating_point(type);
         case 'H':
             return (is_return || sm6_value_is_handle(value)) && type == sm6->handle_type;
+        case 'D':
+            return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.Dimensions");
         case 'S':
             return sm6_type_is_struct(type) && !strcmp(type->u.struc->name, "dx.types.splitdouble");
         case 'v':
