@@ -33,7 +33,7 @@ static const uint64_t ALLOCA_FLAG_IN_ALLOCA = 0x20;
 static const uint64_t ALLOCA_FLAG_EXPLICIT_TYPE = 0x40;
 static const uint64_t ALLOCA_ALIGNMENT_MASK = ALLOCA_FLAG_IN_ALLOCA - 1;
 static const unsigned int SHADER_DESCRIPTOR_TYPE_COUNT = 4;
-static const size_t MAX_IR_INSTRUCTIONS_PER_DXIL_INSTRUCTION = 5;
+static const size_t MAX_IR_INSTRUCTIONS_PER_DXIL_INSTRUCTION = 11;
 
 static const unsigned int dx_max_thread_group_size[3] = {1024, 1024, 64};
 
@@ -377,6 +377,7 @@ enum dx_intrinsic_opcode
     DX_CREATE_HANDLE                =  57,
     DX_CBUFFER_LOAD_LEGACY          =  59,
     DX_SAMPLE                       =  60,
+    DX_SAMPLE_GRAD                  =  63,
     DX_TEXTURE_LOAD                 =  66,
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
@@ -4070,11 +4071,11 @@ static void instruction_set_texel_offset(struct vkd3d_shader_instruction *ins,
 static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
+    struct vkd3d_shader_register coord, ddx, ddy;
     const struct sm6_value *resource, *sampler;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_instruction *ins;
-    struct vkd3d_shader_register coord;
-    const unsigned int clamp_idx = 9;
+    unsigned int clamp_idx;
 
     resource = operands[0];
     sampler = operands[1];
@@ -4087,9 +4088,34 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
     if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2], VKD3D_VEC4_SIZE, NULL, state, &coord))
         return;
 
+    if (op == DX_SAMPLE_GRAD)
+    {
+        if (!sm6_parser_emit_coordinate_construct(sm6, &operands[9], 3, NULL, state, &ddx))
+            return;
+        if (!sm6_parser_emit_coordinate_construct(sm6, &operands[12], 3, NULL, state, &ddy))
+            return;
+    }
+
     ins = state->ins;
-    instruction_init_with_resource(ins, VKD3DSIH_SAMPLE, resource, sm6);
-    if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+    switch (op)
+    {
+        case DX_SAMPLE:
+            instruction_init_with_resource(ins, VKD3DSIH_SAMPLE, resource, sm6);
+            src_params = instruction_src_params_alloc(ins, 3, sm6);
+            clamp_idx = 9;
+            break;
+        case DX_SAMPLE_GRAD:
+            instruction_init_with_resource(ins, VKD3DSIH_SAMPLE_GRAD, resource, sm6);
+            src_params = instruction_src_params_alloc(ins, 5, sm6);
+            src_param_init_vector_from_reg(&src_params[3], &ddx);
+            src_param_init_vector_from_reg(&src_params[4], &ddy);
+            clamp_idx = 15;
+            break;
+        default:
+            vkd3d_unreachable();
+    }
+
+    if (!src_params)
         return;
 
     if (!sm6_value_is_undef(operands[clamp_idx]))
@@ -4358,6 +4384,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ROUND_Z                       ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_SAMPLE                        ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
+    [DX_SAMPLE_GRAD                   ] = {"o", "HHffffiiifffffff", sm6_parser_emit_dx_sample},
     [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
     [DX_SPLIT_DOUBLE                  ] = {"S", "d",    sm6_parser_emit_dx_split_double},
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
