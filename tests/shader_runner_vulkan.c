@@ -310,6 +310,15 @@ static struct resource *vulkan_runner_create_resource(struct shader_runner *r, c
                     usage, format, &resource->memory);
             resource->image_view = create_2d_image_view(runner, resource->image, format);
 
+            if (!params->data)
+            {
+                begin_command_buffer(runner);
+                transition_image_layout(runner, resource->image,
+                        VK_IMAGE_LAYOUT_UNDEFINED, layout);
+                end_command_buffer(runner);
+                break;
+            }
+
             staging_buffer = create_buffer(runner, params->data_size,
                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT, &staging_memory);
             VK_CALL(vkMapMemory(device, staging_memory, 0, VK_WHOLE_SIZE, 0, &data));

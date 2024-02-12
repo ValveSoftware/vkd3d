@@ -130,6 +130,7 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
     D3D12_SUBRESOURCE_DATA resource_data[2];
     struct d3d12_resource *resource;
     unsigned int buffer_offset = 0;
+    D3D12_RESOURCE_STATES state;
 
     if (params->level_count > ARRAY_SIZE(resource_data))
         fatal_error("Level count %u is too high.\n", params->level_count);
@@ -185,14 +186,18 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 runner->heap = create_gpu_descriptor_heap(device,
                         D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, MAX_RESOURCE_DESCRIPTORS);
 
-            resource->resource = create_default_texture2d(device, params->width, params->height, 1, params->level_count,
-                    params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-            upload_texture_data_with_states(resource->resource, resource_data,
-                    params->level_count, test_context->queue, test_context->list,
-                    RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-            reset_command_list(test_context->list, test_context->allocator);
-            ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
-                    NULL, NULL, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+            state = params->data ? D3D12_RESOURCE_STATE_COPY_DEST : D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+            resource->resource = create_default_texture2d(device, params->width, params->height, 1,
+                    params->level_count, params->format, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, state);
+            if (params->data)
+            {
+                upload_texture_data_with_states(resource->resource, resource_data,
+                        params->level_count, test_context->queue, test_context->list,
+                        RESOURCE_STATE_DO_NOT_CHANGE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+                reset_command_list(test_context->list, test_context->allocator);
+            }
+            ID3D12Device_CreateUnorderedAccessView(device, resource->resource, NULL, NULL,
+                    get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             break;
 
         case RESOURCE_TYPE_BUFFER_UAV:
