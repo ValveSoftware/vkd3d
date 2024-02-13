@@ -3780,7 +3780,8 @@ static void sm6_parser_emit_dx_unary(struct sm6_parser *sm6, enum dx_intrinsic_o
     struct vkd3d_shader_src_param *src_param;
 
     vsir_instruction_init(ins, &sm6->p.location, map_dx_unary_op(op));
-    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
     src_param_init_from_value(src_param, operands[0]);
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
