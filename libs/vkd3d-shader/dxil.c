@@ -381,6 +381,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_LOAD                 =  66,
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
+    DX_ATOMIC_BINOP                 =  78,
     DX_DERIV_COARSEX                =  83,
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
@@ -436,6 +437,20 @@ enum dxil_predicate
     ICMP_SGE   = 39,
     ICMP_SLT   = 40,
     ICMP_SLE   = 41,
+};
+
+enum dxil_atomic_binop_code
+{
+    ATOMIC_BINOP_ADD,
+    ATOMIC_BINOP_AND,
+    ATOMIC_BINOP_OR,
+    ATOMIC_BINOP_XOR,
+    ATOMIC_BINOP_IMIN,
+    ATOMIC_BINOP_IMAX,
+    ATOMIC_BINOP_UMIN,
+    ATOMIC_BINOP_UMAX,
+    ATOMIC_BINOP_XCHG,
+    ATOMIC_BINOP_INVALID,
 };
 
 struct sm6_pointer_info
@@ -2275,7 +2290,7 @@ static void src_param_init_from_value(struct vkd3d_shader_src_param *param, cons
 static void src_param_init_vector_from_reg(struct vkd3d_shader_src_param *param,
         const struct vkd3d_shader_register *reg)
 {
-    param->swizzle = VKD3D_SHADER_NO_SWIZZLE;
+    param->swizzle = (reg->dimension == VSIR_DIMENSION_VEC4) ? VKD3D_SHADER_NO_SWIZZLE : VKD3D_SHADER_SWIZZLE(X, X, X, X);
     param->modifiers = VKD3DSPSM_NONE;
     param->reg = *reg;
 }
@@ -3823,6 +3838,100 @@ static void sm6_parser_emit_dx_binary(struct sm6_parser *sm6, enum dx_intrinsic_
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static enum vkd3d_shader_opcode map_dx_atomic_binop(const struct sm6_value *operand, struct sm6_parser *sm6)
+{
+    uint64_t code = sm6_value_get_constant_uint(operand);
+
+    switch (code)
+    {
+        case ATOMIC_BINOP_ADD:
+            return VKD3DSIH_IMM_ATOMIC_IADD;
+        case ATOMIC_BINOP_AND:
+            return VKD3DSIH_IMM_ATOMIC_AND;
+        case ATOMIC_BINOP_IMAX:
+            return VKD3DSIH_IMM_ATOMIC_IMAX;
+        case ATOMIC_BINOP_IMIN:
+            return VKD3DSIH_IMM_ATOMIC_IMIN;
+        case ATOMIC_BINOP_OR:
+            return VKD3DSIH_IMM_ATOMIC_OR;
+        case ATOMIC_BINOP_UMAX:
+            return VKD3DSIH_IMM_ATOMIC_UMAX;
+        case ATOMIC_BINOP_UMIN:
+            return VKD3DSIH_IMM_ATOMIC_UMIN;
+        case ATOMIC_BINOP_XCHG:
+            return VKD3DSIH_IMM_ATOMIC_EXCH;
+        case ATOMIC_BINOP_XOR:
+            return VKD3DSIH_IMM_ATOMIC_XOR;
+        /* DXIL currently doesn't use SUB and NAND. */
+        default:
+            FIXME("Unhandled atomic binop %"PRIu64".\n", code);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Operation %"PRIu64" for an atomic binop instruction is unhandled.", code);
+            return VKD3DSIH_INVALID;
+    }
+}
+
+static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct sm6_value *dst = sm6_parser_get_current_value(sm6);
+    enum vkd3d_shader_resource_type resource_type;
+    struct vkd3d_shader_dst_param *dst_params;
+    struct vkd3d_shader_src_param *src_params;
+    enum vkd3d_shader_opcode handler_idx;
+    struct vkd3d_shader_instruction *ins;
+    const struct sm6_value *resource;
+    struct vkd3d_shader_register reg;
+    const unsigned int coord_idx = 2;
+    unsigned int i, coord_count = 1;
+
+    resource = operands[0];
+    if (!sm6_value_validate_is_handle(resource, sm6))
+        return;
+
+    if ((handler_idx = map_dx_atomic_binop(operands[1], sm6)) == VKD3DSIH_INVALID)
+        return;
+
+    resource_type = resource->u.handle.d->resource_type;
+    if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER || resource->u.handle.d->kind == RESOURCE_KIND_STRUCTUREDBUFFER)
+    {
+        coord_count = 2 + (resource_type != VKD3D_SHADER_RESOURCE_BUFFER);
+        if (!sm6_parser_emit_coordinate_construct(sm6, &operands[coord_idx], coord_count, NULL, state, &reg))
+            return;
+    }
+    else
+    {
+        reg = operands[coord_idx]->u.reg;
+    }
+
+    for (i = coord_idx + coord_count; i < coord_idx + 3; ++i)
+    {
+        if (!operands[i]->is_undefined)
+        {
+            WARN("Ignoring unexpected operand.\n");
+            vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                    "Ignoring an unexpected defined operand value for atomic instruction %u.", handler_idx);
+            break;
+        }
+    }
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, handler_idx);
+
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    src_param_init_vector_from_reg(&src_params[0], &reg);
+    src_param_init_from_value(&src_params[1], operands[5]);
+
+    dst_params = instruction_dst_params_alloc(ins, 2, sm6);
+    dst_param_init(&dst_params[0]);
+    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    dst_param_init(&dst_params[1]);
+    dst_params[1].reg = resource->u.handle.reg;
+
+    dst->u.reg = dst_params[0].reg;
+}
+
 static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4357,6 +4466,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ACOS                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ASIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ATAN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_ATOMIC_BINOP                  ] = {"o", "HciiiR", sm6_parser_emit_dx_atomic_binop},
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},
