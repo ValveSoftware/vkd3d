@@ -579,7 +579,7 @@ static void set_uniforms(struct shader_runner *runner, size_t offset, size_t cou
     memcpy(runner->uniforms + offset, uniforms, count * sizeof(*runner->uniforms));
 }
 
-static void read_int(const char **line, int *i)
+static void read_int(const char **line, int *i, bool is_uniform)
 {
     char *rest;
     long val;
@@ -587,14 +587,14 @@ static void read_int(const char **line, int *i)
     errno = 0;
     val = strtol(*line, &rest, 0);
 
-    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+    if (errno != 0 || (is_uniform && *rest != '\0' && !isspace((unsigned char)*rest)))
         fatal_error("Malformed int constant '%s'.\n", *line);
 
     *i = val;
     if (*i != val)
         fatal_error("Out of range int constant '%.*s'.\n", (int)(rest - *line), *line);
 
-    *line = rest;
+    *line = rest + (!is_uniform && *rest == ',');
 }
 
 static void read_uint(const char **line, unsigned int *u, bool is_uniform)
@@ -617,10 +617,10 @@ static void read_uint(const char **line, unsigned int *u, bool is_uniform)
 
 static void read_int4(const char **line, struct ivec4 *v)
 {
-    read_int(line, &v->x);
-    read_int(line, &v->y);
-    read_int(line, &v->z);
-    read_int(line, &v->w);
+    read_int(line, &v->x, true);
+    read_int(line, &v->y, true);
+    read_int(line, &v->z, true);
+    read_int(line, &v->w, true);
 }
 
 static void read_uint4(const char **line, struct uvec4 *v, bool is_uniform)
@@ -831,6 +831,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         unsigned int left, top, right, bottom, ulps, slot;
         struct resource_readback *rb;
         struct resource *resource;
+        bool is_signed = false;
         RECT rect;
         int len;
 
@@ -910,7 +911,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 ulps = 0;
             todo_if(runner->is_todo) check_readback_data_vec4(rb, &rect, &v, ulps);
         }
-        else if (match_string(line, "rui", &line))
+        else if (match_string(line, "rui", &line) || (is_signed = match_string(line, "ri", &line)))
         {
             unsigned int expect;
             D3D12_BOX box;
@@ -924,7 +925,10 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
             if (*line != '(')
                 fatal_error("Malformed probe arguments '%s'.\n", line);
             ++line;
-            read_uint(&line, &expect, false);
+            if (is_signed)
+                read_int(&line, (int *)&expect, false);
+            else
+                read_uint(&line, &expect, false);
             line = close_parentheses(line);
             todo_if(runner->is_todo) check_readback_data_uint(rb, &box, expect, 0);
         }
@@ -996,7 +1000,7 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
         {
             int i;
 
-            read_int(&line, &i);
+            read_int(&line, &i, true);
             set_uniforms(runner, offset, 1, &i);
         }
         else if (match_string(line, "uint", &line))
