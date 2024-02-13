@@ -3815,7 +3815,8 @@ static void sm6_parser_emit_dx_binary(struct sm6_parser *sm6, enum dx_intrinsic_
     struct vkd3d_shader_src_param *src_params;
 
     vsir_instruction_init(ins, &sm6->p.location, map_dx_binary_op(op, operands[0]->type));
-    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
     src_param_init_from_value(&src_params[0], operands[0]);
     src_param_init_from_value(&src_params[1], operands[1]);
 
