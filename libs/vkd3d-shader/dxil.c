@@ -3967,7 +3967,8 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     }
     e = &signature->elements[row_index];
 
-    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
     src_param->reg = sm6->input_params[row_index].reg;
     src_param_init_scalar(src_param, column_index);
     if (e->register_count > 1)
