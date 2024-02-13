@@ -382,6 +382,7 @@ enum dx_intrinsic_opcode
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
     DX_ATOMIC_BINOP                 =  78,
+    DX_ATOMIC_CMP_XCHG              =  79,
     DX_DERIV_COARSEX                =  83,
     DX_DERIV_COARSEY                =  84,
     DX_DERIV_FINEX                  =  85,
@@ -3876,22 +3877,25 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
 {
     struct sm6_value *dst = sm6_parser_get_current_value(sm6);
     enum vkd3d_shader_resource_type resource_type;
+    bool is_cmp_xchg = op == DX_ATOMIC_CMP_XCHG;
+    unsigned int i, coord_idx, coord_count = 1;
     struct vkd3d_shader_dst_param *dst_params;
     struct vkd3d_shader_src_param *src_params;
     enum vkd3d_shader_opcode handler_idx;
     struct vkd3d_shader_instruction *ins;
     const struct sm6_value *resource;
     struct vkd3d_shader_register reg;
-    const unsigned int coord_idx = 2;
-    unsigned int i, coord_count = 1;
 
     resource = operands[0];
     if (!sm6_value_validate_is_handle(resource, sm6))
         return;
 
-    if ((handler_idx = map_dx_atomic_binop(operands[1], sm6)) == VKD3DSIH_INVALID)
+    if (is_cmp_xchg)
+        handler_idx = VKD3DSIH_IMM_ATOMIC_CMP_EXCH;
+    else if ((handler_idx = map_dx_atomic_binop(operands[1], sm6)) == VKD3DSIH_INVALID)
         return;
 
+    coord_idx = 2 - is_cmp_xchg;
     resource_type = resource->u.handle.d->resource_type;
     if (resource_type != VKD3D_SHADER_RESOURCE_BUFFER || resource->u.handle.d->kind == RESOURCE_KIND_STRUCTUREDBUFFER)
     {
@@ -3918,10 +3922,12 @@ static void sm6_parser_emit_dx_atomic_binop(struct sm6_parser *sm6, enum dx_intr
     ins = state->ins;
     vsir_instruction_init(ins, &sm6->p.location, handler_idx);
 
-    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+    if (!(src_params = instruction_src_params_alloc(ins, 2 + is_cmp_xchg, sm6)))
         return;
     src_param_init_vector_from_reg(&src_params[0], &reg);
-    src_param_init_from_value(&src_params[1], operands[5]);
+    if (is_cmp_xchg)
+        src_param_init_from_value(&src_params[1], operands[4]);
+    src_param_init_from_value(&src_params[1 + is_cmp_xchg], operands[5]);
 
     dst_params = instruction_dst_params_alloc(ins, 2, sm6);
     dst_param_init(&dst_params[0]);
@@ -4467,6 +4473,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_ASIN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ATAN                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_ATOMIC_BINOP                  ] = {"o", "HciiiR", sm6_parser_emit_dx_atomic_binop},
+    [DX_ATOMIC_CMP_XCHG               ] = {"o", "HiiiRR", sm6_parser_emit_dx_atomic_binop},
     [DX_BFREV                         ] = {"m", "R",    sm6_parser_emit_dx_unary},
     [DX_BUFFER_LOAD                   ] = {"o", "Hii",  sm6_parser_emit_dx_buffer_load},
     [DX_CBUFFER_LOAD_LEGACY           ] = {"o", "Hi",   sm6_parser_emit_dx_cbuffer_load},

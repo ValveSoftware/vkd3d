@@ -26,7 +26,7 @@ void main()
 
 [test]
 uniform 0 uint4 3 5 0 0
-todo dispatch 1 1 1
+todo(sm<6) dispatch 1 1 1
 probe uav 1 (0) rui (1)
 probe uav 1 (1) rui (3)
 probe uav 1 (2) rui (15)
@@ -36,7 +36,7 @@ probe uav 1 (5) rui (3)
 probe uav 1 (6) rui (4)
 
 uniform 0 uint4 1 2 0 0
-todo dispatch 2 1 1
+todo(sm<6) dispatch 2 1 1
 probe uav 1 (0) rui (1)
 probe uav 1 (1) rui (3)
 probe uav 1 (2) rui (21)
