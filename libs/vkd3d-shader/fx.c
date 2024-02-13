@@ -86,6 +86,7 @@ struct fx_write_context
     uint32_t object_variable_count;
     uint32_t shared_object_count;
     uint32_t shader_variable_count;
+    uint32_t parameter_count;
     int status;
 
     bool child_effect;
@@ -613,6 +614,73 @@ static uint32_t write_fx_2_string(const char *string, struct fx_write_context *f
     return offset;
 }
 
+static uint32_t write_fx_2_parameter(const struct hlsl_type *type, const char *name, const struct hlsl_semantic *semantic,
+        struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    uint32_t semantic_offset, offset, elements_count = 0, name_offset;
+    struct hlsl_ctx *ctx = fx->ctx;
+    size_t i;
+
+    /* Resolve arrays to element type and number of elements. */
+    if (type->class == HLSL_CLASS_ARRAY)
+    {
+        elements_count = hlsl_get_multiarray_size(type);
+        type = hlsl_get_multiarray_element_type(type);
+    }
+
+    name_offset = write_string(name, fx);
+    semantic_offset = write_string(semantic->name, fx);
+
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_FLOAT:
+        case HLSL_TYPE_BOOL:
+        case HLSL_TYPE_INT:
+        case HLSL_TYPE_VOID:
+            break;
+        default:
+            hlsl_fixme(ctx, &ctx->location, "Writing parameter type %u is not implemented.",
+                    type->base_type);
+            return 0;
+    };
+
+    offset = put_u32(buffer, hlsl_sm1_base_type(type));
+    put_u32(buffer, hlsl_sm1_class(type));
+    put_u32(buffer, name_offset);
+    put_u32(buffer, semantic_offset);
+    put_u32(buffer, elements_count);
+
+    switch (type->class)
+    {
+        case HLSL_CLASS_VECTOR:
+            put_u32(buffer, type->dimx);
+            put_u32(buffer, type->dimy);
+            break;
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_MATRIX:
+            put_u32(buffer, type->dimy);
+            put_u32(buffer, type->dimx);
+            break;
+        case HLSL_CLASS_STRUCT:
+            put_u32(buffer, type->e.record.field_count);
+            break;
+        default:
+            ;
+    }
+
+    if (type->class == HLSL_CLASS_STRUCT)
+    {
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            const struct hlsl_struct_field *field = &type->e.record.fields[i];
+            write_fx_2_parameter(field->type, field->name, &field->semantic, fx);
+        }
+    }
+
+    return offset;
+}
+
 static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
@@ -635,6 +703,86 @@ static void write_fx_2_technique(struct hlsl_ir_var *var, struct fx_write_contex
     set_u32(buffer, count_offset, count);
 }
 
+static uint32_t get_fx_2_type_size(const struct hlsl_type *type)
+{
+    uint32_t size = 0, elements_count;
+    size_t i;
+
+    if (type->class == HLSL_CLASS_ARRAY)
+    {
+        elements_count = hlsl_get_multiarray_size(type);
+        type = hlsl_get_multiarray_element_type(type);
+        return get_fx_2_type_size(type) * elements_count;
+    }
+    else if (type->class == HLSL_CLASS_STRUCT)
+    {
+        for (i = 0; i < type->e.record.field_count; ++i)
+        {
+            const struct hlsl_struct_field *field = &type->e.record.fields[i];
+            size += get_fx_2_type_size(field->type);
+        }
+
+        return size;
+    }
+
+    return type->dimx * type->dimy * sizeof(float);
+}
+
+static uint32_t write_fx_2_initial_value(const struct hlsl_ir_var *var, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    const struct hlsl_type *type = var->data_type;
+    uint32_t i, offset, size, elements_count = 1;
+
+    size = get_fx_2_type_size(type);
+
+    if (type->class == HLSL_CLASS_ARRAY)
+    {
+        elements_count = hlsl_get_multiarray_size(type);
+        type = hlsl_get_multiarray_element_type(type);
+    }
+
+    if (type->class == HLSL_CLASS_OBJECT)
+    {
+        /* Objects are given sequential ids. */
+        offset = put_u32(buffer, fx->object_variable_count++);
+        for (i = 1; i < elements_count; ++i)
+            put_u32(buffer, fx->object_variable_count++);
+    }
+    else
+    {
+        /* FIXME: write actual initial value */
+        offset = put_u32(buffer, 0);
+
+        for (i = 1; i < size / sizeof(uint32_t); ++i)
+            put_u32(buffer, 0);
+    }
+
+    return offset;
+}
+
+static void write_fx_2_parameters(struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->structured;
+    uint32_t desc_offset, value_offset;
+    struct hlsl_ir_var *var;
+
+    LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    {
+        desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
+        value_offset = write_fx_2_initial_value(var, fx);
+
+        put_u32(buffer, desc_offset); /* Parameter description */
+        put_u32(buffer, value_offset); /* Value */
+        put_u32(buffer, 0); /* Flags */
+
+        put_u32(buffer, 0); /* Annotations count */
+        /* FIXME: write annotations */
+
+        ++fx->parameter_count;
+    }
+}
+
 static const struct fx_write_context_ops fx_2_ops =
 {
     .write_string = write_fx_2_string,
@@ -644,9 +792,9 @@ static const struct fx_write_context_ops fx_2_ops =
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
+    uint32_t offset, size, technique_count, parameter_count;
     struct vkd3d_bytecode_buffer buffer = { 0 };
     struct vkd3d_bytecode_buffer *structured;
-    uint32_t offset, size, technique_count;
     struct fx_write_context fx;
 
     fx_write_context_init(ctx, &fx_2_ops, &fx);
@@ -658,12 +806,13 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0xfeff0901); /* Version. */
     offset = put_u32(&buffer, 0);
 
-    put_u32(structured, 0); /* Parameter count */
+    parameter_count = put_u32(structured, 0); /* Parameter count */
     technique_count = put_u32(structured, 0);
     put_u32(structured, 0); /* Unknown */
     put_u32(structured, 0); /* Object count */
 
-    /* TODO: parameters */
+    write_fx_2_parameters(&fx);
+    set_u32(structured, parameter_count, fx.parameter_count);
 
     write_techniques(ctx->globals, &fx);
     set_u32(structured, technique_count, fx.technique_count);

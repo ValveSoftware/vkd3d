@@ -1494,12 +1494,12 @@ static uint32_t sm1_version(enum vkd3d_shader_type type, unsigned int major, uns
         return D3DPS_VERSION(major, minor);
 }
 
-static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
+D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
 {
     switch (type->class)
     {
         case HLSL_CLASS_ARRAY:
-            return sm1_class(type->e.array.type);
+            return hlsl_sm1_class(type->e.array.type);
         case HLSL_CLASS_MATRIX:
             assert(type->modifiers & HLSL_MODIFIERS_MAJORITY_MASK);
             if (type->modifiers & HLSL_MODIFIER_COLUMN_MAJOR)
@@ -1520,7 +1520,7 @@ static D3DXPARAMETER_CLASS sm1_class(const struct hlsl_type *type)
     }
 }
 
-static D3DXPARAMETER_TYPE sm1_base_type(const struct hlsl_type *type)
+D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
 {
     switch (type->base_type)
     {
@@ -1615,7 +1615,7 @@ static void write_sm1_type(struct vkd3d_bytecode_buffer *buffer, struct hlsl_typ
         }
     }
 
-    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(sm1_class(type), sm1_base_type(array_type)));
+    type->bytecode_offset = put_u32(buffer, vkd3d_make_u32(hlsl_sm1_class(type), hlsl_sm1_base_type(array_type)));
     put_u32(buffer, vkd3d_make_u32(type->dimy, type->dimx));
     put_u32(buffer, vkd3d_make_u32(array_size, field_count));
     put_u32(buffer, fields_offset);

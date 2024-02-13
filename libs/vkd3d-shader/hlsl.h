@@ -1363,6 +1363,8 @@ bool hlsl_fold_constant_swizzles(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
 bool hlsl_transform_ir(struct hlsl_ctx *ctx, bool (*func)(struct hlsl_ctx *ctx, struct hlsl_ir_node *, void *),
         struct hlsl_block *block, void *context);
 
+D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type);
+D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type);
 bool hlsl_sm1_register_from_semantic(struct hlsl_ctx *ctx, const struct hlsl_semantic *semantic,
         bool output, D3DSHADER_PARAM_REGISTER_TYPE *type, unsigned int *reg);
 bool hlsl_sm1_usage_from_semantic(const struct hlsl_semantic *semantic, D3DDECLUSAGE *usage, uint32_t *usage_idx);
