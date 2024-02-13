@@ -1,0 +1,76 @@
+[require]
+shader model >= 5.0
+
+[uav 1]
+format r32 uint
+size (buffer, 7)
+
+0xd 5 6 0x10 4 4 7
+
+[compute shader todo]
+RWBuffer<uint> u : register(u1);
+
+uniform uint4 v;
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    InterlockedAnd(u[0], v.x);
+    InterlockedCompareStore(u[1], v.y, v.x);
+    InterlockedAdd(u[2], v.x);
+    InterlockedOr(u[3], v.x);
+    InterlockedMax(u[4], v.x);
+    InterlockedMin(u[5], v.x);
+    InterlockedXor(u[6], v.x);
+}
+
+[test]
+uniform 0 uint4 3 5 0 0
+todo dispatch 1 1 1
+probe uav 1 (0) rui (1)
+probe uav 1 (1) rui (3)
+probe uav 1 (2) rui (15)
+probe uav 1 (3) rui (0x13)
+probe uav 1 (4) rui (4)
+probe uav 1 (5) rui (3)
+probe uav 1 (6) rui (4)
+
+uniform 0 uint4 1 2 0 0
+todo dispatch 2 1 1
+probe uav 1 (0) rui (1)
+probe uav 1 (1) rui (3)
+probe uav 1 (2) rui (21)
+probe uav 1 (3) rui (0x13)
+probe uav 1 (4) rui (4)
+probe uav 1 (5) rui (1)
+probe uav 1 (6) rui (4)
+
+
+[uav 2]
+format r32 sint
+size (buffer, 2)
+
+-3 1
+
+[compute shader todo]
+RWBuffer<int> u : register(u2);
+
+uniform int4 i;
+
+    [numthreads(3, 1, 1)]
+void main()
+{
+    InterlockedMax(u[0], i.x);
+    InterlockedMin(u[1], i.y);
+}
+
+[test]
+uniform 0 int4 1 -3 0 0
+todo dispatch 1 1 1
+probe uav 2 (0) ri (1)
+probe uav 2 (1) ri (-3)
+
+uniform 0 int4 -3 1 0 0
+todo dispatch 1 1 1
+probe uav 2 (0) ri (1)
+probe uav 2 (1) ri (-3)
