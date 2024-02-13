@@ -5114,7 +5114,8 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
     src_param_init_from_value(&src_param[0], ptr);
     src_param->reg.alignment = alignment;
 
