@@ -5274,7 +5274,8 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
     src_param_init_from_value(&src_param[0], src);
 
     dst_param = instruction_dst_params_alloc(ins, 1, sm6);
