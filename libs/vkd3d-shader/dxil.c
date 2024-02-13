@@ -4266,7 +4266,8 @@ static void sm6_parser_emit_dx_texture_load(struct sm6_parser *sm6, enum dx_intr
     for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
         ins->resource_data_type[i] = resource->u.handle.d->resource_data_type;
 
-    src_params = instruction_src_params_alloc(ins, 2 + is_multisample, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 2 + is_multisample, sm6)))
+        return;
     src_param_init_vector_from_reg(&src_params[0], &coord);
     src_param_init_vector_from_reg(&src_params[1], &resource->u.handle.reg);
     if (is_multisample)
