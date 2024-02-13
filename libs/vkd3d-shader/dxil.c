@@ -3935,7 +3935,8 @@ static void sm6_parser_emit_dx_tertiary(struct sm6_parser *sm6, enum dx_intrinsi
     unsigned int i;
 
     vsir_instruction_init(ins, &sm6->p.location, sm6_dx_map_tertiary_op(op));
-    src_params = instruction_src_params_alloc(ins, 3, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+        return;
     for (i = 0; i < 3; ++i)
         src_param_init_from_value(&src_params[i], operands[i]);
 
