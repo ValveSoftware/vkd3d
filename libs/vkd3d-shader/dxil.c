@@ -5395,7 +5395,8 @@ static void sm6_parser_emit_vselect(struct sm6_parser *sm6, const struct dxil_re
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOVC);
 
-    src_params = instruction_src_params_alloc(ins, 3, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+        return;
     for (i = 0; i < 3; ++i)
         src_param_init_from_value(&src_params[i], src[i]);
 
