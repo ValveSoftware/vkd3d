@@ -4903,7 +4903,8 @@ static void sm6_parser_emit_cmp2(struct sm6_parser *sm6, const struct dxil_recor
                 "Ignoring flags %#"PRIx64" for a comparison operation.", flags);
     }
 
-    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
     src_param_init_from_value(&src_params[0 ^ cmp->src_swap], a);
     src_param_init_from_value(&src_params[1 ^ cmp->src_swap], b);
 
