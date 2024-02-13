@@ -3838,7 +3838,8 @@ static void sm6_parser_emit_dx_cbuffer_load(struct sm6_parser *sm6, enum dx_intr
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    src_param = instruction_src_params_alloc(ins, 1, sm6);
+    if (!(src_param = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
     src_param_init_vector_from_reg(src_param, &buffer->u.handle.reg);
     register_index_address_init(&src_param->reg.idx[2], operands[1], sm6);
     assert(src_param->reg.idx_count == 3);
