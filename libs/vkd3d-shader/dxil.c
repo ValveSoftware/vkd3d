@@ -4047,7 +4047,8 @@ static void sm6_parser_emit_dx_buffer_load(struct sm6_parser *sm6, enum dx_intri
     instruction_init_with_resource(ins, (resource->u.handle.d->type == VKD3D_SHADER_DESCRIPTOR_TYPE_UAV)
             ? VKD3DSIH_LD_UAV_TYPED : VKD3DSIH_LD, resource, sm6);
 
-    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
     src_param_init_from_value(&src_params[0], operands[1]);
     if (!sm6_value_is_undef(operands[2]))
     {
