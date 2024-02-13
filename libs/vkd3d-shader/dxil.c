@@ -3529,7 +3529,8 @@ static void sm6_parser_emit_binop(struct sm6_parser *sm6, const struct dxil_reco
                 "Ignoring flags %#"PRIx64" for a binary operation.", flags);
     }
 
-    src_params = instruction_src_params_alloc(ins, 2, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
     src_param_init_from_value(&src_params[0], a);
     src_param_init_from_value(&src_params[1], b);
     if (code == BINOP_SUB)
