@@ -616,3 +616,36 @@ if(sm<4)  uniform 0 float4 1 0 3 1
 if(sm>=4) uniform 0 uint4 1 0 3 1
 draw quad
 probe all rgba (3.0, 4.0, 5.0, 6.0)
+
+[require]
+shader model >= 6.0
+
+[pixel shader]
+uint64_t2 v;
+
+float4 main() : sv_target
+{
+    // Need three cases because dxcompiler optimises two case values to a pair of vselect instructions.
+    switch (v.x)
+    {
+    case 0:
+        return 3.0;
+    case 0x100000002:
+        return 4.0;
+    case 3:
+        return 2.0;
+    default:
+        return 5.0;
+    }
+}
+
+[test]
+uniform 0 uint64_t2 2 0
+draw quad
+probe all rgba (5.0, 5.0, 5.0, 5.0)
+uniform 0 uint64_t2 0x100000002 0
+draw quad
+probe all rgba (4.0, 4.0, 4.0, 4.0)
+uniform 0 uint64_t2 0 0
+draw quad
+probe all rgba (3.0, 3.0, 3.0, 3.0)
