@@ -103,6 +103,7 @@ enum bitcode_constant_code
     CST_CODE_INTEGER         =  4,
     CST_CODE_FLOAT           =  6,
     CST_CODE_STRING          =  8,
+    CST_CODE_CE_CAST         = 11,
     CST_CODE_CE_GEP          = 12,
     CST_CODE_CE_INBOUNDS_GEP = 20,
     CST_CODE_DATA            = 22,
@@ -2217,6 +2218,11 @@ static bool sm6_value_is_ssa(const struct sm6_value *value)
     return sm6_value_is_register(value) && register_is_ssa(&value->u.reg);
 }
 
+static bool sm6_value_is_numeric_array(const struct sm6_value *value)
+{
+    return sm6_value_is_register(value) && register_is_numeric_array(&value->u.reg);
+}
+
 static inline unsigned int sm6_value_get_constant_uint(const struct sm6_value *value)
 {
     if (!sm6_value_is_constant(value))
@@ -3099,15 +3105,16 @@ static enum vkd3d_result sm6_parser_init_constexpr_gep(struct sm6_parser *sm6, c
 static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const struct dxil_block *block)
 {
     enum vkd3d_shader_register_type reg_type = VKD3DSPR_INVALID;
-    const struct sm6_type *type, *elem_type;
+    const struct sm6_type *type, *elem_type, *ptr_type;
+    size_t i, base_value_idx, value_idx;
     enum vkd3d_data_type reg_data_type;
     const struct dxil_record *record;
+    const struct sm6_value *src;
     enum vkd3d_result ret;
     struct sm6_value *dst;
-    size_t i, value_idx;
     uint64_t value;
 
-    for (i = 0, type = NULL; i < block->record_count; ++i)
+    for (i = 0, type = NULL, base_value_idx = sm6->value_count; i < block->record_count; ++i)
     {
         sm6->p.location.column = i;
         record = block->records[i];
@@ -3223,6 +3230,48 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
                     return ret;
                 break;
 
+            case CST_CODE_CE_CAST:
+                if (!dxil_record_validate_operand_count(record, 3, 3, sm6))
+                    return VKD3D_ERROR_INVALID_SHADER;
+
+                if ((value = record->operands[0]) != CAST_BITCAST)
+                {
+                    WARN("Unhandled constexpr cast op %"PRIu64".\n", value);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Constexpr cast op %"PRIu64" is unhandled.", value);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                ptr_type = sm6_parser_get_type(sm6, record->operands[1]);
+                if (!sm6_type_is_pointer(ptr_type))
+                {
+                    WARN("Constexpr cast at constant idx %zu is not a pointer.\n", value_idx);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Constexpr cast source operand is not a pointer.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                if ((value = record->operands[2]) >= sm6->cur_max_value)
+                {
+                    WARN("Invalid value index %"PRIu64".\n", value);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Invalid value index %"PRIu64".", value);
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+                else if (value == value_idx)
+                {
+                    WARN("Invalid value self-reference at %"PRIu64".\n", value);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                            "Invalid value self-reference for a constexpr cast.");
+                    return VKD3D_ERROR_INVALID_SHADER;
+                }
+
+                /* Resolve later in case forward refs exist. */
+                dst->type = type;
+                dst->u.reg.type = VKD3DSPR_COUNT;
+                dst->u.reg.idx[0].offset = value;
+                break;
+
             case CST_CODE_UNDEF:
                 dxil_record_validate_operand_max_count(record, 0, sm6);
                 dst->u.reg.type = VKD3DSPR_UNDEF;
@@ -3246,6 +3295,29 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
         }
 
         ++sm6->value_count;
+    }
+
+    /* Resolve cast forward refs. */
+    for (i = base_value_idx; i < sm6->value_count; ++i)
+    {
+        dst = &sm6->values[i];
+        if (dst->u.reg.type != VKD3DSPR_COUNT)
+            continue;
+
+        type = dst->type;
+
+        src = &sm6->values[dst->u.reg.idx[0].offset];
+        if (!sm6_value_is_numeric_array(src))
+        {
+            WARN("Value is not an array.\n");
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                    "Constexpr cast source value is not a global array element.");
+            return VKD3D_ERROR_INVALID_SHADER;
+        }
+
+        *dst = *src;
+        dst->type = type;
+        dst->u.reg.data_type = vkd3d_data_type_from_sm6_type(type->u.pointer.type);
     }
 
     return VKD3D_OK;

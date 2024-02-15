@@ -1241,6 +1241,12 @@ static inline bool register_is_scalar_constant_zero(const struct vkd3d_shader_re
             && (data_type_is_64_bit(reg->data_type) ? !reg->u.immconst_u64[0] : !reg->u.immconst_u32[0]);
 }
 
+static inline bool register_is_numeric_array(const struct vkd3d_shader_register *reg)
+{
+    return (reg->type == VKD3DSPR_IMMCONSTBUFFER || reg->type == VKD3DSPR_IDXTEMP
+            || reg->type == VKD3DSPR_GROUPSHAREDMEM);
+}
+
 static inline bool vsir_register_is_label(const struct vkd3d_shader_register *reg)
 {
     return reg->type == VKD3DSPR_LABEL;
