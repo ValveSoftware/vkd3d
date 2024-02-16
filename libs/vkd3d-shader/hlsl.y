@@ -1915,13 +1915,19 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
         }
     }
 
-    if (lhs->type == HLSL_IR_INDEX && hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
+    if (lhs->type == HLSL_IR_INDEX && hlsl_index_chain_has_resource_access(hlsl_ir_index(lhs)))
     {
         struct hlsl_ir_node *coords = hlsl_ir_index(lhs)->idx.node;
         struct hlsl_deref resource_deref;
         struct hlsl_type *resource_type;
         struct hlsl_ir_node *store;
         unsigned int dim_count;
+
+        if (!hlsl_index_is_resource_access(hlsl_ir_index(lhs)))
+        {
+            hlsl_fixme(ctx, &lhs->loc, "Non-direct structured resource store.");
+            return NULL;
+        }
 
         if (!hlsl_init_deref_from_index_chain(ctx, &resource_deref, hlsl_ir_index(lhs)->val.node))
             return NULL;

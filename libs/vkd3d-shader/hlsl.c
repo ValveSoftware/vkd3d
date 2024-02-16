@@ -1554,6 +1554,15 @@ bool hlsl_index_is_resource_access(struct hlsl_ir_index *index)
     return index->val.node->data_type->class == HLSL_CLASS_OBJECT;
 }
 
+bool hlsl_index_chain_has_resource_access(struct hlsl_ir_index *index)
+{
+    if (hlsl_index_is_resource_access(index))
+        return true;
+    if (index->val.node->type == HLSL_IR_INDEX)
+        return hlsl_index_chain_has_resource_access(hlsl_ir_index(index->val.node));
+    return false;
+}
+
 struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *val,
         struct hlsl_ir_node *idx, const struct vkd3d_shader_location *loc)
 {

@@ -108,3 +108,18 @@ float4 main() : sv_target1
 {
     return 0;
 }
+
+
+[pixel shader todo]
+struct apple
+{
+    float3 a, x;
+};
+
+RWStructuredBuffer<apple> u;
+
+float4 main() : sv_target
+{
+    u[0].x = float3(30.0, 40.0, 50.0);
+    return 0;
+}
