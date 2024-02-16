@@ -199,10 +199,12 @@ enum dxil_resource_kind
     RESOURCE_KIND_FEEDBACKTEXTURE2DARRAY  = 18,
 };
 
-enum dxil_resource_type
+enum dxil_resource_tag
 {
-    RESOURCE_TYPE_NON_RAW_STRUCTURED = 0,
-    RESOURCE_TYPE_RAW_STRUCTURED     = 1,
+    RESOURCE_TAG_ELEMENT_TYPE          = 0,
+    RESOURCE_TAG_ELEMENT_STRIDE        = 1,
+    RESOURCE_TAG_SAMPLER_FEEDBACK_KIND = 2,
+    RESOURCE_TAG_ENABLE_ATOMIC_64      = 3,
 };
 
 enum dxil_component_type
@@ -6673,15 +6675,97 @@ static enum vkd3d_data_type vkd3d_data_type_from_dxil_component_type(enum dxil_c
     return data_type;
 }
 
+struct resource_additional_values
+{
+    enum vkd3d_data_type data_type;
+    unsigned int byte_stride;
+};
+
+static bool resources_load_additional_values(struct resource_additional_values *info,
+        const struct sm6_metadata_node *node, enum dxil_resource_kind kind, struct sm6_parser *sm6)
+{
+    unsigned int i, operand_count, tag, value;
+
+    info->data_type = VKD3D_DATA_UNUSED;
+    info->byte_stride = 0;
+
+    if (node->operand_count & 1)
+    {
+        WARN("Operand count is not even.\n");
+        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                "Operand count for resource descriptor tag/value pairs is not even.");
+    }
+    operand_count = node->operand_count & ~1u;
+
+    for (i = 0; i < operand_count; i += 2)
+    {
+        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &tag)
+                || !sm6_metadata_get_uint_value(sm6, node->operands[i + 1], &value))
+        {
+            WARN("Failed to load tag/value pair at index %u.\n", i);
+            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                    "Resource descriptor tag/value pair at index %u is not an integer pair.", i);
+            return false;
+        }
+
+        switch (tag)
+        {
+            case RESOURCE_TAG_ELEMENT_TYPE:
+                if (value && kind != RESOURCE_KIND_TYPEDBUFFER && !resource_kind_is_texture(kind))
+                {
+                    WARN("Invalid type %u for an untyped resource.\n", value);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                            "An untyped resource has type %u.", value);
+                    return false;
+                }
+                info->data_type = vkd3d_data_type_from_dxil_component_type(value, sm6);
+                break;
+
+            case RESOURCE_TAG_ELEMENT_STRIDE:
+                if (value && kind != RESOURCE_KIND_STRUCTUREDBUFFER)
+                {
+                    WARN("Invalid stride %u for an unstructured resource.\n", value);
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                            "An unstructured resource has a byte stride.");
+                    return false;
+                }
+                info->byte_stride = value;
+                break;
+
+            case RESOURCE_TAG_SAMPLER_FEEDBACK_KIND:
+                /* MinMip = 0, MipRegionUsed = 1 */
+                FIXME("Unhandled sampler feedback kind %u.\n", value);
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                        "Sampler feedback kind %u is unhandled.", value);
+                break;
+
+            case RESOURCE_TAG_ENABLE_ATOMIC_64:
+                if (value)
+                {
+                    FIXME("Unsupported 64-bit atomic ops.\n");
+                    vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
+                            "64-bit atomic ops on resources are not supported.");
+                }
+                break;
+
+            default:
+                FIXME("Unhandled tag %u, value %u.\n", tag, value);
+                vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
+                        "Tag %u for resource descriptor additional value %u is unhandled.", tag, value);
+                break;
+        }
+    }
+
+    return true;
+}
+
 static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struct sm6_parser *sm6,
         const struct sm6_metadata_value *type_value, bool is_uav, enum dxil_resource_kind kind,
         const struct sm6_metadata_value *m, struct vkd3d_shader_instruction *ins)
 {
+    struct resource_additional_values resource_values;
     enum vkd3d_shader_resource_type resource_type;
-    enum dxil_resource_type dxil_resource_type;
-    const struct sm6_metadata_node *node;
-    enum vkd3d_data_type data_type;
-    unsigned int i, values[2];
+    unsigned int i;
 
     if (!(resource_type = shader_resource_type_from_dxil_resource_kind(kind)))
     {
@@ -6707,72 +6791,37 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
         return NULL;
     }
 
-    node = m->u.node;
-
-    if (node->operand_count < 2)
-    {
-        WARN("Invalid operand count %u.\n", node->operand_count);
-        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND_COUNT,
-                "Invalid operand count %u for a resource descriptor.", node->operand_count);
+    if (!resources_load_additional_values(&resource_values, m->u.node, kind, sm6))
         return NULL;
-    }
-    if (node->operand_count > 2)
-    {
-        WARN("Ignoring %u extra operands.\n", node->operand_count - 2);
-        vkd3d_shader_parser_warning(&sm6->p, VKD3D_SHADER_WARNING_DXIL_IGNORING_OPERANDS,
-                "Ignoring %u extra operands for a resource descriptor.", node->operand_count - 2);
-    }
 
-    for (i = 0; i < 2; ++i)
+    if (kind == RESOURCE_KIND_TYPEDBUFFER || resource_kind_is_texture(kind))
     {
-        if (!sm6_metadata_get_uint_value(sm6, node->operands[i], &values[i]))
+        if (resource_values.data_type == VKD3D_DATA_UNUSED)
         {
-            WARN("Failed to load uint value at index %u.\n", i);
+            WARN("No data type defined.\n");
             vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
-                    "A resource descriptor operand metadata value is not an integer.");
-            return NULL;
-        }
-    }
-
-    if ((dxil_resource_type = values[0]) == RESOURCE_TYPE_NON_RAW_STRUCTURED)
-    {
-        if (kind != RESOURCE_KIND_TYPEDBUFFER && !resource_kind_is_texture(kind))
-        {
-            WARN("Unhandled resource kind %u.\n", kind);
-            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
-                    "Resource kind %u for a typed resource is unhandled.", kind);
-            return NULL;
+                    "A typed resource has no data type.");
         }
 
-        data_type = vkd3d_data_type_from_dxil_component_type(values[1], sm6);
         ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_TYPED : VKD3DSIH_DCL;
         for (i = 0; i < VKD3D_VEC4_SIZE; ++i)
-            ins->declaration.semantic.resource_data_type[i] = data_type;
+            ins->declaration.semantic.resource_data_type[i] = resource_values.data_type;
         ins->declaration.semantic.resource_type = resource_type;
         ins->declaration.semantic.resource.reg.write_mask = VKD3DSP_WRITEMASK_ALL;
 
         return &ins->declaration.semantic.resource;
     }
-    else if (dxil_resource_type == RESOURCE_TYPE_RAW_STRUCTURED)
+    else if (kind == RESOURCE_KIND_RAWBUFFER)
     {
-        if (kind == RESOURCE_KIND_RAWBUFFER)
-        {
-            ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
-            ins->declaration.raw_resource.resource.reg.write_mask = 0;
+        ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_RAW : VKD3DSIH_DCL_RESOURCE_RAW;
+        ins->declaration.raw_resource.resource.reg.write_mask = 0;
 
-            return &ins->declaration.raw_resource.resource;
-        }
-
-        if (kind != RESOURCE_KIND_STRUCTUREDBUFFER)
-        {
-            WARN("Unhandled resource kind %u.\n", kind);
-            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
-                    "Resource kind %u for a raw or structured buffer is unhandled.", kind);
-            return NULL;
-        }
-
+        return &ins->declaration.raw_resource.resource;
+    }
+    else if (kind == RESOURCE_KIND_STRUCTUREDBUFFER)
+    {
         ins->handler_idx = is_uav ? VKD3DSIH_DCL_UAV_STRUCTURED : VKD3DSIH_DCL_RESOURCE_STRUCTURED;
-        ins->declaration.structured_resource.byte_stride = values[1];
+        ins->declaration.structured_resource.byte_stride = resource_values.byte_stride;
         ins->declaration.structured_resource.resource.reg.write_mask = 0;
 
         /* TODO: 16-bit resources. */
@@ -6788,9 +6837,9 @@ static struct vkd3d_shader_resource *sm6_parser_resources_load_common_info(struc
     }
     else
     {
-        FIXME("Unhandled resource type %u.\n", dxil_resource_type);
+        FIXME("Unhandled resource kind %u.\n", kind);
         vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_RESOURCES,
-                "Resource type %u is unhandled.", dxil_resource_type);
+                "Resource kind %u is unhandled.", kind);
     }
 
     return NULL;
