@@ -1942,7 +1942,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
 
         dim_count = hlsl_sampler_dim_count(resource_type->sampler_dim);
 
-        if (writemask != ((1u << resource_type->e.resource_format->dimx) - 1))
+        if (writemask != ((1u << resource_type->e.resource.format->dimx) - 1))
             hlsl_error(ctx, &lhs->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_WRITEMASK,
                     "Resource store expressions must write to all components.");
 
@@ -4308,7 +4308,7 @@ static bool add_load_method_call(struct hlsl_ctx *ctx, struct hlsl_block *block,
             hlsl_get_vector_type(ctx, HLSL_TYPE_INT, sampler_dim + !multisampled), loc)))
         return false;
 
-    load_params.format = object_type->e.resource_format;
+    load_params.format = object_type->e.resource.format;
     load_params.resource = object;
 
     if (!(load = hlsl_new_resource_load(ctx, &load_params, loc)))
@@ -4366,7 +4366,7 @@ static bool add_sample_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
     if (params->args_count > 3 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-    load_params.format = object_type->e.resource_format;
+    load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
 
@@ -4436,7 +4436,7 @@ static bool add_sample_cmp_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     if (params->args_count > 4 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-    load_params.format = object_type->e.resource_format;
+    load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
 
@@ -4526,7 +4526,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
         return false;
     }
 
-    if (read_channel >= object_type->e.resource_format->dimx)
+    if (read_channel >= object_type->e.resource.format->dimx)
     {
         hlsl_error(ctx, loc, VKD3D_SHADER_ERROR_HLSL_INVALID_TYPE,
                 "Method %s() requires at least %u channels.", name, read_channel + 1);
@@ -4537,7 +4537,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         return false;
 
-    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource_format->base_type, 4);
+    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->base_type, 4);
     load_params.resource = object;
     load_params.sampler = params->args[0];
 
@@ -4781,7 +4781,7 @@ static bool add_sample_lod_method_call(struct hlsl_ctx *ctx, struct hlsl_block *
     if (params->args_count > 3 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-    load_params.format = object_type->e.resource_format;
+    load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
 
@@ -4848,7 +4848,7 @@ static bool add_sample_grad_method_call(struct hlsl_ctx *ctx, struct hlsl_block 
     if (params->args_count > 4 + !!offset_dim)
         hlsl_fixme(ctx, loc, "Tiled resource status argument.");
 
-    load_params.format = object_type->e.resource_format;
+    load_params.format = object_type->e.resource.format;
     load_params.resource = object;
     load_params.sampler = params->args[0];
 

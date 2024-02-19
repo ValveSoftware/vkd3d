@@ -194,9 +194,13 @@ struct hlsl_type
             /* Array length, or HLSL_ARRAY_ELEMENTS_COUNT_IMPLICIT if it is not known yet at parse time. */
             unsigned int elements_count;
         } array;
-        /* Format of the data contained within the type if the base_type is HLSL_TYPE_TEXTURE or
-         *   HLSL_TYPE_UAV. */
-        struct hlsl_type *resource_format;
+        /* Additional information if the base_type is HLSL_TYPE_TEXTURE or
+         * HLSL_TYPE_UAV. */
+        struct
+        {
+            /* Format of the data contained within the type. */
+            struct hlsl_type *format;
+        } resource;
         /* Additional field to distinguish object types. Currently used only for technique types. */
         unsigned int version;
     } e;

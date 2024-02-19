@@ -3156,7 +3156,7 @@ static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type
     if (type->class == HLSL_CLASS_ARRAY)
         return sm4_resource_format(type->e.array.type);
 
-    switch (type->e.resource_format->base_type)
+    switch (type->e.resource.format->base_type)
     {
         case HLSL_TYPE_DOUBLE:
             return D3D_RETURN_TYPE_DOUBLE;
@@ -3446,7 +3446,7 @@ static void write_sm4_rdef(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
         }
         else
         {
-            unsigned int dimx = hlsl_type_get_component_type(ctx, resource->data_type, 0)->e.resource_format->dimx;
+            unsigned int dimx = hlsl_type_get_component_type(ctx, resource->data_type, 0)->e.resource.format->dimx;
 
             put_u32(&buffer, sm4_resource_format(resource->data_type));
             put_u32(&buffer, sm4_rdef_resource_dimension(resource->data_type));
@@ -4253,7 +4253,7 @@ static void write_sm4_dcl_textures(const struct tpf_writer *tpf, const struct ex
             {
             case HLSL_SAMPLER_DIM_STRUCTURED_BUFFER:
                 instr.opcode = VKD3D_SM5_OP_DCL_UAV_STRUCTURED;
-                instr.byte_stride = resource->data_type->e.resource_format->reg_size[HLSL_REGSET_NUMERIC] * 4;
+                instr.byte_stride = resource->data_type->e.resource.format->reg_size[HLSL_REGSET_NUMERIC] * 4;
                 break;
             default:
                 instr.opcode = VKD3D_SM5_OP_DCL_UAV_TYPED;

@@ -1107,7 +1107,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         params.type = HLSL_RESOURCE_LOAD;
         params.resource = val;
         params.coords = coords;
-        params.format = val->data_type->e.resource_format;
+        params.format = val->data_type->e.resource.format;
 
         if (!(resource_load = hlsl_new_resource_load(ctx, &params, &instr->loc)))
             return false;
