@@ -6263,12 +6263,12 @@ type_no_void:
     | uav_type '<' type '>'
         {
             validate_uav_type(ctx, $1, $3, &@3);
-            $$ = hlsl_new_uav_type(ctx, $1, $3, 0);
+            $$ = hlsl_new_uav_type(ctx, $1, $3, false);
         }
     | rov_type '<' type '>'
         {
             validate_uav_type(ctx, $1, $3, &@3);
-            $$ = hlsl_new_uav_type(ctx, $1, $3, HLSL_MODIFIER_RASTERIZER_ORDERED);
+            $$ = hlsl_new_uav_type(ctx, $1, $3, true);
         }
     | TYPE_IDENTIFIER
         {

@@ -758,8 +758,8 @@ struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_
     return type;
 }
 
-struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx,
-        enum hlsl_sampler_dim dim, struct hlsl_type *format, uint32_t modifiers)
+struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
+        struct hlsl_type *format, bool rasteriser_ordered)
 {
     struct hlsl_type *type;
 
@@ -770,8 +770,8 @@ struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx,
     type->dimx = format->dimx;
     type->dimy = 1;
     type->sampler_dim = dim;
-    type->modifiers = modifiers;
     type->e.resource.format = format;
+    type->e.resource.rasteriser_ordered = rasteriser_ordered;
     hlsl_type_calculate_reg_size(ctx, type);
     list_add_tail(&ctx->types, &type->entry);
     return type;
@@ -889,6 +889,8 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
             return false;
         if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
                 && !hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format))
+            return false;
+        if (t1->base_type == HLSL_TYPE_UAV && t1->e.resource.rasteriser_ordered != t2->e.resource.rasteriser_ordered)
             return false;
     }
     if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
@@ -1009,7 +1011,10 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
             if (type->base_type == HLSL_TYPE_TECHNIQUE)
                 type->e.version = old->e.version;
             if (old->base_type == HLSL_TYPE_TEXTURE || old->base_type == HLSL_TYPE_UAV)
+            {
                 type->e.resource.format = old->e.resource.format;
+                type->e.resource.rasteriser_ordered = old->e.resource.rasteriser_ordered;
+            }
             break;
 
         default:

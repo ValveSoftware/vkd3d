@@ -200,6 +200,8 @@ struct hlsl_type
         {
             /* Format of the data contained within the type. */
             struct hlsl_type *format;
+            /* The type is a rasteriser-ordered view. */
+            bool rasteriser_ordered;
         } resource;
         /* Additional field to distinguish object types. Currently used only for technique types. */
         unsigned int version;
@@ -370,11 +372,10 @@ struct hlsl_attribute
 #define HLSL_STORAGE_CENTROID            0x00004000
 #define HLSL_STORAGE_NOPERSPECTIVE       0x00008000
 #define HLSL_STORAGE_LINEAR              0x00010000
-#define HLSL_MODIFIER_RASTERIZER_ORDERED 0x00020000
 
 #define HLSL_TYPE_MODIFIERS_MASK     (HLSL_MODIFIER_PRECISE | HLSL_MODIFIER_VOLATILE | \
                                       HLSL_MODIFIER_CONST | HLSL_MODIFIER_ROW_MAJOR | \
-                                      HLSL_MODIFIER_COLUMN_MAJOR | HLSL_MODIFIER_RASTERIZER_ORDERED)
+                                      HLSL_MODIFIER_COLUMN_MAJOR)
 
 #define HLSL_INTERPOLATION_MODIFIERS_MASK (HLSL_STORAGE_NOINTERPOLATION | HLSL_STORAGE_CENTROID | \
                                            HLSL_STORAGE_NOPERSPECTIVE | HLSL_STORAGE_LINEAR)
@@ -1282,8 +1283,8 @@ struct hlsl_ir_var *hlsl_new_synthetic_var_named(struct hlsl_ctx *ctx, const cha
     struct hlsl_type *type, const struct vkd3d_shader_location *loc, bool dummy_scope);
 struct hlsl_type *hlsl_new_texture_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim, struct hlsl_type *format,
         unsigned int sample_count);
-struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx,
-        enum hlsl_sampler_dim dim, struct hlsl_type *format, uint32_t modifiers);
+struct hlsl_type *hlsl_new_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
+        struct hlsl_type *format, bool rasteriser_ordered);
 struct hlsl_ir_node *hlsl_new_uint_constant(struct hlsl_ctx *ctx, unsigned int n,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_unary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg,
