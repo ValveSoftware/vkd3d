@@ -407,6 +407,7 @@ TEST_EXTENSIONS = .shader_test
 
 if BUILD_TESTS
 check_PROGRAMS = $(vkd3d_tests) $(vkd3d_cross_tests) tests/shader_runner
+dist_check_SCRIPTS = tests/test-driver.sh
 TESTS = $(vkd3d_tests) $(vkd3d_cross_tests) $(vkd3d_shader_tests)
 tests_d3d12_LDADD = $(LDADD) @PTHREAD_LIBS@ @DL_LIBS@
 tests_d3d12_invalid_usage_LDADD = $(LDADD) @DL_LIBS@
@@ -423,6 +424,7 @@ tests_shader_runner_SOURCES = \
 tests_vkd3d_api_LDADD = libvkd3d.la @DL_LIBS@
 tests_vkd3d_shader_api_LDADD = libvkd3d-shader.la
 SHADER_TEST_LOG_COMPILER = tests/shader_runner
+SHADER_TEST_LOG_DRIVER = $(srcdir)/tests/test-driver.sh
 endif
 
 EXTRA_DIST += $(vkd3d_shader_tests)
