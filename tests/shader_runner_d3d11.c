@@ -281,13 +281,11 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
     hr = ID3D11Device_CheckFeatureSupport(runner->device, D3D11_FEATURE_DOUBLES,
             &doubles, sizeof(doubles));
     ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
-    trace("DoublePrecisionFloatShaderOps: %u.\n", doubles.DoublePrecisionFloatShaderOps);
     runner->caps.float64 = doubles.DoublePrecisionFloatShaderOps;
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device,
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
-    trace("ROVsSupported: %u.\n", options2.ROVsSupported);
     runner->caps.rov = options2.ROVsSupported;
 
     rt_width = RENDER_TARGET_WIDTH;

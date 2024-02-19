@@ -246,9 +246,6 @@ static bool gl_runner_init(struct gl_runner *runner)
     trace("GL_RENDERER: %s\n", glGetString(GL_RENDERER));
     trace(" GL_VERSION: %s\n", glGetString(GL_VERSION));
 
-    trace("    float64: %u.\n", runner->caps.float64);
-    trace("      int64: %u.\n", runner->caps.int64);
-
     p_glSpecializeShader = (void *)eglGetProcAddress("glSpecializeShader");
 
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE);

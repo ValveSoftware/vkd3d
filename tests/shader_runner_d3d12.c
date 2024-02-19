@@ -627,11 +627,8 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
 
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options));
     ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
-    trace("DoublePrecisionFloatShaderOps: %u.\n", options.DoublePrecisionFloatShaderOps);
-    trace("ROVsSupported: %u.\n", options.ROVsSupported);
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1, &options1, sizeof(options1));
     ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
-    trace("Int64ShaderOps: %u.\n", options1.Int64ShaderOps);
 
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_5_1;

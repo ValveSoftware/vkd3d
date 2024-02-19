@@ -1375,13 +1375,11 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     ENABLE_FEATURE(shaderImageGatherExtended);
     ENABLE_FEATURE(shaderStorageImageWriteWithoutFormat);
 
-    trace("shaderFloat64: %u.\n", ret_features.shaderFloat64);
     if (ret_features.shaderFloat64)
     {
         features.shaderFloat64 = VK_TRUE;
         runner->caps.float64 = true;
     }
-    trace("shaderInt64: %u.\n", ret_features.shaderInt64);
     if (ret_features.shaderInt64)
     {
         features.shaderInt64 = VK_TRUE;

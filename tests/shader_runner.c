@@ -1338,6 +1338,10 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     const char *testname;
     FILE *f;
 
+    trace("   float64: %u.\n", caps->float64);
+    trace("     int64: %u.\n", caps->int64);
+    trace("       rov: %u.\n", caps->rov);
+
     if (!test_options.filename)
         fatal_error("No filename specified.\n");
 
