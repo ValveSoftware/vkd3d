@@ -117,6 +117,15 @@ struct input_element
 #define MAX_RESOURCES 32
 #define MAX_SAMPLERS 32
 
+struct shader_runner_caps
+{
+    enum shader_model minimum_shader_model;
+    enum shader_model maximum_shader_model;
+    bool float64;
+    bool int64;
+    bool rov;
+};
+
 struct shader_runner
 {
     const struct shader_runner_ops *ops;
@@ -152,9 +161,6 @@ struct shader_runner
 
 struct shader_runner_ops
 {
-    /* Returns false if unable to run the given tests. If NULL, all tests are
-     * run. */
-    bool (*check_requirements)(struct shader_runner *runner);
     struct resource *(*create_resource)(struct shader_runner *runner, const struct resource_params *params);
     void (*destroy_resource)(struct shader_runner *runner, struct resource *resource);
     bool (*draw)(struct shader_runner *runner, D3D_PRIMITIVE_TOPOLOGY primitive_topology, unsigned int vertex_count);
@@ -177,8 +183,8 @@ HRESULT dxc_compiler_compile_shader(void *dxc_compiler, enum shader_type type, u
 struct sampler *shader_runner_get_sampler(struct shader_runner *runner, unsigned int slot);
 struct resource *shader_runner_get_resource(struct shader_runner *runner, enum resource_type type, unsigned int slot);
 
-void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops, void *dxc_compiler,
-        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model);
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
+        const struct shader_runner_ops *ops, void *dxc_compiler);
 
 #ifdef _WIN32
 void run_shader_tests_d3d9(void);

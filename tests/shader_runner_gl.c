@@ -58,12 +58,7 @@ static struct gl_resource *gl_resource(struct resource *r)
 struct gl_runner
 {
     struct shader_runner r;
-
-    struct
-    {
-        bool float64;
-        bool int64;
-    } caps;
+    struct shader_runner_caps caps;
 
     EGLDisplay display;
     EGLContext context;
@@ -230,6 +225,8 @@ static bool gl_runner_init(struct gl_runner *runner)
             eglTerminate(display);
             continue;
         }
+        runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
+        runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
         trace("Using device %u.\n", i);
         runner->display = display;
@@ -287,20 +284,6 @@ static void gl_runner_cleanup(struct gl_runner *runner)
     ok(ret, "Failed to destroy EGL context.\n");
     ret = eglTerminate(runner->display);
     ok(ret, "Failed to terminate EGL display connection.\n");
-}
-
-static bool gl_runner_check_requirements(struct shader_runner *r)
-{
-    struct gl_runner *runner = gl_runner(r);
-
-    if (r->require_float64 && !runner->caps.float64)
-        return false;
-    if (r->require_int64 && !runner->caps.int64)
-        return false;
-    if (r->require_rov)
-        return false;
-
-    return true;
 }
 
 static const struct format_info *get_format_info(enum DXGI_FORMAT format)
@@ -1033,7 +1016,6 @@ static void gl_runner_release_readback(struct shader_runner *runner, struct reso
 
 static const struct shader_runner_ops gl_runner_ops =
 {
-    .check_requirements = gl_runner_check_requirements,
     .create_resource = gl_runner_create_resource,
     .destroy_resource = gl_runner_destroy_resource,
     .dispatch = gl_runner_dispatch,
@@ -1053,7 +1035,7 @@ void run_shader_tests_gl(void)
         goto done;
 
     trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with OpenGL\n");
-    run_shader_tests(&runner.r, &gl_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    run_shader_tests(&runner.r, &runner.caps, &gl_runner_ops, NULL);
     gl_runner_cleanup(&runner);
 done:
     vkd3d_test_name = test_name;

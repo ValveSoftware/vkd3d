@@ -65,15 +65,13 @@ static struct d3d11_resource *d3d11_resource(struct resource *r)
 struct d3d11_shader_runner
 {
     struct shader_runner r;
+    struct shader_runner_caps caps;
 
     ID3D11Device *device;
     HWND window;
     IDXGISwapChain *swapchain;
     ID3D11DeviceContext *immediate_context;
     ID3D11RasterizerState *rasterizer_state;
-
-    bool supports_float64;
-    bool supports_rov;
 };
 
 static struct d3d11_shader_runner *d3d11_shader_runner(struct shader_runner *r)
@@ -277,17 +275,20 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
         return FALSE;
     }
 
+    runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
+    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
+
     hr = ID3D11Device_CheckFeatureSupport(runner->device, D3D11_FEATURE_DOUBLES,
             &doubles, sizeof(doubles));
     ok(hr == S_OK, "Failed to check double precision feature support, hr %#lx.\n", hr);
     trace("DoublePrecisionFloatShaderOps: %u.\n", doubles.DoublePrecisionFloatShaderOps);
-    runner->supports_float64 = doubles.DoublePrecisionFloatShaderOps;
+    runner->caps.float64 = doubles.DoublePrecisionFloatShaderOps;
 
     hr = ID3D11Device_CheckFeatureSupport(runner->device,
             D3D11_FEATURE_D3D11_OPTIONS2, &options2, sizeof(options2));
     ok(hr == S_OK, "Got hr %#lx.\n", hr);
     trace("ROVsSupported: %u.\n", options2.ROVsSupported);
-    runner->supports_rov = options2.ROVsSupported;
+    runner->caps.rov = options2.ROVsSupported;
 
     rt_width = RENDER_TARGET_WIDTH;
     rt_height = RENDER_TARGET_HEIGHT;
@@ -334,18 +335,6 @@ static void destroy_test_context(struct d3d11_shader_runner *runner)
 
     ref = ID3D11Device_Release(runner->device);
     ok(!ref, "Device has %lu references left.\n", ref);
-}
-
-static bool d3d11_runner_check_requirements(struct shader_runner *r)
-{
-    struct d3d11_shader_runner *runner = d3d11_shader_runner(r);
-
-    if (runner->r.require_float64 && !runner->supports_float64)
-        return false;
-    if (runner->r.require_rov && !runner->supports_rov)
-        return false;
-
-    return true;
 }
 
 static ID3D11Buffer *create_buffer(ID3D11Device *device, unsigned int bind_flags, unsigned int size, const void *data)
@@ -794,7 +783,6 @@ static void d3d11_runner_release_readback(struct shader_runner *r, struct resour
 
 static const struct shader_runner_ops d3d11_runner_ops =
 {
-    .check_requirements = d3d11_runner_check_requirements,
     .create_resource = d3d11_runner_create_resource,
     .destroy_resource = d3d11_runner_destroy_resource,
     .dispatch = d3d11_runner_dispatch,
@@ -820,7 +808,7 @@ void run_shader_tests_d3d11(void)
         init_adapter_info();
         if (init_test_context(&runner))
         {
-            run_shader_tests(&runner.r, &d3d11_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+            run_shader_tests(&runner.r, &runner.caps, &d3d11_runner_ops, NULL);
             destroy_test_context(&runner);
         }
     }

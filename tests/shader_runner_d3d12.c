@@ -50,6 +50,7 @@ static struct d3d12_resource *d3d12_resource(struct resource *r)
 struct d3d12_shader_runner
 {
     struct shader_runner r;
+    struct shader_runner_caps caps;
 
     struct test_context test_context;
 
@@ -60,9 +61,6 @@ struct d3d12_shader_runner
     ID3D12GraphicsCommandList *compute_list;
 
     IDxcCompiler3 *dxc_compiler;
-
-    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
-    D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
 };
 
 static struct d3d12_shader_runner *d3d12_shader_runner(struct shader_runner *r)
@@ -105,22 +103,6 @@ static ID3D10Blob *compile_shader(const struct d3d12_shader_runner *runner, cons
         ID3D10Blob_Release(errors);
     }
     return blob;
-}
-
-static bool d3d12_runner_check_requirements(struct shader_runner *r)
-{
-    struct d3d12_shader_runner *runner = d3d12_shader_runner(r);
-
-    if (runner->r.require_float64 && !runner->options.DoublePrecisionFloatShaderOps)
-        return false;
-
-    if (runner->r.require_int64 && !runner->options1.Int64ShaderOps)
-        return false;
-
-    if (runner->r.require_rov && !runner->options.ROVsSupported)
-        return false;
-
-    return true;
 }
 
 #define MAX_RESOURCE_DESCRIPTORS (MAX_RESOURCES * 2)
@@ -628,7 +610,6 @@ static void d3d12_runner_release_readback(struct shader_runner *r, struct resour
 
 static const struct shader_runner_ops d3d12_runner_ops =
 {
-    .check_requirements = d3d12_runner_check_requirements,
     .create_resource = d3d12_runner_create_resource,
     .destroy_resource = d3d12_runner_destroy_resource,
     .dispatch = d3d12_runner_dispatch,
@@ -636,6 +617,28 @@ static const struct shader_runner_ops d3d12_runner_ops =
     .get_resource_readback = d3d12_runner_get_resource_readback,
     .release_readback = d3d12_runner_release_readback,
 };
+
+static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
+{
+    ID3D12Device *device = runner->test_context.device;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS1 options1;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS options;
+    HRESULT hr;
+
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options));
+    ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
+    trace("DoublePrecisionFloatShaderOps: %u.\n", options.DoublePrecisionFloatShaderOps);
+    trace("ROVsSupported: %u.\n", options.ROVsSupported);
+    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1, &options1, sizeof(options1));
+    ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
+    trace("Int64ShaderOps: %u.\n", options1.Int64ShaderOps);
+
+    runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
+    runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
+    runner->caps.float64 = options.DoublePrecisionFloatShaderOps;
+    runner->caps.int64 = options1.Int64ShaderOps;
+    runner->caps.rov = options.ROVsSupported;
+}
 
 void run_shader_tests_d3d12(void *dxc_compiler)
 {
@@ -654,6 +657,8 @@ void run_shader_tests_d3d12(void *dxc_compiler)
     init_adapter_info();
     if (!init_test_context(&runner.test_context, &desc))
         return;
+    d3d12_runner_init_caps(&runner);
+
     device = runner.test_context.device;
 
     runner.dxc_compiler = dxc_compiler;
@@ -669,25 +674,14 @@ void run_shader_tests_d3d12(void *dxc_compiler)
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS,
-            &runner.options, sizeof(runner.options));
-    ok(hr == S_OK, "Failed to check feature options support, hr %#x.\n", hr);
-    trace("DoublePrecisionFloatShaderOps: %u.\n", runner.options.DoublePrecisionFloatShaderOps);
-    trace("ROVsSupported: %u.\n", runner.options.ROVsSupported);
-
-    hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1,
-            &runner.options1, sizeof(runner.options1));
-    ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
-
     trace("Compiling SM4-SM5 shaders with %s and executing with %s\n", HLSL_COMPILER, SHADER_RUNNER);
-    run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
-
+    run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, NULL);
     if (dxc_compiler)
     {
-        trace("Int64ShaderOps: %u.\n", runner.options1.Int64ShaderOps);
-
+        runner.caps.minimum_shader_model = SHADER_MODEL_6_0;
+        runner.caps.maximum_shader_model = SHADER_MODEL_6_0;
         trace("Compiling SM6 shaders with dxcompiler and executing with %s\n", SHADER_RUNNER);
-        run_shader_tests(&runner.r, &d3d12_runner_ops, dxc_compiler, SHADER_MODEL_6_0, SHADER_MODEL_6_0);
+        run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
     }
 
     ID3D12GraphicsCommandList_Release(runner.compute_list);

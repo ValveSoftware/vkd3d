@@ -55,6 +55,7 @@ DECLARE_VK_PFN(vkGetInstanceProcAddr)
 struct vulkan_shader_runner
 {
     struct shader_runner r;
+    struct shader_runner_caps caps;
 
     VkInstance instance;
     VkPhysicalDevice phys_device;
@@ -72,9 +73,6 @@ struct vulkan_shader_runner
         uint32_t binding;
     } samplers[MAX_SAMPLERS];
 
-    bool supports_float64;
-    bool supports_int64;
-
     DECLARE_VK_PFN(vkCreateInstance);
 #define VK_INSTANCE_PFN   DECLARE_VK_PFN
 #define VK_DEVICE_PFN     DECLARE_VK_PFN
@@ -84,20 +82,6 @@ struct vulkan_shader_runner
 static struct vulkan_shader_runner *vulkan_shader_runner(struct shader_runner *r)
 {
     return CONTAINING_RECORD(r, struct vulkan_shader_runner, r);
-}
-
-static bool vulkan_runner_check_requirements(struct shader_runner *r)
-{
-    struct vulkan_shader_runner *runner = vulkan_shader_runner(r);
-
-    if (runner->r.require_float64 && !runner->supports_float64)
-        return false;
-    if (runner->r.require_int64 && !runner->supports_int64)
-        return false;
-    if (runner->r.require_rov)
-        return false;
-
-    return true;
 }
 
 #define VK_CALL(f) (runner->f)
@@ -1225,7 +1209,6 @@ static void vulkan_runner_release_readback(struct shader_runner *r, struct resou
 
 static const struct shader_runner_ops vulkan_runner_ops =
 {
-    .check_requirements = vulkan_runner_check_requirements,
     .create_resource = vulkan_runner_create_resource,
     .destroy_resource = vulkan_runner_destroy_resource,
     .dispatch = vulkan_runner_dispatch,
@@ -1396,13 +1379,13 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
     if (ret_features.shaderFloat64)
     {
         features.shaderFloat64 = VK_TRUE;
-        runner->supports_float64 = true;
+        runner->caps.float64 = true;
     }
     trace("shaderInt64: %u.\n", ret_features.shaderInt64);
     if (ret_features.shaderInt64)
     {
         features.shaderInt64 = VK_TRUE;
-        runner->supports_int64 = true;
+        runner->caps.int64 = true;
     }
 
     if ((vr = VK_CALL(vkCreateDevice(runner->phys_device, &device_desc, NULL, &device))))
@@ -1470,11 +1453,15 @@ void run_shader_tests_vulkan(void)
     if (!init_vulkan_runner(&runner))
         return;
 
+    runner.caps.minimum_shader_model = SHADER_MODEL_2_0;
+    runner.caps.maximum_shader_model = SHADER_MODEL_3_0;
     trace("Compiling SM2-SM3 shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_3_0);
+    run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
 
+    runner.caps.minimum_shader_model = SHADER_MODEL_4_0;
+    runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
     trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with Vulkan\n");
-    run_shader_tests(&runner.r, &vulkan_runner_ops, NULL, SHADER_MODEL_4_0, SHADER_MODEL_5_1);
+    run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
 
     cleanup_vulkan_runner(&runner);
 }

@@ -1309,8 +1309,22 @@ static enum parse_state read_shader_directive(struct shader_runner *runner, enum
     return state;
 }
 
-void run_shader_tests(struct shader_runner *runner, const struct shader_runner_ops *ops, void *dxc_compiler,
-        enum shader_model minimum_shader_model, enum shader_model maximum_shader_model)
+static bool check_requirements(const struct shader_runner *runner, const struct shader_runner_caps *caps)
+{
+    if (runner->maximum_shader_model < runner->minimum_shader_model)
+        return false;
+    if (runner->require_float64 && !caps->float64)
+        return false;
+    if (runner->require_int64 && !caps->int64)
+        return false;
+    if (runner->require_rov && !caps->rov)
+        return false;
+
+    return true;
+}
+
+void run_shader_tests(struct shader_runner *runner, const struct shader_runner_caps *caps,
+        const struct shader_runner_ops *ops, void *dxc_compiler)
 {
     size_t shader_source_size = 0, shader_source_len = 0;
     struct resource_params current_resource;
@@ -1332,8 +1346,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
 
     memset(runner, 0, sizeof(*runner));
     runner->ops = ops;
-    runner->minimum_shader_model = minimum_shader_model;
-    runner->maximum_shader_model = maximum_shader_model;
+    runner->minimum_shader_model = caps->minimum_shader_model;
+    runner->maximum_shader_model = caps->maximum_shader_model;
 
     if ((testname = strrchr(test_options.filename, '/')))
         ++testname;
@@ -1360,8 +1374,7 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
                     break;
 
                 case STATE_REQUIRE:
-                    if (runner->maximum_shader_model < runner->minimum_shader_model
-                            || !runner->ops->check_requirements(runner))
+                    if (!check_requirements(runner, caps))
                         skip_tests = true;
                     break;
 
@@ -1512,8 +1525,8 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_o
             else if (!strcmp(line, "[require]\n"))
             {
                 state = STATE_REQUIRE;
-                runner->minimum_shader_model = minimum_shader_model;
-                runner->maximum_shader_model = maximum_shader_model;
+                runner->minimum_shader_model = caps->minimum_shader_model;
+                runner->maximum_shader_model = caps->maximum_shader_model;
                 runner->require_float64 = false;
                 runner->require_int64 = false;
                 runner->require_rov = false;

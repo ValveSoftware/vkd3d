@@ -50,6 +50,7 @@ static struct d3d9_resource *d3d9_resource(struct resource *r)
 struct d3d9_shader_runner
 {
     struct shader_runner r;
+    struct shader_runner_caps caps;
 
     IDirect3DDevice9 *device;
     HWND window;
@@ -154,6 +155,9 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
         return false;
     }
 
+    runner->caps.minimum_shader_model = SHADER_MODEL_2_0;
+    runner->caps.maximum_shader_model = SHADER_MODEL_3_0;
+
     return true;
 }
 
@@ -187,19 +191,6 @@ static D3DTEXTUREADDRESS sampler_address_to_d3d9(D3D12_TEXTURE_ADDRESS_MODE addr
     }
 
     vkd3d_unreachable();
-}
-
-static bool d3d9_runner_check_requirements(struct shader_runner *r)
-{
-    struct d3d9_shader_runner *runner = d3d9_shader_runner(r);
-
-    if (runner->r.minimum_shader_model >= SHADER_MODEL_4_0)
-        return false;
-
-    if (runner->r.require_rov)
-        return false;
-
-    return true;
 }
 
 static struct resource *d3d9_runner_create_resource(struct shader_runner *r, const struct resource_params *params)
@@ -535,7 +526,6 @@ static void d3d9_runner_release_readback(struct shader_runner *r, struct resourc
 
 static const struct shader_runner_ops d3d9_runner_ops =
 {
-    .check_requirements = d3d9_runner_check_requirements,
     .create_resource = d3d9_runner_create_resource,
     .destroy_resource = d3d9_runner_destroy_resource,
     .dispatch = d3d9_runner_dispatch,
@@ -551,16 +541,18 @@ void run_shader_tests_d3d9(void)
 
     trace("Compiling SM2-SM3 shaders with %s and executing with d3d9.dll\n", HLSL_COMPILER);
 
-    d3d9_module = LoadLibraryA("d3d9.dll");
-    if (d3d9_module)
-    {
-        pDirect3DCreate9 = (void *)GetProcAddress(d3d9_module, "Direct3DCreate9");
+    if (!(d3d9_module = LoadLibraryA("d3d9.dll")))
+        return;
 
-        init_adapter_info();
-        init_test_context(&runner);
-        run_shader_tests(&runner.r, &d3d9_runner_ops, NULL, SHADER_MODEL_2_0, SHADER_MODEL_3_0);
+    pDirect3DCreate9 = (void *)GetProcAddress(d3d9_module, "Direct3DCreate9");
+
+    init_adapter_info();
+    if (init_test_context(&runner))
+    {
+        run_shader_tests(&runner.r, &runner.caps, &d3d9_runner_ops, NULL);
         destroy_test_context(&runner);
     }
+
     FreeLibrary(d3d9_module);
 }
 
