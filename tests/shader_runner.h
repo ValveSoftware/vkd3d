@@ -119,6 +119,7 @@ struct input_element
 
 struct shader_runner_caps
 {
+    const char *runner;
     enum shader_model minimum_shader_model;
     enum shader_model maximum_shader_model;
     bool float64;

@@ -32,12 +32,6 @@
 #include "shader_runner.h"
 #include "vkd3d_test.h"
 
-#ifdef VKD3D_CROSSTEST
-static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
-#else
-static const char HLSL_COMPILER[] = "vkd3d-shader";
-#endif
-
 static HRESULT (WINAPI *pCreateDXGIFactory1)(REFIID iid, void **factory);
 
 static HRESULT (WINAPI *pD3D11CreateDevice)(IDXGIAdapter *adapter, D3D_DRIVER_TYPE driver_type,
@@ -275,6 +269,7 @@ static BOOL init_test_context(struct d3d11_shader_runner *runner)
         return FALSE;
     }
 
+    runner->caps.runner = "d3d11.dll";
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
@@ -793,8 +788,6 @@ void run_shader_tests_d3d11(void)
 {
     struct d3d11_shader_runner runner;
     HMODULE dxgi_module, d3d11_module;
-
-    trace("Compiling SM4-SM5 shaders with %s and executing with d3d11.dll\n", HLSL_COMPILER);
 
     d3d11_module = LoadLibraryA("d3d11.dll");
     dxgi_module = LoadLibraryA("dxgi.dll");

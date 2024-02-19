@@ -27,12 +27,6 @@
 #include "shader_runner.h"
 #include "vkd3d_test.h"
 
-#ifdef VKD3D_CROSSTEST
-static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
-#else
-static const char HLSL_COMPILER[] = "vkd3d-shader";
-#endif
-
 struct d3d9_resource
 {
     struct resource r;
@@ -155,6 +149,7 @@ static bool init_test_context(struct d3d9_shader_runner *runner)
         return false;
     }
 
+    runner->caps.runner = "d3d9.dll";
     runner->caps.minimum_shader_model = SHADER_MODEL_2_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_3_0;
 
@@ -538,8 +533,6 @@ void run_shader_tests_d3d9(void)
 {
     struct d3d9_shader_runner runner;
     HMODULE d3d9_module;
-
-    trace("Compiling SM2-SM3 shaders with %s and executing with d3d9.dll\n", HLSL_COMPILER);
 
     if (!(d3d9_module = LoadLibraryA("d3d9.dll")))
         return;

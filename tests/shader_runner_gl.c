@@ -225,6 +225,7 @@ static bool gl_runner_init(struct gl_runner *runner)
             eglTerminate(display);
             continue;
         }
+        runner->caps.runner = "OpenGL";
         runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
         runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
 
@@ -1031,7 +1032,6 @@ void run_shader_tests_gl(void)
     if (!gl_runner_init(&runner))
         goto done;
 
-    trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with OpenGL\n");
     run_shader_tests(&runner.r, &runner.caps, &gl_runner_ops, NULL);
     gl_runner_cleanup(&runner);
 done:

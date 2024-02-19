@@ -25,14 +25,6 @@
 #include "shader_runner.h"
 #include "dxcompiler.h"
 
-#ifdef VKD3D_CROSSTEST
-static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
-static const char SHADER_RUNNER[] = "d3d12.dll";
-#else
-static const char HLSL_COMPILER[] = "vkd3d-shader";
-static const char SHADER_RUNNER[] = "vkd3d";
-#endif
-
 struct d3d12_resource
 {
     struct resource r;
@@ -630,6 +622,11 @@ static void d3d12_runner_init_caps(struct d3d12_shader_runner *runner)
     hr = ID3D12Device_CheckFeatureSupport(device, D3D12_FEATURE_D3D12_OPTIONS1, &options1, sizeof(options1));
     ok(hr == S_OK, "Failed to check feature options1 support, hr %#x.\n", hr);
 
+#ifdef VKD3D_CROSSTEST
+    runner->caps.runner = "d3d12.dll";
+#else
+    runner->caps.runner = "vkd3d";
+#endif
     runner->caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner->caps.maximum_shader_model = SHADER_MODEL_5_1;
     runner->caps.float64 = options.DoublePrecisionFloatShaderOps;
@@ -671,13 +668,11 @@ void run_shader_tests_d3d12(void *dxc_compiler)
             runner.compute_allocator, NULL, &IID_ID3D12GraphicsCommandList, (void **)&runner.compute_list);
     ok(hr == S_OK, "Failed to create command list, hr %#x.\n", hr);
 
-    trace("Compiling SM4-SM5 shaders with %s and executing with %s\n", HLSL_COMPILER, SHADER_RUNNER);
     run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, NULL);
     if (dxc_compiler)
     {
         runner.caps.minimum_shader_model = SHADER_MODEL_6_0;
         runner.caps.maximum_shader_model = SHADER_MODEL_6_0;
-        trace("Compiling SM6 shaders with dxcompiler and executing with %s\n", SHADER_RUNNER);
         run_shader_tests(&runner.r, &runner.caps, &d3d12_runner_ops, dxc_compiler);
     }
 

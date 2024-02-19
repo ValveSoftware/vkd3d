@@ -64,6 +64,22 @@ typedef int HRESULT;
 
 struct test_options test_options = {0};
 
+#ifdef VKD3D_CROSSTEST
+static const char HLSL_COMPILER[] = "d3dcompiler47.dll";
+#else
+static const char HLSL_COMPILER[] = "vkd3d-shader";
+#endif
+static const char *const model_strings[] =
+{
+    [SHADER_MODEL_2_0] = "2.0",
+    [SHADER_MODEL_3_0] = "3.0",
+    [SHADER_MODEL_4_0] = "4.0",
+    [SHADER_MODEL_4_1] = "4.1",
+    [SHADER_MODEL_5_0] = "5.0",
+    [SHADER_MODEL_5_1] = "5.1",
+    [SHADER_MODEL_6_0] = "6.0",
+};
+
 void fatal_error(const char *format, ...)
 {
     va_list args;
@@ -248,17 +264,6 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     if (match_string(line, "shader model >=", &line)
             || (less_than = match_string(line, "shader model <", &line)))
     {
-        static const char *const model_strings[] =
-        {
-            [SHADER_MODEL_2_0] = "2.0",
-            [SHADER_MODEL_3_0] = "3.0",
-            [SHADER_MODEL_4_0] = "4.0",
-            [SHADER_MODEL_4_1] = "4.1",
-            [SHADER_MODEL_5_0] = "5.0",
-            [SHADER_MODEL_5_1] = "5.1",
-            [SHADER_MODEL_6_0] = "6.0",
-        };
-
         for (i = 0; i < ARRAY_SIZE(model_strings); ++i)
         {
             if (match_string(line, model_strings[i], &line))
@@ -1338,6 +1343,9 @@ void run_shader_tests(struct shader_runner *runner, const struct shader_runner_c
     const char *testname;
     FILE *f;
 
+    trace("Compiling SM%s-SM%s shaders with %s and executing with %s.\n",
+            model_strings[caps->minimum_shader_model], model_strings[caps->maximum_shader_model],
+            dxc_compiler ? "dxcompiler" : HLSL_COMPILER, caps->runner);
     trace("   float64: %u.\n", caps->float64);
     trace("     int64: %u.\n", caps->int64);
     trace("       rov: %u.\n", caps->rov);

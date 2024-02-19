@@ -1356,6 +1356,7 @@ static bool init_vulkan_runner(struct vulkan_shader_runner *runner)
         goto out_destroy_instance;
     }
 
+    runner->caps.runner = "Vulkan";
     VK_CALL(vkGetPhysicalDeviceFeatures(runner->phys_device, &ret_features));
 
     device_desc.pEnabledFeatures = &features;
@@ -1453,12 +1454,10 @@ void run_shader_tests_vulkan(void)
 
     runner.caps.minimum_shader_model = SHADER_MODEL_2_0;
     runner.caps.maximum_shader_model = SHADER_MODEL_3_0;
-    trace("Compiling SM2-SM3 shaders with vkd3d-shader and executing with Vulkan\n");
     run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
 
     runner.caps.minimum_shader_model = SHADER_MODEL_4_0;
     runner.caps.maximum_shader_model = SHADER_MODEL_5_1;
-    trace("Compiling SM4-SM5 shaders with vkd3d-shader and executing with Vulkan\n");
     run_shader_tests(&runner.r, &runner.caps, &vulkan_runner_ops, NULL);
 
     cleanup_vulkan_runner(&runner);
