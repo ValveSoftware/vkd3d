@@ -3028,6 +3028,46 @@ static bool intrinsic_cos(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_COS, arg, loc);
 }
 
+static bool write_cosh_or_sinh(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc, bool sinh_mode)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_ir_node *arg;
+    const char *fn_name, *type_name;
+    char *body;
+
+    static const char template[] =
+            "%s %s(%s x)\n"
+            "{\n"
+            "    return (exp(x) %s exp(-x)) / 2;\n"
+            "}\n";
+    static const char fn_name_sinh[] = "sinh";
+    static const char fn_name_cosh[] = "cosh";
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+
+    type_name = arg->data_type->name;
+    fn_name = sinh_mode ? fn_name_sinh : fn_name_cosh;
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template,
+            type_name, fn_name, type_name, sinh_mode ? "-" : "+")))
+        return false;
+
+    func = hlsl_compile_internal_function(ctx, fn_name, body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
+static bool intrinsic_cosh(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_cosh_or_sinh(ctx, params, loc, false);
+}
+
 static bool intrinsic_cross(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -3873,6 +3913,12 @@ static bool intrinsic_sin(struct hlsl_ctx *ctx,
     return !!add_unary_arithmetic_expr(ctx, params->instrs, HLSL_OP1_SIN, arg, loc);
 }
 
+static bool intrinsic_sinh(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    return write_cosh_or_sinh(ctx, params, loc, true);
+}
+
 /* smoothstep(a, b, x) = p^2 (3 - 2p), where p = saturate((x - a)/(b - a)) */
 static bool intrinsic_smoothstep(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
@@ -4277,6 +4323,7 @@ intrinsic_functions[] =
     {"clamp",                               3, true,  intrinsic_clamp},
     {"clip",                                1, true,  intrinsic_clip},
     {"cos",                                 1, true,  intrinsic_cos},
+    {"cosh",                                1, true,  intrinsic_cosh},
     {"cross",                               2, true,  intrinsic_cross},
     {"ddx",                                 1, true,  intrinsic_ddx},
     {"ddx_coarse",                          1, true,  intrinsic_ddx_coarse},
@@ -4314,6 +4361,7 @@ intrinsic_functions[] =
     {"saturate",                            1, true,  intrinsic_saturate},
     {"sign",                                1, true,  intrinsic_sign},
     {"sin",                                 1, true,  intrinsic_sin},
+    {"sinh",                                1, true,  intrinsic_sinh},
     {"smoothstep",                          3, true,  intrinsic_smoothstep},
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
