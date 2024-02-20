@@ -2041,12 +2041,19 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
         flattener->location = instruction->location;
 
         /* Declarations should occur before the first code block, which in hull shaders is marked by the first
-         * phase instruction, and in all other shader types begins with the first label instruction. */
-        if (!after_declarations_section && !vsir_instruction_is_dcl(instruction)
-                && instruction->handler_idx != VKD3DSIH_NOP)
+         * phase instruction, and in all other shader types begins with the first label instruction.
+         * Declaring an indexable temp with function scope is not considered a declaration,
+         * because it needs to live inside a function. */
+        if (!after_declarations_section && instruction->handler_idx != VKD3DSIH_NOP)
         {
-            after_declarations_section = true;
-            cf_flattener_emit_label(flattener, cf_flattener_alloc_block_id(flattener));
+            bool is_function_indexable = instruction->handler_idx == VKD3DSIH_DCL_INDEXABLE_TEMP
+                    && instruction->declaration.indexable_temp.has_function_scope;
+
+            if (!vsir_instruction_is_dcl(instruction) || is_function_indexable)
+            {
+                after_declarations_section = true;
+                cf_flattener_emit_label(flattener, cf_flattener_alloc_block_id(flattener));
+            }
         }
 
         cf_info = flattener->control_flow_depth
