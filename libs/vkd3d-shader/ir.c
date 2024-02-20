@@ -4196,6 +4196,54 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
+static void vsir_cfg_remove_trailing_continue(struct vsir_cfg_structure_list *list, unsigned int target)
+{
+    struct vsir_cfg_structure *last = &list->structures[list->count - 1];
+
+    if (last->type == STRUCTURE_TYPE_JUMP && last->u.jump.type == JUMP_CONTINUE
+            && !last->u.jump.condition && last->u.jump.target == target)
+        --list->count;
+}
+
+static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
+{
+    enum vkd3d_result ret;
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+    {
+        struct vsir_cfg_structure *loop = &list->structures[i];
+        struct vsir_cfg_structure_list *loop_body;
+
+        if (loop->type != STRUCTURE_TYPE_LOOP)
+            continue;
+
+        loop_body = &loop->u.loop.body;
+
+        if (loop_body->count == 0)
+            continue;
+
+        vsir_cfg_remove_trailing_continue(loop_body, loop->u.loop.idx);
+
+        if ((ret = vsir_cfg_optimize_recurse(cfg, loop_body)) < 0)
+            return ret;
+    }
+
+    return VKD3D_OK;
+}
+
+static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
+{
+    enum vkd3d_result ret;
+
+    ret = vsir_cfg_optimize_recurse(cfg, &cfg->structured_program);
+
+    if (TRACE_ON())
+        vsir_cfg_dump_structured_program(cfg);
+
+    return ret;
+}
+
 static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
         struct vsir_cfg_structure_list *list, unsigned int loop_idx)
 {
@@ -5312,6 +5360,12 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         }
 
         if ((result = vsir_cfg_build_structured_program(&cfg)) < 0)
+        {
+            vsir_cfg_cleanup(&cfg);
+            return result;
+        }
+
+        if ((result = vsir_cfg_optimize(&cfg)) < 0)
         {
             vsir_cfg_cleanup(&cfg);
             return result;
