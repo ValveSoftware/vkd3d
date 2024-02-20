@@ -3050,6 +3050,8 @@ struct vsir_cfg_structure
         STRUCTURE_TYPE_BLOCK,
         /* Execute a loop, which is identified by an index. */
         STRUCTURE_TYPE_LOOP,
+        /* Execute a selection construct. */
+        STRUCTURE_TYPE_SELECTION,
         /* Execute a `return' or a (possibly) multilevel `break' or
          * `continue', targeting a loop by its index. If `condition'
          * is non-NULL, then the jump is conditional (this is
@@ -3064,6 +3066,13 @@ struct vsir_cfg_structure
             struct vsir_cfg_structure_list body;
             unsigned idx;
         } loop;
+        struct
+        {
+            struct vkd3d_shader_src_param *condition;
+            struct vsir_cfg_structure_list if_body;
+            struct vsir_cfg_structure_list else_body;
+            bool invert_condition;
+        } selection;
         struct
         {
             enum vsir_cfg_jump_type
@@ -3110,6 +3119,20 @@ static struct vsir_cfg_structure *vsir_cfg_structure_list_append(struct vsir_cfg
     return ret;
 }
 
+static enum vkd3d_result vsir_cfg_structure_list_append_from_region(struct vsir_cfg_structure_list *list,
+        struct vsir_cfg_structure *begin, size_t size)
+{
+    if (!vkd3d_array_reserve((void **)&list->structures, &list->capacity, list->count + size,
+            sizeof(*list->structures)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    memcpy(&list->structures[list->count], begin, size * sizeof(*begin));
+
+    list->count += size;
+
+    return VKD3D_OK;
+}
+
 static void vsir_cfg_structure_init(struct vsir_cfg_structure *structure, enum vsir_cfg_structure_type type)
 {
     memset(structure, 0, sizeof(*structure));
@@ -3118,8 +3141,20 @@ static void vsir_cfg_structure_init(struct vsir_cfg_structure *structure, enum v
 
 static void vsir_cfg_structure_cleanup(struct vsir_cfg_structure *structure)
 {
-    if (structure->type == STRUCTURE_TYPE_LOOP)
-        vsir_cfg_structure_list_cleanup(&structure->u.loop.body);
+    switch (structure->type)
+    {
+        case STRUCTURE_TYPE_LOOP:
+            vsir_cfg_structure_list_cleanup(&structure->u.loop.body);
+            break;
+
+        case STRUCTURE_TYPE_SELECTION:
+            vsir_cfg_structure_list_cleanup(&structure->u.selection.if_body);
+            vsir_cfg_structure_list_cleanup(&structure->u.selection.else_body);
+            break;
+
+        default:
+            break;
+    }
 }
 
 struct vsir_cfg
@@ -3293,6 +3328,25 @@ static void vsir_cfg_structure_dump(struct vsir_cfg *cfg, struct vsir_cfg_struct
             vsir_cfg_structure_list_dump(cfg, &structure->u.loop.body);
 
             TRACE("%s}  # %u\n", cfg->debug_buffer.buffer, structure->u.loop.idx);
+            break;
+
+        case STRUCTURE_TYPE_SELECTION:
+            TRACE("%sif {\n", cfg->debug_buffer.buffer);
+
+            vsir_cfg_structure_list_dump(cfg, &structure->u.selection.if_body);
+
+            if (structure->u.selection.else_body.count == 0)
+            {
+                TRACE("%s}\n", cfg->debug_buffer.buffer);
+            }
+            else
+            {
+                TRACE("%s} else {\n", cfg->debug_buffer.buffer);
+
+                vsir_cfg_structure_list_dump(cfg, &structure->u.selection.else_body);
+
+                TRACE("%s}\n", cfg->debug_buffer.buffer);
+            }
             break;
 
         case STRUCTURE_TYPE_JUMP:
@@ -4205,6 +4259,52 @@ static void vsir_cfg_remove_trailing_continue(struct vsir_cfg_structure_list *li
         --list->count;
 }
 
+static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg_structure_list *list)
+{
+    enum vkd3d_result ret;
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+    {
+        struct vsir_cfg_structure *structure = &list->structures[i], new_selection, *new_jump;
+
+        if (structure->type != STRUCTURE_TYPE_JUMP || !structure->u.jump.condition)
+            continue;
+
+        vsir_cfg_structure_init(&new_selection, STRUCTURE_TYPE_SELECTION);
+        new_selection.u.selection.condition = structure->u.jump.condition;
+        new_selection.u.selection.invert_condition = structure->u.jump.invert_condition;
+
+        if (!(new_jump = vsir_cfg_structure_list_append(&new_selection.u.selection.if_body,
+                STRUCTURE_TYPE_JUMP)))
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        new_jump->u.jump.type = structure->u.jump.type;
+        new_jump->u.jump.target = structure->u.jump.target;
+
+        /* Move the rest of the structure list in the else branch
+         * rather than leaving it after the selection construct. The
+         * reason is that this is more conducive to further
+         * optimization, because all the conditional `break's appear
+         * as the last instruction of a branch of a cascade of
+         * selection constructs at the end of the structure list we're
+         * processing, instead of being buried in the middle of the
+         * structure list itself. */
+        if ((ret = vsir_cfg_structure_list_append_from_region(&new_selection.u.selection.else_body,
+                &list->structures[i + 1], list->count - i - 1)) < 0)
+            return ret;
+
+        *structure = new_selection;
+        list->count = i + 1;
+
+        if ((ret = vsir_cfg_synthesize_selections(&structure->u.selection.else_body)) < 0)
+            return ret;
+
+        break;
+    }
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
 {
     enum vkd3d_result ret;
@@ -4226,6 +4326,9 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
         vsir_cfg_remove_trailing_continue(loop_body, loop->u.loop.idx);
 
         if ((ret = vsir_cfg_optimize_recurse(cfg, loop_body)) < 0)
+            return ret;
+
+        if ((ret = vsir_cfg_synthesize_selections(loop_body)) < 0)
             return ret;
     }
 
@@ -4339,6 +4442,41 @@ static enum vkd3d_result vsir_cfg_structure_list_emit(struct vsir_cfg *cfg,
 
                 break;
             }
+
+            case STRUCTURE_TYPE_SELECTION:
+                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                if (!vsir_instruction_init_with_params(cfg->program, &cfg->instructions[cfg->ins_count], &no_loc,
+                        VKD3DSIH_IF, 0, 1))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                cfg->instructions[cfg->ins_count].src[0] = *structure->u.selection.condition;
+
+                if (structure->u.selection.invert_condition)
+                    cfg->instructions[cfg->ins_count].flags |= VKD3D_SHADER_CONDITIONAL_OP_Z;
+
+                ++cfg->ins_count;
+
+                if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.if_body, loop_idx)) < 0)
+                    return ret;
+
+                if (structure->u.selection.else_body.count != 0)
+                {
+                    if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                        return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                    vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_ELSE);
+
+                    if ((ret = vsir_cfg_structure_list_emit(cfg, &structure->u.selection.else_body, loop_idx)) < 0)
+                        return ret;
+                }
+
+                if (!reserve_instructions(&cfg->instructions, &cfg->ins_capacity, cfg->ins_count + 1))
+                    return VKD3D_ERROR_OUT_OF_MEMORY;
+
+                vsir_instruction_init(&cfg->instructions[cfg->ins_count++], &no_loc, VKD3DSIH_ENDIF);
+                break;
 
             case STRUCTURE_TYPE_JUMP:
             {
