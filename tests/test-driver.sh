@@ -1,8 +1,11 @@
 #! /bin/sh
-# test-driver - basic testsuite driver script.
+# test-driver - basic testsuite driver script. Modified for vkd3d tests.
 
-scriptversion=2022-02-13.00; # UTC
+scriptversion=2022-02-20.01; # UTC
 
+# This is a modified version of the test_driver script provided by
+# auto-tools, whose licence is as follows:
+#
 # Copyright (C) 2011-2021 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -88,15 +91,25 @@ if test $# -eq 0; then
 fi
 
 if test $color_tests = yes; then
-  # Keep this in sync with 'lib/am/check.am:$(am__tty_colors)'.
-  red='[0;31m' # Red.
-  grn='[0;32m' # Green.
-  lgn='[1;32m' # Light green.
-  blu='[1;34m' # Blue.
-  mgn='[0;35m' # Magenta.
-  std='[m'     # No color.
+  color_reset='[0m'
+  color_dark_red='[31m'
+  color_dark_purple='[35m'
+  color_green='[32m'
+  color_yellow='[33m'
+  color_blue='[34m'
+  color_bright_red='[1;91m'
+  color_bright_purple='[1;95m'
+  color_fade='[0;2m'
 else
-  red= grn= lgn= blu= mgn= std=
+  color_reset=
+  color_dark_red=
+  color_dark_purple=
+  color_green=
+  color_yellow=
+  color_blue=
+  color_bright_red=
+  color_bright_purple=
+  color_fade=
 fi
 
 do_exit='rm -f $log_file $trs_file; (exit $st); exit $st'
@@ -119,12 +132,12 @@ else
 fi
 
 case $tweaked_estatus:$expect_failure in
-  0:yes) col=$red res=XPASS recheck=yes gcopy=yes;;
-  0:*)   col=$grn res=PASS  recheck=no  gcopy=no;;
-  77:*)  col=$blu res=SKIP  recheck=no  gcopy=yes;;
-  99:*)  col=$mgn res=ERROR recheck=yes gcopy=yes;;
-  *:yes) col=$lgn res=XFAIL recheck=no  gcopy=yes;;
-  *:*)   col=$red res=FAIL  recheck=yes gcopy=yes;;
+  0:yes) col=$color_dark_red      res=XPASS recheck=yes gcopy=yes;;
+  0:*)   col=$color_green         res=PASS  recheck=no  gcopy=no;;
+  77:*)  col=$color_blue          res=SKIP  recheck=no  gcopy=yes;;
+  99:*)  col=$color_bright_purple res=ERROR recheck=yes gcopy=yes;;
+  *:yes) col=$color_yellow        res=XFAIL recheck=no  gcopy=yes;;
+  *:*)   col=$color_bright_red    res=FAIL  recheck=yes gcopy=yes;;
 esac
 
 # Report the test outcome and exit status in the logs, so that one can
@@ -133,8 +146,63 @@ esac
 # file (automake bug#11814).
 echo "$res $test_name (exit status: $estatus)" >>"$log_file"
 
+# Give detailed report
+awk_program=$(cat <<'EOF'
+BEGIN {
+    FS = ":"
+}
+
+/: Compiling [^[:space:]]+ shaders with [^[:space:]]+ and executing with [^[:space:]]+/ {
+    n = split($3, arr, " ")
+    shader_models = arr[2]
+    backend = arr[n]
+    gsub(/\./, "", backend)
+    str = "<fade>(" shader_models ")" backend "<reset>"
+    printf("#   %-20s\n", str)
+}
+
+/: Test failed:/ {
+    print "<fade>" $4 "<reset>" "[F]"
+}
+
+/: Todo:/ {
+    print "<fade>" $4 "<reset>" "[XF]"
+}
+
+/: Todo succeeded:/ {
+    print "<fade>" $4 "<reset>" "[XP]"
+}
+
+/: Assertion .* failed\./ {
+    print "[AF]" $0
+}
+
+EOF
+)
+
+details=$(awk "$awk_program" "$log_file")
+
+# Count number of [XF] tags.
+xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{print count}')
+
+details=$(echo "$details" |\
+    sed "s/\[F\]/$color_bright_red[F]$color_reset/g" |\
+    sed "s/\[XF\]/$color_yellow[XF]$color_reset/g" |\
+    sed "s/\[XP\]/$color_dark_red[XP]$color_reset/g" |\
+    sed "s/\[AF\]/$color_bright_purple[AF]$color_reset/g" |\
+    sed "s/<fade>/$color_fade/g" |\
+    sed "s/<reset>/$color_reset/g" |\
+    tr '\n' ' ' |\
+    tr '#' '\n' |\
+    awk 'NF != 1' )
+
+# If the test passes but has [XF], we will omit details but report number of [XF]
+if [ "$res" = "PASS" ] && [ $xfcount > 0 ]; then
+  details="$color_yellow($xfcount XF)$color_reset"
+fi
+
 # Report outcome to console.
-echo "${col}${res}${std}: $test_name"
+echo "${col}${res}${color_reset}: $test_name $details"
 
 # Register the test result, and other relevant metadata.
 echo ":test-result: $res" > $trs_file
