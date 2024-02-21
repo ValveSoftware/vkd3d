@@ -13,7 +13,7 @@ mkdir build
 cd build
 if ../configure CFLAGS="-g -O2 -Wno-implicit-fallthrough -Werror" && \
         make -j$(sysctl -n hw.ncpu) ; then
-    make -j$(sysctl -n hw.ncpu) check || \
+    make -j$(sysctl -n hw.ncpu) AM_COLOR_TESTS=always check || \
         touch ../tests_failed
 else
     touch ../build_failed

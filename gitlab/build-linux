@@ -14,7 +14,7 @@ cd build
 export LD_LIBRARY_PATH=/usr/local/lib
 if ../configure --enable-demos --with-spirv-tools DXCOMPILER_LIBS="-L/usr/local/lib" CFLAGS="-g -O2 -Werror" CPPFLAGS="-DVKD3D_SHADER_UNSUPPORTED_DXIL" && \
         make -j$(nproc) ; then
-    make -j$(nproc) check || \
+    make -j$(nproc) AM_COLOR_TESTS=always check || \
         touch ../tests_failed
 else
     touch ../build_failed
