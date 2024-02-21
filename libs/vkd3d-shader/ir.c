@@ -3102,6 +3102,7 @@ struct vsir_cfg
     struct vsir_block *blocks;
     struct vsir_block *entry;
     size_t block_count;
+    struct vkd3d_string_buffer debug_buffer;
 };
 
 static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
@@ -3112,6 +3113,9 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
         vsir_block_cleanup(&cfg->blocks[i]);
 
     vkd3d_free(cfg->blocks);
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_cleanup(&cfg->debug_buffer);
 }
 
 static enum vkd3d_result vsir_cfg_add_edge(struct vsir_cfg *cfg, struct vsir_block *block,
@@ -3181,6 +3185,9 @@ static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program
 
     if (!(cfg->blocks = vkd3d_calloc(cfg->block_count, sizeof(*cfg->blocks))))
         return VKD3D_ERROR_OUT_OF_MEMORY;
+
+    if (TRACE_ON())
+        vkd3d_string_buffer_init(&cfg->debug_buffer);
 
     for (i = 0; i < program->instructions.count; ++i)
     {
@@ -3292,11 +3299,7 @@ static void vsir_cfg_compute_dominators_recurse(struct vsir_block *current, stru
 
 static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
 {
-    struct vkd3d_string_buffer buf;
     size_t i, j;
-
-    if (TRACE_ON())
-        vkd3d_string_buffer_init(&buf);
 
     for (i = 0; i < cfg->block_count; ++i)
     {
@@ -3309,7 +3312,7 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
 
         if (TRACE_ON())
         {
-            vkd3d_string_buffer_printf(&buf, "Block %u dominates:", block->label);
+            vkd3d_string_buffer_printf(&cfg->debug_buffer, "Block %u dominates:", block->label);
             for (j = 0; j < cfg->block_count; j++)
             {
                 struct vsir_block *block2 = &cfg->blocks[j];
@@ -3318,15 +3321,12 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
                     continue;
 
                 if (bitmap_is_set(block->dominates, j))
-                    vkd3d_string_buffer_printf(&buf, " %u", block2->label);
+                    vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", block2->label);
             }
-            TRACE("%s\n", buf.buffer);
-            vkd3d_string_buffer_clear(&buf);
+            TRACE("%s\n", cfg->debug_buffer.buffer);
+            vkd3d_string_buffer_clear(&cfg->debug_buffer);
         }
     }
-
-    if (TRACE_ON())
-        vkd3d_string_buffer_cleanup(&buf);
 }
 
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
