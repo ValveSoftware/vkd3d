@@ -887,7 +887,8 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
     {
         if (t1->sampler_dim != t2->sampler_dim)
             return false;
-        if (t1->base_type == HLSL_TYPE_TEXTURE && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
+        if ((t1->base_type == HLSL_TYPE_TEXTURE || t1->base_type == HLSL_TYPE_UAV)
+                && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
                 && !hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format))
             return false;
         if (t1->base_type == HLSL_TYPE_UAV && t1->e.resource.rasteriser_ordered != t2->e.resource.rasteriser_ordered)
