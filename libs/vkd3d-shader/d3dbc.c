@@ -2002,7 +2002,10 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
-                    /* A compilation pass applies a FLOOR operation to casts to int, so no change is necessary. */
+                    /* A compilation pass turns these into FLOOR+REINTERPRET, so we should not
+                     * reach this case unless we are missing something. */
+                    hlsl_fixme(ctx, &instr->loc, "Unlowered SM1 cast from float to integer.");
+                    break;
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
                     write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, 0, 0);
@@ -2241,6 +2244,12 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     struct hlsl_ir_node *arg3 = expr->operands[2].node;
 
     assert(instr->reg.allocated);
+
+    if (expr->op == HLSL_OP1_REINTERPRET)
+    {
+        write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, 0, 0);
+        return;
+    }
 
     if (expr->op == HLSL_OP1_CAST)
     {

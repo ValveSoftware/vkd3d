@@ -2647,10 +2647,11 @@ static bool sort_synthetic_separated_samplers_first(struct hlsl_ctx *ctx)
     return false;
 }
 
-/* Append a FLOOR before a CAST to int or uint (which is written as a mere MOV). */
+/* Turn CAST to int or uint into FLOOR + REINTERPRET (which is written as a mere MOV). */
 static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
-    struct hlsl_ir_node *arg, *floor, *cast2;
+    struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 };
+    struct hlsl_ir_node *arg, *floor, *res;
     struct hlsl_ir_expr *expr;
 
     if (instr->type != HLSL_IR_EXPR)
@@ -2665,17 +2666,15 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
     if (arg->data_type->base_type != HLSL_TYPE_FLOAT && arg->data_type->base_type != HLSL_TYPE_HALF)
         return false;
 
-    /* Check that the argument is not already a FLOOR */
-    if (arg->type == HLSL_IR_EXPR && hlsl_ir_expr(arg)->op == HLSL_OP1_FLOOR)
-        return false;
-
     if (!(floor = hlsl_new_unary_expr(ctx, HLSL_OP1_FLOOR, arg, &instr->loc)))
         return false;
     hlsl_block_add_instr(block, floor);
 
-    if (!(cast2 = hlsl_new_cast(ctx, floor, instr->data_type, &instr->loc)))
+    memset(operands, 0, sizeof(operands));
+    operands[0] = floor;
+    if (!(res = hlsl_new_expr(ctx, HLSL_OP1_REINTERPRET, operands, instr->data_type, &instr->loc)))
         return false;
-    hlsl_block_add_instr(block, cast2);
+    hlsl_block_add_instr(block, res);
 
     return true;
 }
