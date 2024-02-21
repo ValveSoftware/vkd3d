@@ -3343,6 +3343,61 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     return true;
 }
 
+static bool lower_nonfloat_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
+{
+    struct hlsl_ir_expr *expr;
+
+    if (instr->type != HLSL_IR_EXPR)
+        return false;
+    expr = hlsl_ir_expr(instr);
+    if (expr->op == HLSL_OP1_CAST || instr->data_type->base_type == HLSL_TYPE_FLOAT)
+        return false;
+
+    switch (expr->op)
+    {
+        case HLSL_OP1_ABS:
+        case HLSL_OP1_NEG:
+        case HLSL_OP2_ADD:
+        case HLSL_OP2_DIV:
+        case HLSL_OP2_MAX:
+        case HLSL_OP2_MIN:
+        case HLSL_OP2_MUL:
+        {
+            struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = {0};
+            struct hlsl_ir_node *arg, *arg_cast, *float_expr, *ret;
+            struct hlsl_type *float_type;
+            unsigned int i;
+
+            for (i = 0; i < HLSL_MAX_OPERANDS; ++i)
+            {
+                arg = expr->operands[i].node;
+                if (!arg)
+                    continue;
+
+                float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, arg->data_type->dimx);
+                if (!(arg_cast = hlsl_new_cast(ctx, arg, float_type, &instr->loc)))
+                    return false;
+                hlsl_block_add_instr(block, arg_cast);
+
+                operands[i] = arg_cast;
+            }
+
+            float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, instr->data_type->dimx);
+            if (!(float_expr = hlsl_new_expr(ctx, expr->op, operands, float_type, &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, float_expr);
+
+            if (!(ret = hlsl_new_cast(ctx, float_expr, instr->data_type, &instr->loc)))
+                return false;
+            hlsl_block_add_instr(block, ret);
+
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
 static bool lower_discard_neg(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
 {
     struct hlsl_ir_node *zero, *bool_false, *or, *cmp, *load;
@@ -5121,6 +5176,13 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     while (progress);
     remove_unreachable_code(ctx, body);
     hlsl_transform_ir(ctx, normalize_switch_cases, body, NULL);
+
+    if (profile-> major_version < 4)
+    {
+        lower_ir(ctx, lower_nonfloat_exprs, body);
+        /* Constants casted to float must be folded. */
+        hlsl_transform_ir(ctx, hlsl_fold_constant_exprs, body, NULL);
+    }
 
     lower_ir(ctx, lower_nonconstant_vector_derefs, body);
     lower_ir(ctx, lower_casts_to_bool, body);
