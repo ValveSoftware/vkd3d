@@ -1977,14 +1977,11 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             {
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
-                    /* Integers are internally represented as floats, so no change is necessary.*/
+                case HLSL_TYPE_BOOL:
+                    /* Integrals are internally represented as floats, so no change is necessary.*/
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
                     write_sm1_unary_op(ctx, buffer, D3DSIO_MOV, &instr->reg, &arg1->reg, 0, 0);
-                    break;
-
-                case HLSL_TYPE_BOOL:
-                    hlsl_fixme(ctx, &instr->loc, "SM1 cast from bool to float.");
                     break;
 
                 case HLSL_TYPE_DOUBLE:
