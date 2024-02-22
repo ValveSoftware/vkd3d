@@ -799,6 +799,7 @@ struct hlsl_buffer
     struct vkd3d_shader_location loc;
     enum hlsl_buffer_type type;
     const char *name;
+    uint32_t modifiers;
     /* Register reserved for this buffer, if any.
      * If provided, it should be of type 'b' if type is HLSL_BUFFER_CONSTANT and 't' if type is
      *   HLSL_BUFFER_TEXTURE. */
@@ -1223,7 +1224,7 @@ struct hlsl_ir_node *hlsl_new_binary_expr(struct hlsl_ctx *ctx, enum hlsl_ir_exp
         struct hlsl_ir_node *arg2);
 struct hlsl_ir_node *hlsl_new_bool_constant(struct hlsl_ctx *ctx, bool b, const struct vkd3d_shader_location *loc);
 struct hlsl_buffer *hlsl_new_buffer(struct hlsl_ctx *ctx, enum hlsl_buffer_type type, const char *name,
-        const struct hlsl_reg_reservation *reservation, const struct vkd3d_shader_location *loc);
+        uint32_t modifiers, const struct hlsl_reg_reservation *reservation, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_call(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *decl,
         const struct vkd3d_shader_location *loc);
 struct hlsl_ir_node *hlsl_new_cast(struct hlsl_ctx *ctx, struct hlsl_ir_node *node, struct hlsl_type *type,
