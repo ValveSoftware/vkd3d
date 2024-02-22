@@ -1046,6 +1046,7 @@ static bool gl_runner_draw(struct shader_runner *r,
 
         signature_element = vkd3d_shader_find_signature_element(&vs_input_signature,
                 element->name, element->index, 0);
+        ok(signature_element, "Cannot find signature element %s%u.\n", element->name, element->index);
         attribute_idx = signature_element->register_index;
         format = get_format_info(element->format, false);
 
