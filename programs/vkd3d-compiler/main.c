@@ -295,7 +295,7 @@ static bool parse_formatting(uint32_t *formatting, bool *colour, char *arg)
 {
     static const struct formatting_option
     {
-        char *name;
+        const char *name;
         enum vkd3d_shader_compile_option_formatting_flags value;
     }
     opts[] =
@@ -694,7 +694,7 @@ static bool has_colour(FILE *f)
     setupterm(NULL, fileno(f), &ret);
     if (ret != 1)
         return false;
-    supported = !!tigetstr("setaf");
+    supported = !!tigetstr((char *)"setaf");
     del_curterm(cur_term);
 
     return supported;

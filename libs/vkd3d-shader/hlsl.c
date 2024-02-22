@@ -3403,7 +3403,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
 
     static const struct
     {
-        char *name;
+        const char *name;
         unsigned int version;
     }
     technique_types[] =

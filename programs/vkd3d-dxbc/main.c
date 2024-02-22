@@ -71,7 +71,7 @@ static bool has_colour(void)
     setupterm(NULL, fileno(stdout), &ret);
     if (ret != 1)
         return false;
-    supported = !!tigetstr("setaf");
+    supported = !!tigetstr((char *)"setaf");
     del_curterm(cur_term);
 
     return supported;
