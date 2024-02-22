@@ -214,6 +214,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/uniform-semantics.shader_test \
 	tests/hlsl/vector-indexing-uniform.shader_test \
 	tests/hlsl/vector-indexing.shader_test \
+	tests/hlsl/vertex-shader-ops.shader_test \
 	tests/hlsl/writemask-assignop-0.shader_test \
 	tests/hlsl/writemask-assignop-1.shader_test \
 	tests/hlsl/writemask-assignop-2.shader_test \
