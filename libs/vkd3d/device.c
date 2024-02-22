@@ -1704,6 +1704,7 @@ static HRESULT vkd3d_init_device_caps(struct d3d12_device *device,
     {
         WARN("Disabling robust buffer access for the update after bind feature.\n");
         features->robustBufferAccess = VK_FALSE;
+        physical_device_info->robustness2_features.robustBufferAccess2 = VK_FALSE;
     }
 
     /* Select descriptor heap implementation. Forcing virtual heaps may be useful if
