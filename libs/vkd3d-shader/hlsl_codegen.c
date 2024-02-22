@@ -2903,7 +2903,7 @@ static bool lower_floor(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct
     return true;
 }
 
-/* Use 'movc' for the ternary operator. */
+/* Use movc/cmp/slt for the ternary operator. */
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 }, *replacement;
@@ -2949,8 +2949,44 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     }
     else if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
     {
-        hlsl_fixme(ctx, &instr->loc, "Ternary operator is not implemented for %s profile.", ctx->profile->name);
-        return false;
+        struct hlsl_ir_node *neg, *slt, *sum, *mul, *cond2;
+
+        /* Expression used here is "slt(<cond>) * (first - second) + second". */
+
+        if (ctx->profile->major_version == 3)
+        {
+            if (!(cond2 = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, cond, &instr->loc)))
+                return false;
+        }
+        else
+        {
+            if (!(cond2 = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, cond, cond)))
+                return false;
+        }
+        hlsl_block_add_instr(block, cond2);
+
+        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, cond2, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg);
+
+        if (!(slt = hlsl_new_binary_expr(ctx, HLSL_OP2_SLT, neg, cond2)))
+            return false;
+        hlsl_block_add_instr(block, slt);
+
+        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, second, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, neg);
+
+        if (!(sum = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, first, neg)))
+            return false;
+        hlsl_block_add_instr(block, sum);
+
+        if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, slt, sum)))
+            return false;
+        hlsl_block_add_instr(block, mul);
+
+        if (!(replacement = hlsl_new_binary_expr(ctx, HLSL_OP2_ADD, mul, second)))
+            return false;
     }
     else
     {

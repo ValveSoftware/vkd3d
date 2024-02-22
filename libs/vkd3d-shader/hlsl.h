@@ -593,6 +593,7 @@ enum hlsl_ir_expr_op
     HLSL_OP2_MUL,
     HLSL_OP2_NEQUAL,
     HLSL_OP2_RSHIFT,
+    HLSL_OP2_SLT,
 
     /* DP2ADD(a, b, c) computes the scalar product of a.xy and b.xy,
      * then adds c. */
