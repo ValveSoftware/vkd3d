@@ -5243,6 +5243,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_CENTROID
 %token KW_COLUMN_MAJOR
 %token KW_COMPILE
+%token KW_COMPUTESHADER
 %token KW_CONST
 %token KW_CONTINUE
 %token KW_DEFAULT
@@ -5250,6 +5251,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_DEPTHSTENCILVIEW
 %token KW_DISCARD
 %token KW_DO
+%token KW_DOMAINSHADER
 %token KW_DOUBLE
 %token KW_ELSE
 %token KW_EXTERN
@@ -5258,6 +5260,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_FXGROUP
 %token KW_GEOMETRYSHADER
 %token KW_GROUPSHARED
+%token KW_HULLSHADER
 %token KW_IF
 %token KW_IN
 %token KW_INLINE

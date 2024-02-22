@@ -76,6 +76,7 @@ case                    {return KW_CASE;                }
 cbuffer                 {return KW_CBUFFER;             }
 centroid                {return KW_CENTROID;            }
 column_major            {return KW_COLUMN_MAJOR;        }
+ComputeShader           {return KW_COMPUTESHADER;       }
 compile                 {return KW_COMPILE;             }
 const                   {return KW_CONST;               }
 continue                {return KW_CONTINUE;            }
@@ -83,6 +84,7 @@ DepthStencilState       {return KW_DEPTHSTENCILSTATE;   }
 DepthStencilView        {return KW_DEPTHSTENCILVIEW;    }
 default                 {return KW_DEFAULT;             }
 discard                 {return KW_DISCARD;             }
+DomainShader            {return KW_DOMAINSHADER;        }
 do                      {return KW_DO;                  }
 double                  {return KW_DOUBLE;              }
 else                    {return KW_ELSE;                }
@@ -92,6 +94,7 @@ for                     {return KW_FOR;                 }
 fxgroup                 {return KW_FXGROUP;             }
 GeometryShader          {return KW_GEOMETRYSHADER;      }
 groupshared             {return KW_GROUPSHARED;         }
+HullShader              {return KW_HULLSHADER;          }
 if                      {return KW_IF;                  }
 in                      {return KW_IN;                  }
 inline                  {return KW_INLINE;              }
