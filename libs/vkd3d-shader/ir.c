@@ -3118,6 +3118,11 @@ static void vsir_cfg_cleanup(struct vsir_cfg *cfg)
         vkd3d_string_buffer_cleanup(&cfg->debug_buffer);
 }
 
+static bool vsir_block_dominates(struct vsir_block *b1, struct vsir_block *b2)
+{
+    return bitmap_is_set(b1->dominates, b2->label - 1);
+}
+
 static enum vkd3d_result vsir_cfg_add_edge(struct vsir_cfg *cfg, struct vsir_block *block,
         struct vkd3d_shader_src_param *successor_param)
 {
@@ -3320,7 +3325,7 @@ static void vsir_cfg_compute_dominators(struct vsir_cfg *cfg)
                 if (block2->label == 0)
                     continue;
 
-                if (bitmap_is_set(block->dominates, j))
+                if (vsir_block_dominates(block, block2))
                     vkd3d_string_buffer_printf(&cfg->debug_buffer, " %u", block2->label);
             }
             TRACE("%s\n", cfg->debug_buffer.buffer);
