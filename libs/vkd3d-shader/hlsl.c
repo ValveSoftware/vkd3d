@@ -3017,7 +3017,7 @@ static void free_ir_resource_load(struct hlsl_ir_resource_load *load)
 
 static void free_ir_resource_store(struct hlsl_ir_resource_store *store)
 {
-    hlsl_src_remove(&store->resource.rel_offset);
+    hlsl_cleanup_deref(&store->resource);
     hlsl_src_remove(&store->coords);
     hlsl_src_remove(&store->value);
     vkd3d_free(store);
