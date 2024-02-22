@@ -382,6 +382,8 @@ enum dx_intrinsic_opcode
     DX_SAMPLE_B                     =  61,
     DX_SAMPLE_LOD                   =  62,
     DX_SAMPLE_GRAD                  =  63,
+    DX_SAMPLE_C                     =  64,
+    DX_SAMPLE_C_LZ                  =  65,
     DX_TEXTURE_LOAD                 =  66,
     DX_TEXTURE_STORE                =  67,
     DX_BUFFER_LOAD                  =  68,
@@ -4336,11 +4338,11 @@ static void instruction_set_texel_offset(struct vkd3d_shader_instruction *ins,
 static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
+    unsigned int clamp_idx = 0, component_count = VKD3D_VEC4_SIZE;
     struct vkd3d_shader_register coord, ddx, ddy;
     const struct sm6_value *resource, *sampler;
     struct vkd3d_shader_src_param *src_params;
     struct vkd3d_shader_instruction *ins;
-    unsigned int clamp_idx = 0;
 
     resource = operands[0];
     sampler = operands[1];
@@ -4378,6 +4380,16 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
             src_params = instruction_src_params_alloc(ins, 4, sm6);
             src_param_init_from_value(&src_params[3], operands[9]);
             break;
+        case DX_SAMPLE_C:
+            clamp_idx = 10;
+            /* fall through */
+        case DX_SAMPLE_C_LZ:
+            instruction_init_with_resource(ins, (op == DX_SAMPLE_C_LZ) ? VKD3DSIH_SAMPLE_C_LZ : VKD3DSIH_SAMPLE_C,
+                    resource, sm6);
+            src_params = instruction_src_params_alloc(ins, 4, sm6);
+            src_param_init_from_value(&src_params[3], operands[9]);
+            component_count = 1;
+            break;
         case DX_SAMPLE_GRAD:
             instruction_init_with_resource(ins, VKD3DSIH_SAMPLE_GRAD, resource, sm6);
             src_params = instruction_src_params_alloc(ins, 5, sm6);
@@ -4404,7 +4416,7 @@ static void sm6_parser_emit_dx_sample(struct sm6_parser *sm6, enum dx_intrinsic_
     src_param_init_vector_from_reg(&src_params[2], &sampler->u.handle.reg);
     instruction_set_texel_offset(ins, &operands[6], sm6);
 
-    instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
+    instruction_dst_param_init_ssa_vector(ins, component_count, sm6);
 }
 
 static void sm6_parser_emit_dx_sincos(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
@@ -4666,6 +4678,8 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_RSQRT                         ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_SAMPLE                        ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_B                      ] = {"o", "HHffffiiiff", sm6_parser_emit_dx_sample},
+    [DX_SAMPLE_C                      ] = {"o", "HHffffiiiff", sm6_parser_emit_dx_sample},
+    [DX_SAMPLE_C_LZ                   ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_GRAD                   ] = {"o", "HHffffiiifffffff", sm6_parser_emit_dx_sample},
     [DX_SAMPLE_LOD                    ] = {"o", "HHffffiiif", sm6_parser_emit_dx_sample},
     [DX_SIN                           ] = {"g", "R",    sm6_parser_emit_dx_sincos},
