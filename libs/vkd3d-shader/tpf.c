@@ -4477,7 +4477,7 @@ static void write_sm4_unary_op(const struct tpf_writer *tpf, enum vkd3d_sm4_opco
 }
 
 static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tpf, enum vkd3d_sm4_opcode opcode,
-        const struct hlsl_ir_node *dst, unsigned dst_idx, const struct hlsl_ir_node *src)
+        const struct hlsl_ir_node *dst, unsigned int dst_idx, const struct hlsl_ir_node *src)
 {
     struct sm4_instruction instr;
 
@@ -4486,7 +4486,6 @@ static void write_sm4_unary_op_with_two_destinations(const struct tpf_writer *tp
 
     assert(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
-    assert(1 - dst_idx >= 0);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
@@ -4536,7 +4535,7 @@ static void write_sm4_binary_op_dot(const struct tpf_writer *tpf, enum vkd3d_sm4
 }
 
 static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *tpf,
-        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned dst_idx,
+        enum vkd3d_sm4_opcode opcode, const struct hlsl_ir_node *dst, unsigned int dst_idx,
         const struct hlsl_ir_node *src1, const struct hlsl_ir_node *src2)
 {
     struct sm4_instruction instr;
@@ -4546,7 +4545,6 @@ static void write_sm4_binary_op_with_two_destinations(const struct tpf_writer *t
 
     assert(dst_idx < ARRAY_SIZE(instr.dsts));
     sm4_dst_from_node(&instr.dsts[dst_idx], dst);
-    assert(1 - dst_idx >= 0);
     instr.dsts[1 - dst_idx].reg.type = VKD3DSPR_NULL;
     instr.dsts[1 - dst_idx].reg.dimension = VSIR_DIMENSION_NONE;
     instr.dsts[1 - dst_idx].reg.idx_count = 0;
