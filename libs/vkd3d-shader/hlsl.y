@@ -6542,6 +6542,14 @@ type_no_void:
         {
             $$ = hlsl_get_type(ctx->cur_scope, "DepthStencilView", true, true);
         }
+    | KW_VERTEXSHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "VertexShader", true, true);
+        }
+    | KW_PIXELSHADER
+        {
+            $$ = hlsl_get_type(ctx->cur_scope, "PixelShader", true, true);
+        }
 
 type:
       type_no_void

@@ -84,6 +84,7 @@ struct fx_write_context
     uint32_t buffer_count;
     uint32_t numeric_variable_count;
     uint32_t object_variable_count;
+    uint32_t shader_variable_count;
     int status;
 
     const struct fx_write_context_ops *ops;
@@ -320,19 +321,14 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
     return value;
 }
 
-static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx)
+static const char * get_fx_4_type_name(const struct hlsl_type *type)
 {
-    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
-    uint32_t name_offset, offset, size, stride, numeric_desc;
-    uint32_t elements_count = 0;
-    const char *name;
-    static const uint32_t variable_type[] =
+    static const char * const object_type_names[] =
     {
-        [HLSL_CLASS_SCALAR] = 1,
-        [HLSL_CLASS_VECTOR] = 1,
-        [HLSL_CLASS_MATRIX] = 1,
-        [HLSL_CLASS_OBJECT] = 2,
-        [HLSL_CLASS_STRUCT] = 3,
+        [HLSL_TYPE_PIXELSHADER]      = "PixelShader",
+        [HLSL_TYPE_VERTEXSHADER]     = "VertexShader",
+        [HLSL_TYPE_RENDERTARGETVIEW] = "RenderTargetView",
+        [HLSL_TYPE_DEPTHSTENCILVIEW] = "DepthStencilView",
     };
     static const char * const texture_type_names[] =
     {
@@ -357,6 +353,39 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         [HLSL_SAMPLER_DIM_BUFFER]            = "RWBuffer",
         [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = "RWStructuredBuffer",
     };
+
+    if (type->base_type == HLSL_TYPE_TEXTURE)
+        return texture_type_names[type->sampler_dim];
+
+    if (type->base_type == HLSL_TYPE_UAV)
+        return uav_type_names[type->sampler_dim];
+
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_PIXELSHADER:
+        case HLSL_TYPE_VERTEXSHADER:
+        case HLSL_TYPE_RENDERTARGETVIEW:
+        case HLSL_TYPE_DEPTHSTENCILVIEW:
+            return object_type_names[type->base_type];
+        default:
+            return type->name;
+    }
+}
+
+static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx)
+{
+    struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
+    uint32_t name_offset, offset, size, stride, numeric_desc;
+    uint32_t elements_count = 0;
+    const char *name;
+    static const uint32_t variable_type[] =
+    {
+        [HLSL_CLASS_SCALAR] = 1,
+        [HLSL_CLASS_VECTOR] = 1,
+        [HLSL_CLASS_MATRIX] = 1,
+        [HLSL_CLASS_OBJECT] = 2,
+        [HLSL_CLASS_STRUCT] = 3,
+    };
     struct hlsl_ctx *ctx = fx->ctx;
 
     /* Resolve arrays to element type and number of elements. */
@@ -366,12 +395,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         type = hlsl_get_multiarray_element_type(type);
     }
 
-    if (type->base_type == HLSL_TYPE_TEXTURE)
-        name = texture_type_names[type->sampler_dim];
-    else if (type->base_type == HLSL_TYPE_UAV)
-        name = uav_type_names[type->sampler_dim];
-    else
-        name = type->name;
+    name = get_fx_4_type_name(type);
 
     name_offset = write_string(name, fx);
     offset = put_u32_unaligned(buffer, name_offset);
@@ -424,6 +448,8 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         static const uint32_t object_type[] =
         {
+            [HLSL_TYPE_PIXELSHADER]      = 5,
+            [HLSL_TYPE_VERTEXSHADER]     = 6,
             [HLSL_TYPE_RENDERTARGETVIEW] = 19,
             [HLSL_TYPE_DEPTHSTENCILVIEW] = 20,
         };
@@ -454,7 +480,9 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
         switch (type->base_type)
         {
             case HLSL_TYPE_DEPTHSTENCILVIEW:
+            case HLSL_TYPE_PIXELSHADER:
             case HLSL_TYPE_RENDERTARGETVIEW:
+            case HLSL_TYPE_VERTEXSHADER:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
                 break;
             case HLSL_TYPE_TEXTURE:
@@ -695,9 +723,12 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write
 
 static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
 {
+    const struct hlsl_type *type = hlsl_get_multiarray_element_type(var->data_type);
+    uint32_t elements_count = hlsl_get_multiarray_size(var->data_type);
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t semantic_offset, bind_point = ~0u;
-    uint32_t name_offset, type_offset;
+    uint32_t name_offset, type_offset, i;
+    struct hlsl_ctx *ctx = fx->ctx;
 
     if (var->reg_reservation.reg_type)
         bind_point = var->reg_reservation.reg_index;
@@ -712,8 +743,29 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
     semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
     put_u32(buffer, bind_point); /* Explicit bind point */
 
+    /* Initializer */
+    switch (type->base_type)
+    {
+        case HLSL_TYPE_TEXTURE:
+        case HLSL_TYPE_UAV:
+        case HLSL_TYPE_RENDERTARGETVIEW:
+            break;
+        case HLSL_TYPE_PIXELSHADER:
+        case HLSL_TYPE_VERTEXSHADER:
+            /* FIXME: write shader blobs, once parser support works. */
+            for (i = 0; i < elements_count; ++i)
+                put_u32(buffer, 0);
+            ++fx->shader_variable_count;
+            break;
+        default:
+            hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.\n",
+                    type->base_type);
+    }
+
     put_u32(buffer, 0); /* Annotations count */
     /* FIXME: write annotations */
+
+    ++fx->object_variable_count;
 }
 
 static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx)
@@ -809,7 +861,6 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
 static void write_objects(struct fx_write_context *fx)
 {
     struct hlsl_ir_var *var;
-    uint32_t count = 0;
 
     LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
@@ -817,10 +868,7 @@ static void write_objects(struct fx_write_context *fx)
             continue;
 
         write_fx_4_object_variable(var, fx);
-        ++count;
     }
-
-    fx->object_variable_count += count;
 }
 
 static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
@@ -857,7 +905,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Sampler state count. */
     put_u32(&buffer, 0); /* Rendertarget view count. */
     put_u32(&buffer, 0); /* Depth stencil view count. */
-    put_u32(&buffer, 0); /* Shader count. */
+    put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
     put_u32(&buffer, 0); /* Inline shader count. */
 
     set_u32(&buffer, size_offset, fx.unstructured.size);
@@ -915,7 +963,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, 0); /* Sampler state count. */
     put_u32(&buffer, 0); /* Rendertarget view count. */
     put_u32(&buffer, 0); /* Depth stencil view count. */
-    put_u32(&buffer, 0); /* Shader count. */
+    put_u32(&buffer, fx.shader_variable_count); /* Shader count. */
     put_u32(&buffer, 0); /* Inline shader count. */
     put_u32(&buffer, fx.group_count); /* Group count. */
     put_u32(&buffer, 0); /* UAV count. */

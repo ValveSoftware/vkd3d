@@ -27,7 +27,7 @@ float4 main() : sv_target
     return 0;
 }
 
-[effect todo]
+[effect]
 vertexshader vs1;
 verteXshadeR vs2;
 pixelshader ps1;
