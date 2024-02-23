@@ -1,0 +1,34 @@
+[require]
+shader model >= 5.0
+shader model < 6.0
+
+[pixel shader]
+float4 vertexshadeR;
+float4 geometryshader;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail todo]
+float4 vertexshader;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[pixel shader fail]
+float4 VertexShader;
+
+float4 main() : sv_target
+{
+    return 0;
+}
+
+[effect todo]
+vertexshader vs1;
+verteXshadeR vs2;
+pixelshader ps1;
+pixeLshadeR ps2;
