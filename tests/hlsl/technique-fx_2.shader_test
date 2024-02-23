@@ -86,7 +86,7 @@ technique10
 }
 
 % Effects without techniques are not allowed for fx_2_0
-[effect fail todo]
+[effect fail]
 float4 f;
 
 % fx_5_0 keyword fails with fx_2_0 profile

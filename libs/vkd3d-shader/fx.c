@@ -179,7 +179,6 @@ static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_co
 static int fx_write_context_cleanup(struct fx_write_context *fx)
 {
     struct type_entry *type, *next_type;
-    int status = fx->status;
 
     rb_destroy(&fx->strings, string_storage_destroy, NULL);
 
@@ -189,7 +188,7 @@ static int fx_write_context_cleanup(struct fx_write_context *fx)
         vkd3d_free(type);
     }
 
-    return status;
+    return fx->ctx->result;
 }
 
 static bool technique_matches_version(const struct hlsl_ir_var *var, const struct fx_write_context *fx)
@@ -643,14 +642,17 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     vkd3d_free(fx.unstructured.data);
     vkd3d_free(fx.structured.data);
 
-    if (!fx.status)
+    if (!fx.technique_count)
+        hlsl_error(ctx, &ctx->location, VKD3D_SHADER_ERROR_HLSL_MISSING_TECHNIQUE, "No techniques found.");
+
+    if (fx.status < 0)
+        ctx->result = fx.status;
+
+    if (!ctx->result)
     {
         out->code = buffer.data;
         out->size = buffer.size;
     }
-
-    if (fx.status < 0)
-        ctx->result = fx.status;
 
     return fx_write_context_cleanup(&fx);
 }
@@ -870,14 +872,14 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     set_status(&fx, buffer.status);
 
-    if (!fx.status)
+    if (fx.status < 0)
+        ctx->result = fx.status;
+
+    if (!ctx->result)
     {
         out->code = buffer.data;
         out->size = buffer.size;
     }
-
-    if (fx.status < 0)
-        ctx->result = fx.status;
 
     return fx_write_context_cleanup(&fx);
 }
@@ -933,14 +935,14 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 
     set_status(&fx, buffer.status);
 
-    if (!fx.status)
+    if (fx.status < 0)
+        ctx->result = fx.status;
+
+    if (!ctx->result)
     {
         out->code = buffer.data;
         out->size = buffer.size;
     }
-
-    if (fx.status < 0)
-        ctx->result = fx.status;
 
     return fx_write_context_cleanup(&fx);
 }
