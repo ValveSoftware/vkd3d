@@ -784,7 +784,9 @@ static const char * get_case_insensitive_typename(const char *name)
         "dword",
         "float",
         "matrix",
+        "pixelshader",
         "vector",
+        "vertexshader",
     };
     unsigned int i;
 
@@ -3396,8 +3398,8 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"pass",            HLSL_CLASS_OBJECT, HLSL_TYPE_PASS,          1, 1},
         {"STRING",          HLSL_CLASS_OBJECT, HLSL_TYPE_STRING,        1, 1},
         {"TEXTURE",         HLSL_CLASS_OBJECT, HLSL_TYPE_TEXTURE,       1, 1},
-        {"PIXELSHADER",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
-        {"VERTEXSHADER",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
+        {"pixelshader",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
+        {"vertexshader",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
         {"RenderTargetView",HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1},
         {"DepthStencilView",HLSL_CLASS_OBJECT, HLSL_TYPE_DEPTHSTENCILVIEW, 1, 1},
     };
