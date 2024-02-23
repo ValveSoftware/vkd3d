@@ -2083,7 +2083,7 @@ out:
 }
 #endif
 
-#if defined(SONAME_LIBDXCOMPILER) && !defined(VKD3D_CROSSTEST)
+#if (defined(SONAME_LIBDXCOMPILER) || defined(VKD3D_CROSSTEST))
 static IDxcCompiler3 *dxcompiler_create(void)
 {
     DxcCreateInstanceProc create_instance;
@@ -2095,7 +2095,11 @@ static IDxcCompiler3 *dxcompiler_create(void)
     if ((skip_dxc = getenv("VKD3D_TESTS_SKIP_DXC")) && strcmp(skip_dxc, "") != 0)
         return NULL;
 
+#ifdef VKD3D_CROSSTEST
+    dll = vkd3d_dlopen("dxcompiler.dll");
+#else
     dll = vkd3d_dlopen(SONAME_LIBDXCOMPILER);
+#endif
     ok(dll, "Failed to load dxcompiler library, %s.\n", vkd3d_dlerror());
     if (!dll)
         return NULL;
@@ -2112,7 +2116,7 @@ static IDxcCompiler3 *dxcompiler_create(void)
 
     return compiler;
 }
-#elif !defined(VKD3D_CROSSTEST)
+#else
 static IDxcCompiler3 *dxcompiler_create(void)
 {
     return NULL;
@@ -2121,9 +2125,7 @@ static IDxcCompiler3 *dxcompiler_create(void)
 
 START_TEST(shader_runner)
 {
-#ifndef VKD3D_CROSSTEST
     IDxcCompiler3 *dxc_compiler;
-#endif
 
     parse_args(argc, argv);
 
@@ -2134,7 +2136,14 @@ START_TEST(shader_runner)
 
     run_shader_tests_d3d11();
 
-    run_shader_tests_d3d12(NULL);
+    dxc_compiler = dxcompiler_create();
+    run_shader_tests_d3d12(dxc_compiler);
+
+    if (dxc_compiler)
+    {
+        IDxcCompiler3_Release(dxc_compiler);
+        print_dll_version("dxcompiler.dll");
+    }
 
     print_dll_version("d3dcompiler_47.dll");
     print_dll_version("dxgi.dll");

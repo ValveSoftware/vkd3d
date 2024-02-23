@@ -19,8 +19,10 @@ test-win-64:
   extends: .test-win
   variables:
     TEST_ARCH: "64"
+    VKD3D_TESTS_SKIP_DXC: "1"
 
 test-win-32:
   extends: .test-win
   variables:
     TEST_ARCH: "32"
+    VKD3D_TESTS_SKIP_DXC: "1"
