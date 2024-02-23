@@ -3098,6 +3098,7 @@ static void vsir_block_cleanup(struct vsir_block *block)
 
 struct vsir_cfg
 {
+    struct vkd3d_shader_message_context *message_context;
     struct vsir_program *program;
     struct vsir_block *blocks;
     struct vsir_block *entry;
@@ -3185,13 +3186,15 @@ static void vsir_cfg_dump_dot(struct vsir_cfg *cfg)
     TRACE("}\n");
 }
 
-static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program)
+static enum vkd3d_result vsir_cfg_init(struct vsir_cfg *cfg, struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
 {
     struct vsir_block *current_block = NULL;
     enum vkd3d_result ret;
     size_t i;
 
     memset(cfg, 0, sizeof(*cfg));
+    cfg->message_context = message_context;
     cfg->program = program;
     cfg->block_count = program->block_count;
 
@@ -3440,7 +3443,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         if ((result = materialize_ssas_to_temps(parser)) < 0)
             return result;
 
-        if ((result = vsir_cfg_init(&cfg, &parser->program)) < 0)
+        if ((result = vsir_cfg_init(&cfg, &parser->program, parser->message_context)) < 0)
             return result;
 
         vsir_cfg_compute_dominators(&cfg);
