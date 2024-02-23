@@ -325,6 +325,7 @@ static ID3D12RootSignature *d3d12_runner_create_root_signature(struct d3d12_shad
         sampler_desc->AddressU = sampler->u_address;
         sampler_desc->AddressV = sampler->v_address;
         sampler_desc->AddressW = sampler->w_address;
+        sampler_desc->ComparisonFunc = sampler->func;
         sampler_desc->MaxLOD = FLT_MAX;
         sampler_desc->ShaderRegister = sampler->slot;
         sampler_desc->RegisterSpace = 0;

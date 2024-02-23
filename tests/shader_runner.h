@@ -63,6 +63,7 @@ struct sampler
 
     D3D12_FILTER filter;
     D3D12_TEXTURE_ADDRESS_MODE u_address, v_address, w_address;
+    D3D12_COMPARISON_FUNC func;
 };
 
 enum resource_type
@@ -86,6 +87,7 @@ struct resource_params
     enum resource_dimension dimension;
 
     DXGI_FORMAT format;
+    bool is_shadow;
     enum texture_data_type data_type;
     unsigned int texel_size;
     unsigned int stride;

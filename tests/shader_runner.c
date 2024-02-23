@@ -324,7 +324,8 @@ static void parse_require_directive(struct shader_runner *runner, const char *li
     }
 }
 
-static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size, const char **rest)
+static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_type, unsigned int *texel_size,
+        bool *is_shadow, const char **rest)
 {
     static const struct
     {
@@ -332,6 +333,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
         enum texture_data_type data_type;
         unsigned int texel_size;
         DXGI_FORMAT format;
+        bool is_shadow;
     }
     formats[] =
     {
@@ -341,6 +343,7 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
         {"r32g32 float",        TEXTURE_DATA_FLOAT,  8, DXGI_FORMAT_R32G32_FLOAT},
         {"r32g32 int",          TEXTURE_DATA_SINT,   8, DXGI_FORMAT_R32G32_SINT},
         {"r32g32 uint",         TEXTURE_DATA_UINT,   8, DXGI_FORMAT_R32G32_UINT},
+        {"r32 float shadow",    TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT, true},
         {"r32 float",           TEXTURE_DATA_FLOAT,  4, DXGI_FORMAT_R32_FLOAT},
         {"r32 sint",            TEXTURE_DATA_SINT,   4, DXGI_FORMAT_R32_SINT},
         {"r32 uint",            TEXTURE_DATA_UINT,   4, DXGI_FORMAT_R32_UINT},
@@ -354,6 +357,8 @@ static DXGI_FORMAT parse_format(const char *line, enum texture_data_type *data_t
             if (data_type)
                 *data_type = formats[i].data_type;
             *texel_size = formats[i].texel_size;
+            if (is_shadow)
+                *is_shadow = formats[i].is_shadow;
             return formats[i].format;
         }
     }
@@ -410,11 +415,45 @@ static void parse_sampler_directive(struct sampler *sampler, const char *line)
             if (match_string(line, filters[i].string, &line))
             {
                 sampler->filter = filters[i].filter;
+                if (sampler->func)
+                    sampler->filter |= D3D12_FILTER_REDUCTION_TYPE_COMPARISON << D3D12_FILTER_REDUCTION_TYPE_SHIFT;
                 return;
             }
         }
 
         fatal_error("Unknown sampler filter '%s'.\n", line);
+    }
+    else if (match_string(line, "comparison", &line))
+    {
+        static const struct
+        {
+            const char *string;
+            D3D12_COMPARISON_FUNC func;
+        }
+        funcs[] =
+        {
+            {"less equal", D3D12_COMPARISON_FUNC_LESS_EQUAL},
+            {"not equal", D3D12_COMPARISON_FUNC_NOT_EQUAL},
+            {"greater equal", D3D12_COMPARISON_FUNC_GREATER_EQUAL},
+            {"never", D3D12_COMPARISON_FUNC_NEVER},
+            {"less", D3D12_COMPARISON_FUNC_LESS},
+            {"equal", D3D12_COMPARISON_FUNC_EQUAL},
+            {"greater", D3D12_COMPARISON_FUNC_GREATER},
+            {"always", D3D12_COMPARISON_FUNC_ALWAYS},
+        };
+        unsigned int i;
+
+        for (i = 0; i < ARRAY_SIZE(funcs); ++i)
+        {
+            if (match_string(line, funcs[i].string, &line))
+            {
+                sampler->filter |= D3D12_FILTER_REDUCTION_TYPE_COMPARISON << D3D12_FILTER_REDUCTION_TYPE_SHIFT;
+                sampler->func = funcs[i].func;
+                return;
+            }
+        }
+
+        fatal_error("Unknown sampler func '%s'.\n", line);
     }
     else
     {
@@ -426,7 +465,7 @@ static void parse_resource_directive(struct resource_params *resource, const cha
 {
     if (match_string(line, "format", &line))
     {
-        resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &line);
+        resource->format = parse_format(line, &resource->data_type, &resource->texel_size, &resource->is_shadow, &line);
     }
     else if (match_string(line, "stride", &line))
     {
@@ -513,7 +552,7 @@ static void parse_input_layout_directive(struct shader_runner *runner, const cha
         fatal_error("Malformed input layout directive '%s'.\n", line);
     line = rest;
 
-    element->format = parse_format(line, NULL, &element->texel_size, &line);
+    element->format = parse_format(line, NULL, &element->texel_size, NULL, &line);
 
     if (!(rest = strpbrk(line, " \n")))
         rest = line + strlen(line);

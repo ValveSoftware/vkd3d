@@ -1,0 +1,144 @@
+[require]
+shader model >= 4.0
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison never
+
+[srv 0]
+format r32 float shadow
+size (2d, 2, 2)
+0.5     0.5
+0.5     0.5
+
+[pixel shader]
+Texture2D<float> t : register(t0);
+SamplerComparisonState s : register(s0);
+
+float4 main() : sv_target
+{
+    float ref = 0.5, delta = 0.00000007;
+    return float4(
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref - delta),
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref),
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref + delta),
+        1.0);
+}
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 0.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison less
+
+[test]
+draw quad
+probe all rgba (1.0, 0.0, 0.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison equal
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 0.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison less equal
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 0.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison greater
+
+[test]
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison not equal
+
+[test]
+draw quad
+probe all rgba (1.0, 0.0, 1.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison greater equal
+
+[test]
+draw quad
+probe all rgba (0.0, 1.0, 1.0, 1.0)
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison always
+
+[test]
+draw quad
+probe all rgba (1.0, 1.0, 1.0, 1.0)
+
+
+[sampler 0]
+filter linear linear linear
+address clamp clamp clamp
+comparison greater
+
+% Non-constant ref
+[pixel shader]
+Texture2D<float> t : register(t0);
+SamplerComparisonState s : register(s0);
+
+float ref, delta;
+
+float4 main() : sv_target
+{
+    return float4(
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref - delta),
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref),
+        t.SampleCmpLevelZero(s, float2(0.5, 0.5), ref + delta),
+        1.0);
+}
+
+[test]
+uniform 0 float 0.5
+uniform 1 float 0.00000007
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 1.0)
+
+
+[pixel shader]
+Texture2D<float> t : register(t0);
+SamplerComparisonState s : register(s0);
+
+float ref;
+
+float4 main() : sv_target
+{
+    float delta = 0.00000007;
+    return float4(
+        t.SampleCmp(s, float2(0.5, 0.5), ref - delta),
+        t.SampleCmp(s, float2(0.5, 0.5), 0.5),
+        t.SampleCmp(s, float2(0.5, 0.5), ref + delta),
+        1.0);
+}
+
+[test]
+uniform 0 float 0.5
+draw quad
+probe all rgba (0.0, 0.0, 1.0, 1.0)

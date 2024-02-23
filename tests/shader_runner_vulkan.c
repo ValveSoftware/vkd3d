@@ -841,6 +841,31 @@ static VkSamplerAddressMode vk_address_mode_from_d3d12(D3D12_TEXTURE_ADDRESS_MOD
     }
 }
 
+static enum VkCompareOp vk_compare_op_from_d3d12(D3D12_COMPARISON_FUNC op)
+{
+    switch (op)
+    {
+        case D3D12_COMPARISON_FUNC_NEVER:
+            return VK_COMPARE_OP_NEVER;
+        case D3D12_COMPARISON_FUNC_LESS:
+            return VK_COMPARE_OP_LESS;
+        case D3D12_COMPARISON_FUNC_EQUAL:
+            return VK_COMPARE_OP_EQUAL;
+        case D3D12_COMPARISON_FUNC_LESS_EQUAL:
+            return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER:
+            return VK_COMPARE_OP_GREATER;
+        case D3D12_COMPARISON_FUNC_NOT_EQUAL:
+            return VK_COMPARE_OP_NOT_EQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER_EQUAL:
+            return VK_COMPARE_OP_GREATER_OR_EQUAL;
+        case D3D12_COMPARISON_FUNC_ALWAYS:
+            return VK_COMPARE_OP_ALWAYS;
+        default:
+            fatal_error("Unhandled compare op %#x.\n", op);
+    }
+}
+
 static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_runner *runner)
 {
     VkDescriptorSetLayoutCreateInfo set_desc = {.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -905,6 +930,8 @@ static VkDescriptorSetLayout create_descriptor_set_layout(struct vulkan_shader_r
         sampler_desc.addressModeU = vk_address_mode_from_d3d12(sampler->u_address);
         sampler_desc.addressModeV = vk_address_mode_from_d3d12(sampler->v_address);
         sampler_desc.addressModeW = vk_address_mode_from_d3d12(sampler->w_address);
+        sampler_desc.compareEnable = !!sampler->func;
+        sampler_desc.compareOp = sampler->func ? vk_compare_op_from_d3d12(sampler->func) : 0;
         sampler_desc.maxLod = FLT_MAX;
 
         VK_CALL(vkCreateSampler(runner->device, &sampler_desc, NULL, &vulkan_sampler->vk_sampler));

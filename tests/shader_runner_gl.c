@@ -36,6 +36,7 @@ struct format_info
     enum DXGI_FORMAT f;
     unsigned int component_count;
     bool is_integer;
+    bool is_shadow;
     GLenum internal_format;
     GLenum format;
     GLenum type;
@@ -283,27 +284,28 @@ static void gl_runner_cleanup(struct gl_runner *runner)
     ok(ret, "Failed to terminate EGL display connection.\n");
 }
 
-static const struct format_info *get_format_info(enum DXGI_FORMAT format)
+static const struct format_info *get_format_info(enum DXGI_FORMAT format, bool is_shadow)
 {
     size_t i;
 
     static const struct format_info format_info[] =
     {
-        {DXGI_FORMAT_UNKNOWN,            1, true,  GL_R32UI,    GL_RED_INTEGER,  GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32B32A32_FLOAT, 4, false, GL_RGBA32F,  GL_RGBA,         GL_FLOAT},
-        {DXGI_FORMAT_R32G32B32A32_UINT,  4, true,  GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32B32A32_SINT,  4, true,  GL_RGBA32I,  GL_RGBA_INTEGER, GL_INT},
-        {DXGI_FORMAT_R32G32_FLOAT,       2, false, GL_RG32F,    GL_RG,           GL_FLOAT},
-        {DXGI_FORMAT_R32G32_UINT,        2, true,  GL_RG32UI,   GL_RG_INTEGER,   GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32G32_SINT,        2, true,  GL_RG32I,    GL_RG_INTEGER,   GL_INT},
-        {DXGI_FORMAT_R32_FLOAT,          1, false, GL_R32F,     GL_RED,          GL_FLOAT},
-        {DXGI_FORMAT_R32_UINT,           1, true,  GL_R32UI,    GL_RED_INTEGER,  GL_UNSIGNED_INT},
-        {DXGI_FORMAT_R32_SINT,           1, true,  GL_R32I,     GL_RED_INTEGER,  GL_INT},
+        {DXGI_FORMAT_UNKNOWN,            1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32B32A32_FLOAT, 4, false, false, GL_RGBA32F,            GL_RGBA,            GL_FLOAT},
+        {DXGI_FORMAT_R32G32B32A32_UINT,  4, true,  false, GL_RGBA32UI,           GL_RGBA_INTEGER,    GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32B32A32_SINT,  4, true,  false, GL_RGBA32I,            GL_RGBA_INTEGER,    GL_INT},
+        {DXGI_FORMAT_R32G32_FLOAT,       2, false, false, GL_RG32F,              GL_RG,              GL_FLOAT},
+        {DXGI_FORMAT_R32G32_UINT,        2, true,  false, GL_RG32UI,             GL_RG_INTEGER,      GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32G32_SINT,        2, true,  false, GL_RG32I,              GL_RG_INTEGER,      GL_INT},
+        {DXGI_FORMAT_R32_FLOAT,          1, false, false, GL_R32F,               GL_RED,             GL_FLOAT},
+        {DXGI_FORMAT_R32_FLOAT,          1, false, true,  GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT},
+        {DXGI_FORMAT_R32_UINT,           1, true,  false, GL_R32UI,              GL_RED_INTEGER,     GL_UNSIGNED_INT},
+        {DXGI_FORMAT_R32_SINT,           1, true,  false, GL_R32I,               GL_RED_INTEGER,     GL_INT},
     };
 
     for (i = 0; i < ARRAY_SIZE(format_info); ++i)
     {
-        if (format_info[i].f == format)
+        if (format_info[i].f == format && format_info[i].is_shadow == is_shadow)
             return &format_info[i];
     }
 
@@ -314,7 +316,7 @@ static void init_resource_2d(struct gl_resource *resource, const struct resource
 {
     unsigned int offset, w, h, i;
 
-    resource->format = get_format_info(params->format);
+    resource->format = get_format_info(params->format, params->is_shadow);
     glGenTextures(1, &resource->id);
     glBindTexture(GL_TEXTURE_2D, resource->id);
     glTexStorage2D(GL_TEXTURE_2D, params->level_count,
@@ -336,7 +338,7 @@ static void init_resource_2d(struct gl_resource *resource, const struct resource
 
 static void init_resource_buffer(struct gl_resource *resource, const struct resource_params *params)
 {
-    resource->format = get_format_info(params->format);
+    resource->format = get_format_info(params->format, false);
 
     glGenBuffers(1, &resource->id);
     glBindBuffer(GL_TEXTURE_BUFFER, resource->id);
@@ -721,6 +723,31 @@ static GLenum get_texture_filter_min_gl(D3D12_FILTER filter)
         return filter & 0x10 ? GL_NEAREST_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
 }
 
+static GLenum get_compare_op_gl(D3D12_COMPARISON_FUNC op)
+{
+    switch (op)
+    {
+        case D3D12_COMPARISON_FUNC_NEVER:
+            return GL_NEVER;
+        case D3D12_COMPARISON_FUNC_LESS:
+            return GL_LESS;
+        case D3D12_COMPARISON_FUNC_EQUAL:
+            return GL_EQUAL;
+        case D3D12_COMPARISON_FUNC_LESS_EQUAL:
+            return GL_LEQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER:
+            return GL_GREATER;
+        case D3D12_COMPARISON_FUNC_NOT_EQUAL:
+            return GL_NOTEQUAL;
+        case D3D12_COMPARISON_FUNC_GREATER_EQUAL:
+            return GL_GEQUAL;
+        case D3D12_COMPARISON_FUNC_ALWAYS:
+            return GL_ALWAYS;
+        default:
+            fatal_error("Unhandled compare op %#x.\n", op);
+    }
+}
+
 static GLuint compile_graphics_shader_program(struct gl_runner *runner, ID3D10Blob **vs_blob)
 {
     struct vkd3d_shader_code vs_code, fs_code;
@@ -837,6 +864,11 @@ static bool gl_runner_draw(struct shader_runner *r,
         glSamplerParameteri(id, GL_TEXTURE_WRAP_R, get_texture_wrap_gl(sampler->w_address));
         glSamplerParameteri(id, GL_TEXTURE_MAG_FILTER, get_texture_filter_mag_gl(sampler->filter));
         glSamplerParameteri(id, GL_TEXTURE_MIN_FILTER, get_texture_filter_min_gl(sampler->filter));
+        if (sampler->func)
+        {
+            glSamplerParameteri(id, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+            glSamplerParameteri(id, GL_TEXTURE_COMPARE_FUNC, get_compare_op_gl(sampler->func));
+        }
         sampler_info[i].id = id;
     }
 
@@ -938,7 +970,7 @@ static bool gl_runner_draw(struct shader_runner *r,
         signature_element = vkd3d_shader_find_signature_element(&vs_input_signature,
                 element->name, element->index, 0);
         attribute_idx = signature_element->register_index;
-        format = get_format_info(element->format);
+        format = get_format_info(element->format, false);
 
         glBindBuffer(GL_ARRAY_BUFFER, vbo_info[element->slot].id);
         if (format->is_integer)

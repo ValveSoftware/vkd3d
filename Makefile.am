@@ -163,6 +163,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/return.shader_test \
 	tests/hlsl/round.shader_test \
 	tests/hlsl/sample-bias.shader_test \
+	tests/hlsl/sample-cmp.shader_test \
 	tests/hlsl/sample-grad.shader_test \
 	tests/hlsl/sample-level.shader_test \
 	tests/hlsl/sampler-offset.shader_test \

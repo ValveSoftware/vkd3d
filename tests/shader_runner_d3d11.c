@@ -509,7 +509,7 @@ static ID3D11SamplerState *create_sampler(ID3D11Device *device, const struct sam
     desc.AddressU = (D3D11_TEXTURE_ADDRESS_MODE)sampler->u_address;
     desc.AddressV = (D3D11_TEXTURE_ADDRESS_MODE)sampler->v_address;
     desc.AddressW = (D3D11_TEXTURE_ADDRESS_MODE)sampler->w_address;
-    desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    desc.ComparisonFunc = sampler->func;
     desc.MaxLOD = D3D11_FLOAT32_MAX;
 
     hr = ID3D11Device_CreateSamplerState(device, &desc, &d3d11_sampler);
