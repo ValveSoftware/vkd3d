@@ -5538,10 +5538,6 @@ technique10:
             struct hlsl_scope *scope = ctx->cur_scope;
             hlsl_pop_scope(ctx);
 
-            if (ctx->profile->type == VKD3D_SHADER_TYPE_EFFECT && ctx->profile->major_version == 2)
-                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
-                        "The 'technique10' keyword is invalid for this profile.");
-
             if (!add_technique(ctx, $2, scope, $3, "technique10", &@1))
                 YYABORT;
         }
