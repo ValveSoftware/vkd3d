@@ -139,11 +139,15 @@ static void vkd3d_glsl_generator_init(struct vkd3d_glsl_generator *gen,
     gen->message_context = message_context;
 }
 
-int glsl_compile(struct vsir_program *program, struct vkd3d_shader_code *out,
+int glsl_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_glsl_generator generator;
     int ret;
+
+    if ((ret = vsir_program_normalise(program, config_flags, compile_info, message_context)) < 0)
+        return ret;
 
     vkd3d_glsl_generator_init(&generator, program, message_context);
     ret = vkd3d_glsl_generator_generate(&generator, out);

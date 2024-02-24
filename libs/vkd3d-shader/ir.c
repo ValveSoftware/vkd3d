@@ -6012,7 +6012,8 @@ enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t 
         if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
             return result;
 
-        if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
+        if (compile_info->target_type != VKD3D_SHADER_TARGET_GLSL
+                && (result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
             return result;
     }
 

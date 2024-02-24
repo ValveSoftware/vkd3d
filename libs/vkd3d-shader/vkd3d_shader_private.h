@@ -1538,7 +1538,8 @@ int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, struct shader_signature *signature);
 
-int glsl_compile(struct vsir_program *program, struct vkd3d_shader_code *out,
+int glsl_compile(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_code *out,
         struct vkd3d_shader_message_context *message_context);
 
 #define SPIRV_MAX_SRC_COUNT 6

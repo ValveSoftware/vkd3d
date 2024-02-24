@@ -1576,7 +1576,7 @@ static int vkd3d_shader_parser_compile(struct vkd3d_shader_parser *parser,
         case VKD3D_SHADER_TARGET_GLSL:
             if ((ret = scan_with_parser(&scan_info, message_context, &scan_descriptor_info, parser)) < 0)
                 return ret;
-            ret = glsl_compile(program, out, message_context);
+            ret = glsl_compile(program, parser->config_flags, compile_info, out, message_context);
             vkd3d_shader_free_scan_descriptor_info1(&scan_descriptor_info);
             break;
 
