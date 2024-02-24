@@ -3991,6 +3991,39 @@ static bool intrinsic_tan(struct hlsl_ctx *ctx,
     return !!add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_DIV, sin, cos, loc);
 }
 
+static bool intrinsic_tanh(struct hlsl_ctx *ctx,
+        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_function_decl *func;
+    struct hlsl_ir_node *arg;
+    struct hlsl_type *type;
+    char *body;
+
+    static const char template[] =
+            "%s tanh(%s x)\n"
+            "{\n"
+            "    %s exp_pos, exp_neg;\n"
+            "    exp_pos = exp(x);\n"
+            "    exp_neg = exp(-x);\n"
+            "    return (exp_pos - exp_neg) / (exp_pos + exp_neg);\n"
+            "}\n";
+
+    if (!(arg = intrinsic_float_convert_arg(ctx, params, params->args[0], loc)))
+        return false;
+    type = arg->data_type;
+
+    if (!(body = hlsl_sprintf_alloc(ctx, template,
+            type->name, type->name, type->name)))
+        return false;
+
+    func = hlsl_compile_internal_function(ctx, "tanh", body);
+    vkd3d_free(body);
+    if (!func)
+        return false;
+
+    return add_user_call(ctx, func, params, loc);
+}
+
 static bool intrinsic_tex(struct hlsl_ctx *ctx, const struct parse_initializer *params,
         const struct vkd3d_shader_location *loc, const char *name, enum hlsl_sampler_dim dim)
 {
@@ -4366,6 +4399,7 @@ intrinsic_functions[] =
     {"sqrt",                                1, true,  intrinsic_sqrt},
     {"step",                                2, true,  intrinsic_step},
     {"tan",                                 1, true,  intrinsic_tan},
+    {"tanh",                                1, true,  intrinsic_tanh},
     {"tex1D",                              -1, false, intrinsic_tex1D},
     {"tex2D",                              -1, false, intrinsic_tex2D},
     {"tex2Dlod",                            2, false, intrinsic_tex2Dlod},
