@@ -299,6 +299,15 @@ enum vkd3d_shader_compile_option_name
      * \since 1.11
      */
     VKD3D_SHADER_COMPILE_OPTION_FEATURE = 0x0000000a,
+    /**
+     * If \a value is non-zero compilation will produce a child effect using
+     * shared object descriptions, as instructed by the "shared" modifier.
+     * Child effects are supported with fx_2_0, fx_4_0, and fx_4_1. This option
+     * and "shared" modifiers are ignored for fx_5_0 profile, and non-fx profiles.
+     *
+     * \since 1.12
+     */
+    VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT = 0x0000000b,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };

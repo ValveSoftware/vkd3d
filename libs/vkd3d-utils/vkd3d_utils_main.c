@@ -244,7 +244,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
 {
     struct vkd3d_shader_preprocess_info preprocess_info;
     struct vkd3d_shader_hlsl_source_info hlsl_info;
-    struct vkd3d_shader_compile_option options[4];
+    struct vkd3d_shader_compile_option options[5];
     struct vkd3d_shader_compile_info compile_info;
     struct vkd3d_shader_compile_option *option;
     struct vkd3d_shader_code byte_code;
@@ -262,7 +262,7 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
 
     if (flags & ~(D3DCOMPILE_DEBUG | D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
         FIXME("Ignoring flags %#x.\n", flags);
-    if (effect_flags)
+    if (effect_flags & ~D3DCOMPILE_EFFECT_CHILD_EFFECT)
         FIXME("Ignoring effect flags %#x.\n", effect_flags);
     if (secondary_flags)
         FIXME("Ignoring secondary flags %#x.\n", secondary_flags);
@@ -328,6 +328,13 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
         option = &options[compile_info.option_count++];
         option->name = VKD3D_SHADER_COMPILE_OPTION_BACKWARD_COMPATIBILITY;
         option->value = VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
+    }
+
+    if (effect_flags & D3DCOMPILE_EFFECT_CHILD_EFFECT)
+    {
+        option = &options[compile_info.option_count++];
+        option->name = VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT;
+        option->value = true;
     }
 
     ret = vkd3d_shader_compile(&compile_info, &byte_code, &messages);

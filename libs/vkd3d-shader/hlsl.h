@@ -922,6 +922,7 @@ struct hlsl_ctx
     uint32_t found_numthreads : 1;
 
     bool semantic_compat_mapping;
+    bool child_effect;
 };
 
 struct hlsl_resource_load_params

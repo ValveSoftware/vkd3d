@@ -39,6 +39,7 @@ enum
 {
     OPTION_HELP = CHAR_MAX + 1,
     OPTION_BUFFER_UAV,
+    OPTION_CHILD_EFFECT,
     OPTION_ENTRY,
     OPTION_FRAGMENT_COORDINATE_ORIGIN,
     OPTION_MATRIX_STORAGE_ORDER,
@@ -186,6 +187,8 @@ static void print_usage(const char *program_name)
         "  --buffer-uav=<type>   Specify the buffer type to use for buffer UAV bindings.\n"
         "                        Valid values are 'buffer-texture' (default) and\n"
         "                        'storage-buffer'.\n"
+        "  --child-effect        Compile effect as a child effect. This option is only meaningful\n"
+        "                        for fx_2_0 and fx_4_0/fx_4_1 profiles.\n"
         "  -e, --entry=<name>    Use <name> as the entry point (default is \"main\").\n"
         "  -E                    Preprocess the source code instead of compiling it.\n"
         "  --formatting=<flags>  Specify the formatting options for text output.\n"
@@ -479,6 +482,7 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
     {
         {"help",                       no_argument,       NULL, OPTION_HELP},
         {"buffer-uav",                 required_argument, NULL, OPTION_BUFFER_UAV},
+        {"child-effect",               no_argument,       NULL, OPTION_CHILD_EFFECT},
         {"entry",                      required_argument, NULL, OPTION_ENTRY},
         {"fragment-coordinate-origin", required_argument, NULL, OPTION_FRAGMENT_COORDINATE_ORIGIN},
         {"matrix-storage-order",       required_argument, NULL, OPTION_MATRIX_STORAGE_ORDER},
@@ -521,6 +525,10 @@ static bool parse_command_line(int argc, char **argv, struct options *options)
                     return false;
                 }
                 add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_BUFFER_UAV, buffer_uav);
+                break;
+
+            case OPTION_CHILD_EFFECT:
+                add_compile_option(options, VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT, 1);
                 break;
 
             case OPTION_ENTRY:

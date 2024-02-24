@@ -3597,6 +3597,10 @@ static bool hlsl_ctx_init(struct hlsl_ctx *ctx, const struct vkd3d_shader_compil
         {
             ctx->semantic_compat_mapping = option->value & VKD3D_SHADER_COMPILE_OPTION_BACKCOMPAT_MAP_SEMANTIC_NAMES;
         }
+        else if (option->name == VKD3D_SHADER_COMPILE_OPTION_CHILD_EFFECT)
+        {
+            ctx->child_effect = !!option->value;
+        }
     }
 
     return true;
