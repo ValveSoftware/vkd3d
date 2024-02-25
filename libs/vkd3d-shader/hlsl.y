@@ -6874,6 +6874,8 @@ var_modifiers:
         {
             if (!strcmp($1, "precise"))
                 $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, &@1);
+            else if (!strcmp($1, "single"))
+                $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_SINGLE, &@1);
             else
                 hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_UNKNOWN_MODIFIER,
                         "Unknown modifier %s.", debugstr_a($1));
