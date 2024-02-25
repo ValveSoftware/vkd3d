@@ -1,0 +1,41 @@
+[pixel shader]
+// 'precise' is not a keyword
+float4 precise;
+
+float4 main() : sv_target
+{
+    return precise;
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+[pixel shader fail(sm>=6)]
+precise float4 var;
+typedef float4 precise;
+
+precise main() : sv_target
+{
+    return var;
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)
+
+[pixel shader]
+float4 precise;
+precise float4 var;
+
+float4 main() : sv_target
+{
+    return precise;
+}
+
+[test]
+uniform 0 float4 0.1 0.2 0.3 0.4
+draw quad
+probe all rgba (0.1, 0.2, 0.3, 0.4)

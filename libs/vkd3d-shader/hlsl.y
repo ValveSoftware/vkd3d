@@ -5363,7 +5363,6 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %token KW_PACKOFFSET
 %token KW_PASS
 %token KW_PIXELSHADER
-%token KW_PRECISE
 %token KW_RASTERIZERORDEREDBUFFER
 %token KW_RASTERIZERORDEREDSTRUCTUREDBUFFER
 %token KW_RASTERIZERORDEREDTEXTURE1D
@@ -6823,10 +6822,6 @@ var_modifiers:
         {
             $$ = add_modifiers(ctx, $2, HLSL_STORAGE_NOPERSPECTIVE, &@1);
         }
-    | KW_PRECISE var_modifiers
-        {
-            $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, &@1);
-        }
     | KW_SHARED var_modifiers
         {
             $$ = add_modifiers(ctx, $2, HLSL_STORAGE_SHARED, &@1);
@@ -6875,7 +6870,14 @@ var_modifiers:
         {
             $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_INLINE, &@1);
         }
-
+    | var_identifier var_modifiers
+        {
+            if (!strcmp($1, "precise"))
+                $$ = add_modifiers(ctx, $2, HLSL_MODIFIER_PRECISE, &@1);
+            else
+                hlsl_error(ctx, &@1, VKD3D_SHADER_ERROR_HLSL_UNKNOWN_MODIFIER,
+                        "Unknown modifier %s.", debugstr_a($1));
+        }
 
 complex_initializer:
       initializer_expr

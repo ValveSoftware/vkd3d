@@ -109,7 +109,6 @@ packoffset              {return KW_PACKOFFSET;          }
 pass                    {return KW_PASS;                }
 PixelShader             {return KW_PIXELSHADER;         }
 pixelshader             {return KW_PIXELSHADER;         }
-precise                 {return KW_PRECISE;             }
 RasterizerOrderedBuffer           {return KW_RASTERIZERORDEREDBUFFER;            }
 RasterizerOrderedStructuredBuffer {return KW_RASTERIZERORDEREDSTRUCTUREDBUFFER;  }
 RasterizerOrderedTexture1D        {return KW_RASTERIZERORDEREDTEXTURE1D;         }
