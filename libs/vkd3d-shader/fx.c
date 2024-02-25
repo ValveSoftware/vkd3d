@@ -64,6 +64,7 @@ struct fx_write_context_ops
     uint32_t (*write_type)(const struct hlsl_type *type, struct fx_write_context *fx);
     void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     void (*write_pass)(struct hlsl_ir_var *var, struct fx_write_context *fx);
+    bool are_child_effects_supported;
 };
 
 struct fx_write_context
@@ -84,8 +85,11 @@ struct fx_write_context
     uint32_t buffer_count;
     uint32_t numeric_variable_count;
     uint32_t object_variable_count;
+    uint32_t shared_object_count;
     uint32_t shader_variable_count;
     int status;
+
+    bool child_effect;
 
     const struct fx_write_context_ops *ops;
 };
@@ -175,6 +179,8 @@ static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_co
 
     rb_init(&fx->strings, string_storage_compare);
     list_init(&fx->types);
+
+    fx->child_effect = fx->ops->are_child_effects_supported && ctx->child_effect;
 }
 
 static int fx_write_context_cleanup(struct fx_write_context *fx)
@@ -689,6 +695,7 @@ static const struct fx_write_context_ops fx_4_ops =
     .write_type = write_fx_4_type,
     .write_technique = write_fx_4_technique,
     .write_pass = write_fx_4_pass,
+    .are_child_effects_supported = true,
 };
 
 static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -742,6 +749,12 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
 
     semantic_offset = put_u32(buffer, semantic_offset); /* Semantic */
     put_u32(buffer, bind_point); /* Explicit bind point */
+
+    if (fx->child_effect && var->storage_modifiers & HLSL_STORAGE_SHARED)
+    {
+        ++fx->shared_object_count;
+        return;
+    }
 
     /* Initializer */
     switch (type->base_type)
@@ -858,13 +871,19 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
     }
 }
 
-static void write_objects(struct fx_write_context *fx)
+static void write_objects(struct fx_write_context *fx, bool shared)
 {
     struct hlsl_ir_var *var;
+
+    if (shared && !fx->child_effect)
+        return;
 
     LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         if (!is_object_variable(var))
+            continue;
+
+        if (fx->child_effect && (shared != !!(var->storage_modifiers & HLSL_STORAGE_SHARED)))
             continue;
 
         write_fx_4_object_variable(var, fx);
@@ -882,9 +901,9 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
     write_buffers(&fx);
-    write_objects(&fx);
+    write_objects(&fx, false);
     /* TODO: shared buffers */
-    /* TODO: shared objects */
+    write_objects(&fx, true);
 
     write_techniques(ctx->globals, &fx);
 
@@ -894,7 +913,7 @@ static int hlsl_fx_4_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&buffer, fx.object_variable_count); /* Object variable count. */
     put_u32(&buffer, 0); /* Pool buffer count. */
     put_u32(&buffer, 0); /* Pool variable count. */
-    put_u32(&buffer, 0); /* Pool object count. */
+    put_u32(&buffer, fx.shared_object_count); /* Shared object count. */
     put_u32(&buffer, fx.technique_count);
     size_offset = put_u32(&buffer, 0); /* Unstructured size. */
     put_u32(&buffer, 0); /* String count. */
@@ -941,7 +960,7 @@ static int hlsl_fx_5_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     put_u32(&fx.unstructured, 0); /* Empty string placeholder. */
 
     write_buffers(&fx);
-    write_objects(&fx);
+    write_objects(&fx, false);
     /* TODO: interface variables */
 
     write_groups(&fx);
