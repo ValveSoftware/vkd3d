@@ -15,7 +15,7 @@ float4 main(in float4 res : COLOR1) : sv_target
 
 
 % Check that -0.0f is not less than 0.0f
-[vertex shader todo(sm<4)]
+[vertex shader]
 float a;
 
 void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos : sv_position)
@@ -28,11 +28,11 @@ void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos 
 [test]
 if(sm<4)  uniform 0 float 0.0
 if(sm>=4) uniform 0 float4 0.0 0.0 0.0 0.0
-todo(sm<4) draw quad
+draw quad
 probe all rgba (0.0, 0.0, 0.0, 0.0)
 
 
-[vertex shader todo(sm<4)]
+[vertex shader]
 int a, b;
 
 void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos : sv_position)
@@ -49,12 +49,12 @@ void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos 
 if(sm<4)  uniform 0 float 3
 if(sm<4)  uniform 4 float 4
 if(sm>=4) uniform 0 int4 3 4 0 0
-todo(sm<4) draw quad
+draw quad
 probe all rgba (0.0, 1.0, 0.0, 1.0)
 if(sm<4)  uniform 0 float -2
 if(sm<4)  uniform 4 float -2
 if(sm>=4) uniform 0 int4 -2 -2 0 0
-todo(sm<4) draw quad
+draw quad
 probe all rgba (1.0, 0.0, 0.0, 1.0)
 
 
