@@ -389,6 +389,7 @@ enum dx_intrinsic_opcode
     DX_BUFFER_LOAD                  =  68,
     DX_BUFFER_STORE                 =  69,
     DX_GET_DIMENSIONS               =  72,
+    DX_TEXTURE_GATHER               =  73,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_DERIV_COARSEX                =  83,
@@ -2108,6 +2109,15 @@ static bool sm6_value_is_constant_zero(const struct sm6_value *value)
 static inline bool sm6_value_is_undef(const struct sm6_value *value)
 {
     return sm6_value_is_register(value) && value->u.reg.type == VKD3DSPR_UNDEF;
+}
+
+static bool sm6_value_vector_is_constant_or_undef(const struct sm6_value **values, unsigned int count)
+{
+    unsigned int i;
+    for (i = 0; i < count; ++i)
+        if (!sm6_value_is_constant(values[i]) && !sm6_value_is_undef(values[i]))
+            return false;
+    return true;
 }
 
 static bool sm6_value_is_icb(const struct sm6_value *value)
@@ -4612,6 +4622,58 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
         src_param_init_from_value(src_param, value);
 }
 
+static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_register coord, offset;
+    const struct sm6_value *resource, *sampler;
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+    unsigned int swizzle;
+    bool extended_offset;
+
+    resource = operands[0];
+    sampler = operands[1];
+    if (!sm6_value_validate_is_texture_handle(resource, op, sm6)
+            || !sm6_value_validate_is_sampler_handle(sampler, op, sm6))
+    {
+        return;
+    }
+
+    if (!sm6_parser_emit_coordinate_construct(sm6, &operands[2], VKD3D_VEC4_SIZE, NULL, state, &coord))
+        return;
+
+    if ((extended_offset = !sm6_value_vector_is_constant_or_undef(&operands[6], 2))
+            && !sm6_parser_emit_coordinate_construct(sm6, &operands[6], 2, NULL, state, &offset))
+    {
+        return;
+    }
+
+    ins = state->ins;
+    instruction_init_with_resource(ins, extended_offset ? VKD3DSIH_GATHER4_PO : VKD3DSIH_GATHER4, resource, sm6);
+    if (!(src_params = instruction_src_params_alloc(ins, 3 + extended_offset, sm6)))
+        return;
+
+    src_param_init_vector_from_reg(&src_params[0], &coord);
+    if (extended_offset)
+        src_param_init_vector_from_reg(&src_params[1], &offset);
+    else
+        instruction_set_texel_offset(ins, &operands[6], sm6);
+    src_param_init_vector_from_reg(&src_params[1 + extended_offset], &resource->u.handle.reg);
+    src_param_init_vector_from_reg(&src_params[2 + extended_offset], &sampler->u.handle.reg);
+    /* Swizzle stored in the sampler parameter is the scalar component index to be gathered. */
+    swizzle = sm6_value_get_constant_uint(operands[8]);
+    if (swizzle >= VKD3D_VEC4_SIZE)
+    {
+        WARN("Invalid swizzle %#x.\n", swizzle);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Swizzle %#x for a texture gather operation is invalid.", swizzle);
+    }
+    src_params[2 + extended_offset].swizzle = swizzle;
+
+    instruction_dst_param_init_ssa_vector(ins, VKD3D_VEC4_SIZE, sm6);
+}
+
 static void sm6_parser_emit_dx_texture_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -4791,6 +4853,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_SQRT                          ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_TEXTURE_GATHER                ] = {"o", "HHffffiic", sm6_parser_emit_dx_texture_gather},
     [DX_TEXTURE_LOAD                  ] = {"o", "HiiiiCCC", sm6_parser_emit_dx_texture_load},
     [DX_TEXTURE_STORE                 ] = {"v", "Hiiiooooc", sm6_parser_emit_dx_texture_store},
     [DX_UBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
