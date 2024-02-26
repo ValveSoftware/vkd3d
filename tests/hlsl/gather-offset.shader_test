@@ -99,3 +99,19 @@ float4 main() : sv_target
 [test]
 todo(sm>=6) draw quad
 probe all rgba (0.0, 0.4, 0.0, 0.4)
+
+
+[pixel shader]
+sampler s;
+Texture2D t;
+uniform int2 offset;
+
+float4 main() : sv_target
+{
+    return t.Gather(s, float2(0.2, 0.2), offset);
+}
+
+[test]
+uniform 0 int4 1 0 0 0
+todo(sm>=6) draw quad
+probe all rgba (0.1, 0.2, 0.2, 0.1)
