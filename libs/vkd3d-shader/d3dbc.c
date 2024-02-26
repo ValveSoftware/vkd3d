@@ -2334,10 +2334,14 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             break;
 
         case HLSL_OP2_SLT:
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
+                hlsl_fixme(ctx, &instr->loc, "Lower SLT instructions for pixel shaders.");
             write_sm1_binary_op(ctx, buffer, D3DSIO_SLT, &instr->reg, &arg1->reg, &arg2->reg);
             break;
 
         case HLSL_OP3_CMP:
+            if (ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
+                hlsl_fixme(ctx, &instr->loc, "Lower CMP instructions for vertex shaders.");
             write_sm1_ternary_op(ctx, buffer, D3DSIO_CMP, &instr->reg, &arg1->reg, &arg2->reg, &arg3->reg);
             break;
 

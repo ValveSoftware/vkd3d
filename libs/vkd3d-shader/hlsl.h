@@ -594,6 +594,7 @@ enum hlsl_ir_expr_op
     HLSL_OP2_MUL,
     HLSL_OP2_NEQUAL,
     HLSL_OP2_RSHIFT,
+    /* SLT(a, b) retrieves 1.0 if (a < b), else 0.0. Only used for SM1-SM3 target vertex shaders. */
     HLSL_OP2_SLT,
 
     /* DP2ADD(a, b, c) computes the scalar product of a.xy and b.xy,
