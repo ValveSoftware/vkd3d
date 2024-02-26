@@ -2277,8 +2277,8 @@ HRESULT vkd3d_create_image_resource(ID3D12Device *device,
     object->ID3D12Resource2_iface.lpVtbl = &d3d12_resource_vtbl;
     object->refcount = 1;
     object->internal_refcount = 1;
-    object->desc = create_info->desc;
-    object->format = vkd3d_format_from_d3d12_resource_desc(d3d12_device, &create_info->desc, 0);
+    d3d12_resource_desc1_from_desc(&object->desc, &create_info->desc);
+    object->format = vkd3d_format_from_d3d12_resource_desc(d3d12_device, &object->desc, 0);
     object->u.vk_image = create_info->vk_image;
     object->flags = VKD3D_RESOURCE_EXTERNAL;
     object->flags |= create_info->flags & VKD3D_RESOURCE_PUBLIC_FLAGS;

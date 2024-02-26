@@ -769,6 +769,14 @@ HRESULT d3d12_reserved_resource_create(struct d3d12_device *device,
         const D3D12_CLEAR_VALUE *optimized_clear_value, struct d3d12_resource **resource);
 struct d3d12_resource *unsafe_impl_from_ID3D12Resource(ID3D12Resource *iface);
 
+static inline void d3d12_resource_desc1_from_desc(D3D12_RESOURCE_DESC1 *desc1, const D3D12_RESOURCE_DESC *desc)
+{
+    memcpy(desc1, desc, sizeof(*desc));
+    desc1->SamplerFeedbackMipRegion.Width = 0;
+    desc1->SamplerFeedbackMipRegion.Height = 0;
+    desc1->SamplerFeedbackMipRegion.Depth = 0;
+}
+
 HRESULT vkd3d_allocate_buffer_memory(struct d3d12_device *device, VkBuffer vk_buffer,
         const D3D12_HEAP_PROPERTIES *heap_properties, D3D12_HEAP_FLAGS heap_flags,
         VkDeviceMemory *vk_memory, uint32_t *vk_memory_type, VkDeviceSize *vk_memory_size);

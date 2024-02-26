@@ -3733,14 +3733,6 @@ static void STDMETHODCALLTYPE d3d12_device_CopyDescriptorsSimple(ID3D12Device7 *
             1, &src_descriptor_range_offset, &descriptor_count, descriptor_heap_type);
 }
 
-static void d3d12_resource_desc1_from_desc(D3D12_RESOURCE_DESC1 *desc1, const D3D12_RESOURCE_DESC *desc)
-{
-    memcpy(desc1, desc, sizeof(*desc));
-    desc1->SamplerFeedbackMipRegion.Width = 0;
-    desc1->SamplerFeedbackMipRegion.Height = 0;
-    desc1->SamplerFeedbackMipRegion.Depth = 0;
-}
-
 static void d3d12_resource_allocation_info1_from_vkd3d(D3D12_RESOURCE_ALLOCATION_INFO1 *result,
         const struct vkd3d_resource_allocation_info *info)
 {
