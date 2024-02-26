@@ -104,6 +104,13 @@ static bool compare_uint(unsigned int x, unsigned int y, unsigned int max_diff)
     return diff <= max_diff;
 }
 
+static bool compare_uint64(uint64_t x, uint64_t y, uint64_t max_diff)
+{
+    uint64_t diff = x > y ? x - y : y - x;
+
+    return diff <= max_diff;
+}
+
 static bool compare_color(DWORD c1, DWORD c2, BYTE max_diff)
 {
     return compare_uint(c1 & 0xff, c2 & 0xff, max_diff)
@@ -132,6 +139,28 @@ static bool compare_float(float f, float g, unsigned int ulps)
         y = INT_MIN - y;
 
     return compare_uint(x, y, ulps);
+}
+
+static bool compare_double(double f, double g, unsigned int ulps)
+{
+    int64_t x, y;
+    union
+    {
+        double f;
+        int64_t i;
+    } u;
+
+    u.f = f;
+    x = u.i;
+    u.f = g;
+    y = u.i;
+
+    if (x < 0)
+        x = INT64_MIN - x;
+    if (y < 0)
+        y = INT64_MIN - y;
+
+    return compare_uint64(x, y, ulps);
 }
 
 static inline bool compare_uvec4(const struct uvec4 *v1, const struct uvec4 *v2)
@@ -167,9 +196,19 @@ static float get_readback_float(const struct resource_readback *rb, unsigned int
     return *(float *)get_readback_data(rb, x, y, 0, sizeof(float));
 }
 
+static double get_readback_double(const struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return *(double *)get_readback_data(rb, x, y, 0, sizeof(double));
+}
+
 static unsigned int get_readback_uint(const struct resource_readback *rb, unsigned int x, unsigned int y, unsigned int z)
 {
     return *(unsigned int*)get_readback_data(rb, x, y, z, sizeof(unsigned int));
+}
+
+static uint64_t get_readback_uint64(const struct resource_readback *rb, unsigned int x, unsigned int y)
+{
+    return *(uint64_t*)get_readback_data(rb, x, y, 0, sizeof(uint64_t));
 }
 
 static const struct vec4 *get_readback_vec4(const struct resource_readback *rb, unsigned int x, unsigned int y)
@@ -211,6 +250,35 @@ static inline void check_readback_data_float_(unsigned int line, const struct re
     ok_(line)(all_match, "Got %.8e, expected %.8e at (%u, %u).\n", got, expected, x, y);
 }
 
+#define check_readback_data_double(a, b, c, d) check_readback_data_double_(__LINE__, a, b, c, d)
+static inline void check_readback_data_double_(unsigned int line, const struct resource_readback *rb,
+        const RECT *rect, double expected, unsigned int max_diff)
+{
+    RECT r = {0, 0, rb->width, rb->height};
+    unsigned int x = 0, y;
+    bool all_match = true;
+    double got = 0;
+
+    if (rect)
+        r = *rect;
+
+    for (y = r.top; y < r.bottom; ++y)
+    {
+        for (x = r.left; x < r.right; ++x)
+        {
+            got = get_readback_double(rb, x, y);
+            if (!compare_double(got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got %.15le, expected %.15le at (%u, %u).\n", got, expected, x, y);
+}
+
 #define check_readback_data_uint(a, b, c, d) check_readback_data_uint_(__LINE__, a, b, c, d)
 static inline void check_readback_data_uint_(unsigned int line, struct resource_readback *rb,
         const D3D12_BOX *box, unsigned int expected, unsigned int max_diff)
@@ -243,6 +311,35 @@ static inline void check_readback_data_uint_(unsigned int line, struct resource_
             break;
     }
     ok_(line)(all_match, "Got 0x%08x, expected 0x%08x at (%u, %u, %u).\n", got, expected, x, y, z);
+}
+
+#define check_readback_data_uint64(a, b, c, d) check_readback_data_uint64_(__LINE__, a, b, c, d)
+static inline void check_readback_data_uint64_(unsigned int line, struct resource_readback *rb,
+        const D3D12_BOX *box, uint64_t expected, unsigned int max_diff)
+{
+    D3D12_BOX b = {0, 0, 0, rb->width, rb->height, rb->depth};
+    unsigned int x = 0, y = 0;
+    bool all_match = true;
+    uint64_t got = 0;
+
+    if (box)
+        b = *box;
+
+    for (y = b.top; y < b.bottom; ++y)
+    {
+        for (x = b.left; x < b.right; ++x)
+        {
+            got = get_readback_uint64(rb, x, y);
+            if (!compare_uint64(got, expected, max_diff))
+            {
+                all_match = false;
+                break;
+            }
+        }
+        if (!all_match)
+            break;
+    }
+    ok_(line)(all_match, "Got 0x%016"PRIx64", expected 0x%016"PRIx64" at (%u, %u).\n", got, expected, x, y);
 }
 
 #define check_readback_data_vec4(a, b, c, d) check_readback_data_vec4_(__LINE__, a, b, c, d)

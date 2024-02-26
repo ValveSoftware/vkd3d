@@ -639,7 +639,7 @@ static void read_uint4(const char **line, struct uvec4 *v, bool is_uniform)
     read_uint(line, &v->w, is_uniform);
 }
 
-static void read_int64(const char **line, int64_t *i)
+static void read_int64(const char **line, int64_t *i, bool is_uniform)
 {
     char *rest;
     int64_t val;
@@ -647,14 +647,14 @@ static void read_int64(const char **line, int64_t *i)
     errno = 0;
     val = strtoll(*line, &rest, 0);
 
-    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+    if (errno != 0 || (is_uniform && *rest != '\0' && !isspace((unsigned char)*rest)))
         fatal_error("Malformed int64 constant '%s'.\n", *line);
 
     *i = val;
-    *line = rest;
+    *line = rest + (!is_uniform && *rest == ',');
 }
 
-static void read_uint64(const char **line, uint64_t *u)
+static void read_uint64(const char **line, uint64_t *u, bool is_uniform)
 {
     char *rest;
     uint64_t val;
@@ -662,23 +662,23 @@ static void read_uint64(const char **line, uint64_t *u)
     errno = 0;
     val = strtoull(*line, &rest, 0);
 
-    if (errno != 0 || (*rest != '\0' && !isspace((unsigned char)*rest)))
+    if (errno != 0 || (is_uniform && *rest != '\0' && !isspace((unsigned char)*rest)))
         fatal_error("Malformed uint64 constant '%s'.\n", *line);
 
     *u = val;
-    *line = rest;
+    *line = rest + (!is_uniform && *rest == ',');
 }
 
 static void read_int64_t2(const char **line, struct i64vec2 *v)
 {
-    read_int64(line, &v->x);
-    read_int64(line, &v->y);
+    read_int64(line, &v->x, true);
+    read_int64(line, &v->y, true);
 }
 
 static void read_uint64_t2(const char **line, struct u64vec2 *v)
 {
-    read_uint64(line, &v->x);
-    read_uint64(line, &v->y);
+    read_uint64(line, &v->x, true);
+    read_uint64(line, &v->y, true);
 }
 
 static void parse_test_directive(struct shader_runner *runner, const char *line)
@@ -950,6 +950,38 @@ static void parse_test_directive(struct shader_runner *runner, const char *line)
                 read_uint(&line, &expect, false);
             line = close_parentheses(line);
             todo_if(runner->is_todo) check_readback_data_uint(rb, &box, expect, 0);
+        }
+        else if (match_string(line, "rui64", &line) || (is_signed = match_string(line, "ri64", &line)))
+        {
+            uint64_t expect;
+            D3D12_BOX box;
+
+            box.left = rect.left;
+            box.right = rect.right;
+            box.top = rect.top;
+            box.bottom = rect.bottom;
+            box.front = 0;
+            box.back = 1;
+            if (*line != '(')
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            ++line;
+            if (is_signed)
+                read_int64(&line, (int64_t *)&expect, false);
+            else
+                read_uint64(&line, &expect, false);
+            line = close_parentheses(line);
+            todo_if(runner->is_todo) check_readback_data_uint64(rb, &box, expect, 0);
+        }
+        else if (match_string(line, "rd", &line))
+        {
+            double expect;
+
+            ret = sscanf(line, "( %lf ) %u", &expect, &ulps);
+            if (ret < 1)
+                fatal_error("Malformed probe arguments '%s'.\n", line);
+            if (ret < 2)
+                ulps = 0;
+            todo_if(runner->is_todo) check_readback_data_double(rb, &rect, expect, ulps);
         }
         else if (match_string(line, "r", &line))
         {

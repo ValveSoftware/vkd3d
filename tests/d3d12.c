@@ -52,13 +52,6 @@ static bool compare_uint16(uint16_t a, uint16_t b, unsigned int max_diff)
     return abs(a - b) <= max_diff;
 }
 
-static bool compare_uint64(uint64_t a, uint64_t b, unsigned int max_diff)
-{
-    uint64_t diff = a > b ? a - b : b - a;
-
-    return diff <= max_diff;
-}
-
 static ULONG get_refcount(void *iface)
 {
     IUnknown *unk = iface;
@@ -244,11 +237,6 @@ static uint16_t get_readback_uint16(struct resource_readback *rb, unsigned int x
     return *(uint16_t *)get_readback_data(rb, x, y, 0, sizeof(uint16_t));
 }
 
-static uint64_t get_readback_uint64(struct resource_readback *rb, unsigned int x, unsigned int y)
-{
-    return *(uint64_t *)get_readback_data(rb, x, y, 0, sizeof(uint64_t));
-}
-
 #define check_sub_resource_float(a, b, c, d, e, f) check_sub_resource_float_(__LINE__, a, b, c, d, e, f)
 static void check_sub_resource_float_(unsigned int line, ID3D12Resource *resource,
         unsigned int sub_resource_idx, ID3D12CommandQueue *queue, ID3D12GraphicsCommandList *command_list,
@@ -341,35 +329,6 @@ static void check_sub_resource_uint16_(unsigned int line, ID3D12Resource *resour
     get_resource_readback_with_command_list(resource, sub_resource_idx, &rb, queue, command_list);
     check_readback_data_uint16_(line, &rb.rb, NULL, expected, max_diff);
     release_resource_readback(&rb);
-}
-
-#define check_readback_data_uint64(a, b, c, d) check_readback_data_uint64_(__LINE__, a, b, c, d)
-static void check_readback_data_uint64_(unsigned int line, struct resource_readback *rb,
-        const RECT *rect, uint64_t expected, unsigned int max_diff)
-{
-    RECT r = {0, 0, rb->width, rb->height};
-    unsigned int x = 0, y;
-    bool all_match = true;
-    uint64_t got = 0;
-
-    if (rect)
-        r = *rect;
-
-    for (y = r.top; y < r.bottom; ++y)
-    {
-        for (x = r.left; x < r.right; ++x)
-        {
-            got = get_readback_uint64(rb, x, y);
-            if (!compare_uint64(got, expected, max_diff))
-            {
-                all_match = false;
-                break;
-            }
-        }
-        if (!all_match)
-            break;
-    }
-    ok_(line)(all_match, "Got %#"PRIx64", expected %#"PRIx64" at (%u, %u).\n", got, expected, x, y);
 }
 
 #define check_sub_resource_uint64(a, b, c, d, e, f) check_sub_resource_uint64_(__LINE__, a, b, c, d, e, f)

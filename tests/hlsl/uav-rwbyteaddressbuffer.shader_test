@@ -1,0 +1,59 @@
+[require]
+shader model >= 5.0
+
+[uav 1]
+format r32 float
+size (buffer, 4)
+
+0.1 0.2 0.3 0.4
+
+[pixel shader todo]
+RWByteAddressBuffer u : register(u1);
+
+float4 main() : sv_target
+{
+    u.Store(0, 10);
+    u.Store(4, 11.1f);
+    return 0;
+}
+
+[test]
+todo(sm<6) draw quad
+probe uav 1 (0) ri (10)
+if(sm<6) probe uav 1 (1) ri (11)
+if(sm>=6) probe uav 1 (1) r (11.1)
+
+
+[pixel shader todo]
+RWByteAddressBuffer u : register(u1);
+
+float4 main() : sv_target
+{
+    u.Store(0, (double)12.2);
+    return 0;
+}
+
+[test]
+todo draw quad
+if(sm<6) probe uav 1 (0) ri (12)
+if(sm>=6) probe uav 1 (0) rd (12.2)
+
+
+% SM 6 add support for templated Store<>().
+[require]
+shader model >= 6.0
+
+[pixel shader]
+RWByteAddressBuffer u : register(u1);
+
+float4 main() : sv_target
+{
+    u.Store<int64_t>(0, (int64_t)-12);
+    u.Store<double>(8, 13.3);
+    return 0;
+}
+
+[test]
+todo draw quad
+probe uav 1 (0) ri64 (-12)
+probe uav 1 (1) rd (13.3)

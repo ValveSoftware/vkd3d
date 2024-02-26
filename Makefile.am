@@ -203,6 +203,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/uav-load.shader_test \
 	tests/hlsl/uav-out-param.shader_test \
 	tests/hlsl/uav-rwbuffer.shader_test \
+	tests/hlsl/uav-rwbyteaddressbuffer.shader_test \
 	tests/hlsl/uav-rwstructuredbuffer.shader_test \
 	tests/hlsl/uav-rwtexture.shader_test \
 	tests/hlsl/uniform-parameters.shader_test \
