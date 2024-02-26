@@ -2500,7 +2500,7 @@ static void write_sm1_store(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *
 
     if (store->lhs.var->data_type->class == HLSL_CLASS_MATRIX)
     {
-        FIXME("Matrix writemasks need to be lowered.\n");
+        hlsl_fixme(ctx, &instr->loc, "Lower matrix writemasks.\n");
         return;
     }
 
