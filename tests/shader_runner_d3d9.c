@@ -345,6 +345,10 @@ static bool d3d9_runner_draw(struct shader_runner *r,
 
     if (runner->r.uniform_count)
     {
+        hr = IDirect3DDevice9_SetVertexShaderConstantF(device, 0,
+                (const float *)runner->r.uniforms, runner->r.uniform_count / 4);
+        ok(hr == D3D_OK, "Failed to set uniforms, hr %#lx.\n", hr);
+
         hr = IDirect3DDevice9_SetPixelShaderConstantF(device, 0,
                 (const float *)runner->r.uniforms, runner->r.uniform_count / 4);
         ok(hr == D3D_OK, "Failed to set uniforms, hr %#lx.\n", hr);

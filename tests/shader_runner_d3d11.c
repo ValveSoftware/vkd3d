@@ -620,6 +620,7 @@ static bool d3d11_runner_draw(struct shader_runner *r,
     {
         cb = create_buffer(device, D3D11_BIND_CONSTANT_BUFFER,
                 runner->r.uniform_count * sizeof(*runner->r.uniforms), 0, runner->r.uniforms);
+        ID3D11DeviceContext_VSSetConstantBuffers(context, 0, 1, &cb);
         ID3D11DeviceContext_PSSetConstantBuffers(context, 0, 1, &cb);
     }
 
