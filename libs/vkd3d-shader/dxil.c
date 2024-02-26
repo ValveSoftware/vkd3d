@@ -390,6 +390,7 @@ enum dx_intrinsic_opcode
     DX_BUFFER_STORE                 =  69,
     DX_GET_DIMENSIONS               =  72,
     DX_TEXTURE_GATHER               =  73,
+    DX_TEXTURE_GATHER_CMP           =  74,
     DX_ATOMIC_BINOP                 =  78,
     DX_ATOMIC_CMP_XCHG              =  79,
     DX_DERIV_COARSEX                =  83,
@@ -4650,9 +4651,19 @@ static void sm6_parser_emit_dx_texture_gather(struct sm6_parser *sm6, enum dx_in
     }
 
     ins = state->ins;
-    instruction_init_with_resource(ins, extended_offset ? VKD3DSIH_GATHER4_PO : VKD3DSIH_GATHER4, resource, sm6);
-    if (!(src_params = instruction_src_params_alloc(ins, 3 + extended_offset, sm6)))
-        return;
+    if (op == DX_TEXTURE_GATHER)
+    {
+        instruction_init_with_resource(ins, extended_offset ? VKD3DSIH_GATHER4_PO : VKD3DSIH_GATHER4, resource, sm6);
+        if (!(src_params = instruction_src_params_alloc(ins, 3 + extended_offset, sm6)))
+            return;
+    }
+    else
+    {
+        instruction_init_with_resource(ins, extended_offset ? VKD3DSIH_GATHER4_PO_C : VKD3DSIH_GATHER4_C, resource, sm6);
+        if (!(src_params = instruction_src_params_alloc(ins, 4 + extended_offset, sm6)))
+            return;
+        src_param_init_from_value(&src_params[3 + extended_offset], operands[9]);
+    }
 
     src_param_init_vector_from_reg(&src_params[0], &coord);
     if (extended_offset)
@@ -4854,6 +4865,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_STORE_OUTPUT                  ] = {"v", "ii8o", sm6_parser_emit_dx_store_output},
     [DX_TAN                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
     [DX_TEXTURE_GATHER                ] = {"o", "HHffffiic", sm6_parser_emit_dx_texture_gather},
+    [DX_TEXTURE_GATHER_CMP            ] = {"o", "HHffffiicf", sm6_parser_emit_dx_texture_gather},
     [DX_TEXTURE_LOAD                  ] = {"o", "HiiiiCCC", sm6_parser_emit_dx_texture_load},
     [DX_TEXTURE_STORE                 ] = {"v", "Hiiiooooc", sm6_parser_emit_dx_texture_store},
     [DX_UBFE                          ] = {"m", "iiR",  sm6_parser_emit_dx_tertiary},
