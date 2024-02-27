@@ -1520,6 +1520,7 @@ D3DXPARAMETER_CLASS hlsl_sm1_class(const struct hlsl_type *type)
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
@@ -1621,6 +1622,7 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TECHNIQUE:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:

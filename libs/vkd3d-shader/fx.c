@@ -353,7 +353,6 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
     {
         [HLSL_TYPE_PIXELSHADER]      = "PixelShader",
         [HLSL_TYPE_VERTEXSHADER]     = "VertexShader",
-        [HLSL_TYPE_RENDERTARGETVIEW] = "RenderTargetView",
     };
     static const char * const texture_type_names[] =
     {
@@ -390,12 +389,14 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
             return "DepthStencilView";
 
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
+            return "RenderTargetView";
+
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
-                case HLSL_TYPE_RENDERTARGETVIEW:
                     return object_type_names[type->base_type];
                 default:
                     return type->name;
@@ -436,6 +437,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_OBJECT:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
             put_u32_unaligned(buffer, 2);
@@ -526,19 +528,21 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
     {
         put_u32_unaligned(buffer, 20);
     }
+    else if (type->class == HLSL_CLASS_RENDER_TARGET_VIEW)
+    {
+        put_u32_unaligned(buffer, 19);
+    }
     else if (type->class == HLSL_CLASS_OBJECT)
     {
         static const uint32_t object_type[] =
         {
             [HLSL_TYPE_PIXELSHADER]      = 5,
             [HLSL_TYPE_VERTEXSHADER]     = 6,
-            [HLSL_TYPE_RENDERTARGETVIEW] = 19,
         };
 
         switch (type->base_type)
         {
             case HLSL_TYPE_PIXELSHADER:
-            case HLSL_TYPE_RENDERTARGETVIEW:
             case HLSL_TYPE_VERTEXSHADER:
                 put_u32_unaligned(buffer, object_type[type->base_type]);
                 break;
@@ -547,10 +551,16 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
                 return 0;
         }
     }
-    else /* Numeric type */
+    else if (hlsl_is_numeric_type(type))
     {
         numeric_desc = get_fx_4_numeric_type_description(type, fx);
         put_u32_unaligned(buffer, numeric_desc);
+    }
+    else
+    {
+        FIXME("Type %u is not supported.\n", type->class);
+        set_status(fx, VKD3D_ERROR_NOT_IMPLEMENTED);
+        return 0;
     }
 
     return offset;
@@ -847,6 +857,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
 
         case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_UAV:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_VOID:
             return false;
 
@@ -1032,6 +1043,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
     /* Initializer */
     switch (type->class)
     {
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
             break;
@@ -1039,8 +1051,6 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
         case HLSL_CLASS_OBJECT:
             switch (type->base_type)
             {
-                case HLSL_TYPE_RENDERTARGETVIEW:
-                    break;
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
                     /* FIXME: write shader blobs, once parser support works. */
@@ -1139,6 +1149,7 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
 
     switch (type->class)
     {
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
@@ -1149,7 +1160,6 @@ static bool is_object_variable(const struct hlsl_ir_var *var)
             {
                 case HLSL_TYPE_PIXELSHADER:
                 case HLSL_TYPE_VERTEXSHADER:
-                case HLSL_TYPE_RENDERTARGETVIEW:
                     return true;
                 default:
                     return false;
