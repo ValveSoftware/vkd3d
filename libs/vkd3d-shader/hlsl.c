@@ -979,55 +979,73 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
 
     if (t1->class != t2->class)
         return false;
-    if (t1->base_type != t2->base_type)
-        return false;
-    if (t1->class == HLSL_CLASS_SAMPLER || t1->class == HLSL_CLASS_TEXTURE || t1->class == HLSL_CLASS_UAV)
+
+    switch (t1->class)
     {
-        if (t1->sampler_dim != t2->sampler_dim)
-            return false;
-        if ((t1->class == HLSL_CLASS_TEXTURE || t1->class == HLSL_CLASS_UAV)
-                && t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
-                && !hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format))
-            return false;
-        if (t1->class == HLSL_CLASS_UAV && t1->e.resource.rasteriser_ordered != t2->e.resource.rasteriser_ordered)
-            return false;
-    }
-    if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
-            != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
-        return false;
-    if (t1->dimx != t2->dimx)
-        return false;
-    if (t1->dimy != t2->dimy)
-        return false;
-    if (t1->class == HLSL_CLASS_STRUCT)
-    {
-        size_t i;
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            if (t1->base_type != t2->base_type)
+                return false;
+            if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
+                    != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
+                return false;
+            if (t1->dimx != t2->dimx)
+                return false;
+            if (t1->dimy != t2->dimy)
+                return false;
+            return true;
 
-        if (t1->e.record.field_count != t2->e.record.field_count)
-            return false;
+        case HLSL_CLASS_UAV:
+            if (t1->e.resource.rasteriser_ordered != t2->e.resource.rasteriser_ordered)
+                return false;
+            /* fall through */
+        case HLSL_CLASS_TEXTURE:
+            if (t1->sampler_dim != HLSL_SAMPLER_DIM_GENERIC
+                    && !hlsl_types_are_equal(t1->e.resource.format, t2->e.resource.format))
+                return false;
+            /* fall through */
+        case HLSL_CLASS_SAMPLER:
+            if (t1->sampler_dim != t2->sampler_dim)
+                return false;
+            return true;
 
-        for (i = 0; i < t1->e.record.field_count; ++i)
-        {
-            const struct hlsl_struct_field *field1 = &t1->e.record.fields[i];
-            const struct hlsl_struct_field *field2 = &t2->e.record.fields[i];
-
-            if (!hlsl_types_are_equal(field1->type, field2->type))
+        case HLSL_CLASS_STRUCT:
+            if (t1->e.record.field_count != t2->e.record.field_count)
                 return false;
 
-            if (strcmp(field1->name, field2->name))
-                return false;
-        }
-    }
-    if (t1->class == HLSL_CLASS_ARRAY)
-        return t1->e.array.elements_count == t2->e.array.elements_count
-                && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
-    if (t1->class == HLSL_CLASS_TECHNIQUE)
-    {
-        if (t1->e.version != t2->e.version)
-            return false;
+            for (size_t i = 0; i < t1->e.record.field_count; ++i)
+            {
+                const struct hlsl_struct_field *field1 = &t1->e.record.fields[i];
+                const struct hlsl_struct_field *field2 = &t2->e.record.fields[i];
+
+                if (!hlsl_types_are_equal(field1->type, field2->type))
+                    return false;
+
+                if (strcmp(field1->name, field2->name))
+                    return false;
+            }
+            return true;
+
+        case HLSL_CLASS_ARRAY:
+            return t1->e.array.elements_count == t2->e.array.elements_count
+                    && hlsl_types_are_equal(t1->e.array.type, t2->e.array.type);
+
+        case HLSL_CLASS_TECHNIQUE:
+            return t1->e.version == t2->e.version;
+
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+        case HLSL_CLASS_EFFECT_GROUP:
+        case HLSL_CLASS_PASS:
+        case HLSL_CLASS_PIXEL_SHADER:
+        case HLSL_CLASS_RENDER_TARGET_VIEW:
+        case HLSL_CLASS_STRING:
+        case HLSL_CLASS_VERTEX_SHADER:
+        case HLSL_CLASS_VOID:
+            return true;
     }
 
-    return true;
+    vkd3d_unreachable();
 }
 
 struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
