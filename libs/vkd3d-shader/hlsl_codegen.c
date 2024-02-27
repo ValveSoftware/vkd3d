@@ -1638,6 +1638,7 @@ static bool copy_propagation_transform_load(struct hlsl_ctx *ctx,
              * matrices yet. */
             return false;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_PASS:
         case HLSL_CLASS_STRING:

@@ -354,7 +354,6 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         [HLSL_TYPE_PIXELSHADER]      = "PixelShader",
         [HLSL_TYPE_VERTEXSHADER]     = "VertexShader",
         [HLSL_TYPE_RENDERTARGETVIEW] = "RenderTargetView",
-        [HLSL_TYPE_DEPTHSTENCILVIEW] = "DepthStencilView",
     };
     static const char * const texture_type_names[] =
     {
@@ -380,19 +379,28 @@ static const char * get_fx_4_type_name(const struct hlsl_type *type)
         [HLSL_SAMPLER_DIM_STRUCTURED_BUFFER] = "RWStructuredBuffer",
     };
 
-    if (type->class == HLSL_CLASS_TEXTURE)
-        return texture_type_names[type->sampler_dim];
-
-    if (type->class == HLSL_CLASS_UAV)
-        return uav_type_names[type->sampler_dim];
-
-    switch (type->base_type)
+    switch (type->class)
     {
-        case HLSL_TYPE_PIXELSHADER:
-        case HLSL_TYPE_VERTEXSHADER:
-        case HLSL_TYPE_RENDERTARGETVIEW:
-        case HLSL_TYPE_DEPTHSTENCILVIEW:
-            return object_type_names[type->base_type];
+        case HLSL_CLASS_TEXTURE:
+            return texture_type_names[type->sampler_dim];
+
+        case HLSL_CLASS_UAV:
+            return uav_type_names[type->sampler_dim];
+
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
+            return "DepthStencilView";
+
+        case HLSL_CLASS_OBJECT:
+            switch (type->base_type)
+            {
+                case HLSL_TYPE_PIXELSHADER:
+                case HLSL_TYPE_VERTEXSHADER:
+                case HLSL_TYPE_RENDERTARGETVIEW:
+                    return object_type_names[type->base_type];
+                default:
+                    return type->name;
+            }
+
         default:
             return type->name;
     }
@@ -426,6 +434,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             put_u32_unaligned(buffer, 1);
             break;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_TEXTURE:
         case HLSL_CLASS_UAV:
@@ -513,6 +522,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
 
         put_u32_unaligned(buffer, uav_type[type->sampler_dim]);
     }
+    else if (type->class == HLSL_CLASS_DEPTH_STENCIL_VIEW)
+    {
+        put_u32_unaligned(buffer, 20);
+    }
     else if (type->class == HLSL_CLASS_OBJECT)
     {
         static const uint32_t object_type[] =
@@ -520,12 +533,10 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             [HLSL_TYPE_PIXELSHADER]      = 5,
             [HLSL_TYPE_VERTEXSHADER]     = 6,
             [HLSL_TYPE_RENDERTARGETVIEW] = 19,
-            [HLSL_TYPE_DEPTHSTENCILVIEW] = 20,
         };
 
         switch (type->base_type)
         {
-            case HLSL_TYPE_DEPTHSTENCILVIEW:
             case HLSL_TYPE_PIXELSHADER:
             case HLSL_TYPE_RENDERTARGETVIEW:
             case HLSL_TYPE_VERTEXSHADER:
@@ -834,6 +845,7 @@ static bool is_type_supported_fx_2(struct hlsl_ctx *ctx, const struct hlsl_type 
             hlsl_fixme(ctx, loc, "Write fx 2.0 parameter class %#x.", type->class);
             return false;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_UAV:
         case HLSL_CLASS_VOID:
             return false;

@@ -363,6 +363,7 @@ static void hlsl_type_calculate_reg_size(struct hlsl_ctx *ctx, struct hlsl_type 
             type->reg_size[HLSL_REGSET_UAVS] = 1;
             break;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_PASS:
@@ -428,6 +429,7 @@ static bool type_is_single_component(const struct hlsl_type *type)
 {
     switch (type->class)
     {
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_SAMPLER:
@@ -567,6 +569,7 @@ unsigned int hlsl_type_get_component_offset(struct hlsl_ctx *ctx, struct hlsl_ty
                 }
                 break;
 
+            case HLSL_CLASS_DEPTH_STENCIL_VIEW:
             case HLSL_CLASS_OBJECT:
             case HLSL_CLASS_SAMPLER:
             case HLSL_CLASS_STRING:
@@ -943,6 +946,7 @@ unsigned int hlsl_type_component_count(const struct hlsl_type *type)
         case HLSL_CLASS_ARRAY:
             return hlsl_type_component_count(type->e.array.type) * type->e.array.elements_count;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_SAMPLER:
         case HLSL_CLASS_STRING:
@@ -2366,6 +2370,7 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
             }
             return string;
 
+        case HLSL_CLASS_DEPTH_STENCIL_VIEW:
         case HLSL_CLASS_EFFECT_GROUP:
         case HLSL_CLASS_OBJECT:
         case HLSL_CLASS_PASS:
@@ -3550,7 +3555,6 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
         {"pixelshader",     HLSL_CLASS_OBJECT, HLSL_TYPE_PIXELSHADER,   1, 1},
         {"vertexshader",    HLSL_CLASS_OBJECT, HLSL_TYPE_VERTEXSHADER,  1, 1},
         {"RenderTargetView",HLSL_CLASS_OBJECT, HLSL_TYPE_RENDERTARGETVIEW, 1, 1},
-        {"DepthStencilView",HLSL_CLASS_OBJECT, HLSL_TYPE_DEPTHSTENCILVIEW, 1, 1},
     };
 
     static const struct
@@ -3662,6 +3666,7 @@ static void declare_predefined_types(struct hlsl_ctx *ctx)
     }
 
     ctx->builtin_types.Void = hlsl_new_simple_type(ctx, "void", HLSL_CLASS_VOID);
+    hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "DepthStencilView", HLSL_CLASS_DEPTH_STENCIL_VIEW));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "fxgroup", HLSL_CLASS_EFFECT_GROUP));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "pass", HLSL_CLASS_PASS));
     hlsl_scope_add_type(ctx->globals, hlsl_new_simple_type(ctx, "STRING", HLSL_CLASS_STRING));
