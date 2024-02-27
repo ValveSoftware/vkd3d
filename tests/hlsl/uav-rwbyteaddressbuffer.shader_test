@@ -34,7 +34,7 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+todo(sm<6) draw quad
 if(sm<6) probe uav 1 (0) ri (12)
 if(sm>=6) probe uav 1 (0) rd (12.2)
 
@@ -54,6 +54,6 @@ float4 main() : sv_target
 }
 
 [test]
-todo draw quad
+draw quad
 probe uav 1 (0) ri64 (-12)
 probe uav 1 (1) rd (13.3)

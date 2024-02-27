@@ -7093,8 +7093,8 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
     struct vkd3d_shader_register_info dst_reg_info, src_reg_info;
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
+    unsigned int i, component_count, write_mask;
     uint32_t components[VKD3D_VEC4_SIZE];
-    unsigned int i, component_count;
 
     if (register_is_constant_or_undef(&src->reg) || src->reg.type == VKD3DSPR_SSA || dst->reg.type == VKD3DSPR_SSA
             || dst->modifiers || src->modifiers)
@@ -7145,7 +7145,9 @@ static void spirv_compiler_emit_mov(struct spirv_compiler *compiler,
     }
 
 general_implementation:
-    val_id = spirv_compiler_emit_load_src(compiler, src, dst->write_mask);
+    write_mask = (src->reg.type == VKD3DSPR_IMMCONST64 && !data_type_is_64_bit(dst->reg.data_type))
+            ? vsir_write_mask_64_from_32(dst->write_mask) : dst->write_mask;
+    val_id = spirv_compiler_emit_load_src(compiler, src, write_mask);
     if (dst->reg.data_type != src->reg.data_type)
     {
         val_id = vkd3d_spirv_build_op_bitcast(builder, vkd3d_spirv_get_type_id_for_data_type(builder,
