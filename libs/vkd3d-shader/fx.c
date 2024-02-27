@@ -326,16 +326,16 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
             return 0;
     }
 
-    switch (type->base_type)
+    switch (type->e.numeric.type)
     {
         case HLSL_TYPE_FLOAT:
         case HLSL_TYPE_INT:
         case HLSL_TYPE_UINT:
         case HLSL_TYPE_BOOL:
-            value |= (numeric_base_type[type->base_type] << NUMERIC_BASE_TYPE_SHIFT);
+            value |= (numeric_base_type[type->e.numeric.type] << NUMERIC_BASE_TYPE_SHIFT);
             break;
         default:
-            hlsl_fixme(ctx, &ctx->location, "Not implemented for base type %u.", type->base_type);
+            hlsl_fixme(ctx, &ctx->location, "Not implemented for base type %u.", type->e.numeric.type);
             return 0;
     }
 
@@ -1028,7 +1028,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
 
         default:
             hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
-                    type->base_type);
+                    type->e.numeric.type);
     }
 
     put_u32(buffer, 0); /* Annotations count */

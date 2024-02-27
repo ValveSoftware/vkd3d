@@ -417,7 +417,7 @@ static struct hlsl_type *hlsl_new_type(struct hlsl_ctx *ctx, const char *name, e
         return NULL;
     }
     type->class = type_class;
-    type->base_type = base_type;
+    type->e.numeric.type = base_type;
     type->dimx = dimx;
     type->dimy = dimy;
     hlsl_type_calculate_reg_size(ctx, type);
@@ -477,7 +477,7 @@ static unsigned int traverse_path_from_component_index(struct hlsl_ctx *ctx,
     {
         case HLSL_CLASS_VECTOR:
             assert(index < type->dimx);
-            *type_ptr = hlsl_get_scalar_type(ctx, type->base_type);
+            *type_ptr = hlsl_get_scalar_type(ctx, type->e.numeric.type);
             *index_ptr = 0;
             return index;
 
@@ -487,7 +487,7 @@ static unsigned int traverse_path_from_component_index(struct hlsl_ctx *ctx,
             bool row_major = hlsl_type_is_row_major(type);
 
             assert(index < type->dimx * type->dimy);
-            *type_ptr = hlsl_get_vector_type(ctx, type->base_type, row_major ? type->dimx : type->dimy);
+            *type_ptr = hlsl_get_vector_type(ctx, type->e.numeric.type, row_major ? type->dimx : type->dimy);
             *index_ptr = row_major ? x : y;
             return row_major ? y : x;
         }
@@ -761,13 +761,13 @@ struct hlsl_type *hlsl_get_element_type_from_path_index(struct hlsl_ctx *ctx, co
     switch (type->class)
     {
         case HLSL_CLASS_VECTOR:
-            return hlsl_get_scalar_type(ctx, type->base_type);
+            return hlsl_get_scalar_type(ctx, type->e.numeric.type);
 
         case HLSL_CLASS_MATRIX:
             if (hlsl_type_is_row_major(type))
-                return hlsl_get_vector_type(ctx, type->base_type, type->dimx);
+                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimx);
             else
-                return hlsl_get_vector_type(ctx, type->base_type, type->dimy);
+                return hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimy);
 
         case HLSL_CLASS_ARRAY:
             return type->e.array.type;
@@ -985,7 +985,7 @@ bool hlsl_types_are_equal(const struct hlsl_type *t1, const struct hlsl_type *t2
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
-            if (t1->base_type != t2->base_type)
+            if (t1->e.numeric.type != t2->e.numeric.type)
                 return false;
             if ((t1->modifiers & HLSL_MODIFIER_ROW_MAJOR)
                     != (t2->modifiers & HLSL_MODIFIER_ROW_MAJOR))
@@ -1066,7 +1066,6 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
         }
     }
     type->class = old->class;
-    type->base_type = old->base_type;
     type->dimx = old->dimx;
     type->dimy = old->dimy;
     type->modifiers = old->modifiers | modifiers;
@@ -1078,6 +1077,12 @@ struct hlsl_type *hlsl_type_clone(struct hlsl_ctx *ctx, struct hlsl_type *old,
 
     switch (old->class)
     {
+        case HLSL_CLASS_SCALAR:
+        case HLSL_CLASS_VECTOR:
+        case HLSL_CLASS_MATRIX:
+            type->e.numeric.type = old->e.numeric.type;
+            break;
+
         case HLSL_CLASS_ARRAY:
             if (!(type->e.array.type = hlsl_type_clone(ctx, old->e.array.type, default_majority, modifiers)))
             {
@@ -1665,10 +1670,11 @@ struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned
 
     if (!(swizzle = hlsl_alloc(ctx, sizeof(*swizzle))))
         return NULL;
+    assert(hlsl_is_numeric_type(val->data_type));
     if (components == 1)
-        type = hlsl_get_scalar_type(ctx, val->data_type->base_type);
+        type = hlsl_get_scalar_type(ctx, val->data_type->e.numeric.type);
     else
-        type = hlsl_get_vector_type(ctx, val->data_type->base_type, components);
+        type = hlsl_get_vector_type(ctx, val->data_type->e.numeric.type, components);
     init_node(&swizzle->node, HLSL_IR_SWIZZLE, type, loc);
     hlsl_src_from_node(&swizzle->val, val);
     swizzle->swizzle = s;
@@ -1731,7 +1737,7 @@ struct hlsl_ir_node *hlsl_new_index(struct hlsl_ctx *ctx, struct hlsl_ir_node *v
     if (type->class == HLSL_CLASS_TEXTURE || type->class == HLSL_CLASS_UAV)
         type = type->e.resource.format;
     else if (type->class == HLSL_CLASS_MATRIX)
-        type = hlsl_get_vector_type(ctx, type->base_type, type->dimx);
+        type = hlsl_get_vector_type(ctx, type->e.numeric.type, type->dimx);
     else
         type = hlsl_get_element_type_from_path_index(ctx, type, idx);
 
@@ -2317,18 +2323,18 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
     switch (type->class)
     {
         case HLSL_CLASS_SCALAR:
-            assert(type->base_type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s", base_types[type->base_type]);
+            assert(type->e.numeric.type < ARRAY_SIZE(base_types));
+            vkd3d_string_buffer_printf(string, "%s", base_types[type->e.numeric.type]);
             return string;
 
         case HLSL_CLASS_VECTOR:
-            assert(type->base_type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s%u", base_types[type->base_type], type->dimx);
+            assert(type->e.numeric.type < ARRAY_SIZE(base_types));
+            vkd3d_string_buffer_printf(string, "%s%u", base_types[type->e.numeric.type], type->dimx);
             return string;
 
         case HLSL_CLASS_MATRIX:
-            assert(type->base_type < ARRAY_SIZE(base_types));
-            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->base_type], type->dimy, type->dimx);
+            assert(type->e.numeric.type < ARRAY_SIZE(base_types));
+            vkd3d_string_buffer_printf(string, "%s%ux%u", base_types[type->e.numeric.type], type->dimy, type->dimx);
             return string;
 
         case HLSL_CLASS_ARRAY:
@@ -2365,7 +2371,8 @@ struct vkd3d_string_buffer *hlsl_type_to_string(struct hlsl_ctx *ctx, const stru
                 return string;
             }
 
-            assert(type->e.resource.format->base_type < ARRAY_SIZE(base_types));
+            assert(hlsl_is_numeric_type(type->e.resource.format));
+            assert(type->e.resource.format->e.numeric.type < ARRAY_SIZE(base_types));
             if (type->sampler_dim == HLSL_SAMPLER_DIM_BUFFER)
             {
                 vkd3d_string_buffer_printf(string, "Buffer");
@@ -2688,7 +2695,7 @@ static void dump_ir_constant(struct vkd3d_string_buffer *buffer, const struct hl
     {
         const union hlsl_constant_value_component *value = &constant->value.u[x];
 
-        switch (type->base_type)
+        switch (type->e.numeric.type)
         {
             case HLSL_TYPE_BOOL:
                 vkd3d_string_buffer_printf(buffer, "%s ", value->u ? "true" : "false");

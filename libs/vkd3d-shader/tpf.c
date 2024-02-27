@@ -2744,7 +2744,7 @@ static void write_sm4_block(const struct tpf_writer *tpf, const struct hlsl_bloc
 
 static bool type_is_integer(const struct hlsl_type *type)
 {
-    switch (type->base_type)
+    switch (type->e.numeric.type)
     {
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:
@@ -2933,7 +2933,7 @@ static void write_sm4_signature(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc, 
         put_u32(&buffer, 0); /* name */
         put_u32(&buffer, usage_idx);
         put_u32(&buffer, usage);
-        switch (var->data_type->base_type)
+        switch (var->data_type->e.numeric.type)
         {
             case HLSL_TYPE_FLOAT:
             case HLSL_TYPE_HALF:
@@ -3026,7 +3026,7 @@ static D3D_SHADER_VARIABLE_CLASS sm4_class(const struct hlsl_type *type)
 
 static D3D_SHADER_VARIABLE_TYPE sm4_base_type(const struct hlsl_type *type)
 {
-    switch (type->base_type)
+    switch (type->e.numeric.type)
     {
         case HLSL_TYPE_BOOL:
             return D3D_SVT_BOOL;
@@ -3140,7 +3140,7 @@ static D3D_RESOURCE_RETURN_TYPE sm4_resource_format(const struct hlsl_type *type
     if (type->class == HLSL_CLASS_ARRAY)
         return sm4_resource_format(type->e.array.type);
 
-    switch (type->e.resource.format->base_type)
+    switch (type->e.resource.format->e.numeric.type)
     {
         case HLSL_TYPE_DOUBLE:
             return D3D_RETURN_TYPE_DOUBLE;
@@ -4728,11 +4728,11 @@ static void write_sm4_sampleinfo(const struct tpf_writer *tpf, const struct hlsl
     const struct hlsl_ir_node *dst = &load->node;
     struct sm4_instruction instr;
 
-    assert(dst->data_type->base_type == HLSL_TYPE_UINT || dst->data_type->base_type == HLSL_TYPE_FLOAT);
+    assert(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_SAMPLE_INFO;
-    if (dst->data_type->base_type == HLSL_TYPE_UINT)
+    if (dst->data_type->e.numeric.type == HLSL_TYPE_UINT)
         instr.extra_bits |= VKD3DSI_SAMPLE_INFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
 
     sm4_dst_from_node(&instr.dsts[0], dst);
@@ -4757,11 +4757,11 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
         return;
     }
 
-    assert(dst->data_type->base_type == HLSL_TYPE_UINT || dst->data_type->base_type == HLSL_TYPE_FLOAT);
+    assert(dst->data_type->e.numeric.type == HLSL_TYPE_UINT || dst->data_type->e.numeric.type == HLSL_TYPE_FLOAT);
 
     memset(&instr, 0, sizeof(instr));
     instr.opcode = VKD3D_SM4_OP_RESINFO;
-    if (dst->data_type->base_type == HLSL_TYPE_UINT)
+    if (dst->data_type->e.numeric.type == HLSL_TYPE_UINT)
         instr.extra_bits |= VKD3DSI_RESINFO_UINT << VKD3D_SM4_INSTRUCTION_FLAGS_SHIFT;
 
     sm4_dst_from_node(&instr.dsts[0], dst);
@@ -4776,7 +4776,7 @@ static void write_sm4_resinfo(const struct tpf_writer *tpf, const struct hlsl_ir
 
 static bool type_is_float(const struct hlsl_type *type)
 {
-    return type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF;
+    return type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF;
 }
 
 static void write_sm4_cast_from_bool(const struct tpf_writer *tpf, const struct hlsl_ir_expr *expr,
@@ -4813,11 +4813,11 @@ static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     /* Narrowing casts were already lowered. */
     assert(src_type->dimx == dst_type->dimx);
 
-    switch (dst_type->base_type)
+    switch (dst_type->e.numeric.type)
     {
         case HLSL_TYPE_HALF:
         case HLSL_TYPE_FLOAT:
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
@@ -4846,7 +4846,7 @@ static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_TYPE_INT:
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
@@ -4872,7 +4872,7 @@ static void write_sm4_cast(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_TYPE_UINT:
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
@@ -4942,7 +4942,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
     switch (expr->op)
     {
         case HLSL_OP1_ABS:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_ABS);
@@ -5023,12 +5023,12 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP1_LOGIC_NOT:
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_unary_op(tpf, VKD3D_SM4_OP_NOT, &expr->node, arg1, 0);
             break;
 
         case HLSL_OP1_NEG:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_unary_op(tpf, VKD3D_SM4_OP_MOV, &expr->node, arg1, VKD3DSPSM_NEG);
@@ -5081,7 +5081,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_ADD:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_ADD, &expr->node, arg1, arg2);
@@ -5113,7 +5113,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_DIV:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_DIV, &expr->node, arg1, arg2);
@@ -5129,7 +5129,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_DOT:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     switch (arg1->data_type->dimx)
@@ -5161,9 +5161,9 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_EQ, &expr->node, arg1, arg2);
@@ -5187,9 +5187,9 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_GE, &expr->node, arg1, arg2);
@@ -5216,9 +5216,9 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_LT, &expr->node, arg1, arg2);
@@ -5242,23 +5242,23 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         }
 
         case HLSL_OP2_LOGIC_AND:
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_AND, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LOGIC_OR:
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_OR, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_LSHIFT:
             assert(type_is_integer(dst_type));
-            assert(dst_type->base_type != HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
             write_sm4_binary_op(tpf, VKD3D_SM4_OP_ISHL, &expr->node, arg1, arg2);
             break;
 
         case HLSL_OP2_MAX:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_MAX, &expr->node, arg1, arg2);
@@ -5278,7 +5278,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_MIN:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_MIN, &expr->node, arg1, arg2);
@@ -5298,7 +5298,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_MOD:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_UINT:
                     write_sm4_binary_op_with_two_destinations(tpf, VKD3D_SM4_OP_UDIV, &expr->node, 1, arg1, arg2);
@@ -5310,7 +5310,7 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
             break;
 
         case HLSL_OP2_MUL:
-            switch (dst_type->base_type)
+            switch (dst_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_MUL, &expr->node, arg1, arg2);
@@ -5332,9 +5332,9 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
         {
             const struct hlsl_type *src_type = arg1->data_type;
 
-            assert(dst_type->base_type == HLSL_TYPE_BOOL);
+            assert(dst_type->e.numeric.type == HLSL_TYPE_BOOL);
 
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_FLOAT:
                     write_sm4_binary_op(tpf, VKD3D_SM4_OP_NE, &expr->node, arg1, arg2);
@@ -5356,8 +5356,8 @@ static void write_sm4_expr(const struct tpf_writer *tpf, const struct hlsl_ir_ex
 
         case HLSL_OP2_RSHIFT:
             assert(type_is_integer(dst_type));
-            assert(dst_type->base_type != HLSL_TYPE_BOOL);
-            write_sm4_binary_op(tpf, dst_type->base_type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
+            assert(dst_type->e.numeric.type != HLSL_TYPE_BOOL);
+            write_sm4_binary_op(tpf, dst_type->e.numeric.type == HLSL_TYPE_INT ? VKD3D_SM4_OP_ISHR : VKD3D_SM4_OP_USHR,
                     &expr->node, arg1, arg2);
             break;
 
@@ -5459,7 +5459,7 @@ static void write_sm4_load(const struct tpf_writer *tpf, const struct hlsl_ir_lo
     instr.dst_count = 1;
 
     assert(hlsl_is_numeric_type(type));
-    if (type->base_type == HLSL_TYPE_BOOL && var_is_user_input(tpf->ctx, load->src.var))
+    if (type->e.numeric.type == HLSL_TYPE_BOOL && var_is_user_input(tpf->ctx, load->src.var))
     {
         struct hlsl_constant_value value;
 

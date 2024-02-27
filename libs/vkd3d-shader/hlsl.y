@@ -1352,9 +1352,6 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
 
 static bool expr_compatible_data_types(struct hlsl_type *t1, struct hlsl_type *t2)
 {
-    if (t1->base_type > HLSL_TYPE_LAST_SCALAR || t2->base_type > HLSL_TYPE_LAST_SCALAR)
-        return false;
-
     /* Scalar vars can be converted to pretty much everything */
     if ((t1->dimx == 1 && t1->dimy == 1) || (t2->dimx == 1 && t2->dimy == 1))
         return true;
@@ -1489,7 +1486,7 @@ static struct hlsl_ir_node *add_expr(struct hlsl_ctx *ctx, struct hlsl_block *bl
         struct hlsl_ir_node *load;
         struct hlsl_ir_var *var;
 
-        scalar_type = hlsl_get_scalar_type(ctx, type->base_type);
+        scalar_type = hlsl_get_scalar_type(ctx, type->e.numeric.type);
 
         if (!(var = hlsl_new_synthetic_var(ctx, "split_op", type, loc)))
             return NULL;
@@ -1539,7 +1536,7 @@ static void check_integer_type(struct hlsl_ctx *ctx, const struct hlsl_ir_node *
     const struct hlsl_type *type = instr->data_type;
     struct vkd3d_string_buffer *string;
 
-    switch (type->base_type)
+    switch (type->e.numeric.type)
     {
         case HLSL_TYPE_BOOL:
         case HLSL_TYPE_INT:
@@ -1595,7 +1592,7 @@ static struct hlsl_type *get_common_numeric_type(struct hlsl_ctx *ctx, const str
 
     if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
         return NULL;
-    base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
     return hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
 }
 
@@ -1640,7 +1637,7 @@ static struct hlsl_ir_node *add_binary_comparison_expr(struct hlsl_ctx *ctx, str
     if (!expr_common_shape(ctx, arg1->data_type, arg2->data_type, loc, &type, &dimx, &dimy))
         return NULL;
 
-    base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
     common_type = hlsl_get_numeric_type(ctx, type, base, dimx, dimy);
     return_type = hlsl_get_numeric_type(ctx, type, HLSL_TYPE_BOOL, dimx, dimy);
 
@@ -1680,7 +1677,7 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct h
         enum hlsl_ir_expr_op op, struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2,
         const struct vkd3d_shader_location *loc)
 {
-    enum hlsl_base_type base = arg1->data_type->base_type;
+    enum hlsl_base_type base = arg1->data_type->e.numeric.type;
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *return_type, *integer_type;
     enum hlsl_type_class type;
@@ -1710,7 +1707,7 @@ static struct hlsl_ir_node *add_binary_shift_expr(struct hlsl_ctx *ctx, struct h
 static struct hlsl_ir_node *add_binary_dot_expr(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_node *arg1, struct hlsl_ir_node *arg2, const struct vkd3d_shader_location *loc)
 {
-    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
     struct hlsl_ir_node *args[HLSL_MAX_OPERANDS] = {0};
     struct hlsl_type *common_type, *ret_type;
     enum hlsl_ir_expr_op op;
@@ -1961,7 +1958,7 @@ static struct hlsl_ir_node *add_assignment(struct hlsl_ctx *ctx, struct hlsl_blo
                     "Resource store expressions must write to all components.");
 
         assert(coords->data_type->class == HLSL_CLASS_VECTOR);
-        assert(coords->data_type->base_type == HLSL_TYPE_UINT);
+        assert(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
         assert(coords->data_type->dimx == dim_count);
 
         if (!(store = hlsl_new_resource_store(ctx, &resource_deref, coords, rhs, &lhs->loc)))
@@ -2600,7 +2597,7 @@ static struct hlsl_ir_node *intrinsic_float_convert_arg(struct hlsl_ctx *ctx,
 {
     struct hlsl_type *type = arg->data_type;
 
-    if (type->base_type == HLSL_TYPE_FLOAT || type->base_type == HLSL_TYPE_HALF)
+    if (type->e.numeric.type == HLSL_TYPE_FLOAT || type->e.numeric.type == HLSL_TYPE_HALF)
         return arg;
 
     type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_FLOAT, type->dimx, type->dimy);
@@ -2627,7 +2624,7 @@ static bool convert_args(struct hlsl_ctx *ctx, const struct parse_initializer *p
 static struct hlsl_type *elementwise_intrinsic_get_common_type(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    enum hlsl_base_type base = params->args[0]->data_type->base_type;
+    enum hlsl_base_type base = params->args[0]->data_type->e.numeric.type;
     bool vectors = false, matrices = false;
     unsigned int dimx = 4, dimy = 4;
     struct hlsl_type *common_type;
@@ -2637,7 +2634,7 @@ static struct hlsl_type *elementwise_intrinsic_get_common_type(struct hlsl_ctx *
     {
         struct hlsl_type *arg_type = params->args[i]->data_type;
 
-        base = expr_common_base_type(base, arg_type->base_type);
+        base = expr_common_base_type(base, arg_type->e.numeric.type);
 
         if (arg_type->class == HLSL_CLASS_VECTOR)
         {
@@ -2694,7 +2691,7 @@ static bool elementwise_intrinsic_float_convert_args(struct hlsl_ctx *ctx,
     if (!(type = elementwise_intrinsic_get_common_type(ctx, params, loc)))
         return false;
 
-    base_type = type->base_type == HLSL_TYPE_HALF ? HLSL_TYPE_HALF : HLSL_TYPE_FLOAT;
+    base_type = type->e.numeric.type == HLSL_TYPE_HALF ? HLSL_TYPE_HALF : HLSL_TYPE_FLOAT;
     type = hlsl_get_numeric_type(ctx, type->class, base_type, type->dimx, type->dimy);
 
     return convert_args(ctx, params, type, loc);
@@ -2918,7 +2915,7 @@ static bool intrinsic_asfloat(struct hlsl_ctx *ctx,
     struct hlsl_type *data_type;
 
     data_type = params->args[0]->data_type;
-    if (data_type->base_type == HLSL_TYPE_BOOL || data_type->base_type == HLSL_TYPE_DOUBLE)
+    if (data_type->e.numeric.type == HLSL_TYPE_BOOL || data_type->e.numeric.type == HLSL_TYPE_DOUBLE)
     {
         struct vkd3d_string_buffer *string;
 
@@ -2954,7 +2951,7 @@ static bool intrinsic_asuint(struct hlsl_ctx *ctx,
     }
 
     data_type = params->args[0]->data_type;
-    if (data_type->base_type == HLSL_TYPE_BOOL || data_type->base_type == HLSL_TYPE_DOUBLE)
+    if (data_type->e.numeric.type == HLSL_TYPE_BOOL || data_type->e.numeric.type == HLSL_TYPE_DOUBLE)
     {
         struct vkd3d_string_buffer *string;
 
@@ -3083,7 +3080,7 @@ static bool intrinsic_cross(struct hlsl_ctx *ctx,
     struct hlsl_type *cast_type;
     enum hlsl_base_type base;
 
-    if (arg1->data_type->base_type == HLSL_TYPE_HALF && arg2->data_type->base_type == HLSL_TYPE_HALF)
+    if (arg1->data_type->e.numeric.type == HLSL_TYPE_HALF && arg2->data_type->e.numeric.type == HLSL_TYPE_HALF)
         base = HLSL_TYPE_HALF;
     else
         base = HLSL_TYPE_FLOAT;
@@ -3264,7 +3261,7 @@ static bool intrinsic_determinant(struct hlsl_ctx *ctx,
         return hlsl_add_load_component(ctx, params->instrs, arg, 0, loc);
     }
 
-    typename = type->base_type == HLSL_TYPE_HALF ? "half" : "float";
+    typename = type->e.numeric.type == HLSL_TYPE_HALF ? "half" : "float";
     template = templates[dim];
 
     switch (dim)
@@ -3618,7 +3615,7 @@ static bool intrinsic_mul(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     struct hlsl_ir_node *arg1 = params->args[0], *arg2 = params->args[1], *cast1, *cast2;
-    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->base_type, arg2->data_type->base_type);
+    enum hlsl_base_type base = expr_common_base_type(arg1->data_type->e.numeric.type, arg2->data_type->e.numeric.type);
     struct hlsl_type *cast_type1 = arg1->data_type, *cast_type2 = arg2->data_type, *matrix_type, *ret_type;
     unsigned int i, j, k, vect_count = 0;
     struct hlsl_deref var_deref;
@@ -3821,7 +3818,7 @@ static bool intrinsic_refract(struct hlsl_ctx *ctx,
     if (!(res_type = elementwise_intrinsic_get_common_type(ctx, &mut_params, loc)))
         return false;
 
-    base = expr_common_base_type(res_type->base_type, i_type->base_type);
+    base = expr_common_base_type(res_type->e.numeric.type, i_type->e.numeric.type);
     base = base == HLSL_TYPE_HALF ? HLSL_TYPE_HALF : HLSL_TYPE_FLOAT;
     res_type = convert_numeric_type(ctx, res_type, base);
     idx_type = convert_numeric_type(ctx, i_type, base);
@@ -3881,7 +3878,7 @@ static bool intrinsic_sign(struct hlsl_ctx *ctx,
     struct hlsl_type *int_type = hlsl_get_numeric_type(ctx, arg->data_type->class, HLSL_TYPE_INT,
             arg->data_type->dimx, arg->data_type->dimy);
 
-    if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->base_type), &zero_value, loc)))
+    if (!(zero = hlsl_new_constant(ctx, hlsl_get_scalar_type(ctx, arg->data_type->e.numeric.type), &zero_value, loc)))
         return false;
     hlsl_block_add_instr(params->instrs, zero);
 
@@ -4254,7 +4251,7 @@ static bool intrinsic_transpose(struct hlsl_ctx *ctx,
         return true;
     }
 
-    mat_type = hlsl_get_matrix_type(ctx, arg_type->base_type, arg_type->dimy, arg_type->dimx);
+    mat_type = hlsl_get_matrix_type(ctx, arg_type->e.numeric.type, arg_type->dimy, arg_type->dimx);
 
     if (!(var = hlsl_new_synthetic_var(ctx, "transpose", mat_type, loc)))
         return false;
@@ -4550,7 +4547,7 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
             if (common_type->dimx == 1 && common_type->dimy == 1)
             {
                 common_type = hlsl_get_numeric_type(ctx, cond_type->class,
-                        common_type->base_type, cond_type->dimx, cond_type->dimy);
+                        common_type->e.numeric.type, cond_type->dimx, cond_type->dimy);
             }
             else if (cond_type->dimx != common_type->dimx || cond_type->dimy != common_type->dimy)
             {
@@ -4600,7 +4597,7 @@ static bool add_ternary(struct hlsl_ctx *ctx, struct hlsl_block *block,
         common_type = first->data_type;
     }
 
-    assert(cond->data_type->base_type == HLSL_TYPE_BOOL);
+    assert(cond->data_type->e.numeric.type == HLSL_TYPE_BOOL);
 
     args[0] = cond;
     args[1] = first;
@@ -4923,7 +4920,7 @@ static bool add_gather_method_call(struct hlsl_ctx *ctx, struct hlsl_block *bloc
             hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, sampler_dim), loc)))
         return false;
 
-    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->base_type, 4);
+    load_params.format = hlsl_get_vector_type(ctx, object_type->e.resource.format->e.numeric.type, 4);
     load_params.resource = object;
     load_params.sampler = params->args[0];
 
@@ -6582,7 +6579,7 @@ type_no_void:
                 YYABORT;
             }
 
-            $$ = hlsl_type_clone(ctx, hlsl_get_vector_type(ctx, $3->base_type, $5), 0, 0);
+            $$ = hlsl_type_clone(ctx, hlsl_get_vector_type(ctx, $3->e.numeric.type, $5), 0, 0);
             $$->is_minimum_precision = $3->is_minimum_precision;
         }
     | KW_VECTOR
@@ -6615,7 +6612,7 @@ type_no_void:
                 YYABORT;
             }
 
-            $$ = hlsl_type_clone(ctx, hlsl_get_matrix_type(ctx, $3->base_type, $7, $5), 0, 0);
+            $$ = hlsl_type_clone(ctx, hlsl_get_matrix_type(ctx, $3->e.numeric.type, $7, $5), 0, 0);
             $$->is_minimum_precision = $3->is_minimum_precision;
         }
     | KW_MATRIX

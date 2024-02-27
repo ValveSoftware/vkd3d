@@ -1540,7 +1540,7 @@ D3DXPARAMETER_TYPE hlsl_sm1_base_type(const struct hlsl_type *type)
         case HLSL_CLASS_SCALAR:
         case HLSL_CLASS_VECTOR:
         case HLSL_CLASS_MATRIX:
-            switch (type->base_type)
+            switch (type->e.numeric.type)
             {
                 case HLSL_TYPE_BOOL:
                     return D3DXPT_BOOL;
@@ -2015,11 +2015,11 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
     /* Narrowing casts were already lowered. */
     assert(src_type->dimx == dst_type->dimx);
 
-    switch (dst_type->base_type)
+    switch (dst_type->e.numeric.type)
     {
         case HLSL_TYPE_HALF:
         case HLSL_TYPE_FLOAT:
-            switch (src_type->base_type)
+            switch (src_type->e.numeric.type)
             {
                 case HLSL_TYPE_INT:
                 case HLSL_TYPE_UINT:
@@ -2041,7 +2041,7 @@ static void write_sm1_cast(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
 
         case HLSL_TYPE_INT:
         case HLSL_TYPE_UINT:
-            switch(src_type->base_type)
+            switch(src_type->e.numeric.type)
             {
                 case HLSL_TYPE_HALF:
                 case HLSL_TYPE_FLOAT:
@@ -2303,7 +2303,7 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
         return;
     }
 
-    if (instr->data_type->base_type != HLSL_TYPE_FLOAT)
+    if (instr->data_type->e.numeric.type != HLSL_TYPE_FLOAT)
     {
         /* These need to be lowered. */
         hlsl_fixme(ctx, &instr->loc, "SM1 non-float expression.");

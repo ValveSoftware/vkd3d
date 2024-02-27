@@ -142,9 +142,6 @@ struct hlsl_type
     struct rb_entry scope_entry;
 
     enum hlsl_type_class class;
-    /* If class is <= HLSL_CLASS_LAST_NUMERIC, then base_type is <= HLSL_TYPE_LAST_SCALAR.
-     * Otherwise, base_type is not used. */
-    enum hlsl_base_type base_type;
 
     /* If class is HLSL_CLASS_SAMPLER, then sampler_dim is <= HLSL_SAMPLER_DIM_LAST_SAMPLER.
      * If class is HLSL_CLASS_TEXTURE, then sampler_dim can be any value of the enum except
@@ -175,6 +172,11 @@ struct hlsl_type
 
     union
     {
+        /* Additional information if type is numeric. */
+        struct
+        {
+            enum hlsl_base_type type;
+        } numeric;
         /* Additional information if type is HLSL_CLASS_STRUCT. */
         struct
         {

@@ -263,8 +263,8 @@ static bool types_are_semantic_equivalent(struct hlsl_ctx *ctx, const struct hls
     if (type1->dimx != type2->dimx)
         return false;
 
-    return base_type_get_semantic_equivalent(type1->base_type)
-            == base_type_get_semantic_equivalent(type2->base_type);
+    return base_type_get_semantic_equivalent(type1->e.numeric.type)
+            == base_type_get_semantic_equivalent(type2->e.numeric.type);
 }
 
 static struct hlsl_ir_var *add_semantic_var(struct hlsl_ctx *ctx, struct hlsl_ir_var *var,
@@ -355,10 +355,10 @@ static void prepend_input_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
     if (!semantic->name)
         return;
 
-    vector_type_dst = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+    vector_type_dst = hlsl_get_vector_type(ctx, type->e.numeric.type, hlsl_type_minor_size(type));
     vector_type_src = vector_type_dst;
     if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
-        vector_type_src = hlsl_get_vector_type(ctx, type->base_type, 4);
+        vector_type_src = hlsl_get_vector_type(ctx, type->e.numeric.type, 4);
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
@@ -500,7 +500,7 @@ static void append_output_copy(struct hlsl_ctx *ctx, struct hlsl_block *block, s
     if (!semantic->name)
         return;
 
-    vector_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+    vector_type = hlsl_get_vector_type(ctx, type->e.numeric.type, hlsl_type_minor_size(type));
 
     for (i = 0; i < hlsl_type_major_size(type); ++i)
     {
@@ -1101,7 +1101,7 @@ static bool lower_index_loads(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         struct hlsl_ir_node *resource_load;
 
         assert(coords->data_type->class == HLSL_CLASS_VECTOR);
-        assert(coords->data_type->base_type == HLSL_TYPE_UINT);
+        assert(coords->data_type->e.numeric.type == HLSL_TYPE_UINT);
         assert(coords->data_type->dimx == dim_count);
 
         if (!(coords = add_zero_mipmap_level(ctx, coords, &instr->loc)))
@@ -1191,7 +1191,7 @@ static bool lower_broadcasts(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, s
     {
         struct hlsl_ir_node *new_cast, *swizzle;
 
-        dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->base_type);
+        dst_scalar_type = hlsl_get_scalar_type(ctx, dst_type->e.numeric.type);
         /* We need to preserve the cast since it might be doing more than just
          * turning the scalar into a vector. */
         if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_scalar_type, &cast->node.loc)))
@@ -2065,7 +2065,7 @@ static bool fold_redundant_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         src_type = expr->operands[0].node->data_type;
 
         if (hlsl_types_are_equal(src_type, dst_type)
-                || (src_type->base_type == dst_type->base_type && is_vec1(src_type) && is_vec1(dst_type)))
+                || (src_type->e.numeric.type == dst_type->e.numeric.type && is_vec1(src_type) && is_vec1(dst_type)))
         {
             hlsl_replace_node(&expr->node, expr->operands[0].node);
             return true;
@@ -2192,7 +2192,7 @@ static bool split_matrix_copies(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     type = rhs->data_type;
     if (type->class != HLSL_CLASS_MATRIX)
         return false;
-    element_type = hlsl_get_vector_type(ctx, type->base_type, hlsl_type_minor_size(type));
+    element_type = hlsl_get_vector_type(ctx, type->e.numeric.type, hlsl_type_minor_size(type));
 
     if (rhs->type != HLSL_IR_LOAD)
     {
@@ -2229,7 +2229,7 @@ static bool lower_narrowing_casts(struct hlsl_ctx *ctx, struct hlsl_ir_node *ins
     {
         struct hlsl_ir_node *new_cast, *swizzle;
 
-        dst_vector_type = hlsl_get_vector_type(ctx, dst_type->base_type, src_type->dimx);
+        dst_vector_type = hlsl_get_vector_type(ctx, dst_type->e.numeric.type, src_type->dimx);
         /* We need to preserve the cast since it might be doing more than just
          * narrowing the vector. */
         if (!(new_cast = hlsl_new_cast(ctx, cast->operands[0].node, dst_vector_type, &cast->node.loc)))
@@ -2483,7 +2483,7 @@ static bool lower_nonconstant_vector_derefs(struct hlsl_ctx *ctx, struct hlsl_ir
 
         op = HLSL_OP2_DOT;
         if (type->dimx == 1)
-            op = type->base_type == HLSL_TYPE_BOOL ? HLSL_OP2_LOGIC_AND : HLSL_OP2_MUL;
+            op = type->e.numeric.type == HLSL_TYPE_BOOL ? HLSL_OP2_LOGIC_AND : HLSL_OP2_MUL;
 
         /* Note: We may be creating a DOT for bool vectors here, which we need to lower to
          * LOGIC_OR + LOGIC_AND. */
@@ -2677,9 +2677,9 @@ static bool lower_casts_to_int(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
 
     arg = expr->operands[0].node;
-    if (instr->data_type->base_type != HLSL_TYPE_INT && instr->data_type->base_type != HLSL_TYPE_UINT)
+    if (instr->data_type->e.numeric.type != HLSL_TYPE_INT && instr->data_type->e.numeric.type != HLSL_TYPE_UINT)
         return false;
-    if (arg->data_type->base_type != HLSL_TYPE_FLOAT && arg->data_type->base_type != HLSL_TYPE_HALF)
+    if (arg->data_type->e.numeric.type != HLSL_TYPE_FLOAT && arg->data_type->e.numeric.type != HLSL_TYPE_HALF)
         return false;
 
     if (!(floor = hlsl_new_unary_expr(ctx, HLSL_OP1_FLOOR, arg, &instr->loc)))
@@ -2936,7 +2936,7 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
     float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, arg->data_type->dimx);
 
     /* If this is happens, it means we failed to cast the argument to boolean somewhere. */
-    assert(arg->data_type->base_type == HLSL_TYPE_BOOL);
+    assert(arg->data_type->e.numeric.type == HLSL_TYPE_BOOL);
 
     if (!(arg_cast = hlsl_new_cast(ctx, arg, float_type, &arg->loc)))
         return false;
@@ -2992,7 +2992,7 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
         return false;
     }
 
-    assert(cond->data_type->base_type == HLSL_TYPE_BOOL);
+    assert(cond->data_type->e.numeric.type == HLSL_TYPE_BOOL);
 
     type = hlsl_get_numeric_type(ctx, instr->data_type->class, HLSL_TYPE_FLOAT,
             instr->data_type->dimx, instr->data_type->dimy);
@@ -3286,7 +3286,7 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
     arg_type = expr->operands[0].node->data_type;
     if (type->class > HLSL_CLASS_VECTOR || arg_type->class > HLSL_CLASS_VECTOR)
         return false;
-    if (type->base_type != HLSL_TYPE_BOOL)
+    if (type->e.numeric.type != HLSL_TYPE_BOOL)
         return false;
 
     /* Narrowing casts should have already been lowered. */
@@ -3314,7 +3314,7 @@ struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_bloc
 
     assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
 
-    if (cond_type->base_type != HLSL_TYPE_BOOL)
+    if (cond_type->e.numeric.type != HLSL_TYPE_BOOL)
     {
         cond_type = hlsl_get_numeric_type(ctx, cond_type->class, HLSL_TYPE_BOOL, cond_type->dimx, cond_type->dimy);
 
@@ -3350,7 +3350,7 @@ static bool lower_int_division(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr,
         return false;
     if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
-    if (type->base_type != HLSL_TYPE_INT)
+    if (type->e.numeric.type != HLSL_TYPE_INT)
         return false;
     utype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->dimx, type->dimy);
 
@@ -3416,7 +3416,7 @@ static bool lower_int_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, 
         return false;
     if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
-    if (type->base_type != HLSL_TYPE_INT)
+    if (type->e.numeric.type != HLSL_TYPE_INT)
         return false;
     utype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_UINT, type->dimx, type->dimy);
 
@@ -3475,7 +3475,7 @@ static bool lower_int_abs(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
         return false;
     if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
-    if (type->base_type != HLSL_TYPE_INT)
+    if (type->e.numeric.type != HLSL_TYPE_INT)
         return false;
 
     arg = expr->operands[0].node;
@@ -3506,14 +3506,14 @@ static bool lower_int_dot(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     if (expr->op != HLSL_OP2_DOT)
         return false;
 
-    if (type->base_type == HLSL_TYPE_INT || type->base_type == HLSL_TYPE_UINT
-            || type->base_type == HLSL_TYPE_BOOL)
+    if (type->e.numeric.type == HLSL_TYPE_INT || type->e.numeric.type == HLSL_TYPE_UINT
+            || type->e.numeric.type == HLSL_TYPE_BOOL)
     {
         arg1 = expr->operands[0].node;
         arg2 = expr->operands[1].node;
         assert(arg1->data_type->dimx == arg2->data_type->dimx);
         dimx = arg1->data_type->dimx;
-        is_bool = type->base_type == HLSL_TYPE_BOOL;
+        is_bool = type->e.numeric.type == HLSL_TYPE_BOOL;
 
         if (!(mult = hlsl_new_binary_expr(ctx, is_bool ? HLSL_OP2_LOGIC_AND : HLSL_OP2_MUL, arg1, arg2)))
             return false;
@@ -3559,7 +3559,7 @@ static bool lower_float_modulus(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
         return false;
     if (type->class != HLSL_CLASS_SCALAR && type->class != HLSL_CLASS_VECTOR)
         return false;
-    if (type->base_type != HLSL_TYPE_FLOAT)
+    if (type->e.numeric.type != HLSL_TYPE_FLOAT)
         return false;
     btype = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_BOOL, type->dimx, type->dimy);
 
@@ -3615,7 +3615,7 @@ static bool lower_nonfloat_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
     if (instr->type != HLSL_IR_EXPR)
         return false;
     expr = hlsl_ir_expr(instr);
-    if (expr->op == HLSL_OP1_CAST || instr->data_type->base_type == HLSL_TYPE_FLOAT)
+    if (expr->op == HLSL_OP1_CAST || instr->data_type->e.numeric.type == HLSL_TYPE_FLOAT)
         return false;
 
     switch (expr->op)
@@ -4454,7 +4454,7 @@ static void allocate_const_registers_recurse(struct hlsl_ctx *ctx,
                         continue;
                     value = &constant->value.u[i++];
 
-                    switch (type->base_type)
+                    switch (type->e.numeric.type)
                     {
                         case HLSL_TYPE_BOOL:
                             f = !!value->u;
@@ -5047,7 +5047,7 @@ bool hlsl_component_index_range_from_deref(struct hlsl_ctx *ctx, const struct hl
 
         /* We should always have generated a cast to UINT. */
         assert(path_node->data_type->class == HLSL_CLASS_SCALAR
-                && path_node->data_type->base_type == HLSL_TYPE_UINT);
+                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
@@ -5123,7 +5123,7 @@ bool hlsl_regset_index_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref 
 
         /* We should always have generated a cast to UINT. */
         assert(path_node->data_type->class == HLSL_CLASS_SCALAR
-                && path_node->data_type->base_type == HLSL_TYPE_UINT);
+                && path_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
 
         idx = hlsl_ir_constant(path_node)->value.u[0].u;
 
@@ -5163,7 +5163,7 @@ bool hlsl_offset_from_deref(struct hlsl_ctx *ctx, const struct hlsl_deref *deref
     {
         /* We should always have generated a cast to UINT. */
         assert(offset_node->data_type->class == HLSL_CLASS_SCALAR
-                && offset_node->data_type->base_type == HLSL_TYPE_UINT);
+                && offset_node->data_type->e.numeric.type == HLSL_TYPE_UINT);
         assert(offset_node->type != HLSL_IR_CONSTANT);
         return false;
     }
@@ -5230,7 +5230,7 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
         const struct hlsl_ir_constant *constant;
 
         if (type->class != HLSL_CLASS_SCALAR
-                || (type->base_type != HLSL_TYPE_INT && type->base_type != HLSL_TYPE_UINT))
+                || (type->e.numeric.type != HLSL_TYPE_INT && type->e.numeric.type != HLSL_TYPE_UINT))
         {
             struct vkd3d_string_buffer *string;
 
@@ -5249,8 +5249,8 @@ static void parse_numthreads_attribute(struct hlsl_ctx *ctx, const struct hlsl_a
         }
         constant = hlsl_ir_constant(instr);
 
-        if ((type->base_type == HLSL_TYPE_INT && constant->value.u[0].i <= 0)
-                || (type->base_type == HLSL_TYPE_UINT && !constant->value.u[0].u))
+        if ((type->e.numeric.type == HLSL_TYPE_INT && constant->value.u[0].i <= 0)
+                || (type->e.numeric.type == HLSL_TYPE_UINT && !constant->value.u[0].u))
             hlsl_error(ctx, &instr->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_THREAD_COUNT,
                     "Thread count must be a positive integer.");
 
