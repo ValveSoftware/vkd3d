@@ -3396,7 +3396,7 @@ struct vkd3d_shader_register_info
     bool is_aggregate;
 };
 
-static bool spirv_compiler_get_register_info(const struct spirv_compiler *compiler,
+static bool spirv_compiler_get_register_info(struct spirv_compiler *compiler,
         const struct vkd3d_shader_register *reg, struct vkd3d_shader_register_info *register_info)
 {
     struct vkd3d_symbol reg_symbol, *symbol;
@@ -3422,7 +3422,8 @@ static bool spirv_compiler_get_register_info(const struct spirv_compiler *compil
     vkd3d_symbol_make_register(&reg_symbol, reg);
     if (!(entry = rb_get(&compiler->symbol_table, &reg_symbol)))
     {
-        FIXME("Unrecognized register (%s).\n", debug_vkd3d_symbol(&reg_symbol));
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_INVALID_REGISTER_TYPE,
+                "Unrecognized register (%s).\n", debug_vkd3d_symbol(&reg_symbol));
         memset(register_info, 0, sizeof(*register_info));
         return false;
     }
