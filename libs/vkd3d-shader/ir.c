@@ -4116,10 +4116,28 @@ static enum vkd3d_result vsir_cfg_build_structured_program(struct vsir_cfg *cfg)
                      * false branch. */
                     if (action_true.jump_type == JUMP_NONE)
                     {
+                        invert_condition = true;
+                    }
+                    else if (stack_depth >= 2)
+                    {
+                        struct vsir_cfg_structure_list *inner_loop_frame = stack[stack_depth - 2];
+                        struct vsir_cfg_structure *inner_loop = &inner_loop_frame->structures[inner_loop_frame->count - 1];
+
+                        assert(inner_loop->type == STRUCTURE_TYPE_LOOP);
+
+                        /* Otherwise, if one of the branches is
+                         * continueing the inner loop we're inside,
+                         * make sure it's the false branch (because it
+                         * will be optimized out later). */
+                        if (action_true.jump_type == JUMP_CONTINUE && action_true.target == inner_loop->u.loop.idx)
+                            invert_condition = true;
+                    }
+
+                    if (invert_condition)
+                    {
                         struct vsir_cfg_edge_action tmp = action_true;
                         action_true = action_false;
                         action_false = tmp;
-                        invert_condition = true;
                     }
 
                     assert(action_true.jump_type != JUMP_NONE);
