@@ -8785,7 +8785,6 @@ static void spirv_compiler_emit_ld_tgsm(struct spirv_compiler *compiler,
         ptr_id = vkd3d_spirv_build_op_access_chain1(builder, ptr_type_id, reg_info.id, coordinate_id);
         constituents[j++] = vkd3d_spirv_build_op_load(builder, type_id, ptr_id, SpvMemoryAccessMaskNone);
     }
-    assert(dst->reg.data_type == VKD3D_DATA_UINT);
     spirv_compiler_emit_store_dst_components(compiler, dst, VKD3D_SHADER_COMPONENT_UINT, constituents);
 }
 
