@@ -2321,6 +2321,10 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
                     --indent;
                 break;
 
+            case VKD3DSIH_LABEL:
+                indent = 0;
+                break;
+
             default:
                 break;
         }
@@ -2339,6 +2343,7 @@ enum vkd3d_result d3d_asm_compile(const struct vsir_program *program,
             case VKD3DSIH_IFC:
             case VKD3DSIH_LOOP:
             case VKD3DSIH_SWITCH:
+            case VKD3DSIH_LABEL:
                 ++indent;
                 break;
 
