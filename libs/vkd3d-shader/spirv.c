@@ -8906,7 +8906,6 @@ static void spirv_compiler_emit_store_tgsm(struct spirv_compiler *compiler,
             type_id, reg_info.structure_stride, &src[0], VKD3DSP_WRITEMASK_0, &src[1], VKD3DSP_WRITEMASK_0);
 
     data = &src[instruction->src_count - 1];
-    assert(data->reg.data_type == VKD3D_DATA_UINT);
     val_id = spirv_compiler_emit_load_src(compiler, data, dst->write_mask);
 
     component_count = vsir_write_mask_component_count(dst->write_mask);
