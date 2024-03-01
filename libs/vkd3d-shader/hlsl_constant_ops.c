@@ -1177,30 +1177,11 @@ static bool fold_ternary(struct hlsl_ctx *ctx, struct hlsl_constant_value *dst, 
 
     assert(dst_type->base_type == src2->node.data_type->base_type);
     assert(dst_type->base_type == src3->node.data_type->base_type);
+    assert(src1->node.data_type->base_type == HLSL_TYPE_BOOL);
 
     for (k = 0; k < dst_type->dimx; ++k)
-    {
-        switch (src1->node.data_type->base_type)
-        {
-            case HLSL_TYPE_FLOAT:
-            case HLSL_TYPE_HALF:
-                dst->u[k] = src1->value.u[k].f != 0.0f ? src2->value.u[k] : src3->value.u[k];
-                break;
+        dst->u[k] = src1->value.u[k].u ? src2->value.u[k] : src3->value.u[k];
 
-            case HLSL_TYPE_DOUBLE:
-                dst->u[k] = src1->value.u[k].d != 0.0 ? src2->value.u[k] : src3->value.u[k];
-                break;
-
-            case HLSL_TYPE_INT:
-            case HLSL_TYPE_UINT:
-            case HLSL_TYPE_BOOL:
-                dst->u[k] = src1->value.u[k].u ? src2->value.u[k] : src3->value.u[k];
-                break;
-
-            default:
-                vkd3d_unreachable();
-        }
-    }
     return true;
 }
 

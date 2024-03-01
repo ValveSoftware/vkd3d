@@ -601,12 +601,10 @@ enum hlsl_ir_expr_op
     /* DP2ADD(a, b, c) computes the scalar product of a.xy and b.xy,
      * then adds c. */
     HLSL_OP3_DP2ADD,
-    /* MOVC(a, b, c) returns c if a is bitwise zero and b otherwise.
-     * TERNARY(a, b, c) returns c if a == 0 and b otherwise.
-     * They differ for floating point numbers, because
-     * -0.0 == 0.0, but it is not bitwise zero. CMP(a, b, c) returns b
-       if a >= 0, and c otherwise. It's used only for SM1-SM3 targets, while
-       SM4+ is using MOVC in such cases. */
+    /* TERNARY(a, b, c) returns 'b' if 'a' is true and 'c' otherwise. 'a' must always be boolean.
+     * MOVC(a, b, c) returns 'c' if 'a' is bitwise zero and 'b' otherwise.
+     * CMP(a, b, c) returns 'b' if 'a' >= 0, and 'c' otherwise. It's used only for SM1-SM3 targets,
+       while SM4+ is using MOVC in such cases. */
     HLSL_OP3_CMP,
     HLSL_OP3_MOVC,
     HLSL_OP3_TERNARY,

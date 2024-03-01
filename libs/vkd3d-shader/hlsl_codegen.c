@@ -2958,8 +2958,7 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
 static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, struct hlsl_block *block)
 {
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS] = { 0 }, *replacement;
-    struct hlsl_ir_node *zero, *cond, *first, *second;
-    struct hlsl_constant_value zero_value = { 0 };
+    struct hlsl_ir_node *cond, *first, *second, *float_cond, *neg;
     struct hlsl_ir_expr *expr;
     struct hlsl_type *type;
 
@@ -2980,18 +2979,22 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
         return false;
     }
 
+    assert(cond->data_type->base_type == HLSL_TYPE_BOOL);
+
     if (ctx->profile->major_version < 4)
     {
-        struct hlsl_ir_node *abs, *neg;
+        type = hlsl_get_numeric_type(ctx, instr->data_type->class, HLSL_TYPE_FLOAT,
+                instr->data_type->dimx, instr->data_type->dimy);
 
-        if (!(abs = hlsl_new_unary_expr(ctx, HLSL_OP1_ABS, cond, &instr->loc)))
+        if (!(float_cond = hlsl_new_cast(ctx, cond, type, &instr->loc)))
             return false;
-        hlsl_block_add_instr(block, abs);
+        hlsl_block_add_instr(block, float_cond);
 
-        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, abs, &instr->loc)))
+        if (!(neg = hlsl_new_unary_expr(ctx, HLSL_OP1_NEG, float_cond, &instr->loc)))
             return false;
         hlsl_block_add_instr(block, neg);
 
+        memset(operands, 0, sizeof(operands));
         operands[0] = neg;
         operands[1] = second;
         operands[2] = first;
@@ -3000,21 +3003,6 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     }
     else
     {
-        if (cond->data_type->base_type == HLSL_TYPE_FLOAT)
-        {
-            if (!(zero = hlsl_new_constant(ctx, cond->data_type, &zero_value, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, zero);
-
-            operands[0] = zero;
-            operands[1] = cond;
-            type = cond->data_type;
-            type = hlsl_get_numeric_type(ctx, type->class, HLSL_TYPE_BOOL, type->dimx, type->dimy);
-            if (!(cond = hlsl_new_expr(ctx, HLSL_OP2_NEQUAL, operands, type, &instr->loc)))
-                return false;
-            hlsl_block_add_instr(block, cond);
-        }
-
         memset(operands, 0, sizeof(operands));
         operands[0] = cond;
         operands[1] = first;
@@ -3319,10 +3307,20 @@ static bool lower_casts_to_bool(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr
 struct hlsl_ir_node *hlsl_add_conditional(struct hlsl_ctx *ctx, struct hlsl_block *instrs,
         struct hlsl_ir_node *condition, struct hlsl_ir_node *if_true, struct hlsl_ir_node *if_false)
 {
+    struct hlsl_type *cond_type = condition->data_type;
     struct hlsl_ir_node *operands[HLSL_MAX_OPERANDS];
     struct hlsl_ir_node *cond;
 
     assert(hlsl_types_are_equal(if_true->data_type, if_false->data_type));
+
+    if (cond_type->base_type != HLSL_TYPE_BOOL)
+    {
+        cond_type = hlsl_get_numeric_type(ctx, cond_type->class, HLSL_TYPE_BOOL, cond_type->dimx, cond_type->dimy);
+
+        if (!(condition = hlsl_new_cast(ctx, condition, cond_type, &condition->loc)))
+            return NULL;
+        hlsl_block_add_instr(instrs, condition);
+    }
 
     operands[0] = condition;
     operands[1] = if_true;
@@ -5400,11 +5398,11 @@ int hlsl_emit_bytecode(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry
     hlsl_transform_ir(ctx, split_matrix_copies, body, NULL);
 
     lower_ir(ctx, lower_narrowing_casts, body);
-    lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_int_dot, body);
     lower_ir(ctx, lower_int_division, body);
     lower_ir(ctx, lower_int_modulus, body);
     lower_ir(ctx, lower_int_abs, body);
+    lower_ir(ctx, lower_casts_to_bool, body);
     lower_ir(ctx, lower_float_modulus, body);
     hlsl_transform_ir(ctx, fold_redundant_casts, body, NULL);
     do

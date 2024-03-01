@@ -88,7 +88,7 @@ probe all rgba (1.0, 1.0, 1.0, 1.0)
 % The ternary operator works differently in sm6. See sm6-ternary.shader_test.
 shader model < 6.0
 
-[vertex shader todo(sm<4)]
+[vertex shader]
 int a, b, c;
 
 void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos : sv_position)
@@ -103,11 +103,11 @@ if(sm<4)  uniform 0 float 0
 if(sm<4)  uniform 4 float 100
 if(sm<4)  uniform 8 float 200
 if(sm>=4) uniform 0 int4 0 100 200 0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.2, 0.2, 0.2, 0.2)
 if(sm<4)  uniform 0 float -4
 if(sm<4)  uniform 4 float 100
 if(sm<4)  uniform 8 float 200
 if(sm>=4) uniform 0 int4 -4 100 200 0
-todo(sm<4 | glsl) draw quad
+todo(glsl) draw quad
 probe all rgba (0.1, 0.1, 0.1, 0.1)
