@@ -4419,11 +4419,11 @@ static void spirv_compiler_emit_store_dst_components(struct spirv_compiler *comp
 {
     unsigned int component_count = vsir_write_mask_component_count(dst->write_mask);
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    uint32_t type_id, val_id;
+    uint32_t type_id, dst_type_id, val_id;
 
+    type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
     if (component_count > 1)
     {
-        type_id = vkd3d_spirv_get_type_id(builder, component_type, component_count);
         val_id = vkd3d_spirv_build_op_composite_construct(builder,
                 type_id, component_ids, component_count);
     }
@@ -4431,6 +4431,11 @@ static void spirv_compiler_emit_store_dst_components(struct spirv_compiler *comp
     {
         val_id = *component_ids;
     }
+
+    dst_type_id = vkd3d_spirv_get_type_id_for_data_type(builder, dst->reg.data_type, component_count);
+    if (dst_type_id != type_id)
+        val_id = vkd3d_spirv_build_op_bitcast(builder, dst_type_id, val_id);
+
     spirv_compiler_emit_store_dst(compiler, dst, val_id);
 }
 
