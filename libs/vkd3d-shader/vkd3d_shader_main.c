@@ -1729,26 +1729,31 @@ int vkd3d_shader_compile(const struct vkd3d_shader_compile_info *compile_info,
 
     vkd3d_shader_dump_shader(compile_info);
 
-    switch (compile_info->source_type)
+    if (compile_info->source_type == VKD3D_SHADER_SOURCE_HLSL)
     {
-        case VKD3D_SHADER_SOURCE_DXBC_TPF:
-            ret = compile_dxbc_tpf(compile_info, out, &message_context);
-            break;
+        ret = compile_hlsl(compile_info, out, &message_context);
+    }
+    else
+    {
+        switch (compile_info->source_type)
+        {
+            case VKD3D_SHADER_SOURCE_DXBC_TPF:
+                ret = compile_dxbc_tpf(compile_info, out, &message_context);
+                break;
 
-        case VKD3D_SHADER_SOURCE_HLSL:
-            ret = compile_hlsl(compile_info, out, &message_context);
-            break;
+            case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
+                ret = compile_d3d_bytecode(compile_info, out, &message_context);
+                break;
 
-        case VKD3D_SHADER_SOURCE_D3D_BYTECODE:
-            ret = compile_d3d_bytecode(compile_info, out, &message_context);
-            break;
+            case VKD3D_SHADER_SOURCE_DXBC_DXIL:
+                ret = compile_dxbc_dxil(compile_info, out, &message_context);
+                break;
 
-        case VKD3D_SHADER_SOURCE_DXBC_DXIL:
-            ret = compile_dxbc_dxil(compile_info, out, &message_context);
-            break;
-
-        default:
-            vkd3d_unreachable();
+            default:
+                ERR("Unsupported source type %#x.\n", compile_info->source_type);
+                ret = VKD3D_ERROR_INVALID_ARGUMENT;
+                break;
+        }
     }
 
     vkd3d_shader_message_context_trace_messages(&message_context);
