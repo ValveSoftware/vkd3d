@@ -14,6 +14,24 @@ float4 main(in float4 res : COLOR1) : sv_target
 }
 
 
+% Check that -0.0f is not less than 0.0f
+[vertex shader todo(sm<4)]
+float a;
+
+void main(out float4 res : COLOR1, in float4 pos : position, out float4 out_pos : sv_position)
+{
+    out_pos = pos;
+
+    res = -0.0f < a;
+}
+
+[test]
+if(sm<4)  uniform 0 float 0.0
+if(sm>=4) uniform 0 float4 0.0 0.0 0.0 0.0
+todo(sm<4) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+
 [vertex shader todo(sm<4)]
 int a, b;
 

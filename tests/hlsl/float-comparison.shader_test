@@ -1,3 +1,18 @@
+% Check that -0.0f is not less than 0.0f
+[pixel shader todo(sm<4)]
+float a;
+
+float4 main() : sv_target
+{
+    return -0.0f < a;
+}
+
+[test]
+uniform 0 float 0.0
+todo(sm<4) draw quad
+probe all rgba (0.0, 0.0, 0.0, 0.0)
+
+
 [pixel shader todo(sm<4)]
 uniform float4 f;
 
