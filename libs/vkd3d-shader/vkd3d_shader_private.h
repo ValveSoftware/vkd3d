@@ -1088,6 +1088,7 @@ struct vkd3d_shader_tgsm
 struct vkd3d_shader_tgsm_raw
 {
     struct vkd3d_shader_dst_param reg;
+    unsigned int alignment;
     unsigned int byte_count;
     bool zero_init;
 };
