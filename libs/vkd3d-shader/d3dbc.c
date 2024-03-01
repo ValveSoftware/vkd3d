@@ -541,9 +541,9 @@ static bool add_signature_element(struct vkd3d_shader_sm1_parser *sm1, bool outp
     struct signature_element *element;
 
     if (output)
-        signature = &sm1->p.shader_desc.output_signature;
+        signature = &sm1->p.program.output_signature;
     else
-        signature = &sm1->p.shader_desc.input_signature;
+        signature = &sm1->p.program.input_signature;
 
     if ((element = find_signature_element(signature, name, index)))
     {
@@ -581,9 +581,9 @@ static void add_signature_mask(struct vkd3d_shader_sm1_parser *sm1, bool output,
     struct signature_element *element;
 
     if (output)
-        signature = &sm1->p.shader_desc.output_signature;
+        signature = &sm1->p.program.output_signature;
     else
-        signature = &sm1->p.shader_desc.input_signature;
+        signature = &sm1->p.program.input_signature;
 
     if (!(element = find_signature_element_by_register_index(signature, register_index)))
     {
@@ -886,7 +886,6 @@ static void shader_sm1_destroy(struct vkd3d_shader_parser *parser)
     struct vkd3d_shader_sm1_parser *sm1 = vkd3d_shader_sm1_parser(parser);
 
     vsir_program_cleanup(&parser->program);
-    free_shader_desc(&sm1->p.shader_desc);
     vkd3d_free(sm1);
 }
 

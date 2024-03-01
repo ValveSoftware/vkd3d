@@ -560,13 +560,6 @@ void free_dxbc_shader_desc(struct dxbc_shader_desc *desc)
     shader_signature_cleanup(&desc->patch_constant_signature);
 }
 
-void free_shader_desc(struct vkd3d_shader_desc *desc)
-{
-    shader_signature_cleanup(&desc->input_signature);
-    shader_signature_cleanup(&desc->output_signature);
-    shader_signature_cleanup(&desc->patch_constant_signature);
-}
-
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct dxbc_shader_desc *desc)
 {

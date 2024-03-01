@@ -954,32 +954,32 @@ static void shader_sm4_read_dcl_index_range(struct vkd3d_shader_instruction *ins
         case VKD3DSPR_INCONTROLPOINT:
             io_masks = priv->input_register_masks;
             ranges = &priv->input_index_ranges;
-            signature = &priv->p.shader_desc.input_signature;
+            signature = &priv->p.program.input_signature;
             break;
         case VKD3DSPR_OUTPUT:
             if (sm4_parser_is_in_fork_or_join_phase(priv))
             {
                 io_masks = priv->patch_constant_register_masks;
                 ranges = &priv->patch_constant_index_ranges;
-                signature = &priv->p.shader_desc.patch_constant_signature;
+                signature = &priv->p.program.patch_constant_signature;
             }
             else
             {
                 io_masks = priv->output_register_masks;
                 ranges = &priv->output_index_ranges;
-                signature = &priv->p.shader_desc.output_signature;
+                signature = &priv->p.program.output_signature;
             }
             break;
         case VKD3DSPR_COLOROUT:
         case VKD3DSPR_OUTCONTROLPOINT:
             io_masks = priv->output_register_masks;
             ranges = &priv->output_index_ranges;
-            signature = &priv->p.shader_desc.output_signature;
+            signature = &priv->p.program.output_signature;
             break;
         case VKD3DSPR_PATCHCONST:
             io_masks = priv->patch_constant_register_masks;
             ranges = &priv->patch_constant_index_ranges;
-            signature = &priv->p.shader_desc.patch_constant_signature;
+            signature = &priv->p.program.patch_constant_signature;
             break;
 
         default:
@@ -1113,7 +1113,7 @@ static void shader_sm4_read_dcl_input_ps(struct vkd3d_shader_instruction *ins, u
     if (shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT, dst))
     {
         struct signature_element *e = vsir_signature_find_element_for_reg(
-                &priv->p.shader_desc.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+                &priv->p.program.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
 
         e->interpolation_mode = ins->flags;
     }
@@ -1128,7 +1128,7 @@ static void shader_sm4_read_dcl_input_ps_siv(struct vkd3d_shader_instruction *in
     if (shader_sm4_read_dst_param(priv, &tokens, &tokens[token_count], VKD3D_DATA_FLOAT, dst))
     {
         struct signature_element *e = vsir_signature_find_element_for_reg(
-                &priv->p.shader_desc.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
+                &priv->p.program.input_signature, dst->reg.idx[dst->reg.idx_count - 1].offset, dst->write_mask);
 
         e->interpolation_mode = ins->flags;
     }
@@ -1748,7 +1748,6 @@ static void shader_sm4_destroy(struct vkd3d_shader_parser *parser)
     struct vkd3d_shader_sm4_parser *sm4 = vkd3d_shader_sm4_parser(parser);
 
     vsir_program_cleanup(&parser->program);
-    free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm4);
 }
 
@@ -2673,31 +2672,32 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     shader_desc->is_dxil = false;
     shader_desc->byte_code = dxbc_desc.byte_code;
     shader_desc->byte_code_size = dxbc_desc.byte_code_size;
-    shader_desc->input_signature = dxbc_desc.input_signature;
-    shader_desc->output_signature = dxbc_desc.output_signature;
-    shader_desc->patch_constant_signature = dxbc_desc.patch_constant_signature;
-    memset(&dxbc_desc, 0, sizeof(dxbc_desc));
 
     if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
             compile_info->source_name, message_context))
     {
         WARN("Failed to initialise shader parser.\n");
-        free_shader_desc(shader_desc);
+        free_dxbc_shader_desc(&dxbc_desc);
         vkd3d_free(sm4);
         return VKD3D_ERROR_INVALID_ARGUMENT;
     }
 
+    sm4->p.program.input_signature = dxbc_desc.input_signature;
+    sm4->p.program.output_signature = dxbc_desc.output_signature;
+    sm4->p.program.patch_constant_signature = dxbc_desc.patch_constant_signature;
+    memset(&dxbc_desc, 0, sizeof(dxbc_desc));
+
     /* DXBC stores used masks inverted for output signatures, for some reason.
      * We return them un-inverted. */
-    uninvert_used_masks(&shader_desc->output_signature);
+    uninvert_used_masks(&sm4->p.program.output_signature);
     if (sm4->p.program.shader_version.type == VKD3D_SHADER_TYPE_HULL)
-        uninvert_used_masks(&shader_desc->patch_constant_signature);
+        uninvert_used_masks(&sm4->p.program.patch_constant_signature);
 
-    if (!shader_sm4_parser_validate_signature(sm4, &shader_desc->input_signature,
+    if (!shader_sm4_parser_validate_signature(sm4, &sm4->p.program.input_signature,
             sm4->input_register_masks, "Input")
-            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->output_signature,
+            || !shader_sm4_parser_validate_signature(sm4, &sm4->p.program.output_signature,
             sm4->output_register_masks, "Output")
-            || !shader_sm4_parser_validate_signature(sm4, &shader_desc->patch_constant_signature,
+            || !shader_sm4_parser_validate_signature(sm4, &sm4->p.program.patch_constant_signature,
             sm4->patch_constant_register_masks, "Patch constant"))
     {
         shader_sm4_destroy(&sm4->p);

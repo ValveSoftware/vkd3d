@@ -2444,14 +2444,14 @@ static void spirv_compiler_destroy(struct spirv_compiler *compiler)
     vkd3d_free(compiler);
 }
 
-static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_version *shader_version,
-        struct vkd3d_shader_desc *shader_desc, const struct vkd3d_shader_compile_info *compile_info,
+static struct spirv_compiler *spirv_compiler_create(const struct vsir_program *program,
+        const struct vkd3d_shader_compile_info *compile_info,
         const struct vkd3d_shader_scan_descriptor_info1 *scan_descriptor_info,
         struct vkd3d_shader_message_context *message_context, const struct vkd3d_shader_location *location,
         uint64_t config_flags)
 {
-    const struct shader_signature *patch_constant_signature = &shader_desc->patch_constant_signature;
-    const struct shader_signature *output_signature = &shader_desc->output_signature;
+    const struct shader_signature *patch_constant_signature = &program->patch_constant_signature;
+    const struct shader_signature *output_signature = &program->output_signature;
     const struct vkd3d_shader_interface_info *shader_interface;
     const struct vkd3d_shader_descriptor_offset_info *offset_info;
     const struct vkd3d_shader_spirv_target_info *target_info;
@@ -2562,7 +2562,7 @@ static struct spirv_compiler *spirv_compiler_create(const struct vkd3d_shader_ve
 
     rb_init(&compiler->symbol_table, vkd3d_symbol_compare);
 
-    compiler->shader_type = shader_version->type;
+    compiler->shader_type = program->shader_version.type;
 
     if ((shader_interface = vkd3d_find_struct(compile_info->next, INTERFACE_INFO)))
     {
@@ -9982,7 +9982,6 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     const struct vkd3d_shader_spirv_target_info *info = compiler->spirv_target_info;
     const struct vkd3d_shader_spirv_domain_shader_target_info *ds_info;
     struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
-    struct vkd3d_shader_desc *shader_desc = &parser->shader_desc;
     struct vkd3d_shader_instruction_array instructions;
     struct vsir_program *program = &parser->program;
     enum vkd3d_result result = VKD3D_OK;
@@ -10007,12 +10006,12 @@ static int spirv_compiler_generate_spirv(struct spirv_compiler *compiler,
     instructions = program->instructions;
     memset(&program->instructions, 0, sizeof(program->instructions));
 
-    compiler->input_signature = shader_desc->input_signature;
-    compiler->output_signature = shader_desc->output_signature;
-    compiler->patch_constant_signature = shader_desc->patch_constant_signature;
-    memset(&shader_desc->input_signature, 0, sizeof(shader_desc->input_signature));
-    memset(&shader_desc->output_signature, 0, sizeof(shader_desc->output_signature));
-    memset(&shader_desc->patch_constant_signature, 0, sizeof(shader_desc->patch_constant_signature));
+    compiler->input_signature = program->input_signature;
+    compiler->output_signature = program->output_signature;
+    compiler->patch_constant_signature = program->patch_constant_signature;
+    memset(&program->input_signature, 0, sizeof(program->input_signature));
+    memset(&program->output_signature, 0, sizeof(program->output_signature));
+    memset(&program->patch_constant_signature, 0, sizeof(program->patch_constant_signature));
     compiler->use_vocp = program->use_vocp;
     compiler->block_names = program->block_names;
     compiler->block_name_count = program->block_name_count;
@@ -10119,8 +10118,8 @@ int spirv_compile(struct vkd3d_shader_parser *parser,
     struct spirv_compiler *spirv_compiler;
     int ret;
 
-    if (!(spirv_compiler = spirv_compiler_create(&parser->program.shader_version, &parser->shader_desc,
-            compile_info, scan_descriptor_info, message_context, &parser->location, parser->config_flags)))
+    if (!(spirv_compiler = spirv_compiler_create(&parser->program, compile_info,
+            scan_descriptor_info, message_context, &parser->location, parser->config_flags)))
     {
         ERR("Failed to create SPIR-V compiler.\n");
         return VKD3D_ERROR;

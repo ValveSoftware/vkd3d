@@ -1043,9 +1043,6 @@ struct vkd3d_shader_desc
     const uint32_t *byte_code;
     size_t byte_code_size;
     bool is_dxil;
-    struct shader_signature input_signature;
-    struct shader_signature output_signature;
-    struct shader_signature patch_constant_signature;
 
     struct
     {
@@ -1303,6 +1300,10 @@ struct vsir_program
     struct vkd3d_shader_version shader_version;
     struct vkd3d_shader_instruction_array instructions;
 
+    struct shader_signature input_signature;
+    struct shader_signature output_signature;
+    struct shader_signature patch_constant_signature;
+
     unsigned int input_control_point_count, output_control_point_count;
     unsigned int block_count;
     unsigned int temp_count;
@@ -1498,7 +1499,6 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
 void free_dxbc_shader_desc(struct dxbc_shader_desc *desc);
-void free_shader_desc(struct vkd3d_shader_desc *desc);
 
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, const char *source_name, struct dxbc_shader_desc *desc);

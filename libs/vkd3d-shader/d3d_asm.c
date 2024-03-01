@@ -2196,22 +2196,22 @@ static enum vkd3d_result dump_signature(struct vkd3d_d3d_asm_compiler *compiler,
 }
 
 static enum vkd3d_result dump_signatures(struct vkd3d_d3d_asm_compiler *compiler,
-        const struct vkd3d_shader_desc *shader_desc, enum vkd3d_shader_type shader_type)
+        const struct vsir_program *program)
 {
     enum vkd3d_result ret;
 
     if ((ret = dump_signature(compiler, ".input",
-            shader_type == VKD3D_SHADER_TYPE_DOMAIN ? "vicp" : "v",
-            &shader_desc->input_signature)) < 0)
+            program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN ? "vicp" : "v",
+            &program->input_signature)) < 0)
         return ret;
 
     if ((ret = dump_signature(compiler, ".output", "o",
-            &shader_desc->output_signature)) < 0)
+            &program->output_signature)) < 0)
         return ret;
 
     if ((ret = dump_signature(compiler, ".patch_constant",
-            shader_type == VKD3D_SHADER_TYPE_DOMAIN ? "vpc" : "o",
-            &shader_desc->patch_constant_signature)) < 0)
+            program->shader_version.type == VKD3D_SHADER_TYPE_DOMAIN ? "vpc" : "o",
+            &program->patch_constant_signature)) < 0)
         return ret;
 
     vkd3d_string_buffer_printf(&compiler->buffer, "%s.text%s\n",
@@ -2297,7 +2297,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
      * doesn't even have an explicit concept of signature. */
     if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
     {
-        if ((result = dump_signatures(&compiler, shader_desc, shader_version->type)) < 0)
+        if ((result = dump_signatures(&compiler, program)) < 0)
         {
             vkd3d_string_buffer_cleanup(buffer);
             return result;

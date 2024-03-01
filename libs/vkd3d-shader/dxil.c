@@ -4193,7 +4193,7 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
 
     vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
 
-    signature = &sm6->p.shader_desc.input_signature;
+    signature = &sm6->p.program.input_signature;
     if (row_index >= signature->element_count)
     {
         WARN("Invalid row index %u.\n", row_index);
@@ -4583,7 +4583,7 @@ static void sm6_parser_emit_dx_store_output(struct sm6_parser *sm6, enum dx_intr
     row_index = sm6_value_get_constant_uint(operands[0]);
     column_index = sm6_value_get_constant_uint(operands[2]);
 
-    signature = &sm6->p.shader_desc.output_signature;
+    signature = &sm6->p.program.output_signature;
     if (row_index >= signature->element_count)
     {
         WARN("Invalid row index %u.\n", row_index);
@@ -7827,19 +7827,19 @@ static enum vkd3d_result sm6_parser_signatures_init(struct sm6_parser *sm6, cons
     }
 
     if (m->u.node->operand_count && (ret = sm6_parser_read_signature(sm6, m->u.node->operands[0],
-            &sm6->p.shader_desc.input_signature)) < 0)
+            &sm6->p.program.input_signature)) < 0)
     {
         return ret;
     }
     if (m->u.node->operand_count > 1 && (ret = sm6_parser_read_signature(sm6, m->u.node->operands[1],
-            &sm6->p.shader_desc.output_signature)) < 0)
+            &sm6->p.program.output_signature)) < 0)
     {
         return ret;
     }
     /* TODO: patch constant signature in operand 2. */
 
-    sm6_parser_init_input_signature(sm6, &sm6->p.shader_desc.input_signature);
-    sm6_parser_init_output_signature(sm6, &sm6->p.shader_desc.output_signature);
+    sm6_parser_init_input_signature(sm6, &sm6->p.program.input_signature);
+    sm6_parser_init_output_signature(sm6, &sm6->p.program.output_signature);
 
     return VKD3D_OK;
 }
@@ -8137,7 +8137,6 @@ static void sm6_parser_destroy(struct vkd3d_shader_parser *parser)
     sm6_parser_metadata_cleanup(sm6);
     vkd3d_free(sm6->descriptors);
     vkd3d_free(sm6->values);
-    free_shader_desc(&parser->shader_desc);
     vkd3d_free(sm6);
 }
 
@@ -8155,15 +8154,16 @@ static struct sm6_function *sm6_parser_get_function(const struct sm6_parser *sm6
     return NULL;
 }
 
-static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t *byte_code, size_t byte_code_size,
-        const char *source_name, struct vkd3d_shader_message_context *message_context)
+static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const char *source_name,
+        struct vkd3d_shader_message_context *message_context, struct dxbc_shader_desc *dxbc_desc)
 {
-    const struct shader_signature *output_signature = &sm6->p.shader_desc.output_signature;
-    const struct shader_signature *input_signature = &sm6->p.shader_desc.input_signature;
+    const struct shader_signature *output_signature = &sm6->p.program.output_signature;
+    const struct shader_signature *input_signature = &sm6->p.program.input_signature;
+    size_t count, length, function_count, byte_code_size = dxbc_desc->byte_code_size;
     const struct vkd3d_shader_location location = {.source_name = source_name};
     uint32_t version_token, dxil_version, token_count, magic;
+    const uint32_t *byte_code = dxbc_desc->byte_code;
     unsigned int chunk_offset, chunk_size;
-    size_t count, length, function_count;
     enum bitcode_block_abbreviation abbr;
     struct vkd3d_shader_version version;
     struct dxil_block *block;
@@ -8255,6 +8255,11 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const uint32_t 
             (count + (count >> 2)) / 2u + 10);
     sm6->ptr = &sm6->start[1];
     sm6->bitpos = 2;
+
+    sm6->p.program.input_signature = dxbc_desc->input_signature;
+    sm6->p.program.output_signature = dxbc_desc->output_signature;
+    sm6->p.program.patch_constant_signature = dxbc_desc->patch_constant_signature;
+    memset(dxbc_desc, 0, sizeof(*dxbc_desc));
 
     block = &sm6->root_block;
     if ((ret = dxil_block_init(block, NULL, sm6)) < 0)
@@ -8453,23 +8458,25 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
     shader_desc->is_dxil = true;
     shader_desc->byte_code = dxbc_desc.byte_code;
     shader_desc->byte_code_size = dxbc_desc.byte_code_size;
-    shader_desc->input_signature = dxbc_desc.input_signature;
-    shader_desc->output_signature = dxbc_desc.output_signature;
-    shader_desc->patch_constant_signature = dxbc_desc.patch_constant_signature;
-    memset(&dxbc_desc, 0, sizeof(dxbc_desc));
 
     if (((uintptr_t)shader_desc->byte_code & (VKD3D_DXBC_CHUNK_ALIGNMENT - 1)))
     {
         /* LLVM bitcode should be 32-bit aligned, but before dxc v1.7.2207 this was not always the case in the DXBC
          * container due to missing padding after signature names. Get an aligned copy to prevent unaligned access. */
         if (!(byte_code = vkd3d_malloc(align(shader_desc->byte_code_size, VKD3D_DXBC_CHUNK_ALIGNMENT))))
-            ERR("Failed to allocate aligned chunk. Unaligned access will occur.\n");
-        else
-            memcpy(byte_code, shader_desc->byte_code, shader_desc->byte_code_size);
+        {
+            ERR("Failed to allocate aligned chunk.\n");
+            free_dxbc_shader_desc(&dxbc_desc);
+            vkd3d_free(sm6);
+            return VKD3D_ERROR_OUT_OF_MEMORY;
+        }
+
+        memcpy(byte_code, shader_desc->byte_code, shader_desc->byte_code_size);
+        dxbc_desc.byte_code = byte_code;
     }
 
-    ret = sm6_parser_init(sm6, byte_code ? byte_code : shader_desc->byte_code, shader_desc->byte_code_size,
-            compile_info->source_name, message_context);
+    ret = sm6_parser_init(sm6, compile_info->source_name, message_context, &dxbc_desc);
+    free_dxbc_shader_desc(&dxbc_desc);
     vkd3d_free(byte_code);
 
     if (!sm6->p.failed && ret >= 0)

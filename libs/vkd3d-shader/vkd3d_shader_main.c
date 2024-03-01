@@ -1450,11 +1450,11 @@ static int scan_with_parser(const struct vkd3d_shader_compile_info *compile_info
 
     if (!ret && signature_info)
     {
-        if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &parser->shader_desc.input_signature)
+        if (!vkd3d_shader_signature_from_shader_signature(&signature_info->input, &parser->program.input_signature)
                 || !vkd3d_shader_signature_from_shader_signature(&signature_info->output,
-                        &parser->shader_desc.output_signature)
+                        &parser->program.output_signature)
                 || !vkd3d_shader_signature_from_shader_signature(&signature_info->patch_constant,
-                        &parser->shader_desc.patch_constant_signature))
+                        &parser->program.patch_constant_signature))
         {
             ret = VKD3D_ERROR_OUT_OF_MEMORY;
         }
