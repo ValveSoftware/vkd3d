@@ -116,7 +116,7 @@ void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID,
 
 [test]
 uniform 0 uint 1
-todo dispatch 2 1 1
+todo(sm<6) dispatch 2 1 1
 probe uav 1 (0)  r (0.0)
 probe uav 1 (1)  r (0.0)
 probe uav 1 (2)  r (0.0)

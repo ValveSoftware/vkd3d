@@ -8904,8 +8904,8 @@ static void spirv_compiler_emit_store_tgsm(struct spirv_compiler *compiler,
     const struct vkd3d_shader_dst_param *dst = instruction->dst;
     const struct vkd3d_shader_src_param *src = instruction->src;
     uint32_t base_coordinate_id, component_idx;
-    const struct vkd3d_shader_src_param *data;
     struct vkd3d_shader_register_info reg_info;
+    struct vkd3d_shader_src_param data;
     unsigned int component_count;
 
     if (!spirv_compiler_get_register_info(compiler, &dst->reg, &reg_info))
@@ -8917,8 +8917,9 @@ static void spirv_compiler_emit_store_tgsm(struct spirv_compiler *compiler,
     base_coordinate_id = spirv_compiler_emit_raw_structured_addressing(compiler,
             type_id, reg_info.structure_stride, &src[0], VKD3DSP_WRITEMASK_0, &src[1], VKD3DSP_WRITEMASK_0);
 
-    data = &src[instruction->src_count - 1];
-    val_id = spirv_compiler_emit_load_src(compiler, data, dst->write_mask);
+    data = src[instruction->src_count - 1];
+    data.reg.data_type = VKD3D_DATA_UINT;
+    val_id = spirv_compiler_emit_load_src(compiler, &data, dst->write_mask);
 
     component_count = vsir_write_mask_component_count(dst->write_mask);
     for (component_idx = 0; component_idx < component_count; ++component_idx)
