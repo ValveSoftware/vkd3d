@@ -8427,6 +8427,7 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
     struct vkd3d_shader_desc *shader_desc;
+    struct dxbc_shader_desc dxbc_desc = {0};
     uint32_t *byte_code = NULL;
     struct sm6_parser *sm6;
     int ret;
@@ -8439,18 +8440,23 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
         return VKD3D_ERROR_OUT_OF_MEMORY;
     }
 
-    shader_desc = &sm6->p.shader_desc;
-    shader_desc->is_dxil = true;
+    dxbc_desc.is_dxil = true;
     if ((ret = shader_extract_from_dxbc(&compile_info->source, message_context, compile_info->source_name,
-            shader_desc)) < 0)
+            &dxbc_desc)) < 0)
     {
         WARN("Failed to extract shader, vkd3d result %d.\n", ret);
         vkd3d_free(sm6);
         return ret;
     }
 
-    sm6->p.shader_desc = *shader_desc;
     shader_desc = &sm6->p.shader_desc;
+    shader_desc->is_dxil = true;
+    shader_desc->byte_code = dxbc_desc.byte_code;
+    shader_desc->byte_code_size = dxbc_desc.byte_code_size;
+    shader_desc->input_signature = dxbc_desc.input_signature;
+    shader_desc->output_signature = dxbc_desc.output_signature;
+    shader_desc->patch_constant_signature = dxbc_desc.patch_constant_signature;
+    memset(&dxbc_desc, 0, sizeof(dxbc_desc));
 
     if (((uintptr_t)shader_desc->byte_code & (VKD3D_DXBC_CHUNK_ALIGNMENT - 1)))
     {

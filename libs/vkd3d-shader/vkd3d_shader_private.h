@@ -1028,6 +1028,16 @@ struct signature_element *vsir_signature_find_element_for_reg(const struct shade
         unsigned int reg_idx, unsigned int write_mask);
 void shader_signature_cleanup(struct shader_signature *signature);
 
+struct dxbc_shader_desc
+{
+    const uint32_t *byte_code;
+    size_t byte_code_size;
+    bool is_dxil;
+    struct shader_signature input_signature;
+    struct shader_signature output_signature;
+    struct shader_signature patch_constant_signature;
+};
+
 struct vkd3d_shader_desc
 {
     const uint32_t *byte_code;
@@ -1487,10 +1497,11 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
 int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser);
 
+void free_dxbc_shader_desc(struct dxbc_shader_desc *desc);
 void free_shader_desc(struct vkd3d_shader_desc *desc);
 
 int shader_extract_from_dxbc(const struct vkd3d_shader_code *dxbc,
-        struct vkd3d_shader_message_context *message_context, const char *source_name, struct vkd3d_shader_desc *desc);
+        struct vkd3d_shader_message_context *message_context, const char *source_name, struct dxbc_shader_desc *desc);
 int shader_parse_input_signature(const struct vkd3d_shader_code *dxbc,
         struct vkd3d_shader_message_context *message_context, struct shader_signature *signature);
 
