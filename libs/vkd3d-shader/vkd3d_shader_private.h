@@ -1040,9 +1040,6 @@ struct dxbc_shader_desc
 
 struct vkd3d_shader_desc
 {
-    const uint32_t *byte_code;
-    size_t byte_code_size;
-
     struct
     {
         uint32_t used, external;

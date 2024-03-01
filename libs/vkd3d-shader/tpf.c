@@ -2647,7 +2647,6 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
     struct vkd3d_shader_instruction_array *instructions;
-    struct vkd3d_shader_desc *shader_desc;
     struct vkd3d_shader_instruction *ins;
     struct vkd3d_shader_sm4_parser *sm4;
     struct dxbc_shader_desc dxbc_desc = {0};
@@ -2668,11 +2667,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         return ret;
     }
 
-    shader_desc = &sm4->p.shader_desc;
-    shader_desc->byte_code = dxbc_desc.byte_code;
-    shader_desc->byte_code_size = dxbc_desc.byte_code_size;
-
-    if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
+    if (!shader_sm4_init(sm4, dxbc_desc.byte_code, dxbc_desc.byte_code_size,
             compile_info->source_name, message_context))
     {
         WARN("Failed to initialise shader parser.\n");

@@ -8431,7 +8431,6 @@ static enum vkd3d_result sm6_parser_init(struct sm6_parser *sm6, const char *sou
 int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_message_context *message_context, struct vkd3d_shader_parser **parser)
 {
-    struct vkd3d_shader_desc *shader_desc;
     struct dxbc_shader_desc dxbc_desc = {0};
     uint32_t *byte_code = NULL;
     struct sm6_parser *sm6;
@@ -8454,15 +8453,11 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
         return ret;
     }
 
-    shader_desc = &sm6->p.shader_desc;
-    shader_desc->byte_code = dxbc_desc.byte_code;
-    shader_desc->byte_code_size = dxbc_desc.byte_code_size;
-
-    if (((uintptr_t)shader_desc->byte_code & (VKD3D_DXBC_CHUNK_ALIGNMENT - 1)))
+    if (((uintptr_t)dxbc_desc.byte_code & (VKD3D_DXBC_CHUNK_ALIGNMENT - 1)))
     {
         /* LLVM bitcode should be 32-bit aligned, but before dxc v1.7.2207 this was not always the case in the DXBC
          * container due to missing padding after signature names. Get an aligned copy to prevent unaligned access. */
-        if (!(byte_code = vkd3d_malloc(align(shader_desc->byte_code_size, VKD3D_DXBC_CHUNK_ALIGNMENT))))
+        if (!(byte_code = vkd3d_malloc(align(dxbc_desc.byte_code_size, VKD3D_DXBC_CHUNK_ALIGNMENT))))
         {
             ERR("Failed to allocate aligned chunk.\n");
             free_dxbc_shader_desc(&dxbc_desc);
@@ -8470,7 +8465,7 @@ int vkd3d_shader_sm6_parser_create(const struct vkd3d_shader_compile_info *compi
             return VKD3D_ERROR_OUT_OF_MEMORY;
         }
 
-        memcpy(byte_code, shader_desc->byte_code, shader_desc->byte_code_size);
+        memcpy(byte_code, dxbc_desc.byte_code, dxbc_desc.byte_code_size);
         dxbc_desc.byte_code = byte_code;
     }
 

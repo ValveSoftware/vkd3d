@@ -1236,7 +1236,6 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     const struct vkd3d_shader_location location = {.source_name = compile_info->source_name};
     const uint32_t *code = compile_info->source.code;
     size_t code_size = compile_info->source.size;
-    struct vkd3d_shader_desc *shader_desc;
     struct vkd3d_shader_version version;
     uint16_t shader_type;
     size_t token_count;
@@ -1289,9 +1288,6 @@ static enum vkd3d_result shader_sm1_init(struct vkd3d_shader_sm1_parser *sm1,
     if (!vkd3d_shader_parser_init(&sm1->p, message_context, compile_info->source_name, &version, &shader_sm1_parser_ops,
             code_size != ~(size_t)0 ? token_count / 4u + 4 : 16))
         return VKD3D_ERROR_OUT_OF_MEMORY;
-    shader_desc = &sm1->p.shader_desc;
-    shader_desc->byte_code = code;
-    shader_desc->byte_code_size = code_size;
     sm1->ptr = sm1->start;
 
     return VKD3D_OK;
