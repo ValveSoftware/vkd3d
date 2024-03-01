@@ -543,6 +543,7 @@ struct sm6_value
 {
     const struct sm6_type *type;
     enum sm6_value_type value_type;
+    unsigned int structure_stride;
     bool is_undefined;
     union
     {
@@ -3033,6 +3034,7 @@ static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6
     dst_param_init(&ins->declaration.tgsm_raw.reg);
     register_init_with_id(&ins->declaration.tgsm_raw.reg.reg, VKD3DSPR_GROUPSHAREDMEM, data_type, sm6->tgsm_count++);
     dst->u.reg = ins->declaration.tgsm_raw.reg.reg;
+    dst->structure_stride = 0;
     ins->declaration.tgsm_raw.alignment = alignment;
     byte_count = elem_type->u.width / 8u;
     if (byte_count != 4)
@@ -3042,6 +3044,33 @@ static void sm6_parser_declare_tgsm_raw(struct sm6_parser *sm6, const struct sm6
                 "Raw TGSM byte count %u is not supported.", byte_count);
     }
     ins->declaration.tgsm_raw.byte_count = byte_count;
+    /* The initialiser value index will be resolved later when forward references can be handled. */
+    ins->flags = init;
+}
+
+static void sm6_parser_declare_tgsm_structured(struct sm6_parser *sm6, const struct sm6_type *elem_type,
+        unsigned int count, unsigned int alignment, unsigned int init, struct sm6_value *dst)
+{
+    enum vkd3d_data_type data_type = vkd3d_data_type_from_sm6_type(elem_type);
+    struct vkd3d_shader_instruction *ins;
+    unsigned int structure_stride;
+
+    ins = sm6_parser_add_instruction(sm6, VKD3DSIH_DCL_TGSM_STRUCTURED);
+    dst_param_init(&ins->declaration.tgsm_structured.reg);
+    register_init_with_id(&ins->declaration.tgsm_structured.reg.reg, VKD3DSPR_GROUPSHAREDMEM,
+            data_type, sm6->tgsm_count++);
+    dst->u.reg = ins->declaration.tgsm_structured.reg.reg;
+    structure_stride = elem_type->u.width / 8u;
+    if (structure_stride != 4)
+    {
+        FIXME("Unsupported structure stride %u.\n", structure_stride);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Structured TGSM byte stride %u is not supported.", structure_stride);
+    }
+    dst->structure_stride = structure_stride;
+    ins->declaration.tgsm_structured.alignment = alignment;
+    ins->declaration.tgsm_structured.byte_stride = structure_stride;
+    ins->declaration.tgsm_structured.structure_count = count;
     /* The initialiser value index will be resolved later when forward references can be handled. */
     ins->flags = init;
 }
@@ -3178,15 +3207,10 @@ static bool sm6_parser_declare_global(struct sm6_parser *sm6, const struct dxil_
                     "TGSM variables of type class %u are not supported.", scalar_type->class);
             return false;
         }
-        if (count != 1)
-        {
-            FIXME("Unsupported structured TGSM.\n");
-            vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
-                    "Structured TGSM global variables are not supported.");
-            return false;
-        }
-
-        sm6_parser_declare_tgsm_raw(sm6, scalar_type, alignment, init, dst);
+        if (count == 1)
+            sm6_parser_declare_tgsm_raw(sm6, scalar_type, alignment, init, dst);
+        else
+            sm6_parser_declare_tgsm_structured(sm6, scalar_type, count, alignment, init, dst);
     }
     else
     {
@@ -3330,6 +3354,11 @@ static enum vkd3d_result sm6_parser_globals_init(struct sm6_parser *sm6)
         else if (ins->handler_idx == VKD3DSIH_DCL_TGSM_RAW)
         {
             ins->declaration.tgsm_raw.zero_init = resolve_forward_zero_initialiser(ins->flags, sm6);
+            ins->flags = 0;
+        }
+        else if (ins->handler_idx == VKD3DSIH_DCL_TGSM_STRUCTURED)
+        {
+            ins->declaration.tgsm_structured.zero_init = resolve_forward_zero_initialiser(ins->flags, sm6);
             ins->flags = 0;
         }
     }
@@ -5627,6 +5656,7 @@ static void sm6_parser_emit_gep(struct sm6_parser *sm6, const struct dxil_record
     register_index_address_init(&reg->idx[1], elem_value, sm6);
     reg->idx[1].is_in_bounds = is_in_bounds;
     reg->idx_count = 2;
+    dst->structure_stride = src->structure_stride;
 
     ins->handler_idx = VKD3DSIH_NOP;
 }
@@ -5673,15 +5703,34 @@ static void sm6_parser_emit_load(struct sm6_parser *sm6, const struct dxil_recor
     if (record->operands[i])
         WARN("Ignoring volatile modifier.\n");
 
-    operand_count = 1 + (ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
-    vsir_instruction_init(ins, &sm6->p.location, (operand_count > 1) ? VKD3DSIH_LD_RAW : VKD3DSIH_MOV);
+    if (ptr->structure_stride)
+    {
+        assert(ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
+        vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_LD_STRUCTURED);
 
-    if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
-        return;
-    if (operand_count > 1)
-        src_param_make_constant_uint(&src_params[0], 0);
-    src_param_init_from_value(&src_params[operand_count - 1], ptr);
-    src_params[operand_count - 1].reg.alignment = alignment;
+        if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+            return;
+        if (ptr->u.reg.idx[1].rel_addr)
+            src_params[0] = *ptr->u.reg.idx[1].rel_addr;
+        else
+            src_param_make_constant_uint(&src_params[0], ptr->u.reg.idx[1].offset);
+        /* Struct offset is always zero as there is no struct, just an array. */
+        src_param_make_constant_uint(&src_params[1], 0);
+        src_param_init_from_value(&src_params[2], ptr);
+        src_params[2].reg.alignment = alignment;
+    }
+    else
+    {
+        operand_count = 1 + (ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
+        vsir_instruction_init(ins, &sm6->p.location, (operand_count > 1) ? VKD3DSIH_LD_RAW : VKD3DSIH_MOV);
+
+        if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
+            return;
+        if (operand_count > 1)
+            src_param_make_constant_uint(&src_params[0], 0);
+        src_param_init_from_value(&src_params[operand_count - 1], ptr);
+        src_params[operand_count - 1].reg.alignment = alignment;
+    }
 
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
@@ -5836,14 +5885,32 @@ static void sm6_parser_emit_store(struct sm6_parser *sm6, const struct dxil_reco
     if (record->operands[i])
         WARN("Ignoring volatile modifier.\n");
 
-    operand_count = 1 + (ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
-    vsir_instruction_init(ins, &sm6->p.location, (operand_count > 1) ? VKD3DSIH_STORE_RAW : VKD3DSIH_MOV);
+    if (ptr->structure_stride)
+    {
+        assert(ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
+        vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_STORE_STRUCTURED);
 
-    if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
-        return;
-    if (operand_count > 1)
-        src_param_make_constant_uint(&src_params[0], 0);
-    src_param_init_from_value(&src_params[operand_count - 1], src);
+        if (!(src_params = instruction_src_params_alloc(ins, 3, sm6)))
+            return;
+        if (ptr->u.reg.idx[1].rel_addr)
+            src_params[0] = *ptr->u.reg.idx[1].rel_addr;
+        else
+            src_param_make_constant_uint(&src_params[0], ptr->u.reg.idx[1].offset);
+        /* Struct offset is always zero as there is no struct, just an array. */
+        src_param_make_constant_uint(&src_params[1], 0);
+        src_param_init_from_value(&src_params[2], src);
+    }
+    else
+    {
+        operand_count = 1 + (ptr->u.reg.type == VKD3DSPR_GROUPSHAREDMEM);
+        vsir_instruction_init(ins, &sm6->p.location, (operand_count > 1) ? VKD3DSIH_STORE_RAW : VKD3DSIH_MOV);
+
+        if (!(src_params = instruction_src_params_alloc(ins, operand_count, sm6)))
+            return;
+        if (operand_count > 1)
+            src_param_make_constant_uint(&src_params[0], 0);
+        src_param_init_from_value(&src_params[operand_count - 1], src);
+    }
 
     dst_param = instruction_dst_params_alloc(ins, 1, sm6);
     dst_param_init(dst_param);
