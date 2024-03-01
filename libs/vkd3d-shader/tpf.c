@@ -2504,7 +2504,7 @@ static const struct vkd3d_shader_parser_ops shader_sm4_parser_ops =
 };
 
 static bool shader_sm4_init(struct vkd3d_shader_sm4_parser *sm4, const uint32_t *byte_code,
-        size_t byte_code_size, const char *source_name, const struct shader_signature *output_signature,
+        size_t byte_code_size, const char *source_name,
         struct vkd3d_shader_message_context *message_context)
 {
     struct vkd3d_shader_version version;
@@ -2670,7 +2670,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     if (!shader_sm4_init(sm4, shader_desc->byte_code, shader_desc->byte_code_size,
-            compile_info->source_name, &shader_desc->output_signature, message_context))
+            compile_info->source_name, message_context))
     {
         WARN("Failed to initialise shader parser.\n");
         free_shader_desc(shader_desc);
