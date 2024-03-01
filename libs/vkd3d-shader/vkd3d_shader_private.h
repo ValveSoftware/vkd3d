@@ -755,6 +755,12 @@ enum vkd3d_shader_uav_flags
     VKD3DSUF_ORDER_PRESERVING_COUNTER = 0x100,
 };
 
+enum vkd3d_shader_atomic_rmw_flags
+{
+    VKD3DARF_SEQ_CST  = 0x1,
+    VKD3DARF_VOLATILE = 0x2,
+};
+
 enum vkd3d_tessellator_domain
 {
     VKD3D_TESSELLATOR_DOMAIN_LINE      = 1,

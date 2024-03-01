@@ -448,6 +448,23 @@ static void shader_dump_global_flags(struct vkd3d_d3d_asm_compiler *compiler,
         vkd3d_string_buffer_printf(&compiler->buffer, "unknown_flags(%#"PRIx64")", (uint64_t)global_flags);
 }
 
+static void shader_dump_atomic_op_flags(struct vkd3d_d3d_asm_compiler *compiler, uint32_t atomic_flags)
+{
+    if (atomic_flags & VKD3DARF_SEQ_CST)
+    {
+        vkd3d_string_buffer_printf(&compiler->buffer, "_seqCst");
+        atomic_flags &= ~VKD3DARF_SEQ_CST;
+    }
+    if (atomic_flags & VKD3DARF_VOLATILE)
+    {
+        vkd3d_string_buffer_printf(&compiler->buffer, "_volatile");
+        atomic_flags &= ~VKD3DARF_VOLATILE;
+    }
+
+    if (atomic_flags)
+        vkd3d_string_buffer_printf(&compiler->buffer, "_unknown_flags(%#x)", atomic_flags);
+}
+
 static void shader_dump_sync_flags(struct vkd3d_d3d_asm_compiler *compiler, uint32_t sync_flags)
 {
     if (sync_flags & VKD3DSSF_GLOBAL_UAV)
@@ -1732,6 +1749,19 @@ static void shader_dump_instruction_flags(struct vkd3d_d3d_asm_compiler *compile
                 case VKD3DSI_SAMPLE_INFO_UINT: shader_addline(buffer, "_uint"); break;
                 default: shader_addline(buffer, "_unrecognized(%#x)", ins->flags);
             }
+            break;
+
+        case VKD3DSIH_IMM_ATOMIC_CMP_EXCH:
+        case VKD3DSIH_IMM_ATOMIC_IADD:
+        case VKD3DSIH_IMM_ATOMIC_AND:
+        case VKD3DSIH_IMM_ATOMIC_IMAX:
+        case VKD3DSIH_IMM_ATOMIC_IMIN:
+        case VKD3DSIH_IMM_ATOMIC_OR:
+        case VKD3DSIH_IMM_ATOMIC_UMAX:
+        case VKD3DSIH_IMM_ATOMIC_UMIN:
+        case VKD3DSIH_IMM_ATOMIC_EXCH:
+        case VKD3DSIH_IMM_ATOMIC_XOR:
+            shader_dump_atomic_op_flags(compiler, ins->flags);
             break;
 
         case VKD3DSIH_SYNC:

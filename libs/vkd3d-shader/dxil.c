@@ -463,6 +463,32 @@ enum dxil_predicate
     ICMP_SLE   = 41,
 };
 
+enum dxil_rmw_code
+{
+    RMW_XCHG =  0,
+    RMW_ADD  =  1,
+    RMW_SUB  =  2,
+    RMW_AND  =  3,
+    RMW_NAND =  4,
+    RMW_OR   =  5,
+    RMW_XOR  =  6,
+    RMW_MAX  =  7,
+    RMW_MIN  =  8,
+    RMW_UMAX =  9,
+    RMW_UMIN = 10,
+};
+
+enum dxil_atomic_ordering
+{
+    ORDERING_NOTATOMIC = 0,
+    ORDERING_UNORDERED = 1,
+    ORDERING_MONOTONIC = 2,
+    ORDERING_ACQUIRE   = 3,
+    ORDERING_RELEASE   = 4,
+    ORDERING_ACQREL    = 5,
+    ORDERING_SEQCST    = 6,
+};
+
 enum dxil_atomic_binop_code
 {
     ATOMIC_BINOP_ADD,
@@ -2593,6 +2619,18 @@ static bool sm6_value_validate_is_bool(const struct sm6_value *value, struct sm6
     return true;
 }
 
+static bool sm6_value_validate_is_pointer_to_i32(const struct sm6_value *value, struct sm6_parser *sm6)
+{
+    if (!sm6_type_is_pointer(value->type) || !sm6_type_is_i32(value->type->u.pointer.type))
+    {
+        WARN("Operand result type %u is not a pointer to i32.\n", value->type->class);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "An int32 pointer operand passed to a DXIL instruction is not an int32 pointer.");
+        return false;
+    }
+    return true;
+}
+
 static const struct sm6_value *sm6_parser_get_value_safe(struct sm6_parser *sm6, unsigned int idx)
 {
     if (idx < sm6->value_count)
@@ -3507,6 +3545,9 @@ struct function_emission_state
     unsigned int temp_idx;
 };
 
+static bool sm6_parser_emit_reg_composite_construct(struct sm6_parser *sm6, const struct vkd3d_shader_register **operand_regs,
+        unsigned int component_count, struct function_emission_state *state, struct vkd3d_shader_register *reg);
+
 static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_record *record,
         struct vkd3d_shader_instruction *ins, struct sm6_value *dst)
 {
@@ -3580,6 +3621,129 @@ static void sm6_parser_emit_alloca(struct sm6_parser *sm6, const struct dxil_rec
         WARN("Ignoring flags %#"PRIx64".\n", packed_operands);
 
     sm6_parser_declare_indexable_temp(sm6, elem_type, type[0]->u.array.count, alignment, true, 0, ins, dst);
+}
+
+static enum vkd3d_shader_opcode map_dx_atomicrmw_op(uint64_t code)
+{
+    switch (code)
+    {
+        case RMW_ADD:
+            return VKD3DSIH_IMM_ATOMIC_IADD;
+        case RMW_AND:
+            return VKD3DSIH_IMM_ATOMIC_AND;
+        case RMW_MAX:
+            return VKD3DSIH_IMM_ATOMIC_IMAX;
+        case RMW_MIN:
+            return VKD3DSIH_IMM_ATOMIC_IMIN;
+        case RMW_OR:
+            return VKD3DSIH_IMM_ATOMIC_OR;
+        case RMW_UMAX:
+            return VKD3DSIH_IMM_ATOMIC_UMAX;
+        case RMW_UMIN:
+            return VKD3DSIH_IMM_ATOMIC_UMIN;
+        case RMW_XCHG:
+            return VKD3DSIH_IMM_ATOMIC_EXCH;
+        case RMW_XOR:
+            return VKD3DSIH_IMM_ATOMIC_XOR;
+        default:
+            /* DXIL currently doesn't use SUB and NAND. */
+            return VKD3DSIH_INVALID;
+    }
+}
+
+static void sm6_parser_emit_atomicrmw(struct sm6_parser *sm6, const struct dxil_record *record,
+        struct function_emission_state *state, struct sm6_value *dst)
+{
+    struct vkd3d_shader_register coord, const_offset, const_zero;
+    const struct vkd3d_shader_register *regs[2];
+    struct vkd3d_shader_dst_param *dst_params;
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+    const struct sm6_value *ptr, *src;
+    enum vkd3d_shader_opcode op;
+    unsigned int i = 0;
+    bool is_volatile;
+    uint64_t code;
+
+    if (!(ptr = sm6_parser_get_value_by_ref(sm6, record, NULL, &i))
+            || !sm6_value_validate_is_pointer_to_i32(ptr, sm6))
+        return;
+
+    if (ptr->u.reg.type != VKD3DSPR_GROUPSHAREDMEM)
+    {
+        WARN("Register is not groupshared.\n");
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "The destination register for an atomicrmw instruction is not groupshared memory.");
+        return;
+    }
+
+    dst->type = ptr->type->u.pointer.type;
+
+    if (!(src = sm6_parser_get_value_by_ref(sm6, record, dst->type, &i)))
+        return;
+
+    if (!dxil_record_validate_operand_count(record, i + 4, i + 4, sm6))
+        return;
+
+    if ((op = map_dx_atomicrmw_op(code = record->operands[i++])) == VKD3DSIH_INVALID)
+    {
+        FIXME("Unhandled atomicrmw op %"PRIu64".\n", code);
+        vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                "Operation %"PRIu64" for an atomicrmw instruction is unhandled.", code);
+        return;
+    }
+
+    is_volatile = record->operands[i++];
+
+    /* It's currently not possible to specify an atomic ordering in HLSL, and it defaults to seq_cst. */
+    if ((code = record->operands[i++]) != ORDERING_SEQCST)
+        FIXME("Unhandled atomic ordering %"PRIu64".\n", code);
+
+    if ((code = record->operands[i]) != 1)
+        WARN("Ignoring synchronisation scope %"PRIu64".\n", code);
+
+    if (ptr->structure_stride)
+    {
+        if (ptr->u.reg.idx[1].rel_addr)
+        {
+            regs[0] = &ptr->u.reg.idx[1].rel_addr->reg;
+        }
+        else
+        {
+            register_make_constant_uint(&const_offset, ptr->u.reg.idx[1].offset);
+            regs[0] = &const_offset;
+        }
+        register_make_constant_uint(&const_zero, 0);
+        regs[1] = &const_zero;
+        if (!sm6_parser_emit_reg_composite_construct(sm6, regs, 2, state, &coord))
+            return;
+    }
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, op);
+    ins->flags = is_volatile ? VKD3DARF_SEQ_CST | VKD3DARF_VOLATILE : VKD3DARF_SEQ_CST;
+
+    if (!(src_params = instruction_src_params_alloc(ins, 2, sm6)))
+        return;
+    if (ptr->structure_stride)
+        src_param_init_vector_from_reg(&src_params[0], &coord);
+    else
+        src_param_make_constant_uint(&src_params[0], 0);
+    src_param_init_from_value(&src_params[1], src);
+
+    dst_params = instruction_dst_params_alloc(ins, 2, sm6);
+    register_init_ssa_scalar(&dst_params[0].reg, dst->type, dst, sm6);
+    dst_param_init(&dst_params[0]);
+
+    dst_params[1].reg = ptr->u.reg;
+    /* The groupshared register has data type UAV when accessed. */
+    dst_params[1].reg.data_type = VKD3D_DATA_UAV;
+    dst_params[1].reg.idx[1].rel_addr = NULL;
+    dst_params[1].reg.idx[1].offset = ~0u;
+    dst_params[1].reg.idx_count = 1;
+    dst_param_init(&dst_params[1]);
+
+    dst->u.reg = dst_params[0].reg;
 }
 
 static enum vkd3d_shader_opcode map_binary_op(uint64_t code, const struct sm6_type *type_a,
@@ -6676,6 +6840,13 @@ static enum vkd3d_result sm6_parser_function_init(struct sm6_parser *sm6, const 
             case FUNC_CODE_INST_ALLOCA:
                 sm6_parser_emit_alloca(sm6, record, ins, dst);
                 break;
+            case FUNC_CODE_INST_ATOMICRMW:
+            {
+                struct function_emission_state state = {code_block, ins};
+                sm6_parser_emit_atomicrmw(sm6, record, &state, dst);
+                sm6->p.program.temp_count = max(sm6->p.program.temp_count, state.temp_idx);
+                break;
+            }
             case FUNC_CODE_INST_BINOP:
                 sm6_parser_emit_binop(sm6, record, ins, dst);
                 break;
