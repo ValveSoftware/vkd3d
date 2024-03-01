@@ -2669,7 +2669,6 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
     }
 
     shader_desc = &sm4->p.shader_desc;
-    shader_desc->is_dxil = false;
     shader_desc->byte_code = dxbc_desc.byte_code;
     shader_desc->byte_code_size = dxbc_desc.byte_code_size;
 

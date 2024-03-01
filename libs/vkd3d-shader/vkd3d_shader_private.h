@@ -1042,7 +1042,6 @@ struct vkd3d_shader_desc
 {
     const uint32_t *byte_code;
     size_t byte_code_size;
-    bool is_dxil;
 
     struct
     {

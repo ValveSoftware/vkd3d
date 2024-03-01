@@ -3720,7 +3720,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if ((result = instruction_array_lower_texkills(parser)) < 0)
         return result;
 
-    if (parser->shader_desc.is_dxil)
+    if (parser->program.shader_version.major >= 6)
     {
         struct vsir_cfg cfg;
 
