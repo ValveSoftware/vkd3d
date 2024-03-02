@@ -5399,7 +5399,8 @@ static void write_sm4_jump(const struct tpf_writer *tpf, const struct hlsl_ir_ju
 
         case HLSL_IR_JUMP_DISCARD_NZ:
         {
-            instr.opcode = VKD3D_SM4_OP_DISCARD | VKD3D_SM4_CONDITIONAL_NZ;
+            instr.opcode = VKD3D_SM4_OP_DISCARD;
+            instr.extra_bits = VKD3D_SM4_CONDITIONAL_NZ;
 
             memset(&instr.srcs[0], 0, sizeof(*instr.srcs));
             instr.src_count = 1;
