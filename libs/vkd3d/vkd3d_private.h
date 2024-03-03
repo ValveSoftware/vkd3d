@@ -1669,7 +1669,7 @@ struct vkd3d_desc_object_cache
 /* ID3D12Device */
 struct d3d12_device
 {
-    ID3D12Device8 ID3D12Device8_iface;
+    ID3D12Device9 ID3D12Device9_iface;
     unsigned int refcount;
 
     VkDevice vk_device;
@@ -1744,29 +1744,29 @@ struct vkd3d_queue *d3d12_device_get_vkd3d_queue(struct d3d12_device *device, D3
 bool d3d12_device_is_uma(struct d3d12_device *device, bool *coherent);
 void d3d12_device_mark_as_removed(struct d3d12_device *device, HRESULT reason,
         const char *message, ...) VKD3D_PRINTF_FUNC(3, 4);
-struct d3d12_device *unsafe_impl_from_ID3D12Device8(ID3D12Device8 *iface);
+struct d3d12_device *unsafe_impl_from_ID3D12Device9(ID3D12Device9 *iface);
 HRESULT d3d12_device_add_descriptor_heap(struct d3d12_device *device, struct d3d12_descriptor_heap *heap);
 void d3d12_device_remove_descriptor_heap(struct d3d12_device *device, struct d3d12_descriptor_heap *heap);
 
 static inline HRESULT d3d12_device_query_interface(struct d3d12_device *device, REFIID iid, void **object)
 {
-    return ID3D12Device8_QueryInterface(&device->ID3D12Device8_iface, iid, object);
+    return ID3D12Device9_QueryInterface(&device->ID3D12Device9_iface, iid, object);
 }
 
 static inline ULONG d3d12_device_add_ref(struct d3d12_device *device)
 {
-    return ID3D12Device8_AddRef(&device->ID3D12Device8_iface);
+    return ID3D12Device9_AddRef(&device->ID3D12Device9_iface);
 }
 
 static inline ULONG d3d12_device_release(struct d3d12_device *device)
 {
-    return ID3D12Device8_Release(&device->ID3D12Device8_iface);
+    return ID3D12Device9_Release(&device->ID3D12Device9_iface);
 }
 
 static inline unsigned int d3d12_device_get_descriptor_handle_increment_size(struct d3d12_device *device,
         D3D12_DESCRIPTOR_HEAP_TYPE descriptor_type)
 {
-    return ID3D12Device8_GetDescriptorHandleIncrementSize(&device->ID3D12Device8_iface, descriptor_type);
+    return ID3D12Device9_GetDescriptorHandleIncrementSize(&device->ID3D12Device9_iface, descriptor_type);
 }
 
 /* utils */
