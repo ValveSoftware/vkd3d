@@ -1524,6 +1524,19 @@ static uint32_t vkd3d_spirv_build_op_logical_equal(struct vkd3d_spirv_builder *b
             SpvOpLogicalEqual, result_type, operand0, operand1);
 }
 
+static uint32_t vkd3d_spirv_build_op_logical_or(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t operand0, uint32_t operand1)
+{
+    return vkd3d_spirv_build_op_tr2(builder, &builder->function_stream,
+            SpvOpLogicalOr, result_type, operand0, operand1);
+}
+
+static uint32_t vkd3d_spirv_build_op_logical_not(struct vkd3d_spirv_builder *builder,
+        uint32_t result_type, uint32_t operand)
+{
+    return vkd3d_spirv_build_op_tr1(builder, &builder->function_stream, SpvOpLogicalNot, result_type, operand);
+}
+
 static uint32_t vkd3d_spirv_build_op_convert_utof(struct vkd3d_spirv_builder *builder,
         uint32_t result_type, uint32_t unsigned_value)
 {
@@ -7686,6 +7699,26 @@ static void spirv_compiler_emit_comparison_instruction(struct spirv_compiler *co
     spirv_compiler_emit_store_reg(compiler, &dst->reg, dst->write_mask, result_id);
 }
 
+static void spirv_compiler_emit_orderedness_instruction(struct spirv_compiler *compiler,
+        const struct vkd3d_shader_instruction *instruction)
+{
+    struct vkd3d_spirv_builder *builder = &compiler->spirv_builder;
+    const struct vkd3d_shader_dst_param *dst = instruction->dst;
+    const struct vkd3d_shader_src_param *src = instruction->src;
+    uint32_t type_id, src0_id, src1_id, val_id;
+
+    type_id = spirv_compiler_get_type_id_for_dst(compiler, dst);
+    src0_id = spirv_compiler_emit_load_src(compiler, &src[0], dst->write_mask);
+    src1_id = spirv_compiler_emit_load_src(compiler, &src[1], dst->write_mask);
+    /* OpOrdered and OpUnordered are only available in Kernel mode. */
+    src0_id = vkd3d_spirv_build_op_is_nan(builder, type_id, src0_id);
+    src1_id = vkd3d_spirv_build_op_is_nan(builder, type_id, src1_id);
+    val_id = vkd3d_spirv_build_op_logical_or(builder, type_id, src0_id, src1_id);
+    if (instruction->handler_idx == VKD3DSIH_ORD)
+        val_id = vkd3d_spirv_build_op_logical_not(builder, type_id, val_id);
+    spirv_compiler_emit_store_dst(compiler, dst, val_id);
+}
+
 static uint32_t spirv_compiler_emit_conditional_branch(struct spirv_compiler *compiler,
         const struct vkd3d_shader_instruction *instruction, uint32_t target_block_id)
 {
@@ -9670,6 +9703,10 @@ static int spirv_compiler_handle_instruction(struct spirv_compiler *compiler,
         case VKD3DSIH_UGE:
         case VKD3DSIH_ULT:
             spirv_compiler_emit_comparison_instruction(compiler, instruction);
+            break;
+        case VKD3DSIH_ORD:
+        case VKD3DSIH_UNO:
+            spirv_compiler_emit_orderedness_instruction(compiler, instruction);
             break;
         case VKD3DSIH_BFI:
         case VKD3DSIH_IBFE:
