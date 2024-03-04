@@ -23,6 +23,7 @@
 #include "vkd3d_d3d12.h"
 #include "vkd3d_dxgiformat.h"
 #include "vkd3d_common.h"
+#include "vkd3d_shader.h"
 #include "utils.h"
 
 #define RENDER_TARGET_WIDTH 640
@@ -127,6 +128,18 @@ struct shader_runner_caps
     bool int64;
     bool rov;
 };
+
+static inline unsigned int shader_runner_caps_get_feature_flags(const struct shader_runner_caps *caps)
+{
+    unsigned int flags = 0;
+
+    if (caps->int64)
+        flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64;
+    if (caps->float64)
+        flags |= VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64;
+
+    return flags;
+}
 
 struct shader_runner
 {

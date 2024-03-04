@@ -27,7 +27,6 @@
 #include <EGL/eglext.h>
 #include <GL/gl.h>
 #include "shader_runner.h"
-#include "vkd3d_shader.h"
 #include "vkd3d_d3dcompiler.h"
 
 static PFNGLSPECIALIZESHADERPROC p_glSpecializeShader;
@@ -442,11 +441,12 @@ static bool compile_shader(struct gl_runner *runner, ID3DBlob *blob, struct vkd3
     char *messages;
     int ret;
 
-    static const struct vkd3d_shader_compile_option options[] =
+    const struct vkd3d_shader_compile_option options[] =
     {
         {VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10},
         {VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN,
                 VKD3D_SHADER_COMPILE_OPTION_FRAGMENT_COORDINATE_ORIGIN_LOWER_LEFT},
+        {VKD3D_SHADER_COMPILE_OPTION_FEATURE, shader_runner_caps_get_feature_flags(&runner->caps)},
     };
 
     info.next = &combined_sampler_info;
