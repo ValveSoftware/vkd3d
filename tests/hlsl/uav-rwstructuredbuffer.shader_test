@@ -156,3 +156,25 @@ float4 main() : sv_target1
 todo(sm<6) draw quad
 probe uav 2 (0) rgbai (11, -12, 13, -14)
 probe uav 2 (1) rgbai (-15, 16, -17, 18)
+
+[uav 2]
+stride 4
+size (buffer, 2)
+
+1 2
+
+% Test scalar store
+[pixel shader todo]
+RWStructuredBuffer<uint> u : register(u2);
+
+float4 main() : sv_target1
+{
+    u[0] = 11;
+    u[1] = 12;
+    return 0;
+}
+
+[test]
+todo(sm<6) draw quad
+probe uav 2 (0) ri (11)
+probe uav 2 (1) ri (12)
