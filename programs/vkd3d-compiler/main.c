@@ -835,6 +835,10 @@ int main(int argc, char **argv)
         options.formatting |= VKD3D_SHADER_COMPILE_OPTION_FORMATTING_COLOUR;
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FORMATTING, options.formatting);
     add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_API_VERSION, VKD3D_SHADER_API_VERSION_1_10);
+    if (options.target_type == VKD3D_SHADER_TARGET_SPIRV_BINARY
+            || options.target_type == VKD3D_SHADER_TARGET_SPIRV_TEXT)
+        add_compile_option(&options, VKD3D_SHADER_COMPILE_OPTION_FEATURE,
+                VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64 | VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64);
 
     info.type = VKD3D_SHADER_STRUCTURE_TYPE_COMPILE_INFO;
     info.next = &hlsl_source_info;
