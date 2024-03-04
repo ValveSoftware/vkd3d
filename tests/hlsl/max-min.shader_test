@@ -1,0 +1,115 @@
+[pixel shader]
+uniform float2 u;
+
+float4 main() : sv_target
+{
+    return float4(max(u.x, u.y), max(2, 2.1), max(true, 2), max(-1, -1));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.0 0.0
+todo(glsl) draw quad
+probe all rgba (0.7, 2.1, 2.0, -1.0)
+
+
+[pixel shader]
+uniform float4 u;
+
+float4 main() : sv_target
+{
+    float3 a = float3(-0.1, 0.2, 0.3);
+
+    return float4(max(u.xy, u.zw), max(a, u.xy));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.4 0.8
+todo(glsl) draw quad
+probe all rgba (0.7, 0.8, 0.7, 0.2)
+
+
+[pixel shader]
+float4 main() : sv_target
+{
+    float2x3 a = {1, 2, 3, 4, 5, 6};
+    float3x2 b = {6, 5, 4, 3, 2, 1};
+
+    float2x2 r = max(a, b);
+    return float4(r);
+}
+
+[test]
+todo(glsl) draw quad
+probe all rgba (6.0, 5.0, 4.0, 5.0)
+
+
+[pixel shader fail]
+float4 main() : sv_target
+{
+    float2x2 a = {1, 2, 3, 4};
+    float4 b = {4, 3, 2, 1};
+
+    max(a, b);
+    return 0;
+}
+
+
+[pixel shader]
+uniform float2 u;
+
+float4 main() : sv_target
+{
+    return float4(min(u.x, u.y), min(2, 2.1), min(true, 2), min(-1, -2));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.0 0.0
+todo(glsl) draw quad
+probe all rgba (-0.1, 2.0, 1.0, -2.0)
+
+
+[pixel shader]
+uniform float4 u;
+
+float4 main() : sv_target
+{
+    float3 a = float3(-0.2, 0.2, 0.3);
+
+    return float4(min(u.xy, u.zw), min(a, u.xy));
+}
+
+[test]
+uniform 0 float4 0.7 -0.1 0.4 0.8
+todo(glsl) draw quad
+probe all rgba (0.4, -0.1, -0.2, -0.1)
+
+
+[require]
+shader model >= 4.0
+
+[pixel shader]
+uniform uint2 u;
+
+uint4 main() : sv_target
+{
+    return uint4(max(u.x, u.y), min(true, u.y), max(1, 2), min(1, 2));
+}
+
+[test]
+uniform 0 uint4 1 2 0 0
+todo(glsl) draw quad
+probe all rgbaui (2, 1, 2, 1)
+
+
+[pixel shader todo]
+uniform int2 u;
+
+int4 main() : sv_target
+{
+    return int4(max(u.x, u.y), min(u.x, u.y), max(-true, -2), min(-1, -2));
+}
+
+[test]
+uniform 0 int4 -1 -2 0 0
+todo(sm<6) draw quad
+probe all rgbai (-1, -2, -1, -2)

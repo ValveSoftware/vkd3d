@@ -149,7 +149,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/math.shader_test \
 	tests/hlsl/matrix-indexing.shader_test \
 	tests/hlsl/matrix-semantics.shader_test \
-	tests/hlsl/max.shader_test \
+	tests/hlsl/max-min.shader_test \
 	tests/hlsl/minimum-precision.shader_test \
 	tests/hlsl/mul.shader_test \
 	tests/hlsl/multiple-rt.shader_test \
