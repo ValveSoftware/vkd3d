@@ -2763,30 +2763,14 @@ static bool add_combine_components(struct hlsl_ctx *ctx, const struct parse_init
 static bool intrinsic_all(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *mul, *one, *zero, *load;
-    unsigned int i, count;
+    struct hlsl_ir_node *arg = params->args[0], *cast;
+    struct hlsl_type *bool_type;
 
-    if (!(one = hlsl_new_float_constant(ctx, 1.0f, loc)))
+    bool_type = convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_BOOL);
+    if (!(cast = add_cast(ctx, params->instrs, arg, bool_type, loc)))
         return false;
-    hlsl_block_add_instr(params->instrs, one);
 
-    if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
-        return false;
-    hlsl_block_add_instr(params->instrs, zero);
-
-    mul = one;
-
-    count = hlsl_type_component_count(arg->data_type);
-    for (i = 0; i < count; ++i)
-    {
-        if (!(load = hlsl_add_load_component(ctx, params->instrs, arg, i, loc)))
-            return false;
-
-        if (!(mul = add_binary_arithmetic_expr(ctx, params->instrs, HLSL_OP2_MUL, load, mul, loc)))
-            return false;
-    }
-
-    return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, mul, zero, loc);
+    return add_combine_components(ctx, params, cast, HLSL_OP2_LOGIC_AND, loc);
 }
 
 static bool intrinsic_any(struct hlsl_ctx *ctx, const struct parse_initializer *params,
