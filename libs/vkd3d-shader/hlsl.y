@@ -2728,6 +2728,38 @@ static bool intrinsic_acos(struct hlsl_ctx *ctx,
     return write_acos_or_asin(ctx, params, loc, false);
 }
 
+/* Find the type corresponding to the given source type, with the same
+ * dimensions but a different base type. */
+static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
+        const struct hlsl_type *type, enum hlsl_base_type base_type)
+{
+    return hlsl_get_numeric_type(ctx, type->class, base_type, type->dimx, type->dimy);
+}
+
+static bool add_combine_components(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        struct hlsl_ir_node *arg, enum hlsl_ir_expr_op op, const struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_node *res, *load;
+    unsigned int i, count;
+
+    count = hlsl_type_component_count(arg->data_type);
+
+    if (!(res = hlsl_add_load_component(ctx, params->instrs, arg, 0, loc)))
+        return false;
+
+    for (i = 1; i < count; ++i)
+    {
+        if (!(load = hlsl_add_load_component(ctx, params->instrs, arg, i, loc)))
+            return false;
+
+        if (!(res = hlsl_new_binary_expr(ctx, op, res, load)))
+                return NULL;
+        hlsl_block_add_instr(params->instrs, res);
+    }
+
+    return true;
+}
+
 static bool intrinsic_all(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
@@ -2757,52 +2789,17 @@ static bool intrinsic_all(struct hlsl_ctx *ctx,
     return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, mul, zero, loc);
 }
 
-static bool intrinsic_any(struct hlsl_ctx *ctx,
-        const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
+static bool intrinsic_any(struct hlsl_ctx *ctx, const struct parse_initializer *params,
+        const struct vkd3d_shader_location *loc)
 {
-    struct hlsl_ir_node *arg = params->args[0], *dot, *or, *zero, *bfalse, *load;
-    unsigned int i, count;
+    struct hlsl_ir_node *arg = params->args[0], *cast;
+    struct hlsl_type *bool_type;
 
-    if (arg->data_type->class != HLSL_CLASS_VECTOR && arg->data_type->class != HLSL_CLASS_SCALAR)
-    {
-        hlsl_fixme(ctx, loc, "any() implementation for non-vector, non-scalar");
+    bool_type = convert_numeric_type(ctx, arg->data_type, HLSL_TYPE_BOOL);
+    if (!(cast = add_cast(ctx, params->instrs, arg, bool_type, loc)))
         return false;
-    }
 
-    if (arg->data_type->base_type == HLSL_TYPE_FLOAT)
-    {
-        if (!(zero = hlsl_new_float_constant(ctx, 0.0f, loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, zero);
-
-        if (!(dot = add_binary_dot_expr(ctx, params->instrs, arg, arg, loc)))
-            return false;
-
-        return !!add_binary_comparison_expr(ctx, params->instrs, HLSL_OP2_NEQUAL, dot, zero, loc);
-    }
-    else if (arg->data_type->base_type == HLSL_TYPE_BOOL)
-    {
-        if (!(bfalse = hlsl_new_bool_constant(ctx, false, loc)))
-            return false;
-        hlsl_block_add_instr(params->instrs, bfalse);
-
-        or = bfalse;
-
-        count = hlsl_type_component_count(arg->data_type);
-        for (i = 0; i < count; ++i)
-        {
-            if (!(load = hlsl_add_load_component(ctx, params->instrs, arg, i, loc)))
-                return false;
-
-            if (!(or = add_binary_bitwise_expr(ctx, params->instrs, HLSL_OP2_BIT_OR, or, load, loc)))
-                return false;
-        }
-
-        return true;
-    }
-
-    hlsl_fixme(ctx, loc, "any() implementation for non-float, non-bool");
-    return false;
+    return add_combine_components(ctx, params, cast, HLSL_OP2_LOGIC_OR, loc);
 }
 
 static bool intrinsic_asin(struct hlsl_ctx *ctx,
@@ -2901,15 +2898,6 @@ static bool intrinsic_atan2(struct hlsl_ctx *ctx,
         const struct parse_initializer *params, const struct vkd3d_shader_location *loc)
 {
     return write_atan_or_atan2(ctx, params, loc, true);
-}
-
-
-/* Find the type corresponding to the given source type, with the same
- * dimensions but a different base type. */
-static struct hlsl_type *convert_numeric_type(const struct hlsl_ctx *ctx,
-        const struct hlsl_type *type, enum hlsl_base_type base_type)
-{
-    return hlsl_get_numeric_type(ctx, type->class, base_type, type->dimx, type->dimy);
 }
 
 static bool intrinsic_asfloat(struct hlsl_ctx *ctx,
