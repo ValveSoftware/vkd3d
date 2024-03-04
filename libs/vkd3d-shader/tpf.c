@@ -164,6 +164,21 @@ STATIC_ASSERT(SM4_MAX_SRC_COUNT <= SPIRV_MAX_SRC_COUNT);
 /* The shift that corresponds to the D3D_SIF_TEXTURE_COMPONENTS mask. */
 #define VKD3D_SM4_SIF_TEXTURE_COMPONENTS_SHIFT 2
 
+#define VKD3D_SM4_REQUIRES_DOUBLES                              0x00000001
+#define VKD3D_SM4_REQUIRES_EARLY_DEPTH_STENCIL                  0x00000002
+#define VKD3D_SM4_REQUIRES_UAVS_AT_EVERY_STAGE                  0x00000004
+#define VKD3D_SM4_REQUIRES_64_UAVS                              0x00000008
+#define VKD3D_SM4_REQUIRES_MINIMUM_PRECISION                    0x00000010
+#define VKD3D_SM4_REQUIRES_11_1_DOUBLE_EXTENSIONS               0x00000020
+#define VKD3D_SM4_REQUIRES_11_1_SHADER_EXTENSIONS               0x00000040
+#define VKD3D_SM4_REQUIRES_LEVEL_9_COMPARISON_FILTERING         0x00000080
+#define VKD3D_SM4_REQUIRES_TILED_RESOURCES                      0x00000100
+#define VKD3D_SM4_REQUIRES_STENCIL_REF                          0x00000200
+#define VKD3D_SM4_REQUIRES_INNER_COVERAGE                       0x00000400
+#define VKD3D_SM4_REQUIRES_TYPED_UAV_LOAD_ADDITIONAL_FORMATS    0x00000800
+#define VKD3D_SM4_REQUIRES_ROVS                                 0x00001000
+#define VKD3D_SM4_REQUIRES_VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER 0x00002000
+
 enum vkd3d_sm4_opcode
 {
     VKD3D_SM4_OP_ADD                              = 0x00,
@@ -5896,6 +5911,31 @@ static void write_sm4_shdr(struct hlsl_ctx *ctx,
     sm4_free_extern_resources(extern_resources, extern_resources_count);
 }
 
+static void write_sm4_sfi0(struct hlsl_ctx *ctx, struct dxbc_writer *dxbc)
+{
+    struct extern_resource *extern_resources;
+    unsigned int extern_resources_count;
+    uint64_t *flags;
+
+    flags = vkd3d_calloc(1, sizeof(*flags));
+
+    extern_resources = sm4_get_extern_resources(ctx, &extern_resources_count);
+    for (unsigned int i = 0; i < extern_resources_count; ++i)
+    {
+        if (extern_resources[i].data_type->e.resource.rasteriser_ordered)
+            *flags |= VKD3D_SM4_REQUIRES_ROVS;
+    }
+    sm4_free_extern_resources(extern_resources, extern_resources_count);
+
+    /* FIXME: We also emit code that should require UAVS_AT_EVERY_STAGE,
+     * STENCIL_REF, and TYPED_UAV_LOAD_ADDITIONAL_FORMATS. */
+
+    if (flags)
+        dxbc_writer_add_section(dxbc, TAG_SFI0, flags, sizeof(*flags));
+    else
+        vkd3d_free(flags);
+}
+
 int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_func, struct vkd3d_shader_code *out)
 {
     struct dxbc_writer dxbc;
@@ -5908,6 +5948,7 @@ int hlsl_sm4_write(struct hlsl_ctx *ctx, struct hlsl_ir_function_decl *entry_fun
     write_sm4_signature(ctx, &dxbc, true);
     write_sm4_rdef(ctx, &dxbc);
     write_sm4_shdr(ctx, entry_func, &dxbc);
+    write_sm4_sfi0(ctx, &dxbc);
 
     if (!(ret = ctx->result))
         ret = dxbc_writer_write(&dxbc, out);
