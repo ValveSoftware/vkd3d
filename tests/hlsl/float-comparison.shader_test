@@ -32,40 +32,25 @@ float4 main() : sv_target
     result.z += (n != f.y)    ?   100000.0 : 0.0;
     result.z += !(n == f.y)   ?  1000000.0 : 0.0;
     result.z += !(n != f.y)   ? 10000000.0 : 0.0;
-    /* It doesn't seem possible to generate DXIL instructions for 'is ordered' or 'is unordered'.
-     * Expressions 'isnan(n)' and '(isnan(n) || isnan(f.x))' compile into intrinsics. */
-    result.w = 0;
+    // These compile to FCMP_ORD, but prepending a ! does not result in FCMP_UNO
+    result.w  = (f.y < f.x || f.y >= f.x) ?  1.0 : 0.0;
+    result.w += (n < f.x || n >= f.x)     ? 10.0 : 0.0;
     return result;
 }
 
+[test]
+uniform 0 float4 0.0 1.5 1.5 0.0
+todo(sm<4 | sm>=6) draw quad
 % SM1-3 apparently treats '0/0' as zero.
-[require]
-shader model < 4.0
-
-[test]
-uniform 0 float4 0.0 1.5 1.5 0.0
-todo(sm<4) draw quad
-todo probe all rgba (1010101.0, 11001100.0, 1101001.0, 0.0)
-
+if(sm<4) todo probe all rgba (1010101.0, 11001100.0, 1101001.0, 11.0)
 % SM4-5 optimises away the 'not' by inverting the condition, even though this is invalid for NaN.
-[require]
-shader model >= 4.0
-shader model < 6.0
-
-[test]
-uniform 0 float4 0.0 1.5 1.5 0.0
-draw quad
-todo probe all rgba (1010101.0, 0.0, 1101001.0, 0.0)
-
+if(sm>=4 & sm<6) todo probe all rgba (1010101.0, 0.0, 1101001.0, 1.0)
 % SM6 emits the correct ordered/unordered instructions, so comparisons are false for NaN, and are made true with 'not'.
+if(sm>=6) probe all rgba (1010101.0, 11110000.0, 1101001.0, 1.0)
+
+
 [require]
 shader model >= 6.0
-
-[test]
-uniform 0 float4 0.0 1.5 1.5 0.0
-draw quad
-probe all rgba (1010101.0, 11110000.0, 1101001.0, 0.0)
-
 
 [pixel shader]
 uniform float4 f;
