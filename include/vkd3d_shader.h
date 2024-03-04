@@ -199,7 +199,13 @@ enum vkd3d_shader_compile_option_fragment_coordinate_origin
 /** Advertises feature availability. \since 1.11 */
 enum vkd3d_shader_compile_option_feature_flags
 {
+    /** The SPIR-V target environment supports 64-bit integer types. This
+     * corresponds to the "shaderInt64" feature in the Vulkan API, and the
+     * "GL_ARB_gpu_shader_int64" extension in the OpenGL API. */
     VKD3D_SHADER_COMPILE_OPTION_FEATURE_INT64         = 0x00000001,
+    /** The SPIR-V target environment supports 64-bit floating-point types.
+     * This corresponds to the "shaderFloat64" feature in the Vulkan API, and
+     * the "GL_ARB_gpu_shader_fp64" extension in the OpenGL API. */
     VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLOAT64       = 0x00000002,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_FEATURE_FLAGS),
