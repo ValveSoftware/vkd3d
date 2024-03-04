@@ -420,7 +420,8 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
     struct vkd3d_shader_resource_binding bindings[MAX_RESOURCES + MAX_SAMPLERS];
     struct vkd3d_shader_push_constant_buffer push_constants;
     struct vkd3d_shader_resource_binding *binding;
-    struct vkd3d_shader_compile_option options[1];
+    struct vkd3d_shader_compile_option options[2];
+    struct vkd3d_shader_compile_option *option;
     unsigned int i, compile_options;
     char profile[7];
     char *messages;
@@ -449,10 +450,14 @@ static bool compile_shader(struct vulkan_shader_runner *runner, const char *sour
 
     info.options = options;
     info.option_count = 0;
+
+    option = &options[info.option_count++];
+    option->name = VKD3D_SHADER_COMPILE_OPTION_API_VERSION;
+    option->value = VKD3D_SHADER_API_VERSION_1_10;
+
     compile_options = runner->r.compile_options;
     if (compile_options)
     {
-        struct vkd3d_shader_compile_option *option;
 
         if (compile_options & (D3DCOMPILE_PACK_MATRIX_ROW_MAJOR | D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR))
         {
