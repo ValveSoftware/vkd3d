@@ -2333,6 +2333,10 @@ static void write_sm1_expr(struct hlsl_ctx *ctx, struct vkd3d_bytecode_buffer *b
             }
             break;
 
+        case HLSL_OP2_LOGIC_OR:
+            write_sm1_binary_op(ctx, buffer, D3DSIO_MAX, &instr->reg, &arg1->reg, &arg2->reg);
+            break;
+
         case HLSL_OP2_SLT:
             if (ctx->profile->type == VKD3D_SHADER_TYPE_PIXEL)
                 hlsl_fixme(ctx, &instr->loc, "Lower SLT instructions for pixel shaders.");

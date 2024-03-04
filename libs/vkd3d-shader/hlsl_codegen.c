@@ -3622,6 +3622,7 @@ static bool lower_nonfloat_exprs(struct hlsl_ctx *ctx, struct hlsl_ir_node *inst
         case HLSL_OP1_NEG:
         case HLSL_OP2_ADD:
         case HLSL_OP2_DIV:
+        case HLSL_OP2_LOGIC_OR:
         case HLSL_OP2_MAX:
         case HLSL_OP2_MIN:
         case HLSL_OP2_MUL:
