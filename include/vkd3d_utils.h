@@ -119,6 +119,7 @@ VKD3D_UTILS_API HRESULT WINAPI D3DStripShader(const void *data, SIZE_T data_size
 /** \since 1.11 */
 VKD3D_UTILS_API HRESULT WINAPI D3DDisassemble(const void *data,
         SIZE_T data_size, UINT flags, const char *comments, ID3DBlob **blob);
+/** \since 1.11 */
 VKD3D_UTILS_API HRESULT WINAPI D3DReflect(const void *data, SIZE_T data_size, REFIID iid, void **reflection);
 
 #ifdef __cplusplus
