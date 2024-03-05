@@ -1990,9 +1990,13 @@ VKD3D_SHADER_API const enum vkd3d_shader_target_type *vkd3d_shader_get_supported
  * - VKD3D_SHADER_SOURCE_DXBC_TPF to VKD3D_SHADER_TARGET_SPIRV_TEXT
  *   (if vkd3d was compiled with SPIRV-Tools)
  * - VKD3D_SHADER_SOURCE_DXBC_TPF to VKD3D_SHADER_TARGET_D3D_ASM
+ * - VKD3D_SHADER_SOURCE_D3D_BYTECODE to VKD3D_SHADER_TARGET_SPIRV_BINARY
+ * - VKD3D_SHADER_SOURCE_D3D_BYTECODE to VKD3D_SHADER_TARGET_SPIRV_TEXT
+ *   (if vkd3d was compiled with SPIRV-Tools)
  * - VKD3D_SHADER_SOURCE_D3D_BYTECODE to VKD3D_SHADER_TARGET_D3D_ASM
  * - VKD3D_SHADER_SOURCE_HLSL to VKD3D_SHADER_TARGET_DXBC_TPF
  * - VKD3D_SHADER_SOURCE_HLSL to VKD3D_SHADER_TARGET_D3D_BYTECODE
+ * - VKD3D_SHADER_SOURCE_HLSL to VKD3D_SHADER_TARGET_FX
  *
  * Supported transformations can also be detected at runtime with the functions
  * vkd3d_shader_get_supported_source_types() and
