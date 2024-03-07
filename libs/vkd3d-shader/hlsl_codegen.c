@@ -2948,7 +2948,7 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
     }
     else if (ctx->profile->major_version < 4 && ctx->profile->type == VKD3D_SHADER_TYPE_VERTEX)
     {
-        struct hlsl_ir_node *neg, *slt, *sum, *mul, *cond2;
+        struct hlsl_ir_node *neg, *slt, *sum, *cond2, *slt_cast, *mul;
 
         /* Expression used here is "slt(<cond>) * (first - second) + second". */
 
@@ -2980,7 +2980,11 @@ static bool lower_ternary(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, stru
             return false;
         hlsl_block_add_instr(block, sum);
 
-        if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, slt, sum)))
+        if (!(slt_cast = hlsl_new_cast(ctx, slt, sum->data_type, &instr->loc)))
+            return false;
+        hlsl_block_add_instr(block, slt_cast);
+
+        if (!(mul = hlsl_new_binary_expr(ctx, HLSL_OP2_MUL, slt_cast, sum)))
             return false;
         hlsl_block_add_instr(block, mul);
 
