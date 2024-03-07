@@ -96,6 +96,8 @@ int vkd3d_glsl_generator_generate(struct vkd3d_glsl_generator *generator,
     unsigned int i;
     void *code;
 
+    ERR("Generating a GLSL shader. This is unsupported; you get to keep all the pieces if it breaks.\n");
+
     vkd3d_string_buffer_printf(&generator->buffer, "#version 440\n\n");
     vkd3d_string_buffer_printf(&generator->buffer, "void main()\n{\n");
 
