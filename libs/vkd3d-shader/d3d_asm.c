@@ -372,6 +372,7 @@ struct vkd3d_d3d_asm_colours
     const char *swizzle;
     const char *version;
     const char *write_mask;
+    const char *label;
 };
 
 struct vkd3d_d3d_asm_compiler
@@ -922,7 +923,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     static const char * const rastout_reg_names[] = {"oPos", "oFog", "oPts"};
     static const char * const misctype_reg_names[] = {"vPos", "vFace"};
 
-    shader_addline(buffer, "%s", compiler->colours.reg);
+    shader_addline(buffer, "%s", reg->type == VKD3DSPR_LABEL ? compiler->colours.label : compiler->colours.reg);
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
@@ -2245,6 +2246,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
         .swizzle = "",
         .version = "",
         .write_mask = "",
+        .label = "",
     };
     static const struct vkd3d_d3d_asm_colours colours =
     {
@@ -2257,6 +2259,7 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
         .swizzle = "\x1b[93m",
         .version = "\x1b[36m",
         .write_mask = "\x1b[93m",
+        .label = "\x1b[91m",
     };
 
     formatting = VKD3D_SHADER_COMPILE_OPTION_FORMATTING_INDENT
