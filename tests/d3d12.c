@@ -32383,7 +32383,10 @@ static void test_resource_allocation_info(void)
             ok(infos1[i].SizeInBytes == sizes[i], "Got unexpected size %"PRIu64".\n", infos1[i].SizeInBytes);
 
             if (!i)
+            {
+                vkd3d_test_pop_context();
                 continue;
+            }
 
             ok(infos1[i].Offset - infos1[i - 1].Offset >= infos1[i - 1].SizeInBytes,
                     "Got unexpected prev size %"PRIu64", prev offset %"PRIu64", offset %"PRIu64".\n",
