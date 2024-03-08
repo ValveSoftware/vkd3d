@@ -33454,6 +33454,7 @@ static void test_coverage(void)
         reset_command_list(command_list, context.allocator);
         transition_resource_state(command_list, texture,
                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        bug_if(is_mvk_device(context.device))
         check_sub_resource_uint(texture, 0, queue, command_list, tests[i].sample_mask & 0xf, 0);
 
         reset_command_list(command_list, context.allocator);
