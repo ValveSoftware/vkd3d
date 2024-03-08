@@ -2062,6 +2062,9 @@ static void write_sm1_semantic_dcl(struct hlsl_ctx *ctx, struct vkd3d_bytecode_b
     D3DDECLUSAGE usage;
     bool ret;
 
+    if ((!output && !var->last_read) || (output && !var->first_write))
+        return;
+
     if (hlsl_sm1_register_from_semantic(ctx, &var->semantic, output, &reg.type, &reg.reg))
     {
         usage = 0;
