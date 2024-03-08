@@ -128,17 +128,6 @@ static void check_alignment_(unsigned int line, uint64_t size, uint64_t alignmen
             size, aligned_size);
 }
 
-static void uav_barrier(ID3D12GraphicsCommandList *list, ID3D12Resource *resource)
-{
-    D3D12_RESOURCE_BARRIER barrier;
-
-    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    barrier.UAV.pResource = resource;
-
-    ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
-}
-
 static const DXGI_FORMAT depth_stencil_formats[] =
 {
     DXGI_FORMAT_R32G8X24_TYPELESS,

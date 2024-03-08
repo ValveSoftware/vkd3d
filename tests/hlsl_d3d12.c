@@ -516,10 +516,17 @@ static void test_thread_id(void)
 
     for (i = 0; i < 3; ++i)
     {
+        const UINT clear_value[4] = {0};
+
         textures[i] = create_default_texture3d(device, 16, 8, 8, 1, DXGI_FORMAT_R32G32B32A32_UINT,
                 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         ID3D12Device_CreateUnorderedAccessView(device, textures[i], NULL, NULL,
                 get_cpu_descriptor_handle(&context, heap, i));
+        ID3D12GraphicsCommandList_ClearUnorderedAccessViewUint(command_list,
+                get_gpu_descriptor_handle(&context, heap, i),
+                get_cpu_descriptor_handle(&context, heap, i),
+                textures[i], clear_value, 0, NULL);
+        uav_barrier(command_list, textures[i]);
     }
 
     cs_code = compile_shader(cs_source, "cs_5_0");

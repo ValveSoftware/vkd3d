@@ -269,6 +269,17 @@ static void transition_sub_resource_state(ID3D12GraphicsCommandList *list, ID3D1
     ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
 }
 
+static inline void uav_barrier(ID3D12GraphicsCommandList *list, ID3D12Resource *resource)
+{
+    D3D12_RESOURCE_BARRIER barrier;
+
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    barrier.UAV.pResource = resource;
+
+    ID3D12GraphicsCommandList_ResourceBarrier(list, 1, &barrier);
+}
+
 #define create_command_queue(a, b, c) create_command_queue_(__LINE__, a, b, c)
 static inline ID3D12CommandQueue *create_command_queue_(unsigned int line, ID3D12Device *device,
         D3D12_COMMAND_LIST_TYPE type, int priority)
