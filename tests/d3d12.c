@@ -38139,6 +38139,7 @@ static void test_hull_shader_punned_array(void)
     transition_resource_state(command_list, context.render_target,
             D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE);
 
+    bug_if(is_mvk_device(context.device))
     check_sub_resource_uint(context.render_target, 0, queue, command_list, 0xcc996633, 0);
 
     destroy_test_context(&context);
