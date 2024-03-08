@@ -144,7 +144,7 @@ shader model >= 6.0
 
 [test]
 draw triangle list 3
-probe (320,240) rgba (0.250390589, 0.499088615, 0.250520796, 1.0) 1
+probe (320,240) rgba (0.250390589, 0.499088615, 0.250520796, 1.0) 4
 
 [require]
 shader model >= 4.0
