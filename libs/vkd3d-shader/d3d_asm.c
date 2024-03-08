@@ -2293,7 +2293,9 @@ enum vkd3d_result vkd3d_dxbc_binary_to_text(const struct vsir_program *program,
             shader_get_type_prefix(shader_version->type), shader_version->major,
             shader_version->minor, compiler.colours.reset);
 
-    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES)
+    /* The signatures we emit only make sense for DXBC shaders. D3DBC
+     * doesn't even have an explicit concept of signature. */
+    if (formatting & VKD3D_SHADER_COMPILE_OPTION_FORMATTING_IO_SIGNATURES && shader_version->major >= 4)
     {
         if ((result = dump_signatures(&compiler, shader_desc, shader_version->type)) < 0)
         {
