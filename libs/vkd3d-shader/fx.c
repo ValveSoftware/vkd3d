@@ -799,7 +799,8 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
         bind_point = b->reservation.reg_index;
     if (b->type == HLSL_BUFFER_TEXTURE)
         flags |= IS_TBUFFER;
-    /* FIXME: set 'single' flag for fx_5_0 */
+    if (ctx->profile->major_version == 5 && b->modifiers & HLSL_MODIFIER_SINGLE)
+        flags |= IS_SINGLE;
 
     name_offset = write_string(b->name, fx);
 
