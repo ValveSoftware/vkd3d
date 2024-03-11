@@ -611,11 +611,15 @@ static uint32_t write_fx_2_string(const char *string, struct fx_write_context *f
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->unstructured;
     const char *s = string ? string : "";
+    static const char tail[3];
     uint32_t size, offset;
 
     size = strlen(s) + 1;
     offset = put_u32(buffer, size);
     bytecode_put_bytes(buffer, s, size);
+    size %= 4;
+    if (size)
+        bytecode_put_bytes_unaligned(buffer, tail, 4 - size);
     return offset;
 }
 
