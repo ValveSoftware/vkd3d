@@ -514,27 +514,30 @@ static void shader_dump_uav_flags(struct vkd3d_d3d_asm_compiler *compiler, uint3
         vkd3d_string_buffer_printf(&compiler->buffer, "_unknown_flags(%#x)", uav_flags);
 }
 
-static void shader_dump_tessellator_domain(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_tessellator_domain domain)
+static void shader_print_tessellator_domain(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, enum vkd3d_tessellator_domain d, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *domain;
 
-    shader_addline(buffer, "domain_");
-    switch (domain)
+    switch (d)
     {
         case VKD3D_TESSELLATOR_DOMAIN_LINE:
-            shader_addline(buffer, "isoline");
+            domain = "domain_isoline";
             break;
         case VKD3D_TESSELLATOR_DOMAIN_TRIANGLE:
-            shader_addline(buffer, "tri");
+            domain = "domain_tri";
             break;
         case VKD3D_TESSELLATOR_DOMAIN_QUAD:
-            shader_addline(buffer, "quad");
+            domain = "domain_quad";
             break;
         default:
-            shader_addline(buffer, "unknown_tessellator_domain(%#x)", domain);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled tessellator domain %#x>%s%s",
+                    prefix, compiler->colours.error, d, compiler->colours.reset, suffix);
+            return;
     }
+
+    vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, domain, suffix);
 }
 
 static void shader_dump_tessellator_output_primitive(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1938,8 +1941,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_DOMAIN:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_tessellator_domain(compiler, ins->declaration.tessellator_domain);
+            shader_print_tessellator_domain(compiler, " ", ins->declaration.tessellator_domain, "");
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
