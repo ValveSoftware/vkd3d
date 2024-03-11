@@ -540,30 +540,33 @@ static void shader_print_tessellator_domain(struct vkd3d_d3d_asm_compiler *compi
     vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, domain, suffix);
 }
 
-static void shader_dump_tessellator_output_primitive(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_shader_tessellator_output_primitive output_primitive)
+static void shader_print_tessellator_output_primitive(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, enum vkd3d_shader_tessellator_output_primitive p, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *primitive;
 
-    shader_addline(buffer, "output_");
-    switch (output_primitive)
+    switch (p)
     {
         case VKD3D_SHADER_TESSELLATOR_OUTPUT_POINT:
-            shader_addline(buffer, "point");
+            primitive = "output_point";
             break;
         case VKD3D_SHADER_TESSELLATOR_OUTPUT_LINE:
-            shader_addline(buffer, "line");
+            primitive = "output_line";
             break;
         case VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CW:
-            shader_addline(buffer, "triangle_cw");
+            primitive = "output_triangle_cw";
             break;
         case VKD3D_SHADER_TESSELLATOR_OUTPUT_TRIANGLE_CCW:
-            shader_addline(buffer, "triangle_ccw");
+            primitive = "output_triangle_ccw";
             break;
         default:
-            shader_addline(buffer, "unknown_tessellator_output_primitive(%#x)", output_primitive);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled tessellator output primitive %#x>%s%s",
+                    prefix, compiler->colours.error, p, compiler->colours.reset, suffix);
+            return;
     }
+
+    vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, primitive, suffix);
 }
 
 static void shader_dump_tessellator_partitioning(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1945,8 +1948,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_OUTPUT_PRIMITIVE:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_tessellator_output_primitive(compiler, ins->declaration.tessellator_output_primitive);
+            shader_print_tessellator_output_primitive(compiler, " ", ins->declaration.tessellator_output_primitive, "");
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_PARTITIONING:
