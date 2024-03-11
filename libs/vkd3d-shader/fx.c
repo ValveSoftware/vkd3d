@@ -61,7 +61,6 @@ struct fx_write_context;
 struct fx_write_context_ops
 {
     uint32_t (*write_string)(const char *string, struct fx_write_context *fx);
-    uint32_t (*write_type)(const struct hlsl_type *type, struct fx_write_context *fx);
     void (*write_technique)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     void (*write_pass)(struct hlsl_ir_var *var, struct fx_write_context *fx);
     bool are_child_effects_supported;
@@ -112,11 +111,15 @@ static void write_pass(struct hlsl_ir_var *var, struct fx_write_context *fx)
     fx->ops->write_pass(var, fx);
 }
 
+static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_context *fx);
+
 static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context *fx)
 {
     struct type_entry *type_entry;
     unsigned int elements_count;
     const char *name;
+
+    assert(fx->ctx->profile->major_version >= 4);
 
     if (type->class == HLSL_CLASS_ARRAY)
     {
@@ -143,7 +146,7 @@ static uint32_t write_type(const struct hlsl_type *type, struct fx_write_context
     if (!(type_entry = hlsl_alloc(fx->ctx, sizeof(*type_entry))))
         return 0;
 
-    type_entry->offset = fx->ops->write_type(type, fx);
+    type_entry->offset = write_fx_4_type(type, fx);
     type_entry->name = name;
     type_entry->elements_count = elements_count;
 
@@ -692,7 +695,6 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 static const struct fx_write_context_ops fx_4_ops =
 {
     .write_string = write_fx_4_string,
-    .write_type = write_fx_4_type,
     .write_technique = write_fx_4_technique,
     .write_pass = write_fx_4_pass,
     .are_child_effects_supported = true,
