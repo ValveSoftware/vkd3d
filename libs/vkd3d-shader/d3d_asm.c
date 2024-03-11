@@ -569,30 +569,33 @@ static void shader_print_tessellator_output_primitive(struct vkd3d_d3d_asm_compi
     vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, primitive, suffix);
 }
 
-static void shader_dump_tessellator_partitioning(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_shader_tessellator_partitioning partitioning)
+static void shader_print_tessellator_partitioning(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, enum vkd3d_shader_tessellator_partitioning p, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
+    const char *partitioning;
 
-    shader_addline(buffer, "partitioning_");
-    switch (partitioning)
+    switch (p)
     {
         case VKD3D_SHADER_TESSELLATOR_PARTITIONING_INTEGER:
-            shader_addline(buffer, "integer");
+            partitioning = "partitioning_integer";
             break;
         case VKD3D_SHADER_TESSELLATOR_PARTITIONING_POW2:
-            shader_addline(buffer, "pow2");
+            partitioning = "partitioning_pow2";
             break;
         case VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_ODD:
-            shader_addline(buffer, "fractional_odd");
+            partitioning = "partitioning_fractional_odd";
             break;
         case VKD3D_SHADER_TESSELLATOR_PARTITIONING_FRACTIONAL_EVEN:
-            shader_addline(buffer, "fractional_even");
+            partitioning = "partitioning_fractional_even";
             break;
         default:
-            shader_addline(buffer, "unknown_tessellator_partitioning(%#x)", partitioning);
-            break;
+            vkd3d_string_buffer_printf(buffer, "%s%s<unhandled tessellator partitioning %#x>%s%s",
+                    prefix, compiler->colours.error, p, compiler->colours.reset, suffix);
+            return;
     }
+
+    vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, partitioning, suffix);
 }
 
 static void shader_dump_shader_input_sysval_semantic(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1952,8 +1955,7 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_TESSELLATOR_PARTITIONING:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_tessellator_partitioning(compiler, ins->declaration.tessellator_partitioning);
+            shader_print_tessellator_partitioning(compiler, " ", ins->declaration.tessellator_partitioning, "");
             break;
 
         case VKD3DSIH_DCL_TGSM_RAW:
