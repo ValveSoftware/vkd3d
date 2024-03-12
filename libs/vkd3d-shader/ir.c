@@ -2713,7 +2713,7 @@ static const struct vkd3d_shader_src_param *materialize_ssas_to_temps_compute_so
     vkd3d_unreachable();
 }
 
-static bool materialize_ssas_to_temps_synthesize_mov(struct vkd3d_shader_parser *parser,
+static bool materialize_ssas_to_temps_synthesize_mov(struct vsir_program *program,
         struct vkd3d_shader_instruction *instruction, const struct vkd3d_shader_location *loc,
         const struct vkd3d_shader_dst_param *dest, const struct vkd3d_shader_src_param *cond,
         const struct vkd3d_shader_src_param *source, bool invert)
@@ -2721,7 +2721,7 @@ static bool materialize_ssas_to_temps_synthesize_mov(struct vkd3d_shader_parser 
     struct vkd3d_shader_src_param *src;
     struct vkd3d_shader_dst_param *dst;
 
-    if (!vsir_instruction_init_with_params(&parser->program, instruction, loc,
+    if (!vsir_instruction_init_with_params(program, instruction, loc,
             cond ? VKD3DSIH_MOVC : VKD3DSIH_MOV, 1, cond ? 3 : 1))
         return false;
 
@@ -2729,7 +2729,7 @@ static bool materialize_ssas_to_temps_synthesize_mov(struct vkd3d_shader_parser 
     src = instruction->src;
 
     dst[0] = *dest;
-    materialize_ssas_to_temps_process_dst_param(&parser->program, &dst[0]);
+    materialize_ssas_to_temps_process_dst_param(program, &dst[0]);
 
     assert(dst[0].write_mask == VKD3DSP_WRITEMASK_0);
     assert(dst[0].modifiers == 0);
@@ -2741,19 +2741,19 @@ static bool materialize_ssas_to_temps_synthesize_mov(struct vkd3d_shader_parser 
         src[1 + invert] = *source;
         memset(&src[2 - invert], 0, sizeof(src[2 - invert]));
         src[2 - invert].reg = dst[0].reg;
-        materialize_ssas_to_temps_process_src_param(&parser->program, &src[1]);
-        materialize_ssas_to_temps_process_src_param(&parser->program, &src[2]);
+        materialize_ssas_to_temps_process_src_param(program, &src[1]);
+        materialize_ssas_to_temps_process_src_param(program, &src[2]);
     }
     else
     {
         src[0] = *source;
-        materialize_ssas_to_temps_process_src_param(&parser->program, &src[0]);
+        materialize_ssas_to_temps_process_src_param(program, &src[0]);
     }
 
     return true;
 }
 
-static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_materialise_ssas_to_temps(struct vsir_program *program)
 {
     struct vkd3d_shader_instruction *instructions = NULL;
     struct materialize_ssas_to_temps_block_data
@@ -2764,18 +2764,18 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
     size_t ins_capacity = 0, ins_count = 0, i;
     unsigned int current_label = 0;
 
-    if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
+    if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count))
         goto fail;
 
-    if (!(block_index = vkd3d_calloc(parser->program.block_count, sizeof(*block_index))))
+    if (!(block_index = vkd3d_calloc(program->block_count, sizeof(*block_index))))
     {
         ERR("Failed to allocate block index.\n");
         goto fail;
     }
 
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -2797,16 +2797,16 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
         }
     }
 
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         size_t j;
 
         for (j = 0; j < ins->dst_count; ++j)
-            materialize_ssas_to_temps_process_dst_param(&parser->program, &ins->dst[j]);
+            materialize_ssas_to_temps_process_dst_param(program, &ins->dst[j]);
 
         for (j = 0; j < ins->src_count; ++j)
-            materialize_ssas_to_temps_process_src_param(&parser->program, &ins->src[j]);
+            materialize_ssas_to_temps_process_src_param(program, &ins->src[j]);
 
         switch (ins->handler_idx)
         {
@@ -2827,9 +2827,10 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
                     {
                         const struct vkd3d_shader_src_param *source;
 
-                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
-                                &parser->program.instructions.elements[j].dst[0], NULL, source, false))
+                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
+                                current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
+                                &ins->location, &program->instructions.elements[j].dst[0], NULL, source, false))
                             goto fail;
 
                         ++ins_count;
@@ -2849,9 +2850,10 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
                     {
                         const struct vkd3d_shader_src_param *source;
 
-                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
-                                &parser->program.instructions.elements[j].dst[0], cond, source, false))
+                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
+                                current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
+                                &ins->location, &program->instructions.elements[j].dst[0], cond, source, false))
                             goto fail;
 
                         ++ins_count;
@@ -2861,9 +2863,10 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
                     {
                         const struct vkd3d_shader_src_param *source;
 
-                        source = materialize_ssas_to_temps_compute_source(&parser->program.instructions.elements[j], current_label);
-                        if (!materialize_ssas_to_temps_synthesize_mov(parser, &instructions[ins_count], &ins->location,
-                                &parser->program.instructions.elements[j].dst[0], cond, source, true))
+                        source = materialize_ssas_to_temps_compute_source(&program->instructions.elements[j],
+                                current_label);
+                        if (!materialize_ssas_to_temps_synthesize_mov(program, &instructions[ins_count],
+                                &ins->location, &program->instructions.elements[j].dst[0], cond, source, true))
                             goto fail;
 
                         ++ins_count;
@@ -2885,13 +2888,13 @@ static enum vkd3d_result materialize_ssas_to_temps(struct vkd3d_shader_parser *p
         instructions[ins_count++] = *ins;
     }
 
-    vkd3d_free(parser->program.instructions.elements);
+    vkd3d_free(program->instructions.elements);
     vkd3d_free(block_index);
-    parser->program.instructions.elements = instructions;
-    parser->program.instructions.capacity = ins_capacity;
-    parser->program.instructions.count = ins_count;
-    parser->program.temp_count += parser->program.ssa_count;
-    parser->program.ssa_count = 0;
+    program->instructions.elements = instructions;
+    program->instructions.capacity = ins_capacity;
+    program->instructions.count = ins_count;
+    program->temp_count += program->ssa_count;
+    program->ssa_count = 0;
 
     return VKD3D_OK;
 
@@ -3923,7 +3926,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
 
-        if ((result = materialize_ssas_to_temps(parser)) < 0)
+        if ((result = vsir_program_materialise_ssas_to_temps(program)) < 0)
             return result;
 
         if ((result = vsir_cfg_init(&cfg, program, parser->message_context)) < 0)
