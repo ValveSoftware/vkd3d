@@ -1611,6 +1611,11 @@ static inline enum vkd3d_shader_component_type vkd3d_component_type_from_resourc
     }
 }
 
+static inline bool component_type_is_64_bit(enum vkd3d_shader_component_type component_type)
+{
+    return component_type == VKD3D_SHADER_COMPONENT_DOUBLE || component_type == VKD3D_SHADER_COMPONENT_UINT64;
+}
+
 enum vkd3d_shader_input_sysval_semantic vkd3d_siv_from_sysval_indexed(enum vkd3d_shader_sysval_semantic sysval,
         unsigned int index);
 
