@@ -94,9 +94,8 @@ static bool vsir_instruction_init_with_params(struct vsir_program *program,
     return true;
 }
 
-static enum vkd3d_result instruction_array_lower_texkills(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_lower_texkills(struct vsir_program *program)
 {
-    struct vsir_program *program = &parser->program;
     struct vkd3d_shader_instruction_array *instructions = &program->instructions;
     struct vkd3d_shader_instruction *texkill_ins, *ins;
     unsigned int components_read = 3 + (program->shader_version.major >= 2);
@@ -3906,25 +3905,25 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
-    struct vkd3d_shader_instruction_array *instructions = &parser->program.instructions;
+    struct vsir_program *program = &parser->program;
     enum vkd3d_result result = VKD3D_OK;
 
-    remove_dcl_temps(&parser->program);
+    remove_dcl_temps(program);
 
-    if ((result = instruction_array_lower_texkills(parser)) < 0)
+    if ((result = vsir_program_lower_texkills(program)) < 0)
         return result;
 
-    if (parser->program.shader_version.major >= 6)
+    if (program->shader_version.major >= 6)
     {
         struct vsir_cfg cfg;
 
-        if ((result = lower_switch_to_if_ladder(&parser->program)) < 0)
+        if ((result = lower_switch_to_if_ladder(program)) < 0)
             return result;
 
         if ((result = materialize_ssas_to_temps(parser)) < 0)
             return result;
 
-        if ((result = vsir_cfg_init(&cfg, &parser->program, parser->message_context)) < 0)
+        if ((result = vsir_cfg_init(&cfg, program, parser->message_context)) < 0)
             return result;
 
         vsir_cfg_compute_dominators(&cfg);
@@ -3957,29 +3956,29 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     }
     else
     {
-        if (parser->program.shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
+        if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         {
             if ((result = remap_output_signature(parser, compile_info)) < 0)
                 return result;
         }
 
-        if (parser->program.shader_version.type == VKD3D_SHADER_TYPE_HULL)
+        if (program->shader_version.type == VKD3D_SHADER_TYPE_HULL)
         {
-            if ((result = instruction_array_flatten_hull_shader_phases(instructions)) < 0)
+            if ((result = instruction_array_flatten_hull_shader_phases(&program->instructions)) < 0)
                 return result;
 
-            if ((result = instruction_array_normalise_hull_shader_control_point_io(instructions,
-                    &parser->program.input_signature)) < 0)
+            if ((result = instruction_array_normalise_hull_shader_control_point_io(&program->instructions,
+                    &program->input_signature)) < 0)
                 return result;
         }
 
         if ((result = shader_normalise_io_registers(parser)) < 0)
             return result;
 
-        if ((result = instruction_array_normalise_flat_constants(&parser->program)) < 0)
+        if ((result = instruction_array_normalise_flat_constants(program)) < 0)
             return result;
 
-        remove_dead_code(&parser->program);
+        remove_dead_code(program);
 
         if ((result = normalise_combined_samplers(parser)) < 0)
             return result;
@@ -3989,7 +3988,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         return result;
 
     if (TRACE_ON())
-        vkd3d_shader_trace(&parser->program);
+        vkd3d_shader_trace(program);
 
     if (!parser->failed && (result = vsir_validate(parser)) < 0)
         return result;
