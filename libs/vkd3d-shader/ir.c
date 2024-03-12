@@ -2905,20 +2905,20 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
-static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_structurise(struct vsir_program *program)
 {
-    const unsigned int block_temp_idx = parser->program.temp_count;
+    const unsigned int block_temp_idx = program->temp_count;
     struct vkd3d_shader_instruction *instructions = NULL;
     const struct vkd3d_shader_location no_loc = {0};
     size_t ins_capacity = 0, ins_count = 0, i;
     bool first_label_found = false;
 
-    if (!reserve_instructions(&instructions, &ins_capacity, parser->program.instructions.count))
+    if (!reserve_instructions(&instructions, &ins_capacity, program->instructions.count))
         goto fail;
 
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
 
         switch (ins->handler_idx)
         {
@@ -2934,23 +2934,27 @@ static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *par
                 {
                     first_label_found = true;
 
-                    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_MOV, 1, 1))
+                    if (!vsir_instruction_init_with_params(program,
+                            &instructions[ins_count], &no_loc, VKD3DSIH_MOV, 1, 1))
                         goto fail;
                     dst_param_init_temp_uint(&instructions[ins_count].dst[0], block_temp_idx);
                     src_param_init_const_uint(&instructions[ins_count].src[0], label_from_src_param(&ins->src[0]));
                     ins_count++;
 
-                    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_LOOP, 0, 0))
+                    if (!vsir_instruction_init_with_params(program,
+                            &instructions[ins_count], &no_loc, VKD3DSIH_LOOP, 0, 0))
                         goto fail;
                     ins_count++;
 
-                    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_SWITCH, 0, 1))
+                    if (!vsir_instruction_init_with_params(program,
+                            &instructions[ins_count], &no_loc, VKD3DSIH_SWITCH, 0, 1))
                         goto fail;
                     src_param_init_temp_uint(&instructions[ins_count].src[0], block_temp_idx);
                     ins_count++;
                 }
 
-                if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_CASE, 0, 1))
+                if (!vsir_instruction_init_with_params(program,
+                        &instructions[ins_count], &no_loc, VKD3DSIH_CASE, 0, 1))
                     goto fail;
                 src_param_init_const_uint(&instructions[ins_count].src[0], label_from_src_param(&ins->src[0]));
                 ins_count++;
@@ -2962,7 +2966,8 @@ static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *par
 
                 if (vsir_register_is_label(&ins->src[0].reg))
                 {
-                    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_MOV, 1, 1))
+                    if (!vsir_instruction_init_with_params(program,
+                            &instructions[ins_count], &no_loc, VKD3DSIH_MOV, 1, 1))
                         goto fail;
                     dst_param_init_temp_uint(&instructions[ins_count].dst[0], block_temp_idx);
                     src_param_init_const_uint(&instructions[ins_count].src[0], label_from_src_param(&ins->src[0]));
@@ -2970,7 +2975,8 @@ static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *par
                 }
                 else
                 {
-                    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_MOVC, 1, 3))
+                    if (!vsir_instruction_init_with_params(program,
+                            &instructions[ins_count], &no_loc, VKD3DSIH_MOVC, 1, 3))
                         goto fail;
                     dst_param_init_temp_uint(&instructions[ins_count].dst[0], block_temp_idx);
                     instructions[ins_count].src[0] = ins->src[0];
@@ -2979,7 +2985,8 @@ static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *par
                     ins_count++;
                 }
 
-                if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_BREAK, 0, 0))
+                if (!vsir_instruction_init_with_params(program,
+                        &instructions[ins_count], &no_loc, VKD3DSIH_BREAK, 0, 0))
                     goto fail;
                 ins_count++;
                 break;
@@ -2999,23 +3006,23 @@ static enum vkd3d_result simple_structurizer_run(struct vkd3d_shader_parser *par
     if (!reserve_instructions(&instructions, &ins_capacity, ins_count + 3))
         goto fail;
 
-    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_ENDSWITCH, 0, 0))
+    if (!vsir_instruction_init_with_params(program, &instructions[ins_count], &no_loc, VKD3DSIH_ENDSWITCH, 0, 0))
         goto fail;
     ins_count++;
 
-    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_ENDLOOP, 0, 0))
+    if (!vsir_instruction_init_with_params(program, &instructions[ins_count], &no_loc, VKD3DSIH_ENDLOOP, 0, 0))
         goto fail;
     ins_count++;
 
-    if (!vsir_instruction_init_with_params(&parser->program, &instructions[ins_count], &no_loc, VKD3DSIH_RET, 0, 0))
+    if (!vsir_instruction_init_with_params(program, &instructions[ins_count], &no_loc, VKD3DSIH_RET, 0, 0))
         goto fail;
     ins_count++;
 
-    vkd3d_free(parser->program.instructions.elements);
-    parser->program.instructions.elements = instructions;
-    parser->program.instructions.capacity = ins_capacity;
-    parser->program.instructions.count = ins_count;
-    parser->program.temp_count += 1;
+    vkd3d_free(program->instructions.elements);
+    program->instructions.elements = instructions;
+    program->instructions.capacity = ins_capacity;
+    program->instructions.count = ins_count;
+    program->temp_count += 1;
 
     return VKD3D_OK;
 
@@ -3952,7 +3959,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
             return result;
         }
 
-        if ((result = simple_structurizer_run(parser)) < 0)
+        if ((result = vsir_program_structurise(program)) < 0)
         {
             vsir_cfg_cleanup(&cfg);
             return result;
