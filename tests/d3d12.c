@@ -19214,7 +19214,15 @@ static void test_descriptors_visibility(void)
     root_signature_desc.NumStaticSamplers = 2;
     root_signature_desc.pStaticSamplers = sampler_desc;
     hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    /* llvmpipe (from Mesa 24.0.4) has maxBoundDescriptorSet == 8, which is less than we need. */
+    todo_if(is_llvmpipe_device(device))
     ok(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+
+    if (FAILED(hr))
+    {
+        destroy_test_context(&context);
+        return;
+    }
 
     context.pipeline_state = create_pipeline_state(device,
             context.root_signature, context.render_target_desc.Format,
@@ -20858,7 +20866,15 @@ static void test_depth_stencil_sampling(void)
     root_signature_desc.NumStaticSamplers = 2;
     root_signature_desc.pStaticSamplers = sampler_desc;
     hr = create_root_signature(device, &root_signature_desc, &context.root_signature);
+    /* llvmpipe (from Mesa 24.0.4) has maxBoundDescriptorSet == 8, which is less than we need. */
+    todo_if(is_llvmpipe_device(device))
     ok(SUCCEEDED(hr), "Failed to create root signature, hr %#x.\n", hr);
+
+    if (FAILED(hr))
+    {
+        destroy_test_context(&context);
+        return;
+    }
 
     pso_compare = create_pipeline_state(device,
             context.root_signature, context.render_target_desc.Format, NULL, &ps_compare, NULL);

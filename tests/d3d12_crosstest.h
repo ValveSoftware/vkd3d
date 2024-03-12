@@ -401,6 +401,11 @@ static inline bool is_mesa_intel_device(ID3D12Device *device)
     return false;
 }
 
+static inline bool is_llvmpipe_device(ID3D12Device *device)
+{
+    return false;
+}
+
 static inline bool is_nvidia_device(ID3D12Device *device)
 {
     return false;
@@ -647,6 +652,14 @@ static inline bool is_mesa_intel_device(ID3D12Device *device)
 
     get_driver_properties(device, &properties);
     return properties.driverID == VK_DRIVER_ID_INTEL_OPEN_SOURCE_MESA_KHR;
+}
+
+static inline bool is_llvmpipe_device(ID3D12Device *device)
+{
+    VkPhysicalDeviceDriverPropertiesKHR properties;
+
+    get_driver_properties(device, &properties);
+    return properties.driverID == VK_DRIVER_ID_MESA_LLVMPIPE;
 }
 
 static inline bool is_nvidia_device(ID3D12Device *device)
