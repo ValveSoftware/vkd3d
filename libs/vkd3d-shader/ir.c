@@ -1670,19 +1670,20 @@ static void remove_dead_code(struct vsir_program *program)
     }
 }
 
-static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_normalise_combined_samplers(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
 {
     unsigned int i;
 
-    for (i = 0; i < parser->program.instructions.count; ++i)
+    for (i = 0; i < program->instructions.count; ++i)
     {
-        struct vkd3d_shader_instruction *ins = &parser->program.instructions.elements[i];
+        struct vkd3d_shader_instruction *ins = &program->instructions.elements[i];
         struct vkd3d_shader_src_param *srcs;
 
         switch (ins->handler_idx)
         {
             case VKD3DSIH_TEX:
-                if (!(srcs = shader_src_param_allocator_get(&parser->program.instructions.src_params, 3)))
+                if (!(srcs = shader_src_param_allocator_get(&program->instructions.src_params, 3)))
                     return VKD3D_ERROR_OUT_OF_MEMORY;
                 memset(srcs, 0, sizeof(*srcs) * 3);
 
@@ -1725,7 +1726,7 @@ static enum vkd3d_result normalise_combined_samplers(struct vkd3d_shader_parser 
             case VKD3DSIH_TEXREG2AR:
             case VKD3DSIH_TEXREG2GB:
             case VKD3DSIH_TEXREG2RGB:
-                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                vkd3d_shader_error(message_context, &ins->location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: "
                         "Combined sampler instruction %#x.", ins->handler_idx);
                 return VKD3D_ERROR_NOT_IMPLEMENTED;
@@ -4372,7 +4373,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
 
         remove_dead_code(program);
 
-        if ((result = normalise_combined_samplers(parser)) < 0)
+        if ((result = vsir_program_normalise_combined_samplers(program, message_context)) < 0)
             return result;
     }
 
