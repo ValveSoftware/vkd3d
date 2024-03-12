@@ -1386,10 +1386,9 @@ static void shader_instruction_normalise_io_params(struct vkd3d_shader_instructi
     }
 }
 
-static enum vkd3d_result shader_normalise_io_registers(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_normalise_io_registers(struct vsir_program *program)
 {
-    struct io_normaliser normaliser = {parser->program.instructions};
-    struct vsir_program *program = &parser->program;
+    struct io_normaliser normaliser = {program->instructions};
     struct vkd3d_shader_instruction *ins;
     bool has_control_point_phase;
     unsigned int i, j;
@@ -4365,7 +4364,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
                 return result;
         }
 
-        if ((result = shader_normalise_io_registers(parser)) < 0)
+        if ((result = vsir_program_normalise_io_registers(program)) < 0)
             return result;
 
         if ((result = instruction_array_normalise_flat_constants(program)) < 0)
