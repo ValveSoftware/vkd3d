@@ -2960,6 +2960,8 @@ static enum vkd3d_result sm6_parser_constants_init(struct sm6_parser *sm6, const
 
             default:
                 FIXME("Unhandled constant code %u.\n", record->code);
+                vkd3d_shader_parser_error(&sm6->p, VKD3D_SHADER_ERROR_DXIL_INVALID_OPERAND,
+                        "Constant code %u is unhandled.", record->code);
                 dst->u.reg.type = VKD3DSPR_UNDEF;
                 break;
         }
