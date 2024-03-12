@@ -64,6 +64,53 @@ if(sm>=4 & sm<6) todo probe all rgba (1010101.0, 0.0, 1101001.0, 1.0)
 if(sm>=6) probe all rgba (1010101.0, 11110000.0, 1101001.0, 1.0)
 
 
+% In shader model 2.0, native compares two numbers for equality checking if (a - b)*(a - b) is
+% positive instead of |a - b|. We check if this causes some changes in behavior for very small and
+% very large numbers.
+% For large numbers the behavior is the same, even though the multiplication reaches inf, but for
+% very small ones it is not because the multiplication results in 0.
+%
+% NOTE: Seems that subnormal numbers are considered equal to zero, at least in the WARP driver.
+% Probably this is implementation dependent and deserves separate testing, so only normal numbers
+% are passed on these tests.
+[require]
+shader model >= 2.0
+shader model < 3.0
+
+[pixel shader todo(sm<4)]
+float4 a, b;
+
+float4 main() : sv_target
+{
+    return a == b;
+}
+
+[test]
+uniform 0 float4 1e-37  1e-37 1e+38  1e+38
+uniform 4 float4     0 -1e-37 1e+38 -1e+38
+todo(sm<4) draw quad
+probe all rgba (1.0, 1.0, 1.0, 0.0)
+
+
+[require]
+shader model >= 3.0
+shader model < 4.0
+
+[pixel shader todo(sm<4)]
+float4 a, b;
+
+float4 main() : sv_target
+{
+    return a == b;
+}
+
+[test]
+uniform 0 float4 1e-37  1e-37 1e+38  1e+38
+uniform 4 float4     0 -1e-37 1e+38 -1e+38
+todo(sm<4) draw quad
+probe all rgba (0.0, 0.0, 1.0, 0.0)
+
+
 [require]
 shader model >= 6.0
 
