@@ -229,10 +229,11 @@ static const struct vkd3d_shader_varying_map *find_varying_map(
     return NULL;
 }
 
-static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info)
+static enum vkd3d_result vsir_program_remap_output_signature(struct vsir_program *program,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
-    struct shader_signature *signature = &parser->program.output_signature;
+    const struct vkd3d_shader_location location = {.source_name = compile_info->source_name};
+    struct shader_signature *signature = &program->output_signature;
     const struct vkd3d_shader_varying_map_info *varying_map;
     unsigned int i;
 
@@ -254,7 +255,7 @@ static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *pars
              * location with a different mask. */
             if (input_mask && input_mask != e->mask)
             {
-                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: "
                         "Output mask %#x does not match input mask %#x.",
                         e->mask, input_mask);
@@ -271,7 +272,7 @@ static enum vkd3d_result remap_output_signature(struct vkd3d_shader_parser *pars
     {
         if (varying_map->varying_map[i].output_signature_index >= signature->element_count)
         {
-            vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+            vkd3d_shader_error(message_context, &location, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                     "Aborting due to not yet implemented feature: "
                     "The next stage consumes varyings not written by this stage.");
             return VKD3D_ERROR_NOT_IMPLEMENTED;
@@ -3918,6 +3919,7 @@ static enum vkd3d_result vsir_cfg_generate_synthetic_loop_intervals(struct vsir_
 enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         const struct vkd3d_shader_compile_info *compile_info)
 {
+    struct vkd3d_shader_message_context *message_context = parser->message_context;
     struct vsir_program *program = &parser->program;
     enum vkd3d_result result = VKD3D_OK;
 
@@ -3936,7 +3938,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
         if ((result = vsir_program_materialise_ssas_to_temps(program)) < 0)
             return result;
 
-        if ((result = vsir_cfg_init(&cfg, program, parser->message_context)) < 0)
+        if ((result = vsir_cfg_init(&cfg, program, message_context)) < 0)
             return result;
 
         vsir_cfg_compute_dominators(&cfg);
@@ -3971,7 +3973,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     {
         if (program->shader_version.type != VKD3D_SHADER_TYPE_PIXEL)
         {
-            if ((result = remap_output_signature(parser, compile_info)) < 0)
+            if ((result = vsir_program_remap_output_signature(program, compile_info, message_context)) < 0)
                 return result;
         }
 
