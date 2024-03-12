@@ -1,0 +1,135 @@
+[require]
+shader model >= 5.0
+
+[uav 1]
+format r32 uint
+size (buffer, 4)
+
+1 0 0 0
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u1);
+groupshared uint m;
+
+    [numthreads(32, 1, 1)]
+void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
+{
+    if (!local_idx)
+        m = group_id.x;
+    GroupMemoryBarrierWithGroupSync();
+    InterlockedAdd(m, group_id.x);
+    GroupMemoryBarrierWithGroupSync();
+    if (!local_idx)
+        u.Store(4 * group_id.x, m);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) rui (0)
+probe uav 1 (1) rui (33)
+probe uav 1 (2) rui (66)
+probe uav 1 (3) rui (99)
+
+
+[uav 1]
+format r32 sint
+size (buffer, 4)
+
+1 0 0 0
+
+[compute shader todo]
+RWByteAddressBuffer u : register(u1);
+groupshared int m;
+
+    [numthreads(32, 1, 1)]
+void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID)
+{
+    if (!local_idx)
+        m = group_id.x;
+    GroupMemoryBarrierWithGroupSync();
+    InterlockedAdd(m, -group_id.x);
+    GroupMemoryBarrierWithGroupSync();
+    if (!local_idx)
+        u.Store(4 * group_id.x, m);
+}
+
+[test]
+todo dispatch 4 1 1
+probe uav 1 (0) ri (0)
+probe uav 1 (1) ri (-31)
+probe uav 1 (2) ri (-62)
+probe uav 1 (3) ri (-93)
+
+
+[uav 1]
+format r32 float
+size (buffer, 8)
+
+1 1 1 1 0 0 0 0
+
+[uav 2]
+format r32 sint
+size (buffer, 8)
+
+1 1 1 1 0 0 0 0
+
+[compute shader todo]
+uniform uint idx;
+
+#define GROUP_SIZE 4
+
+struct data
+{
+    float f;
+    uint u;
+};
+
+RWBuffer<float> u : register(u1);
+RWBuffer<uint> u2 : register(u2);
+groupshared data m[GROUP_SIZE];
+
+    [numthreads(GROUP_SIZE, 1, 1)]
+void main(uint local_idx : SV_GroupIndex, uint group_id : SV_GroupID,
+        uint thread_id : SV_DispatchThreadID)
+{
+    uint i;
+    if (!local_idx)
+    {
+        for (i = 0; i < GROUP_SIZE; ++i)
+        {
+            m[i].f = group_id.x;
+            m[i].u = group_id.x;
+        }
+    }
+    GroupMemoryBarrierWithGroupSync();
+    InterlockedAdd(m[0].u, 2);
+    InterlockedAdd(m[idx].u, 1);
+    GroupMemoryBarrierWithGroupSync();
+    for (i = 0; i < local_idx; ++i)
+    {
+        m[local_idx].f += group_id.x;
+        m[local_idx].u += group_id.x;
+    }
+    u[thread_id.x] = m[local_idx].f;
+    u2[thread_id.x] = m[local_idx].u;
+}
+
+[test]
+uniform 0 uint 1
+todo dispatch 2 1 1
+probe uav 1 (0)  r (0.0)
+probe uav 1 (1)  r (0.0)
+probe uav 1 (2)  r (0.0)
+probe uav 1 (3)  r (0.0)
+probe uav 1 (4)  r (1.0)
+probe uav 1 (5)  r (2.0)
+probe uav 1 (6)  r (3.0)
+probe uav 1 (7)  r (4.0)
+probe uav 2 (0)  ri (8)
+probe uav 2 (1)  ri (4)
+probe uav 2 (2)  ri (0)
+probe uav 2 (3)  ri (0)
+probe uav 2 (4)  ri (9)
+probe uav 2 (5)  ri (6)
+probe uav 2 (6)  ri (3)
+probe uav 2 (7)  ri (4)

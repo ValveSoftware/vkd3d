@@ -200,6 +200,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/texture-load-typed.shader_test \
 	tests/hlsl/texture-load.shader_test \
 	tests/hlsl/texture-ordering.shader_test \
+	tests/hlsl/tgsm.shader_test \
 	tests/hlsl/transpose.shader_test \
 	tests/hlsl/trigonometry.shader_test \
 	tests/hlsl/trunc.shader_test \
