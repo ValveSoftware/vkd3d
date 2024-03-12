@@ -183,7 +183,7 @@ EOF
 details=$(awk "$awk_program" "$log_file")
 
 # Count number of [XF] tags.
-xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{print count}')
+xfcount=$(echo "$details" | awk '/\[XF\]/{count++} END{printf "%d", count}')
 
 details=$(echo "$details" |\
     sed "s/\[F\]/$color_bright_red[F]$color_reset/g" |\
@@ -197,7 +197,7 @@ details=$(echo "$details" |\
     awk 'NF != 1' )
 
 # If the test passes but has [XF], we will omit details but report number of [XF]
-if [ "$res" = "PASS" ] && [ $xfcount > 0 ]; then
+if [ "$res" = "PASS" ] && [ "$xfcount" -gt 0 ]; then
   details="$color_yellow($xfcount XF)$color_reset"
 fi
 
