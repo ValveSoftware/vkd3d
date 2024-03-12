@@ -1792,10 +1792,10 @@ struct cf_flattener_info
 
 struct cf_flattener
 {
-    struct vkd3d_shader_parser *parser;
+    struct vsir_program *program;
 
     struct vkd3d_shader_location location;
-    bool allocation_failed;
+    enum vkd3d_result status;
 
     struct vkd3d_shader_instruction *instructions;
     size_t instruction_capacity;
@@ -1815,13 +1815,20 @@ struct cf_flattener
     size_t control_flow_info_size;
 };
 
+static void cf_flattener_set_error(struct cf_flattener *flattener, enum vkd3d_result error)
+{
+    if (flattener->status != VKD3D_OK)
+        return;
+    flattener->status = error;
+}
+
 static struct vkd3d_shader_instruction *cf_flattener_require_space(struct cf_flattener *flattener, size_t count)
 {
     if (!vkd3d_array_reserve((void **)&flattener->instructions, &flattener->instruction_capacity,
             flattener->instruction_count + count, sizeof(*flattener->instructions)))
     {
         ERR("Failed to allocate instructions.\n");
-        flattener->allocation_failed = true;
+        cf_flattener_set_error(flattener, VKD3D_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     return &flattener->instructions[flattener->instruction_count];
@@ -1853,9 +1860,9 @@ static struct vkd3d_shader_src_param *instruction_src_params_alloc(struct vkd3d_
 {
     struct vkd3d_shader_src_param *params;
 
-    if (!(params = vsir_program_get_src_params(&flattener->parser->program, count)))
+    if (!(params = vsir_program_get_src_params(flattener->program, count)))
     {
-        flattener->allocation_failed = true;
+        cf_flattener_set_error(flattener, VKD3D_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     ins->src = params;
@@ -1869,10 +1876,10 @@ static void cf_flattener_emit_label(struct cf_flattener *flattener, unsigned int
 
     if (!(ins = cf_flattener_require_space(flattener, 1)))
         return;
-    if (vsir_instruction_init_label(ins, &flattener->location, label_id, &flattener->parser->program))
+    if (vsir_instruction_init_label(ins, &flattener->location, label_id, flattener->program))
         ++flattener->instruction_count;
     else
-        flattener->allocation_failed = true;
+        cf_flattener_set_error(flattener, VKD3D_ERROR_OUT_OF_MEMORY);
 }
 
 /* For conditional branches, this returns the false target branch parameter. */
@@ -1950,7 +1957,7 @@ static struct cf_flattener_info *cf_flattener_push_control_flow_level(struct cf_
             flattener->control_flow_depth + 1, sizeof(*flattener->control_flow_info)))
     {
         ERR("Failed to allocate control flow info structure.\n");
-        flattener->allocation_failed = true;
+        cf_flattener_set_error(flattener, VKD3D_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
 
@@ -2017,12 +2024,12 @@ static void VKD3D_PRINTF_FUNC(3, 4) cf_flattener_create_block_name(struct cf_fla
     flattener->block_names[block_id] = buffer.buffer;
 }
 
-static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener)
+static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flattener *flattener,
+        struct vkd3d_shader_message_context *message_context)
 {
     bool main_block_open, is_hull_shader, after_declarations_section;
-    struct vkd3d_shader_parser *parser = flattener->parser;
     struct vkd3d_shader_instruction_array *instructions;
-    struct vsir_program *program = &parser->program;
+    struct vsir_program *program = flattener->program;
     struct vkd3d_shader_instruction *dst_ins;
     size_t i;
 
@@ -2074,7 +2081,8 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 break;
 
             case VKD3DSIH_LABEL:
-                vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
+                vkd3d_shader_error(message_context, &instruction->location,
+                        VKD3D_SHADER_ERROR_VSIR_NOT_IMPLEMENTED,
                         "Aborting due to not yet implemented feature: Label instruction.");
                 return VKD3D_ERROR_NOT_IMPLEMENTED;
 
@@ -2239,8 +2247,10 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
                 if (src->swizzle != VKD3D_SHADER_SWIZZLE(X, X, X, X))
                 {
                     WARN("Unexpected src swizzle %#x.\n", src->swizzle);
-                    vkd3d_shader_parser_error(parser, VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE,
+                    vkd3d_shader_error(message_context, &instruction->location,
+                            VKD3D_SHADER_ERROR_VSIR_INVALID_SWIZZLE,
                             "The swizzle for a switch case value is not scalar X.");
+                    cf_flattener_set_error(flattener, VKD3D_ERROR_INVALID_SHADER);
                 }
                 value = *src->reg.u.immconst_u32;
 
@@ -2368,21 +2378,18 @@ static enum vkd3d_result cf_flattener_iterate_instruction_array(struct cf_flatte
         ++flattener->instruction_count;
     }
 
-    return flattener->allocation_failed ? VKD3D_ERROR_OUT_OF_MEMORY : VKD3D_OK;
+    return flattener->status;
 }
 
-static enum vkd3d_result flatten_control_flow_constructs(struct vkd3d_shader_parser *parser)
+static enum vkd3d_result vsir_program_flatten_control_flow_constructs(struct vsir_program *program,
+        struct vkd3d_shader_message_context *message_context)
 {
-    struct vsir_program *program = &parser->program;
-    struct cf_flattener flattener = {0};
+    struct cf_flattener flattener = {.program = program};
     enum vkd3d_result result;
 
-    flattener.parser = parser;
-    result = cf_flattener_iterate_instruction_array(&flattener);
-
-    if (result >= 0)
+    if ((result = cf_flattener_iterate_instruction_array(&flattener, message_context)) >= 0)
     {
-        vkd3d_free(parser->program.instructions.elements);
+        vkd3d_free(program->instructions.elements);
         program->instructions.elements = flattener.instructions;
         program->instructions.capacity = flattener.instruction_capacity;
         program->instructions.count = flattener.instruction_count;
@@ -4377,13 +4384,13 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
             return result;
     }
 
-    if ((result = flatten_control_flow_constructs(parser)) < 0)
+    if ((result = vsir_program_flatten_control_flow_constructs(program, message_context)) < 0)
         return result;
 
     if (TRACE_ON())
         vkd3d_shader_trace(program);
 
-    if (!parser->failed && (result = vsir_validate(parser)) < 0)
+    if ((result = vsir_validate(parser)) < 0)
         return result;
 
     if (parser->failed)
