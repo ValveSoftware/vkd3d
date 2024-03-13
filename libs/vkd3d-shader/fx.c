@@ -159,6 +159,7 @@ static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_co
         struct fx_write_context *fx)
 {
     unsigned int version = ctx->profile->major_version;
+    struct hlsl_block block;
 
     memset(fx, 0, sizeof(*fx));
 
@@ -184,6 +185,11 @@ static void fx_write_context_init(struct hlsl_ctx *ctx, const struct fx_write_co
     list_init(&fx->types);
 
     fx->child_effect = fx->ops->are_child_effects_supported && ctx->child_effect;
+
+    hlsl_block_init(&block);
+    hlsl_prepend_global_uniform_copy(fx->ctx, &block);
+    hlsl_block_cleanup(&block);
+    hlsl_calculate_buffer_offsets(fx->ctx);
 }
 
 static int fx_write_context_cleanup(struct fx_write_context *fx)
@@ -836,12 +842,6 @@ static void write_fx_4_buffer(struct hlsl_buffer *b, struct fx_write_context *fx
 static void write_buffers(struct fx_write_context *fx)
 {
     struct hlsl_buffer *buffer;
-    struct hlsl_block block;
-
-    hlsl_block_init(&block);
-    hlsl_prepend_global_uniform_copy(fx->ctx, &block);
-    hlsl_block_cleanup(&block);
-    hlsl_calculate_buffer_offsets(fx->ctx);
 
     LIST_FOR_EACH_ENTRY(buffer, &fx->ctx->buffers, struct hlsl_buffer, entry)
     {
