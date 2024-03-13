@@ -3056,6 +3056,9 @@ struct vsir_cfg
          * block), but we still try to keep `begin' as forward as
          * possible, to keep the loop scope as small as possible. */
         bool synthetic;
+        /* The number of jump instructions (both conditional and
+         * unconditional) that target this loop. */
+        unsigned int target_count;
     } *loop_intervals;
     size_t loop_interval_count, loop_interval_capacity;
 
@@ -3104,6 +3107,7 @@ static enum vkd3d_result vsir_cfg_add_loop_interval(struct vsir_cfg *cfg, unsign
     interval->begin = begin;
     interval->end = end;
     interval->synthetic = synthetic;
+    interval->target_count = 0;
 
     return VKD3D_OK;
 }
@@ -4106,13 +4110,18 @@ fail:
     return VKD3D_ERROR_OUT_OF_MEMORY;
 }
 
-static void vsir_cfg_remove_trailing_continue(struct vsir_cfg_structure_list *list, unsigned int target)
+static void vsir_cfg_remove_trailing_continue(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list, unsigned int target)
 {
     struct vsir_cfg_structure *last = &list->structures[list->count - 1];
 
     if (last->type == STRUCTURE_TYPE_JUMP && last->u.jump.type == JUMP_CONTINUE
             && !last->u.jump.condition && last->u.jump.target == target)
+    {
         --list->count;
+        assert(cfg->loop_intervals[target].target_count > 0);
+        --cfg->loop_intervals[target].target_count;
+    }
 }
 
 static struct vsir_cfg_structure *vsir_cfg_get_trailing_break(struct vsir_cfg_structure_list *list)
@@ -4143,7 +4152,8 @@ static struct vsir_cfg_structure *vsir_cfg_get_trailing_break(struct vsir_cfg_st
  * instructions are continue and continue, or continue and break. But
  * in practice I don't think those situations can happen given the
  * previous passes we do on the program, so we don't care. */
-static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg_structure_list *list)
+static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list)
 {
     struct vsir_cfg_structure *selection, *if_break, *else_break, *new_break;
     unsigned int if_target, else_target, max_target;
@@ -4166,6 +4176,7 @@ static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg_
         return VKD3D_ERROR_OUT_OF_MEMORY;
     new_break->u.jump.type = JUMP_BREAK;
     new_break->u.jump.target = max_target;
+    ++cfg->loop_intervals[max_target].target_count;
 
     /* Pointer `selection' could have been invalidated by the append
      * operation. */
@@ -4173,14 +4184,24 @@ static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg_
     assert(selection->type == STRUCTURE_TYPE_SELECTION);
 
     if (if_target == max_target)
+    {
         --selection->u.selection.if_body.count;
+        assert(cfg->loop_intervals[if_target].target_count > 0);
+        --cfg->loop_intervals[if_target].target_count;
+    }
+
     if (else_target == max_target)
+    {
         --selection->u.selection.else_body.count;
+        assert(cfg->loop_intervals[else_target].target_count > 0);
+        --cfg->loop_intervals[else_target].target_count;
+    }
 
     return VKD3D_OK;
 }
 
-static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg_structure_list *list)
+static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list)
 {
     enum vkd3d_result ret;
     size_t i;
@@ -4217,10 +4238,10 @@ static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg_structur
         *structure = new_selection;
         list->count = i + 1;
 
-        if ((ret = vsir_cfg_synthesize_selections(&structure->u.selection.else_body)) < 0)
+        if ((ret = vsir_cfg_synthesize_selections(cfg, &structure->u.selection.else_body)) < 0)
             return ret;
 
-        if ((ret = vsir_cfg_move_breaks_out_of_selections(list)) < 0)
+        if ((ret = vsir_cfg_move_breaks_out_of_selections(cfg, list)) < 0)
             return ret;
 
         break;
@@ -4247,21 +4268,53 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
         if (loop_body->count == 0)
             continue;
 
-        vsir_cfg_remove_trailing_continue(loop_body, loop->u.loop.idx);
+        vsir_cfg_remove_trailing_continue(cfg, loop_body, loop->u.loop.idx);
 
         if ((ret = vsir_cfg_optimize_recurse(cfg, loop_body)) < 0)
             return ret;
 
-        if ((ret = vsir_cfg_synthesize_selections(loop_body)) < 0)
+        if ((ret = vsir_cfg_synthesize_selections(cfg, loop_body)) < 0)
             return ret;
     }
 
     return VKD3D_OK;
 }
 
+static void vsir_cfg_count_targets(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+    {
+        struct vsir_cfg_structure *structure = &list->structures[i];
+
+        switch (structure->type)
+        {
+            case STRUCTURE_TYPE_BLOCK:
+                break;
+
+            case STRUCTURE_TYPE_LOOP:
+                vsir_cfg_count_targets(cfg, &structure->u.loop.body);
+                break;
+
+            case STRUCTURE_TYPE_SELECTION:
+                vsir_cfg_count_targets(cfg, &structure->u.selection.if_body);
+                vsir_cfg_count_targets(cfg, &structure->u.selection.else_body);
+                break;
+
+            case STRUCTURE_TYPE_JUMP:
+                if (structure->u.jump.type == JUMP_BREAK || structure->u.jump.type == JUMP_CONTINUE)
+                    ++cfg->loop_intervals[structure->u.jump.target].target_count;
+                break;
+        }
+    }
+}
+
 static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
 {
     enum vkd3d_result ret;
+
+    vsir_cfg_count_targets(cfg, &cfg->structured_program);
 
     ret = vsir_cfg_optimize_recurse(cfg, &cfg->structured_program);
 
