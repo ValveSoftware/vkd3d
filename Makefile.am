@@ -205,6 +205,7 @@ vkd3d_shader_tests = \
 	tests/hlsl/trunc.shader_test \
 	tests/hlsl/type-names.shader_test \
 	tests/hlsl/uav-atomics.shader_test \
+	tests/hlsl/uav-counter.shader_test \
 	tests/hlsl/uav-load.shader_test \
 	tests/hlsl/uav-out-param.shader_test \
 	tests/hlsl/uav-rwbuffer.shader_test \

@@ -481,6 +481,15 @@ static void parse_resource_directive(struct resource_params *resource, const cha
             resource->dimension = RESOURCE_DIMENSION_BUFFER;
             resource->height = 1;
         }
+        else if (sscanf(line, "( counter_buffer , %u ) ", &resource->width) == 1)
+        {
+            resource->dimension = RESOURCE_DIMENSION_BUFFER;
+            resource->height = 1;
+            resource->is_uav_counter = true;
+            resource->stride = sizeof(uint32_t);
+            resource->texel_size = resource->stride;
+            resource->format = DXGI_FORMAT_UNKNOWN;
+        }
         else if (sscanf(line, "( 2d , %u , %u ) ", &resource->width, &resource->height) == 2)
         {
             resource->dimension = RESOURCE_DIMENSION_2D;

@@ -49,6 +49,7 @@ struct d3d11_resource
     ID3D11RenderTargetView *rtv;
     ID3D11ShaderResourceView *srv;
     ID3D11UnorderedAccessView *uav;
+    bool is_uav_counter;
 };
 
 static struct d3d11_resource *d3d11_resource(struct resource *r)
@@ -438,12 +439,13 @@ static void init_resource_uav_buffer(struct d3d11_shader_runner *runner, struct 
 
     resource->buffer = create_buffer(device, D3D11_BIND_UNORDERED_ACCESS, params->data_size, params->stride, params->data);
     resource->resource = (ID3D11Resource *)resource->buffer;
+    resource->is_uav_counter = params->is_uav_counter;
 
     uav_desc.Format = params->format;
     uav_desc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
     uav_desc.Buffer.FirstElement = 0;
     uav_desc.Buffer.NumElements = params->data_size / params->texel_size;
-    uav_desc.Buffer.Flags = 0;
+    uav_desc.Buffer.Flags = params->is_uav_counter ? D3D11_BUFFER_UAV_FLAG_COUNTER : 0;
     hr = ID3D11Device_CreateUnorderedAccessView(device, resource->resource, &uav_desc, &resource->uav);
     ok(hr == S_OK, "Failed to create view, hr %#lx.\n", hr);
 }
@@ -754,7 +756,10 @@ static struct resource_readback *d3d11_runner_get_resource_readback(struct shade
             assert(0);
     }
 
-    ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, resource->resource);
+    if (resource->is_uav_counter)
+        ID3D11DeviceContext_CopyStructureCount(runner->immediate_context, (ID3D11Buffer *)rb->resource, 0, resource->uav);
+    else
+        ID3D11DeviceContext_CopyResource(runner->immediate_context, rb->resource, resource->resource);
     hr = ID3D11DeviceContext_Map(runner->immediate_context, rb->resource, 0, D3D11_MAP_READ, 0, &map_desc);
     ok(hr == S_OK, "Failed to map texture, hr %#lx.\n", hr);
 

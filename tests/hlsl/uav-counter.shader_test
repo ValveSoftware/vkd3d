@@ -1,0 +1,39 @@
+[require]
+shader model >= 5.0
+
+[uav 1]
+format r32 uint
+size (counter_buffer, 1)
+0
+
+[compute shader todo]
+RWStructuredBuffer<uint> u : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main()
+{
+    u.IncrementCounter();
+}
+
+[test]
+todo dispatch 3 1 1
+probe uav 1 (0) rui (12)
+
+
+[uav 1]
+format r32 sint
+size (counter_buffer, 1)
+0
+
+[compute shader todo]
+RWStructuredBuffer<int> u : register(u1);
+
+    [numthreads(4, 1, 1)]
+void main()
+{
+    u.DecrementCounter();
+}
+
+[test]
+todo dispatch 3 1 1
+probe uav 1 (0) ri (-12)

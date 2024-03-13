@@ -203,7 +203,8 @@ static struct resource *d3d12_runner_create_resource(struct shader_runner *r, co
                 uav_desc.Buffer.StructureByteStride = params->stride;
 
                 ID3D12Device_CreateUnorderedAccessView(device, resource->resource,
-                        NULL, &uav_desc, get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
+                        params->is_uav_counter ? resource->resource : NULL, &uav_desc,
+                        get_cpu_descriptor_handle(test_context, runner->heap, resource->r.slot + MAX_RESOURCES));
             }
             else
             {
