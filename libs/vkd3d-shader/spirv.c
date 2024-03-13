@@ -7020,6 +7020,15 @@ static enum vkd3d_result spirv_compiler_emit_alu_instruction(struct spirv_compil
     SpvOp op = SpvOpMax;
     unsigned int i;
 
+    if (src->reg.data_type == VKD3D_DATA_UINT64 && instruction->handler_idx == VKD3DSIH_COUNTBITS)
+    {
+        /* At least some drivers support this anyway, but if validation is enabled it will fail. */
+        FIXME("Unsupported 64-bit source for bit count.\n");
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "64-bit source for bit count is not supported.");
+        return VKD3D_ERROR_INVALID_SHADER;
+    }
+
     if (src->reg.data_type == VKD3D_DATA_BOOL)
     {
         if (dst->reg.data_type == VKD3D_DATA_BOOL)
