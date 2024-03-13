@@ -2726,7 +2726,7 @@ int vkd3d_shader_sm4_parser_create(const struct vkd3d_shader_compile_info *compi
         shader_sm4_validate_default_phase_index_ranges(sm4);
 
     if (!sm4->p.failed)
-        vsir_validate(&sm4->p);
+        vkd3d_shader_parser_validate(&sm4->p);
 
     if (sm4->p.failed)
     {

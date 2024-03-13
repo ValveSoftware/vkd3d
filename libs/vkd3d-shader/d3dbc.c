@@ -1358,7 +1358,7 @@ int vkd3d_shader_sm1_parser_create(const struct vkd3d_shader_compile_info *compi
         sm1->p.shader_desc.flat_constant_count[i].external = get_external_constant_count(sm1, i);
 
     if (!sm1->p.failed)
-        ret = vsir_validate(&sm1->p);
+        ret = vkd3d_shader_parser_validate(&sm1->p);
 
     if (sm1->p.failed && ret >= 0)
         ret = VKD3D_ERROR_INVALID_SHADER;

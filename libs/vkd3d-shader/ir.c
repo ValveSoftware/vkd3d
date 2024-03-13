@@ -4390,21 +4390,21 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (TRACE_ON())
         vkd3d_shader_trace(program);
 
-    if ((result = vsir_validate(parser)) < 0)
+    if ((result = vsir_program_validate(program, parser->config_flags,
+            compile_info->source_name, message_context)) < 0)
         return result;
-
-    if (parser->failed)
-        result = VKD3D_ERROR_INVALID_SHADER;
 
     return result;
 }
 
 struct validation_context
 {
-    struct vkd3d_shader_parser *parser;
+    struct vkd3d_shader_message_context *message_context;
     const struct vsir_program *program;
     size_t instruction_idx;
+    struct vkd3d_shader_location null_location;
     bool invalid_instruction_idx;
+    enum vkd3d_result status;
     bool dcl_temps_found;
     enum vkd3d_shader_opcode phase;
     enum cf_type
@@ -4450,16 +4450,21 @@ static void VKD3D_PRINTF_FUNC(3, 4) validator_error(struct validation_context *c
 
     if (ctx->invalid_instruction_idx)
     {
-        vkd3d_shader_parser_error(ctx->parser, error, "%s", buf.buffer);
+        vkd3d_shader_error(ctx->message_context, &ctx->null_location, error, "%s", buf.buffer);
         ERR("VSIR validation error: %s\n", buf.buffer);
     }
     else
     {
-        vkd3d_shader_parser_error(ctx->parser, error, "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
+        const struct vkd3d_shader_instruction *ins = &ctx->program->instructions.elements[ctx->instruction_idx];
+        vkd3d_shader_error(ctx->message_context, &ins->location, error,
+                "instruction %zu: %s", ctx->instruction_idx + 1, buf.buffer);
         ERR("VSIR validation error: instruction %zu: %s\n", ctx->instruction_idx + 1, buf.buffer);
     }
 
     vkd3d_string_buffer_cleanup(&buf);
+
+    if (!ctx->status)
+        ctx->status = VKD3D_ERROR_INVALID_SHADER;
 }
 
 static void vsir_validate_src_param(struct validation_context *ctx,
@@ -4513,10 +4518,10 @@ static void vsir_validate_register(struct validation_context *ctx,
             if (reg->idx[0].rel_addr)
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "Non-NULL relative address for a TEMP register.");
 
-            if (reg->idx[0].offset >= ctx->parser->program.temp_count)
+            if (reg->idx[0].offset >= ctx->program->temp_count)
             {
                 validator_error(ctx, VKD3D_SHADER_ERROR_VSIR_INVALID_INDEX, "TEMP register index %u exceeds the maximum count %u.",
-                        reg->idx[0].offset, ctx->parser->program.temp_count);
+                        reg->idx[0].offset, ctx->program->temp_count);
                 break;
             }
 
@@ -4706,7 +4711,7 @@ static void vsir_validate_dst_param(struct validation_context *ctx,
     switch (dst->reg.type)
     {
         case VKD3DSPR_SSA:
-            if (dst->reg.idx[0].offset < ctx->parser->program.ssa_count)
+            if (dst->reg.idx[0].offset < ctx->program->ssa_count)
             {
                 struct validation_context_ssa_data *data = &ctx->ssas[dst->reg.idx[0].offset];
 
@@ -4759,7 +4764,7 @@ static void vsir_validate_src_param(struct validation_context *ctx,
     switch (src->reg.type)
     {
         case VKD3DSPR_SSA:
-            if (src->reg.idx[0].offset < ctx->parser->program.ssa_count)
+            if (src->reg.idx[0].offset < ctx->program->ssa_count)
             {
                 struct validation_context_ssa_data *data = &ctx->ssas[src->reg.idx[0].offset];
                 unsigned int i;
@@ -4850,7 +4855,6 @@ static void vsir_validate_instruction(struct validation_context *ctx)
     size_t i;
 
     instruction = &ctx->program->instructions.elements[ctx->instruction_idx];
-    ctx->parser->location = instruction->location;
 
     for (i = 0; i < instruction->dst_count; ++i)
         vsir_validate_dst_param(ctx, &instruction->dst[i]);
@@ -5201,17 +5205,20 @@ static void vsir_validate_instruction(struct validation_context *ctx)
     }
 }
 
-enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
+enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,
+        const char *source_name, struct vkd3d_shader_message_context *message_context)
 {
     struct validation_context ctx =
     {
-        .parser = parser,
-        .program = &parser->program,
+        .message_context = message_context,
+        .program = program,
+        .null_location = {.source_name = source_name},
+        .status = VKD3D_OK,
         .phase = VKD3DSIH_INVALID,
     };
     unsigned int i;
 
-    if (!(parser->config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
+    if (!(config_flags & VKD3D_SHADER_CONFIG_FLAG_FORCE_VALIDATION))
         return VKD3D_OK;
 
     if (!(ctx.temps = vkd3d_calloc(ctx.program->temp_count, sizeof(*ctx.temps))))
@@ -5220,7 +5227,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     if (!(ctx.ssas = vkd3d_calloc(ctx.program->ssa_count, sizeof(*ctx.ssas))))
         goto fail;
 
-    for (ctx.instruction_idx = 0; ctx.instruction_idx < parser->program.instructions.count; ++ctx.instruction_idx)
+    for (ctx.instruction_idx = 0; ctx.instruction_idx < program->instructions.count; ++ctx.instruction_idx)
         vsir_validate_instruction(&ctx);
 
     ctx.invalid_instruction_idx = true;
@@ -5245,7 +5252,7 @@ enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser)
     vkd3d_free(ctx.temps);
     vkd3d_free(ctx.ssas);
 
-    return VKD3D_OK;
+    return ctx.status;
 
 fail:
     vkd3d_free(ctx.blocks);

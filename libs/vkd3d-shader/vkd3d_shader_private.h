@@ -814,6 +814,8 @@ enum vkd3d_shader_type
     VKD3D_SHADER_TYPE_COUNT,
 };
 
+struct vkd3d_shader_message_context;
+
 struct vkd3d_shader_version
 {
     enum vkd3d_shader_type type;
@@ -1319,6 +1321,8 @@ struct vsir_program
 
 bool vsir_program_init(struct vsir_program *program, const struct vkd3d_shader_version *version, unsigned int reserve);
 void vsir_program_cleanup(struct vsir_program *program);
+enum vkd3d_result vsir_program_validate(struct vsir_program *program, uint64_t config_flags,
+        const char *source_name, struct vkd3d_shader_message_context *message_context);
 
 static inline struct vkd3d_shader_dst_param *vsir_program_get_dst_params(
         struct vsir_program *program, unsigned int count)
@@ -1362,6 +1366,12 @@ void vkd3d_shader_parser_warning(struct vkd3d_shader_parser *parser,
 static inline void vkd3d_shader_parser_destroy(struct vkd3d_shader_parser *parser)
 {
     parser->ops->parser_destroy(parser);
+}
+
+static inline enum vkd3d_result vkd3d_shader_parser_validate(struct vkd3d_shader_parser *parser)
+{
+    return vsir_program_validate(&parser->program, parser->config_flags,
+            parser->location.source_name, parser->message_context);
 }
 
 struct vkd3d_shader_descriptor_info1
@@ -1526,8 +1536,6 @@ int preproc_lexer_parse(const struct vkd3d_shader_compile_info *compile_info,
 
 int hlsl_compile_shader(const struct vkd3d_shader_code *hlsl, const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, struct vkd3d_shader_message_context *message_context);
-
-enum vkd3d_result vsir_validate(struct vkd3d_shader_parser *parser);
 
 static inline enum vkd3d_shader_component_type vkd3d_component_type_from_data_type(
         enum vkd3d_data_type data_type)
