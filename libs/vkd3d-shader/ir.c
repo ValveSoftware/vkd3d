@@ -4250,8 +4250,64 @@ static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg *cfg,
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_cfg_append_loop(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *new_list, struct vsir_cfg_structure *loop)
+{
+    struct vsir_cfg_structure_list *loop_body = &loop->u.loop.body;
+    unsigned int target, loop_idx = loop->u.loop.idx;
+    struct vsir_cfg_structure *trailing_break;
+    enum vkd3d_result ret;
+
+    trailing_break = vsir_cfg_get_trailing_break(loop_body);
+
+    /* If the loop's last instruction is not a break, we cannot remove
+     * the loop itself. */
+    if (!trailing_break)
+    {
+        if ((ret = vsir_cfg_structure_list_append_from_region(new_list, loop, 1)) < 0)
+            return ret;
+        memset(loop, 0, sizeof(*loop));
+        return VKD3D_OK;
+    }
+
+    target = trailing_break->u.jump.target;
+    assert(cfg->loop_intervals[target].target_count > 0);
+
+    /* If the loop is not targeted by any jump, we can remove it. The
+     * trailing `break' then targets another loop, so we have to keep
+     * it. */
+    if (cfg->loop_intervals[loop_idx].target_count == 0)
+    {
+        if ((ret = vsir_cfg_structure_list_append_from_region(new_list,
+                &loop_body->structures[0], loop_body->count)) < 0)
+            return ret;
+        loop_body->count = 0;
+        return VKD3D_OK;
+    }
+
+    /* If the loop is targeted only by its own trailing `break'
+     * instruction, then we can remove it together with the `break'
+     * itself. */
+    if (target == loop_idx && cfg->loop_intervals[loop_idx].target_count == 1)
+    {
+        --cfg->loop_intervals[loop_idx].target_count;
+        if ((ret = vsir_cfg_structure_list_append_from_region(new_list,
+                &loop_body->structures[0], loop_body->count - 1)) < 0)
+            return ret;
+        loop_body->count = 0;
+        return VKD3D_OK;
+    }
+
+    if ((ret = vsir_cfg_structure_list_append_from_region(new_list, loop, 1)) < 0)
+        return ret;
+    memset(loop, 0, sizeof(*loop));
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
 {
+    struct vsir_cfg_structure_list new_list = {0};
     enum vkd3d_result ret;
     size_t i;
 
@@ -4261,23 +4317,44 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
         struct vsir_cfg_structure_list *loop_body;
 
         if (loop->type != STRUCTURE_TYPE_LOOP)
+        {
+            if ((ret = vsir_cfg_structure_list_append_from_region(&new_list, loop, 1)) < 0)
+                goto fail;
+            memset(loop, 0, sizeof(*loop));
             continue;
+        }
 
         loop_body = &loop->u.loop.body;
 
         if (loop_body->count == 0)
+        {
+            if ((ret = vsir_cfg_structure_list_append_from_region(&new_list, loop, 1)) < 0)
+                goto fail;
+            memset(loop, 0, sizeof(*loop));
             continue;
+        }
 
         vsir_cfg_remove_trailing_continue(cfg, loop_body, loop->u.loop.idx);
 
         if ((ret = vsir_cfg_optimize_recurse(cfg, loop_body)) < 0)
-            return ret;
+            goto fail;
 
         if ((ret = vsir_cfg_synthesize_selections(cfg, loop_body)) < 0)
-            return ret;
+            goto fail;
+
+        if ((ret = vsir_cfg_append_loop(cfg, &new_list, loop)) < 0)
+            goto fail;
     }
 
+    vsir_cfg_structure_list_cleanup(list);
+    *list = new_list;
+
     return VKD3D_OK;
+
+fail:
+    vsir_cfg_structure_list_cleanup(list);
+
+    return ret;
 }
 
 static void vsir_cfg_count_targets(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
