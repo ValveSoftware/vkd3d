@@ -23171,6 +23171,7 @@ static void test_cs_uav_store(void)
 
         ID3D12GraphicsCommandList_ClearUnorderedAccessViewFloat(command_list,
                 gpu_descriptor_handle, cpu_descriptor_handle, resource, zero, 0, NULL);
+        uav_barrier(command_list, resource);
 
         ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
         ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
@@ -23200,6 +23201,7 @@ static void test_cs_uav_store(void)
 
     ID3D12GraphicsCommandList_ClearUnorderedAccessViewFloat(command_list,
             gpu_descriptor_handle, cpu_descriptor_handle, resource, zero, 0, NULL);
+    uav_barrier(command_list, resource);
     ID3D12GraphicsCommandList_SetPipelineState(command_list, pipeline_state);
     ID3D12GraphicsCommandList_SetComputeRootSignature(command_list, root_signature);
     ID3D12GraphicsCommandList_SetComputeRootConstantBufferView(command_list, 1,
