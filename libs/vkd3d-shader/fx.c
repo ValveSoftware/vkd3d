@@ -811,12 +811,13 @@ static const struct fx_write_context_ops fx_2_ops =
 
 static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
 {
-    uint32_t offset, size, technique_count, parameter_count;
+    uint32_t offset, size, technique_count, parameter_count, object_count;
     struct vkd3d_bytecode_buffer buffer = { 0 };
     struct vkd3d_bytecode_buffer *structured;
     struct fx_write_context fx;
 
     fx_write_context_init(ctx, &fx_2_ops, &fx);
+    fx.object_variable_count = 1;
     structured = &fx.structured;
 
     /* First entry is always zeroed and skipped. */
@@ -828,10 +829,11 @@ static int hlsl_fx_2_write(struct hlsl_ctx *ctx, struct vkd3d_shader_code *out)
     parameter_count = put_u32(structured, 0); /* Parameter count */
     technique_count = put_u32(structured, 0);
     put_u32(structured, 0); /* Unknown */
-    put_u32(structured, 0); /* Object count */
+    object_count = put_u32(structured, 0);
 
     write_fx_2_parameters(&fx);
     set_u32(structured, parameter_count, fx.parameter_count);
+    set_u32(structured, object_count, fx.object_variable_count);
 
     write_techniques(ctx->globals, &fx);
     set_u32(structured, technique_count, fx.technique_count);
