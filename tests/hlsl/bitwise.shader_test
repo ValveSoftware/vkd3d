@@ -161,6 +161,25 @@ float4 main() : SV_TARGET
 draw quad
 probe all rgba (0.0, 1.0, 1.0, 0.0)
 
+[pixel shader todo]
+uint u;
+int i;
+
+uint4 main() : sv_target
+{
+    return uint4(countbits(u), firstbitlow(u), firstbithigh(u), firstbithigh(i));
+}
+
+[test]
+uniform 0 uint4 0 0 0 0
+todo(sm<6) draw quad
+probe all rgbaui (0, 0xffffffff, 0xffffffff, 0xffffffff)
+uniform 0 uint4 0xffffffff 0xffffffff 0 0
+todo(sm<6) draw quad
+probe all rgbaui (32, 0, 31, 0xffffffff)
+uniform 0 uint4 0xcccccccc 0xcccccccc 0 0
+todo(sm<6) draw quad
+probe all rgbaui (16, 2, 31, 29)
 
 [require]
 shader model >= 6.0
@@ -245,3 +264,23 @@ float4 main() : sv_target
 uniform 0 uint64_t2 0x300000000 0x500000000
 draw quad
 probe all rgba (25769803776.0, 4294967296.0, 30064771072.0, 1.844674404e19) 1
+
+[pixel shader]
+uint64_t u;
+int64_t i;
+
+uint4 main() : sv_target
+{
+    return uint4(0, firstbitlow(u), firstbithigh(u), firstbithigh(i));
+}
+
+[test]
+uniform 0 uint64_t2 0 0
+todo draw quad
+probe all rgbaui (0, 0xffffffff, 0xffffffff, 0xffffffff)
+uniform 0 int64_t2 -1 -1
+todo draw quad
+probe all rgbaui (64, 0, 63, 0xffffffff)
+uniform 0 uint64_t2 0xcccccccccccccccc 0xcccccccccccccccc
+todo draw quad
+probe all rgbaui (32, 2, 63, 61)
