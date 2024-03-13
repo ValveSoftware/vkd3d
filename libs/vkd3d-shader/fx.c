@@ -840,7 +840,7 @@ static void write_buffers(struct fx_write_context *fx)
 
     hlsl_block_init(&block);
     hlsl_prepend_global_uniform_copy(fx->ctx, &block);
-    hlsl_block_init(&block);
+    hlsl_block_cleanup(&block);
     hlsl_calculate_buffer_offsets(fx->ctx);
 
     LIST_FOR_EACH_ENTRY(buffer, &fx->ctx->buffers, struct hlsl_buffer, entry)
