@@ -4115,6 +4115,71 @@ static void vsir_cfg_remove_trailing_continue(struct vsir_cfg_structure_list *li
         --list->count;
 }
 
+static struct vsir_cfg_structure *vsir_cfg_get_trailing_break(struct vsir_cfg_structure_list *list)
+{
+    struct vsir_cfg_structure *structure;
+    size_t count = list->count;
+
+    if (count == 0)
+        return NULL;
+
+    structure = &list->structures[count - 1];
+
+    if (structure->type != STRUCTURE_TYPE_JUMP || structure->u.jump.type != JUMP_BREAK
+            || structure->u.jump.condition)
+        return NULL;
+
+    return structure;
+}
+
+/* When the last instruction in both branches of a selection construct
+ * is an unconditional break, any of them can be moved after the
+ * selection construct. If they break the same loop both of them can
+ * be moved out, otherwise we can choose which one: we choose the one
+ * that breaks the innermost loop, because we hope to eventually
+ * remove the loop itself.
+ *
+ * In principle a similar movement could be done when the last
+ * instructions are continue and continue, or continue and break. But
+ * in practice I don't think those situations can happen given the
+ * previous passes we do on the program, so we don't care. */
+static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg_structure_list *list)
+{
+    struct vsir_cfg_structure *selection, *if_break, *else_break, *new_break;
+    unsigned int if_target, else_target, max_target;
+    size_t pos = list->count - 1;
+
+    selection = &list->structures[pos];
+    assert(selection->type == STRUCTURE_TYPE_SELECTION);
+
+    if_break = vsir_cfg_get_trailing_break(&selection->u.selection.if_body);
+    else_break = vsir_cfg_get_trailing_break(&selection->u.selection.else_body);
+
+    if (!if_break || !else_break)
+        return VKD3D_OK;
+
+    if_target = if_break->u.jump.target;
+    else_target = else_break->u.jump.target;
+    max_target = max(if_target, else_target);
+
+    if (!(new_break = vsir_cfg_structure_list_append(list, STRUCTURE_TYPE_JUMP)))
+        return VKD3D_ERROR_OUT_OF_MEMORY;
+    new_break->u.jump.type = JUMP_BREAK;
+    new_break->u.jump.target = max_target;
+
+    /* Pointer `selection' could have been invalidated by the append
+     * operation. */
+    selection = &list->structures[pos];
+    assert(selection->type == STRUCTURE_TYPE_SELECTION);
+
+    if (if_target == max_target)
+        --selection->u.selection.if_body.count;
+    if (else_target == max_target)
+        --selection->u.selection.else_body.count;
+
+    return VKD3D_OK;
+}
+
 static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg_structure_list *list)
 {
     enum vkd3d_result ret;
@@ -4153,6 +4218,9 @@ static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg_structur
         list->count = i + 1;
 
         if ((ret = vsir_cfg_synthesize_selections(&structure->u.selection.else_body)) < 0)
+            return ret;
+
+        if ((ret = vsir_cfg_move_breaks_out_of_selections(list)) < 0)
             return ret;
 
         break;
