@@ -7169,6 +7169,16 @@ static void spirv_compiler_emit_ext_glsl_instruction(struct spirv_compiler *comp
     unsigned int i, component_count;
     enum GLSLstd450 glsl_inst;
 
+    if (src[0].reg.data_type == VKD3D_DATA_UINT64 && (instruction->handler_idx == VKD3DSIH_FIRSTBIT_HI
+            || instruction->handler_idx == VKD3DSIH_FIRSTBIT_LO || instruction->handler_idx == VKD3DSIH_FIRSTBIT_SHI))
+    {
+        /* At least some drivers support this anyway, but if validation is enabled it will fail. */
+        FIXME("Unsupported 64-bit source for handler %#x.\n", instruction->handler_idx);
+        spirv_compiler_error(compiler, VKD3D_SHADER_ERROR_SPV_NOT_IMPLEMENTED,
+                "64-bit source for handler %#x is not supported.", instruction->handler_idx);
+        return;
+    }
+
     glsl_inst = spirv_compiler_map_ext_glsl_instruction(instruction);
     if (glsl_inst == GLSLstd450Bad)
     {
