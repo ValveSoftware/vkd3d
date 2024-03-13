@@ -4393,11 +4393,9 @@ fail:
     return ret;
 }
 
-enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
-        const struct vkd3d_shader_compile_info *compile_info)
+enum vkd3d_result vsir_program_normalise(struct vsir_program *program, uint64_t config_flags,
+        const struct vkd3d_shader_compile_info *compile_info, struct vkd3d_shader_message_context *message_context)
 {
-    struct vkd3d_shader_message_context *message_context = parser->message_context;
-    struct vsir_program *program = &parser->program;
     enum vkd3d_result result = VKD3D_OK;
 
     remove_dcl_temps(program);
@@ -4488,7 +4486,7 @@ enum vkd3d_result vkd3d_shader_normalise(struct vkd3d_shader_parser *parser,
     if (TRACE_ON())
         vkd3d_shader_trace(program);
 
-    if ((result = vsir_program_validate(program, parser->config_flags,
+    if ((result = vsir_program_validate(program, config_flags,
             compile_info->source_name, message_context)) < 0)
         return result;
 
