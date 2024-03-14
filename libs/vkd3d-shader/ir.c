@@ -4307,19 +4307,21 @@ static enum vkd3d_result vsir_cfg_append_loop(struct vsir_cfg *cfg,
 
 static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list)
 {
-    struct vsir_cfg_structure_list new_list = {0};
+    struct vsir_cfg_structure_list old_list = *list, *new_list = list;
     enum vkd3d_result ret;
     size_t i;
 
-    for (i = 0; i < list->count; ++i)
+    memset(new_list, 0, sizeof(*new_list));
+
+    for (i = 0; i < old_list.count; ++i)
     {
-        struct vsir_cfg_structure *loop = &list->structures[i];
+        struct vsir_cfg_structure *loop = &old_list.structures[i];
         struct vsir_cfg_structure_list *loop_body;
 
         if (loop->type != STRUCTURE_TYPE_LOOP)
         {
-            if ((ret = vsir_cfg_structure_list_append_from_region(&new_list, loop, 1)) < 0)
-                goto fail;
+            if ((ret = vsir_cfg_structure_list_append_from_region(new_list, loop, 1)) < 0)
+                goto out;
             memset(loop, 0, sizeof(*loop));
             continue;
         }
@@ -4328,8 +4330,8 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
 
         if (loop_body->count == 0)
         {
-            if ((ret = vsir_cfg_structure_list_append_from_region(&new_list, loop, 1)) < 0)
-                goto fail;
+            if ((ret = vsir_cfg_structure_list_append_from_region(new_list, loop, 1)) < 0)
+                goto out;
             memset(loop, 0, sizeof(*loop));
             continue;
         }
@@ -4337,22 +4339,19 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
         vsir_cfg_remove_trailing_continue(cfg, loop_body, loop->u.loop.idx);
 
         if ((ret = vsir_cfg_optimize_recurse(cfg, loop_body)) < 0)
-            goto fail;
+            goto out;
 
         if ((ret = vsir_cfg_synthesize_selections(cfg, loop_body)) < 0)
-            goto fail;
+            goto out;
 
-        if ((ret = vsir_cfg_append_loop(cfg, &new_list, loop)) < 0)
-            goto fail;
+        if ((ret = vsir_cfg_append_loop(cfg, new_list, loop)) < 0)
+            goto out;
     }
 
-    vsir_cfg_structure_list_cleanup(list);
-    *list = new_list;
+    ret = VKD3D_OK;
 
-    return VKD3D_OK;
-
-fail:
-    vsir_cfg_structure_list_cleanup(list);
+out:
+    vsir_cfg_structure_list_cleanup(&old_list);
 
     return ret;
 }
