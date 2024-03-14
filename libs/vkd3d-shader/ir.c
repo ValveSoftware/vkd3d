@@ -4200,6 +4200,25 @@ static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg 
     return VKD3D_OK;
 }
 
+static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections_recursively(struct vsir_cfg *cfg,
+        struct vsir_cfg_structure_list *list)
+{
+    struct vsir_cfg_structure *trailing;
+
+    if (list->count == 0)
+        return VKD3D_OK;
+
+    trailing = &list->structures[list->count - 1];
+
+    if (trailing->type != STRUCTURE_TYPE_SELECTION)
+        return VKD3D_OK;
+
+    vsir_cfg_move_breaks_out_of_selections_recursively(cfg, &trailing->u.selection.if_body);
+    vsir_cfg_move_breaks_out_of_selections_recursively(cfg, &trailing->u.selection.else_body);
+
+    return vsir_cfg_move_breaks_out_of_selections(cfg, list);
+}
+
 static enum vkd3d_result vsir_cfg_synthesize_selections(struct vsir_cfg *cfg,
         struct vsir_cfg_structure_list *list)
 {
@@ -4364,7 +4383,7 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
         }
     }
 
-    ret = VKD3D_OK;
+    ret = vsir_cfg_move_breaks_out_of_selections_recursively(cfg, list);
 
 out:
     vsir_cfg_structure_list_cleanup(&old_list);
