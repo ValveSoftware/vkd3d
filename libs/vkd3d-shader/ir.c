@@ -4315,7 +4315,7 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
 
     for (i = 0; i < old_list.count; ++i)
     {
-        struct vsir_cfg_structure *loop = &old_list.structures[i];
+        struct vsir_cfg_structure *loop = &old_list.structures[i], *selection;
         struct vsir_cfg_structure_list *loop_body;
 
         if (loop->type != STRUCTURE_TYPE_LOOP)
@@ -4346,6 +4346,22 @@ static enum vkd3d_result vsir_cfg_optimize_recurse(struct vsir_cfg *cfg, struct 
 
         if ((ret = vsir_cfg_append_loop(cfg, new_list, loop)) < 0)
             goto out;
+
+        /* If the last pushed instruction is a selection and one of the branches terminates with a
+         * `break', start pushing to the other branch, in the hope of eventually push a `break'
+         * there too and be able to remove a loop. */
+        if (new_list->count == 0)
+            continue;
+
+        selection = &new_list->structures[new_list->count - 1];
+
+        if (selection->type == STRUCTURE_TYPE_SELECTION)
+        {
+            if (vsir_cfg_get_trailing_break(&selection->u.selection.if_body))
+                new_list = &selection->u.selection.else_body;
+            else if (vsir_cfg_get_trailing_break(&selection->u.selection.else_body))
+                new_list = &selection->u.selection.if_body;
+        }
     }
 
     ret = VKD3D_OK;
