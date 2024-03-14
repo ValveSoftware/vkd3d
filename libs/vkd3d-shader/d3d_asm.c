@@ -1388,8 +1388,8 @@ static void shader_print_non_uniform(struct vkd3d_d3d_asm_compiler *compiler, co
                 compiler->colours.modifier, compiler->colours.reset);
 }
 
-static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
-        const struct vkd3d_shader_register *reg)
+static void shader_print_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, const struct vkd3d_shader_register *reg, const char *suffix)
 {
     static const char *dimensions[] =
     {
@@ -1402,7 +1402,10 @@ static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
     const char *dimension;
 
     if (!(compiler->flags & VSIR_ASM_FLAG_DUMP_TYPES))
+    {
+        vkd3d_string_buffer_printf(buffer, "%s%s", prefix, suffix);
         return;
+    }
 
     if (reg->data_type == VKD3D_DATA_UNUSED)
         return;
@@ -1412,9 +1415,9 @@ static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
     else
         dimension = "??";
 
-    shader_addline(buffer, " <%s", dimension);
+    vkd3d_string_buffer_printf(buffer, "%s <%s", prefix, dimension);
     shader_dump_data_type(compiler, reg->data_type);
-    shader_addline(buffer, ">");
+    vkd3d_string_buffer_printf(buffer, ">%s", suffix);
 }
 
 static void shader_print_write_mask(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1460,8 +1463,7 @@ static void shader_print_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
 
     shader_print_precision(compiler, &param->reg);
     shader_print_non_uniform(compiler, &param->reg);
-    shader_dump_reg_type(compiler, &param->reg);
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s", suffix);
+    shader_print_reg_type(compiler, "", &param->reg, suffix);
 }
 
 static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
@@ -1552,8 +1554,7 @@ static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
 
     shader_print_precision(compiler, &param->reg);
     shader_print_non_uniform(compiler, &param->reg);
-    shader_dump_reg_type(compiler, &param->reg);
-    vkd3d_string_buffer_printf(buffer, "%s", suffix);
+    shader_print_reg_type(compiler, "", &param->reg, suffix);
 }
 
 static void shader_dump_ins_modifiers(struct vkd3d_d3d_asm_compiler *compiler,
