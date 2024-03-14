@@ -102,6 +102,11 @@ static void set_status(struct fx_write_context *fx, int status)
         fx->status = status;
 }
 
+static bool has_annotations(const struct hlsl_ir_var *var)
+{
+    return var->annotations && !list_empty(&var->annotations->vars);
+}
+
 static uint32_t write_string(const char *string, struct fx_write_context *fx)
 {
     return fx->ops->write_string(string, fx);
@@ -765,9 +770,10 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
 {
     struct vkd3d_bytecode_buffer *buffer = &fx->structured;
     uint32_t desc_offset, value_offset;
+    struct hlsl_ctx *ctx = fx->ctx;
     struct hlsl_ir_var *var;
 
-    LIST_FOR_EACH_ENTRY(var, &fx->ctx->extern_vars, struct hlsl_ir_var, extern_entry)
+    LIST_FOR_EACH_ENTRY(var, &ctx->extern_vars, struct hlsl_ir_var, extern_entry)
     {
         desc_offset = write_fx_2_parameter(var->data_type, var->name, &var->semantic, fx);
         value_offset = write_fx_2_initial_value(var, fx);
@@ -777,7 +783,8 @@ static void write_fx_2_parameters(struct fx_write_context *fx)
         put_u32(buffer, 0); /* Flags */
 
         put_u32(buffer, 0); /* Annotations count */
-        /* FIXME: write annotations */
+        if (has_annotations(var))
+            hlsl_fixme(ctx, &ctx->location, "Writing annotations for parameters is not implemented.");
 
         ++fx->parameter_count;
     }
@@ -864,6 +871,7 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write
     {
         HAS_EXPLICIT_BIND_POINT = 0x4,
     };
+    struct hlsl_ctx *ctx = fx->ctx;
 
     /* Explicit bind point. */
     if (var->reg_reservation.reg_type)
@@ -882,7 +890,8 @@ static void write_fx_4_numeric_variable(struct hlsl_ir_var *var, struct fx_write
     put_u32(buffer, flags); /* Flags */
 
     put_u32(buffer, 0); /* Annotations count */
-    /* FIXME: write annotations */
+    if (has_annotations(var))
+        hlsl_fixme(ctx, &ctx->location, "Writing annotations for numeric variables is not implemented.");
 }
 
 static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_context *fx)
@@ -933,7 +942,8 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
     }
 
     put_u32(buffer, 0); /* Annotations count */
-    /* FIXME: write annotations */
+    if (has_annotations(var))
+        hlsl_fixme(ctx, &ctx->location, "Writing annotations for object variables is not implemented.");
 
     ++fx->object_variable_count;
 }
