@@ -937,8 +937,8 @@ static void shader_print_subscript_range(struct vkd3d_d3d_asm_compiler *compiler
         vkd3d_string_buffer_printf(&compiler->buffer, "*]");
 }
 
-static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg,
-        bool is_declaration)
+static void shader_print_register(struct vkd3d_d3d_asm_compiler *compiler, const char *prefix,
+        const struct vkd3d_shader_register *reg, bool is_declaration, const char *suffix)
 {
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
     unsigned int offset = reg->idx[0].offset;
@@ -947,22 +947,23 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     static const char * const rastout_reg_names[] = {"oPos", "oFog", "oPts"};
     static const char * const misctype_reg_names[] = {"vPos", "vFace"};
 
-    shader_addline(buffer, "%s", reg->type == VKD3DSPR_LABEL ? compiler->colours.label : compiler->colours.reg);
+    vkd3d_string_buffer_printf(buffer, "%s%s", prefix,
+            reg->type == VKD3DSPR_LABEL ? compiler->colours.label : compiler->colours.reg);
     switch (reg->type)
     {
         case VKD3DSPR_TEMP:
-            shader_addline(buffer, "r");
+            vkd3d_string_buffer_printf(buffer, "r");
             break;
 
         case VKD3DSPR_INPUT:
-            shader_addline(buffer, "v");
+            vkd3d_string_buffer_printf(buffer, "v");
             break;
 
         case VKD3DSPR_CONST:
         case VKD3DSPR_CONST2:
         case VKD3DSPR_CONST3:
         case VKD3DSPR_CONST4:
-            shader_addline(buffer, "c");
+            vkd3d_string_buffer_printf(buffer, "c");
             offset = shader_get_float_offset(reg->type, offset);
             break;
 
@@ -972,205 +973,202 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
             break;
 
         case VKD3DSPR_RASTOUT:
-            shader_addline(buffer, "%s", rastout_reg_names[offset]);
+            vkd3d_string_buffer_printf(buffer, "%s", rastout_reg_names[offset]);
             break;
 
         case VKD3DSPR_COLOROUT:
-            shader_addline(buffer, "oC");
+            vkd3d_string_buffer_printf(buffer, "oC");
             break;
 
         case VKD3DSPR_DEPTHOUT:
-            shader_addline(buffer, "oDepth");
+            vkd3d_string_buffer_printf(buffer, "oDepth");
             break;
 
         case VKD3DSPR_DEPTHOUTGE:
-            shader_addline(buffer, "oDepthGE");
+            vkd3d_string_buffer_printf(buffer, "oDepthGE");
             break;
 
         case VKD3DSPR_DEPTHOUTLE:
-            shader_addline(buffer, "oDepthLE");
+            vkd3d_string_buffer_printf(buffer, "oDepthLE");
             break;
 
         case VKD3DSPR_ATTROUT:
-            shader_addline(buffer, "oD");
+            vkd3d_string_buffer_printf(buffer, "oD");
             break;
 
         case VKD3DSPR_TEXCRDOUT:
             /* Vertex shaders >= 3.0 use general purpose output registers
              * (VKD3DSPR_OUTPUT), which can include an address token. */
             if (vkd3d_shader_ver_ge(&compiler->shader_version, 3, 0))
-                shader_addline(buffer, "o");
+                vkd3d_string_buffer_printf(buffer, "o");
             else
-                shader_addline(buffer, "oT");
+                vkd3d_string_buffer_printf(buffer, "oT");
             break;
 
         case VKD3DSPR_CONSTINT:
-            shader_addline(buffer, "i");
+            vkd3d_string_buffer_printf(buffer, "i");
             break;
 
         case VKD3DSPR_CONSTBOOL:
-            shader_addline(buffer, "b");
+            vkd3d_string_buffer_printf(buffer, "b");
             break;
 
         case VKD3DSPR_LABEL:
-            shader_addline(buffer, "l");
+            vkd3d_string_buffer_printf(buffer, "l");
             break;
 
         case VKD3DSPR_LOOP:
-            shader_addline(buffer, "aL");
+            vkd3d_string_buffer_printf(buffer, "aL");
             break;
 
         case VKD3DSPR_COMBINED_SAMPLER:
         case VKD3DSPR_SAMPLER:
-            shader_addline(buffer, "s");
+            vkd3d_string_buffer_printf(buffer, "s");
             is_descriptor = true;
             break;
 
         case VKD3DSPR_MISCTYPE:
             if (offset > 1)
-            {
-                FIXME("Unhandled misctype register %u.\n", offset);
-                shader_addline(buffer, "<unhandled misctype %#x>", offset);
-            }
+                vkd3d_string_buffer_printf(buffer, "%s<unhandled misctype %#x>%s",
+                        compiler->colours.error, offset, compiler->colours.reset);
             else
-            {
-                shader_addline(buffer, "%s", misctype_reg_names[offset]);
-            }
+                vkd3d_string_buffer_printf(buffer, "%s", misctype_reg_names[offset]);
             break;
 
         case VKD3DSPR_PREDICATE:
-            shader_addline(buffer, "p");
+            vkd3d_string_buffer_printf(buffer, "p");
             break;
 
         case VKD3DSPR_IMMCONST:
-            shader_addline(buffer, "l");
+            vkd3d_string_buffer_printf(buffer, "l");
             break;
 
         case VKD3DSPR_IMMCONST64:
-            shader_addline(buffer, "d");
+            vkd3d_string_buffer_printf(buffer, "d");
             break;
 
         case VKD3DSPR_CONSTBUFFER:
-            shader_addline(buffer, "cb");
+            vkd3d_string_buffer_printf(buffer, "cb");
             is_descriptor = true;
             break;
 
         case VKD3DSPR_IMMCONSTBUFFER:
-            shader_addline(buffer, "icb");
+            vkd3d_string_buffer_printf(buffer, "icb");
             break;
 
         case VKD3DSPR_PRIMID:
-            shader_addline(buffer, "primID");
+            vkd3d_string_buffer_printf(buffer, "primID");
             break;
 
         case VKD3DSPR_NULL:
-            shader_addline(buffer, "null");
+            vkd3d_string_buffer_printf(buffer, "null");
             break;
 
         case VKD3DSPR_RASTERIZER:
-            shader_addline(buffer, "rasterizer");
+            vkd3d_string_buffer_printf(buffer, "rasterizer");
             break;
 
         case VKD3DSPR_RESOURCE:
-            shader_addline(buffer, "t");
+            vkd3d_string_buffer_printf(buffer, "t");
             is_descriptor = true;
             break;
 
         case VKD3DSPR_UAV:
-            shader_addline(buffer, "u");
+            vkd3d_string_buffer_printf(buffer, "u");
             is_descriptor = true;
             break;
 
         case VKD3DSPR_OUTPOINTID:
-            shader_addline(buffer, "vOutputControlPointID");
+            vkd3d_string_buffer_printf(buffer, "vOutputControlPointID");
             break;
 
         case VKD3DSPR_FORKINSTID:
-            shader_addline(buffer, "vForkInstanceId");
+            vkd3d_string_buffer_printf(buffer, "vForkInstanceId");
             break;
 
         case VKD3DSPR_JOININSTID:
-            shader_addline(buffer, "vJoinInstanceId");
+            vkd3d_string_buffer_printf(buffer, "vJoinInstanceId");
             break;
 
         case VKD3DSPR_INCONTROLPOINT:
-            shader_addline(buffer, "vicp");
+            vkd3d_string_buffer_printf(buffer, "vicp");
             break;
 
         case VKD3DSPR_OUTCONTROLPOINT:
-            shader_addline(buffer, "vocp");
+            vkd3d_string_buffer_printf(buffer, "vocp");
             break;
 
         case VKD3DSPR_PATCHCONST:
-            shader_addline(buffer, "vpc");
+            vkd3d_string_buffer_printf(buffer, "vpc");
             break;
 
         case VKD3DSPR_TESSCOORD:
-            shader_addline(buffer, "vDomainLocation");
+            vkd3d_string_buffer_printf(buffer, "vDomainLocation");
             break;
 
         case VKD3DSPR_GROUPSHAREDMEM:
-            shader_addline(buffer, "g");
+            vkd3d_string_buffer_printf(buffer, "g");
             break;
 
         case VKD3DSPR_THREADID:
-            shader_addline(buffer, "vThreadID");
+            vkd3d_string_buffer_printf(buffer, "vThreadID");
             break;
 
         case VKD3DSPR_THREADGROUPID:
-            shader_addline(buffer, "vThreadGroupID");
+            vkd3d_string_buffer_printf(buffer, "vThreadGroupID");
             break;
 
         case VKD3DSPR_LOCALTHREADID:
-            shader_addline(buffer, "vThreadIDInGroup");
+            vkd3d_string_buffer_printf(buffer, "vThreadIDInGroup");
             break;
 
         case VKD3DSPR_LOCALTHREADINDEX:
-            shader_addline(buffer, "vThreadIDInGroupFlattened");
+            vkd3d_string_buffer_printf(buffer, "vThreadIDInGroupFlattened");
             break;
 
         case VKD3DSPR_IDXTEMP:
-            shader_addline(buffer, "x");
+            vkd3d_string_buffer_printf(buffer, "x");
             break;
 
         case VKD3DSPR_STREAM:
-            shader_addline(buffer, "m");
+            vkd3d_string_buffer_printf(buffer, "m");
             break;
 
         case VKD3DSPR_FUNCTIONBODY:
-            shader_addline(buffer, "fb");
+            vkd3d_string_buffer_printf(buffer, "fb");
             break;
 
         case VKD3DSPR_FUNCTIONPOINTER:
-            shader_addline(buffer, "fp");
+            vkd3d_string_buffer_printf(buffer, "fp");
             break;
 
         case VKD3DSPR_COVERAGE:
-            shader_addline(buffer, "vCoverage");
+            vkd3d_string_buffer_printf(buffer, "vCoverage");
             break;
 
         case VKD3DSPR_SAMPLEMASK:
-            shader_addline(buffer, "oMask");
+            vkd3d_string_buffer_printf(buffer, "oMask");
             break;
 
         case VKD3DSPR_GSINSTID:
-            shader_addline(buffer, "vGSInstanceID");
+            vkd3d_string_buffer_printf(buffer, "vGSInstanceID");
             break;
 
         case VKD3DSPR_OUTSTENCILREF:
-            shader_addline(buffer, "oStencilRef");
+            vkd3d_string_buffer_printf(buffer, "oStencilRef");
             break;
 
         case VKD3DSPR_UNDEF:
-            shader_addline(buffer, "undef");
+            vkd3d_string_buffer_printf(buffer, "undef");
             break;
 
         case VKD3DSPR_SSA:
-            shader_addline(buffer, "sr");
+            vkd3d_string_buffer_printf(buffer, "sr");
             break;
 
         default:
-            shader_addline(buffer, "<unhandled_rtype(%#x)>", reg->type);
+            vkd3d_string_buffer_printf(buffer, "%s<unhandled register type %#x>%s",
+                    compiler->colours.error, reg->type, compiler->colours.reset);
             break;
     }
 
@@ -1189,7 +1187,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                 break;
         }
 
-        shader_addline(buffer, "%s(", compiler->colours.reset);
+        vkd3d_string_buffer_printf(buffer, "%s(", compiler->colours.reset);
         switch (reg->dimension)
         {
             case VSIR_DIMENSION_SCALAR:
@@ -1210,7 +1208,8 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_uint_literal(compiler, "", reg->u.immconst_u32[0], "");
                         break;
                     default:
-                        shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
+                        vkd3d_string_buffer_printf(buffer, "%s<unhandled data type %#x>%s",
+                                compiler->colours.error, reg->data_type, compiler->colours.reset);
                         break;
                 }
                 break;
@@ -1249,20 +1248,22 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
                         shader_print_uint_literal(compiler, ", ", reg->u.immconst_u32[3], "");
                         break;
                     default:
-                        shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
+                        vkd3d_string_buffer_printf(buffer, "%s<unhandled data type %#x>%s",
+                                compiler->colours.error, reg->data_type, compiler->colours.reset);
                         break;
                 }
                 break;
 
             default:
-                shader_addline(buffer, "<unhandled immconst dimension %#x>", reg->dimension);
+                vkd3d_string_buffer_printf(buffer, "%s<unhandled immconst dimension %#x>%s",
+                        compiler->colours.error, reg->dimension, compiler->colours.reset);
                 break;
         }
-        shader_addline(buffer, ")");
+        vkd3d_string_buffer_printf(buffer, ")");
     }
     else if (reg->type == VKD3DSPR_IMMCONST64)
     {
-        shader_addline(buffer, "%s(", compiler->colours.reset);
+        vkd3d_string_buffer_printf(buffer, "%s(", compiler->colours.reset);
         /* A double2 vector is treated as a float4 vector in enum vsir_dimension. */
         if (reg->dimension == VSIR_DIMENSION_SCALAR || reg->dimension == VSIR_DIMENSION_VEC4)
         {
@@ -1280,14 +1281,16 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
             }
             else
             {
-                shader_addline(buffer, "<unhandled data type %#x>", reg->data_type);
+                vkd3d_string_buffer_printf(buffer, "%s<unhandled data type %#x>%s",
+                        compiler->colours.error, reg->data_type, compiler->colours.reset);
             }
         }
         else
         {
-            shader_addline(buffer, "<unhandled immconst64 dimension %#x>", reg->dimension);
+            vkd3d_string_buffer_printf(buffer, "%s<unhandled immconst64 dimension %#x>%s",
+                    compiler->colours.error, reg->dimension, compiler->colours.reset);
         }
-        shader_addline(buffer, ")");
+        vkd3d_string_buffer_printf(buffer, ")");
     }
     else if (reg->type != VKD3DSPR_RASTOUT
             && reg->type != VKD3DSPR_MISCTYPE
@@ -1331,7 +1334,7 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
         }
         else
         {
-            shader_addline(buffer, "%s", compiler->colours.reset);
+            vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
         }
 
         if (reg->type == VKD3DSPR_FUNCTIONPOINTER)
@@ -1339,8 +1342,9 @@ static void shader_dump_register(struct vkd3d_d3d_asm_compiler *compiler, const 
     }
     else
     {
-        shader_addline(buffer, "%s", compiler->colours.reset);
+        vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
     }
+    vkd3d_string_buffer_printf(buffer, "%s", suffix);
 }
 
 static void shader_print_precision(struct vkd3d_d3d_asm_compiler *compiler, const struct vkd3d_shader_register *reg)
@@ -1444,8 +1448,7 @@ static void shader_print_dst_param(struct vkd3d_d3d_asm_compiler *compiler,
 {
     uint32_t write_mask = param->write_mask;
 
-    vkd3d_string_buffer_printf(&compiler->buffer, "%s", prefix);
-    shader_dump_register(compiler, &param->reg, is_declaration);
+    shader_print_register(compiler, prefix, &param->reg, is_declaration, "");
 
     if (write_mask && param->reg.dimension == VSIR_DIMENSION_VEC4)
     {
@@ -1468,6 +1471,7 @@ static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     struct vkd3d_string_buffer *buffer = &compiler->buffer;
     uint32_t swizzle = param->swizzle;
     const char *modifier = "";
+    bool is_abs = false;
 
     if (src_modifier == VKD3DSPSM_NEG
             || src_modifier == VKD3DSPSM_BIASNEG
@@ -1482,9 +1486,9 @@ static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
     vkd3d_string_buffer_printf(buffer, "%s%s", prefix, modifier);
 
     if (src_modifier == VKD3DSPSM_ABS || src_modifier == VKD3DSPSM_ABSNEG)
-        vkd3d_string_buffer_printf(buffer, "|");
+        is_abs = true;
 
-    shader_dump_register(compiler, &param->reg, false);
+    shader_print_register(compiler, is_abs ? "|" : "", &param->reg, false, "");
 
     switch (src_modifier)
     {
@@ -1543,7 +1547,7 @@ static void shader_print_src_param(struct vkd3d_d3d_asm_compiler *compiler,
                     swizzle_chars[swizzle_z], swizzle_chars[swizzle_w], compiler->colours.reset);
     }
 
-    if (src_modifier == VKD3DSPSM_ABS || src_modifier == VKD3DSPSM_ABSNEG)
+    if (is_abs)
         vkd3d_string_buffer_printf(buffer, "|");
 
     shader_print_precision(compiler, &param->reg);
@@ -1851,14 +1855,13 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.opcode);
             shader_dump_decl_usage(compiler, &ins->declaration.semantic, ins->flags);
             shader_dump_ins_modifiers(compiler, &ins->declaration.semantic.resource.reg);
-            vkd3d_string_buffer_printf(buffer, "%s ", compiler->colours.reset);
-            shader_dump_register(compiler, &ins->declaration.semantic.resource.reg.reg, true);
+            vkd3d_string_buffer_printf(buffer, "%s", compiler->colours.reset);
+            shader_print_register(compiler, " ", &ins->declaration.semantic.resource.reg.reg, true, "");
             shader_dump_register_space(compiler, ins->declaration.semantic.resource.range.space);
             break;
 
         case VKD3DSIH_DCL_CONSTANT_BUFFER:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_register(compiler, &ins->declaration.cb.src.reg, true);
+            shader_print_register(compiler, " ", &ins->declaration.cb.src.reg, true, "");
             if (vkd3d_shader_ver_ge(&compiler->shader_version, 6, 0))
                 shader_print_subscript(compiler, ins->declaration.cb.size, NULL);
             else if (vkd3d_shader_ver_ge(&compiler->shader_version, 5, 1))
@@ -1958,10 +1961,8 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
             break;
 
         case VKD3DSIH_DCL_SAMPLER:
-            vkd3d_string_buffer_printf(buffer, " ");
-            shader_dump_register(compiler, &ins->declaration.sampler.src.reg, true);
-            if (ins->flags == VKD3DSI_SAMPLER_COMPARISON_MODE)
-                shader_addline(buffer, ", comparisonMode");
+            shader_print_register(compiler, " ", &ins->declaration.sampler.src.reg, true,
+                    ins->flags == VKD3DSI_SAMPLER_COMPARISON_MODE ? ", comparisonMode" : "");
             shader_dump_register_space(compiler, ins->declaration.sampler.range.space);
             break;
 
