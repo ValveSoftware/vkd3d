@@ -1378,6 +1378,9 @@ static void shader_dump_reg_type(struct vkd3d_d3d_asm_compiler *compiler,
     if (!(compiler->flags & VSIR_ASM_FLAG_DUMP_TYPES))
         return;
 
+    if (reg->data_type == VKD3D_DATA_UNUSED)
+        return;
+
     if (reg->dimension < ARRAY_SIZE(dimensions))
         dimension = dimensions[reg->dimension];
     else
