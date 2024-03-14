@@ -330,37 +330,6 @@ static const char * const shader_opcode_names[] =
     [VKD3DSIH_XOR                             ] = "xor",
 };
 
-static const struct
-{
-    enum vkd3d_shader_input_sysval_semantic sysval_semantic;
-    const char *sysval_name;
-}
-shader_input_sysval_semantic_names[] =
-{
-    {VKD3D_SIV_POSITION,                   "position"},
-    {VKD3D_SIV_CLIP_DISTANCE,              "clip_distance"},
-    {VKD3D_SIV_CULL_DISTANCE,              "cull_distance"},
-    {VKD3D_SIV_RENDER_TARGET_ARRAY_INDEX,  "render_target_array_index"},
-    {VKD3D_SIV_VIEWPORT_ARRAY_INDEX,       "viewport_array_index"},
-    {VKD3D_SIV_VERTEX_ID,                  "vertex_id"},
-    {VKD3D_SIV_INSTANCE_ID,                "instance_id"},
-    {VKD3D_SIV_PRIMITIVE_ID,               "primitive_id"},
-    {VKD3D_SIV_IS_FRONT_FACE,              "is_front_face"},
-    {VKD3D_SIV_SAMPLE_INDEX,               "sample_index"},
-    {VKD3D_SIV_QUAD_U0_TESS_FACTOR,        "finalQuadUeq0EdgeTessFactor"},
-    {VKD3D_SIV_QUAD_V0_TESS_FACTOR,        "finalQuadVeq0EdgeTessFactor"},
-    {VKD3D_SIV_QUAD_U1_TESS_FACTOR,        "finalQuadUeq1EdgeTessFactor"},
-    {VKD3D_SIV_QUAD_V1_TESS_FACTOR,        "finalQuadVeq1EdgeTessFactor"},
-    {VKD3D_SIV_QUAD_U_INNER_TESS_FACTOR,   "finalQuadUInsideTessFactor"},
-    {VKD3D_SIV_QUAD_V_INNER_TESS_FACTOR,   "finalQuadVInsideTessFactor"},
-    {VKD3D_SIV_TRIANGLE_U_TESS_FACTOR,     "finalTriUeq0EdgeTessFactor"},
-    {VKD3D_SIV_TRIANGLE_V_TESS_FACTOR,     "finalTriVeq0EdgeTessFactor"},
-    {VKD3D_SIV_TRIANGLE_W_TESS_FACTOR,     "finalTriWeq0EdgeTessFactor"},
-    {VKD3D_SIV_TRIANGLE_INNER_TESS_FACTOR, "finalTriInsideTessFactor"},
-    {VKD3D_SIV_LINE_DETAIL_TESS_FACTOR,    "finalLineDetailTessFactor"},
-    {VKD3D_SIV_LINE_DENSITY_TESS_FACTOR,   "finalLineDensityTessFactor"},
-};
-
 struct vkd3d_d3d_asm_colours
 {
     const char *reset;
@@ -615,21 +584,54 @@ static void shader_print_tessellator_partitioning(struct vkd3d_d3d_asm_compiler 
     vkd3d_string_buffer_printf(buffer, "%s%s%s", prefix, partitioning, suffix);
 }
 
-static void shader_dump_shader_input_sysval_semantic(struct vkd3d_d3d_asm_compiler *compiler,
-        enum vkd3d_shader_input_sysval_semantic semantic)
+static void shader_print_input_sysval_semantic(struct vkd3d_d3d_asm_compiler *compiler,
+        const char *prefix, enum vkd3d_shader_input_sysval_semantic semantic, const char *suffix)
 {
     unsigned int i;
 
+    static const struct
+    {
+        enum vkd3d_shader_input_sysval_semantic sysval_semantic;
+        const char *sysval_name;
+    }
+    shader_input_sysval_semantic_names[] =
+    {
+        {VKD3D_SIV_POSITION,                   "position"},
+        {VKD3D_SIV_CLIP_DISTANCE,              "clip_distance"},
+        {VKD3D_SIV_CULL_DISTANCE,              "cull_distance"},
+        {VKD3D_SIV_RENDER_TARGET_ARRAY_INDEX,  "render_target_array_index"},
+        {VKD3D_SIV_VIEWPORT_ARRAY_INDEX,       "viewport_array_index"},
+        {VKD3D_SIV_VERTEX_ID,                  "vertex_id"},
+        {VKD3D_SIV_INSTANCE_ID,                "instance_id"},
+        {VKD3D_SIV_PRIMITIVE_ID,               "primitive_id"},
+        {VKD3D_SIV_IS_FRONT_FACE,              "is_front_face"},
+        {VKD3D_SIV_SAMPLE_INDEX,               "sample_index"},
+        {VKD3D_SIV_QUAD_U0_TESS_FACTOR,        "finalQuadUeq0EdgeTessFactor"},
+        {VKD3D_SIV_QUAD_V0_TESS_FACTOR,        "finalQuadVeq0EdgeTessFactor"},
+        {VKD3D_SIV_QUAD_U1_TESS_FACTOR,        "finalQuadUeq1EdgeTessFactor"},
+        {VKD3D_SIV_QUAD_V1_TESS_FACTOR,        "finalQuadVeq1EdgeTessFactor"},
+        {VKD3D_SIV_QUAD_U_INNER_TESS_FACTOR,   "finalQuadUInsideTessFactor"},
+        {VKD3D_SIV_QUAD_V_INNER_TESS_FACTOR,   "finalQuadVInsideTessFactor"},
+        {VKD3D_SIV_TRIANGLE_U_TESS_FACTOR,     "finalTriUeq0EdgeTessFactor"},
+        {VKD3D_SIV_TRIANGLE_V_TESS_FACTOR,     "finalTriVeq0EdgeTessFactor"},
+        {VKD3D_SIV_TRIANGLE_W_TESS_FACTOR,     "finalTriWeq0EdgeTessFactor"},
+        {VKD3D_SIV_TRIANGLE_INNER_TESS_FACTOR, "finalTriInsideTessFactor"},
+        {VKD3D_SIV_LINE_DETAIL_TESS_FACTOR,    "finalLineDetailTessFactor"},
+        {VKD3D_SIV_LINE_DENSITY_TESS_FACTOR,   "finalLineDensityTessFactor"},
+    };
+
     for (i = 0; i < ARRAY_SIZE(shader_input_sysval_semantic_names); ++i)
     {
-        if (shader_input_sysval_semantic_names[i].sysval_semantic == semantic)
-        {
-            vkd3d_string_buffer_printf(&compiler->buffer, "%s", shader_input_sysval_semantic_names[i].sysval_name);
-            return;
-        }
+        if (shader_input_sysval_semantic_names[i].sysval_semantic != semantic)
+            continue;
+
+        vkd3d_string_buffer_printf(&compiler->buffer, "%s%s%s",
+                prefix, shader_input_sysval_semantic_names[i].sysval_name, suffix);
+        return;
     }
 
-    vkd3d_string_buffer_printf(&compiler->buffer, "unknown_shader_input_sysval_semantic(%#x)", semantic);
+    vkd3d_string_buffer_printf(&compiler->buffer, "%s%s<unhandled input sysval semantic %#x>%s%s",
+            prefix, compiler->colours.error, semantic, compiler->colours.reset, suffix);
 }
 
 static void shader_dump_resource_type(struct vkd3d_d3d_asm_compiler *compiler, enum vkd3d_shader_resource_type type)
@@ -1920,16 +1922,14 @@ static void shader_dump_instruction(struct vkd3d_d3d_asm_compiler *compiler,
         case VKD3DSIH_DCL_INPUT_SIV:
         case VKD3DSIH_DCL_OUTPUT_SIV:
             shader_print_dst_param(compiler, " ", &ins->declaration.register_semantic.reg, true, "");
-            shader_addline(buffer, ", ");
-            shader_dump_shader_input_sysval_semantic(compiler, ins->declaration.register_semantic.sysval_semantic);
+            shader_print_input_sysval_semantic(compiler, ", ", ins->declaration.register_semantic.sysval_semantic, "");
             break;
 
         case VKD3DSIH_DCL_INPUT_PS_SIV:
             vkd3d_string_buffer_printf(buffer, " ");
             shader_dump_interpolation_mode(compiler, ins->flags);
             shader_print_dst_param(compiler, " ", &ins->declaration.register_semantic.reg, true, "");
-            shader_addline(buffer, ", ");
-            shader_dump_shader_input_sysval_semantic(compiler, ins->declaration.register_semantic.sysval_semantic);
+            shader_print_input_sysval_semantic(compiler, ", ", ins->declaration.register_semantic.sysval_semantic, "");
             break;
 
         case VKD3DSIH_DCL_INPUT:
