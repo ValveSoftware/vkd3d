@@ -312,7 +312,7 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
             value |= numeric_type_class[type->class];
             break;
         default:
-            hlsl_fixme(ctx, &ctx->location, "Not implemented for type class %u.\n", type->class);
+            hlsl_fixme(ctx, &ctx->location, "Not implemented for type class %u.", type->class);
             return 0;
     }
 
@@ -325,7 +325,7 @@ static uint32_t get_fx_4_numeric_type_description(const struct hlsl_type *type, 
             value |= (numeric_base_type[type->base_type] << NUMERIC_BASE_TYPE_SHIFT);
             break;
         default:
-            hlsl_fixme(ctx, &ctx->location, "Not implemented for base type %u.\n", type->base_type);
+            hlsl_fixme(ctx, &ctx->location, "Not implemented for base type %u.", type->base_type);
             return 0;
     }
 
@@ -426,7 +426,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
             put_u32_unaligned(buffer, variable_type[type->class]);
             break;
         default:
-            hlsl_fixme(ctx, &ctx->location, "Writing type class %u is not implemented.\n", type->class);
+            hlsl_fixme(ctx, &ctx->location, "Writing type class %u is not implemented.", type->class);
             return 0;
     }
 
@@ -508,7 +508,7 @@ static uint32_t write_fx_4_type(const struct hlsl_type *type, struct fx_write_co
                 put_u32_unaligned(buffer, uav_type[type->sampler_dim]);
                 break;
             default:
-                hlsl_fixme(ctx, &ctx->location, "Object type %u is not supported.\n", type->base_type);
+                hlsl_fixme(ctx, &ctx->location, "Object type %u is not supported.", type->base_type);
                 return 0;
         }
     }
@@ -928,7 +928,7 @@ static void write_fx_4_object_variable(struct hlsl_ir_var *var, struct fx_write_
             ++fx->shader_variable_count;
             break;
         default:
-            hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.\n",
+            hlsl_fixme(ctx, &ctx->location, "Writing initializer for object type %u is not implemented.",
                     type->base_type);
     }
 
