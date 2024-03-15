@@ -156,3 +156,26 @@ float4 main() : SV_TARGET
 [test]
 todo(glsl) draw quad
 probe all rgba (0.0, 1.0, 1.0, 1.0)
+
+
+[pixel shader todo(sm<4)]
+int a, b;
+
+float4 main() : SV_TARGET
+{
+    return float4(!(a && b), !!(a || b), !!!a, !(a < b));
+}
+
+[test]
+if(sm<4)  uniform 0 float 5
+if(sm<4)  uniform 4 float 0
+if(sm>=4) uniform 0 int 5
+if(sm>=4) uniform 1 int 0
+todo(sm<4 | glsl) draw quad
+probe all rgba (1.0, 1.0, 0.0, 1.0)
+if(sm<4)  uniform 0 float -1
+if(sm<4)  uniform 4 float 3
+if(sm>=4) uniform 0 int -1
+if(sm>=4) uniform 1 int 3
+todo(sm<4 | glsl) draw quad
+probe all rgba (0.0, 1.0, 0.0, 0.0)
