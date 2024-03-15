@@ -4268,6 +4268,17 @@ static enum vkd3d_result vsir_cfg_move_breaks_out_of_selections(struct vsir_cfg 
         --cfg->loop_intervals[else_target].target_count;
     }
 
+    /* If a branch becomes empty, make it the else branch, so we save a block. */
+    if (selection->u.selection.if_body.count == 0)
+    {
+        struct vsir_cfg_structure_list tmp;
+
+        selection->u.selection.invert_condition = !selection->u.selection.invert_condition;
+        tmp = selection->u.selection.if_body;
+        selection->u.selection.if_body = selection->u.selection.else_body;
+        selection->u.selection.else_body = tmp;
+    }
+
     return VKD3D_OK;
 }
 
