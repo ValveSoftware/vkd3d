@@ -423,6 +423,10 @@ struct hlsl_ir_var
     /* Scope that contains annotations for this variable. */
     struct hlsl_scope *annotations;
 
+    /* The state block on the variable's declaration, if any.
+     * These are only really used for effect profiles. */
+    struct hlsl_state_block *state_block;
+
     /* Indexes of the IR instructions where the variable is first written and last read (liveness
      *   range). The IR instructions are numerated starting from 2, because 0 means unused, and 1
      *   means function entry. */
@@ -456,6 +460,38 @@ struct hlsl_ir_var
     uint32_t is_uniform : 1;
     uint32_t is_param : 1;
     uint32_t is_separated_resource : 1;
+};
+
+/* This struct is used to represent assignments in state block entries:
+ *     name = {args[0], args[1], ...};
+ *       - or -
+ *     name = args[0]
+ *       - or -
+ *     name[lhs_index] = args[0]
+ *       - or -
+ *     name[lhs_index] = {args[0], args[1], ...};
+ */
+struct hlsl_state_block_entry
+{
+    /* For assignments, the name in the lhs. */
+    char *name;
+
+    /* Whether the lhs in the assignment is indexed and, in that case, its index. */
+    bool lhs_has_index;
+    unsigned int lhs_index;
+
+    /* Instructions present in the rhs. */
+    struct hlsl_block *instrs;
+
+    /* For assignments, arguments of the rhs initializer. */
+    struct hlsl_ir_node **args;
+    unsigned int args_count;
+};
+
+struct hlsl_state_block
+{
+    struct hlsl_state_block_entry **entries;
+    size_t count, capacity;
 };
 
 /* Sized array of variables representing a function's parameters. */
@@ -1216,6 +1252,7 @@ void hlsl_replace_node(struct hlsl_ir_node *old, struct hlsl_ir_node *new);
 void hlsl_free_attribute(struct hlsl_attribute *attr);
 void hlsl_free_instr(struct hlsl_ir_node *node);
 void hlsl_free_instr_list(struct list *list);
+void hlsl_free_state_block(struct hlsl_state_block *state_block);
 void hlsl_free_type(struct hlsl_type *type);
 void hlsl_free_var(struct hlsl_ir_var *decl);
 

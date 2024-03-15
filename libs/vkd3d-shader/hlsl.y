@@ -77,6 +77,8 @@ struct parse_variable_def
     struct hlsl_type *basic_type;
     uint32_t modifiers;
     struct vkd3d_shader_location modifiers_loc;
+
+    struct hlsl_state_block *state_block;
 };
 
 struct parse_function
@@ -112,6 +114,12 @@ struct parse_attribute_list
 {
     unsigned int count;
     const struct hlsl_attribute **attrs;
+};
+
+struct state_block_index
+{
+    bool has_index;
+    unsigned int index;
 };
 
 }
@@ -931,6 +939,8 @@ static void free_parse_variable_def(struct parse_variable_def *v)
     vkd3d_free(v->arrays.sizes);
     vkd3d_free(v->name);
     hlsl_cleanup_semantic(&v->semantic);
+    if (v->state_block)
+        hlsl_free_state_block(v->state_block);
     vkd3d_free(v);
 }
 
@@ -2347,6 +2357,9 @@ static struct hlsl_block *initialize_vars(struct hlsl_ctx *ctx, struct list *var
             free_parse_variable_def(v);
             continue;
         }
+
+        var->state_block = v->state_block;
+        v->state_block = NULL;
         type = var->data_type;
 
         if (v->initializer.args_count)
@@ -5252,6 +5265,16 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     hlsl_release_string_buffer(ctx, string);
 }
 
+static bool state_block_add_entry(struct hlsl_state_block *state_block, struct hlsl_state_block_entry *entry)
+{
+    if (!vkd3d_array_reserve((void **)&state_block->entries, &state_block->capacity, state_block->count + 1,
+            sizeof(*state_block->entries)))
+        return false;
+
+    state_block->entries[state_block->count++] = entry;
+    return true;
+}
+
 }
 
 %locations
@@ -5292,6 +5315,8 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
     struct parse_attribute_list attr_list;
     struct hlsl_ir_switch_case *switch_case;
     struct hlsl_scope *scope;
+    struct hlsl_state_block *state_block;
+    struct state_block_index state_block_index;
 }
 
 %token KW_BLENDSTATE
@@ -5493,6 +5518,7 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <name> var_identifier
 %type <name> name_opt
 
+
 %type <parameter> parameter
 
 %type <parameters> param_list
@@ -5504,6 +5530,10 @@ static void validate_uav_type(struct hlsl_ctx *ctx, enum hlsl_sampler_dim dim,
 %type <sampler_dim> texture_type texture_ms_type uav_type rov_type
 
 %type <semantic> semantic
+
+%type <state_block> state_block
+
+%type <state_block_index> state_block_index_opt
 
 %type <switch_case> switch_case
 
@@ -6649,22 +6679,54 @@ variable_decl:
             $$->reg_reservation = $3.reg_reservation;
         }
 
-state:
-      any_identifier '=' expr ';'
-        {
-            vkd3d_free($1);
-            destroy_block($3);
-        }
-
 state_block_start:
       %empty
         {
             ctx->in_state_block = 1;
         }
 
+state_block_index_opt:
+      %empty
+        {
+            $$.has_index = false;
+            $$.index = 0;
+        }
+    | '[' C_INTEGER ']'
+       {
+            if ($2 < 0)
+            {
+                hlsl_error(ctx, &@2, VKD3D_SHADER_ERROR_HLSL_INVALID_INDEX,
+                        "State block array index is not a positive integer constant.");
+                YYABORT;
+            }
+            $$.has_index = true;
+            $$.index = $2;
+       }
+
 state_block:
       %empty
-    | state_block state
+        {
+            if (!($$ = hlsl_alloc(ctx, sizeof(*$$))))
+                YYABORT;
+        }
+    | state_block any_identifier state_block_index_opt '=' complex_initializer ';'
+        {
+            struct hlsl_state_block_entry *entry;
+
+            if (!(entry = hlsl_alloc(ctx, sizeof(*entry))))
+                YYABORT;
+
+            entry->name = $2;
+            entry->lhs_has_index = $3.has_index;
+            entry->lhs_index = $3.index;
+
+            entry->instrs = $5.instrs;
+            entry->args = $5.args;
+            entry->args_count = $5.args_count;
+
+            $$ = $1;
+            state_block_add_entry($$, entry);
+        }
 
 variable_def:
       variable_decl
@@ -6676,6 +6738,7 @@ variable_def:
     | variable_decl '{' state_block_start state_block '}'
         {
             $$ = $1;
+            $$->state_block = $4;
             ctx->in_state_block = 0;
         }
 

@@ -134,6 +134,26 @@ struct hlsl_ir_var *hlsl_get_var(struct hlsl_scope *scope, const char *name)
     return hlsl_get_var(scope->upper, name);
 }
 
+static void free_state_block_entry(struct hlsl_state_block_entry *entry)
+{
+    vkd3d_free(entry->name);
+    vkd3d_free(entry->args);
+    hlsl_block_cleanup(entry->instrs);
+    vkd3d_free(entry->instrs);
+    vkd3d_free(entry);
+}
+
+void hlsl_free_state_block(struct hlsl_state_block *state_block)
+{
+    unsigned int k;
+
+    assert(state_block);
+    for (k = 0; k < state_block->count; ++k)
+        free_state_block_entry(state_block->entries[k]);
+    vkd3d_free(state_block->entries);
+    vkd3d_free(state_block);
+}
+
 void hlsl_free_var(struct hlsl_ir_var *decl)
 {
     unsigned int k;
@@ -142,6 +162,11 @@ void hlsl_free_var(struct hlsl_ir_var *decl)
     hlsl_cleanup_semantic(&decl->semantic);
     for (k = 0; k <= HLSL_REGSET_LAST_OBJECT; ++k)
         vkd3d_free((void *)decl->objects_usage[k]);
+    if (decl->state_block)
+    {
+        hlsl_free_state_block(decl->state_block);
+        decl->state_block = NULL;
+    }
     vkd3d_free(decl);
 }
 
@@ -3658,6 +3683,20 @@ static void hlsl_ctx_cleanup(struct hlsl_ctx *ctx)
     vkd3d_string_buffer_cache_cleanup(&ctx->string_buffers);
 
     rb_destroy(&ctx->functions, free_function_rb, NULL);
+
+    /* State blocks must be free before the variables, because they contain instructions that may
+     * refer to them. */
+    LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &ctx->scopes, struct hlsl_scope, entry)
+    {
+        LIST_FOR_EACH_ENTRY_SAFE(var, next_var, &scope->vars, struct hlsl_ir_var, scope_entry)
+        {
+            if (var->state_block)
+            {
+                hlsl_free_state_block(var->state_block);
+                var->state_block = NULL;
+            }
+        }
+    }
 
     LIST_FOR_EACH_ENTRY_SAFE(scope, next_scope, &ctx->scopes, struct hlsl_scope, entry)
     {
