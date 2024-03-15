@@ -2919,6 +2919,9 @@ static bool lower_logic_not(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, st
     arg = expr->operands[0].node;
     float_type = hlsl_get_vector_type(ctx, HLSL_TYPE_FLOAT, arg->data_type->dimx);
 
+    /* If this is happens, it means we failed to cast the argument to boolean somewhere. */
+    assert(arg->data_type->base_type == HLSL_TYPE_BOOL);
+
     if (!(arg_cast = hlsl_new_cast(ctx, arg, float_type, &arg->loc)))
         return false;
     hlsl_block_add_instr(block, arg_cast);

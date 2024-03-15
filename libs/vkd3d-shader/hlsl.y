@@ -438,8 +438,9 @@ static uint32_t add_modifiers(struct hlsl_ctx *ctx, uint32_t modifiers, uint32_t
 
 static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *cond_block)
 {
-    struct hlsl_ir_node *condition, *not, *iff, *jump;
+    struct hlsl_ir_node *condition, *cast, *not, *iff, *jump;
     struct hlsl_block then_block;
+    struct hlsl_type *bool_type;
 
     /* E.g. "for (i = 0; ; ++i)". */
     if (list_empty(&cond_block->instrs))
@@ -449,7 +450,12 @@ static bool append_conditional_break(struct hlsl_ctx *ctx, struct hlsl_block *co
 
     check_condition_type(ctx, condition);
 
-    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, condition, &condition->loc)))
+    bool_type = hlsl_get_scalar_type(ctx, HLSL_TYPE_BOOL);
+    if (!(cast = hlsl_new_cast(ctx, condition, bool_type, &condition->loc)))
+        return false;
+    hlsl_block_add_instr(cond_block, cast);
+
+    if (!(not = hlsl_new_unary_expr(ctx, HLSL_OP1_LOGIC_NOT, cast, &condition->loc)))
         return false;
     hlsl_block_add_instr(cond_block, not);
 
