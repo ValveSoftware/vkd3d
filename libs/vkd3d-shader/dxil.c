@@ -410,6 +410,7 @@ enum dx_intrinsic_opcode
     DX_GROUP_ID                     =  94,
     DX_THREAD_ID_IN_GROUP           =  95,
     DX_FLATTENED_THREAD_ID_IN_GROUP =  96,
+    DX_MAKE_DOUBLE                  = 101,
     DX_SPLIT_DOUBLE                 = 102,
     DX_LEGACY_F32TOF16              = 130,
     DX_LEGACY_F16TOF32              = 131,
@@ -2369,6 +2370,12 @@ static void src_param_init_scalar(struct vkd3d_shader_src_param *param, unsigned
     param->swizzle = vkd3d_shader_create_swizzle(component_idx, component_idx, component_idx, component_idx);
     if (data_type_is_64_bit(param->reg.data_type))
         param->swizzle &= VKD3D_SHADER_SWIZZLE_64_MASK;
+    param->modifiers = VKD3DSPSM_NONE;
+}
+
+static void src_param_init_vector(struct vkd3d_shader_src_param *param, unsigned int component_count)
+{
+    param->swizzle = VKD3D_SHADER_NO_SWIZZLE & ((1ull << VKD3D_SHADER_SWIZZLE_SHIFT(component_count)) - 1);
     param->modifiers = VKD3DSPSM_NONE;
 }
 
@@ -4699,6 +4706,26 @@ static void sm6_parser_emit_dx_load_input(struct sm6_parser *sm6, enum dx_intrin
     instruction_dst_param_init_ssa_scalar(ins, sm6);
 }
 
+static void sm6_parser_emit_dx_make_double(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
+        const struct sm6_value **operands, struct function_emission_state *state)
+{
+    struct vkd3d_shader_src_param *src_params;
+    struct vkd3d_shader_instruction *ins;
+    struct vkd3d_shader_register reg;
+
+    if (!sm6_parser_emit_composite_construct(sm6, &operands[0], 2, state, &reg))
+        return;
+
+    ins = state->ins;
+    vsir_instruction_init(ins, &sm6->p.location, VKD3DSIH_MOV);
+    if (!(src_params = instruction_src_params_alloc(ins, 1, sm6)))
+        return;
+    src_params[0].reg = reg;
+    src_param_init_vector(&src_params[0], 2);
+
+    instruction_dst_param_init_ssa_scalar(ins, sm6);
+}
+
 static void sm6_parser_emit_dx_raw_buffer_load(struct sm6_parser *sm6, enum dx_intrinsic_opcode op,
         const struct sm6_value **operands, struct function_emission_state *state)
 {
@@ -5356,6 +5383,7 @@ static const struct sm6_dx_opcode_info sm6_dx_op_table[] =
     [DX_LEGACY_F32TOF16               ] = {"i", "f",    sm6_parser_emit_dx_unary},
     [DX_LOAD_INPUT                    ] = {"o", "ii8i", sm6_parser_emit_dx_load_input},
     [DX_LOG                           ] = {"g", "R",    sm6_parser_emit_dx_unary},
+    [DX_MAKE_DOUBLE                   ] = {"d", "ii",   sm6_parser_emit_dx_make_double},
     [DX_RAW_BUFFER_LOAD               ] = {"o", "Hii8i", sm6_parser_emit_dx_raw_buffer_load},
     [DX_RAW_BUFFER_STORE              ] = {"v", "Hiioooocc", sm6_parser_emit_dx_raw_buffer_store},
     [DX_ROUND_NE                      ] = {"g", "R",    sm6_parser_emit_dx_unary},
