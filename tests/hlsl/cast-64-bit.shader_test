@@ -36,6 +36,37 @@ todo(sm<6) draw quad
 probe all rgbaui (0, 0xc0120000, 0x80000000, 0x40210000)
 
 
+[pixel shader todo]
+uniform uint4 u;
+
+float4 main() : sv_target
+{
+    // Low bits, high bits
+    double2 d = asdouble(u.xz, u.yw);
+    return float4(d, 0, 0);
+}
+
+[test]
+uniform 0 uint4 0xc000000 0x40020000 0x80000000 0xc04be000
+todo draw quad
+probe all rgba (2.25, -55.75001526, 0.0, 0.0) 1
+
+
+[pixel shader todo]
+uniform uint2 u;
+
+float4 main() : sv_target
+{
+    double d = asdouble(u.x, u.y);
+    return float4(d, 0, 0, 0);
+}
+
+[test]
+uniform 0 uint4 0x80000000 0xc04be000 0 0
+todo draw quad
+probe all rgba (-55.75001526, 0.0, 0.0, 0.0) 1
+
+
 [require]
 shader model >= 6.0
 int64
