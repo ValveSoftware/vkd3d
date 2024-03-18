@@ -302,8 +302,10 @@ enum vkd3d_shader_compile_option_name
     /**
      * If \a value is non-zero compilation will produce a child effect using
      * shared object descriptions, as instructed by the "shared" modifier.
-     * Child effects are supported with fx_2_0, fx_4_0, and fx_4_1. This option
-     * and "shared" modifiers are ignored for fx_5_0 profile, and non-fx profiles.
+     * Child effects are supported with fx_4_0, and fx_4_1 profiles. This option
+     * and "shared" modifiers are ignored for the fx_5_0 profile and non-fx profiles.
+     * The fx_2_0 profile does not have a separate concept of child effects, variables
+     * marked with "shared" modifier will be marked as such in a binary.
      *
      * \since 1.12
      */
