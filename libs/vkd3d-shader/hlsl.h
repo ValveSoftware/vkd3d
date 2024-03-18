@@ -298,6 +298,7 @@ enum hlsl_ir_node_type
     HLSL_IR_STORE,
     HLSL_IR_SWIZZLE,
     HLSL_IR_SWITCH,
+    HLSL_IR_STATEBLOCK_CONSTANT,
 };
 
 /* Common data for every type of IR instruction node. */
@@ -785,6 +786,14 @@ struct hlsl_ir_constant
     struct hlsl_reg reg;
 };
 
+/* Stateblock constants are undeclared values found on state blocks or technique passes descriptions,
+ *   that do not concern regular pixel, vertex, or compute shaders, except for parsing. */
+struct hlsl_ir_stateblock_constant
+{
+    struct hlsl_ir_node node;
+    char *name;
+};
+
 struct hlsl_scope
 {
     /* Item entry for hlsl_ctx.scopes. */
@@ -1058,6 +1067,12 @@ static inline struct hlsl_ir_switch *hlsl_ir_switch(const struct hlsl_ir_node *n
 {
     assert(node->type == HLSL_IR_SWITCH);
     return CONTAINING_RECORD(node, struct hlsl_ir_switch, node);
+}
+
+static inline struct hlsl_ir_stateblock_constant *hlsl_ir_stateblock_constant(const struct hlsl_ir_node *node)
+{
+    assert(node->type == HLSL_IR_STATEBLOCK_CONSTANT);
+    return CONTAINING_RECORD(node, struct hlsl_ir_stateblock_constant, node);
 }
 
 static inline void hlsl_block_init(struct hlsl_block *block)
@@ -1334,6 +1349,8 @@ struct hlsl_type *hlsl_new_struct_type(struct hlsl_ctx *ctx, const char *name,
         struct hlsl_struct_field *fields, size_t field_count);
 struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned int components,
         struct hlsl_ir_node *val, const struct vkd3d_shader_location *loc);
+struct hlsl_ir_node *hlsl_new_stateblock_constant(struct hlsl_ctx *ctx, const char *name,
+        struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var(struct hlsl_ctx *ctx, const char *template,
         struct hlsl_type *type, const struct vkd3d_shader_location *loc);
 struct hlsl_ir_var *hlsl_new_synthetic_var_named(struct hlsl_ctx *ctx, const char *name,

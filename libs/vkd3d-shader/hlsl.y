@@ -1294,6 +1294,7 @@ static unsigned int evaluate_static_expression_as_uint(struct hlsl_ctx *ctx, str
             case HLSL_IR_RESOURCE_STORE:
             case HLSL_IR_STORE:
             case HLSL_IR_SWITCH:
+            case HLSL_IR_STATEBLOCK_CONSTANT:
                 hlsl_error(ctx, &node->loc, VKD3D_SHADER_ERROR_HLSL_INVALID_SYNTAX,
                         "Expected literal expression.");
         }
@@ -7365,15 +7366,13 @@ primary_expr:
         {
             if (ctx->in_state_block)
             {
-                struct hlsl_ir_load *load;
-                struct hlsl_ir_var *var;
+                struct hlsl_ir_node *constant;
 
-                if (!(var = hlsl_new_synthetic_var(ctx, "state_block_expr",
-                        hlsl_get_scalar_type(ctx, HLSL_TYPE_INT), &@1)))
+                if (!(constant = hlsl_new_stateblock_constant(ctx, $1, &@1)))
                     YYABORT;
-                if (!(load = hlsl_new_var_load(ctx, var, &@1)))
-                    YYABORT;
-                if (!($$ = make_block(ctx, &load->node)))
+                vkd3d_free($1);
+
+                if (!($$ = make_block(ctx, constant)))
                     YYABORT;
             }
             else

@@ -3746,6 +3746,9 @@ static bool dce(struct hlsl_ctx *ctx, struct hlsl_ir_node *instr, void *context)
         case HLSL_IR_RESOURCE_STORE:
         case HLSL_IR_SWITCH:
             break;
+        case HLSL_IR_STATEBLOCK_CONSTANT:
+            /* Stateblock constants should not appear in the shader program. */
+            vkd3d_unreachable();
     }
 
     return false;
@@ -3868,6 +3871,9 @@ static void compute_liveness_recurse(struct hlsl_block *block, unsigned int loop
         {
         case HLSL_IR_CALL:
             /* We should have inlined all calls before computing liveness. */
+            vkd3d_unreachable();
+        case HLSL_IR_STATEBLOCK_CONSTANT:
+            /* Stateblock constants should not appear in the shader program. */
             vkd3d_unreachable();
 
         case HLSL_IR_STORE:

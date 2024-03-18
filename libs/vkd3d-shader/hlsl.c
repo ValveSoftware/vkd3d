@@ -1586,6 +1586,27 @@ struct hlsl_ir_node *hlsl_new_swizzle(struct hlsl_ctx *ctx, uint32_t s, unsigned
     return &swizzle->node;
 }
 
+struct hlsl_ir_node *hlsl_new_stateblock_constant(struct hlsl_ctx *ctx, const char *name,
+        struct vkd3d_shader_location *loc)
+{
+    struct hlsl_ir_stateblock_constant *constant;
+    struct hlsl_type *type = hlsl_get_scalar_type(ctx, HLSL_TYPE_INT);
+
+    if (!(constant = hlsl_alloc(ctx, sizeof(*constant))))
+        return NULL;
+
+    init_node(&constant->node, HLSL_IR_STATEBLOCK_CONSTANT, type, loc);
+
+    if (!(constant->name = hlsl_alloc(ctx, strlen(name) + 1)))
+    {
+        vkd3d_free(constant);
+        return NULL;
+    }
+    strcpy(constant->name, name);
+
+    return &constant->node;
+}
+
 bool hlsl_index_is_noncontiguous(struct hlsl_ir_index *index)
 {
     struct hlsl_type *type = index->val.node->data_type;
@@ -1909,6 +1930,12 @@ static struct hlsl_ir_node *clone_index(struct hlsl_ctx *ctx, struct clone_instr
     return dst;
 }
 
+static struct hlsl_ir_node *clone_stateblock_constant(struct hlsl_ctx *ctx,
+        struct clone_instr_map *map, struct hlsl_ir_stateblock_constant *constant)
+{
+    return hlsl_new_stateblock_constant(ctx, constant->name, &constant->node.loc);
+}
+
 void hlsl_free_ir_switch_case(struct hlsl_ir_switch_case *c)
 {
     hlsl_block_cleanup(&c->body);
@@ -2004,6 +2031,9 @@ static struct hlsl_ir_node *clone_instr(struct hlsl_ctx *ctx,
 
         case HLSL_IR_SWIZZLE:
             return clone_swizzle(ctx, map, hlsl_ir_swizzle(instr));
+
+        case HLSL_IR_STATEBLOCK_CONSTANT:
+            return clone_stateblock_constant(ctx, map, hlsl_ir_stateblock_constant(instr));
     }
 
     vkd3d_unreachable();
@@ -2835,6 +2865,12 @@ static void dump_ir_index(struct vkd3d_string_buffer *buffer, const struct hlsl_
     vkd3d_string_buffer_printf(buffer, "]");
 }
 
+static void dump_ir_stateblock_constant(struct vkd3d_string_buffer *buffer,
+        const struct hlsl_ir_stateblock_constant *constant)
+{
+    vkd3d_string_buffer_printf(buffer, "%s", constant->name);
+}
+
 static void dump_ir_switch(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer, const struct hlsl_ir_switch *s)
 {
     struct hlsl_ir_switch_case *c;
@@ -2922,6 +2958,10 @@ static void dump_instr(struct hlsl_ctx *ctx, struct vkd3d_string_buffer *buffer,
 
         case HLSL_IR_SWIZZLE:
             dump_ir_swizzle(buffer, hlsl_ir_swizzle(instr));
+            break;
+
+        case HLSL_IR_STATEBLOCK_CONSTANT:
+            dump_ir_stateblock_constant(buffer, hlsl_ir_stateblock_constant(instr));
             break;
     }
 }
@@ -3095,6 +3135,12 @@ static void free_ir_index(struct hlsl_ir_index *index)
     vkd3d_free(index);
 }
 
+static void free_ir_stateblock_constant(struct hlsl_ir_stateblock_constant *constant)
+{
+    vkd3d_free(constant->name);
+    vkd3d_free(constant);
+}
+
 void hlsl_free_instr(struct hlsl_ir_node *node)
 {
     assert(list_empty(&node->uses));
@@ -3151,6 +3197,10 @@ void hlsl_free_instr(struct hlsl_ir_node *node)
 
         case HLSL_IR_SWITCH:
             free_ir_switch(hlsl_ir_switch(node));
+            break;
+
+        case HLSL_IR_STATEBLOCK_CONSTANT:
+            free_ir_stateblock_constant(hlsl_ir_stateblock_constant(node));
             break;
     }
 }
