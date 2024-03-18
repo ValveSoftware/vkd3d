@@ -3010,6 +3010,7 @@ struct vsir_cfg_structure
             unsigned int target;
             struct vkd3d_shader_src_param *condition;
             bool invert_condition;
+            bool needs_launcher;
         } jump;
     } u;
 };
@@ -3304,8 +3305,9 @@ static void vsir_cfg_structure_dump(struct vsir_cfg *cfg, struct vsir_cfg_struct
                     vkd3d_unreachable();
             }
 
-            TRACE("%s%s%s %u\n", cfg->debug_buffer.buffer, type_str,
-                    structure->u.jump.condition ? "c" : "", structure->u.jump.target);
+            TRACE("%s%s%s %u%s\n", cfg->debug_buffer.buffer, type_str,
+                    structure->u.jump.condition ? "c" : "", structure->u.jump.target,
+                    structure->u.jump.needs_launcher ? "  # launch" : "");
             break;
         }
 
@@ -4551,6 +4553,45 @@ static void vsir_cfg_mark_trampolines(struct vsir_cfg *cfg, struct vsir_cfg_stru
     }
 }
 
+/* Launchers are the counterpart of trampolines. A launcher is inserted just before a jump, and
+ * writes in a well-known variable what is the target of the jump. Trampolines will then read that
+ * variable to decide how to redirect the jump to its intended target. A launcher is needed each
+ * time the innermost loop containing the jump itself has a trampoline (independently of whether the
+ * jump is targeting that loop or not). */
+static void vsir_cfg_mark_launchers(struct vsir_cfg *cfg, struct vsir_cfg_structure_list *list,
+        struct vsir_cfg_structure *loop)
+{
+    size_t i;
+
+    for (i = 0; i < list->count; ++i)
+    {
+        struct vsir_cfg_structure *structure = &list->structures[i];
+
+        switch (structure->type)
+        {
+            case STRUCTURE_TYPE_BLOCK:
+                break;
+
+            case STRUCTURE_TYPE_LOOP:
+                vsir_cfg_mark_launchers(cfg, &structure->u.loop.body, structure);
+                break;
+
+            case STRUCTURE_TYPE_SELECTION:
+                vsir_cfg_mark_launchers(cfg, &structure->u.selection.if_body, loop);
+                vsir_cfg_mark_launchers(cfg, &structure->u.selection.else_body, loop);
+                break;
+
+            case STRUCTURE_TYPE_JUMP:
+                if (structure->u.jump.type != JUMP_BREAK && structure->u.jump.type != JUMP_CONTINUE)
+                    break;
+                assert(loop && loop->type == STRUCTURE_TYPE_LOOP);
+                if (loop->u.loop.needs_trampoline)
+                    structure->u.jump.needs_launcher = true;
+                break;
+        }
+    }
+}
+
 static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
 {
     enum vkd3d_result ret;
@@ -4559,7 +4600,13 @@ static enum vkd3d_result vsir_cfg_optimize(struct vsir_cfg *cfg)
 
     ret = vsir_cfg_optimize_recurse(cfg, &cfg->structured_program);
 
+    /* Trampolines and launchers cannot be marked with the same pass,
+     * because a jump might have to be marked as launcher even when it
+     * targets its innermost loop, if other jumps in the same loop
+     * need a trampoline anyway. So launchers can be discovered only
+     * once all the trampolines are known. */
     vsir_cfg_mark_trampolines(cfg, &cfg->structured_program, NULL);
+    vsir_cfg_mark_launchers(cfg, &cfg->structured_program, NULL);
 
     if (TRACE_ON())
         vsir_cfg_dump_structured_program(cfg);
@@ -4746,7 +4793,7 @@ static enum vkd3d_result vsir_cfg_structure_list_emit_jump(struct vsir_cfg *cfg,
     if (!reserve_instructions(&target->instructions, &target->ins_capacity, target->ins_count + 2))
         return VKD3D_ERROR_OUT_OF_MEMORY;
 
-    if (opcode == VKD3DSIH_BREAK || opcode == VKD3DSIH_BREAKP)
+    if (jump->needs_launcher)
     {
         if (!vsir_instruction_init_with_params(cfg->program, &target->instructions[target->ins_count],
                 &no_loc, VKD3DSIH_MOV, 1, 1))
